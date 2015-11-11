@@ -161,7 +161,6 @@ BackgroundSync::BackgroundSync()
                          std::numeric_limits<long long>::max()),
       _lastFetchedHash(0),
       _pause(true),
-      _appliedBuffer(true),
       _replCoord(getGlobalReplicationCoordinator()),
       _initialSyncRequestedFlag(false),
       _indexPrefetchConfig(PREFETCH_ALL) {}
@@ -181,20 +180,6 @@ void BackgroundSync::shutdown() {
     invariant(inShutdown());
     clearBuffer();
     _pause = true;
-
-    // Wake up producerThread so it notices that we're in shutdown
-    _appliedBufferCondition.notify_all();
-    _pausedCondition.notify_all();
-}
-
-void BackgroundSync::notify(OperationContext* txn) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-
-    // If all ops in the buffer have been applied, unblock waitForRepl (if it's waiting)
-    if (_buffer.empty()) {
-        _appliedBuffer = true;
-        _appliedBufferCondition.notify_all();
-    }
 }
 
 void BackgroundSync::producerThread() {
@@ -505,11 +490,6 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
             sleepsecs(20);
         }
 
-        {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
-            _appliedBuffer = false;
-        }
-
         OCCASIONALLY {
             LOG(2) << "bgsync buffer has " << _buffer.size() << " bytes";
         }
@@ -647,8 +627,6 @@ void BackgroundSync::stop() {
     _syncSourceHost = HostAndPort();
     _lastOpTimeFetched = OpTime();
     _lastFetchedHash = 0;
-    _appliedBufferCondition.notify_all();
-    _pausedCondition.notify_all();
 }
 
 void BackgroundSync::start(OperationContext* txn) {
@@ -668,13 +646,6 @@ void BackgroundSync::start(OperationContext* txn) {
 bool BackgroundSync::isPaused() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _pause;
-}
-
-void BackgroundSync::waitUntilPaused() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    while (!_pause) {
-        _pausedCondition.wait(lock);
-    }
 }
 
 void BackgroundSync::clearBuffer() {

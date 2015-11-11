@@ -87,12 +87,8 @@ public:
 
 
     void shutdown();
-    void notify(OperationContext* txn);
 
     bool isPaused() const;
-
-    // Blocks until _pause becomes true from a call to stop() or shutdown()
-    void waitUntilPaused();
 
     virtual ~BackgroundSync() {}
 
@@ -158,9 +154,6 @@ private:
 
     // if produce thread should be running
     bool _pause;
-    stdx::condition_variable _pausedCondition;
-    bool _appliedBuffer;
-    stdx::condition_variable _appliedBufferCondition;
 
     HostAndPort _syncSourceHost;
 

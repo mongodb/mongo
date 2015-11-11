@@ -439,10 +439,6 @@ Status _initialSync() {
     // Clear the initial sync flag -- cannot be done under a db lock, or recursive.
     clearInitialSyncFlag(&txn);
 
-    // If we just cloned & there were no ops applied, we still want the primary to know where
-    // we're up to
-    bgsync->notify(&txn);
-
     log() << "initial sync done";
     return Status::OK();
 }
