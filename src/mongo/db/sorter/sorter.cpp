@@ -49,11 +49,14 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <snappy.h>
+#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/util/assert_util.h"
@@ -217,11 +220,27 @@ private:
 
         // negative size means compressed
         const bool compressed = rawSize < 0;
-        const int32_t blockSize = std::abs(rawSize);
+        int32_t blockSize = std::abs(rawSize);
 
         _buffer.reset(new char[blockSize]);
         read(_buffer.get(), blockSize);
         massert(16816, "file too short?", !_done);
+
+        auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
+        if (hooks->enabled()) {
+            std::unique_ptr<char[]> out(new char[blockSize]);
+            size_t outLen;
+            Status status = hooks->unprotectTmpData(reinterpret_cast<uint8_t*>(_buffer.get()),
+                                                    blockSize,
+                                                    reinterpret_cast<uint8_t*>(out.get()),
+                                                    blockSize,
+                                                    &outLen);
+            massert(28841,
+                    str::stream() << "Failed to unprotect data: " << status.toString(),
+                    status.isOK());
+            blockSize = outLen;
+            _buffer.swap(out);
+        }
 
         if (!compressed) {
             _reader.reset(new BufReader(_buffer.get(), blockSize));
@@ -841,23 +860,46 @@ template <typename Key, typename Value>
 void SortedFileWriter<Key, Value>::spill() {
     namespace str = mongoutils::str;
 
-    if (_buffer.len() == 0)
+    int32_t size = _buffer.len();
+    char* outBuffer = _buffer.buf();
+
+    if (size == 0)
         return;
 
     std::string compressed;
-    snappy::Compress(_buffer.buf(), _buffer.len(), &compressed);
+    snappy::Compress(outBuffer, size, &compressed);
     verify(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
 
+    const bool shouldCompress = compressed.size() < size_t(_buffer.len() / 10 * 9);
+    if (shouldCompress) {
+        size = compressed.size();
+        outBuffer = const_cast<char*>(compressed.data());
+    }
+
+    std::unique_ptr<char[]> out;
+    auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
+    if (hooks->enabled()) {
+        size_t protectedSizeMax = size + hooks->additionalBytesForProtectedBuffer();
+        out.reset(new char[protectedSizeMax]);
+        size_t resultLen;
+        Status status = hooks->protectTmpData(reinterpret_cast<const uint8_t*>(outBuffer),
+                                              size,
+                                              reinterpret_cast<uint8_t*>(out.get()),
+                                              protectedSizeMax,
+                                              &resultLen);
+        massert(28842,
+                str::stream() << "Failed to compress data: " << status.toString(),
+                status.isOK());
+        outBuffer = out.get();
+        size = resultLen;
+    }
+
+    // negative size means compressed
+    size = shouldCompress ? -size : size;
     try {
-        if (compressed.size() < size_t(_buffer.len() / 10 * 9)) {
-            const int32_t size = -int32_t(compressed.size());  // negative means compressed
-            _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
-            _file.write(compressed.data(), compressed.size());
-        } else {
-            const int32_t size = _buffer.len();
-            _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
-            _file.write(_buffer.buf(), _buffer.len());
-        }
+        _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+        _file.write(outBuffer, std::abs(size));
+
     } catch (const std::exception&) {
         msgasserted(16821,
                     str::stream() << "error writing to file \"" << _fileName

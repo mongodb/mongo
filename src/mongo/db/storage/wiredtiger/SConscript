@@ -1,6 +1,17 @@
 Import("env")
 Import("wiredtiger")
 
+env.Library(
+    target='storage_wiredtiger_customization_hooks',
+    source= ['wiredtiger_customization_hooks.cpp'],
+    LIBDEPS= ['$BUILD_DIR/mongo/base',
+              '$BUILD_DIR/mongo/db/service_context'],
+    PROGDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongod',
+        '$BUILD_DIR/mongo/mongos',
+    ],
+    )
+
 if wiredtiger:
     wtEnv = env.Clone()
     wtEnv.InjectThirdPartyIncludePaths(libraries=['wiredtiger'])
@@ -10,7 +21,6 @@ if wiredtiger:
     wtEnv.Library(
         target='storage_wiredtiger_core',
         source= [
-            'wiredtiger_customization_hooks.cpp',
             'wiredtiger_global_options.cpp',
             'wiredtiger_index.cpp',
             'wiredtiger_kv_engine.cpp',
@@ -22,6 +32,7 @@ if wiredtiger:
             'wiredtiger_util.cpp',
             ],
         LIBDEPS= [
+            'storage_wiredtiger_customization_hooks',
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/namespace_string',
             '$BUILD_DIR/mongo/db/catalog/collection_options',
@@ -57,6 +68,7 @@ if wiredtiger:
             'wiredtiger_server_status.cpp',
             ],
         LIBDEPS=['storage_wiredtiger_core',
+                 'storage_wiredtiger_customization_hooks',
                  '$BUILD_DIR/mongo/db/storage/kv/kv_engine',
                  '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
                  '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',

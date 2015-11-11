@@ -33,6 +33,10 @@
 #include <boost/filesystem.hpp>
 
 #include "mongo/config.h"
+#include "mongo/base/init.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -50,6 +54,12 @@ using std::pair;
 // TODO: This should go away once we can do these checks at compile time
 bool isMongos() {
     return false;
+}
+
+// Stub to avoid including the server environment library.
+MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
+    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
+    return Status::OK();
 }
 
 //
