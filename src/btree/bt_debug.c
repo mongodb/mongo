@@ -566,7 +566,7 @@ __debug_tree(
 
 	/* A NULL page starts at the top of the tree -- it's a convenience. */
 	if (page == NULL)
-		page = S2BT(session)->root.page;
+		page = btree->root.page;
 
 	WT_WITH_BTREE(session, btree, ret = __debug_page(ds, page, flags));
 
