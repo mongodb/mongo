@@ -69,11 +69,23 @@ load("jstests/replsets/rslib.js");
     a.createCollection("kap2", { capped: true, size: 5501 });
     replTest.awaitReplication();
 
+    var timeout;
+    if (replTest.getConfigFromPrimary().protocolVersion == 1) {
+        timeout = 30 * 1000;
+    } else {
+        timeout = 60 * 1000;
+    }
     // isolate A and wait for B to become master
     conns[0].disconnect(conns[1]);
     conns[0].disconnect(conns[2]);
-    assert.soon(function () { try { return B.isMaster().ismaster; } catch(e) { return false; } });
-    
+    assert.soon(function () {
+        try {
+            return B.isMaster().ismaster;
+        } catch(e) {
+            return false;
+        }
+    }, timeout);
+
     // do operations on B and B alone, these will be rolled back
     assert.writeOK(b.bar.insert({ q: 4 }));
     assert.writeOK(b.bar.update({ q: 3 }, { q: 3, rb: true }));
