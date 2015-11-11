@@ -121,9 +121,8 @@ docSourceEnv.Library(
         'document_value',
         'expression',
         '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_customization_hooks',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/third_party/shim_snappy',
     ],
     LIBDEPS_TAGS=[

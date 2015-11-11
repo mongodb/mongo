@@ -49,11 +49,6 @@ public:
     virtual ~WiredTigerCustomizationHooks() = default;
 
     /**
-     * Returns true if the customization hooks are enabled.
-     */
-    virtual bool enabled() const = 0;
-
-    /**
      * Perform any encryption engine initialization/sanity checking that needs to happen after
      * storage engine initialization but before the server starts accepting incoming connections.
      *
@@ -66,25 +61,6 @@ public:
      *  provided table name
      */
     virtual std::string getOpenConfig(StringData tableName) = 0;
-
-    /**
-     * Returns the maximum size addition when doing transforming temp data.
-     */
-    size_t additionalBytesForProtectedBuffer() {
-        return 32;
-    }
-
-    /**
-     * Transform temp data to non-readable form before writing it to disk.
-     */
-    virtual Status protectTmpData(
-        const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) = 0;
-
-    /**
-     * Tranforms temp data back to readable form, after reading from disk.
-     */
-    virtual Status unprotectTmpData(
-        const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) = 0;
 };
 
 // Empty default implementation of the abstract class WiredTigerCustomizationHooks
@@ -92,16 +68,8 @@ class EmptyWiredTigerCustomizationHooks : public WiredTigerCustomizationHooks {
 public:
     ~EmptyWiredTigerCustomizationHooks() override;
 
-    bool enabled() const override;
-
     bool restartRequired() override;
 
     std::string getOpenConfig(StringData tableName) override;
-
-    Status protectTmpData(
-        const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) override;
-
-    Status unprotectTmpData(
-        const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) override;
 };
 }  // namespace mongo

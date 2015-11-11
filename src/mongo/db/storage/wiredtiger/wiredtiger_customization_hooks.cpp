@@ -65,10 +65,6 @@ WiredTigerCustomizationHooks* WiredTigerCustomizationHooks::get(ServiceContext* 
 
 EmptyWiredTigerCustomizationHooks::~EmptyWiredTigerCustomizationHooks() {}
 
-bool EmptyWiredTigerCustomizationHooks::enabled() const {
-    return false;
-}
-
 bool EmptyWiredTigerCustomizationHooks::restartRequired() {
     return false;
 }
@@ -77,15 +73,4 @@ std::string EmptyWiredTigerCustomizationHooks::getOpenConfig(StringData tableNam
     return "";
 }
 
-Status EmptyWiredTigerCustomizationHooks::protectTmpData(
-    const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) {
-    return Status(ErrorCodes::InternalError,
-                  "Customization hooks must be enabled to use preprocessTmpData.");
-}
-
-Status EmptyWiredTigerCustomizationHooks::unprotectTmpData(
-    const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) {
-    return Status(ErrorCodes::InternalError,
-                  "Customization hooks must be enabled to use postprocessTmpData.");
-}
 }  // namespace mongo
