@@ -101,6 +101,10 @@ const HostAndPort& ConnectionImpl::getHostAndPort() const {
     return _hostAndPort;
 }
 
+bool ConnectionImpl::isHealthy() {
+    return true;
+}
+
 void ConnectionImpl::clear() {
     _setupQueue.clear();
     _refreshQueue.clear();

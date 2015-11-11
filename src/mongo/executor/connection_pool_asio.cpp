@@ -121,6 +121,11 @@ const HostAndPort& ASIOConnection::getHostAndPort() const {
     return _hostAndPort;
 }
 
+bool ASIOConnection::isHealthy() {
+    // Check if the remote host has closed the connection.
+    return _impl->connection().stream().isOpen();
+}
+
 void ASIOConnection::indicateUsed() {
     // It is illegal to attempt to use a connection after calling indicateFailure().
     invariant(_status.isOK() || _status == ConnectionPool::kConnectionStateUnknown);

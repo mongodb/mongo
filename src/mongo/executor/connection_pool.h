@@ -208,6 +208,11 @@ public:
      */
     virtual const HostAndPort& getHostAndPort() const = 0;
 
+    /**
+     * Check if the connection is healthy using some implementation defined condition.
+     */
+    virtual bool isHealthy() = 0;
+
 protected:
     /**
      * Making these protected makes the definitions available to override in

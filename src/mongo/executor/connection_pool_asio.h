@@ -78,6 +78,8 @@ public:
     std::unique_ptr<NetworkInterfaceASIO::AsyncOp> releaseAsyncOp();
     void bindAsyncOp(std::unique_ptr<NetworkInterfaceASIO::AsyncOp> op);
 
+    bool isHealthy() override;
+
 private:
     void indicateUsed() override;
     Date_t getLastUsed() const override;

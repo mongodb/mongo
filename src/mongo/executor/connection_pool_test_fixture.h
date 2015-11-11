@@ -87,6 +87,8 @@ public:
 
     const HostAndPort& getHostAndPort() const override;
 
+    bool isHealthy() override;
+
     // Dump all connection callbacks
     static void clear();
 

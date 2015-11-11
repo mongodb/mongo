@@ -25,6 +25,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/connection_pool.h"
@@ -32,8 +34,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
-
 
 // One interesting implementation note herein concerns how setup() and
 // refresh() are invoked outside of the global lock, but setTimeout is not.
@@ -456,6 +458,22 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
         auto conn = std::move(iter->second);
         _readyPool.erase(iter);
         conn->cancelTimeout();
+
+        if (!conn->isHealthy()) {
+            log() << "dropping unhealthy pooled connection to " << conn->getHostAndPort().host()
+                  << ":" << conn->getHostAndPort().port();
+
+            if (_readyPool.empty()) {
+                log() << "after drop, pool was empty, going to spawn some connections";
+                // Spawn some more connections to the bad host if we're all out.
+                spawnConnections(lk, conn->getHostAndPort());
+            }
+
+            // Drop the bad connection.
+            conn.reset();
+            // Retry.
+            continue;
+        }
 
         // Grab the request and callback
         auto cb = std::move(_requests.top().second);
