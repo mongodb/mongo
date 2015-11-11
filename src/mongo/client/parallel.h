@@ -148,17 +148,20 @@ public:
 
     ~ParallelSortClusteredCursor();
 
-    std::string getNS();
-
     /** call before using */
     void init(OperationContext* txn);
 
     bool more();
     BSONObj next();
-    std::string type() const {
-        return "ParallelSort";
-    }
 
+    /**
+     * Returns the set of shards with open cursors.
+     */
+    void getQueryShardIds(std::set<ShardId>& shardIds);
+
+    DBClientCursorPtr getShardCursor(const ShardId& shardId);
+
+private:
     void fullInit(OperationContext* txn);
     void startInit(OperationContext* txn);
     void finishInit(OperationContext* txn);
@@ -166,50 +169,8 @@ public:
     bool isCommand() {
         return NamespaceString(_qSpec.ns()).isCommand();
     }
-    bool isExplain() {
-        return _qSpec.isExplain();
-    }
 
-    /**
-     * Sets the batch size on all underlying cursors to 'newBatchSize'.
-     */
-    void setBatchSize(int newBatchSize);
-
-    /**
-     * Returns whether the collection was sharded when the cursors were established.
-     */
-    bool isSharded();
-
-    /**
-     * Returns the number of shards with open cursors.
-     */
-    int getNumQueryShards();
-
-    /**
-     * Returns the set of shards with open cursors.
-     */
-    void getQueryShardIds(std::set<ShardId>& shardIds);
-
-    /**
-     * Returns the single shard with an open cursor.
-     * It is an error to call this if getNumQueryShards() > 1
-     */
-    ShardId getQueryShardId();
-
-    /**
-     * Returns primary shard with an open cursor.
-     * It is an error to call this if the collection is sharded.
-     */
-    std::shared_ptr<Shard> getPrimary();
-
-    DBClientCursorPtr getShardCursor(const ShardId& shardId);
-
-    void explain(BSONObjBuilder& b);
-
-private:
     void _finishCons();
-
-    void _explain(std::map<std::string, std::list<BSONObj>>& out);
 
     void _markStaleNS(const NamespaceString& staleNS,
                       const StaleConfigException& e,

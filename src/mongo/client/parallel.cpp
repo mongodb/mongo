@@ -74,12 +74,6 @@ void ParallelSortClusteredCursor::init(OperationContext* txn) {
     }
 }
 
-string ParallelSortClusteredCursor::getNS() {
-    if (!_qSpec.isEmpty())
-        return _qSpec.ns();
-    return _ns;
-}
-
 /**
  * Throws a RecvStaleConfigException wrapping the stale error document in this cursor when the
  * ShardConfigStale flag is set or a command returns a ErrorCodes::SendStaleConfig error code.
@@ -114,139 +108,6 @@ static void throwCursorError(DBClientCursor* cursor) {
     if (cursor->hasResultFlag(ResultFlag_ErrSet)) {
         BSONObj o = cursor->next();
         throw UserException(o["code"].numberInt(), o["$err"].str());
-    }
-}
-
-void ParallelSortClusteredCursor::explain(BSONObjBuilder& b) {
-    // Note: by default we filter out allPlans and oldPlan in the shell's
-    // explain() function. If you add any recursive structures, make sure to
-    // edit the JS to make sure everything gets filtered.
-
-    // Return single shard output if we're versioned but not sharded, or
-    // if we specified only a single shard
-    // TODO:  We should really make this simpler - all queries via mongos
-    // *always* get the same explain format
-    if (!isSharded()) {
-        map<string, list<BSONObj>> out;
-        _explain(out);
-        verify(out.size() == 1);
-        list<BSONObj>& l = out.begin()->second;
-        verify(l.size() == 1);
-        b.appendElements(*(l.begin()));
-        return;
-    }
-
-    b.append("clusteredType", type());
-
-    string cursorType;
-    BSONObj indexBounds;
-    BSONObj oldPlan;
-
-    long long millis = 0;
-    double numExplains = 0;
-
-    long long nReturned = 0;
-    long long keysExamined = 0;
-    long long docsExamined = 0;
-
-    map<string, list<BSONObj>> out;
-    {
-        _explain(out);
-
-        BSONObjBuilder x(b.subobjStart("shards"));
-        for (map<string, list<BSONObj>>::iterator i = out.begin(); i != out.end(); ++i) {
-            const ShardId& shardId = i->first;
-            list<BSONObj> l = i->second;
-            BSONArrayBuilder y(x.subarrayStart(shardId));
-            for (list<BSONObj>::iterator j = l.begin(); j != l.end(); ++j) {
-                BSONObj temp = *j;
-
-                // If appending the next output from the shard is going to make the BSON
-                // too large, then don't add it. We make sure the BSON doesn't get bigger
-                // than the allowable "user size" for a BSONObj. This leaves a little bit
-                // of extra space which mongos can use to add extra data.
-                if ((x.len() + temp.objsize()) > BSONObjMaxUserSize) {
-                    y.append(BSON("warning"
-                                  << "shard output omitted due to nearing 16 MB limit"));
-                    break;
-                }
-
-                y.append(temp);
-
-                if (temp.hasField("executionStats")) {
-                    // Here we assume that the shard gave us back explain 2.0 style output.
-                    BSONObj execStats = temp["executionStats"].Obj();
-                    if (execStats.hasField("nReturned")) {
-                        nReturned += execStats["nReturned"].numberLong();
-                    }
-                    if (execStats.hasField("totalKeysExamined")) {
-                        keysExamined += execStats["totalKeysExamined"].numberLong();
-                    }
-                    if (execStats.hasField("totalDocsExamined")) {
-                        docsExamined += execStats["totalDocsExamined"].numberLong();
-                    }
-                    if (execStats.hasField("executionTimeMillis")) {
-                        millis += execStats["executionTimeMillis"].numberLong();
-                    }
-                } else {
-                    // Here we assume that the shard gave us back explain 1.0 style output.
-                    if (temp.hasField("n")) {
-                        nReturned += temp["n"].numberLong();
-                    }
-                    if (temp.hasField("nscanned")) {
-                        keysExamined += temp["nscanned"].numberLong();
-                    }
-                    if (temp.hasField("nscannedObjects")) {
-                        docsExamined += temp["nscannedObjects"].numberLong();
-                    }
-                    if (temp.hasField("millis")) {
-                        millis += temp["millis"].numberLong();
-                    }
-                    if (String == temp["cursor"].type()) {
-                        if (cursorType.empty()) {
-                            cursorType = temp["cursor"].String();
-                        } else if (cursorType != temp["cursor"].String()) {
-                            cursorType = "multiple";
-                        }
-                    }
-                    if (Object == temp["indexBounds"].type()) {
-                        indexBounds = temp["indexBounds"].Obj();
-                    }
-                    if (Object == temp["oldPlan"].type()) {
-                        oldPlan = temp["oldPlan"].Obj();
-                    }
-                }
-
-                numExplains++;
-            }
-            y.done();
-        }
-        x.done();
-    }
-
-    if (!cursorType.empty()) {
-        b.append("cursor", cursorType);
-    }
-
-    b.appendNumber("n", nReturned);
-    b.appendNumber("nscanned", keysExamined);
-    b.appendNumber("nscannedObjects", docsExamined);
-
-    b.appendNumber("millisShardTotal", millis);
-    b.append("millisShardAvg",
-             numExplains ? static_cast<int>(static_cast<double>(millis) / numExplains) : 0);
-    b.append("numQueries", (int)numExplains);
-    b.append("numShards", (int)out.size());
-
-    if (out.size() == 1) {
-        b.append("indexBounds", indexBounds);
-        if (!oldPlan.isEmpty()) {
-            // this is to stay in compliance with mongod behavior
-            // we should make this cleaner, i.e. {} == nothing
-            b.append("oldPlan", oldPlan);
-        }
-    } else {
-        // TODO: this is lame...
     }
 }
 
@@ -1101,37 +962,11 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
     _numServers = _cursorMap.size();
 }
 
-bool ParallelSortClusteredCursor::isSharded() {
-    // LEGACY is always unsharded
-    if (_qSpec.isEmpty())
-        return false;
-    // We're always sharded if the number of cursors != 1
-    // TODO: Kept this way for compatibility with getPrimary(), but revisit
-    if (_cursorMap.size() != 1)
-        return true;
-    // Return if the single cursor is sharded
-    return NULL != _cursorMap.begin()->second.pcState->manager;
-}
-
-int ParallelSortClusteredCursor::getNumQueryShards() {
-    return _cursorMap.size();
-}
-
-ShardId ParallelSortClusteredCursor::getQueryShardId() {
-    return _cursorMap.begin()->first;
-}
-
 void ParallelSortClusteredCursor::getQueryShardIds(set<ShardId>& shardIds) {
     for (map<ShardId, PCMData>::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end;
          ++i) {
         shardIds.insert(i->first);
     }
-}
-
-std::shared_ptr<Shard> ParallelSortClusteredCursor::getPrimary() {
-    if (isSharded())
-        return std::shared_ptr<Shard>();
-    return _cursorMap.begin()->second.pcState->primary;
 }
 
 DBClientCursorPtr ParallelSortClusteredCursor::getShardCursor(const ShardId& shardId) {
@@ -1414,13 +1249,6 @@ ParallelSortClusteredCursor::~ParallelSortClusteredCursor() {
     _done = true;
 }
 
-void ParallelSortClusteredCursor::setBatchSize(int newBatchSize) {
-    for (int i = 0; i < _numServers; i++) {
-        if (_cursors[i].get())
-            _cursors[i].get()->setBatchSize(newBatchSize);
-    }
-}
-
 bool ParallelSortClusteredCursor::more() {
     if (_needToSkip > 0) {
         int n = _needToSkip;
@@ -1493,16 +1321,6 @@ BSONObj ParallelSortClusteredCursor::next() {
         _cursors[bestFrom].getMData()->pcState->count++;
 
     return best;
-}
-
-void ParallelSortClusteredCursor::_explain(map<string, list<BSONObj>>& out) {
-    set<ShardId> shardIds;
-    getQueryShardIds(shardIds);
-
-    for (const ShardId& shardId : shardIds) {
-        list<BSONObj>& l = out[shardId];
-        l.push_back(getShardCursor(shardId)->peekFirst().getOwned());
-    }
 }
 
 }  // namespace mongo
