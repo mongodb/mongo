@@ -5,6 +5,10 @@ pre:
     - command: shell.track
 
 post:
+    - command: "json.send"
+      params:
+        name: "perf"
+        file: "src/perf.json"
     - command: attach.results
       params:
         file_location: src/report.json
@@ -216,7 +220,43 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python ../dsi/bin/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.0.6-Baseline --overrideFile ../dsi/bin/override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
+          python -u ../dsi/bin/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.0.6-Baseline --overrideFile ../dsi/bin/override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
+
+  "compare":
+    - command: shell.exec
+      params: 
+        script: | 
+          rm -rf ./*
+          mkdir src
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: dsi/${revision}/compare.py
+        bucket: mciuploads
+        local_file: src/compare.py
+    - command: json.get
+      params:
+        task: ${compare_task}
+        variant : ${variant1}
+        file: "src/standalone.json"
+        name: "perf"
+    - command: json.get
+      params:
+        task: ${compare_task}
+        variant : ${variant2}
+        file: "src/oplog.json"
+        name: "perf"
+    - command: shell.exec
+      type : test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          python -u ../dsi/bin/compare.py -b standalone.json -c oplog.json -t ${threshold}
+
+
 
 #######################################
 #               Tasks                 #
@@ -254,6 +294,17 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb.tar.gz
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/buildscripts/compare.py
+        remote_file: dsi/${revision}/compare.py
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/octet-stream}
+        display_name: compare.py
+
 
 # The industry_benchmarks_WT task runs the "bring up cluster" task and is
 # the only one to do so - all other tasks run "restore cluster".  As such,
@@ -339,6 +390,71 @@ tasks:
     - func: "destroy cluster"      
     - func: "analyze"
 
+- name: industry_benchmarks_WT_oplog_comp
+  depends_on:
+    - name: industry_benchmarks_WT
+      variant: linux-standalone
+      status : "*"
+    - name: industry_benchmarks_WT
+      variant: linux-1-node-replSet
+      status: "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task: "industry_benchmarks_WT"
+        variant1: "linux-standalone"
+        variant2: "linux-1-node-replSet"
+        threshold: 70
+
+- name: industry_benchmarks_MMAPv1_oplog_comp
+  depends_on:
+    - name: industry_benchmarks_MMAPv1
+      variant: linux-standalone
+      status: "*"
+    - name: industry_benchmarks_MMAPv1
+      variant: linux-1-node-replSet
+      status: "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task: "industry_benchmarks_MMAPv1"
+        variant1: "linux-standalone"
+        variant2: "linux-1-node-replSet"
+        threshold: 70
+
+- name: core_workloads_WT_oplog_comp
+  depends_on:
+    - name: core_workloads_WT
+      variant: linux-standalone
+      status: "*"
+    - name: core_workloads_WT
+      variant: linux-1-node-replSet
+      status: "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task: "core_workloads_WT"
+        variant1: "linux-standalone"
+        variant2: "linux-1-node-replSet"
+        threshold: 70
+
+- name: core_workloads_MMAPv1_oplog_comp
+  depends_on:
+    - name: core_workloads_MMAPv1
+      variant: linux-standalone
+      status: "*"
+    - name: core_workloads_MMAPv1
+      variant: linux-1-node-replSet
+      status: "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task: "core_workloads_MMAPv1"
+        variant1: "linux-standalone"
+        variant2: "linux-1-node-replSet"
+        threshold: 70
+
+
 #######################################
 #            Buildvariants            #
 #######################################
@@ -410,3 +526,14 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+
+- name: linux-oplog-compare
+  display_name: Linux Oplog Compare
+  batchtime: 1440 # 24 hours
+  run_on:
+      - "linux-64-amzn-perf-standalone"
+  tasks:
+    - name: industry_benchmarks_WT_oplog_comp
+    - name: core_workloads_WT_oplog_comp
+    - name: industry_benchmarks_MMAPv1_oplog_comp
+    - name: core_workloads_MMAPv1_oplog_comp
