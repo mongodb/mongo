@@ -48,7 +48,8 @@ ASIOTimer::ASIOTimer(asio::io_service::strand* strand)
       _callbackSharedState(std::make_shared<CallbackSharedState>()) {}
 
 ASIOTimer::~ASIOTimer() {
-    cancelTimeout();
+    stdx::lock_guard<stdx::mutex> lk(_callbackSharedState->mutex);
+    ++_callbackSharedState->id;
 }
 
 void ASIOTimer::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
@@ -90,12 +91,17 @@ void ASIOTimer::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
 }
 
 void ASIOTimer::cancelTimeout() {
-    _strand->dispatch([this] {
-        {
-            stdx::lock_guard<stdx::mutex> lk(_callbackSharedState->mutex);
-            _callbackSharedState->id++;
-        }
-
+    decltype(_callbackSharedState) sharedState;
+    decltype(_callbackSharedState->id) id;
+    {
+        stdx::lock_guard<stdx::mutex> lk(_callbackSharedState->mutex);
+        id = ++_callbackSharedState->id;
+        sharedState = _callbackSharedState;
+    }
+    _strand->dispatch([this, id, sharedState] {
+        stdx::lock_guard<stdx::mutex> lk(sharedState->mutex);
+        if (sharedState->id != id)
+            return;
         _impl.cancel();
     });
 }

@@ -460,8 +460,7 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
         conn->cancelTimeout();
 
         if (!conn->isHealthy()) {
-            log() << "dropping unhealthy pooled connection to " << conn->getHostAndPort().host()
-                  << ":" << conn->getHostAndPort().port();
+            log() << "dropping unhealthy pooled connection to " << conn->getHostAndPort();
 
             if (_readyPool.empty()) {
                 log() << "after drop, pool was empty, going to spawn some connections";
