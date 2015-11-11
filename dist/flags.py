@@ -8,12 +8,6 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-    'cache_flush' : [
-        'SYNC_CHECKPOINT',
-        'SYNC_CLOSE',
-        'SYNC_DISCARD',
-        'SYNC_WRITE_LEAVES',
-    ],
     'file_types' : [
         'FILE_TYPE_CHECKPOINT',
         'FILE_TYPE_DATA',
