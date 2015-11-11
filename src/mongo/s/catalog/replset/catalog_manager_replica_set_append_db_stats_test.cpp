@@ -48,7 +48,7 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using stdx::chrono::milliseconds;
 
-using CatalogManagerReplSetAppendDbStatsTest = CatalogManagerReplSetAppendDbStatsTestFixture;
+using CatalogManagerReplSetAppendDbStatsTest = CatalogManagerReplSetTestFixture;
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
