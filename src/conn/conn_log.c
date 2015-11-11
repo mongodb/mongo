@@ -33,7 +33,7 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
 	if (WT_STRING_MATCH("dsync", cval.str, cval.len))
 		FLD_SET(conn->txn_logsync, WT_LOG_DSYNC | WT_LOG_FLUSH);
 	else if (WT_STRING_MATCH("fsync", cval.str, cval.len))
-		FLD_SET(conn->txn_logsync, WT_LOG_FLUSH | WT_LOG_FSYNC);
+		FLD_SET(conn->txn_logsync, WT_LOG_FSYNC);
 	else if (WT_STRING_MATCH("none", cval.str, cval.len))
 		FLD_SET(conn->txn_logsync, WT_LOG_FLUSH);
 	return (0);
