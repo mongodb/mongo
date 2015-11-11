@@ -132,6 +132,25 @@ __wt_session_lock_dhandle(
 	want_exclusive = LF_ISSET(WT_DHANDLE_EXCLUSIVE);
 
 	/*
+	 * If this session already has exclusive access to the handle, there is
+	 * no point trying to lock it again.
+	 *
+	 * This should only happen if a checkpoint handle is locked multiple
+	 * times during a checkpoint operation, or the handle is already open
+	 * without any special flags.  In particular, it must fail if
+	 * attempting to checkpoint a handle opened for a bulk load, even in
+	 * the same session.
+	 */
+	if (dhandle->excl_session == session) {
+		if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
+		    (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+		    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)))
+			return (EBUSY);
+		++dhandle->excl_ref;
+		return (0);
+	}
+
+	/*
 	 * Check that the handle is open.  We've already incremented
 	 * the reference count, so once the handle is open it won't be
 	 * closed by another thread.
@@ -207,6 +226,11 @@ __wt_session_lock_dhandle(
 
 			/* We have an exclusive lock, we're done. */
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
+			WT_ASSERT(session,
+			    dhandle->excl_session == NULL &&
+			    dhandle->excl_ref == 0);
+			dhandle->excl_session = session;
+			dhandle->excl_ref = 1;
 			WT_ASSERT(session, !F_ISSET(dhandle, WT_DHANDLE_DEAD));
 			return (0);
 		}
@@ -454,19 +478,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_RET(__session_get_dhandle(session, uri, checkpoint));
 		dhandle = session->dhandle;
 
-		/*
-		 * If this session already owns the handle, increase
-		 * the owner ref count.
-		 */
-		if (dhandle->excl_session == session)
-			dhandle->excl_ref++;
-		else {
-			/* Try to lock the handle. */
-			WT_RET(__wt_session_lock_dhandle(
-			    session, flags, &is_dead));
-			if (is_dead)
-				continue;
-		}
+		/* Try to lock the handle. */
+		WT_RET(__wt_session_lock_dhandle(session, flags, &is_dead));
+		if (is_dead)
+			continue;
 
 		/* If the handle is open in the mode we want, we're done. */
 		if (LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
