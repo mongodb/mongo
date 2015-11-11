@@ -359,6 +359,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
                     metadataObj,
                     _replCoord->getConfig().getElectionTimeoutPeriod());
 
+    LOG(1) << "scheduling fetcher to read remote oplog on " << source;
     auto scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
         warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "
@@ -366,6 +367,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
         return;
     }
     fetcher.wait();
+    LOG(1) << "fetcher stopped reading remote oplog on " << source;
 
     // If the background sync is paused after the fetcher is started, we need to
     // re-evaluate our sync source and oplog common point.
