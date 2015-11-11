@@ -13,7 +13,7 @@
  *	Discard pages for a specific file.
  */
 int
-__wt_evict_file(WT_SESSION_IMPL *session, int syncop)
+__wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;

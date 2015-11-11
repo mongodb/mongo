@@ -13,7 +13,7 @@
  *	Flush pages for a specific file.
  */
 static int
-__sync_file(WT_SESSION_IMPL *session, int syncop)
+__sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
 	struct timespec end, start;
 	WT_BTREE *btree;
@@ -128,12 +128,19 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (walk == NULL)
 				break;
 
+			/* Skip clean pages. */
+			if (!__wt_page_is_modified(walk->page))
+				continue;
+
+			/*
+			 * Take a local reference to the page modify structure
+			 * now that we know the page is dirty. It needs to be
+			 * done in this order otherwise the page modify
+			 * structure could have been created between taking the
+			 * reference and checking modified.
+			 */
 			page = walk->page;
 			mod = page->modify;
-
-			/* Skip clean pages. */
-			if (!__wt_page_is_modified(page))
-				continue;
 
 			/*
 			 * Write dirty pages, unless we can be sure they only
@@ -169,6 +176,9 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			WT_ERR(__wt_reconcile(session, walk, NULL, 0));
 		}
 		break;
+	case WT_SYNC_CLOSE:
+	case WT_SYNC_DISCARD:
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
@@ -250,7 +260,7 @@ err:	/* On error, clear any left-over tree walk. */
  *	Cache operations.
  */
 int
-__wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
+__wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_CACHE_OP op)
 {
 	WT_DECL_RET;
 	WT_BTREE *btree;
@@ -269,6 +279,9 @@ __wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 		WT_ASSERT(session, btree->ckpt == NULL);
 		btree->ckpt = ckptbase;
 		break;
+	case WT_SYNC_DISCARD:
+	case WT_SYNC_WRITE_LEAVES:
+		break;
 	}
 
 	switch (op) {
@@ -280,13 +293,15 @@ __wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	case WT_SYNC_DISCARD:
 		WT_ERR(__wt_evict_file(session, op));
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	switch (op) {
 	case WT_SYNC_CHECKPOINT:
 	case WT_SYNC_CLOSE:
 		btree->ckpt = NULL;
+		break;
+	case WT_SYNC_DISCARD:
+	case WT_SYNC_WRITE_LEAVES:
 		break;
 	}
 
