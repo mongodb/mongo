@@ -84,7 +84,7 @@ load("jstests/replsets/rslib.js");
         } catch(e) {
             return false;
         }
-    }, timeout);
+    }, "node B did not become master as expected", timeout);
 
     // do operations on B and B alone, these will be rolled back
     assert.writeOK(b.bar.insert({ q: 4 }));
