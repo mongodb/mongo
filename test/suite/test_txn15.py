@@ -70,9 +70,14 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
     # Overrides WiredTigerTestCase, add extra config params
     def setUpConnectionOpen(self, dir):
         self.home = dir
+        #
+        # Turn off using any environment variables that may be set by the
+        # testing infrastructure.
+        #
         conn_params = \
             'create,statistics=(fast),error_prefix="%s: ",' % self.shortid() + \
             'log=(archive=false,enabled,file_max=100K),' + \
+            'use_environment=false,' + \
             'transaction_sync=(enabled=%s),' % self.conn_enable + \
             'transaction_sync=(method=%s),' % self.conn_method
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
