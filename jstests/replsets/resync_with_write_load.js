@@ -89,7 +89,7 @@ print("waiting for load generation to finish");
 loadGen();
 
 // load must stop before we await replication.
-replTest.awaitReplication();
+replTest.awaitReplication(60 * 1000);
 
 // Make sure oplogs match
 try {
