@@ -367,8 +367,8 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_REF *child_ref, **child_refp, *ref, **root_refp;
 	size_t child_incr, root_decr, root_incr, size;
 	uint64_t split_gen;
-	uint32_t children, chunk, i, j, moved_entries, new_entries, remain;
-	uint32_t skip_leading, slots;
+	uint32_t children, chunk, i, j, remain;
+	uint32_t slots;
 	bool complete;
 	void *p;
 
@@ -393,48 +393,19 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	pindex = WT_INTL_INDEX_GET_SAFE(root);
 
 	/*
-	 * A prepending/appending workload will repeatedly deepen parts of the
-	 * tree that aren't changing, and appending workloads are not uncommon.
-	 * First, keep the first/last pages of the tree at their current level,
-	 * to catch simple workloads. Second, track the number of entries which
-	 * resulted from the last time we deepened this page, and if we refilled
-	 * this page without splitting into those slots, ignore them for this
-	 * split. It's not exact because an eviction might split into any part
-	 * of the page: if 80% of the splits are at the end of the page, assume
-	 * an append-style workload. Of course, the plan eventually fails: when
-	 * repeatedly deepening this page for an append-only workload, we will
-	 * progressively ignore more and more of the slots. When ignoring 90% of
-	 * the slots, deepen the entire page again.
-	 *
-	 * Figure out how many slots we're leaving at this level and how many
-	 * child pages we're creating.
+	 * Decide how many child pages to create, then calculate the standard
+	 * chunk and whatever remains. Sanity check the number of children:
+	 * the decision to split matched to the deepen-per-child configuration
+	 * might get it wrong.
 	 */
-#undef	skip_trailing
-#define	skip_trailing	1
-	skip_leading = 1;
-	new_entries = pindex->entries - root->pg_intl_deepen_split_last;
-	if (root->pg_intl_deepen_split_append > (new_entries * 8) / 10)
-		skip_leading = root->pg_intl_deepen_split_last;
-	if (skip_leading > (pindex->entries * 9) * 10)
-		skip_leading = 1;
-
-	/*
-	 * In a few (rare) cases we split pages with only a few entries, and in
-	 * those cases we keep it simple, 10 children, skip only first and last
-	 * entries. Otherwise, split into a lot of child pages.
-	 */
-	moved_entries = pindex->entries - (skip_leading + skip_trailing);
-	children = moved_entries / btree->split_deepen_per_child;
+	children = pindex->entries / btree->split_deepen_per_child;
 	if (children < 10) {
+		if (pindex->entries < 100)
+			return (EBUSY);
 		children = 10;
-		skip_leading = 1;
-		moved_entries =
-		    pindex->entries - (skip_leading + skip_trailing);
 	}
-
-	/* Calculate the standard chunk, and whatever remains. */
-	chunk = moved_entries / children;
-	remain = moved_entries - chunk * (children - 1);
+	chunk = pindex->entries / children;
+	remain = pindex->entries - chunk * (children - 1);
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " root page elements, splitting into %" PRIu32
@@ -442,36 +413,29 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	    root, pindex->entries, children));
 
 	/*
-	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects. Initialize
-	 * the slots of the allocated WT_PAGE_INDEX to point to the pages we're
-	 * keeping at the current level (both leading and trailing), and the
-	 * rest of the slots to point to newly allocated WT_REF objects.
+	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects to be inserted
+	 * into the root page, replacing the root's page-index.
 	 */
-	size = sizeof(WT_PAGE_INDEX) +
-	    (children + skip_leading + skip_trailing) * sizeof(WT_REF *);
+	size = sizeof(WT_PAGE_INDEX) + children * sizeof(WT_REF *);
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
 	root_incr += size;
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
-	alloc_index->entries = children + skip_leading + skip_trailing;
-	for (alloc_refp = alloc_index->index,			/* leading */
-	    i = 0; i < skip_leading; ++alloc_refp, ++i)
-		*alloc_refp = pindex->index[i];
-	for (i = 0; i < children; ++alloc_refp, ++i)		/* new */
+	alloc_index->entries = children;
+	alloc_refp = alloc_index->index;
+	for (i = 0; i < children; alloc_refp++, ++i)
 		WT_ERR(__wt_calloc_one(session, alloc_refp));
-	*alloc_refp = pindex->index[pindex->entries - 1];	/* trailing */
 	root_incr += children * sizeof(WT_REF);
 
 	/* Allocate child pages, and connect them into the new page index. */
-	for (root_refp = pindex->index + skip_leading,
-	    alloc_refp = alloc_index->index + skip_leading,
-	    i = 0; i < children; ++i) {
+	for (root_refp = pindex->index,
+	    alloc_refp = alloc_index->index, i = 0; i < children; ++i) {
 		slots = i == children - 1 ? remain : chunk;
 		WT_ERR(__wt_page_alloc(
 		    session, root->type, 0, slots, false, &child));
 
 		/*
-		 * Initialize the parent page's child reference; we need a copy
-		 * of the page's key.
+		 * Initialize the page's child reference; we need a copy of the
+		 * page's key.
 		 */
 		ref = *alloc_refp++;
 		ref->home = root;
@@ -522,17 +486,9 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
 	WT_ASSERT(session,
-	    alloc_refp - alloc_index->index ==
-	    (ptrdiff_t)(alloc_index->entries - skip_trailing));
-	WT_ASSERT(session, root_refp - pindex->index ==
-	    (ptrdiff_t)(pindex->entries - skip_trailing));
-
-	/*
-	 * Save the number of entries created by deepening the tree and reset
-	 * the count of splits into this page after that point.
-	 */
-	root->pg_intl_deepen_split_append = 0;
-	root->pg_intl_deepen_split_last = alloc_index->entries;
+	    alloc_refp - alloc_index->index == (ptrdiff_t)alloc_index->entries);
+	WT_ASSERT(session,
+	    root_refp - pindex->index == (ptrdiff_t)pindex->entries);
 
 	/*
 	 * Confirm the root page's index hasn't moved, then update it, which
@@ -570,20 +526,13 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	 * evicted because of the eviction transaction value set above.
 	 */
 	for (alloc_refp = alloc_index->index,
-	    i = alloc_index->entries; i > 0; ++alloc_refp, --i) {
+	    i = 0; i < alloc_index->entries; ++alloc_refp, ++i) {
 		ref = *alloc_refp;
 		WT_ASSERT(session, ref->home == root);
 		if (ref->state != WT_REF_MEM)
 			continue;
 
-		/*
-		 * We left the first/last children of the root at the current
-		 * level to avoid bad split patterns, they might be leaf pages;
-		 * check the page type before we continue.
-		 */
 		child = ref->page;
-		if (!WT_PAGE_IS_INTERNAL(child))
-			continue;
 #ifdef HAVE_DIAGNOSTIC
 		WT_WITH_PAGE_INDEX(session,
 		    __split_verify_intl_key_order(session, child));
@@ -738,27 +687,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	alloc_index->entries = result_entries;
 	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
-		if (next_ref == ref) {
+		if (next_ref == ref)
 			for (j = 0; j < new_entries; ++j) {
 				ref_new[j]->home = parent;
 				*alloc_refp++ = ref_new[j];
 			}
-
-			/*
-			 * We detect append-style workloads to avoid repeatedly
-			 * deepening parts of the tree where no work is being
-			 * done by tracking if we're splitting after the slots
-			 * created by the last split to deepen this parent.
-			 *
-			 * Note the calculation: i is a 0-based array offset and
-			 * split-last is a count of entries, also either or both
-			 * i and split-last might be unsigned 0, don't decrement
-			 * either one.
-			 */
-			if (i > parent->pg_intl_deepen_split_last)
-				parent->
-				    pg_intl_deepen_split_append += new_entries;
-		} else if (next_ref->state != WT_REF_SPLIT)
+		else if (next_ref->state != WT_REF_SPLIT)
 			/* Skip refs we have marked for deletion. */
 			*alloc_refp++ = next_ref;
 	}
@@ -923,7 +857,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_REF *child_ref, **child_refp, *page_ref, **page_refp, *ref;
 	size_t child_incr, page_decr, page_incr, parent_incr, size;
 	uint64_t split_gen;
-	uint32_t children, chunk, i, j, moved_entries, remain;
+	uint32_t children, chunk, i, j, remain;
 	uint32_t slots;
 	bool complete;
 	void *p;
@@ -947,13 +881,20 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
 
-	/* Figure out how many child pages we're creating. */
-	moved_entries = pindex->entries;
-	children = moved_entries / btree->split_deepen_per_child;
-
-	/* Calculate the standard chunk, and whatever remains. */
-	chunk = moved_entries / children;
-	remain = moved_entries - chunk * (children - 1);
+	/*
+	 * Decide how many child pages to create, then calculate the standard
+	 * chunk and whatever remains. Sanity check the number of children:
+	 * the decision to split matched to the deepen-per-child configuration
+	 * might get it wrong.
+	 */
+	children = pindex->entries / btree->split_deepen_per_child;
+	if (children < 10) {
+		if (pindex->entries < 100)
+			return (EBUSY);
+		children = 10;
+	}
+	chunk = pindex->entries / children;
+	remain = pindex->entries - chunk * (children - 1);
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " internal page elements, splitting into %" PRIu32
@@ -980,7 +921,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 
 	/*
 	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects to be inserted
-	 * into the page's parent, replacing the page's WT_REF.
+	 * into the page's parent, replacing the page's page-index.
 	 *
 	 * The first slot of the new WT_PAGE_INDEX is the original page WT_REF.
 	 * The remainder of the slots are allocated WT_REFs.
@@ -1099,7 +1040,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * evicted because of the eviction transaction value set above.
 	 */
 	for (alloc_refp = alloc_index->index,
-	    i = alloc_index->entries; i > 0; ++alloc_refp, --i) {
+	    i = 0; i < alloc_index->entries; ++alloc_refp, ++i) {
 		ref = *alloc_refp;
 		WT_ASSERT(session, ref->home == parent);
 		if (ref->state != WT_REF_MEM)
@@ -1296,10 +1237,7 @@ __split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
 
-	/*
-	 * Sanity check for a reasonable number of keys on-page keys. Splitting
-	 * with too few keys leads to excessively deep trees.
-	 */
+	/* Sanity check for a reasonable number of on-page keys. */
 	if (pindex->entries < 100)
 		return (false);
 
@@ -1317,8 +1255,7 @@ __split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * splitting into parent pages can become large enough to result
 	 * in slow operations.
 	 */
-	if (!__wt_ref_is_root(ref) &&
-	    pindex->entries > btree->split_deepen_min_child)
+	if (pindex->entries > btree->split_deepen_min_child)
 		return (true);
 
 	return (false);

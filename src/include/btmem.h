@@ -437,24 +437,10 @@ struct __wt_page {
 				uint32_t deleted_entries;
 				WT_REF	**index;
 			} * volatile __index;	/* Collated children */
-
-			/*
-			 * When splitting to deepen the tree, track the number
-			 * of entries in the newly created parent, and how many
-			 * subsequent splits follow the initial set of entries.
-			 * If future splits into the page are generally after
-			 * the initial set of items, perform future deepening
-			 * splits in this page to optimize for an append-style
-			 * workload.
-			 */
-			uint32_t deepen_split_append;
-			uint32_t deepen_split_last;
 		} intl;
 #undef	pg_intl_recno
 #define	pg_intl_recno			u.intl.recno
 #define	pg_intl_parent_ref		u.intl.parent_ref
-#define	pg_intl_deepen_split_append	u.intl.deepen_split_append
-#define	pg_intl_deepen_split_last	u.intl.deepen_split_last
 
 	/*
 	 * Macros to copy/set the index because the name is obscured to ensure
