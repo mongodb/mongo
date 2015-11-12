@@ -812,8 +812,18 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
         ScopeGuard memberFreer = MakeGuard(&WorkingSet::free, _ws, id);
 
         if (!member->hasLoc()) {
-            // We expect to be here because of an invalidation causing a force-fetch, and
-            // doc-locking storage engines do not issue invalidations.
+            // We expect to be here because of an invalidation causing a force-fetch.
+
+            // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so
+            // will not produce any more results even if there is another matching document.
+            // Throw a WCE here so that these operations get another chance to find a matching
+            // document. The findAndModify command should automatically retry if it gets a WCE. The
+            // findAndModify command should automatically retry if it gets a WCE.
+            // TODO: this is not necessary if there was no sort specified.
+            if (_params.request->shouldReturnAnyDocs()) {
+                throw WriteConflictException();
+            }
+
             ++_specificStats.nInvalidateSkips;
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
@@ -891,6 +901,14 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 member->transitionToOwnedObj();
             }
         } catch (const WriteConflictException& wce) {
+            // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so
+            // will not produce any more results even if there is another matching document.
+            // Re-throw the WCE here so that these operations get another chance to find a matching
+            // document. The findAndModify command should automatically retry if it gets a WCE.
+            // TODO: this is not necessary if there was no sort specified.
+            if (_params.request->shouldReturnAnyDocs()) {
+                throw;
+            }
             _idRetrying = id;
             memberFreer.Dismiss();  // Keep this member around so we can retry updating it.
             *out = WorkingSet::INVALID_ID;

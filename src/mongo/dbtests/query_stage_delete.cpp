@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -251,8 +252,10 @@ public:
 };
 
 /**
- * Test that the delete stage does not delete or return WorkingSetMembers that it gets back from
- * a child in the OWNED_OBJ state.
+ * Test that a delete stage which has not been asked to return the deleted document will skip a
+ * WorkingSetMember that has been returned from the child in the OWNED_OBJ state. A WorkingSetMember
+ * in the OWNED_OBJ state implies there was a conflict during execution, so this WorkingSetMember
+ * should be skipped.
  */
 class QueryStageDeleteSkipOwnedObjects : public QueryStageDeleteBase {
 public:
@@ -277,7 +280,6 @@ public:
         // Configure the delete.
         DeleteStageParams deleteParams;
         deleteParams.isMulti = false;
-        deleteParams.returnDeleted = true;
         deleteParams.canonicalQuery = cq.get();
 
         const auto deleteStage =
@@ -298,6 +300,51 @@ public:
     }
 };
 
+/**
+ * Test that a delete stage which has been asked to return the deleted document will throw an
+ * exception when a child returns a WorkingSetMember in the OWNED_OBJ state. A WorkingSetMember in
+ * the OWNED_OBJ state implies there was a conflict during execution.
+ *
+ * The delete stage is only asked to return documents during a findAndModify, and should throw a
+ * WriteConflictException if there was a conflict. The findAndModify command will automatically
+ * retry any WriteConflictExceptions.
+ */
+class QueryStageDeleteShouldRetryConflictsForFindAndModify : public QueryStageDeleteBase {
+public:
+    void run() {
+        // Various variables we'll need.
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        Collection* coll = ctx.getCollection();
+        const BSONObj query = BSONObj();
+        const auto ws = make_unique<WorkingSet>();
+        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
+
+        // Configure a QueuedDataStage to pass an OWNED_OBJ to the delete stage.
+        auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
+        {
+            WorkingSetID id = ws->allocate();
+            WorkingSetMember* member = ws->get(id);
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{x: 1}"));
+            member->transitionToOwnedObj();
+            qds->pushBack(id);
+        }
+
+        // Configure the delete.
+        DeleteStageParams deleteParams;
+        deleteParams.isMulti = false;
+        deleteParams.returnDeleted = true;  // Emulate a findAndModify.
+        deleteParams.canonicalQuery = cq.get();
+
+        const auto deleteStage =
+            make_unique<DeleteStage>(&_txn, deleteParams, ws.get(), coll, qds.release());
+
+        // Call work, passing the set up member to the delete stage.
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        ASSERT_THROWS(deleteStage->work(&id), WriteConflictException);
+    }
+};
+
+
 class All : public Suite {
 public:
     All() : Suite("query_stage_delete") {}
@@ -307,6 +354,7 @@ public:
         add<QueryStageDeleteInvalidateUpcomingObject>();
         add<QueryStageDeleteReturnOldDoc>();
         add<QueryStageDeleteSkipOwnedObjects>();
+        add<QueryStageDeleteShouldRetryConflictsForFindAndModify>();
     }
 };
 

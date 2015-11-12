@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -525,8 +526,10 @@ public:
 };
 
 /**
- * Test that the update stage does not update or return WorkingSetMembers that it gets back from
- * a child in the OWNED_OBJ state.
+ * Test that an update stage which has not been asked to return any version of the updated document
+ * will skip a WorkingSetMember that has been returned from the child in the OWNED_OBJ state. A
+ * WorkingSetMember in the OWNED_OBJ state implies there was a conflict during execution, so this
+ * WorkingSetMember should be skipped.
  */
 class QueryStageUpdateSkipOwnedObjects : public QueryStageUpdateBase {
 public:
@@ -547,7 +550,6 @@ public:
         request.setUpdates(fromjson("{$set: {x: 0}}"));
         request.setSort(BSONObj());
         request.setMulti(false);
-        request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
         request.setLifecycle(&updateLifecycle);
 
         ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
@@ -584,6 +586,63 @@ public:
     }
 };
 
+/**
+ * Test that an update stage which has been asked to return the updated document will throw an
+ * exception when a child returns a WorkingSetMember in the OWNED_OBJ state. A WorkingSetMember in
+ * the OWNED_OBJ state implies there was a conflict during execution.
+ *
+ * The update stage is only asked to return the updated document during a findAndModify, and should
+ * throw a WriteConflictException if there was a conflict. The findAndModify command will
+ * automatically retry any WriteConflictExceptions.
+ */
+class QueryStageUpdateShouldRetryConflictsForFindAndModify : public QueryStageUpdateBase {
+public:
+    void run() {
+        // Various variables we'll need.
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        OpDebug* opDebug = &CurOp::get(_txn)->debug();
+        Collection* coll = ctx.getCollection();
+        UpdateLifecycleImpl updateLifecycle(false, nss);
+        UpdateRequest request(nss);
+        UpdateDriver driver((UpdateDriver::Options()));
+        const BSONObj query = BSONObj();
+        const auto ws = make_unique<WorkingSet>();
+        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
+
+        // Populate the request.
+        request.setQuery(query);
+        request.setUpdates(fromjson("{$set: {x: 0}}"));
+        request.setSort(BSONObj());
+        request.setMulti(false);
+        // Emulate a findAndModify.
+        request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
+        request.setLifecycle(&updateLifecycle);
+
+        ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
+
+        // Configure a QueuedDataStage to pass an OWNED_OBJ to the update stage.
+        auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
+        {
+            WorkingSetID id = ws->allocate();
+            WorkingSetMember* member = ws->get(id);
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{x: 1}"));
+            member->transitionToOwnedObj();
+            qds->pushBack(id);
+        }
+
+        // Configure the update.
+        UpdateStageParams updateParams(&request, &driver, opDebug);
+        updateParams.canonicalQuery = cq.get();
+
+        const auto updateStage =
+            make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release());
+
+        // Call work, passing the set up member to the update stage.
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        ASSERT_THROWS(updateStage->work(&id), WriteConflictException);
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("query_stage_update") {}
@@ -595,6 +654,7 @@ public:
         add<QueryStageUpdateReturnOldDoc>();
         add<QueryStageUpdateReturnNewDoc>();
         add<QueryStageUpdateSkipOwnedObjects>();
+        add<QueryStageUpdateShouldRetryConflictsForFindAndModify>();
     }
 };
 

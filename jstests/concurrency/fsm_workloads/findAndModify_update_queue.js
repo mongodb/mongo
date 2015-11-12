@@ -43,6 +43,8 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways.commandWorked(res);
 
             var doc = res.value;
+            assertWhenOwnColl.neq(
+                doc, null, 'findAndModify should have found and updated a matching document');
             if (doc !== null) {
                 this.saveDocId.call(this, db, collName, doc._id);
             }

@@ -363,14 +363,9 @@ public:
                          &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
                          txn);
 
-        // We may encounter a WriteConflictException when creating a collection during an
-        // upsert, even when holding the exclusive lock on the database (due to other load on
-        // the system). The query framework should handle all other WriteConflictExceptions,
-        // but we defensively wrap the operation in the retry loop anyway.
-        //
-        // SERVER-17579 getExecutorUpdate() and getExecutorDelete() can throw a
-        // WriteConflictException when checking whether an index is ready or not.
-        // (on debug builds only)
+        // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it is
+        // executing a findAndModify. This is done to ensure that we can always match, modify, and
+        // return the document under concurrency, if a matching document exists.
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             if (args.isRemove()) {
                 DeleteRequest request(nsString);
