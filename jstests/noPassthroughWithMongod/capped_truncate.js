@@ -14,13 +14,6 @@
                                          autoIndexId: true }));
     var t = db.capped_truncate;
 
-    // It is an error to remove a non-positive number of documents.
-    assert.commandFailed(db.runCommand({ captrunc: "capped_truncate", n: -1 }),
-                         "captrunc didn't return an error when attempting to remove a negative " +
-                         "number of documents");
-    assert.commandFailed(db.runCommand({ captrunc: "capped_truncate", n: 0 }),
-                         "captrunc didn't return an error when attempting to remove 0 documents");
-
     for (var j = 1; j <= 10; j++) {
         assert.writeOK(t.insert({x:j}));
     }

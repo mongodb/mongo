@@ -228,11 +228,6 @@ public:
         int n = cmdObj.getIntField("n");
         bool inc = cmdObj.getBoolField("inc");  // inclusive range?
 
-        if (n <= 0) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::BadValue, "n must be a positive integer"});
-        }
-
         OldClientWriteContext ctx(txn, fullNs);
         Collection* collection = ctx.getCollection();
 
