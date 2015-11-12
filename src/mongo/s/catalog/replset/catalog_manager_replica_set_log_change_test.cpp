@@ -142,7 +142,7 @@ protected:
 
         BSONObjBuilder createResponseBuilder;
         Command::appendCommandStatus(createResponseBuilder,
-                                     Status(ErrorCodes::HostUnreachable, "socket error"));
+                                     Status(ErrorCodes::ExceededTimeLimit, "operation timed out"));
         expectConfigCollectionCreate(
             configHost, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
 

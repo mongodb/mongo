@@ -56,7 +56,7 @@ const int kMaxNumFailedHostRetryAttempts = 3;
  * be retried.
  */
 bool isPerShardRetriableError(ErrorCodes::Error err) {
-    return (ErrorCodes::isNetworkError(err) || ErrorCodes::isNotMasterError(err) ||
+    return (ShardRegistry::kNetworkOrNotMasterErrors.count(err) ||
             err == ErrorCodes::NotMasterOrSecondary);
 }
 

@@ -821,8 +821,8 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
         cmdToRun = modifiedCmd.obj();
     }
 
-    auto response =
-        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, dbname, cmdToRun);
+    auto response = grid.shardRegistry()->runCommandOnConfigWithRetries(
+        txn, dbname, cmdToRun, ShardRegistry::kNotMasterErrors);
 
     if (!response.isOK()) {
         return Command::appendCommandStatus(*result, response.getStatus());
@@ -865,15 +865,9 @@ bool CatalogManagerReplicaSet::runUserManagementReadCommand(OperationContext* tx
 Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
                                                          const BSONArray& updateOps,
                                                          const BSONArray& preCondition) {
-    ShardRegistry::ErrorCodesSet networkOrNotMasterErrors{ErrorCodes::NotMaster,
-                                                          ErrorCodes::NotMasterNoSlaveOk,
-                                                          ErrorCodes::HostUnreachable,
-                                                          ErrorCodes::HostNotFound,
-                                                          ErrorCodes::NetworkTimeout};
-
     BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition);
     auto response = grid.shardRegistry()->runCommandOnConfigWithRetries(
-        txn, "config", cmd, networkOrNotMasterErrors);
+        txn, "config", cmd, ShardRegistry::kNetworkOrNotMasterErrors);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -897,12 +891,21 @@ DistLockManager* CatalogManagerReplicaSet::getDistLockManager() {
 void CatalogManagerReplicaSet::writeConfigServerDirect(OperationContext* txn,
                                                        const BatchedCommandRequest& batchRequest,
                                                        BatchedCommandResponse* batchResponse) {
-    std::string dbname = batchRequest.getNS().db().toString();
+    _runBatchWriteCommand(txn, batchRequest, batchResponse, ShardRegistry::kNotMasterErrors);
+}
+
+void CatalogManagerReplicaSet::_runBatchWriteCommand(
+    OperationContext* txn,
+    const BatchedCommandRequest& batchRequest,
+    BatchedCommandResponse* batchResponse,
+    const ShardRegistry::ErrorCodesSet& errorsToCheck) {
+    const std::string dbname = batchRequest.getNS().db().toString();
     invariant(dbname == "config" || dbname == "admin");
+
     const BSONObj cmdObj = batchRequest.toBSON();
 
     auto response =
-        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, dbname, cmdObj);
+        grid.shardRegistry()->runCommandOnConfigWithRetries(txn, dbname, cmdObj, errorsToCheck);
     if (!response.isOK()) {
         _toBatchError(response.getStatus(), batchResponse);
         return;
@@ -934,7 +937,7 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
 
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         BatchedCommandResponse response;
-        writeConfigServerDirect(txn, request, &response);
+        _runBatchWriteCommand(txn, request, &response, ShardRegistry::kNotMasterErrors);
 
         Status status = response.toStatus();
 
@@ -958,16 +961,25 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
             }
 
             auto existingDocs = fetchDuplicate.getValue().value;
+            if (existingDocs.empty()) {
+                return Status(ErrorCodes::DuplicateKey,
+                              stream() << "DuplicateKey error" << causedBy(status)
+                                       << " was returned after a retry attempt, but no documents "
+                                          "were found. This means a concurrent change occurred "
+                                          "together with the retries.");
+            }
+
             invariant(existingDocs.size() == 1);
 
             BSONObj existing = std::move(existingDocs.front());
             if (existing.woCompare(doc) == 0) {
                 // Documents match, so treat the operation as success
-                status = Status::OK();
+                return Status::OK();
             }
         }
 
-        if (ErrorCodes::isNetworkError(status.code()) && (retry < kMaxWriteRetry)) {
+        if (ShardRegistry::kNetworkOrNotMasterErrors.count(status.code()) &&
+            (retry < kMaxWriteRetry)) {
             continue;
         }
 
@@ -1031,20 +1043,10 @@ Status CatalogManagerReplicaSet::removeConfigDocuments(OperationContext* txn,
     request.setNS(nss);
     request.setWriteConcern(WriteConcernOptions::Majority);
 
-    for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
-        BatchedCommandResponse response;
-        writeConfigServerDirect(txn, request, &response);
+    BatchedCommandResponse response;
+    _runBatchWriteCommand(txn, request, &response, ShardRegistry::kNetworkOrNotMasterErrors);
 
-        Status status = response.toStatus();
-
-        if (ErrorCodes::isNetworkError(status.code()) && (retry < kMaxWriteRetry)) {
-            continue;
-        }
-
-        return status;
-    }
-
-    MONGO_UNREACHABLE;
+    return response.toStatus();
 }
 
 Status CatalogManagerReplicaSet::_checkDbDoesNotExist(OperationContext* txn,
@@ -1132,8 +1134,8 @@ Status CatalogManagerReplicaSet::_createCappedConfigCollection(OperationContext*
                                                                StringData collName,
                                                                int cappedSize) {
     BSONObj createCmd = BSON("create" << collName << "capped" << true << "size" << cappedSize);
-    auto result =
-        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, "config", createCmd);
+    auto result = grid.shardRegistry()->runCommandOnConfigWithRetries(
+        txn, "config", createCmd, ShardRegistry::kNetworkOrNotMasterErrors);
     if (!result.isOK()) {
         return result.getStatus();
     }
@@ -1305,14 +1307,15 @@ StatusWith<BSONObj> CatalogManagerReplicaSet::_runReadCommand(
     OperationContext* txn,
     const std::string& dbname,
     const BSONObj& cmdObj,
-    const ReadPreferenceSetting& settings) {
+    const ReadPreferenceSetting& readPref) {
     for (int retry = 1; retry <= kMaxReadRetry; ++retry) {
-        auto response = grid.shardRegistry()->runCommandOnConfig(txn, settings, dbname, cmdObj);
+        auto response = grid.shardRegistry()->runCommandOnConfig(txn, readPref, dbname, cmdObj);
         if (response.isOK()) {
             return response;
         }
 
-        if (ErrorCodes::isNetworkError(response.getStatus().code()) && retry < kMaxReadRetry) {
+        if (ShardRegistry::kNetworkOrNotMasterErrors.count(response.getStatus().code()) &&
+            retry < kMaxReadRetry) {
             continue;
         }
 

@@ -85,9 +85,6 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     return o.obj();
 }()};
 
-ShardRegistry::ErrorCodesSet kNotMasterErrors{ErrorCodes::NotMaster,
-                                              ErrorCodes::NotMasterNoSlaveOk};
-
 BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
     Seconds maxTime = kConfigCommandTimeout;
 
@@ -122,6 +119,19 @@ BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
 }
 
 }  // unnamed namespace
+
+const ShardRegistry::ErrorCodesSet ShardRegistry::kNotMasterErrors{ErrorCodes::NotMaster,
+                                                                   ErrorCodes::NotMasterNoSlaveOk};
+const ShardRegistry::ErrorCodesSet ShardRegistry::kNetworkOrNotMasterErrors{
+    ErrorCodes::NotMaster,
+    ErrorCodes::NotMasterNoSlaveOk,
+    ErrorCodes::HostUnreachable,
+    ErrorCodes::HostNotFound,
+    ErrorCodes::NetworkTimeout,
+    // This set includes interrupted because replica set step down kills all server operations
+    // before it closes connections so it may happen that the caller actually receives the
+    // interruption.
+    ErrorCodes::Interrupted};
 
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                              std::unique_ptr<executor::TaskExecutorPool> executorPool,
@@ -520,8 +530,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
             return result;
         }
 
-        if ((ErrorCodes::isNetworkError(result.getStatus().code()) ||
-             ErrorCodes::isNotMasterError(result.getStatus().code())) &&
+        if (kNetworkOrNotMasterErrors.count(result.getStatus().code()) &&
             retry < kOnErrorNumRetries) {
             continue;
         }
@@ -603,25 +612,6 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
         readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata : kReplSecondaryOkMetadata,
         kNotMasterErrors);
 
-    if (!response.isOK()) {
-        return response.getStatus();
-    }
-
-    advanceConfigOpTime(response.getValue().visibleOpTime);
-    return response.getValue().response;
-}
-
-StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(OperationContext* txn,
-                                                                          const std::string& dbname,
-                                                                          const BSONObj& cmdObj) {
-    auto response = _runCommandWithRetries(txn,
-                                           _executorPool->getFixedExecutor(),
-                                           getConfigShard(),
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           dbname,
-                                           cmdObj,
-                                           kReplMetadata,
-                                           kNotMasterErrors);
     if (!response.isOK()) {
         return response.getStatus();
     }

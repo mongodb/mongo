@@ -278,26 +278,23 @@ public:
                                                        const std::string& dbname,
                                                        const BSONObj& cmdObj);
 
-    StatusWith<BSONObj> runCommandOnConfigWithNotMasterRetries(OperationContext* txn,
-                                                               const std::string& dbname,
-                                                               const BSONObj& cmdObj);
-
     class ErrorCodesHash {
     public:
         size_t operator()(ErrorCodes::Error e) const {
             return std::hash<typename std::underlying_type<ErrorCodes::Error>::type>()(e);
         }
     };
+
     using ErrorCodesSet = unordered_set<ErrorCodes::Error, ErrorCodesHash>;
 
     /**
-     * Runs commands against a config shard. Retries if executing the command fails with one
-     * of the given error codes, or if executing the command succeeds but the command
-     * failed with one of the codes. If executing the command fails with a different
-     * code we return that code. If executing the command succeeds and the command
-     * itself succeeds or fails with a code not in the set, then we return the command response
-     * object. Thus the caller is responsible for checking the command response object for any kind
-     * of command-specific failures other than those specified in errorsToCheck.
+     * Runs commands against the config shard's primary. Retries if executing the command fails with
+     * one of the given error codes, or if executing the command succeeds but the server returned
+     * one of the codes. If executing the command fails with a different code we return that code.
+     * If executing the command succeeds and the command itself succeeds or fails with a code not in
+     * the set, then we return the command response object. Thus the caller is responsible for
+     * checking the command response object for any kind of command-specific failures other than
+     * those specified in errorsToCheck.
      */
     StatusWith<BSONObj> runCommandOnConfigWithRetries(OperationContext* txn,
                                                       const std::string& dbname,
@@ -311,6 +308,18 @@ public:
     static void updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter,
                                      const HostAndPort& remoteHost,
                                      const Status& remoteCommandStatus);
+
+    /**
+     * Set of error codes, which indicate that the remote host is not the current master. Retries on
+     * errors from this set are always safe and should be used by default.
+     */
+    static const ErrorCodesSet kNotMasterErrors;
+
+    /**
+     * Set of error codes which includes NotMaster and any network exceptions. Retries on errors
+     * from this set are not always safe and may require some additional idempotency guarantees.
+     */
+    static const ErrorCodesSet kNetworkOrNotMasterErrors;
 
 private:
     using ShardMap = std::unordered_map<ShardId, std::shared_ptr<Shard>>;

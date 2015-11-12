@@ -188,8 +188,8 @@ Status DistLockCatalogImpl::ping(OperationContext* txn, StringData processID, Da
     request.setUpsert(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandOnConfigWithRetries(
+        txn, _locksNS.db().toString(), request.toBSON(), ShardRegistry::kNotMasterErrors);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -220,8 +220,8 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandOnConfigWithRetries(
+        txn, _locksNS.db().toString(), request.toBSON(), ShardRegistry::kNotMasterErrors);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -274,8 +274,8 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* txn,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandOnConfigWithRetries(
+        txn, _locksNS.db().toString(), request.toBSON(), ShardRegistry::kNotMasterErrors);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -306,8 +306,8 @@ Status DistLockCatalogImpl::unlock(OperationContext* txn, const OID& lockSession
         BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandOnConfigWithRetries(
+        txn, _locksNS.db().toString(), request.toBSON(), ShardRegistry::kNotMasterErrors);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -418,8 +418,8 @@ Status DistLockCatalogImpl::stopPing(OperationContext* txn, StringData processId
         FindAndModifyRequest::makeRemove(_lockPingNS, BSON(LockpingsType::process() << processId));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus = _client->runCommandOnConfigWithRetries(
+        txn, _locksNS.db().toString(), request.toBSON(), ShardRegistry::kNotMasterErrors);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();

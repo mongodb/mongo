@@ -31,6 +31,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/catalog/catalog_manager_common.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -171,7 +172,16 @@ private:
     StatusWith<BSONObj> _runReadCommand(OperationContext* txn,
                                         const std::string& dbname,
                                         const BSONObj& cmdObj,
-                                        const ReadPreferenceSetting& settings);
+                                        const ReadPreferenceSetting& readPref);
+
+    /**
+     * Executes the specified batch write command on the current config server's primary and retries
+     * on the specified set of errors using the default retry policy.
+     */
+    void _runBatchWriteCommand(OperationContext* txn,
+                               const BatchedCommandRequest& request,
+                               BatchedCommandResponse* response,
+                               const ShardRegistry::ErrorCodesSet& errorsToCheck);
 
     /**
      * Helper method for running a count command against the config server with appropriate
