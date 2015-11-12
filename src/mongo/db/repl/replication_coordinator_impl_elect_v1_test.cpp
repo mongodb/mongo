@@ -637,7 +637,8 @@ TEST_F(ReplCoordElectV1Test, ElectionFailsWhenTermChangesDuringDryRun) {
     auto onDryRunRequest = [this](const RemoteCommandRequest& request) {
         // Update to a future term before dry run completes.
         ASSERT_EQUALS(0, request.cmdObj.getIntField("candidateIndex"));
-        ASSERT_TRUE(getTopoCoord().updateTerm(1000, getNet()->now()));
+        ASSERT(getTopoCoord().updateTerm(1000, getNet()->now()) ==
+               TopologyCoordinator::UpdateTermResult::kUpdatedTerm);
     };
     simulateSuccessfulDryRun(onDryRunRequest);
 

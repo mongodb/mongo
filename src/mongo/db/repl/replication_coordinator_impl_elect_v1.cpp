@@ -181,9 +181,9 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
 
     log() << "dry election run succeeded, running for election";
     // Stepdown is impossible from this term update.
-    bool updated = false;
-    _updateTerm_incallback(originalTerm + 1, &updated);
-    invariant(updated);
+    TopologyCoordinator::UpdateTermResult updateTermResult;
+    _updateTerm_incallback(originalTerm + 1, &updateTermResult);
+    invariant(updateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm);
     // Secure our vote for ourself first
     _topCoord->voteForMyselfV1();
 

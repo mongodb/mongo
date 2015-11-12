@@ -506,7 +506,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
     for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
         auto result = _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
         if (result.isOK()) {
-            return {std::move(result)};
+            return result;
         }
 
         if ((ErrorCodes::isNetworkError(result.getStatus().code()) ||
@@ -680,7 +680,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithRetries
         auto response = _runCommandWithMetadata(
             txn, executor, shard, readPref, dbname, cmdWithMaxTimeMS, metadata, errorsToCheck);
         if (response.isOK()) {
-            return {std::move(response)};
+            return response;
         }
 
         if (errorsToCheck.count(response.getStatus().code()) && retry < kOnErrorNumRetries) {

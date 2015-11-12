@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_name.h"
@@ -364,10 +365,12 @@ public:
     /**
      * Non-blocking version of updateTerm.
      * Returns event handle that we can use to wait for the operation to complete.
-     * When the operation is complete (waitForEvent() returns), 'updated' will be set to true
-     * if the term increased and potential stepdown has finished.
+     * When the operation is complete (waitForEvent() returns), 'updateResult' will be set
+     * to a status telling if the term increased or a stepdown was triggered.
+
      */
-    ReplicationExecutor::EventHandle updateTerm_forTest(long long term, bool* updated);
+    ReplicationExecutor::EventHandle updateTerm_forTest(
+        long long term, TopologyCoordinator::UpdateTermResult* updateResult);
 
     /**
      * If called after _startElectSelfV1(), blocks until all asynchronous
@@ -1043,11 +1046,12 @@ private:
     /**
      * Callback that attempts to set the current term in topology coordinator and
      * relinquishes primary if the term actually changes and we are primary.
-     * *updated will be true if the term increased.
+     * *updateTermResult will be the result of the update term attempt.
      * Returns the finish event if it does not finish in this function, for example,
      * due to stepdown, otherwise the returned EventHandle is invalid.
      */
-    EventHandle _updateTerm_incallback(long long term, bool* updated = nullptr);
+    EventHandle _updateTerm_incallback(
+        long long term, TopologyCoordinator::UpdateTermResult* updateTermResult = nullptr);
 
     /**
      * Callback that processes the ReplSetMetadata returned from a command run against another

@@ -149,7 +149,7 @@ public:
     virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
     virtual int getMaintenanceCount() const;
     virtual long long getTerm();
-    virtual bool updateTerm(long long term, Date_t now);
+    virtual UpdateTermResult updateTerm(long long term, Date_t now);
     virtual void setForceSyncSourceIndex(int index);
     virtual HostAndPort chooseNewSyncSource(Date_t now, const Timestamp& lastTimestampApplied);
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);

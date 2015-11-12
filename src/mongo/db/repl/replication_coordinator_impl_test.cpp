@@ -1285,8 +1285,13 @@ TEST_F(ReplCoordTest, UpdateTerm) {
     // higher term, step down and change term
     Handle cbHandle;
     ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(&txn, 2).code());
-    ASSERT_EQUALS(2, getReplCoord()->getTerm());
+    // Term hasn't been incremented yet, as we need another try to update it after stepdown.
+    ASSERT_EQUALS(1, getReplCoord()->getTerm());
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    // Now update term should actually update the term, as stepdown is complete.
+    ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(&txn, 2).code());
+    ASSERT_EQUALS(2, getReplCoord()->getTerm());
 }
 
 TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreThanOnce) {
@@ -1322,11 +1327,11 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
     };
     replExec->scheduleWorkWithGlobalExclusiveLock(stepDownFinishBlocker);
 
-    bool termUpdated2 = false;
+    TopologyCoordinator::UpdateTermResult termUpdated2;
     auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
     ASSERT(updateTermEvh2.isValid());
 
-    bool termUpdated3 = false;
+    TopologyCoordinator::UpdateTermResult termUpdated3;
     auto updateTermEvh3 = getReplCoord()->updateTerm_forTest(3, &termUpdated3);
     ASSERT(updateTermEvh3.isValid());
 
@@ -1335,14 +1340,22 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
 
     // Both _updateTerm_incallback tasks should be scheduled.
     replExec->waitForEvent(updateTermEvh2);
-    ASSERT_TRUE(termUpdated2);
+    ASSERT(termUpdated2 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
     replExec->waitForEvent(updateTermEvh3);
-    ASSERT_TRUE(termUpdated3);
+    ASSERT(termUpdated3 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
 
-    ASSERT_EQUALS(3, getReplCoord()->getTerm());
+    // Term hasn't updated yet.
+    ASSERT_EQUALS(1, getReplCoord()->getTerm());
 
     // Update term event handles will wait for potential stepdown.
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    TopologyCoordinator::UpdateTermResult termUpdated4;
+    auto updateTermEvh4 = getReplCoord()->updateTerm_forTest(3, &termUpdated4);
+    ASSERT(updateTermEvh4.isValid());
+    replExec->waitForEvent(updateTermEvh4);
+    ASSERT(termUpdated4 == TopologyCoordinator::UpdateTermResult::kUpdatedTerm);
+    ASSERT_EQUALS(3, getReplCoord()->getTerm());
 }
 
 TEST_F(StepDownTest, StepDownNotPrimary) {

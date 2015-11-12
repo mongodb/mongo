@@ -112,12 +112,14 @@ public:
      */
     virtual long long getTerm() = 0;
 
+    enum class UpdateTermResult { kAlreadyUpToDate, kTriggerStepDown, kUpdatedTerm };
+
     /**
      * Sets the latest term this member is aware of to the higher of its current value and
      * the value passed in as "term".
-     * Returns true if the local term value is changed.
+     * Returns the result of setting the term value, or if a stepdown should be triggered.
      */
-    virtual bool updateTerm(long long term, Date_t now) = 0;
+    virtual UpdateTermResult updateTerm(long long term, Date_t now) = 0;
 
     ////////////////////////////////////////////////////////////
     //

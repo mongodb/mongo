@@ -2250,14 +2250,21 @@ int TopologyCoordinatorImpl::getMaintenanceCount() const {
     return _maintenanceModeCalls;
 }
 
-bool TopologyCoordinatorImpl::updateTerm(long long term, Date_t now) {
+TopologyCoordinator::UpdateTermResult TopologyCoordinatorImpl::updateTerm(long long term,
+                                                                          Date_t now) {
     if (term <= _term) {
-        return false;
+        return TopologyCoordinator::UpdateTermResult::kAlreadyUpToDate;
     }
     // Don't run election if we just stood up or learned about a new term.
     _electionSleepUntil = now + _rsConfig.getElectionTimeoutPeriod();
+
+    // Don't update the term just yet if we are going to step down, as we don't want to report
+    // that we are primary in the new term.
+    if (_iAmPrimary()) {
+        return TopologyCoordinator::UpdateTermResult::kTriggerStepDown;
+    }
     _term = term;
-    return true;
+    return TopologyCoordinator::UpdateTermResult::kUpdatedTerm;
 }
 
 

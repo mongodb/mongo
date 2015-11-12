@@ -3080,14 +3080,15 @@ void ReplicationCoordinatorImpl::_getTerm_helper(const ReplicationExecutor::Call
     *term = _topCoord->getTerm();
 }
 
-EventHandle ReplicationCoordinatorImpl::updateTerm_forTest(long long term, bool* updated) {
+EventHandle ReplicationCoordinatorImpl::updateTerm_forTest(
+    long long term, TopologyCoordinator::UpdateTermResult* updateResult) {
     auto finishEvhStatus = _replExecutor.makeEvent();
     invariantOK(finishEvhStatus.getStatus());
     EventHandle finishEvh = finishEvhStatus.getValue();
     auto signalFinishEvent =
         [this, finishEvh](const CallbackArgs&) { this->_replExecutor.signalEvent(finishEvh); };
-    auto work = [this, term, updated, signalFinishEvent](const CallbackArgs& args) {
-        auto evh = _updateTerm_incallback(term, updated);
+    auto work = [this, term, updateResult, signalFinishEvent](const CallbackArgs& args) {
+        auto evh = _updateTerm_incallback(term, updateResult);
         if (evh.isValid()) {
             _replExecutor.onEvent(evh, signalFinishEvent);
         } else {
@@ -3111,46 +3112,48 @@ Status ReplicationCoordinatorImpl::updateTerm(OperationContext* txn, long long t
 
     // Check we haven't acquired any lock, because potential stepdown needs global lock.
     dassert(!txn->lockState()->isLocked());
-    bool updated = false;
+    TopologyCoordinator::UpdateTermResult updateTermResult;
     EventHandle finishEvh;
-    auto work = [this, term, &updated, &finishEvh](const CallbackArgs&) {
-        finishEvh = _updateTerm_incallback(term, &updated);
+    auto work = [this, term, &updateTermResult, &finishEvh](const CallbackArgs&) {
+        finishEvh = _updateTerm_incallback(term, &updateTermResult);
     };
     _scheduleWorkAndWaitForCompletion(work);
     // Wait for potential stepdown to finish.
     if (finishEvh.isValid()) {
         _replExecutor.waitForEvent(finishEvh);
     }
-    if (updated) {
+    if (updateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm ||
+        updateTermResult == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
         return {ErrorCodes::StaleTerm, "Replication term of this node was stale; retry query"};
     }
 
     return Status::OK();
 }
 
-EventHandle ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, bool* updated) {
+EventHandle ReplicationCoordinatorImpl::_updateTerm_incallback(
+    long long term, TopologyCoordinator::UpdateTermResult* updateTermResult) {
     if (!isV1ElectionProtocol()) {
         LOG(3) << "Cannot update term in election protocol version 0";
         return EventHandle();
     }
 
     auto now = _replExecutor.now();
-    bool termUpdated = _topCoord->updateTerm(term, now);
+    TopologyCoordinator::UpdateTermResult localUpdateTermResult = _topCoord->updateTerm(term, now);
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _cachedTerm = _topCoord->getTerm();
 
-        if (termUpdated) {
+        if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm) {
             _cancelPriorityTakeover_inlock();
             _cancelAndRescheduleElectionTimeout_inlock();
         }
     }
 
-    if (updated) {
-        *updated = termUpdated;
+    if (updateTermResult) {
+        *updateTermResult = localUpdateTermResult;
     }
 
-    if (termUpdated && getMemberState().primary()) {
+    if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
         log() << "stepping down from primary, because a new term has begun: " << term;
         _topCoord->prepareForStepDown();
         return _stepDownStart();
