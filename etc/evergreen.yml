@@ -295,6 +295,90 @@ functions:
         . venv-release/bin/activate
         pip install --retries 30 --timeout 30 jira==0.16 requests==2.7.0
 
+  "run jstestfuzz":
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          git clone git@github.com:10gen/jstestfuzz.git
+
+          if [ "Windows_NT" != "$OS" ]; then
+            curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.7-linux-x64.tar.gz --output node.tar.gz
+            ${decompress} node.tar.gz
+          fi
+
+          cp mongodb*/bin/mongod .
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
+          git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
+    - command: shell.exec
+      params:
+        working_dir: src/jstestfuzz
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ "Windows_NT" = "$OS" ]; then
+            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
+            # Work around the issue by specifying a different %APPDATA% path.
+            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
+            export APPDATA=${workdir}/npm-app-data
+            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs"
+          else
+            export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin"
+          fi
+
+          npm install
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src/jstestfuzz
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [ "Windows_NT" = "$OS" ]; then
+            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
+            # Work around the issue by specifying a different %APPDATA% path.
+            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
+            export APPDATA=${workdir}/npm-app-data
+            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs"
+          else
+            export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin"
+          fi
+
+          # Run jstestfuzz self-tests; redirect to /dev/null to avoid polluting the logs.
+          echo "jstestfuzz self-tests are starting"
+          npm test > /dev/null 2>&1
+          echo "jstestfuzz self-tests finished"
+
+          npm start -- --jsTestsDir ../jstests
+    - command: archive.targz_pack
+      params:
+        target: "jstests.tgz"
+        source_dir: "src/jstestfuzz"
+        include:
+          - "out/*.js"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: jstests.tgz
+        remote_file: mongodb-mongo-master/${build_variant}/${revision}/jstestfuzz/jstestfuzz-${build_id}-${execution}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: Generated Tests - Execution ${execution}
+
 pre:
   - command: shell.track
   - command: shell.exec
@@ -506,88 +590,7 @@ tasks:
   - name: compile
   commands:
     - func: "do setup"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          git clone git@github.com:10gen/jstestfuzz.git
-
-          if [ "Windows_NT" != "$OS" ]; then
-            curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.7-linux-x64.tar.gz --output node.tar.gz
-            ${decompress} node.tar.gz
-          fi
-
-          cp mongodb*/bin/mongod .
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
-          git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
-    - command: shell.exec
-      params:
-        working_dir: src/jstestfuzz
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs"
-          else
-            export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin"
-          fi
-
-          npm install
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src/jstestfuzz
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs"
-          else
-            export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin"
-          fi
-
-          # Run jstestfuzz self-tests; redirect to /dev/null to avoid polluting the logs.
-          echo "jstestfuzz self-tests are starting"
-          npm test > /dev/null 2>&1
-          echo "jstestfuzz self-tests finished"
-
-          npm start -- --jsTestsDir ../jstests
-    - command: archive.targz_pack
-      params:
-        target: "jstests.tgz"
-        source_dir: "src/jstestfuzz"
-        include:
-          - "out/*.js"
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: jstests.tgz
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/jstestfuzz/jstestfuzz-${build_id}-${execution}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: Generated Tests - Execution ${execution}
+    - func: "run jstestfuzz"
     - func: "run tests"
       # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
       # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
@@ -596,6 +599,24 @@ tasks:
       timeout_secs: 1800
       vars:
         resmoke_args: --suites=jstestfuzz
+        should_shuffle: false
+
+## jstestfuzz sharded cluster ##
+- name: jstestfuzz_sharded_WT
+  exec_timeout_secs: 7200 # Time out the task if it runs for more than 2 hours.
+  depends_on:
+  - name: compile
+  commands:
+    - func: "do setup"
+    - func: "run jstestfuzz"
+    - func: "run tests"
+      # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
+      # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
+      # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
+      # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
+      timeout_secs: 1800
+      vars:
+        resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger
         should_shuffle: false
 
 ## unit tests ##
@@ -2172,6 +2193,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -2371,6 +2393,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -2425,6 +2448,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod_WT
   - name: bulk_gle_passthrough_WT
@@ -2500,6 +2524,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mongosTest
   - name: mmap
   - name: multiversion
@@ -2599,6 +2624,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -2683,6 +2709,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_WT_ese
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -2769,6 +2796,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -2928,6 +2956,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -3021,6 +3050,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -3169,6 +3199,7 @@ buildvariants:
   - name: sharding_WT_ese
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
   - name: replicasets_WT_ese
@@ -3226,6 +3257,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -3596,6 +3628,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -3684,6 +3717,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -3769,6 +3803,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -3841,6 +3876,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -3941,6 +3977,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -4041,6 +4078,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -4120,6 +4158,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -4165,6 +4204,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -4214,6 +4254,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
@@ -4284,6 +4325,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -4359,6 +4401,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
@@ -4429,6 +4472,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -4585,6 +4629,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -4655,6 +4700,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -4736,6 +4782,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
@@ -4773,6 +4820,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
@@ -4963,6 +5011,7 @@ buildvariants:
   tasks:
   - name: compile
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: unittests
 
 - name: ubuntu1410-fast-clang
@@ -5018,6 +5067,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
