@@ -23,6 +23,10 @@ DEST_TO_CONFIG = {
     "dbpath_prefix": "dbpathPrefix",
     "dbtest_executable": "dbtest",
     "dry_run": "dryRun",
+    "exclude_with_all_tags": "excludeWithAllTags",
+    "exclude_with_any_tags": "excludeWithAnyTags",
+    "include_with_all_tags": "includeWithAllTags",
+    "include_with_any_tags": "includeWithAnyTags",
     "jobs": "jobs",
     "mongo_executable": "mongo",
     "mongod_executable": "mongod",
@@ -84,11 +88,28 @@ def parse_command_line():
                       help="Executes all tests in all suites, even if some of them fail.")
 
     parser.add_option("--dbpathPrefix", dest="dbpath_prefix", metavar="PATH",
-                      help=("The directory which will contain the dbpaths of any mongod's started "
+                      help=("The directory which will contain the dbpaths of any mongod's started"
                             " by resmoke.py or the tests themselves."))
 
     parser.add_option("--dbtest", dest="dbtest_executable", metavar="PATH",
                       help="The path to the dbtest executable for resmoke to use.")
+
+    parser.add_option("--excludeWithAllTags", dest="exclude_with_all_tags", metavar="TAG1,TAG2",
+                      help=("Comma separated list of tags. Any jstest that contains all of the"
+                            " specified tags will be excluded from any suites that are run."))
+
+    parser.add_option("--excludeWithAnyTags", dest="exclude_with_any_tags", metavar="TAG1,TAG2",
+                      help=("Comma separated list of tags. Any jstest that contains any of the"
+                            " specified tags will be excluded from any suites that are run."))
+
+    parser.add_option("--includeWithAllTags", dest="include_with_all_tags", metavar="TAG1,TAG2",
+                      help=("Comma separated list of tags. For the jstest portion of the suite(s),"
+                            " only tests which have all of the specified tags will be run."))
+
+    parser.add_option("--includeWithAnyTags", dest="include_with_any_tags", metavar="TAG1,TAG2",
+                      help=("Comma separated list of tags. For the jstest portion of the suite(s),"
+                            " only tests which have at least one of the specified tags will be"
+                            " run."))
 
     parser.add_option("-n", action="store_const", const="tests", dest="dry_run",
                       help=("Output the tests that would be run."))
@@ -203,7 +224,11 @@ def update_config_vars(values):
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpathPrefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest"))
     _config.DRY_RUN = config.pop("dryRun")
+    _config.EXCLUDE_WITH_ALL_TAGS = config.pop("excludeWithAllTags")
+    _config.EXCLUDE_WITH_ANY_TAGS = config.pop("excludeWithAnyTags")
     _config.FAIL_FAST = not config.pop("continueOnFailure")
+    _config.INCLUDE_WITH_ALL_TAGS = config.pop("includeWithAllTags")
+    _config.INCLUDE_WITH_ANY_TAGS = config.pop("includeWithAnyTags")
     _config.JOBS = config.pop("jobs")
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo"))
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod"))
