@@ -199,6 +199,8 @@ jsTestOptions = function(){
                               auditDestination: TestData.auditDestination,
                               minPort: TestData.minPort,
                               maxPort: TestData.maxPort,
+                              // Note: does not support the array version
+                              mongosBinVersion: TestData.mongosBinVersion || "",
                             }
                         );
     }

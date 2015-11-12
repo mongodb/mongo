@@ -537,20 +537,25 @@ MongoRunner.mongosOptions = function( opts ) {
         opts.logpath = opts.logFile;
     }
 
-    if( jsTestOptions().keyFile && !opts.keyFile) {
-        opts.keyFile = jsTestOptions().keyFile
+    var testOptions = jsTestOptions();
+    if (testOptions.keyFile && !opts.keyFile) {
+        opts.keyFile = testOptions.keyFile;
     }
-    
+
     if (opts.hasOwnProperty("auditDestination")) {
         // opts.auditDestination, if set, must be a string
         if (typeof opts.auditDestination !== "string") {
             throw new Error("The auditDestination option must be a string if it is specified");
         }
-    } else if (jsTestOptions().auditDestination !== undefined) {
-        if (typeof(jsTestOptions().auditDestination) !== "string") {
+    } else if (testOptions.auditDestination !== undefined) {
+        if (typeof(testOptions.auditDestination) !== "string") {
             throw new Error("The auditDestination option must be a string if it is specified");
         }
-        opts.auditDestination = jsTestOptions().auditDestination;
+        opts.auditDestination = testOptions.auditDestination;
+    }
+
+    if (!opts.hasOwnProperty('binVersion') && testOptions.mongosBinVersion) {
+        opts.binVersion = MongoRunner.getBinVersionFor(testOptions.mongosBinVersion);
     }
 
     return opts
@@ -758,7 +763,8 @@ _startMongodNoReset = function(){
  */
 function appendSetParameterArgs(argArray) {
     var programName = argArray[0];
-    if (programName.endsWith('mongod') || programName.endsWith('mongos')) {
+    if (programName.endsWith('mongod') || programName.endsWith('mongos')
+        || programName.startsWith('mongod-') || programName.startsWith('mongos-')) {
         if (jsTest.options().enableTestCommands) {
             argArray.push.apply(argArray, ['--setParameter', "enableTestCommands=1"]);
         }
@@ -781,7 +787,7 @@ function appendSetParameterArgs(argArray) {
             argArray.push.apply(argArray, ['--setParameter', "enableLocalhostAuthBypass=false"]);
         }
 
-        // mongos only options
+        // mongos only options. Note: excludes mongos with version suffix (ie. mongos-3.0).
         if (programName.endsWith('mongos')) {
             // apply setParameters for mongos
             if (jsTest.options().setParametersMongos) {
@@ -793,7 +799,7 @@ function appendSetParameterArgs(argArray) {
                 }
             }
         }
-        // mongod only options
+        // mongod only options. Note: excludes mongos with version suffix (ie. mongos-3.0).
         else if (programName.endsWith('mongod')) {
             // set storageEngine for mongod
             if (jsTest.options().storageEngine) {

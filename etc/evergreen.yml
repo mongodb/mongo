@@ -280,7 +280,7 @@ functions:
           extra_args="$extra_args --shuffle"
         fi
 
-        ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+        ${path_prefix} ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
   "setup release credentials":
     command: shell.exec
@@ -401,6 +401,17 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: Generated Tests - Execution ${execution}
+
+  "do multiversion setup" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        rm -rf /data/install /data/multiversion
+        ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "2.4" "2.6" "3.0"
 
 pre:
   - command: shell.track
@@ -1176,18 +1187,12 @@ tasks:
   name: multiversion
   commands:
   - func: "do setup"
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        cp mongodb*/bin/* .
-        rm -rf /data/install /data/multiversion
-        ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "2.4" "2.6" "3.0"
-        PATH=$PATH:/data/multiversion ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=multiversion --jobs ${num_jobs_available|1} --shuffle ${test_flags} --log=buildlogger --reportFile=report.json
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      path_prefix: PATH=$PATH:/data/multiversion
+      resmoke_args: --suites=multiversion
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: noPassthrough
@@ -1606,6 +1611,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_legacy_multiversion
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      path_prefix: PATH=$PATH:/data/multiversion
+      resmoke_args: --suites=sharding_legacy_multiversion
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -2267,6 +2283,7 @@ buildvariants:
   - name: replication_auth
   - name: sharding
   - name: sharding_legacy
+  - name: sharding_legacy_multiversion
   - name: sharding_WT
   - name: sharding_auth
   - name: slow1
@@ -2603,6 +2620,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2705,6 +2723,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2881,6 +2900,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -3827,6 +3847,7 @@ buildvariants:
   - name: sharding_legacy
   - name: sharding_legacy_op_query_WT
   - name: sharding_op_query_WT
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -3978,6 +3999,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4081,6 +4103,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4184,6 +4207,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4439,6 +4463,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4590,6 +4615,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4822,6 +4848,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -5087,6 +5114,7 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_legacy_multiversion
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
@@ -5207,6 +5235,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
