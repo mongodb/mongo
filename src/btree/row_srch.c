@@ -291,9 +291,10 @@ restart_page:	page = current->page;
 			}
 
 		/*
-		 * Set the slot to descend the tree: descent is already set if
-		 * there was an exact match on the page, otherwise, base is
-		 * the smallest index greater than key, possibly (last + 1).
+		 * Set the slot to descend the tree: descent was already set if
+		 * there was an exact match on the page, otherwise, base is the
+		 * smallest index greater than key, possibly one past the last
+		 * slot.
 		 */
 		descent = pindex->index[base - 1];
 
@@ -301,14 +302,14 @@ restart_page:	page = current->page;
 		 * If we end up somewhere other than the last slot, it's not a
 		 * right-side descent.
 		 */
-		if (pindex->entries != base - 1)
+		if (pindex->entries != base)
 			descend_right = false;
 
 		/*
 		 * If on the last slot (the key is larger than any key on the
 		 * page), check for an internal page split race.
 		 */
-		if (pindex->entries == base - 1) {
+		if (pindex->entries == base) {
 append:			if (parent_pindex != NULL &&
 			    __wt_split_intl_race(
 			    session, current->home, parent_pindex)) {
@@ -505,7 +506,13 @@ leaf_match:	cbt->compare = 0;
 
 	return (0);
 
-err:	if (leaf != NULL)
+err:	/*
+	 * Release the current page if the search started at the root. If the
+	 * search didn't start at the root we should never have gone looking
+	 * beyond the start page.
+	 */
+	WT_ASSERT(session, leaf == NULL || leaf == current);
+	if (leaf == NULL)
 		WT_TRET(__wt_page_release(session, current, 0));
 	return (ret);
 }

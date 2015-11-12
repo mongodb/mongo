@@ -407,7 +407,8 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	remain = pindex->entries - chunk * (children - 1);
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
+	    "%p: %" PRIu32 " root page elements, splitting into %" PRIu32
+	    " children",
 	    root, pindex->entries, children));
 
 	/*
@@ -913,7 +914,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	remain = moved_entries - chunk * (children - 1);
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
+	    "%p: %" PRIu32 " internal page elements, splitting into %" PRIu32
+	    " children",
 	    page, pindex->entries, children));
 
 	/*
@@ -1462,7 +1464,7 @@ __split_multi_inmem_final(WT_PAGE *orig, WT_MULTI *multi)
 	uint32_t i, slot;
 
 	/*
-	 * We've successfully created new in-memory pages. For error-handling
+	 * We successfully created new in-memory pages. For error-handling
 	 * reasons, we've left the update chains referenced by both the original
 	 * and new pages. We're ready to discard the original page, terminate
 	 * the original page's reference to any update list we moved.
@@ -1481,6 +1483,25 @@ __split_multi_inmem_final(WT_PAGE *orig, WT_MULTI *multi)
 				supd->ins->upd = NULL;
 			break;
 		}
+}
+
+/*
+ * __split_multi_inmem_fail --
+ *	Discard allocated pages after failure.
+ */
+static void
+__split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	/*
+	 * We failed creating new in-memory pages. For error-handling reasons,
+	 * we've left the update chains referenced by both the original and
+	 * new pages. Discard the new pages, setting a flag so the discard code
+	 * doesn't discard the updates on the page.
+	 */
+	if (ref->page != NULL) {
+		F_SET_ATOMIC(ref->page, WT_PAGE_UPDATE_IGNORE);
+		__wt_free_ref(session, ref->page, ref, true);
+	}
 }
 
 /*
@@ -1897,24 +1918,8 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	__wt_page_out(session, &page);
 
 	if (0) {
-err:		/*
-		 * A note on error handling: when handling unresolved changes,
-		 * we create new in-memory pages with those unresolved changes.
-		 * The problem is the new pages are given references to the
-		 * original page's update lists, and once all of the pages are
-		 * created, there's a second pass to remove the updates from the
-		 * original page. If an error occurs, we can't simply free the
-		 * newly created pages, that would discard the original page's
-		 * updates. Set a flag so the discard function doesn't discard
-		 * the updates on the page.
-		 */
-		for (i = 0; i < new_entries; ++i)
-			if (ref_new[i]->page != NULL) {
-				F_SET_ATOMIC(
-				    ref_new[i]->page, WT_PAGE_UPDATE_IGNORE);
-				__wt_free_ref(session,
-				    ref_new[i]->page, ref_new[i], true);
-			}
+err:		for (i = 0; i < new_entries; ++i)
+			__split_multi_inmem_fail(session, ref_new[i]);
 	}
 
 	__wt_free(session, ref_new);
@@ -1971,6 +1976,7 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 int
 __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_REF new;
@@ -1989,7 +1995,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Build the new page.
 	 */
 	memset(&new, 0, sizeof(new));
-	WT_RET(__split_multi_inmem(session, page, &new, &mod->mod_multi[0]));
+	WT_ERR(__split_multi_inmem(session, page, &new, &mod->mod_multi[0]));
 
 	/*
 	 * The rewrite succeeded, we can no longer fail.
@@ -2013,4 +2019,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 
 	return (0);
+
+err:	__split_multi_inmem_fail(session, &new);
+	return (ret);
 }

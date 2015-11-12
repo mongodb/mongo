@@ -594,15 +594,16 @@ wiredtiger_open_common = connection_runtime_config + [
         checkpoints''',
         type='boolean'),
     Config('direct_io', '', r'''
-        Use \c O_DIRECT to access files.  Options are given as a list,
-        such as <code>"direct_io=[data]"</code>.  Configuring
-        \c direct_io requires care, see @ref
-        tuning_system_buffer_cache_direct_io for important warnings.
-        Including \c "data" will cause WiredTiger data files to use
-        \c O_DIRECT, including \c "log" will cause WiredTiger log files
-        to use \c O_DIRECT, and including \c "checkpoint" will cause
-        WiredTiger data files opened at a checkpoint (i.e: read only) to
-        use \c O_DIRECT''',
+        Use \c O_DIRECT on POSIX systems, and \c FILE_FLAG_NO_BUFFERING on
+        Windows to access files.  Options are given as a list, such as
+        <code>"direct_io=[data]"</code>.  Configuring \c direct_io requires
+        care, see @ref tuning_system_buffer_cache_direct_io for important
+        warnings.  Including \c "data" will cause WiredTiger data files to use
+        direct I/O, including \c "log" will cause WiredTiger log files to use
+        direct I/O, and including \c "checkpoint" will cause WiredTiger data
+        files opened at a checkpoint (i.e: read only) to use direct I/O.
+        \c direct_io should be combined with \c write_through to get the
+        equivalent of \c O_DIRECT on Windows.''',
         type='list', choices=['checkpoint', 'data', 'log']),
     Config('encryption', '', r'''
         configure an encryptor for system wide metadata and logs.
@@ -674,6 +675,17 @@ wiredtiger_open_common = connection_runtime_config + [
             @ref tune_durability for more information''',
             choices=['dsync', 'fsync', 'none']),
         ]),
+    Config('write_through', '', r'''
+        Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files.  Ignored
+        on non-Windows systems.  Options are given as a list, such as
+        <code>"write_through=[data]"</code>.  Configuring \c write_through
+        requires care, see @ref tuning_system_buffer_cache_direct_io for
+        important warnings.  Including \c "data" will cause WiredTiger data
+        files to write through cache, including \c "log" will cause WiredTiger
+        log files to write through cache. \c write_through should be combined
+        with \c direct_io to get the equivalent of POSIX \c O_DIRECT on
+        Windows.''',
+        type='list', choices=['data', 'log']),
 ]
 
 wiredtiger_open = wiredtiger_open_common + [
