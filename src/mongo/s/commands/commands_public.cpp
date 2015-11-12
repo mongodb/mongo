@@ -993,7 +993,7 @@ public:
 
         BSONObj query = getQuery(cmdObj);
         set<ShardId> shardIds;
-        cm->getShardIdsForQuery(shardIds, query);
+        cm->getShardIdsForQuery(txn, query, &shardIds);
 
         set<BSONObj, BSONObjCmp> all;
         int size = 32;
@@ -1243,7 +1243,7 @@ public:
 
         BSONObj query = getQuery(cmdObj);
         set<ShardId> shardIds;
-        cm->getShardIdsForQuery(shardIds, query);
+        cm->getShardIdsForQuery(txn, query, &shardIds);
 
         // We support both "num" and "limit" options to control limit
         int limit = 100;

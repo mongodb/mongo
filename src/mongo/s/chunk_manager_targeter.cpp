@@ -418,9 +418,9 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
         endpoints->push_back(endpoint);
         return result;
     } else if (updateType == UpdateType_OpStyle) {
-        return targetQuery(query, endpoints);
+        return targetQuery(txn, query, endpoints);
     } else {
-        return targetDoc(updateExpr, endpoints);
+        return targetDoc(txn, updateExpr, endpoints);
     }
 }
 
@@ -464,18 +464,20 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* txn,
         endpoints->push_back(endpoint);
         return result;
     } else {
-        return targetQuery(deleteDoc.getQuery(), endpoints);
+        return targetQuery(txn, deleteDoc.getQuery(), endpoints);
     }
 }
 
-Status ChunkManagerTargeter::targetDoc(const BSONObj& doc,
+Status ChunkManagerTargeter::targetDoc(OperationContext* txn,
+                                       const BSONObj& doc,
                                        vector<ShardEndpoint*>* endpoints) const {
     // NOTE: This is weird and fragile, but it's the way our language works right now -
     // documents are either A) invalid or B) valid equality queries over themselves.
-    return targetQuery(doc, endpoints);
+    return targetQuery(txn, doc, endpoints);
 }
 
-Status ChunkManagerTargeter::targetQuery(const BSONObj& query,
+Status ChunkManagerTargeter::targetQuery(OperationContext* txn,
+                                         const BSONObj& query,
                                          vector<ShardEndpoint*>* endpoints) const {
     if (!_primary && !_manager) {
         return Status(ErrorCodes::NamespaceNotFound,
@@ -486,7 +488,7 @@ Status ChunkManagerTargeter::targetQuery(const BSONObj& query,
     set<ShardId> shardIds;
     if (_manager) {
         try {
-            _manager->getShardIdsForQuery(shardIds, query);
+            _manager->getShardIdsForQuery(txn, query, &shardIds);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }

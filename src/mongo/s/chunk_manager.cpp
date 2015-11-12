@@ -476,7 +476,9 @@ ChunkPtr ChunkManager::findIntersectingChunk(OperationContext* txn, const BSONOb
                               << ", number of chunks: " << _chunkMap.size());
 }
 
-void ChunkManager::getShardIdsForQuery(set<ShardId>& shardIds, const BSONObj& query) const {
+void ChunkManager::getShardIdsForQuery(OperationContext* txn,
+                                       const BSONObj& query,
+                                       set<ShardId>* shardIds) const {
     auto statusWithCQ =
         CanonicalQuery::canonicalize(NamespaceString(_ns), query, ExtensionsCallbackNoop());
 
@@ -486,6 +488,14 @@ void ChunkManager::getShardIdsForQuery(set<ShardId>& shardIds, const BSONObj& qu
     // Query validation
     if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR)) {
         uassert(13501, "use geoNear command rather than $near query", false);
+    }
+
+    // Fast path for targeting equalities on the shard key.
+    auto shardKeyToFind = _keyPattern.extractShardKeyFromQuery(*cq);
+    if (shardKeyToFind.isOK() && !shardKeyToFind.getValue().isEmpty()) {
+        auto chunk = findIntersectingChunk(txn, shardKeyToFind.getValue());
+        shardIds->insert(chunk->getShardId());
+        return;
     }
 
     // Transforms query into bounds for each field in the shard key
@@ -504,19 +514,19 @@ void ChunkManager::getShardIdsForQuery(set<ShardId>& shardIds, const BSONObj& qu
     BoundList ranges = _keyPattern.flattenBounds(bounds);
 
     for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        getShardIdsForRange(shardIds, it->first /*min*/, it->second /*max*/);
+        getShardIdsForRange(*shardIds, it->first /*min*/, it->second /*max*/);
 
         // once we know we need to visit all shards no need to keep looping
-        if (shardIds.size() == _shardIds.size())
+        if (shardIds->size() == _shardIds.size())
             break;
     }
 
     // SERVER-4914 Some clients of getShardIdsForQuery() assume at least one shard will be
     // returned.  For now, we satisfy that assumption by adding a shard with no matches rather
     // than return an empty set of shards.
-    if (shardIds.empty()) {
+    if (shardIds->empty()) {
         massert(16068, "no chunk ranges available", !_chunkRanges.ranges().empty());
-        shardIds.insert(_chunkRanges.ranges().begin()->second->getShardId());
+        shardIds->insert(_chunkRanges.ranges().begin()->second->getShardId());
     }
 }
 

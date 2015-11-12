@@ -196,8 +196,12 @@ public:
      */
     ChunkPtr findIntersectingChunk(OperationContext* txn, const BSONObj& shardKey) const;
 
-    void getShardIdsForQuery(std::set<ShardId>& shardIds, const BSONObj& query) const;
+    void getShardIdsForQuery(OperationContext* txn,
+                             const BSONObj& query,
+                             std::set<ShardId>* shardIds) const;
+
     void getAllShardIds(std::set<ShardId>* all) const;
+
     /** @param shardIds set to the shard ids for shards
      *         covered by the interval [min, max], see SERVER-4791
      */

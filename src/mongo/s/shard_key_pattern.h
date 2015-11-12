@@ -38,6 +38,7 @@
 
 namespace mongo {
 
+class CanonicalQuery;
 class FieldRef;
 
 /**
@@ -163,6 +164,7 @@ public:
      *                                                 a : { $eq : { b : ... } }
      */
     StatusWith<BSONObj> extractShardKeyFromQuery(const BSONObj& basicQuery) const;
+    StatusWith<BSONObj> extractShardKeyFromQuery(const CanonicalQuery& query) const;
 
     /**
      * Returns true if the shard key pattern can ensure that the unique index pattern is

@@ -128,14 +128,18 @@ private:
      *
      * Returns !OK with message if replacement could not be targeted
      */
-    Status targetDoc(const BSONObj& doc, std::vector<ShardEndpoint*>* endpoints) const;
+    Status targetDoc(OperationContext* txn,
+                     const BSONObj& doc,
+                     std::vector<ShardEndpoint*>* endpoints) const;
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
      *
      * Returns !OK with message if query could not be targeted.
      */
-    Status targetQuery(const BSONObj& query, std::vector<ShardEndpoint*>* endpoints) const;
+    Status targetQuery(OperationContext* txn,
+                       const BSONObj& query,
+                       std::vector<ShardEndpoint*>* endpoints) const;
 
     /**
      * Returns a ShardEndpoint for an exact shard key query.
