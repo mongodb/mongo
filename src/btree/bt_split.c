@@ -492,13 +492,6 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	    root_refp - pindex->index == (ptrdiff_t)(pindex->entries));
 
 	/*
-	 * Save the number of entries created by deepening the tree and reset
-	 * the count of splits into this page after that point.
-	 */
-	root->pg_intl_deepen_split_append = 0;
-	root->pg_intl_deepen_split_last = alloc_index->entries;
-
-	/*
 	 * Confirm the root page's index hasn't moved, then update it, which
 	 * makes the split visible to threads descending the tree. From this
 	 * point on, we're committed to the split.
@@ -696,27 +689,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	alloc_index->entries = result_entries;
 	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
-		if (next_ref == ref) {
+		if (next_ref == ref)
 			for (j = 0; j < new_entries; ++j) {
 				ref_new[j]->home = parent;
 				*alloc_refp++ = ref_new[j];
 			}
-
-			/*
-			 * We detect append-style workloads to avoid repeatedly
-			 * deepening parts of the tree where no work is being
-			 * done by tracking if we're splitting after the slots
-			 * created by the last split to deepen this parent.
-			 *
-			 * Note the calculation: i is a 0-based array offset and
-			 * split-last is a count of entries, also either or both
-			 * i and split-last might be unsigned 0, don't decrement
-			 * either one.
-			 */
-			if (i > parent->pg_intl_deepen_split_last)
-				parent->
-				    pg_intl_deepen_split_append += new_entries;
-		} else if (next_ref->state != WT_REF_SPLIT)
+		else if (next_ref->state != WT_REF_SPLIT)
 			/* Skip refs we have marked for deletion. */
 			*alloc_refp++ = next_ref;
 	}
