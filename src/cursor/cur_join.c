@@ -879,6 +879,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_CURSOR_JOIN_ENTRY *entry;
 	WT_DECL_RET;
 	WT_CURSOR_JOIN_ENDPOINT *end, *newend;
+	bool range_eq;
 	int nonbloom;
 	size_t i;
 	ssize_t ins;
@@ -960,10 +961,11 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		 */
 		for (i = 0; i < entry->ends_next; i++) {
 			end = &entry->ends[i];
+			range_eq = (range == WT_CURJOIN_END_EQ);
 			if ((F_ISSET(end, WT_CURJOIN_END_GT) &&
-			    (range & WT_CURJOIN_END_GE) != 0) ||
+			    ((range & WT_CURJOIN_END_GT) != 0 || range_eq)) ||
 			    (F_ISSET(end, WT_CURJOIN_END_LT) &&
-			    (range & WT_CURJOIN_END_LE) != 0) ||
+			    ((range & WT_CURJOIN_END_LT) != 0 || range_eq)) ||
 			    (end->flags == WT_CURJOIN_END_EQ &&
 			    (range & (WT_CURJOIN_END_LT | WT_CURJOIN_END_GT))
 			    != 0)) {
