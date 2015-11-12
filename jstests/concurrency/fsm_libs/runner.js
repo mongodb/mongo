@@ -2,9 +2,10 @@
 
 load('jstests/concurrency/fsm_libs/assert.js');
 load('jstests/concurrency/fsm_libs/cluster.js');
-load('jstests/concurrency/fsm_libs/name_utils.js');
 load('jstests/concurrency/fsm_libs/parse_config.js');
 load('jstests/concurrency/fsm_libs/thread_mgr.js');
+load('jstests/concurrency/fsm_utils/name_utils.js'); // for uniqueCollName and uniqueDBName
+load('jstests/concurrency/fsm_utils/setup_teardown_functions.js');
 
 var runner = (function() {
 
@@ -368,6 +369,23 @@ var runner = (function() {
         });
     }
 
+    function useDropDistLockFailPoint(cluster, clusterOptions) {
+        assert(cluster.isSharded(), 'cluster is not sharded');
+
+        // For sharded clusters, enable a fail point that allows dropCollection to wait longer
+        // to acquire the distributed lock. This prevents tests from failing if the distributed
+        // lock is already held by the balancer or by a workload operation. The increased wait
+        // is shorter than the distributed-lock-takeover period because otherwise the node
+        // would be assumed to be down and the lock would be overtaken.
+        if (cluster.isUsingLegacyConfigServers()) {
+            clusterOptions.setupFunctions.mongos.push(increaseDropDistLockTimeoutSCCC);
+            clusterOptions.teardownFunctions.mongos.push(resetDropDistLockTimeoutSCCC);
+        } else {
+            clusterOptions.setupFunctions.mongos.push(increaseDropDistLockTimeout);
+            clusterOptions.teardownFunctions.mongos.push(resetDropDistLockTimeout);
+        }
+    }
+
     function runWorkloads(workloads,
                           clusterOptions,
                           executionMode,
@@ -416,18 +434,10 @@ var runner = (function() {
         var threadMgr = new ThreadManager(clusterOptions, executionMode);
 
         var cluster = new Cluster(clusterOptions);
-        cluster.setup();
-
-        // For sharded clusters, enable a fail point that allows
-        // dropCollection to wait longer to acquire the distributed lock.
-        // This prevents tests from failing if the distributed lock is
-        // already held by the balancer or by a workload operation. The
-        // increased wait is shorter than the distributed-lock-takeover
-        // period because otherwise the node would be assumed to be down
-        // and the lock would be overtaken.
         if (cluster.isSharded()) {
-            cluster.increaseDropDistLockTimeout();
+            useDropDistLockFailPoint(cluster, clusterOptions);
         }
+        cluster.setup();
 
         // Clean up the state left behind by other tests in the concurrency suite
         // to avoid having too many open files
@@ -519,10 +529,6 @@ var runner = (function() {
                 // Ensure that secondaries have caught up for workload teardown (SERVER-18878)
                 cluster.awaitReplication();
             });
-
-            if (cluster.isSharded()) {
-                cluster.resetDropDistLockTimeout();
-            }
         } finally {
             cluster.teardown();
         }

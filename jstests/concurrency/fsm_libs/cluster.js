@@ -18,8 +18,9 @@ var Cluster = function(options) {
             'sameDB',
             'setupFunctions',
             'sharded',
+            'teardownFunctions',
             'useLegacyConfigServers'
-            ];
+        ];
 
         Object.keys(options).forEach(function(option) {
             assert.contains(option, allowedKeys,
@@ -55,11 +56,40 @@ var Cluster = function(options) {
         options.setupFunctions = options.setupFunctions || {};
         assert.eq('object', typeof options.setupFunctions);
 
-        options.setupFunctions.mongod = options.setupFunctions.mongod || function(db) { };
-        assert.eq('function', typeof options.setupFunctions.mongod);
+        options.setupFunctions.mongod = options.setupFunctions.mongod || [];
+        assert(Array.isArray(options.setupFunctions.mongod),
+               'Expected setupFunctions.mongod to be an array');
+        assert(options.setupFunctions.mongod.every(f => (typeof f === 'function')),
+               'Expected setupFunctions.mongod to be an array of functions');
 
-        options.setupFunctions.mongos = options.setupFunctions.mongos || function(db) { };
-        assert.eq('function', typeof options.setupFunctions.mongos);
+        if (typeof options.setupFunctions.mongos !== 'undefined') {
+            assert(options.sharded, "Must be sharded if 'setupFunctions.mongos' is specified");
+        }
+
+        options.setupFunctions.mongos = options.setupFunctions.mongos || [];
+        assert(Array.isArray(options.setupFunctions.mongos),
+               'Expected setupFunctions.mongos to be an array');
+        assert(options.setupFunctions.mongos.every(f => (typeof f === 'function')),
+               'Expected setupFunctions.mongos to be an array of functions');
+
+        options.teardownFunctions = options.teardownFunctions || {};
+        assert.eq('object', typeof options.teardownFunctions);
+
+        options.teardownFunctions.mongod = options.teardownFunctions.mongod || [];
+        assert(Array.isArray(options.teardownFunctions.mongod),
+               'Expected teardownFunctions.mongod to be an array');
+        assert(options.teardownFunctions.mongod.every(f => (typeof f === 'function')),
+               'Expected teardownFunctions.mongod to be an array of functions');
+
+        if (typeof options.teardownFunctions.mongos !== 'undefined') {
+            assert(options.sharded, "Must be sharded if 'teardownFunctions.mongos' is specified");
+        }
+
+        options.teardownFunctions.mongos = options.teardownFunctions.mongos || [];
+        assert(Array.isArray(options.teardownFunctions.mongos),
+               'Expected teardownFunctions.mongos to be an array');
+        assert(options.teardownFunctions.mongos.every(f => (typeof f === 'function')),
+               'Expected teardownFunctions.mongos to be an array of functions');
 
         assert(!options.masterSlave || !options.replication, "Both 'masterSlave' and " +
                "'replication' cannot be true");
@@ -123,7 +153,10 @@ var Cluster = function(options) {
                 st.shardColl.apply(st, arguments);
             };
 
-            this.teardown = function() {
+            this.teardown = function teardown() {
+                options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+                options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
+
                 st.stop();
             };
 
@@ -172,7 +205,9 @@ var Cluster = function(options) {
             conn = rst.getPrimary();
             primaries = [conn];
 
-            this.teardown = function() {
+            this.teardown = function teardown() {
+                options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+
                 rst.stopSet();
             };
 
@@ -188,7 +223,9 @@ var Cluster = function(options) {
             master.adminCommand({ setParameter: 1, logLevel: verbosityLevel });
             slave.adminCommand({ setParameter: 1, logLevel: verbosityLevel });
 
-            this.teardown = function() {
+            this.teardown = function teardown() {
+                options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+
                 rt.stop();
             };
 
@@ -203,8 +240,10 @@ var Cluster = function(options) {
 
         initialized = true;
 
-        this.executeOnMongodNodes(options.setupFunctions.mongod);
-        this.executeOnMongosNodes(options.setupFunctions.mongos);
+        options.setupFunctions.mongod.forEach(this.executeOnMongodNodes);
+        if (options.sharded) {
+            options.setupFunctions.mongos.forEach(this.executeOnMongosNodes);
+        }
     };
 
 
@@ -241,7 +280,9 @@ var Cluster = function(options) {
         });
     };
 
-    this.teardown = function teardown() { };
+    this.teardown = function teardown() {
+        options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+    };
 
     this.getDB = function getDB(dbName) {
         if (!initialized) {
@@ -264,11 +305,16 @@ var Cluster = function(options) {
     };
 
     this.isSharded = function isSharded() {
-        return !!options.sharded;
+        return options.sharded;
     };
 
     this.isReplication = function isReplication() {
-        return !!options.replication;
+        return options.replication;
+    };
+
+    this.isUsingLegacyConfigServers = function isUsingLegacyConfigServers() {
+        assert(this.isSharded(), 'cluster is not sharded');
+        return options.useLegacyConfigServers;
     };
 
     this.shardCollection = function shardCollection() {
@@ -381,49 +427,6 @@ var Cluster = function(options) {
 
                 var totalTime = Date.now() - startTime;
                 jsTest.log(primary.host + ': awaitReplication completed in ' + totalTime + ' ms');
-            });
-        }
-    };
-
-    this.increaseDropDistLockTimeout = function increaseDropDistLockTimeout() {
-        assert(this.isSharded(), 'cluster is not sharded');
-
-        var waitTime = 600; // in seconds, i.e. 10 minutes
-        if (options.useLegacyConfigServers) {
-            this.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.runCommand({
-                    configureFailPoint: 'setSCCCDropCollDistLockWait',
-                    mode: 'alwaysOn',
-                    data: { waitForSecs: waitTime }
-                }));
-            });
-        } else {
-            this.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.runCommand({
-                    configureFailPoint: 'setDropCollDistLockWait',
-                    mode: 'alwaysOn',
-                    data: { waitForSecs: waitTime }
-                }));
-            });
-        }
-    };
-
-    this.resetDropDistLockTimeout = function resetDropDistLockTimeout() {
-        assert(this.isSharded(), 'cluster is not sharded');
-
-        if (options.useLegacyConfigServers) {
-            this.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.runCommand({
-                    configureFailPoint: 'setSCCCDropCollDistLockWait',
-                    mode: 'off'
-                }));
-            });
-        } else {
-            this.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.runCommand({
-                    configureFailPoint: 'setDropCollDistLockWait',
-                    mode: 'off'
-                }));
             });
         }
     };
