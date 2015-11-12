@@ -148,22 +148,20 @@ ResponseStatus decodeRPC(Message* received,
                                         << " but reply was '"
                                         << networkOpToString(received->operation()) << "'");
         }
-        auto ownedCommandReply = reply->getCommandReply().getOwned();
-        auto ownedReplyMetadata = reply->getMetadata().getOwned();
+        auto commandReply = reply->getCommandReply();
+        auto replyMetadata = reply->getMetadata();
 
         // Handle incoming reply metadata.
         if (metadataHook) {
-            auto listenStatus = callNoexcept(*metadataHook,
-                                             &rpc::EgressMetadataHook::readReplyMetadata,
-                                             source,
-                                             ownedReplyMetadata);
+            auto listenStatus = callNoexcept(
+                *metadataHook, &rpc::EgressMetadataHook::readReplyMetadata, source, replyMetadata);
             if (!listenStatus.isOK()) {
                 return listenStatus;
             }
         }
 
         return {RemoteCommandResponse(
-            std::move(ownedCommandReply), std::move(ownedReplyMetadata), elapsed)};
+            std::move(*received), std::move(commandReply), std::move(replyMetadata), elapsed)};
     } catch (...) {
         return exceptionToStatus();
     }

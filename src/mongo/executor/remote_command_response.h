@@ -29,8 +29,10 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -51,12 +53,22 @@ struct RemoteCommandResponse {
     RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj, Milliseconds millis)
         : data(std::move(dataObj)), metadata(std::move(metadataObj)), elapsedMillis(millis) {}
 
+    RemoteCommandResponse(Message message,
+                          BSONObj dataObj,
+                          BSONObj metadataObj,
+                          Milliseconds millis)
+        : message(std::make_shared<const Message>(std::move(message))),
+          data(std::move(dataObj)),
+          metadata(std::move(metadataObj)),
+          elapsedMillis(millis) {}
+
     RemoteCommandResponse(const rpc::ReplyInterface& rpcReply, Milliseconds millis);
 
     std::string toString() const;
 
-    BSONObj data;
-    BSONObj metadata;
+    std::shared_ptr<const Message> message;  // May be null.
+    BSONObj data;                            // Either owned or points into message.
+    BSONObj metadata;                        // Either owned or points into message.
     Milliseconds elapsedMillis = {};
 };
 

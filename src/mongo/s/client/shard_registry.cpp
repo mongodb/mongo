@@ -746,8 +746,8 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     }
 
     CommandResponse cmdResponse;
-    cmdResponse.response = response.data;
-    cmdResponse.metadata = response.metadata;
+    cmdResponse.response = response.data.getOwned();
+    cmdResponse.metadata = response.metadata.getOwned();
 
     if (response.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
         auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(response.metadata);
