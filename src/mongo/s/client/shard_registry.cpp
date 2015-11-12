@@ -73,7 +73,7 @@ using repl::OpTime;
 namespace {
 
 const Seconds kConfigCommandTimeout{30};
-const int kNotMasterNumRetries = 3;
+const int kOnErrorNumRetries = 3;
 const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
 const BSONObj kSecondaryOkMetadata{rpc::ServerSelectionMetadata(true, boost::none).toBSON()};
 
@@ -83,6 +83,9 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     o.appendElements(kReplMetadata);
     return o.obj();
 }()};
+
+ShardRegistry::ErrorCodesSet kNotMasterErrors{ErrorCodes::NotMaster,
+                                              ErrorCodes::NotMasterNoSlaveOk};
 
 BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
     Seconds maxTime = kConfigCommandTimeout;
@@ -500,7 +503,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    for (int retry = 1; retry <= kNotMasterNumRetries; retry++) {
+    for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
         auto result = _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
         if (result.isOK()) {
             return {std::move(result)};
@@ -508,7 +511,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
 
         if ((ErrorCodes::isNetworkError(result.getStatus().code()) ||
              ErrorCodes::isNotMasterError(result.getStatus().code())) &&
-            retry < kNotMasterNumRetries) {
+            retry < kOnErrorNumRetries) {
             continue;
         }
 
@@ -523,15 +526,16 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
                                                      const ReadPreferenceSetting& readPref,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj) {
-    auto response = _runCommandWithNotMasterRetries(txn,
-                                                    _executorPool->getFixedExecutor(),
-                                                    shard,
-                                                    readPref,
-                                                    dbName,
-                                                    cmdObj,
-                                                    readPref.pref == ReadPreference::PrimaryOnly
-                                                        ? rpc::makeEmptyMetadata()
-                                                        : kSecondaryOkMetadata);
+    auto response = _runCommandWithRetries(txn,
+                                           _executorPool->getFixedExecutor(),
+                                           shard,
+                                           readPref,
+                                           dbName,
+                                           cmdObj,
+                                           readPref.pref == ReadPreference::PrimaryOnly
+                                               ? rpc::makeEmptyMetadata()
+                                               : kSecondaryOkMetadata,
+                                           kNotMasterErrors);
     if (!response.isOK()) {
         return response.getStatus();
     }
@@ -557,15 +561,16 @@ StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
                                                          const ReadPreferenceSetting& readPref,
                                                          const std::string& dbName,
                                                          const BSONObj& cmdObj) {
-    auto status = _runCommandWithNotMasterRetries(txn,
-                                                  _executorForAddShard.get(),
-                                                  shard,
-                                                  readPref,
-                                                  dbName,
-                                                  cmdObj,
-                                                  readPref.pref == ReadPreference::PrimaryOnly
-                                                      ? rpc::makeEmptyMetadata()
-                                                      : kSecondaryOkMetadata);
+    auto status = _runCommandWithRetries(txn,
+                                         _executorForAddShard.get(),
+                                         shard,
+                                         readPref,
+                                         dbName,
+                                         cmdObj,
+                                         readPref.pref == ReadPreference::PrimaryOnly
+                                             ? rpc::makeEmptyMetadata()
+                                             : kSecondaryOkMetadata,
+                                         kNotMasterErrors);
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -577,14 +582,15 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
                                                       const ReadPreferenceSetting& readPref,
                                                       const std::string& dbName,
                                                       const BSONObj& cmdObj) {
-    auto response = _runCommandWithNotMasterRetries(
+    auto response = _runCommandWithRetries(
         txn,
         _executorPool->getFixedExecutor(),
         getConfigShard(),
         readPref,
         dbName,
         cmdObj,
-        readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata : kReplSecondaryOkMetadata);
+        readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata : kReplSecondaryOkMetadata,
+        kNotMasterErrors);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -597,14 +603,14 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
 StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(OperationContext* txn,
                                                                           const std::string& dbname,
                                                                           const BSONObj& cmdObj) {
-    auto response =
-        _runCommandWithNotMasterRetries(txn,
-                                        _executorPool->getFixedExecutor(),
-                                        getConfigShard(),
-                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                        dbname,
-                                        cmdObj,
-                                        kReplMetadata);
+    auto response = _runCommandWithRetries(txn,
+                                           _executorPool->getFixedExecutor(),
+                                           getConfigShard(),
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           dbname,
+                                           cmdObj,
+                                           kReplMetadata,
+                                           kNotMasterErrors);
     if (!response.isOK()) {
         return response.getStatus();
     }
@@ -620,14 +626,14 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationConte
     auto shard = getShard(txn, shardId);
     invariant(!shard->isConfig());
 
-    auto response =
-        _runCommandWithNotMasterRetries(txn,
-                                        _executorPool->getFixedExecutor(),
-                                        shard,
-                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                        dbname,
-                                        cmdObj,
-                                        rpc::makeEmptyMetadata());
+    auto response = _runCommandWithRetries(txn,
+                                           _executorPool->getFixedExecutor(),
+                                           shard,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           dbname,
+                                           cmdObj,
+                                           rpc::makeEmptyMetadata(),
+                                           kNotMasterErrors);
     if (!response.isOK()) {
         return response.getStatus();
     }
@@ -635,28 +641,49 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationConte
     return response.getValue().response;
 }
 
-StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMasterRetries(
+StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithRetries(
+    OperationContext* txn,
+    const std::string& dbname,
+    const BSONObj& cmdObj,
+    const ShardRegistry::ErrorCodesSet& errorsToCheck) {
+    auto response = _runCommandWithRetries(txn,
+                                           _executorPool->getFixedExecutor(),
+                                           getConfigShard(),
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           dbname,
+                                           cmdObj,
+                                           kReplMetadata,
+                                           errorsToCheck);
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+
+    advanceConfigOpTime(response.getValue().visibleOpTime);
+    return response.getValue().response;
+}
+
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithRetries(
     OperationContext* txn,
     TaskExecutor* executor,
     const std::shared_ptr<Shard>& shard,
     const ReadPreferenceSetting& readPref,
     const std::string& dbname,
     const BSONObj& cmdObj,
-    const BSONObj& metadata) {
+    const BSONObj& metadata,
+    const ShardRegistry::ErrorCodesSet& errorsToCheck) {
     const bool isConfigShard = shard->isConfig();
-    for (int retry = 1; retry <= kNotMasterNumRetries; ++retry) {
+    for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
         const BSONObj cmdWithMaxTimeMS =
             (isConfigShard ? appendMaxTimeToCmdObj(txn->getRemainingMaxTimeMicros(), cmdObj)
                            : cmdObj);
 
         auto response = _runCommandWithMetadata(
-            txn, executor, shard, readPref, dbname, cmdWithMaxTimeMS, metadata);
+            txn, executor, shard, readPref, dbname, cmdWithMaxTimeMS, metadata, errorsToCheck);
         if (response.isOK()) {
             return {std::move(response)};
         }
 
-        if (ErrorCodes::isNotMasterError(response.getStatus().code()) &&
-            retry < kNotMasterNumRetries) {
+        if (errorsToCheck.count(response.getStatus().code()) && retry < kOnErrorNumRetries) {
             continue;
         }
 
@@ -673,7 +700,8 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     const ReadPreferenceSetting& readPref,
     const std::string& dbName,
     const BSONObj& cmdObj,
-    const BSONObj& metadata) {
+    const BSONObj& metadata,
+    const ShardRegistry::ErrorCodesSet& errorsToCheck) {
     auto targeter = shard->getTargeter();
     auto host = targeter->findHost(readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
     if (!host.isOK()) {
@@ -708,7 +736,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     Status commandSpecificStatus = getStatusFromCommandResult(response.data);
     updateReplSetMonitor(targeter, host.getValue(), commandSpecificStatus);
 
-    if (ErrorCodes::isNotMasterError(commandSpecificStatus.code())) {
+    if (errorsToCheck.count(commandSpecificStatus.code())) {
         return commandSpecificStatus;
     }
 

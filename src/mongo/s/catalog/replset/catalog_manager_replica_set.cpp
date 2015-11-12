@@ -865,9 +865,15 @@ bool CatalogManagerReplicaSet::runUserManagementReadCommand(OperationContext* tx
 Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
                                                          const BSONArray& updateOps,
                                                          const BSONArray& preCondition) {
+    ShardRegistry::ErrorCodesSet networkOrNotMasterErrors{ErrorCodes::NotMaster,
+                                                          ErrorCodes::NotMasterNoSlaveOk,
+                                                          ErrorCodes::HostUnreachable,
+                                                          ErrorCodes::HostNotFound,
+                                                          ErrorCodes::NetworkTimeout};
+
     BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition);
-    auto response =
-        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, "config", cmd);
+    auto response = grid.shardRegistry()->runCommandOnConfigWithRetries(
+        txn, "config", cmd, networkOrNotMasterErrors);
 
     if (!response.isOK()) {
         return response.getStatus();

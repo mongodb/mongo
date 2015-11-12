@@ -39,6 +39,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/mutex.h"
 
@@ -272,6 +273,28 @@ public:
                                                                const std::string& dbname,
                                                                const BSONObj& cmdObj);
 
+    class ErrorCodesHash {
+    public:
+        size_t operator()(ErrorCodes::Error e) const {
+            return std::hash<typename std::underlying_type<ErrorCodes::Error>::type>()(e);
+        }
+    };
+    using ErrorCodesSet = unordered_set<ErrorCodes::Error, ErrorCodesHash>;
+
+    /**
+     * Runs commands against a config shard. Retries if executing the command fails with one
+     * of the given error codes, or if executing the command succeeds but the command
+     * failed with one of the codes. If executing the command fails with a different
+     * code we return that code. If executing the command succeeds and the command
+     * itself succeeds or fails with a code not in the set, then we return the command response
+     * object. Thus the caller is responsible for checking the command response object for any kind
+     * of command-specific failures other than those specified in errorsToCheck.
+     */
+    StatusWith<BSONObj> runCommandOnConfigWithRetries(OperationContext* txn,
+                                                      const std::string& dbname,
+                                                      const BSONObj& cmdObj,
+                                                      const ErrorCodesSet& errorsToCheck);
+
     /**
      * Notifies the specified RemoteCommandTargeter of a particular mode of failure for the
      * specified host.
@@ -305,8 +328,8 @@ private:
     std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
 
     /**
-     * Runs a command against the specified host, checks the returned reply (if any) for NotMaster
-     * class of errors and returns the result. If the command succeeds, it is the responsibility
+     * Runs a command against the specified host, checks the returned reply (if any) for
+     * errorsToCheck and returns the result. If the command succeeds, it is the responsibility
      * of the caller to check the returned BSON for command-specific failures.
      */
     StatusWith<CommandResponse> _runCommandWithMetadata(OperationContext* txn,
@@ -315,16 +338,8 @@ private:
                                                         const ReadPreferenceSetting& readPref,
                                                         const std::string& dbName,
                                                         const BSONObj& cmdObj,
-                                                        const BSONObj& metadata);
-
-    StatusWith<CommandResponse> _runCommandWithNotMasterRetries(
-        OperationContext* txn,
-        executor::TaskExecutor* executor,
-        const std::shared_ptr<Shard>& shard,
-        const ReadPreferenceSetting& readPref,
-        const std::string& dbname,
-        const BSONObj& cmdObj,
-        const BSONObj& metadata);
+                                                        const BSONObj& metadata,
+                                                        const ErrorCodesSet& errorsToCheck);
 
     StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
                                                       const ReadPreferenceSetting& readPref,
@@ -332,6 +347,20 @@ private:
                                                       const BSONObj& query,
                                                       const BSONObj& sort,
                                                       boost::optional<long long> limit);
+
+
+    /**
+     * Runs a command cmdObj, extracts an error code from its result and retries if its in the
+     * errorsToCheck set or reaches the max number of retries.
+     */
+    StatusWith<CommandResponse> _runCommandWithRetries(OperationContext* txn,
+                                                       executor::TaskExecutor* executor,
+                                                       const std::shared_ptr<Shard>& shard,
+                                                       const ReadPreferenceSetting& readPref,
+                                                       const std::string& dbname,
+                                                       const BSONObj& cmdObj,
+                                                       const BSONObj& metadata,
+                                                       const ErrorCodesSet& errorsToCheck);
 
     // Factory to obtain remote command targeters for shards
     const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
