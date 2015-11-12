@@ -45,7 +45,8 @@ const Seconds kFindHostTimeoutPad(1);
 }  // namespace
 
 Milliseconds RemoteCommandTargeter::selectFindHostMaxWaitTime(OperationContext* txn) {
-    Milliseconds remainingMaxTime(txn->getRemainingMaxTimeMicros());
+    // TODO: Get remaining max time from 'txn'.
+    Milliseconds remainingMaxTime(0);
     if (remainingMaxTime > Milliseconds::zero()) {
         return std::min(remainingMaxTime - kFindHostTimeoutPad,
                         Milliseconds(kDefaultFindHostMaxWaitTime));

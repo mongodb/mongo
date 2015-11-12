@@ -110,8 +110,7 @@ protected:
         const auto lpq =
             unittest::assertGet(LiteParsedQuery::makeFromFindCommand(_nss, findCmd, isExplain));
 
-        ClusterClientCursorParams params =
-            ClusterClientCursorParams(operationContext(), _nss, readPref);
+        ClusterClientCursorParams params = ClusterClientCursorParams(_nss, readPref);
         params.sort = lpq->getSort();
         params.limit = lpq->getLimit();
         params.batchSize = getMoreBatchSize ? getMoreBatchSize : lpq->getBatchSize();

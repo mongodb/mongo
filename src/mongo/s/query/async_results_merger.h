@@ -205,8 +205,7 @@ private:
          *
          * May not be called once a cursor has already been established.
          */
-        Status resolveShardIdToHostAndPort(OperationContext* txn,
-                                           const ReadPreferenceSetting& readPref);
+        Status resolveShardIdToHostAndPort(const ReadPreferenceSetting& readPref);
 
         // ShardId on which a cursor will be created.
         const boost::optional<ShardId> shardId;

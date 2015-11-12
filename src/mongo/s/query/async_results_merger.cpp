@@ -289,8 +289,7 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
     } else {
         // Do the first time shard host resolution.
         invariant(_params.readPreference);
-        Status resolveStatus =
-            remote.resolveShardIdToHostAndPort(_params.txn, *_params.readPreference);
+        Status resolveStatus = remote.resolveShardIdToHostAndPort(*_params.readPreference);
         if (!resolveStatus.isOK()) {
             return resolveStatus;
         }
@@ -439,7 +438,8 @@ void AsyncResultsMerger::handleBatchResponse(
     if (!cursorResponseStatus.isOK()) {
         // Notify the shard registry of the failure.
         if (remote.shardId) {
-            auto shard = grid.shardRegistry()->getShard(_params.txn, *remote.shardId);
+            // TODO: Pass down an OperationContext* to use here.
+            auto shard = grid.shardRegistry()->getShard(nullptr, *remote.shardId);
             if (!shard) {
                 remote.status = Status(cursorResponseStatus.getStatus().code(),
                                        str::stream() << "Could not find shard " << *remote.shardId
@@ -637,18 +637,19 @@ bool AsyncResultsMerger::RemoteCursorData::exhausted() const {
 }
 
 Status AsyncResultsMerger::RemoteCursorData::resolveShardIdToHostAndPort(
-    OperationContext* txn, const ReadPreferenceSetting& readPref) {
+    const ReadPreferenceSetting& readPref) {
     invariant(shardId);
     invariant(!cursorId);
 
-    const auto shard = grid.shardRegistry()->getShard(txn, *shardId);
+    // TODO: Pass down an OperationContext* to use here.
+    const auto shard = grid.shardRegistry()->getShard(nullptr, *shardId);
     if (!shard) {
         return Status(ErrorCodes::ShardNotFound,
                       str::stream() << "Could not find shard " << *shardId);
     }
 
     auto findHostStatus = shard->getTargeter()->findHost(
-        readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
+        readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(nullptr));
     if (!findHostStatus.isOK()) {
         return findHostStatus.getStatus();
     }
