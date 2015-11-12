@@ -464,7 +464,7 @@ var runner = (function() {
                 var startTime = new Date(); // Initialize in case setupWorkload fails below
                 var endTime, totalTime;
 
-                jsTest.log(workloads.join('\n'));
+                jsTest.log('Workload(s) started: ' + workloads.join(' '));
 
                 prepareCollections(workloads, context, cluster, clusterOptions, executionOptions);
 
@@ -501,9 +501,8 @@ var runner = (function() {
                     });
 
                     totalTime = endTime.getTime() - startTime.getTime();
-                    if (!executionMode.parallel && !executionMode.composed) {
-                        jsTest.log(workloads[0] + ': Workload completed in ' + totalTime + ' ms');
-                    }
+                    jsTest.log('Workload(s) completed in ' + totalTime + ' ms: ' +
+                                workloads.join(' '));
                 }
 
                 // Only drop the collections/databases if all the workloads ran successfully
