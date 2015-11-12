@@ -61,6 +61,7 @@
     testCases.forEach(function (tc) {
         var testRun = new ElectionTimingTest(tc);
         tc.testResults = testRun.testResults;
+        tc.electionTimeoutLimitMillis = testRun.electionTimeoutLimitMillis;
 
         if (testRun.testErrors.length) {
             // Stop tests if we encounter an error.
@@ -85,9 +86,19 @@
         var resAvg = Array.avg(allResults);
         var resMin = Math.min(...allResults);
         var resMax = Math.max(...allResults);
+        var resStdDev = Array.stdDev(allResults);
+
         jsTestLog("Results: " + tc.name +
                   " Average over " +  allResults.length + " runs: " + resAvg +
-                  " Min: " +  resMin + " Max: " + resMax);
+                  " Min: " +  resMin + " Max: " + resMax +
+                  " Limit: " + tc.electionTimeoutLimitMillis/1000 +
+                  " StdDev: " + resStdDev.toFixed(4));
+
+        allResults.forEach(function(failoverElapsedMillis) {
+            assert.lte(failoverElapsedMillis, tc.electionTimeoutLimitMillis/1000,
+                tc.name + ': failover (' + failoverElapsedMillis + ' sec) took too long. limit: ' +
+                tc.electionTimeoutLimitMillis/1000 + ' sec');
+        });
     });
 
     jsTestLog("Tests completed in: " + (Date.now() - testStart) / 1000 + " seconds");

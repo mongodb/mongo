@@ -11,7 +11,7 @@ var ElectionTimingTest = function(opts) {
 
     // The config is set to two electable nodes since we use waitForMemberState
     // to wait for the electable secondary to become primary.
-    this.nodes = [
+    this.nodes = opts.nodes || [
         {},
         {},
         {rsConfig: {arbiterOnly: true}}
@@ -31,6 +31,9 @@ var ElectionTimingTest = function(opts) {
 
     // A function that triggers election, default is to kill the mongod process.
     this.electionTrigger = opts.electionTrigger || this.stopPrimary;
+
+    // A function that waits for new primary to be elected.
+    this.waitForNewPrimary = opts.waitForNewPrimary || this.waitForNewPrimary;
 
     // A function that cleans up after the election trigger.
     this.testReset = opts.testReset || this.stopPrimaryReset;
@@ -80,6 +83,10 @@ ElectionTimingTest.prototype._runTimingTest = function() {
         var coll = primary.getCollection(collectionName);
         var secondary = this.rst.getSecondary();
 
+        this.electionTimeoutLimitMillis =
+            ElectionTimingTest.calculateElectionTimeoutLimitMillis(primary);
+        jsTestLog('Election timeout limit: ' + this.electionTimeoutLimitMillis + ' ms');
+
         for (var i = 0; i < 100; i++) {
             assert.writeOK(coll.insert({_id: i,
                                         x: i * 3,
@@ -107,21 +114,13 @@ ElectionTimingTest.prototype._runTimingTest = function() {
 
             // Wait for the electable secondary to become primary.
             try {
-                assert.commandWorked(
-                    secondary.adminCommand({
-                        replSetTest: 1,
-                        waitForMemberState: this.rst.PRIMARY,
-                        timeoutMillis: 60 * 1000
-                    }),
-                    "node " + secondary.host + " failed to become primary"
-                );
+                this.waitForNewPrimary(this.rst, secondary);
             } catch (e) {
                 // If we didn"t find a primary, save the error, break so this
                 // ReplSetTest is stopped. We can"t continue from a flaky state.
                 this.testErrors.push({testRun: run,
                                       cycle: cycle,
-                                      status: "waitForMemberState(PRIMARY) failed: " +
-                                               secondary.host,
+                                      status: "new primary not elected",
                                       error: e});
                 break;
             }
@@ -190,3 +189,44 @@ ElectionTimingTest.prototype.stepDownPrimaryReset = function() {
     sleep(this.stepDownGuardTime * 1000);
 };
 
+ElectionTimingTest.prototype.waitForNewPrimary = function(rst, secondary) {
+    assert.commandWorked(
+        secondary.adminCommand({
+            replSetTest: 1,
+            waitForMemberState: rst.PRIMARY,
+            timeoutMillis: 60 * 1000
+        }),
+        "node " + secondary.host + " failed to become primary"
+    );
+};
+
+/**
+ * Calculates upper limit for actual failover time in milliseconds.
+ */
+ElectionTimingTest.calculateElectionTimeoutLimitMillis = function(primary) {
+    var configResult = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1}));
+    var config = configResult.config;
+    // Protocol version is 0 if missing from config.
+    var protocolVersion = config.hasOwnProperty("protocolVersion") ? config.protocolVersion : 0;
+    var electionTimeoutMillis = 0;
+    var electionTimeoutOffsetLimitFraction = 0;
+    if (protocolVersion == 0) {
+        electionTimeoutMillis = 30000;  // from TopologyCoordinatorImpl::VoteLease::leaseTime
+        electionTimeoutOffsetLimitFraction = 0;
+    } else {
+        electionTimeoutMillis = config.settings.electionTimeoutMillis;
+        var getParameterResult = assert.commandWorked(primary.adminCommand({
+            getParameter: 1,
+            replElectionTimeoutOffsetLimitFraction: 1,
+        }));
+        electionTimeoutOffsetLimitFraction =
+            getParameterResult.replElectionTimeoutOffsetLimitFraction;
+    }
+    var assertSoonIntervalMillis = 200;  // from assert.js
+    var applierDrainWaitMillis = 1000;  // from SyncTail::tryPopAndWaitForMore()
+    var electionTimeoutLimitMillis =
+        (1 + electionTimeoutOffsetLimitFraction) * electionTimeoutMillis +
+        applierDrainWaitMillis +
+        assertSoonIntervalMillis;
+    return electionTimeoutLimitMillis;
+}
