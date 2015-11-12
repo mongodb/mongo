@@ -1499,6 +1499,15 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: sharding_op_query_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding --shellReadMode=legacy --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: sharding_auth
   commands:
   - func: "do setup"
@@ -1525,6 +1534,15 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_legacy
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_legacy_op_query_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_legacy --shellReadMode=legacy --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -3704,6 +3722,8 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: sharding_legacy
+  - name: sharding_legacy_op_query_WT
+  - name: sharding_op_query_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2

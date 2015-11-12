@@ -278,12 +278,19 @@
         assert.eq(arrayGetNames(sortArrayByName(cursorArray)), userCollIndexes);
 
         // Find query.
-        cursor = userColl.find({g: 3}, {_id: 0, c: 1}).sort({s: 1}).batchSize(1);
+        cursor = userColl.find({g: {$gte: 2}}, {_id: 0, c: 1}).sort({s: 1}).batchSize(2);
+        assert.eq(cursor.objsLeftInBatch(), 2);
+        assert.eq(cursor.next(), {c: 1});
         assert.eq(cursor.objsLeftInBatch(), 1);
-        assert.eq(cursor.next(), {c: 11});
+        assert.eq(cursor.next(), {c: 18});
         assert(cursor.hasNext());
+        assert.eq(cursor.objsLeftInBatch(), 2);
+        assert.eq(cursor.next(), {c: 11});
         assert.eq(cursor.objsLeftInBatch(), 1);
         assert.eq(cursor.next(), {c: 2});
+        assert(cursor.hasNext());
+        assert.eq(cursor.objsLeftInBatch(), 1);
+        assert.eq(cursor.next(), {c: 16});
         assert(!cursor.hasNext());
 
         // Aggregate query.
