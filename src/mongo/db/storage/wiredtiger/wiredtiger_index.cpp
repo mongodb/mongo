@@ -897,6 +897,26 @@ public:
         _key.resetToKey(key, _idx.ordering());  // loc doesn't go in _key for unique indexes
     }
 
+    virtual void seekExact(const BSONObj& key) {
+        const BSONObj finalKey = stripFieldNames(key);
+        fillKey(finalKey, RecordId());
+        WT_CURSOR* c = _cursor.get();
+
+        const WiredTigerItem keyItem(_key.getBuffer(), _key.getSize());
+        c->set_key(c, keyItem.Get());
+
+        int ret = WT_OP_CHECK(c->search(c));
+        if (ret == WT_NOTFOUND) {
+            _eof = true;
+            TRACE_CURSOR << "\t not found";
+            return;
+        }
+        invariantWTOK(ret);
+        _eof = false;
+        _isKeyCurrent = true;
+        dassertKeyCacheIsValid();
+    }
+
     virtual bool _locate(RecordId loc) {
         if (!seekWTCursor()) {
             // If didn't seek to exact key, start at beginning of wherever we ended up.

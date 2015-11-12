@@ -224,6 +224,16 @@ public:
         virtual bool locate(const BSONObj& key, const RecordId& loc) = 0;
 
         /**
+	 * Position 'this' forward (reverse) cursor at the first (last) entry
+	 * with the specified key.  The cursor should be positioned at EOF or at
+	 * the entry immediately after (before) the specified key if no such
+	 * entry exists.
+         */
+        virtual void seekExact(const BSONObj& key) {
+            (void)locate(key, getDirection() == 1 ? RecordId::min() : RecordId::max());
+        }
+
+        /**
          * Position 'this' forward (reverse) cursor either at the next
          * (previous) occurrence of a particular key or immediately after
          * (or immediately before).

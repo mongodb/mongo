@@ -186,7 +186,7 @@ Status BtreeBasedAccessMethod::touch(OperationContext* txn, const BSONObj& obj) 
 
     boost::scoped_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-        cursor->locate(*i, RecordId());
+        cursor->seekExact(*i);
     }
 
     return Status::OK();
@@ -199,7 +199,7 @@ Status BtreeBasedAccessMethod::touch(OperationContext* txn) const {
 
 RecordId BtreeBasedAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
     boost::scoped_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
-    cursor->locate(key, RecordId::min());
+    cursor->seekExact(key);
 
     // A null bucket means the key wasn't found (nor was anything found after it).
     if (cursor->isEOF()) {
