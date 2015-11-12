@@ -79,6 +79,14 @@ const std::string kGetLastErrorModesFieldName = "getLastErrorModes";
 }  // namespace
 
 Status ReplicaSetConfig::initialize(const BSONObj& cfg, bool usePV1ByDefault) {
+    return _initialize(cfg, false, usePV1ByDefault);
+}
+
+Status ReplicaSetConfig::initializeForInitiate(const BSONObj& cfg, bool usePV1ByDefault) {
+    return _initialize(cfg, true, usePV1ByDefault);
+}
+
+Status ReplicaSetConfig::_initialize(const BSONObj& cfg, bool forInitiate, bool usePV1ByDefault) {
     _isInitialized = false;
     _members.clear();
     Status status =
@@ -127,8 +135,10 @@ Status ReplicaSetConfig::initialize(const BSONObj& cfg, bool usePV1ByDefault) {
     //
     // Parse configServer
     //
-    status = bsonExtractBooleanFieldWithDefault(
-        cfg, kConfigServerFieldName, serverGlobalParams.configsvr, &_configServer);
+    status = bsonExtractBooleanFieldWithDefault(cfg,
+                                                kConfigServerFieldName,
+                                                forInitiate ? serverGlobalParams.configsvr : false,
+                                                &_configServer);
     if (!status.isOK()) {
         return status;
     }

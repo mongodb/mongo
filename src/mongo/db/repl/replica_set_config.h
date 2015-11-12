@@ -72,6 +72,12 @@ public:
     Status initialize(const BSONObj& cfg, bool usePV1ByDefault = false);
 
     /**
+     * Same as the generic initialize() above except will default "configsvr" setting to the value
+     * of serverGlobalParams.configsvr.
+     */
+    Status initializeForInitiate(const BSONObj& cfg, bool usePV1ByDefault = false);
+
+    /**
      * Returns true if this object has been successfully initialized or copied from
      * an initialized object.
      */
@@ -305,6 +311,8 @@ private:
      * Adds internal write concern modes to the getLastErrorModes list.
      */
     void _addInternalWriteConcernModes();
+
+    Status _initialize(const BSONObj& cfg, bool forInitiate, bool usePV1ByDefault);
 
     bool _isInitialized = false;
     long long _version = 1;

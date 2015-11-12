@@ -32,6 +32,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -714,12 +715,55 @@ TEST(ReplicaSetConfig, ConfigServerField) {
 
     // Configs in which configsvr is not the same as the --configsvr flag are invalid.
     serverGlobalParams.configsvr = true;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.configsvr = false; });
+
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(ErrorCodes::BadValue, config2.validate());
 
     serverGlobalParams.configsvr = false;
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
     ASSERT_OK(config2.validate());
+}
+
+TEST(ReplicaSetConfig, ConfigServerFieldDefaults) {
+    serverGlobalParams.configsvr = false;
+
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "protocolVersion" << 1 << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_FALSE(config.isConfigServer());
+
+    ReplicaSetConfig config2;
+    ASSERT_OK(
+        config2.initializeForInitiate(BSON("_id"
+                                           << "rs0"
+                                           << "protocolVersion" << 1 << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345")))));
+    ASSERT_FALSE(config2.isConfigServer());
+
+    serverGlobalParams.configsvr = true;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.configsvr = false; });
+
+    ReplicaSetConfig config3;
+    ASSERT_OK(config3.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "protocolVersion" << 1 << "version" << 1 << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345")))));
+    ASSERT_FALSE(config3.isConfigServer());
+
+    ReplicaSetConfig config4;
+    ASSERT_OK(
+        config4.initializeForInitiate(BSON("_id"
+                                           << "rs0"
+                                           << "protocolVersion" << 1 << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345")))));
+    ASSERT_TRUE(config4.isConfigServer());
 }
 
 TEST(ReplicaSetConfig, HeartbeatIntervalField) {

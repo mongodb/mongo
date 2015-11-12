@@ -46,26 +46,26 @@ TEST(ValidateConfigForInitiate, VersionMustBe1) {
     rses.addSelf(HostAndPort("h1"));
 
     ReplicaSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 2 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                              << "h1")))));
+    ASSERT_OK(config.initializeForInitiate(BSON("_id"
+                                                << "rs0"
+                                                << "version" << 2 << "members"
+                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                         << "h1")))));
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                   validateConfigForInitiate(&rses, config).getStatus());
 }
 
 TEST(ValidateConfigForInitiate, MustFindSelf) {
     ReplicaSetConfig config;
-    ASSERT_OK(
-        config.initialize(BSON("_id"
-                               << "rs0"
-                               << "version" << 1 << "members"
-                               << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                        << "h1")
-                                             << BSON("_id" << 2 << "host"
-                                                           << "h2") << BSON("_id" << 3 << "host"
-                                                                                  << "h3")))));
+    ASSERT_OK(config.initializeForInitiate(BSON("_id"
+                                                << "rs0"
+                                                << "version" << 1 << "members"
+                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                         << "h1")
+                                                              << BSON("_id" << 2 << "host"
+                                                                            << "h2")
+                                                              << BSON("_id" << 3 << "host"
+                                                                            << "h3")))));
     ReplicationCoordinatorExternalStateMock notPresentExternalState;
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
@@ -83,16 +83,16 @@ TEST(ValidateConfigForInitiate, MustFindSelf) {
 
 TEST(ValidateConfigForInitiate, SelfMustBeElectable) {
     ReplicaSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                              << "h1")
-                                                   << BSON("_id" << 2 << "host"
-                                                                 << "h2"
-                                                                 << "priority" << 0)
-                                                   << BSON("_id" << 3 << "host"
-                                                                 << "h3")))));
+    ASSERT_OK(config.initializeForInitiate(BSON("_id"
+                                                << "rs0"
+                                                << "version" << 1 << "members"
+                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                         << "h1")
+                                                              << BSON("_id" << 2 << "host"
+                                                                            << "h2"
+                                                                            << "priority" << 0)
+                                                              << BSON("_id" << 3 << "host"
+                                                                            << "h3")))));
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
@@ -488,13 +488,13 @@ TEST(ValidateConfigForInitiate, NewConfigInvalid) {
     // config is invalid, validateConfigForInitiate will return a status indicating what is
     // wrong with the new config.
     ReplicaSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 2 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 0 << "host"
-                                                                    << "h3")))));
+    ASSERT_OK(newConfig.initializeForInitiate(BSON("_id"
+                                                   << "rs0"
+                                                   << "version" << 2 << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                            << "h2")
+                                                                 << BSON("_id" << 0 << "host"
+                                                                               << "h3")))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
