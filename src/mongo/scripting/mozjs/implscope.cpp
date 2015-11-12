@@ -37,6 +37,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/stack_locator.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -198,7 +199,7 @@ void MozJSImplScope::_gcCallback(JSRuntime* rt, JSGCStatus status, void* data) {
           << std::endl;
 }
 
-MozJSImplScope::MozRuntime::MozRuntime() {
+MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
     mongo::sm::reset(kMallocMemoryLimit);
 
     // If this runtime isn't running on an NSPR thread, then it is
@@ -223,6 +224,16 @@ MozJSImplScope::MozRuntime::MozRuntime() {
         }
 
         _runtime = JS_NewRuntime(kMaxBytesBeforeGC);
+
+        // We turn on a variety of optimizations if the jit is enabled
+        if (engine->isJITEnabled()) {
+            JS::RuntimeOptionsRef(_runtime)
+                .setAsmJS(true)
+                .setBaseline(true)
+                .setIon(true)
+                .setNativeRegExp(true)
+                .setUnboxedObjects(true);
+        }
 
         const StackLocator locator;
         const auto available = locator.available();
@@ -261,7 +272,7 @@ MozJSImplScope::MozRuntime::~MozRuntime() {
 
 MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
     : _engine(engine),
-      _mr(),
+      _mr(engine),
       _runtime(_mr._runtime),
       _context(_mr._context),
       _globalProto(_context),

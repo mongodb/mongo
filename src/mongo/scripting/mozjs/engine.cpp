@@ -33,11 +33,18 @@
 #include "mongo/scripting/mozjs/engine.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/proxyscope.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+namespace {
+
+MONGO_EXPORT_SERVER_PARAMETER(disableJavaScriptJIT, bool, false);
+
+}  // namespace
 
 void ScriptEngine::setup() {
     if (!globalScriptEngine) {
@@ -104,6 +111,14 @@ void MozJSScriptEngine::interruptAll() {
     for (auto&& iScope : _opToScopeMap) {
         iScope.second->kill();
     }
+}
+
+void MozJSScriptEngine::enableJIT(bool value) {
+    disableJavaScriptJIT.store(!value);
+}
+
+bool MozJSScriptEngine::isJITEnabled() const {
+    return !disableJavaScriptJIT.load();
 }
 
 void MozJSScriptEngine::registerOperation(OperationContext* txn, MozJSImplScope* scope) {

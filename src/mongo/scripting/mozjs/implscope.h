@@ -313,7 +313,7 @@ private:
      */
     struct MozRuntime {
     public:
-        MozRuntime();
+        MozRuntime(const MozJSScriptEngine* engine);
         ~MozRuntime();
 
         PRThread* _thread = nullptr;

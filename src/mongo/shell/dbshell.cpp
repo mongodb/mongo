@@ -681,6 +681,7 @@ int _main(int argc, char* argv[], char** envp) {
     mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
     mongo::ScriptEngine::setup();
     mongo::globalScriptEngine->setScopeInitCallback(mongo::shell_utils::initScope);
+    mongo::globalScriptEngine->enableJIT(!shellGlobalParams.nojit);
     unique_ptr<mongo::Scope> scope(mongo::globalScriptEngine->newScope());
     shellMainScope = scope.get();
 

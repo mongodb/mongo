@@ -119,6 +119,11 @@ Status addMongoShellOptions(moe::OptionSection* options) {
     options->addOptionChaining(
         "ipv6", "ipv6", moe::Switch, "enable IPv6 support (disabled by default)");
 
+    options->addOptionChaining("disableJavaScriptJIT",
+                               "disableJavaScriptJIT",
+                               moe::Switch,
+                               "disable the Javascript Just In Time compiler");
+
     Status ret = Status::OK();
 #ifdef MONGO_CONFIG_SSL
     ret = addSSLClientOptions(options);
@@ -257,6 +262,9 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
     if (params.count("norc")) {
         shellGlobalParams.norc = true;
+    }
+    if (params.count("disableJavaScriptJIT")) {
+        shellGlobalParams.nojit = true;
     }
     if (params.count("files")) {
         shellGlobalParams.files = params["files"].as<vector<string>>();
