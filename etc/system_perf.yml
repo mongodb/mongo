@@ -254,7 +254,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../dsi/bin/compare.py -b standalone.json -c oplog.json -t ${threshold}
+          python -u compare.py -b standalone.json -c oplog.json -t ${threshold}
 
 
 
