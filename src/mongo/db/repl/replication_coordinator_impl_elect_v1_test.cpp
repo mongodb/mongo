@@ -144,6 +144,29 @@ TEST_F(ReplCoordElectV1Test, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 }
 
+TEST_F(ReplCoordElectV1Test, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345")) << "protocolVersion"
+                            << 1),
+                       HostAndPort("node1", 12345));
+
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_RECOVERING));
+
+    ASSERT(getReplCoord()->getMemberState().recovering())
+        << getReplCoord()->getMemberState().toString();
+
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(10, 0), 0));
+    simulateEnoughHeartbeatsForElectability();
+
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    ASSERT_EQUALS(Date_t(), electionTimeoutWhen);
+}
+
 TEST_F(ReplCoordElectV1Test, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     OperationContextReplMock txn;
     startCapturingLogMessages();
@@ -183,6 +206,41 @@ TEST_F(ReplCoordElectV1Test, ElectionSucceedsWhenAllNodesVoteYea) {
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345")) << "protocolVersion"
                              << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    OperationContextNoop txn;
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    startCapturingLogMessages();
+    simulateSuccessfulV1Election();
+    getReplCoord()->waitForElectionFinish_forTest();
+
+    // Check last vote
+    auto lastVote = getExternalState()->loadLocalLastVoteDocument(nullptr);
+    ASSERT(lastVote.isOK());
+    ASSERT_EQ(0, lastVote.getValue().getCandidateIndex());
+    ASSERT_EQ(1, lastVote.getValue().getTerm());
+
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("election succeeded"));
+}
+
+TEST_F(ReplCoordElectV1Test, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "members"
+                             << BSON_ARRAY(
+                                    BSON("_id" << 1 << "host"
+                                               << "node1:12345")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "node2:12345") << BSON("_id" << 3 << "host"
+                                                                                  << "node3:12345")
+                                    << BSON("_id" << 4 << "host"
+                                                  << "node4:12345") << BSON("_id" << 5 << "host"
+                                                                                  << "node5:12345")
+                                    << BSON("_id" << 6 << "host"
+                                                  << "node6:12345") << BSON("_id" << 7 << "host"
+                                                                                  << "node7:12345"))
+                             << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop txn;
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
