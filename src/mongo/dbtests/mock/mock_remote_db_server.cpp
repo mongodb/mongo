@@ -169,8 +169,8 @@ rpc::UniqueReply MockRemoteDBServer::runCommandWithMetadata(MockRemoteDBServer::
     // We need to construct a reply message - it will always be read through a view so it
     // doesn't matter whether we use CommandReplBuilder or LegacyReplyBuilder
     auto message = rpc::CommandReplyBuilder{}
-                       .setMetadata(rpc::makeEmptyMetadata())
                        .setCommandReply(reply)
+                       .setMetadata(rpc::makeEmptyMetadata())
                        .done();
     auto replyView = stdx::make_unique<rpc::CommandReply>(&message);
     return rpc::UniqueReply(std::move(message), std::move(replyView));

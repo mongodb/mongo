@@ -73,8 +73,8 @@ TEST(RequestBuilder, RoundTrip) {
 
     auto msg = r.setDatabase(databaseName)
                    .setCommandName(commandName)
-                   .setMetadata(metadata)
                    .setCommandArgs(commandArgs)
+                   .setMetadata(metadata)
                    .addInputDocs(inputDocRange)
                    .done();
 

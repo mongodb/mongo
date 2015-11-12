@@ -97,6 +97,23 @@ public:
         _b.reserveBytes(1);
     }
 
+    // Tag for a special overload of BSONObjBuilder that allows the user to continue
+    // building in to an existing BufBuilder that has already been built in to. Use with caution.
+    struct ResumeBuildingTag {};
+
+    BSONObjBuilder(ResumeBuildingTag, BufBuilder& existingBuilder, std::size_t offset = 0)
+        : _b(existingBuilder),
+          _buf(0),
+          _offset(offset),
+          _s(this),
+          _tracker(nullptr),
+          _doneCalled(false) {
+        invariant(_b.len() >= BSONObj::kMinBSONLength);
+        _b.setlen(_b.len() - 1);  // get rid of the previous EOO.
+        // Reserve space for our EOO.
+        _b.reserveBytes(1);
+    }
+
     BSONObjBuilder(const BSONSizeTracker& tracker)
         : _b(_buf),
           _buf(sizeof(BSONObj::Holder) + tracker.getSize()),

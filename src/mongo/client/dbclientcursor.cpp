@@ -85,8 +85,8 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
     // We need to get the command name from the upconverted command as it may have originally
     // been wrapped.
     requestBuilder->setCommandName(upconvertedCommand.firstElementFieldName());
-    requestBuilder->setMetadata(metadataBob.done());
     requestBuilder->setCommandArgs(std::move(upconvertedCommand));
+    requestBuilder->setMetadata(metadataBob.done());
 
     return requestBuilder->done();
 }

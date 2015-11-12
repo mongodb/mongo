@@ -77,15 +77,15 @@ protected:
 };
 
 TEST_F(ReplyTest, ParseAllFields) {
-    BSONObjBuilder metadataBob{};
-    metadataBob.append("foo", "bar");
-    auto metadata = metadataBob.done();
-    writeObj(metadata);
-
     BSONObjBuilder commandReplyBob{};
     commandReplyBob.append("baz", "garply");
     auto commandReply = commandReplyBob.done();
     writeObj(commandReply);
+
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    writeObj(metadata);
 
     BSONObjBuilder outputDoc1Bob{};
     outputDoc1Bob.append("meep", "boop").append("meow", "chirp");

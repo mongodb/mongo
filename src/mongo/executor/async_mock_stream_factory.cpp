@@ -302,8 +302,8 @@ void AsyncMockStreamFactory::MockStream::simulateServer(
     }
 
     auto replyBuilder = rpc::makeReplyBuilder(proto);
-    replyBuilder->setMetadata(resp.metadata);
     replyBuilder->setCommandReply(resp.data);
+    replyBuilder->setMetadata(resp.metadata);
 
     auto replyMsg = replyBuilder->done();
     replyMsg.header().setResponseTo(messageId);

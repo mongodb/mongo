@@ -1200,7 +1200,7 @@ void Command::execCommand(OperationContext* txn,
         // see SERVER-18515 for details.
         uassertStatusOK(rpc::readRequestMetadata(txn, request.getMetadata()));
 
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
+        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
 
         std::string dbname = request.getDatabase().toString();
         unique_ptr<MaintenanceModeSetter> mmSetter;
@@ -1337,7 +1337,7 @@ void Command::execCommand(OperationContext* txn,
 bool Command::run(OperationContext* txn,
                   const rpc::RequestInterface& request,
                   rpc::ReplyBuilderInterface* replyBuilder) {
-    BSONObjBuilder replyBuilderBob;
+    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder());
 
     repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
 
@@ -1346,9 +1346,10 @@ bool Command::run(OperationContext* txn,
         // parse and validate ReadConcernArgs
         auto readConcernParseStatus = readConcernArgs.initialize(request.getCommandArgs());
         if (!readConcernParseStatus.isOK()) {
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                .setCommandReply(readConcernParseStatus);
-            return false;
+            auto result = appendCommandStatus(inPlaceReplyBob, readConcernParseStatus);
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
         }
 
         if (!supportsReadConcern()) {
@@ -1356,23 +1357,27 @@ bool Command::run(OperationContext* txn,
             // readConcern regardless.
             if (!readConcernArgs.getOpTime().isNull() ||
                 readConcernArgs.getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
-                replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                    .setCommandReply({ErrorCodes::InvalidOptions,
-                                      str::stream()
-                                          << "Command " << name << " does not support "
-                                          << repl::ReadConcernArgs::kReadConcernFieldName});
-                return false;
+                auto result = appendCommandStatus(
+                    inPlaceReplyBob,
+                    {ErrorCodes::InvalidOptions,
+                     str::stream() << "Command " << name << " does not support "
+                                   << repl::ReadConcernArgs::kReadConcernFieldName});
+                inPlaceReplyBob.doneFast();
+                replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+                return result;
             }
         } else {
             // Skip waiting for the OpTime when testing snapshot behavior.
             if (!testingSnapshotBehaviorInIsolation) {
                 // Wait for readConcern to be satisfied.
                 auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcernArgs);
-                readConcernResult.appendInfo(&replyBuilderBob);
+                readConcernResult.appendInfo(&inPlaceReplyBob);
                 if (!readConcernResult.getStatus().isOK()) {
-                    replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                        .setCommandReply(readConcernResult.getStatus(), replyBuilderBob.done());
-                    return false;
+                    auto result =
+                        appendCommandStatus(inPlaceReplyBob, readConcernResult.getStatus());
+                    inPlaceReplyBob.doneFast();
+                    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+                    return result;
                 }
             }
 
@@ -1389,8 +1394,10 @@ bool Command::run(OperationContext* txn,
                 }
 
                 if (!status.isOK()) {
-                    replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
-                    return false;
+                    auto result = appendCommandStatus(inPlaceReplyBob, status);
+                    inPlaceReplyBob.doneFast();
+                    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+                    return result;
                 }
             }
         }
@@ -1404,8 +1411,11 @@ bool Command::run(OperationContext* txn,
     // run expects const db std::string (can't bind to temporary)
     const std::string db = request.getDatabase().toString();
 
+
     // TODO: remove queryOptions parameter from command's run method.
-    bool result = this->run(txn, db, cmd, 0, errmsg, replyBuilderBob);
+    bool result = this->run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
+    appendCommandStatus(inPlaceReplyBob, result, errmsg);
+    inPlaceReplyBob.doneFast();
 
     BSONObjBuilder metadataBob;
 
@@ -1429,17 +1439,7 @@ bool Command::run(OperationContext* txn,
         rpc::ConfigServerMetadata(opTime).writeToMetadata(&metadataBob);
     }
 
-    auto cmdResponse = replyBuilderBob.done();
     replyBuilder->setMetadata(metadataBob.done());
-
-    if (result) {
-        replyBuilder->setCommandReply(std::move(cmdResponse));
-    } else {
-        // maintain existing behavior of returning all data appended to builder
-        // even if command returned false
-        replyBuilder->setCommandReply(Status(ErrorCodes::CommandFailed, errmsg),
-                                      std::move(cmdResponse));
-    }
 
     return result;
 }

@@ -57,7 +57,6 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     rpc::LegacyRequestBuilder requestBuilder{};
     requestBuilder.setDatabase("admin");
     requestBuilder.setCommandName("isMaster");
-    requestBuilder.setMetadata(rpc::makeEmptyMetadata());
 
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
@@ -72,6 +71,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     }
 
     requestBuilder.setCommandArgs(bob.done());
+    requestBuilder.setMetadata(rpc::makeEmptyMetadata());
 
     // Set current command to ismaster request and run
     auto beginStatus = op->beginCommand(

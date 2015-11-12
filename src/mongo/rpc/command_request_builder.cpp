@@ -57,13 +57,6 @@ CommandRequestBuilder& CommandRequestBuilder::setDatabase(StringData database) {
 CommandRequestBuilder& CommandRequestBuilder::setCommandName(StringData commandName) {
     invariant(_state == State::kCommandName);
     _builder.appendStr(commandName);
-    _state = State::kMetadata;
-    return *this;
-}
-
-CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
-    invariant(_state == State::kMetadata);
-    metadata.appendSelfToBufBuilder(_builder);
     _state = State::kCommandArgs;
     return *this;
 }
@@ -71,6 +64,13 @@ CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
 CommandRequestBuilder& CommandRequestBuilder::setCommandArgs(BSONObj commandArgs) {
     invariant(_state == State::kCommandArgs);
     commandArgs.appendSelfToBufBuilder(_builder);
+    _state = State::kMetadata;
+    return *this;
+}
+
+CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
+    invariant(_state == State::kMetadata);
+    metadata.appendSelfToBufBuilder(_builder);
     _state = State::kInputDocs;
     return *this;
 }

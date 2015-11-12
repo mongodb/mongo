@@ -43,8 +43,6 @@ namespace {
 
 using namespace mongo;
 
-void testMaxCommandReply(rpc::ReplyBuilderInterface& replyBuilder);
-
 template <typename T>
 void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder);
 
@@ -92,8 +90,8 @@ TEST(CommandReplyBuilder, MemAccess) {
     BSONObj metadata = buildMetadata();
     BSONObj commandReply = buildCommand();
     rpc::CommandReplyBuilder replyBuilder;
-    replyBuilder.setMetadata(metadata);
     replyBuilder.setCommandReply(commandReply);
+    replyBuilder.setMetadata(metadata);
     auto msg = replyBuilder.done();
 
     rpc::CommandReply parsed(&msg);
@@ -106,8 +104,8 @@ TEST(LegacyReplyBuilder, MemAccess) {
     BSONObj metadata = buildMetadata();
     BSONObj commandReply = buildEmptyCommand();
     rpc::LegacyReplyBuilder replyBuilder;
-    replyBuilder.setMetadata(metadata);
     replyBuilder.setCommandReply(commandReply);
+    replyBuilder.setMetadata(metadata);
     auto msg = replyBuilder.done();
 
     rpc::LegacyReply parsed(&msg);
@@ -116,32 +114,13 @@ TEST(LegacyReplyBuilder, MemAccess) {
     ASSERT_EQUALS(parsed.getCommandReply(), commandReply);
 }
 
-DEATH_TEST(LegacyReplyBuilder, FailureAddingDoc, "Invariant failure _allowAddingOutputDocs") {
-    BSONObj metadata = buildMetadata();
-    BSONObj commandReply = buildCommand();
-    rpc::LegacyReplyBuilder replyBuilder;
-    replyBuilder.setMetadata(metadata);
-    replyBuilder.setCommandReply(commandReply);
-    replyBuilder.addOutputDoc(BSONObj());
-}
-
-DEATH_TEST(LegacyReplyBuilder, FailureAddingDocs, "Invariant failure _allowAddingOutputDocs") {
-    BSONObj metadata = buildMetadata();
-    BSONObj commandReply = buildCommand();
-    rpc::LegacyReplyBuilder replyBuilder;
-    replyBuilder.setMetadata(metadata);
-    replyBuilder.setCommandReply(commandReply);
-    rpc::DocumentRange range;
-    replyBuilder.addOutputDocs(range);
-}
-
 template <typename T>
 void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder) {
     auto metadata = buildMetadata();
     auto commandReply = buildEmptyCommand();
 
-    replyBuilder.setMetadata(metadata);
     replyBuilder.setCommandReply(commandReply);
+    replyBuilder.setMetadata(metadata);
 
     BSONObjBuilder outputDoc1Bob{};
     outputDoc1Bob.append("z", "t");
@@ -160,207 +139,18 @@ void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder) {
     outputDoc2.appendSelfToBufBuilder(outputDocs);
     outputDoc3.appendSelfToBufBuilder(outputDocs);
     rpc::DocumentRange outputDocRange{outputDocs.buf(), outputDocs.buf() + outputDocs.len()};
-    replyBuilder.addOutputDocs(outputDocRange);
+    if (replyBuilder.getProtocol() != rpc::Protocol::kOpQuery) {
+        replyBuilder.addOutputDocs(outputDocRange);
+    }
 
     auto msg = replyBuilder.done();
 
     T parsed(&msg);
 
     ASSERT_EQUALS(parsed.getMetadata(), metadata);
-    ASSERT_TRUE(parsed.getOutputDocs() == outputDocRange);
-}
-
-TEST(CommandReplyBuilder, MaxCommandReply) {
-    rpc::CommandReplyBuilder replyBuilder;
-    testMaxCommandReply(replyBuilder);
-}
-
-TEST(LegacyReplyBuilder, MaxCommandReply) {
-    rpc::LegacyReplyBuilder replyBuilder;
-    testMaxCommandReply(replyBuilder);
-}
-
-TEST(LegacyReplyBuilderSpaceTest, DocSize) {
-    rpc::LegacyReplyBuilder replyBuilder;
-    auto metadata = buildMetadata();
-    auto commandReply = buildEmptyCommand();
-
-    replyBuilder.setMetadata(metadata);
-    replyBuilder.setCommandReply(commandReply);
-
-    auto sizeBefore = replyBuilder.availableBytes();
-
-    for (int i = 0; i < 100000; ++i) {
-        BSONObjBuilder docBuilder;
-        docBuilder.append("foo" + std::to_string(i), "bar" + std::to_string(i));
-        auto statusAfter = replyBuilder.addOutputDoc(docBuilder.done());
-        ASSERT_TRUE(statusAfter.isOK());
+    if (replyBuilder.getProtocol() != rpc::Protocol::kOpQuery) {
+        ASSERT_TRUE(parsed.getOutputDocs() == outputDocRange);
     }
-
-    auto sizeAfter = replyBuilder.availableBytes();
-    auto msg = replyBuilder.done();
-
-    // construct an empty message to compare the estimated size difference with
-    // the actual difference
-    rpc::LegacyReplyBuilder replyBuilder0;
-    replyBuilder0.setMetadata(metadata);
-    replyBuilder0.setCommandReply(commandReply);
-    auto msg0 = replyBuilder0.done();
-
-    QueryResult::View qr0 = msg0.singleData().view2ptr();
-    auto dataLen0 = static_cast<std::size_t>(qr0.msgdata().dataLen());
-
-    QueryResult::View qr = msg.singleData().view2ptr();
-    auto dataLen = static_cast<std::size_t>(qr.msgdata().dataLen());
-
-    // below tests the array space estimates
-    // due to the inaccuracy in size estimation algo the actual size is off by up to 6 bytes
-    // on the large # of documents
-    ASSERT_EQUALS(sizeBefore - sizeAfter, dataLen - dataLen0 + 5);
-}
-
-class CommandReplyBuilderSpaceTest : public mongo::unittest::Test {
-protected:
-    // compute  an empty doc size to use in follow up tests for payload size computation
-    virtual void setUp() override {
-        BSONObjBuilder docBuilder1{};
-        docBuilder1.append("x", "");
-        auto emptyDoc = docBuilder1.done();
-        emptyDocSize = emptyDoc.objsize();
-    }
-
-    virtual void tearDown() override {}
-
-    std::size_t emptyDocSize = 0u;
-};
-
-TEST_F(CommandReplyBuilderSpaceTest, DocSizeEq) {
-    rpc::CommandReplyBuilder replyBuilder;
-    auto metadata = buildMetadata();
-    auto commandReply = buildEmptyCommand();
-    replyBuilder.setMetadata(metadata);
-    replyBuilder.setCommandReply(commandReply);
-
-    std::size_t spaceBefore = replyBuilder.availableBytes();
-
-    BSONObjBuilder docBuilder{};
-    docBuilder.append("foo", "bar");
-    auto doc = docBuilder.done();
-    std::size_t docSize = doc.objsize();
-
-    replyBuilder.addOutputDoc(doc);
-    std::size_t spaceAfter = replyBuilder.availableBytes();
-    ASSERT_EQUALS(spaceBefore - docSize, spaceAfter);
-}
-
-// multiple calls to addOutputDoc, no metadata
-TEST_F(CommandReplyBuilderSpaceTest, MaxDocSize1) {
-    rpc::CommandReplyBuilder replyBuilder;
-
-    auto metadata = buildMetadata();
-    auto commandReply = buildEmptyCommand();
-    replyBuilder.setMetadata(metadata);
-    replyBuilder.setCommandReply(commandReply);
-
-    std::size_t availSpace = replyBuilder.availableBytes();
-
-    while (availSpace > 0u) {
-        std::size_t payloadSz =
-            std::min(availSpace, static_cast<std::size_t>(mongo::BSONObjMaxUserSize)) -
-            emptyDocSize;
-        BSONObjBuilder docBuilder{};
-        std::string payload = std::string(payloadSz, 'y');
-        docBuilder.append("x", payload);
-        auto doc = docBuilder.done();
-        replyBuilder.addOutputDoc(doc);
-        availSpace = replyBuilder.availableBytes();
-    }
-    auto msg = replyBuilder.done();
-    auto sizeUInt = static_cast<std::size_t>(msg.size());
-
-    ASSERT_EQUALS(sizeUInt, mongo::MaxMessageSizeBytes);
-}
-
-// multiple calls to addOutputDoc, some metadata
-TEST_F(CommandReplyBuilderSpaceTest, MaxDocSize2) {
-    rpc::CommandReplyBuilder replyBuilder;
-
-    auto metadata = buildMetadata();
-    auto commandReply = buildEmptyCommand();
-    replyBuilder.setMetadata(metadata);
-    replyBuilder.setCommandReply(commandReply);
-
-    std::size_t availSpace = replyBuilder.availableBytes();
-
-    while (availSpace > 0u) {
-        std::size_t payloadSz =
-            std::min(availSpace, static_cast<std::size_t>(mongo::BSONObjMaxUserSize)) -
-            emptyDocSize;
-        BSONObjBuilder docBuilder{};
-        std::string payload = std::string(payloadSz, 'y');
-        docBuilder.append("x", payload);
-        auto doc = docBuilder.done();
-        replyBuilder.addOutputDoc(doc);
-        availSpace = replyBuilder.availableBytes();
-    }
-    auto msg = replyBuilder.done();
-    auto sizeUInt = static_cast<std::size_t>(msg.size());
-
-    ASSERT_EQUALS(sizeUInt, mongo::MaxMessageSizeBytes);
-}
-
-
-// single call to addOutputDocs
-TEST_F(CommandReplyBuilderSpaceTest, MaxDocSize3) {
-    rpc::CommandReplyBuilder replyBuilder;
-
-    auto metadata = buildMetadata();
-    auto commandReply = buildEmptyCommand();
-    replyBuilder.setMetadata(metadata);
-    replyBuilder.setCommandReply(commandReply);
-
-    std::size_t availSpace = replyBuilder.availableBytes();
-
-    BufBuilder docs;
-    while (availSpace > 0u) {
-        std::size_t payloadSz =
-            std::min(availSpace, static_cast<std::size_t>(mongo::BSONObjMaxUserSize)) -
-            emptyDocSize;
-        BSONObjBuilder docBuilder{};
-        std::string payload = std::string(payloadSz, 'y');
-        docBuilder.append("x", payload);
-        auto doc = docBuilder.done();
-        availSpace -= doc.objsize();
-        doc.appendSelfToBufBuilder(docs);
-    }
-    rpc::DocumentRange docRange{docs.buf(), docs.buf() + docs.len()};
-    replyBuilder.addOutputDocs(docRange);
-
-    auto msg = replyBuilder.done();
-
-    auto sizeUInt = static_cast<std::size_t>(msg.size());
-
-    ASSERT_EQUALS(sizeUInt, mongo::MaxMessageSizeBytes);
-}
-
-// call to addCommandReply
-void testMaxCommandReply(rpc::ReplyBuilderInterface& replyBuilder) {
-    BSONObjBuilder docBuilder1{};
-    docBuilder1.append("x", "");
-    auto emptyDoc = docBuilder1.done();
-    std::size_t emptyDocSize = emptyDoc.objsize();
-
-    auto metadata = buildMetadata();
-    replyBuilder.setMetadata(metadata);
-
-    auto payloadSz = static_cast<std::size_t>(mongo::BSONObjMaxUserSize) - emptyDocSize;
-
-    BSONObjBuilder commandReplyBuilder{};
-    std::string payload = std::string(payloadSz, 'y');
-    commandReplyBuilder.append("x", payload);
-    auto commandReply = commandReplyBuilder.obj();
-    ASSERT_EQUALS(commandReply.objsize(), mongo::BSONObjMaxUserSize);
-    replyBuilder.setCommandReply(commandReply);
 }
 
 }  // namespace

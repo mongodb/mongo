@@ -62,9 +62,9 @@ public:
 
     CommandRequestBuilder& setCommandName(StringData commandName) final;
 
-    CommandRequestBuilder& setMetadata(BSONObj metadata) final;
-
     CommandRequestBuilder& setCommandArgs(BSONObj commandArgs) final;
+
+    CommandRequestBuilder& setMetadata(BSONObj metadata) final;
 
     CommandRequestBuilder& addInputDocs(DocumentRange inputDocs) final;
 

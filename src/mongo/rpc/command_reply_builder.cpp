@@ -46,44 +46,39 @@ CommandReplyBuilder::CommandReplyBuilder(Message&& message) : _message{std::move
     _builder.skip(mongo::MsgData::MsgDataHeaderSize);
 }
 
-CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
-    invariant(_state == State::kMetadata);
-
-    metadata.appendSelfToBufBuilder(_builder);
-    _state = State::kCommandReply;
-    return *this;
-}
-
 CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(const BSONObj& commandReply) {
     invariant(_state == State::kCommandReply);
 
     commandReply.appendSelfToBufBuilder(_builder);
+    _state = State::kMetadata;
+    return *this;
+}
+
+BufBuilder& CommandReplyBuilder::getInPlaceReplyBuilder() {
+    invariant(_state == State::kCommandReply);
+    _state = State::kMetadata;
+    return _builder;
+}
+
+CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
+    invariant(_state == State::kMetadata);
+    metadata.appendSelfToBufBuilder(_builder);
     _state = State::kOutputDocs;
     return *this;
 }
+
 
 Status CommandReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
     invariant(_state == State::kOutputDocs);
     auto rangeData = outputDocs.data();
     auto dataSize = rangeData.length();
-    auto hasSpace = _hasSpaceFor(dataSize);
-    if (!hasSpace.isOK()) {
-        return hasSpace;
-    }
-
+    invariant(_state == State::kOutputDocs);
     _builder.appendBuf(rangeData.data(), dataSize);
     return Status::OK();
 }
 
 Status CommandReplyBuilder::addOutputDoc(const BSONObj& outputDoc) {
     invariant(_state == State::kOutputDocs);
-
-    auto dataSize = static_cast<std::size_t>(outputDoc.objsize());
-    auto hasSpace = _hasSpaceFor(dataSize);
-    if (!hasSpace.isOK()) {
-        return hasSpace;
-    }
-
     outputDoc.appendSelfToBufBuilder(_builder);
     return Status::OK();
 }
@@ -97,15 +92,15 @@ Protocol CommandReplyBuilder::getProtocol() const {
 }
 
 void CommandReplyBuilder::reset() {
-    // If we are in State::kMetadata, we are already in the 'start' state, so by
+    // If we are in State::kCommandReply, we are already in the 'start' state, so by
     // immediately returning, we save a heap allocation.
-    if (_state == State::kMetadata) {
+    if (_state == State::kCommandReply) {
         return;
     }
     _builder.reset();
     _builder.skip(mongo::MsgData::MsgDataHeaderSize);
     _message.reset();
-    _state = State::kMetadata;
+    _state = State::kCommandReply;
 }
 
 Message CommandReplyBuilder::done() {
@@ -117,24 +112,6 @@ Message CommandReplyBuilder::done() {
     _message.setData(msg.view2ptr(), true);  // transfer ownership to Message
     _state = State::kDone;
     return std::move(_message);
-}
-
-std::size_t CommandReplyBuilder::availableBytes() const {
-    int intLen = _builder.len();
-    invariant(0 <= intLen);
-    std::size_t len = static_cast<std::size_t>(intLen);
-    invariant(len <= mongo::MaxMessageSizeBytes);
-    return mongo::MaxMessageSizeBytes - len;
-}
-
-Status CommandReplyBuilder::_hasSpaceFor(std::size_t dataSize) const {
-    size_t availBytes = availableBytes();
-    if (availBytes < dataSize) {
-        return Status(ErrorCodes::Overflow,
-                      str::stream() << "Not enough space to store " << dataSize << " bytes. Only "
-                                    << availBytes << " bytes are available.");
-    }
-    return Status::OK();
 }
 
 }  // rpc

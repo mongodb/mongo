@@ -64,9 +64,9 @@ private:
     Message _message;
     BufBuilder _builder{};
 
-    // we need to stash this as we need commandArgs to
+    // we need to stash this as we need metadata to
     // upconvert.
-    BSONObj _metadata;
+    BSONObj _commandArgs;
 
     std::string _ns{};  // copied to in setDatabase
 

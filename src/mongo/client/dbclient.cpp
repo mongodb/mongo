@@ -307,8 +307,8 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
 
     requestBuilder->setDatabase(database);
     requestBuilder->setCommandName(command);
-    requestBuilder->setMetadata(metadataBob.done());
     requestBuilder->setCommandArgs(commandArgs);
+    requestBuilder->setMetadata(metadataBob.done());
     auto requestMsg = requestBuilder->done();
 
     Message replyMsg;

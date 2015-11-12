@@ -1096,8 +1096,8 @@ static void insertSystemIndexes(OperationContext* txn, DbMessage& d, CurOp& curO
             auto indexNs = NamespaceString(d.getns());
             auto cmdRequestMsg = requestBuilder.setDatabase(indexNs.db())
                                      .setCommandName("createIndexes")
-                                     .setMetadata(rpc::makeEmptyMetadata())
                                      .setCommandArgs(cmdObj)
+                                     .setMetadata(rpc::makeEmptyMetadata())
                                      .done();
             rpc::LegacyRequest cmdRequest{&cmdRequestMsg};
             rpc::LegacyReplyBuilder cmdReplyBuilder{};

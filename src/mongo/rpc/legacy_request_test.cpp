@@ -43,8 +43,8 @@ TEST(LegacyRequest, InvalidNSThrows) {
     rpc::LegacyRequestBuilder crb;
     crb.setDatabase("foo////!!!!<><><>");
     crb.setCommandName("foo");
-    crb.setMetadata(BSONObj());
     crb.setCommandArgs(BSON("ping" << 1));
+    crb.setMetadata(BSONObj());
     auto msg = crb.done();
     ASSERT_THROWS(rpc::LegacyRequest{&msg}, AssertionException);
 }

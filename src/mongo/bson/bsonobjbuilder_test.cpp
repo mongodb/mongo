@@ -38,12 +38,13 @@
 
 namespace {
 
-using std::string;
-using std::stringstream;
 using mongo::BSONElement;
 using mongo::BSONObj;
 using mongo::BSONObjBuilder;
 using mongo::BSONType;
+using mongo::BufBuilder;
+using std::string;
+using std::stringstream;
 
 const long long maxEncodableInt = (1 << 30) - 1;
 const long long minEncodableInt = -maxEncodableInt;
@@ -262,6 +263,44 @@ TEST(BSONObjBuilderTest, AppendMaxTimestampConversion) {
 
     mongo::Timestamp timestamp = e.timestamp();
     ASSERT_FALSE(timestamp.isNull());
+}
+
+TEST(BSONObjBuilderTest, ResumeBuilding) {
+    BufBuilder b;
+    {
+        BSONObjBuilder firstBuilder(b);
+        firstBuilder.append("a", "b");
+    }
+    {
+        BSONObjBuilder secondBuilder(BSONObjBuilder::ResumeBuildingTag(), b);
+        secondBuilder.append("c", "d");
+    }
+    auto obj = BSONObj(b.buf());
+    ASSERT_EQ(obj,
+              BSON("a"
+                   << "b"
+                   << "c"
+                   << "d"));
+}
+
+TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
+    BufBuilder b;
+    // build a trivial object.
+    {
+        BSONObjBuilder firstBuilder(b);
+        firstBuilder.append("ll",
+                            BSON("f" << BSON("cc"
+                                             << "dd")));
+    }
+    // add a complex field
+    {
+        BSONObjBuilder secondBuilder(BSONObjBuilder::ResumeBuildingTag(), b);
+        secondBuilder.append("a", BSON("c" << 3));
+    }
+    auto obj = BSONObj(b.buf());
+    ASSERT_EQ(obj,
+              BSON("ll" << BSON("f" << BSON("cc"
+                                            << "dd")) << "a" << BSON("c" << 3)));
 }
 
 }  // unnamed namespace

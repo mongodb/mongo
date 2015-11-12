@@ -94,9 +94,9 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
 
     Validated<BSONObj> obj;
     uassertStatusOK(cur.readAndAdvance<>(&obj));
-    _metadata = std::move(obj.val);
-    uassertStatusOK(cur.readAndAdvance<>(&obj));
     _commandArgs = std::move(obj.val);
+    uassertStatusOK(cur.readAndAdvance<>(&obj));
+    _metadata = std::move(obj.val);
 
     _inputDocs = DocumentRange{cur.data(), messageEnd};
 }

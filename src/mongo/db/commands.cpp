@@ -400,8 +400,8 @@ void Command::generateHelpResponse(OperationContext* txn,
     helpBuilder.append("help", ss.str());
     helpBuilder.append("lockType", command.isWriteCommandForConfigServer() ? 1 : 0);
 
-    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
     replyBuilder->setCommandReply(helpBuilder.done());
+    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 }
 
 namespace {
@@ -416,8 +416,6 @@ void _generateErrorResponse(OperationContext* txn,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
 
-    replyBuilder->setMetadata(metadata);
-
     // We need to include some extra information for SendStaleConfig.
     if (exception.getCode() == ErrorCodes::SendStaleConfig) {
         const SendStaleConfigException& scex =
@@ -430,6 +428,8 @@ void _generateErrorResponse(OperationContext* txn,
     } else {
         replyBuilder->setCommandReply(exception.toStatus());
     }
+
+    replyBuilder->setMetadata(metadata);
 }
 
 }  // namespace
@@ -470,7 +470,7 @@ void runCommands(OperationContext* txn,
                  const rpc::RequestInterface& request,
                  rpc::ReplyBuilderInterface* replyBuilder) {
     try {
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
+        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
 
         Command* c = nullptr;
         // In the absence of a Command object, no redaction is possible. Therefore

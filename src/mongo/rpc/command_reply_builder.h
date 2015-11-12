@@ -56,8 +56,11 @@ public:
      */
     CommandReplyBuilder(Message&& message);
 
-    CommandReplyBuilder& setMetadata(const BSONObj& metadata) final;
+
     CommandReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
+    BufBuilder& getInPlaceReplyBuilder() final;
+
+    CommandReplyBuilder& setMetadata(const BSONObj& metadata) final;
 
     Status addOutputDocs(DocumentRange outputDocs) final;
     Status addOutputDoc(const BSONObj& outputDoc) final;
@@ -75,19 +78,11 @@ public:
      */
     Message done() final;
 
-    std::size_t availableBytes() const final;
-
 private:
-    /**
-     *  Checks if there is enough space in the buffer to store dataSize bytes
-     *  and computes error message if not.
-     */
-    Status _hasSpaceFor(std::size_t dataSize) const;
-
     // Default values are all empty.
     BufBuilder _builder{};
     Message _message;
-    State _state{State::kMetadata};
+    State _state{State::kCommandReply};
 };
 
 }  // namespace rpc

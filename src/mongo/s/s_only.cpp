@@ -88,7 +88,7 @@ void Command::execCommand(OperationContext* txn,
                            cmdObj,
                            result);
 
-    replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(result.done());
+    replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
 }
 
 void Command::execCommandClientBasic(OperationContext* txn,

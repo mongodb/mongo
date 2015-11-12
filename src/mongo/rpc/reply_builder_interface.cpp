@@ -48,13 +48,16 @@ const char kErrorField[] = "errmsg";
 // similar to appendCommandStatus (duplicating logic here to avoid cyclic library
 // dependency)
 BSONObj augmentReplyWithStatus(const Status& status, const BSONObj& reply) {
-    BSONObjBuilder bob;
-    bob.appendElements(reply);
-
-    if (!reply.hasField(kOKField)) {
-        bob.append(kOKField, status.isOK() ? 1.0 : 0.0);
+    auto okField = reply.getField(kOKField);
+    if (!okField.eoo() && okField.trueValue()) {
+        return reply;
     }
 
+    BSONObjBuilder bob;
+    bob.appendElements(reply);
+    if (okField.eoo()) {
+        bob.append(kOKField, status.isOK() ? 1.0 : 0.0);
+    }
     if (status.isOK()) {
         return bob.obj();
     }

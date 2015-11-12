@@ -64,15 +64,15 @@ TEST(CommandRequest, ParseAllFields) {
     auto commandName = std::string{"abababa"};
     writeString(commandName);
 
-    BSONObjBuilder metadataBob{};
-    metadataBob.append("foo", "bar");
-    auto metadata = metadataBob.done();
-    writeObj(metadata);
-
     BSONObjBuilder commandArgsBob{};
     commandArgsBob.append("baz", "garply");
     auto commandArgs = commandArgsBob.done();
     writeObj(commandArgs);
+
+    BSONObjBuilder metadataBob{};
+    metadataBob.append("foo", "bar");
+    auto metadata = metadataBob.done();
+    writeObj(metadata);
 
     BSONObjBuilder inputDoc1Bob{};
     inputDoc1Bob.append("meep", "boop").append("meow", "chirp");
@@ -112,8 +112,8 @@ TEST(CommandRequest, InvalidNSThrows) {
     rpc::CommandRequestBuilder crb;
     crb.setDatabase("foo////!!!!<><><>");
     crb.setCommandName("foo");
-    crb.setMetadata(BSONObj());
     crb.setCommandArgs(BSON("ping" << 1));
+    crb.setMetadata(BSONObj());
     auto msg = crb.done();
     ASSERT_THROWS(rpc::CommandRequest{&msg}, AssertionException);
 }

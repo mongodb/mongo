@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/rpc/protocol.h"
 
 namespace mongo {
@@ -59,13 +60,19 @@ public:
 
     virtual ~ReplyBuilderInterface() = default;
 
-    virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;
 
     /**
      * Sets the raw command reply. This should probably not be used in favor of the
      * variants that accept a Status or StatusWith.
      */
     virtual ReplyBuilderInterface& setRawCommandReply(const BSONObj& reply) = 0;
+
+    /**
+     * Returns a BufBuilder suitable for building a command reply in place.
+     */
+    virtual BufBuilder& getInPlaceReplyBuilder() = 0;
+
+    virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;
 
     /**
      * Sets the reply for this command. If an engaged StatusWith<BSONObj> is passed, the command
@@ -120,12 +127,6 @@ public:
      * written.
      */
     virtual void reset() = 0;
-
-    /**
-     * Returns available space in bytes, should be used to verify that the message have enough
-     * space for ouput documents.
-     */
-    virtual std::size_t availableBytes() const = 0;
 
     /**
      * Writes data then transfers ownership of the message to the caller. The behavior of

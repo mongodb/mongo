@@ -81,8 +81,8 @@ StatusWith<Message> messageFromRequest(const RemoteCommandRequest& request,
     auto toSend = rpc::makeRequestBuilder(protocol)
                       ->setDatabase(request.dbname)
                       .setCommandName(request.cmdObj.firstElementFieldName())
-                      .setMetadata(maybeAugmented)
                       .setCommandArgs(request.cmdObj)
+                      .setMetadata(maybeAugmented)
                       .done();
     return std::move(toSend);
 }

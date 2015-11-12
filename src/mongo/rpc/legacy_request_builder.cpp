@@ -60,25 +60,24 @@ LegacyRequestBuilder& LegacyRequestBuilder::setDatabase(StringData database) {
 LegacyRequestBuilder& LegacyRequestBuilder::setCommandName(StringData commandName) {
     invariant(_state == State::kCommandName);
     // no op, as commandName is the first element of commandArgs
-    _state = State::kMetadata;
-    return *this;
-}
-
-LegacyRequestBuilder& LegacyRequestBuilder::setMetadata(BSONObj metadata) {
-    invariant(_state == State::kMetadata);
-    _metadata = std::move(metadata);
     _state = State::kCommandArgs;
     return *this;
 }
 
 LegacyRequestBuilder& LegacyRequestBuilder::setCommandArgs(BSONObj commandArgs) {
     invariant(_state == State::kCommandArgs);
+    _commandArgs = std::move(commandArgs);
+    _state = State::kMetadata;
+    return *this;
+}
 
+LegacyRequestBuilder& LegacyRequestBuilder::setMetadata(BSONObj metadata) {
+    invariant(_state == State::kMetadata);
     BSONObj legacyCommandArgs;
     int queryOptions;
 
     std::tie(legacyCommandArgs, queryOptions) = uassertStatusOK(
-        rpc::downconvertRequestMetadata(std::move(commandArgs), std::move(_metadata)));
+        rpc::downconvertRequestMetadata(std::move(_commandArgs), std::move(metadata)));
 
     _builder.appendNum(queryOptions);  // queryOptions
     _builder.appendStr(_ns);

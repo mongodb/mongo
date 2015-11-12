@@ -274,10 +274,8 @@ public:
 
         rpc::CommandRequestBuilder requestBuilder{};
 
-        requestBuilder.setDatabase("admin")
-            .setCommandName(cmd)
-            .setMetadata(rpc::makeEmptyMetadata())
-            .setCommandArgs(cmdObj);
+        requestBuilder.setDatabase("admin").setCommandName(cmd).setCommandArgs(cmdObj).setMetadata(
+            rpc::makeEmptyMetadata());
 
         auto cmdRequestMsg = requestBuilder.done();
         rpc::CommandRequest cmdRequest{&cmdRequestMsg};

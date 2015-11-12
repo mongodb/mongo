@@ -167,8 +167,8 @@ Message ASIOConnection::makeIsMasterRequest(ASIOConnection* conn) {
     rpc::LegacyRequestBuilder requestBuilder{};
     requestBuilder.setDatabase("admin");
     requestBuilder.setCommandName("isMaster");
-    requestBuilder.setMetadata(rpc::makeEmptyMetadata());
     requestBuilder.setCommandArgs(BSON("isMaster" << 1));
+    requestBuilder.setMetadata(rpc::makeEmptyMetadata());
 
     return requestBuilder.done();
 }

@@ -165,7 +165,7 @@ public:
                         commandReply = StatusWith<BSONObj>(*status);
                     }
                     auto cmdResponse =
-                        replyBuilder->setMetadata(metadata).setCommandReply(commandReply).done();
+                        replyBuilder->setCommandReply(commandReply).setMetadata(metadata).done();
                     _mp->say(cmdResponse, requestId);
                     continue;
                 }

@@ -420,8 +420,8 @@ public:
 
         // Build a mock reply message
         auto replyBuilder = rpc::makeReplyBuilder(rpc::Protocol::kOpCommandV1);
-        replyBuilder->setMetadata(BSONObj());
         replyBuilder->setCommandReply(BSON("hello!" << 1));
+        replyBuilder->setMetadata(BSONObj());
 
         auto message = replyBuilder->done();
         message.header().setResponseTo(messageId);

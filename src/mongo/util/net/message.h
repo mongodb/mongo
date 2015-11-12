@@ -66,8 +66,10 @@ enum NetworkOp {
     dbGetMore = 2005,
     dbDelete = 2006,
     dbKillCursors = 2007,
-    dbCommand = 2008,
-    dbCommandReply = 2009,
+    // dbCommand_DEPRECATED = 2008, //
+    // dbCommandReply_DEPRECATED = 2009, //
+    dbCommand = 2010,
+    dbCommandReply = 2011,
 };
 
 enum class LogicalOp {
