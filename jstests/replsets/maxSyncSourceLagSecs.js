@@ -27,7 +27,8 @@
     jsTestLog("Setting sync target of slave 2 to slave 1");
     assert.commandWorked(slaves[1].getDB("admin").runCommand({replSetSyncFrom: slaves[0].name}));
     assert.soon(function() {
-            return (replTest.status().members[2].syncingTo === slaves[0].name);
+            var res = slaves[1].getDB("admin").runCommand({"replSetGetStatus": 1});
+            return res.syncingTo === slaves[0].name;
         }, "sync target not changed to other slave");
     printjson(replTest.status());
 
@@ -36,7 +37,8 @@
     master.getDB("foo").bar.save({a: 2});
 
     assert.soon(function() {
-            return (replTest.status().members[2].syncingTo === master.name);
+            var res = slaves[1].getDB("admin").runCommand({"replSetGetStatus": 1});
+            return res.syncingTo === master.name;
         }, "sync target not changed back to primary");
     printjson(replTest.status());
 
