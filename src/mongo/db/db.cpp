@@ -202,6 +202,10 @@ public:
             break;
         }
     }
+
+    virtual void close() {
+        Client::destroy();
+    }
 };
 
 static void logStartup(OperationContext* txn) {

@@ -126,6 +126,8 @@ public:
         port->reply(m, response);
     }
 
+    virtual void close() {}
+
 } dummyHandler;
 
 // TODO: Take this out and make it as a reusable class in a header file. The only

@@ -168,6 +168,10 @@ public:
         // Release connections back to pool, if any still cached
         ShardConnection::releaseMyConnections();
     }
+
+    virtual void close() {
+        Client::destroy();
+    }
 };
 
 DBClientBase* createDirectClient(OperationContext* txn) {

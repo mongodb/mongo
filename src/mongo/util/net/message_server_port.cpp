@@ -210,6 +210,7 @@ private:
         int64_t counter = 0;
         try {
             handler->connected(portWithHandler.get());
+            ON_BLOCK_EXIT([handler]() { handler->close(); });
 
             while (!inShutdown()) {
                 m.reset();
@@ -222,7 +223,6 @@ private:
                         log() << "end connection " << portWithHandler->psock->remoteString() << " ("
                               << conns << word << " now open)" << endl;
                     }
-                    portWithHandler->shutdown();
                     break;
                 }
 
@@ -238,18 +238,16 @@ private:
         } catch (AssertionException& e) {
             log() << "AssertionException handling request, closing client connection: " << e
                   << endl;
-            portWithHandler->shutdown();
         } catch (SocketException& e) {
             log() << "SocketException handling request, closing client connection: " << e << endl;
-            portWithHandler->shutdown();
         } catch (const DBException&
                      e) {  // must be right above std::exception to avoid catching subclasses
             log() << "DBException handling request, closing client connection: " << e << endl;
-            portWithHandler->shutdown();
         } catch (std::exception& e) {
             error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
             dbexit(EXIT_UNCAUGHT);
         }
+        portWithHandler->shutdown();
 
 // Normal disconnect path.
 #ifdef MONGO_CONFIG_SSL

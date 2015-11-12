@@ -56,9 +56,15 @@ typedef long long ConnectionId;
 /** the database's concept of an outside "client" */
 class Client : public ClientBasic {
 public:
-    /** each thread which does db operations has a Client object in TLS.
-     *  call this when your thread starts.
-    */
+    /**
+     * Creates a Client object and stores it in TLS for the current thread.
+     *
+     * An unowned pointer to a AbstractMessagingPort may optionally be provided. If 'mp' is
+     * non-null, then it will be used to augment the thread name, and for reporting purposes.
+     *
+     * If provided, 'mp' must outlive the newly-created Client object. Client::destroy() may be used
+     * to help enforce that the Client does not outlive 'mp'.
+     */
     static void initThread(const char* desc, AbstractMessagingPort* mp = 0);
     static void initThread(const char* desc,
                            ServiceContext* serviceContext,
@@ -74,6 +80,15 @@ public:
      * Inits a thread if that thread has not already been init'd, using the existing thread name
      */
     static void initThreadIfNotAlready();
+
+    /**
+     * Destroys the Client object stored in TLS for the current thread. The current thread must have
+     * a Client.
+     *
+     * If destroy() is not called explicitly, then the Client stored in TLS will be destroyed upon
+     * exit of the current thread.
+     */
+    static void destroy();
 
     std::string clientAddress(bool includePort = false) const;
     const std::string& desc() const {
