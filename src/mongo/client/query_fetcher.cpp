@@ -30,17 +30,35 @@
 
 #include "mongo/client/query_fetcher.h"
 
+#include "mongo/executor/remote_command_request.h"
+
 namespace mongo {
+
 
 QueryFetcher::QueryFetcher(executor::TaskExecutor* exec,
                            const HostAndPort& src,
                            const NamespaceString& nss,
                            const BSONObj& cmdBSON,
-                           const CallbackFn& work,
+                           const CallbackFn& onBatchAvailable,
                            const BSONObj& metadata)
+    : QueryFetcher(exec,
+                   src,
+                   nss,
+                   cmdBSON,
+                   onBatchAvailable,
+                   metadata,
+                   executor::RemoteCommandRequest::kNoTimeout) {}
+
+QueryFetcher::QueryFetcher(executor::TaskExecutor* exec,
+                           const HostAndPort& source,
+                           const NamespaceString& nss,
+                           const BSONObj& cmdBSON,
+                           const QueryFetcher::CallbackFn& onBatchAvailable,
+                           const BSONObj& metadata,
+                           Milliseconds timeout)
     : _exec(exec),
       _fetcher(exec,
-               src,
+               source,
                nss.db().toString(),
                cmdBSON,
                stdx::bind(&QueryFetcher::_onFetchCallback,
@@ -48,8 +66,9 @@ QueryFetcher::QueryFetcher(executor::TaskExecutor* exec,
                           stdx::placeholders::_1,
                           stdx::placeholders::_2,
                           stdx::placeholders::_3),
-               metadata),
-      _work(work) {}
+               metadata,
+               timeout),
+      _work(onBatchAvailable) {}
 
 void QueryFetcher::_onFetchCallback(const Fetcher::QueryResponseStatus& fetchResult,
                                     Fetcher::NextAction* nextAction,

@@ -60,6 +60,13 @@ public:
                  const BSONObj& cmdBSON,
                  const QueryFetcher::CallbackFn& onBatchAvailable,
                  const BSONObj& metadata = rpc::makeEmptyMetadata());
+    QueryFetcher(executor::TaskExecutor* exec,
+                 const HostAndPort& source,
+                 const NamespaceString& nss,
+                 const BSONObj& cmdBSON,
+                 const QueryFetcher::CallbackFn& onBatchAvailable,
+                 const BSONObj& metadata,
+                 Milliseconds timeout);
     virtual ~QueryFetcher() = default;
 
     bool isActive() const {

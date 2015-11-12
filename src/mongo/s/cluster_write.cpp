@@ -257,13 +257,17 @@ void ClusterWriter::write(OperationContext* txn,
         grid.catalogManager(txn)->writeConfigServerDirect(txn, *request, response);
     } else {
         ChunkManagerTargeter targeter(request->getTargetingNSS());
-        Status targetInitStatus = targeter.init(txn);
 
+        Status targetInitStatus = targeter.init(txn);
         if (!targetInitStatus.isOK()) {
-            // Errors will be reported in response if we are unable to target
-            warning() << "could not initialize targeter for"
-                      << (request->isInsertIndexRequest() ? " index" : "")
-                      << " write op in collection " << request->getTargetingNS();
+            toBatchError(Status(targetInitStatus.code(),
+                                str::stream() << "unable to target"
+                                              << (request->isInsertIndexRequest() ? " index" : "")
+                                              << " write op for collection "
+                                              << request->getTargetingNS()
+                                              << causedBy(targetInitStatus)),
+                         response);
+            return;
         }
 
         DBClientShardResolver resolver;

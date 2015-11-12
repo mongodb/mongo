@@ -498,7 +498,8 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
                          findCmdBuilder.done(),
                          fetcherCallback,
                          readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata
-                                                                      : kReplSecondaryOkMetadata);
+                                                                      : kReplSecondaryOkMetadata,
+                         maxTime);
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
         return scheduleStatus;
