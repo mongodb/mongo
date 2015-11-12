@@ -413,31 +413,29 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	    root, pindex->entries, children));
 
 	/*
-	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects. Initialize
-	 * the slots of the allocated WT_PAGE_INDEX to point to the pages we're
-	 * keeping at the current level (both leading and trailing), and the
-	 * rest of the slots to point to newly allocated WT_REF objects.
+	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects to be inserted
+	 * into the root page, replacing the root's page-index.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + children * sizeof(WT_REF *);
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
 	root_incr += size;
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = children;
-	for (alloc_refp = alloc_index->index, i = 0;
-	    i < children; alloc_refp++, ++i)
+	alloc_refp = alloc_index->index;
+	for (i = 0; i < children; alloc_refp++, ++i)
 		WT_ERR(__wt_calloc_one(session, alloc_refp));
 	root_incr += children * sizeof(WT_REF);
 
 	/* Allocate child pages, and connect them into the new page index. */
-	for (root_refp = pindex->index, alloc_refp = alloc_index->index, i=0;
-	    i < children; ++i) {
+	for (root_refp = pindex->index,
+	    alloc_refp = alloc_index->index, i = 0; i < children; ++i) {
 		slots = i == children - 1 ? remain : chunk;
 		WT_ERR(__wt_page_alloc(
 		    session, root->type, 0, slots, false, &child));
 
 		/*
-		 * Initialize the parent page's child reference; we need a copy
-		 * of the page's key.
+		 * Initialize the page's child reference; we need a copy of the
+		 * page's key.
 		 */
 		ref = *alloc_refp++;
 		ref->home = root;
@@ -487,10 +485,10 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
-	WT_ASSERT(session, alloc_refp - alloc_index->index ==
-	    (ptrdiff_t)(alloc_index->entries));
 	WT_ASSERT(session,
-	    root_refp - pindex->index == (ptrdiff_t)(pindex->entries));
+	    alloc_refp - alloc_index->index == (ptrdiff_t)alloc_index->entries);
+	WT_ASSERT(session,
+	    root_refp - pindex->index == (ptrdiff_t)pindex->entries);
 
 	/*
 	 * Confirm the root page's index hasn't moved, then update it, which
@@ -535,7 +533,6 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 			continue;
 
 		child = ref->page;
-		WT_ASSERT(session, WT_PAGE_IS_INTERNAL(child));
 #ifdef HAVE_DIAGNOSTIC
 		WT_WITH_PAGE_INDEX(session,
 		    __split_verify_intl_key_order(session, child));
@@ -924,7 +921,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 
 	/*
 	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects to be inserted
-	 * into the page's parent, replacing the page's WT_REF.
+	 * into the page's parent, replacing the page's page-index.
 	 *
 	 * The first slot of the new WT_PAGE_INDEX is the original page WT_REF.
 	 * The remainder of the slots are allocated WT_REFs.
@@ -1043,7 +1040,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * evicted because of the eviction transaction value set above.
 	 */
 	for (alloc_refp = alloc_index->index,
-	    i = alloc_index->entries; i > 0; ++alloc_refp, --i) {
+	    i = 0; i < alloc_index->entries; ++alloc_refp, ++i) {
 		ref = *alloc_refp;
 		WT_ASSERT(session, ref->home == parent);
 		if (ref->state != WT_REF_MEM)
