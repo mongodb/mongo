@@ -1286,6 +1286,11 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 	const char *env_config;
 	size_t len;
 
+	/* Only use the environment variable if configured. */
+	WT_RET(__wt_config_gets(session, cfg, "use_environment", &cval));
+	if (cval.val == 0)
+		return (0);
+
 	ret = __wt_getenv(session, "WIREDTIGER_CONFIG", &env_config);
 	if (ret == WT_NOTFOUND)
 		return (0);
@@ -1333,15 +1338,16 @@ err:	__wt_free(session, env_config);
 static int
 __conn_home(WT_SESSION_IMPL *session, const char *home, const char *cfg[])
 {
-	WT_DECL_RET;
 	WT_CONFIG_ITEM cval;
 
 	/* If the application specifies a home directory, use it. */
 	if (home != NULL)
 		goto copy;
 
-	ret = __wt_getenv(session, "WIREDTIGER_HOME", &S2C(session)->home);
-	if (ret == 0)
+	/* Only use the environment variable if configured. */
+	WT_RET(__wt_config_gets(session, cfg, "use_environment", &cval));
+	if (cval.val != 0 &&
+	    __wt_getenv(session, "WIREDTIGER_HOME", &S2C(session)->home) == 0)
 		return (0);
 
 	/* If there's no WIREDTIGER_HOME environment variable, use ".". */

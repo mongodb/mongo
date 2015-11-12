@@ -147,7 +147,22 @@ class test_priv01(wttest.WiredTigerTestCase):
         self.common_test(None, None, 'use_environment_priv=true')
         self.checkfiles(".")
 
+    def test_env_conf(self):
+        # If no homedir is set, use environment
+        edir = 'envdir'
+        os.mkdir(edir)
+        self.common_test(None, edir, 'use_environment=true')
+		# this check fails because of test harness files:
+        #self.checknofiles('.')
+        self.checkfiles(edir)
 
+    def test_env_conf_off(self):
+        # If no homedir is set, use environment
+        edir = 'envdir'
+        os.mkdir(edir)
+        self.common_test(None, edir, 'use_environment=false')
+        self.checknofiles(edir)
+        self.checkfiles('.')
 
 if __name__ == '__main__':
     wttest.run()
