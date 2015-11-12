@@ -56,7 +56,7 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
         ('b_off', dict(begin_sync='sync=false')),
     ]
     # We don't test 'background' in this test.  It isn't applicable for the
-    # particulars here and cuts the number of scenarios.  It is an error for
+    # particulars here and reduces the number of scenarios.  It is an error for
     # both begin_transaction and commit_transaction to have explicit settings.
     # We will avoid that in the code below.
     commit_sync = [
@@ -87,7 +87,8 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
     # Given the different configuration settings determine if this group
     # of settings would result in either a wait for write or sync.
     # Returns None, "write" or "sync".  None means no waiting for either.
-    # write means wait for write, but not sync.  Sync means both write and sync.
+    # "write" means wait for write, but not sync.  "sync" means both
+    # write and sync.
     def syncLevel(self):
         # We know that we skip illegal settings where both begin and commit
         # have explicit settings.  So we don't have to check that here.
@@ -97,6 +98,8 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
         if self.begin_sync == None and self.commit_sync == None:
             if self.conn_enable == 'false':
                 return None
+            # Only fsync implies sync.  Both dsync and none (meaning
+            # write-no-sync) imply write.
             if self.conn_method == 'fsync':
                 return 'sync'
             else:
@@ -105,7 +108,7 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
         if self.begin_sync == 'sync=false' or self.commit_sync == 'sync=off':
             return None
 
-        # If we get here, the transaction turns it on in some way so we
+        # If we get here, the transaction turns sync on in some way so we
         # only need to check the method type.
         if self.conn_method == 'fsync':
             return 'sync'
@@ -121,6 +124,12 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create(self.uri, self.create_params)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
+        #
+        # !!! Implementation detail here.  We record the stats that
+        # indicate the code went through the release code explicitly
+        # (instead of the worker thread).  They indicate we came
+        # through the special case path for handling a flush or sync.
+        #
         write1 = stat_cursor[stat.conn.log_release_write_lsn][2]
         sync1 = stat_cursor[stat.conn.log_sync][2]
         stat_cursor.close()
@@ -139,6 +148,10 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
 
         checks = self.syncLevel()
         # Checking sync implies the write.
+        # If we did special processing the stats should not be the
+        # same.  Otherwise the number of writes should be equal.
+        # We do not check for syncs being equal because worker threads
+        # also increment that stat when they sync and close a log file.
         if checks != None:
             self.assertNotEqual(write1, write2)
             if checks == 'sync':
