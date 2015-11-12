@@ -393,16 +393,17 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	pindex = WT_INTL_INDEX_GET_SAFE(root);
 
 	/*
-	 * In a few (rare) cases we split pages with only a few entries, and in
-	 * those cases we keep it simple, 10 children, skip only first and last
-	 * entries. Otherwise, split into a lot of child pages.
+	 * Decide how many child pages to create, then calculate the standard
+	 * chunk and whatever remains. Sanity check the number of children:
+	 * the decision to split matched to the deepen-per-child configuration
+	 * might get it wrong.
 	 */
 	children = pindex->entries / btree->split_deepen_per_child;
 	if (children < 10) {
+		if (pindex->entries < 100)
+			return (EBUSY);
 		children = 10;
 	}
-
-	/* Calculate the standard chunk, and whatever remains. */
 	chunk = pindex->entries / children;
 	remain = pindex->entries - chunk * (children - 1);
 
@@ -859,7 +860,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_REF *child_ref, **child_refp, *page_ref, **page_refp, *ref;
 	size_t child_incr, page_decr, page_incr, parent_incr, size;
 	uint64_t split_gen;
-	uint32_t children, chunk, i, j, moved_entries, remain;
+	uint32_t children, chunk, i, j, remain;
 	uint32_t slots;
 	bool complete;
 	void *p;
@@ -883,13 +884,20 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
 
-	/* Figure out how many child pages we're creating. */
-	moved_entries = pindex->entries;
-	children = moved_entries / btree->split_deepen_per_child;
-
-	/* Calculate the standard chunk, and whatever remains. */
-	chunk = moved_entries / children;
-	remain = moved_entries - chunk * (children - 1);
+	/*
+	 * Decide how many child pages to create, then calculate the standard
+	 * chunk and whatever remains. Sanity check the number of children:
+	 * the decision to split matched to the deepen-per-child configuration
+	 * might get it wrong.
+	 */
+	children = pindex->entries / btree->split_deepen_per_child;
+	if (children < 10) {
+		if (pindex->entries < 100)
+			return (EBUSY);
+		children = 10;
+	}
+	chunk = pindex->entries / children;
+	remain = pindex->entries - chunk * (children - 1);
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " internal page elements, splitting into %" PRIu32
@@ -1232,10 +1240,7 @@ __split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
 
-	/*
-	 * Sanity check for a reasonable number of keys on-page keys. Splitting
-	 * with too few keys leads to excessively deep trees.
-	 */
+	/* Sanity check for a reasonable number of on-page keys. */
 	if (pindex->entries < 100)
 		return (false);
 
