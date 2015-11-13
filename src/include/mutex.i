@@ -329,7 +329,7 @@ __wt_fair_unlock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_fair_islocked --
- *	Test whether the lock is currently held
+ *	Test whether the lock is currently held.
  */
 static inline bool
 __wt_fair_islocked(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
