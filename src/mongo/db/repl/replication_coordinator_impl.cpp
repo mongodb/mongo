@@ -36,8 +36,6 @@
 #include <limits>
 
 #include "mongo/base/status.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/client_basic.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -2055,10 +2053,6 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
         return status;
     }
 
-    BSONObj oldConfigObjForAudit = _rsConfig.toBSON();
-    BSONObj newConfigObjForAudit = newConfig.toBSON();
-    audit::logReplSetReconfig(
-        ClientBasic::getCurrent(), &oldConfigObjForAudit, &newConfigObjForAudit);
     const stdx::function<void(const ReplicationExecutor::CallbackArgs&)> reconfigFinishFn(
         stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
                    this,
@@ -2178,11 +2172,6 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
                 << status;
         return status;
     }
-
-    BSONObj oldConfigObjForAudit;
-    BSONObj newConfigObjForAudit = newConfig.toBSON();
-    audit::logReplSetReconfig(
-        ClientBasic::getCurrent(), &oldConfigObjForAudit, &newConfigObjForAudit);
 
     if (replEnabled) {
         CBHStatus cbh = _replExecutor.scheduleWork(
