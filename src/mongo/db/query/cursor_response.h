@@ -39,13 +39,66 @@
 namespace mongo {
 
 /**
+ * Builds the cursor field for a reply to a cursor-generating command in place.
+ */
+class CursorResponseBuilder {
+    MONGO_DISALLOW_COPYING(CursorResponseBuilder);
+
+public:
+    /**
+     * Once constructed, you may not use the passed-in BSONObjBuilder until you call either done()
+     * or abandon(), or this object goes out of scope. This is the same as the rule when using a
+     * BSONObjBuilder to build a sub-object with subobjStart().
+     *
+     * If the builder goes out of scope without a call to done(), any data appended to the
+     * builder will be removed.
+     */
+    CursorResponseBuilder(bool isInitialResponse, BSONObjBuilder* commandResponse);
+
+    ~CursorResponseBuilder() {
+        if (_active)
+            abandon();
+    }
+
+    size_t bytesUsed() const {
+        invariant(_active);
+        return _batch.len();
+    }
+
+    void append(const BSONObj& obj) {
+        invariant(_active);
+        _batch.append(obj);
+    }
+
+    /**
+     * Call this after successfully appending all fields that will be part of this response.
+     * After calling, you may not call any more methods on this object.
+     */
+    void done(CursorId cursorId, StringData cursorNamespace);
+
+    /**
+     * Call this if the response should not contain cursor information. It will completely remove
+     * the cursor field from the commandResponse, as if the CursorResponseBuilder was never used.
+     * After calling, you may not call any more methods on this object.
+     */
+    void abandon();
+
+private:
+    const int _responseInitialLen;  // Must be the first member so its initializer runs first.
+    bool _active = true;
+    BSONObjBuilder* const _commandResponse;
+    BSONObjBuilder _cursorObject;
+    BSONArrayBuilder _batch;
+};
+
+/**
  * Builds a cursor response object from the provided cursor identifiers and "firstBatch",
  * and appends the response object to the provided builder under the field name "cursor".
  *
  * The response object has the following format:
  *   { id: <NumberLong>, ns: <String>, firstBatch: <Array> }.
  *
- * This function is deprecated.  Prefer CursorResponse::toBSON() instead.
+ * This function is deprecated.  Prefer CursorResponseBuilder or CursorResponse::toBSON() instead.
  */
 void appendCursorResponseObject(long long cursorId,
                                 StringData cursorNamespace,
@@ -59,7 +112,7 @@ void appendCursorResponseObject(long long cursorId,
  * The response object has the following format:
  *   { id: <NumberLong>, ns: <String>, nextBatch: <Array> }.
  *
- * This function is deprecated.  Prefer CursorResponse::toBSON() instead.
+ * This function is deprecated.  Prefer CursorResponseBuilder or CursorResponse::toBSON() instead.
  */
 void appendGetMoreResponseObject(long long cursorId,
                                  StringData cursorNamespace,

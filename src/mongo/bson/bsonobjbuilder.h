@@ -601,6 +601,20 @@ public:
     BSONObjBuilder& append(StringData fieldName, const std::map<K, T>& vals);
 
     /**
+     * Resets this BSONObjBulder to an empty state. All previously added fields are lost.  If this
+     * BSONObjBuilder is using an externally provided BufBuilder, this method does not affect the
+     * bytes before the start of this object.
+     *
+     * Invalid to call if done() has already been called in order to finalize the BSONObj.
+     */
+    void resetToEmpty() {
+        invariant(!_doneCalled);
+        _s.reset();
+        // Reset the position the next write will go to right after our size reservation.
+        _b.setlen(_offset + sizeof(int));
+    }
+
+    /**
      * destructive
      * The returned BSONObj will free the buffer when it is finished.
      * @return owned BSONObj
@@ -887,10 +901,9 @@ private:
 
 template <class T>
 inline BSONObjBuilder& BSONObjBuilder::append(StringData fieldName, const std::vector<T>& vals) {
-    BSONObjBuilder arrBuilder;
+    BSONObjBuilder arrBuilder(subarrayStart(fieldName));
     for (unsigned int i = 0; i < vals.size(); ++i)
         arrBuilder.append(numStr(i), vals[i]);
-    appendArray(fieldName, arrBuilder.done());
     return *this;
 }
 

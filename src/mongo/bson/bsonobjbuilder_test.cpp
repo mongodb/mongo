@@ -303,4 +303,21 @@ TEST(BSONObjBuilderTest, ResumeBuildingWithNesting) {
                                             << "dd")) << "a" << BSON("c" << 3)));
 }
 
+TEST(BSONObjBuilderTest, ResetToEmptyResultsInEmptyObj) {
+    BSONObjBuilder bob;
+    bob.append("a", 3);
+    bob.resetToEmpty();
+    ASSERT_EQ(BSONObj(), bob.obj());
+}
+
+TEST(BSONObjBuilderTest, ResetToEmptyForNestedBuilderOnlyResetsInnerObj) {
+    BSONObjBuilder bob;
+    bob.append("a", 3);
+    BSONObjBuilder innerObj(bob.subobjStart("nestedObj"));
+    innerObj.append("b", 4);
+    innerObj.resetToEmpty();
+    innerObj.done();
+    ASSERT_EQ(BSON("a" << 3 << "nestedObj" << BSONObj()), bob.obj());
+}
+
 }  // unnamed namespace

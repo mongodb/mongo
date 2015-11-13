@@ -48,6 +48,30 @@ const char kBatchFieldInitial[] = "firstBatch";
 
 }  // namespace
 
+CursorResponseBuilder::CursorResponseBuilder(bool isInitialResponse,
+                                             BSONObjBuilder* commandResponse)
+    : _responseInitialLen(commandResponse->bb().len()),
+      _commandResponse(commandResponse),
+      _cursorObject(commandResponse->subobjStart(kCursorField)),
+      _batch(_cursorObject.subarrayStart(isInitialResponse ? kBatchFieldInitial : kBatchField)) {}
+
+void CursorResponseBuilder::done(CursorId cursorId, StringData cursorNamespace) {
+    invariant(_active);
+    _batch.doneFast();
+    _cursorObject.append(kIdField, cursorId);
+    _cursorObject.append(kNsField, cursorNamespace);
+    _cursorObject.doneFast();
+    _active = false;
+}
+
+void CursorResponseBuilder::abandon() {
+    invariant(_active);
+    _batch.doneFast();
+    _cursorObject.doneFast();
+    _commandResponse->bb().setlen(_responseInitialLen);  // Removes everything we've added.
+    _active = false;
+}
+
 void appendCursorResponseObject(long long cursorId,
                                 StringData cursorNamespace,
                                 BSONArray firstBatch,

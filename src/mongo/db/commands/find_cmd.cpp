@@ -294,15 +294,15 @@ public:
         const LiteParsedQuery& pq = exec->getCanonicalQuery()->getParsed();
 
         // Stream query results, adding them to a BSONArray as we go.
-        BSONArrayBuilder firstBatch;
+        CursorResponseBuilder firstBatch(/*isInitialResponse*/ true, &result);
         BSONObj obj;
         PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
         long long numResults = 0;
-        while (!FindCommon::enoughForFirstBatch(pq, numResults, firstBatch.len()) &&
+        while (!FindCommon::enoughForFirstBatch(pq, numResults, firstBatch.bytesUsed()) &&
                PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
             // If adding this object will cause us to exceed the BSON size limit, then we stash
             // it for later.
-            if (firstBatch.len() + obj.objsize() > BSONObjMaxUserSize && numResults > 0) {
+            if (firstBatch.bytesUsed() + obj.objsize() > BSONObjMaxUserSize && numResults > 0) {
                 exec->enqueue(obj);
                 break;
             }
@@ -314,6 +314,7 @@ public:
 
         // Throw an assertion if query execution fails for any reason.
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+            firstBatch.abandon();
             const std::unique_ptr<PlanStageStats> stats(exec->getStats());
             error() << "Plan executor error during find command: " << PlanExecutor::statestr(state)
                     << ", stats: " << Explain::statsToBSON(*stats);
@@ -374,7 +375,7 @@ public:
         }
 
         // Generate the response object to send to the client.
-        appendCursorResponseObject(cursorId, nss.ns(), firstBatch.arr(), &result);
+        firstBatch.done(cursorId, nss.ns());
         return true;
     }
 

@@ -294,7 +294,7 @@ public:
         }
 
         CursorId respondWithId = 0;
-        BSONArrayBuilder nextBatch;
+        CursorResponseBuilder nextBatch(/*isInitialResponse*/ false, &result);
         BSONObj obj;
         PlanExecutor::ExecState state;
         long long numResults = 0;
@@ -360,7 +360,7 @@ public:
             CurOp::get(txn)->debug().cursorExhausted = true;
         }
 
-        appendGetMoreResponseObject(respondWithId, request.nss.ns(), nextBatch.arr(), &result);
+        nextBatch.done(respondWithId, request.nss.ns());
 
         if (respondWithId) {
             cursorFreer.Dismiss();
@@ -390,7 +390,7 @@ public:
      */
     Status generateBatch(ClientCursor* cursor,
                          const GetMoreRequest& request,
-                         BSONArrayBuilder* nextBatch,
+                         CursorResponseBuilder* nextBatch,
                          PlanExecutor::ExecState* state,
                          long long* numResults) {
         PlanExecutor* exec = cursor->getExecutor();
@@ -404,7 +404,8 @@ public:
             while (PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, NULL))) {
                 // If adding this object will cause us to exceed the BSON size limit, then we
                 // stash it for later.
-                if (nextBatch->len() + obj.objsize() > BSONObjMaxUserSize && *numResults > 0) {
+                if (nextBatch->bytesUsed() + obj.objsize() > BSONObjMaxUserSize &&
+                    *numResults > 0) {
                     exec->enqueue(obj);
                     break;
                 }
@@ -414,7 +415,7 @@ public:
                 (*numResults)++;
 
                 if (FindCommon::enoughForGetMore(
-                        request.batchSize.value_or(0), *numResults, nextBatch->len())) {
+                        request.batchSize.value_or(0), *numResults, nextBatch->bytesUsed())) {
                     break;
                 }
             }
@@ -428,6 +429,8 @@ public:
         }
 
         if (PlanExecutor::FAILURE == *state || PlanExecutor::DEAD == *state) {
+            nextBatch->abandon();
+
             const std::unique_ptr<PlanStageStats> stats(exec->getStats());
             error() << "GetMore command executor error: " << PlanExecutor::statestr(*state)
                     << ", stats: " << Explain::statsToBSON(*stats);

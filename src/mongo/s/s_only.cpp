@@ -127,6 +127,7 @@ void Command::execCommandClientBasic(OperationContext* txn,
     try {
         ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
     } catch (const DBException& e) {
+        result.resetToEmpty();
         const int code = e.getCode();
 
         // Codes for StaleConfigException

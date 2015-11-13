@@ -165,11 +165,11 @@ public:
         }
 
         // Build the response document.
-        BSONArrayBuilder arr;
+        CursorResponseBuilder firstBatch(/*firstBatch*/ true, &result);
         for (const auto& obj : batch) {
-            arr.append(obj);
+            firstBatch.append(obj);
         }
-        appendCursorResponseObject(cursorId.getValue(), nss.ns(), arr.arr(), &result);
+        firstBatch.done(cursorId.getValue(), nss.ns());
         return true;
     }
 

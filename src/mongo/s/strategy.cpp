@@ -165,23 +165,19 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
     auto cursorId = ClusterFind::runQuery(txn, *canonicalQuery.getValue(), readPreference, &batch);
     uassertStatusOK(cursorId.getStatus());
 
-    BufBuilder buffer(FindCommon::kInitReplyBufferSize);
-
     // Fill out the response buffer.
     int numResults = 0;
-    for (const auto& obj : batch) {
-        buffer.appendBuf((void*)obj.objdata(), obj.objsize());
+    OpQueryReplyBuilder reply;
+    for (auto&& obj : batch) {
+        obj.appendSelfToBufBuilder(reply.bufBuilderForResults());
         numResults++;
     }
-
-    replyToQuery(0,  // query result flags
-                 request.p(),
-                 request.m(),
-                 buffer.buf(),
-                 buffer.len(),
-                 numResults,
-                 0,  // startingFrom
-                 cursorId.getValue());
+    reply.send(request.p(),
+               0,  // query result flags
+               request.m(),
+               numResults,
+               0,  // startingFrom
+               cursorId.getValue());
 }
 
 void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
@@ -207,7 +203,6 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
     bool cmChangeAttempted = false;
 
     while (true) {
-        BSONObjBuilder builder;
         try {
             BSONObj cmdObj = q.query;
             {
@@ -236,9 +231,12 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                 }
             }
 
-            Command::runAgainstRegistered(txn, q.ns, cmdObj, builder, q.queryOptions);
-            BSONObj x = builder.done();
-            replyToQuery(0, request.p(), request.m(), x);
+            OpQueryReplyBuilder reply;
+            {
+                BSONObjBuilder builder(reply.bufBuilderForResults());
+                Command::runAgainstRegistered(txn, q.ns, cmdObj, builder, q.queryOptions);
+            }
+            reply.sendCommandReply(request.p(), request.m());
             return;
         } catch (const StaleConfigException& e) {
             if (loops <= 0)
@@ -262,9 +260,12 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
 
                 grid.forwardingCatalogManager()->waitForCatalogManagerChange(txn);
             } else {
-                Command::appendCommandStatus(builder, e.toStatus());
-                BSONObj x = builder.done();
-                replyToQuery(0, request.p(), request.m(), x);
+                OpQueryReplyBuilder reply;
+                {
+                    BSONObjBuilder builder(reply.bufBuilderForResults());
+                    Command::appendCommandStatus(builder, e.toStatus());
+                }
+                reply.sendCommandReply(request.p(), request.m());
                 return;
             }
         }

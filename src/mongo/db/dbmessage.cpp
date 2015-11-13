@@ -169,6 +169,39 @@ T DbMessage::readAndAdvance() {
     return t;
 }
 
+OpQueryReplyBuilder::OpQueryReplyBuilder() : _buffer(32768) {
+    _buffer.skip(sizeof(QueryResult::Value));
+}
+
+void OpQueryReplyBuilder::send(AbstractMessagingPort* destination,
+                               int queryResultFlags,
+                               Message& requestMsg,
+                               int nReturned,
+                               int startingFrom,
+                               long long cursorId) {
+    Message response;
+    putInMessage(&response, queryResultFlags, nReturned, startingFrom, cursorId);
+    destination->reply(requestMsg, response, requestMsg.header().getId());
+}
+
+void OpQueryReplyBuilder::sendCommandReply(AbstractMessagingPort* destination,
+                                           Message& requestMsg) {
+    send(destination, /*queryFlags*/ 0, requestMsg, /*nReturned*/ 1);
+}
+
+void OpQueryReplyBuilder::putInMessage(
+    Message* out, int queryResultFlags, int nReturned, int startingFrom, long long cursorId) {
+    QueryResult::View qr = _buffer.buf();
+    qr.setResultFlags(queryResultFlags);
+    qr.msgdata().setLen(_buffer.len());
+    qr.msgdata().setOperation(opReply);
+    qr.setCursorId(cursorId);
+    qr.setStartingFrom(startingFrom);
+    qr.setNReturned(nReturned);
+    _buffer.decouple();
+    out->setData(qr.view2ptr(), true);  // transport will free
+}
+
 void replyToQuery(int queryResultFlags,
                   AbstractMessagingPort* p,
                   Message& requestMsg,
@@ -177,19 +210,9 @@ void replyToQuery(int queryResultFlags,
                   int nReturned,
                   int startingFrom,
                   long long cursorId) {
-    BufBuilder b(32768);
-    b.skip(sizeof(QueryResult::Value));
-    b.appendBuf(data, size);
-    QueryResult::View qr = b.buf();
-    qr.setResultFlags(queryResultFlags);
-    qr.msgdata().setLen(b.len());
-    qr.msgdata().setOperation(opReply);
-    qr.setCursorId(cursorId);
-    qr.setStartingFrom(startingFrom);
-    qr.setNReturned(nReturned);
-    b.decouple();
-    Message resp(qr.view2ptr(), true);
-    p->reply(requestMsg, resp, requestMsg.header().getId());
+    OpQueryReplyBuilder reply;
+    reply.bufBuilderForResults().appendBuf(data, size);
+    reply.send(p, queryResultFlags, requestMsg, nReturned, startingFrom, cursorId);
 }
 
 void replyToQuery(int queryResultFlags,
@@ -208,21 +231,8 @@ void replyToQuery(int queryResultFlags, Message& m, DbResponse& dbresponse, BSON
 }
 
 void replyToQuery(int queryResultFlags, Message& response, const BSONObj& resultObj) {
-    BufBuilder bufBuilder;
-    bufBuilder.skip(sizeof(QueryResult::Value));
-    bufBuilder.appendBuf(reinterpret_cast<void*>(const_cast<char*>(resultObj.objdata())),
-                         resultObj.objsize());
-
-    QueryResult::View queryResult = bufBuilder.buf();
-    bufBuilder.decouple();
-
-    queryResult.setResultFlags(queryResultFlags);
-    queryResult.msgdata().setLen(bufBuilder.len());
-    queryResult.msgdata().setOperation(opReply);
-    queryResult.setCursorId(0);
-    queryResult.setStartingFrom(0);
-    queryResult.setNReturned(1);
-
-    response.setData(queryResult.view2ptr(), true);  // transport will free
+    OpQueryReplyBuilder reply;
+    resultObj.appendSelfToBufBuilder(reply.bufBuilderForResults());
+    reply.putInMessage(&response, queryResultFlags, /*nReturned*/ 1);
 }
 }
