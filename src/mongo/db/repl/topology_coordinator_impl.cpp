@@ -1079,10 +1079,9 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBDataV1(
     // Priority takeover when the replset is stable.
     //
     // Take over the primary only if the remote primary is in the latest term I know.
-    // This is done only when we get a heartbeat response from the primary.
     // Otherwise, there must be an outstanding election, which may succeed or not, but
     // the remote primary will become aware of that election eventually and step down.
-    if (_hbdata[primaryIndex].getTerm() == _term && updatedConfigIndex == primaryIndex &&
+    if (_hbdata[primaryIndex].getTerm() == _term &&
         _rsConfig.getMemberAt(primaryIndex).getPriority() <
             _rsConfig.getMemberAt(_selfIndex).getPriority()) {
         LOG(4) << "I can take over the primary due to higher priority."

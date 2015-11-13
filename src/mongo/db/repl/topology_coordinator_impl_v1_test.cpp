@@ -2757,16 +2757,6 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataTermPreventsPriorityTakeover)
     ASSERT_EQUALS(HeartbeatResponseAction::PriorityTakeover, nextAction.getAction());
     ASSERT_EQUALS(2, getCurrentPrimaryIndex());
 
-    // Heartbeat from a secondary node shouldn't schedule a priority takeover.
-    nextAction = receiveUpHeartbeat(HostAndPort("host1"),
-                                    "rs0",
-                                    MemberState::RS_SECONDARY,
-                                    election,
-                                    election,
-                                    lastOpTimeApplied);
-    ASSERT_NO_ACTION(nextAction.getAction());
-    ASSERT_EQUALS(2, getCurrentPrimaryIndex());
-
     now()++;
     // Host 1 starts an election due to higher priority by sending vote requests.
     // Vote request updates my term.
