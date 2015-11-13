@@ -353,6 +353,28 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 }
 
 /*
+ * __split_child_txn_set --
+ *	Ensure the newly created child isn't evicted for now.
+ */
+static void
+__split_child_txn_set(WT_PAGE *child)
+{
+	/*
+	 * Once the split is live, newly created internal pages might be evicted
+	 * and their WT_REF structures freed. If those pages are evicted before
+	 * threads exit the previous parent page's index array, a thread might
+	 * see a freed WT_REF. To ensure that doesn't happen, the page's modify
+	 * structure has a field with a transaction ID that's checked before any
+	 * internal page is evicted. Unfortunately, we don't know the correct
+	 * value until we update the parent page's index (we need a transaction
+	 * ID from after that update), but the act of updating the parent page's
+	 * index is what allows the eviction to happen. For now, set that field
+	 * to an impossibly large value, we'll reset it after the split is live.
+	 */
+	child->modify->mod_split_txn = UINT64_MAX;
+}
+
+/*
  * __split_ref_move_cleanup --
  *	Clean up the moved WT_REF structures after the split succeeds.
  */
@@ -362,7 +384,15 @@ __split_ref_move_cleanup(WT_SESSION_IMPL *session,
 {
 	WT_PAGE *child;
 	WT_REF *ref, *child_ref;
+	uint64_t txn_new_id;
 	uint32_t i;
+
+	/*
+	 * When creating new internal pages as part of a split, we set a field
+	 * in those page's modify structure to prevent them from being evicted.
+	 * Reset that field to a reasonable value.
+	 */
+	txn_new_id = __wt_txn_new_id(session);
 
 	/*
 	 * The WT_REF structures moved to newly allocated child pages reference
@@ -410,6 +440,8 @@ __split_ref_move_cleanup(WT_SESSION_IMPL *session,
 			if (child_ref->home == original_page) {
 				child_ref->home = child;
 				child_ref->pindex_hint = 0;
+
+				child->modify->mod_split_txn = txn_new_id;
 			}
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);
@@ -528,14 +560,8 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 		WT_ERR(__wt_page_modify_init(session, child));
 		__wt_page_modify_set(session, child);
 
-		/*
-		 * Once the split goes live, the newly created internal pages
-		 * might be evicted and their WT_REF structures freed.  If those
-		 * pages are evicted before threads exit the previous page index
-		 * array, a thread might see a freed WT_REF.  Set the eviction
-		 * transaction requirement for the newly created internal pages.
-		 */
-		child->modify->mod_split_txn = __wt_txn_new_id(session);
+		/* Ensure the newly created page isn't evicted for now. */
+		__split_child_txn_set(child);
 
 		/*
 		 * The newly allocated child's page index references the same
@@ -997,14 +1023,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 		WT_ERR(__wt_page_modify_init(session, child));
 		__wt_page_modify_set(session, child);
 
-		/*
-		 * Once the split goes live, the newly created internal pages
-		 * might be evicted and their WT_REF structures freed.  If those
-		 * pages are evicted before threads exit the previous page index
-		 * array, a thread might see a freed WT_REF.  Set the eviction
-		 * transaction requirement for the newly created internal pages.
-		 */
-		child->modify->mod_split_txn = __wt_txn_new_id(session);
+		/* Ensure the newly created page isn't evicted for now. */
+		__split_child_txn_set(child);
 
 		/*
 		 * The newly allocated child's page index references the same
