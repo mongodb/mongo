@@ -353,11 +353,11 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 }
 
 /*
- * __split_child_txn_set --
+ * __split_child_no_evict --
  *	Ensure the newly created child isn't evicted for now.
  */
 static void
-__split_child_txn_set(WT_PAGE *child)
+__split_child_no_evict(WT_PAGE *child)
 {
 	/*
 	 * Once the split is live, newly created internal pages might be evicted
@@ -561,7 +561,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 		__wt_page_modify_set(session, child);
 
 		/* Ensure the newly created page isn't evicted for now. */
-		__split_child_txn_set(child);
+		__split_child_no_evict(child);
 
 		/*
 		 * The newly allocated child's page index references the same
@@ -1024,7 +1024,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 		__wt_page_modify_set(session, child);
 
 		/* Ensure the newly created page isn't evicted for now. */
-		__split_child_txn_set(child);
+		__split_child_no_evict(child);
 
 		/*
 		 * The newly allocated child's page index references the same
