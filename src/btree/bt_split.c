@@ -1044,8 +1044,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * We're not acquiring hazard pointers on these pages, they cannot be
 	 * evicted because of the eviction transaction value set above.
 	 */
-	for (alloc_refp = alloc_index->index,
-	    i = 0; i < alloc_index->entries; ++alloc_refp, ++i) {
+	for (alloc_refp = alloc_index->index + 1,
+	    i = 1; i < alloc_index->entries; ++alloc_refp, ++i) {
 		ref = *alloc_refp;
 		WT_ASSERT(session, ref->home == parent);
 		if (ref->state != WT_REF_MEM)
