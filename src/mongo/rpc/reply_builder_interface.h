@@ -70,7 +70,7 @@ public:
     /**
      * Returns a BufBuilder suitable for building a command reply in place.
      */
-    virtual BufBuilder& getInPlaceReplyBuilder() = 0;
+    virtual BufBuilder& getInPlaceReplyBuilder(std::size_t reserveBytes) = 0;
 
     virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;
 

@@ -58,7 +58,7 @@ public:
 
 
     CommandReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
-    BufBuilder& getInPlaceReplyBuilder() final;
+    BufBuilder& getInPlaceReplyBuilder(std::size_t) final;
 
     CommandReplyBuilder& setMetadata(const BSONObj& metadata) final;
 

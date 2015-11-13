@@ -1337,7 +1337,7 @@ void Command::execCommand(OperationContext* txn,
 bool Command::run(OperationContext* txn,
                   const rpc::RequestInterface& request,
                   rpc::ReplyBuilderInterface* replyBuilder) {
-    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder());
+    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(reserveBytesForReply()));
 
     repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
 

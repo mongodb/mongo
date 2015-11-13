@@ -52,7 +52,7 @@ public:
 
     LegacyReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
 
-    BufBuilder& getInPlaceReplyBuilder() final;
+    BufBuilder& getInPlaceReplyBuilder(std::size_t) final;
 
     LegacyReplyBuilder& setMetadata(const BSONObj& metadata) final;
 

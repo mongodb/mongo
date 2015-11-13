@@ -43,6 +43,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/find_common.h"
 
 /**
  * Examines all documents in a given radius of a given point.
@@ -72,6 +73,10 @@ public:
     }
     bool supportsReadConcern() const final {
         return true;
+    }
+
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

@@ -95,6 +95,10 @@ public:
     // collection name or just a database name.
     ResourcePattern parseResourcePattern(const std::string& dbname, const BSONObj& cmdObj) const;
 
+    virtual std::size_t reserveBytesForReply() const {
+        return 0u;
+    }
+
     const std::string name;
 
     /* run the given command

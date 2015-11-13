@@ -105,6 +105,10 @@ public:
         return LogicalOp::opQuery;
     }
 
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
+    }
+
     /**
      * A find command does not increment the command counter, but rather increments the
      * query counter.

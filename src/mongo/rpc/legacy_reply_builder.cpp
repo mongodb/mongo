@@ -58,8 +58,12 @@ LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(const BSONObj& comman
     return *this;
 }
 
-BufBuilder& LegacyReplyBuilder::getInPlaceReplyBuilder() {
+BufBuilder& LegacyReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
     invariant(_state == State::kCommandReply);
+    // Eagerly allocate reserveBytes bytes.
+    _builder.reserveBytes(reserveBytes);
+    // Claim our reservation immediately so we can actually write data to it.
+    _builder.claimReservedBytes(reserveBytes);
     _state = State::kMetadata;
     return _builder;
 }

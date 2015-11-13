@@ -46,6 +46,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/log.h"
@@ -79,6 +80,10 @@ public:
     }
     bool supportsReadConcern() const final {
         return true;
+    }
+
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

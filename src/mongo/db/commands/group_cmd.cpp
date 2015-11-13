@@ -37,6 +37,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/group.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 
 namespace mongo {
@@ -69,6 +70,10 @@ private:
 
     bool supportsReadConcern() const final {
         return true;
+    }
+
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
     }
 
     virtual void help(std::stringstream& help) const {

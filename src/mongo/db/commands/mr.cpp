@@ -55,6 +55,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -1249,6 +1250,10 @@ public:
 
     virtual bool slaveOverrideOk() const {
         return true;
+    }
+
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
     }
 
     virtual void help(stringstream& help) const {

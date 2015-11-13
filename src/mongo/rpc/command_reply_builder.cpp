@@ -48,14 +48,17 @@ CommandReplyBuilder::CommandReplyBuilder(Message&& message) : _message{std::move
 
 CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(const BSONObj& commandReply) {
     invariant(_state == State::kCommandReply);
-
     commandReply.appendSelfToBufBuilder(_builder);
     _state = State::kMetadata;
     return *this;
 }
 
-BufBuilder& CommandReplyBuilder::getInPlaceReplyBuilder() {
+BufBuilder& CommandReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
     invariant(_state == State::kCommandReply);
+    // Eagerly allocate reserveBytes bytes.
+    _builder.reserveBytes(reserveBytes);
+    // Claim our reservation immediately so we can actually write data to it.
+    _builder.claimReservedBytes(reserveBytes);
     _state = State::kMetadata;
     return _builder;
 }

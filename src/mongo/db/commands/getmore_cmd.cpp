@@ -107,6 +107,13 @@ public:
         return LogicalOp::opGetMore;
     }
 
+    std::size_t reserveBytesForReply() const override {
+        // The extra 1K is an artifact of how we construct batches. We consider a batch to be full
+        // when it exceeds the goal batch size. In the case that we are just below the limit and
+        // then read a large document, the extra 1K helps prevent a final realloc+memcpy.
+        return FindCommon::kMaxBytesToReturnToClientAtOnce + 1024u;
+    }
+
     /**
      * A getMore command increments the getMore counter, not the command counter.
      */
