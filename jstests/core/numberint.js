@@ -46,7 +46,7 @@ a.a = n;
 p = tojson( a );
 assert.eq.automsg( "'{ \"a\" : NumberInt(-11111) }'", "p" );
 
-// parsing: v8 evaluates not numbers to 0 which is not bad
+// parsing: SpiderMonkey evaluates non-numeric strings as 0, which is not bad
 //assert.throws.automsg( function() { new NumberInt( "" ); } );
 //assert.throws.automsg( function() { new NumberInt( "y" ); } );
 

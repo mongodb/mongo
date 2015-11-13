@@ -53,8 +53,8 @@ var workerThread = (function() {
                 // workload A. The $config.data of workload B can define a
                 // function that closes over the $config object of workload A
                 // (known as $super to workload B). This reference is lost when
-                // the config object is serialized through BSON into the V8 isolate,
-                // which results in undefined variables in the derived workload.
+                // the config object is serialized to BSON, which results in
+                // undefined variables in the derived workload.
                 var data = Object.extend({}, args.data[workload], true);
                 data = Object.extend(data, config.data, true);
 

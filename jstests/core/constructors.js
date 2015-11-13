@@ -284,28 +284,22 @@ dbEvalConstructorTest(md5Constructors);
 dbEvalConstructorTest(hexdataConstructors);
 dbEvalConstructorTest(dateConstructors);
 
-// SERVER-8963
-if (db.runCommand({buildinfo:1}).javascriptEngine == "V8") {
-    mapReduceConstructorTest(dbrefConstructors);
-    mapReduceConstructorTest(dbpointerConstructors);
-    mapReduceConstructorTest(objectidConstructors);
-    mapReduceConstructorTest(timestampConstructors);
-    mapReduceConstructorTest(bindataConstructors);
-    mapReduceConstructorTest(uuidConstructors);
-    mapReduceConstructorTest(md5Constructors);
-    mapReduceConstructorTest(hexdataConstructors);
-}
+mapReduceConstructorTest(dbrefConstructors);
+mapReduceConstructorTest(dbpointerConstructors);
+mapReduceConstructorTest(objectidConstructors);
+mapReduceConstructorTest(timestampConstructors);
+mapReduceConstructorTest(bindataConstructors);
+mapReduceConstructorTest(uuidConstructors);
+mapReduceConstructorTest(md5Constructors);
+mapReduceConstructorTest(hexdataConstructors);
 mapReduceConstructorTest(dateConstructors);
 
-// SERVER-8963
-if (db.runCommand({buildinfo:1}).javascriptEngine == "V8") {
-    whereConstructorTest(dbrefConstructors);
-    whereConstructorTest(dbpointerConstructors);
-    whereConstructorTest(objectidConstructors);
-    whereConstructorTest(timestampConstructors);
-    whereConstructorTest(bindataConstructors);
-    whereConstructorTest(uuidConstructors);
-    whereConstructorTest(md5Constructors);
-    whereConstructorTest(hexdataConstructors);
-}
+whereConstructorTest(dbrefConstructors);
+whereConstructorTest(dbpointerConstructors);
+whereConstructorTest(objectidConstructors);
+whereConstructorTest(timestampConstructors);
+whereConstructorTest(bindataConstructors);
+whereConstructorTest(uuidConstructors);
+whereConstructorTest(md5Constructors);
+whereConstructorTest(hexdataConstructors);
 whereConstructorTest(dateConstructors);

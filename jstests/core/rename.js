@@ -33,7 +33,7 @@ c.drop();
 
 // TODO: too many numbers hard coded here
 // this test depends precisely on record size and hence may not be very reliable
-// note we use floats to make sure numbers are represented as doubles for both SM and v8, since test relies on record size
+// note we use floats to make sure numbers are represented as doubles for SpiderMonkey, since test relies on record size
 db.createCollection( "jstests_rename_a", {capped:true,size:10000} );
 for( i = 0.1; i < 10; ++i ) {
     a.save( { i: i } );

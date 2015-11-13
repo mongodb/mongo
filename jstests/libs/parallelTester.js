@@ -268,7 +268,8 @@ if ( typeof _threadInject != "undefined" ){
         
         runners.forEach( function( x ) { x.start(); } );
         var nFailed = 0;
-        // v8 doesn't like it if we exit before all threads are joined (SERVER-529)
+        // SpiderMonkey doesn't like it if we exit before all threads are joined
+        // (see SERVER-19615 for a similar issue).
         runners.forEach( function( x ) { if( !x.returnData() ) { ++nFailed; } } );        
         assert.eq( 0, nFailed, msg );
     }

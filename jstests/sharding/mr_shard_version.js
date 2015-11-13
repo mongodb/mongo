@@ -42,7 +42,7 @@ for( var i = 0; i < st._shardServers.length; i++ ){
                                     command : { moveChunk : "" + coll, 
                                                      find : { _id : ( j == 0 ? 0 : halfId ) },
                                                        to : st._shardServers[i].shardName } } // , check : checkMigrate }
-        // TODO:  Deadlock due to global V8Lock between scopes if we stop with a js check
+        // TODO: Re-enable the checkMigrate check when SERVER-21359 is fixed.
     }
 }
 
