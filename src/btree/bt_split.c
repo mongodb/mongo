@@ -1300,6 +1300,9 @@ __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 		if (!__split_internal_should_split(session, ref))
 			break;
 
+		WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
+		    "__split_parent_climb of %p", ref));
+
 		/*
 		 * If we've reached the root page, there are no subsequent pages
 		 * to review, deepen the tree and quit.
@@ -1828,6 +1831,9 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *parent;
 	bool hazard;
 
+	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
+	    "__wt_split_insert of %p", ref));
+
 	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
 	if ((ret = __split_insert(session, ref)) != 0) {
 		WT_TRET(__split_internal_unlock(session, parent, hazard));
@@ -1917,6 +1923,9 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	WT_PAGE *parent;
 	bool hazard;
 
+	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
+	    "__wt_split_multi of %p", ref));
+
 	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
 	if ((ret = __split_multi(session, ref, closing)) != 0 || closing) {
 		WT_TRET(__split_internal_unlock(session, parent, hazard));
@@ -1943,6 +1952,9 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *parent;
 	bool hazard;
 
+	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
+	    "__wt_split_reverse of %p", ref));
+
 	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
 	ret = __split_parent(session, ref, NULL, 0, 0, false, true);
 	WT_TRET(__split_internal_unlock(session, parent, hazard));
@@ -1963,6 +1975,9 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	page = ref->page;
 	mod = page->modify;
+
+	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
+	    "__wt_split_rewrite of %p", ref));
 
 	/*
 	 * This isn't a split: a reconciliation failed because we couldn't write
