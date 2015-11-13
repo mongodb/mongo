@@ -152,7 +152,7 @@ class test_priv01(wttest.WiredTigerTestCase):
         edir = 'envdir'
         os.mkdir(edir)
         self.common_test(None, edir, 'use_environment=true')
-		# this check fails because of test harness files:
+        # this check fails because of test harness files:
         #self.checknofiles('.')
         self.checkfiles(edir)
 
