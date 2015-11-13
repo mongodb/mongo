@@ -444,16 +444,16 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     }
 
     const auto& documents = queryResponse.documents;
-    auto documentBegin = documents.cbegin();
-    auto documentEnd = documents.cend();
+    auto firstDocToApply = documents.cbegin();
+    auto lastDocToApply = documents.cend();
 
     // Check start of remote oplog and, if necessary, stop fetcher to execute rollback.
     if (queryResponse.first) {
-        auto getNextOperation = [&documentBegin, documentEnd]() -> StatusWith<BSONObj> {
-            if (documentBegin == documentEnd) {
+        auto getNextOperation = [&firstDocToApply, lastDocToApply]() -> StatusWith<BSONObj> {
+            if (firstDocToApply == lastDocToApply) {
                 return Status(ErrorCodes::OplogStartMissing, "remote oplog start missing");
             }
-            return *(documentBegin++);
+            return *(firstDocToApply++);
         };
 
         *remoteOplogStartStatus =
@@ -465,28 +465,40 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
 
         // If this is the first batch and no rollback is needed, we should have advanced
         // the document iterator.
-        invariant(documentBegin != documents.cbegin());
+        invariant(firstDocToApply != documents.cbegin());
     }
 
-    // process documents
-    int currentBatchMessageSize = 0;
-    for (auto documentIter = documentBegin; documentIter != documentEnd; ++documentIter) {
-        if (inShutdown()) {
-            return;
-        }
+    // No work to do if we are draining/primary.
+    if (_replCoord->isWaitingForApplierToDrain() || _replCoord->getMemberState().primary()) {
+        LOG(1) << "waiting for draining or we are primary, not adding more ops to buffer";
+        return;
+    }
 
-        // If we are transitioning to primary state, we need to leave
-        // this loop in order to go into bgsync-pause mode.
-        if (_replCoord->isWaitingForApplierToDrain() || _replCoord->getMemberState().primary()) {
-            LOG(1) << "waiting for draining or we are primary, not adding more ops to buffer";
-            return;
-        }
+    if (MONGO_FAIL_POINT(stepDownWhileDrainingFailPoint)) {
+        sleepsecs(20);
+    }
 
-        // At this point, we are guaranteed to have at least one thing to read out
-        // of the fetcher.
-        const BSONObj& o = *documentIter;
-        currentBatchMessageSize += o.objsize();
-        opsReadStats.increment();
+    // The count of the bytes of the documents read off the network.
+    int networkDocumentBytes = 0;
+    std::for_each(documents.cbegin(),
+                  documents.cend(),
+                  [&networkDocumentBytes](BSONObj doc) { networkDocumentBytes += doc.objsize(); });
+
+    // These numbers are for the documents we will apply.
+    auto toApplyDocumentCount = documents.size();
+    auto toApplyDocumentBytes = networkDocumentBytes;
+    if (queryResponse.first) {
+        // The count is one less since the first document found was already applied ($gte $ts query)
+        // and we will not apply it again. We just needed to check it so we didn't rollback, or
+        // error above.
+        --toApplyDocumentCount;
+        const auto alreadyAppliedDocument = documents.cbegin();
+        toApplyDocumentBytes -= alreadyAppliedDocument->objsize();
+    }
+
+    if (toApplyDocumentBytes > 0) {
+        // Wait for enough space.
+        _buffer.waitForSpace(toApplyDocumentBytes);
 
         if (MONGO_FAIL_POINT(stepDownWhileDrainingFailPoint)) {
             sleepsecs(20);
@@ -496,27 +508,33 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
             LOG(2) << "bgsync buffer has " << _buffer.size() << " bytes";
         }
 
-        bufferCountGauge.increment();
-        bufferSizeGauge.increment(getSize(o));
-        _buffer.push(o);
+        // Buffer docs for later application.
+        std::vector<BSONObj> objs{firstDocToApply, lastDocToApply};
+        _buffer.pushAllNonBlocking(objs);
 
+        // Inc stats.
+        opsReadStats.increment(documents.size());  // we read all of the docs in the query.
+        networkByteStats.increment(networkDocumentBytes);
+        bufferCountGauge.increment(toApplyDocumentCount);
+        bufferSizeGauge.increment(toApplyDocumentBytes);
+
+        // Update last fetched info.
+        auto lastDoc = objs.back();
         {
             stdx::unique_lock<stdx::mutex> lock(_mutex);
-            _lastFetchedHash = o["h"].numberLong();
-            _lastOpTimeFetched = fassertStatusOK(28770, OpTime::parseFromOplogEntry(o));
-            LOG(3) << "lastOpTimeFetched: " << _lastOpTimeFetched;
+            _lastFetchedHash = lastDoc["h"].numberLong();
+            _lastOpTimeFetched = fassertStatusOK(28770, OpTime::parseFromOplogEntry(lastDoc));
+            LOG(3) << "batch lastOpTimeFetched: " << _lastOpTimeFetched;
         }
     }
 
     // record time for each batch
     getmoreReplStats.recordMillis(durationCount<Milliseconds>(queryResponse.elapsedMillis));
 
-    networkByteStats.increment(currentBatchMessageSize);
-
     // Check some things periodically
     // (whenever we run out of items in the
     // current cursor batch)
-    if (currentBatchMessageSize > 0 && currentBatchMessageSize < BatchIsSmallish) {
+    if (networkDocumentBytes > 0 && networkDocumentBytes < BatchIsSmallish) {
         // on a very low latency network, if we don't wait a little, we'll be
         // getting ops to write almost one at a time.  this will both be expensive
         // for the upstream server as well as potentially defeating our parallel
@@ -526,6 +544,10 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
         // "caught up".
         //
         sleepmillis(SleepToAllowBatchingMillis);
+    }
+
+    if (inShutdown()) {
+        return;
     }
 
     // If we are transitioning to primary state, we need to leave
