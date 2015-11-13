@@ -353,35 +353,50 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 }
 
 /*
- * __split_child_no_evict --
- *	Ensure the newly created child isn't evicted for now.
+ * __split_child_block_evict_and_split --
+ *	Ensure the newly created child isn't evicted or split for now.
  */
 static void
-__split_child_no_evict(WT_PAGE *child)
+__split_child_block_evict_and_split(WT_PAGE *child)
 {
 	/*
 	 * Once the split is live, newly created internal pages might be evicted
-	 * and their WT_REF structures freed. If those pages are evicted before
-	 * threads exit the previous parent page's index array, a thread might
-	 * see a freed WT_REF. To ensure that doesn't happen, the page's modify
-	 * structure has a field with a transaction ID that's checked before any
-	 * internal page is evicted. Unfortunately, we don't know the correct
-	 * value until we update the parent page's index (we need a transaction
-	 * ID from after that update), but the act of updating the parent page's
-	 * index is what allows the eviction to happen. For now, set that field
-	 * to an impossibly large value, we'll reset it after the split is live.
+	 * and their WT_REF structures freed. If that happens before all threads
+	 * exit the index of the page which previously "owned" the WT_REF, a
+	 * thread might see a freed WT_REF. To ensure that doesn't happen, the
+	 * newly created page's modify structure has a field with a transaction
+	 * ID that's checked before any internal page is evicted. Unfortunately,
+	 * we don't know the correct value until we update the original page's
+	 * index (we need a transaction ID from after that update), but the act
+	 * of updating the original page's index is what allows the eviction to
+	 * happen.
+	 *
+	 * Once the split is live, newly created internal pages might themselves
+	 * split. The split itself is not the problem: if a page splits before
+	 * we fix up its WT_REF (in other words, a WT_REF we move is then moved
+	 * again, before we reset the underlying page's parent reference), it's
+	 * OK because the test we use to find a WT_REF and WT_PAGE that require
+	 * fixing up is only that the WT_REF points to the wrong parent, not it
+	 * points to a specific wrong parent. The problem is our fix up of the
+	 * WT_REFs in the created page could race with the subsequent fix of the
+	 * same WT_REFs (in a different created page), we'd have to acquire some
+	 * lock to prevent that race, and that's going to be difficult at best.
+	 *
+	 * For now, block eviction and splits in newly created pages until they
+	 * have been fixed up.
 	 */
-	child->modify->mod_split_txn = UINT64_MAX;
+	F_SET_ATOMIC(child, WT_PAGE_SPLIT_BLOCK);
 }
 
 /*
- * __split_ref_move_cleanup --
- *	Clean up the moved WT_REF structures after the split succeeds.
+ * __split_ref_move_final --
+ *	Finalize the moved WT_REF structures after the split succeeds.
  */
-static void
-__split_ref_move_cleanup(WT_SESSION_IMPL *session,
-    WT_REF **refp, uint32_t entries, WT_PAGE *original_page)
+static int
+__split_ref_move_final(
+    WT_SESSION_IMPL *session, WT_REF **refp, uint32_t entries)
 {
+	WT_DECL_RET;
 	WT_PAGE *child;
 	WT_REF *ref, *child_ref;
 	uint64_t txn_new_id;
@@ -389,8 +404,9 @@ __split_ref_move_cleanup(WT_SESSION_IMPL *session,
 
 	/*
 	 * When creating new internal pages as part of a split, we set a field
-	 * in those page's modify structure to prevent them from being evicted.
-	 * Reset that field to a reasonable value.
+	 * in those pages modify structure to prevent them from being evicted
+	 * until all threads are known to have exited the index of the page that
+	 * previously "owned" the WT_REF. Set that field to a safe value.
 	 */
 	txn_new_id = __wt_txn_new_id(session);
 
@@ -402,20 +418,26 @@ __split_ref_move_cleanup(WT_SESSION_IMPL *session,
 	 * page being searched no longer references the child. When that failure
 	 * happens the thread waits for the reference's home page to be updated,
 	 * which we do here: walk the children and fix them up.
-	 *
-	 * We're not acquiring hazard pointers on these pages, they cannot be
-	 * evicted because of the eviction transaction value set when they were
-	 * created.
 	 */
 	for (i = 0; i < entries; ++i, ++refp) {
 		ref = *refp;
 
 		/*
-		 * The page may have been evicted, that's OK, the information
-		 * we're fixing up is for in-memory pages only.
+		 * We don't hold hazard pointers on created pages, they cannot
+		 * be evicted because the page-modify transaction value set as
+		 * they were created prevents eviction. (See above, we reset
+		 * that value as part of fixing up the page.) But, an eviction
+		 * thread might be attempting to evict the page (the WT_REF may
+		 * be WT_REF_LOCKED), or it may be a disk based page (the WT_REF
+		 * may be WT_REF_READING), or it may be in some other state.
+		 * Acquire a hazard pointer for any in-memory pages so we know
+		 * the state of the page. Ignore pages not in-memory (deleted,
+		 * on-disk, being read), there's no in-memory structure to fix.
 		 */
-		if (ref->state != WT_REF_MEM)
+		if ((ret = __wt_page_in(session,
+		    ref, WT_READ_CACHE | WT_READ_NO_EVICT)) == WT_NOTFOUND)
 			continue;
+		WT_ERR(ret);
 
 		child = ref->page;
 #ifdef HAVE_DIAGNOSTIC
@@ -423,9 +445,10 @@ __split_ref_move_cleanup(WT_SESSION_IMPL *session,
 		    __split_verify_intl_key_order(session, child));
 #endif
 		/*
-		 * We have the parent locked, but there's nothing to prevent
-		 * this child from splitting beneath us; ensure that reading
-		 * the child's page index structure is safe.
+		 * We use a page flag to prevent the child from splitting from
+		 * underneath us, but the split-generation error checks don't
+		 * know about that flag; use the standard macros to ensure that
+		 * reading the child's page index structure is safe.
 		 */
 		WT_ENTER_PAGE_INDEX(session);
 		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
@@ -434,10 +457,8 @@ __split_ref_move_cleanup(WT_SESSION_IMPL *session,
 			 * opened up access from the top of the tree already,
 			 * disk pages may have been read in since then, and
 			 * those pages would have correct parent references.
-			 * Only update pages that reference the original page,
-			 * they must be wrong.
 			 */
-			if (child_ref->home == original_page) {
+			if (child_ref->home != child) {
 				child_ref->home = child;
 				child_ref->pindex_hint = 0;
 
@@ -445,6 +466,11 @@ __split_ref_move_cleanup(WT_SESSION_IMPL *session,
 			}
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);
+
+		/* The child can now be evicted or split. */
+		F_CLR_ATOMIC(child, WT_PAGE_SPLIT_BLOCK);
+
+		WT_ERR(__wt_hazard_clear(session, child));
 	}
 
 	/*
@@ -452,6 +478,10 @@ __split_ref_move_cleanup(WT_SESSION_IMPL *session,
 	 * threads spin on incorrect page references longer than necessary.
 	 */
 	WT_FULL_BARRIER();
+	return (0);
+
+err:	/* Something really bad just happened. */
+	WT_PANIC_RET(session, ret, "fatal error resolving a split");
 }
 
 /*
@@ -560,8 +590,8 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 		WT_ERR(__wt_page_modify_init(session, child));
 		__wt_page_modify_set(session, child);
 
-		/* Ensure the newly created page isn't evicted for now. */
-		__split_child_no_evict(child);
+		/* Ensure the page isn't evicted or split for now. */
+		__split_child_block_evict_and_split(child);
 
 		/*
 		 * The newly allocated child's page index references the same
@@ -609,8 +639,8 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	    __split_verify_intl_key_order(session, root));
 #endif
 	/* Fix up the moved WT_REF structures. */
-	__split_ref_move_cleanup(
-	    session, alloc_index->index, alloc_index->entries, root);
+	WT_ERR(__split_ref_move_final(
+	    session, alloc_index->index, alloc_index->entries));
 
 	/* We've installed the allocated page-index, ensure error handling. */
 	alloc_index = NULL;
@@ -1023,8 +1053,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 		WT_ERR(__wt_page_modify_init(session, child));
 		__wt_page_modify_set(session, child);
 
-		/* Ensure the newly created page isn't evicted for now. */
-		__split_child_no_evict(child);
+		/* Ensure the page isn't evicted or split for now. */
+		__split_child_block_evict_and_split(child);
 
 		/*
 		 * The newly allocated child's page index references the same
@@ -1077,8 +1107,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 #endif
 
 	/* Fix up the moved WT_REF structures. */
-	__split_ref_move_cleanup(session,
-	    alloc_index->index + 1, alloc_index->entries - 1, page);
+	WT_ERR(__split_ref_move_final(
+	    session, alloc_index->index + 1, alloc_index->entries - 1));
 
 	/*
 	 * We don't care about the page-index we allocated, all we needed was
@@ -1171,6 +1201,11 @@ __split_internal_lock(
 	 */
 	for (;;) {
 		parent = ref->home;
+
+		/* Skip pages that aren't ready to split. */
+		if (F_ISSET_ATOMIC(parent, WT_PAGE_SPLIT_BLOCK))
+			return (EBUSY);
+
 		WT_RET(__wt_fair_lock(session, &parent->page_lock));
 		if (parent == ref->home)
 			break;

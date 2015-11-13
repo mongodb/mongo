@@ -1110,7 +1110,8 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * transaction value is globally visible.
 	 */
 	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
-	    !__wt_txn_visible_all(session, mod->mod_split_txn))
+	    (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK) ||
+	    !__wt_txn_visible_all(session, mod->mod_split_txn)))
 		return (false);
 
 	/*
