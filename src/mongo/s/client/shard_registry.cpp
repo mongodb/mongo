@@ -172,10 +172,11 @@ void ShardRegistry::shutdown() {
 
 void ShardRegistry::reload(OperationContext* txn) {
     auto shardsStatus = grid.catalogManager(txn)->getAllShards(txn);
-    uassert(13632,
-            str::stream() << "could not get updated shard list from config server due to "
-                          << shardsStatus.getStatus().toString(),
-            shardsStatus.isOK());
+    if (!shardsStatus.isOK()) {
+        uasserted(shardsStatus.getStatus().code(),
+                  str::stream() << "could not get updated shard list from config server due to "
+                                << shardsStatus.getStatus().toString());
+    }
     vector<ShardType> shards = std::move(shardsStatus.getValue().value);
     OpTime reloadOpTime = std::move(shardsStatus.getValue().opTime);
 
@@ -209,6 +210,11 @@ void ShardRegistry::reload(OperationContext* txn) {
 
         _addShard_inlock(shardType);
     }
+}
+
+void ShardRegistry::rebuildConfigShard() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _addConfigShard_inlock();
 }
 
 shared_ptr<Shard> ShardRegistry::getShard(OperationContext* txn, const ShardId& shardId) {

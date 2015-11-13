@@ -54,6 +54,8 @@
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
 
@@ -165,31 +167,47 @@ Status initializeGlobalShardingState(OperationContext* txn,
                                          makeTaskExecutor(executor::makeNetworkInterface()),
                                          configCS));
 
-    try {
-        std::unique_ptr<ForwardingCatalogManager> catalogManager =
-            stdx::make_unique<ForwardingCatalogManager>(
-                getGlobalServiceContext(),
-                configCS,
-                shardRegistry.get(),
-                HostAndPort(getHostName(), serverGlobalParams.port));
+    std::unique_ptr<ForwardingCatalogManager> catalogManager =
+        stdx::make_unique<ForwardingCatalogManager>(
+            getGlobalServiceContext(),
+            configCS,
+            shardRegistry.get(),
+            HostAndPort(getHostName(), serverGlobalParams.port));
 
-        shardRegistry->startup();
-        grid.init(
-            std::move(catalogManager),
-            std::move(shardRegistry),
-            stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getClockSource()));
+    shardRegistry->startup();
+    grid.init(std::move(catalogManager),
+              std::move(shardRegistry),
+              stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getClockSource()));
 
-        auto status = grid.catalogManager(txn)->startup(txn, allowNetworking);
-        if (!status.isOK()) {
-            return status;
+    while (!inShutdown()) {
+        try {
+            Status status = grid.catalogManager(txn)->startup(txn, allowNetworking);
+            uassertStatusOK(status);
+
+            if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::NONE) {
+                grid.shardRegistry()->reload(txn);
+            }
+            return Status::OK();
+        } catch (const DBException& ex) {
+            Status status = ex.toStatus();
+            if (status == ErrorCodes::ConfigServersInconsistent) {
+                // Legacy catalog manager can return ConfigServersInconsistent.  When that happens
+                // we should immediately fail initialization.  For all other failures we should
+                // retry.
+                return status;
+            }
+            if (status == ErrorCodes::ReplicaSetNotFound) {
+                // ReplicaSetNotFound most likely means we've been waiting for the config replica
+                // set to come up for so long that the ReplicaSetMonitor stopped monitoring the set.
+                // Rebuild the config shard to force the monitor to resume monitoring the config
+                // servers.
+                grid.shardRegistry()->rebuildConfigShard();
+            }
+            log() << "Error initializing sharding state, sleeping for 2 seconds and trying again"
+                  << causedBy(status);
+            sleepmillis(2000);
+            continue;
         }
-
-        // ShardRegistry::reload may throw, in which case we will just fail the initialization
-        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::NONE) {
-            grid.shardRegistry()->reload(txn);
-        }
-    } catch (const DBException& ex) {
-        return ex.toStatus();
     }
 
     return Status::OK();

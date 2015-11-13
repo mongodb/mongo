@@ -11,15 +11,17 @@ res = assert.commandFailed(
     connA.adminCommand({ moveChunk: 'DummyDB.DummyColl',
                          find: { e: 0 },
                          to: 'DummyShard',
-                         configdb: 'localhost:1' }));
-assert.eq(ErrorCodes.ManualInterventionRequired, res.code);
+                         configdb: 'localhost:1',
+                         maxTimeMS: 10000}));
+assert.eq(ErrorCodes.ExceededTimeLimit, res.code);
 
 res = assert.commandFailed(
     connB.adminCommand({ moveChunk: 'DummyDB.DummyColl',
                          find: { e: 0 },
                          to: 'DummyShard',
-                         configdb: 'localhost:1' }));
-assert.eq(ErrorCodes.ManualInterventionRequired, res.code);
+                         configdb: 'localhost:1',
+                         maxTimeMS: 10000}));
+assert.eq(ErrorCodes.ExceededTimeLimit, res.code);
 
 MongoRunner.stopMongod(conn);
 

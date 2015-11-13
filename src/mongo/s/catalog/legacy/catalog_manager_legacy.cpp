@@ -216,9 +216,15 @@ Status CatalogManagerLegacy::init(const ConnectionString& configDBCS) {
 }
 
 Status CatalogManagerLegacy::startup(OperationContext* txn, bool allowNetworking) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_started) {
+        return Status::OK();
+    }
+
     if (!allowNetworking) {
         // Config servers shouldn't call dbHash on themselves and shards don't need to
         // run the checker.
+        _started = true;
         return Status::OK();
     }
 
@@ -227,7 +233,8 @@ Status CatalogManagerLegacy::startup(OperationContext* txn, bool allowNetworking
         return status;
     }
 
-    return status;
+    _started = true;
+    return Status::OK();
 }
 
 Status CatalogManagerLegacy::initConfigVersion(OperationContext* txn) {
@@ -1228,6 +1235,9 @@ Status CatalogManagerLegacy::_checkConfigServersConsistent(const unsigned tries)
 
     unsigned firstGood = 0;
     int up = 0;
+    // becomes false if we are able to get any response (even a failed one) from any of the config
+    // servers
+    bool networkError = true;
     vector<BSONObj> res;
 
     // The last error we saw on a config server
@@ -1262,6 +1272,8 @@ Status CatalogManagerLegacy::_checkConfigServersConsistent(const unsigned tries)
                     firstGood = i;
                 up++;
             }
+            // Network errors throw, so if we got this far there wasn't a network error
+            networkError = false;
             conn->done();
         } catch (const DBException& excep) {
             if (conn) {
@@ -1287,7 +1299,7 @@ Status CatalogManagerLegacy::_checkConfigServersConsistent(const unsigned tries)
     }
 
     if (up == 0) {
-        return {ErrorCodes::ConfigServersInconsistent,
+        return {networkError ? ErrorCodes::HostUnreachable : ErrorCodes::UnknownError,
                 str::stream() << "no config servers successfully contacted" << causedBy(&errMsg)};
     } else if (up == 1) {
         warning() << "only 1 config server reachable, continuing";

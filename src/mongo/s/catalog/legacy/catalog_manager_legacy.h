@@ -213,6 +213,10 @@ private:
     // True if CatalogManagerLegacy::shutDown has been called. False, otherwise.
     bool _inShutdown = false;
 
+    // Set to true once startup() has been called and returned an OK status.  Allows startup() to be
+    // called multiple times with any time after the first successful call being a no-op.
+    bool _started = false;
+
     // used by consistency checker thread to check if config
     // servers are consistent
     bool _consistentFromLastCheck = false;

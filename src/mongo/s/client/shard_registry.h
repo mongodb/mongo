@@ -140,6 +140,14 @@ public:
     void reload(OperationContext* txn);
 
     /**
+     * Throws out and reconstructs the config shard.  This has the effect that if replica set
+     * monitoring of the config server replica set has stopped (because the set was down for too
+     * long), this will cause the ReplicaSetMonitor to be rebuilt, which will re-trigger monitoring
+     * of the config replica set to resume.
+     */
+    void rebuildConfigShard();
+
+    /**
      * Updates _lookup and _rsLookup based on the given new version of the given Shard's
      * ConnectionString.
      * Used to update the ShardRegistry when a change in replica set membership is detected by the

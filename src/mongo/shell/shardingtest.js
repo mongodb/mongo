@@ -238,12 +238,7 @@ var ShardingTest = function(params) {
         } else {
             // Old style config triplet
             for (var i = 0; i < this._configServers.length; i++) {
-                if (otherParams.useBridge) {
-                    MongoRunner.stopMongod(unbridgedConfigServers[i]);
-                    this._configServers[i].stop();
-                } else {
-                    MongoRunner.stopMongod(this._configServers[i]);
-                }
+                this.stopConfigServer(i);
             }
         }
 
@@ -569,7 +564,7 @@ var ShardingTest = function(params) {
     };
 
     /**
-     * Kills the mongod with index n.
+     * Kills the shard mongod with index n.
      */
     this.stopMongod = function(n) {
         if (otherParams.useBridge) {
@@ -581,7 +576,19 @@ var ShardingTest = function(params) {
     };
 
     /**
-     * Restarts a previously stopped mongos.
+     * Kills the config server mongod with index n.
+     */
+    this.stopConfigServer = function(n) {
+        if (otherParams.useBridge) {
+            MongoRunner.stopMongod(unbridgedConfigServers[n]);
+            this._configServers[n].stop();
+        } else {
+            MongoRunner.stopMongod(this._configServers[n]);
+        }
+    }
+
+    /**
+     * Stops and restarts a mongos process.
      *
      * If opts is specified, the new mongos is started using those options. Otherwise, it is started
      * with its previous parameters.
@@ -633,9 +640,12 @@ var ShardingTest = function(params) {
     };
 
     /**
-     * Restarts a previously stopped mongod using the same parameters as before.
+     * Stops and restarts a shard mongod process.
      *
-     * Warning: Overwrites the old dn member variables.
+     * If opts is specified, the new mongod is started using those options. Otherwise, it is started
+     * with its previous parameters.
+     *
+     * Warning: Overwrites the old dn/shardn member variables.
      */
     this.restartMongod = function(n) {
         var mongod;
@@ -674,6 +684,53 @@ var ShardingTest = function(params) {
         this["shard" + n] = this._connections[n];
         this["d" + n] = this._connections[n];
     };
+
+    /**
+     * Stops and restarts a config server mongod process.
+     *
+     * If opts is specified, the new mongod is started using those options. Otherwise, it is started
+     * with its previous parameters.
+     *
+     * Warning: Overwrites the old cn/confign member variables.
+     */
+    this.restartConfigServer = function(n) {
+        var mongod;
+
+        if (otherParams.useBridge) {
+            mongod = unbridgedConfigServers[n];
+        } else {
+            mongod = this["c" + n];
+        }
+
+        this.stopConfigServer(n);
+
+        if (otherParams.useBridge) {
+            this._configServers[n] = new MongoBridge({
+                hostName: otherParams.useHostname ? hostName : "localhost",
+                port: this._configServers[n].port,
+                // The mongod processes identify themselves to mongobridge as host:port, where the
+                // host is the actual hostname of the machine and not localhost.
+                dest: hostName + ":" + mongod.port,
+            });
+        }
+
+        mongod.restart = true;
+        var newConn = MongoRunner.runMongod(mongod);
+        if (!newConn) {
+            throw new Error("Failed to restart config server " + n);
+        }
+
+        if (otherParams.useBridge) {
+            this._configServers[n].connectToBridge();
+            unbridgedConfigServers[n] = newConn;
+        } else {
+            this._configServers[n] = newConn;
+        }
+
+        this["config" + n] = this._configServers[n];
+        this["c" + n] = this._configServers[n];
+    };
+
 
     /**
      * Helper method for setting primary shard of a database and making sure that it was successful.

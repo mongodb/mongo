@@ -229,7 +229,7 @@ TEST(SetShardVersionRequest, ToSSVCommandInit) {
                    << "init" << true << "authoritative" << true << "configdb" << configCS.toString()
                    << "shard"
                    << "TestShard"
-                   << "shardHost" << shardCS.toString()));
+                   << "shardHost" << shardCS.toString() << "maxTimeMS" << 30000));
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandInitNoConnectionVersioning) {
@@ -249,7 +249,8 @@ TEST(SetShardVersionRequest, ToSSVCommandInitNoConnectionVersioning) {
                    << "init" << true << "authoritative" << true << "configdb" << configCS.toString()
                    << "shard"
                    << "TestShard"
-                   << "shardHost" << shardCS.toString() << "noConnectionVersioning" << true));
+                   << "shardHost" << shardCS.toString() << "maxTimeMS" << 30000
+                   << "noConnectionVersioning" << true));
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFull) {

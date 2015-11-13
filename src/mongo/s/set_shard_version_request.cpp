@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -213,7 +214,11 @@ BSONObj SetShardVersionRequest::toBSON() const {
     cmdBuilder.append(kShardName, _shardName);
     cmdBuilder.append(kShardConnectionString, _shardCS.toString());
 
-    if (!_init) {
+    if (_init) {
+        // Always include a 30 second timeout on sharding state initialization, to work around
+        // SERVER-21458.
+        cmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS, 30000);
+    } else {
         _version.get().appendForSetShardVersion(&cmdBuilder);
     }
 

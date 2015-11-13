@@ -148,19 +148,6 @@ string ShardingState::getShardName() {
     return _shardName;
 }
 
-void ShardingState::initialize(OperationContext* txn, const string& configSvr) {
-    uassert(18509,
-            "Unable to obtain host name during sharding initialization.",
-            !getHostName().empty());
-
-    ConnectionString configSvrConnStr = uassertStatusOK(ConnectionString::parse(configSvr));
-    _initializeImpl(txn, configSvrConnStr);
-
-    uassertStatusOK(_waitForInitialization());
-
-    updateConfigServerOpTimeFromMetadata(txn);
-}
-
 void ShardingState::shutDown(OperationContext* txn) {
     bool mustEnterShutdownState = false;
 
@@ -514,16 +501,32 @@ Status ShardingState::refreshMetadataNow(OperationContext* txn,
     return _refreshMetadata(txn, ns, ChunkVersion(0, 0, OID()), false, latestShardVersion);
 }
 
-void ShardingState::_initializeImpl(OperationContext* txn, ConnectionString configSvr) {
+void ShardingState::initialize(OperationContext* txn, const string& configSvr) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-        if (_getInitializationState() != InitializationState::kNew) {
-            return;
-        }
+        if (_getInitializationState() == InitializationState::kNew) {
+            uassert(18509,
+                    "Unable to obtain host name during sharding initialization.",
+                    !getHostName().empty());
 
-        _setInitializationState_inlock(InitializationState::kInitializing);
+            ConnectionString configSvrConnStr = uassertStatusOK(ConnectionString::parse(configSvr));
+
+            _setInitializationState_inlock(InitializationState::kInitializing);
+
+            stdx::thread thread([this, configSvrConnStr] { _initializeImpl(configSvrConnStr); });
+            thread.detach();
+        }
     }
+
+    uassertStatusOK(_waitForInitialization(txn));
+
+    updateConfigServerOpTimeFromMetadata(txn);
+}
+
+void ShardingState::_initializeImpl(ConnectionString configSvr) {
+    Client::initThread("ShardingState initialization");
+    auto txn = cc().makeOperationContext();
 
     // Do this initialization outside of the lock, since we are already protected by having entered
     // the kInitializing state.
@@ -532,41 +535,48 @@ void ShardingState::_initializeImpl(OperationContext* txn, ConnectionString conf
         &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
 
     try {
-        Status status = initializeGlobalShardingState(txn, configSvr, false);
+        Status status = initializeGlobalShardingState(txn.get(), configSvr, false);
         _signalInitializationComplete(status);
     } catch (const DBException& ex) {
         _signalInitializationComplete(ex.toStatus());
     }
 }
 
-Status ShardingState::_waitForInitialization() {
+Status ShardingState::_waitForInitialization(OperationContext* txn) {
     if (enabled())
         return Status::OK();
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    while (_getInitializationState() == InitializationState::kInitializing) {
-        _initializationFinishedCondition.wait(lk);
+    {
+        const Microseconds timeRemaining(txn->getRemainingMaxTimeMicros());
+        while (_getInitializationState() == InitializationState::kInitializing ||
+               _getInitializationState() == InitializationState::kNew) {
+            if (timeRemaining.count()) {
+                const auto deadline = stdx::chrono::system_clock::now() + timeRemaining;
+
+                if (stdx::cv_status::timeout ==
+                    _initializationFinishedCondition.wait_until(lk, deadline)) {
+                    return Status(ErrorCodes::ExceededTimeLimit,
+                                  "Initializing sharding state exceeded time limit");
+                }
+            } else {
+                _initializationFinishedCondition.wait(lk);
+            }
+        }
     }
 
-    switch (_getInitializationState()) {
-        case InitializationState::kNew:
-            return Status(ErrorCodes::NotYetInitialized, "Sharding state is not yet initialized.");
-        case InitializationState::kInitializing:
-            fassertFailedWithStatus(
-                28841,
-                Status(ErrorCodes::InternalError,
-                       "Sharding state initialization has reached an invalid state."));
-            break;
-        case InitializationState::kInitialized:
-            fassertStatusOK(34349, _initializationStatus);
-            return Status::OK();
-        case InitializationState::kError:
-            return Status(ErrorCodes::ManualInterventionRequired,
-                          str::stream()
-                              << "Server's sharding metadata manager failed to initialize and will "
-                                 "remain in this state until the instance is manually reset"
-                              << causedBy(_initializationStatus));
+    auto initializationState = _getInitializationState();
+    if (initializationState == InitializationState::kInitialized) {
+        fassertStatusOK(34349, _initializationStatus);
+        return Status::OK();
+    }
+    if (initializationState == InitializationState::kError) {
+        return Status(ErrorCodes::ManualInterventionRequired,
+                      str::stream()
+                          << "Server's sharding metadata manager failed to initialize and will "
+                             "remain in this state until the instance is manually reset"
+                          << causedBy(_initializationStatus));
     }
 
     MONGO_UNREACHABLE;
@@ -601,7 +611,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
                                        const ChunkVersion& reqShardVersion,
                                        bool useRequestedVersion,
                                        ChunkVersion* latestShardVersion) {
-    Status status = _waitForInitialization();
+    Status status = _waitForInitialization(txn);
     if (!status.isOK())
         return status;
 

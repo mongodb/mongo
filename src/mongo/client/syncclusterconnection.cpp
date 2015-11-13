@@ -436,8 +436,9 @@ unique_ptr<DBClientCursor> SyncClusterConnection::_queryOnActive(const string& n
                   << " failed to: " << _conns[i]->toString() << " exception" << endl;
         }
     }
-    throw UserException(
-        8002, str::stream() << "all servers down/unreachable when querying: " << _address);
+    throw UserException(ErrorCodes::HostUnreachable,
+                        str::stream()
+                            << "all servers down/unreachable when querying: " << _address);
 }
 
 unique_ptr<DBClientCursor> SyncClusterConnection::getMore(const string& ns,

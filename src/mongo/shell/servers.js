@@ -611,7 +611,7 @@ MongoRunner.runMongod = function( opts ){
     }
 
     var mongod = MongoRunner.startWithArgs(opts, waitForConnect);
-    if (!waitForConnect) mongos = {};
+    if (!waitForConnect) mongod = {};
     if (!mongod) return null;
     
     mongod.commandLine = MongoRunner.arrToOpts( opts )

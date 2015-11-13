@@ -346,13 +346,13 @@ private:
      *
      * Doesn't throw, only updates the initialization state variables.
      *
-     * @param txn Operation context of the command which requested the initialization.
-     * @param recoveryRecord If nullptr is passed, will do the initialization assuming there is no
-     *  recovery to be done. Otherwise, will schedule a thread to do the recovery based on the
-     *  contents of the recovery record.
+     * Runs in a new thread so that if all config servers are down initialization can continue
+     * retrying in the background even if the operation that kicked off the initialization has
+     * terminated.
+     *
      * @param configSvr Connection string of the config server to use.
      */
-    void _initializeImpl(OperationContext* txn, ConnectionString configSvr);
+    void _initializeImpl(ConnectionString configSvr);
 
     /**
      * Must be called only when the current state is kInitializing. Sets the current state to
@@ -364,7 +364,7 @@ private:
      * Blocking method, which waits for the initialization state to become kInitialized or kError
      * and returns the initialization status.
      */
-    Status _waitForInitialization();
+    Status _waitForInitialization(OperationContext* txn);
 
     /**
      * Simple wrapper to cast the initialization state atomic uint64 to InitializationState value
