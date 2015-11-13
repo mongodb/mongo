@@ -26,9 +26,9 @@
  *    it in the license file.
  */
 
-#include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
-
 #include "mongo/platform/basic.h"
+
+#include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
 
 #include <map>
 #include <string>
@@ -419,7 +419,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
 
                         getMockCatalog()->expectNoGrabLock();
                     },
-                    {ErrorCodes::NetworkTimeout, "bad test network"});
+                    {ErrorCodes::ExceededMemoryLimit, "bad remote server"});
             }
         },
         {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -568,7 +568,7 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
             lastTS = lockSessionID;
             getMockCatalog()->expectNoGrabLock();
         },
-        {ErrorCodes::NetworkTimeout, "bad test network"});
+        {ErrorCodes::ExceededMemoryLimit, "bad remote server"});
 
     stdx::mutex unlockMutex;
     stdx::condition_variable unlockCV;
@@ -588,7 +588,7 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
     auto lockStatus =
         getMgr()->lock(txn(), lockName, whyMsg, Milliseconds(10), Milliseconds(1)).getStatus();
     ASSERT_NOT_OK(lockStatus);
-    ASSERT_EQUALS(ErrorCodes::NetworkTimeout, lockStatus.code());
+    ASSERT_EQUALS(ErrorCodes::ExceededMemoryLimit, lockStatus.code());
 
     bool didTimeout = false;
     {
@@ -1758,6 +1758,43 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfConfigServerClockGoesBackw
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
+}
+
+TEST_F(ReplSetDistLockManagerFixture, LockAcquisitionRetriesOnNetworkErrorSuccess) {
+    getMockCatalog()->expectGrabLock(
+        [&](StringData, const OID&, StringData, StringData, Date_t, StringData) {
+            // Next acquisition should be successful
+            LocksType currentLockDoc;
+            currentLockDoc.setName("LockName");
+            currentLockDoc.setState(LocksType::LOCKED);
+            currentLockDoc.setProcess("otherProcess");
+            currentLockDoc.setLockID(OID("5572007fda9e476582bf3716"));
+            currentLockDoc.setWho("me");
+            currentLockDoc.setWhy("Lock reason");
+
+            getMockCatalog()->expectGrabLock(
+                [&](StringData, const OID&, StringData, StringData, Date_t, StringData) {},
+                currentLockDoc);
+        },
+        {ErrorCodes::NetworkTimeout, "network error"});
+
+    getMockCatalog()->expectUnLock([&](const OID& lockSessionID) {}, Status::OK());
+
+    auto status = getMgr()
+                      ->lock(txn(), "LockName", "Lock reason", Milliseconds(0), Milliseconds(0))
+                      .getStatus();
+    ASSERT_OK(status);
+}
+
+TEST_F(ReplSetDistLockManagerFixture, LockAcquisitionRetriesOnInterruptionNeverSucceeds) {
+    getMockCatalog()->expectGrabLock(
+        [&](StringData, const OID&, StringData, StringData, Date_t, StringData) {},
+        {ErrorCodes::Interrupted, "operation interrupted"});
+
+    getMockCatalog()->expectUnLock([&](const OID& lockSessionID) {}, Status::OK());
+
+    auto status = getMgr()->lock(txn(), "bar", "foo", Milliseconds(0), Milliseconds(0)).getStatus();
+    ASSERT_NOT_OK(status);
 }
 
 /**

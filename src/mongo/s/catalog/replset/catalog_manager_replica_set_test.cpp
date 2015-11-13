@@ -1468,7 +1468,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateDatabase) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, UpdateDatabaseHostUnreachable) {
+TEST_F(CatalogManagerReplSetTest, UpdateDatabaseExceededTimeLimit) {
     HostAndPort host1("TestHost1");
     configTargeter()->setFindHostReturnValue(host1);
 
@@ -1479,7 +1479,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateDatabaseHostUnreachable) {
 
     auto future = launchAsync([this, dbt] {
         auto status = catalogManager()->updateDatabase(operationContext(), dbt.getName(), dbt);
-        ASSERT_EQ(ErrorCodes::HostUnreachable, status);
+        ASSERT_EQ(ErrorCodes::ExceededTimeLimit, status);
     });
 
     onCommand([host1](const RemoteCommandRequest& request) {
@@ -1487,8 +1487,8 @@ TEST_F(CatalogManagerReplSetTest, UpdateDatabaseHostUnreachable) {
 
         BatchedCommandResponse response;
         response.setOk(false);
-        response.setErrCode(ErrorCodes::HostUnreachable);
-        response.setErrMessage("socket error");
+        response.setErrCode(ErrorCodes::ExceededTimeLimit);
+        response.setErrMessage("operation timed out");
 
         return response.toBSON();
     });

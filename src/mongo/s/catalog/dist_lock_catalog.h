@@ -124,8 +124,10 @@ public:
                                                StringData why) = 0;
 
     /**
-     * Attempts to set the state of the lock document with lockSessionID to unlocked.
-     * Common status errors include socket errors.
+     * Attempts to set the state of the lock document with lockSessionID to unlocked. Returns OK,
+     * if at the end of this call it is determined that the lock is defintely not owned by the
+     * specified session (i.e., it is not owned at all or if it is owned by a different session).
+     * Otherwise, it returns an error status. Common errors include socket errors.
      */
     virtual Status unlock(OperationContext* txn, const OID& lockSessionID) = 0;
 

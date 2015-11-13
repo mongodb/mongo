@@ -867,7 +867,7 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
                                                          const BSONArray& preCondition) {
     BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition);
     auto response = grid.shardRegistry()->runCommandOnConfigWithRetries(
-        txn, "config", cmd, ShardRegistry::kNetworkOrNotMasterErrors);
+        txn, "config", cmd, ShardRegistry::kAllRetriableErrors);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -978,8 +978,7 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
             }
         }
 
-        if (ShardRegistry::kNetworkOrNotMasterErrors.count(status.code()) &&
-            (retry < kMaxWriteRetry)) {
+        if (ShardRegistry::kAllRetriableErrors.count(status.code()) && (retry < kMaxWriteRetry)) {
             continue;
         }
 
@@ -1014,7 +1013,7 @@ StatusWith<bool> CatalogManagerReplicaSet::updateConfigDocument(OperationContext
     request.setWriteConcern(WriteConcernOptions::Majority);
 
     BatchedCommandResponse response;
-    writeConfigServerDirect(txn, request, &response);
+    _runBatchWriteCommand(txn, request, &response, ShardRegistry::kAllRetriableErrors);
 
     Status status = response.toStatus();
     if (!status.isOK()) {
@@ -1044,7 +1043,7 @@ Status CatalogManagerReplicaSet::removeConfigDocuments(OperationContext* txn,
     request.setWriteConcern(WriteConcernOptions::Majority);
 
     BatchedCommandResponse response;
-    _runBatchWriteCommand(txn, request, &response, ShardRegistry::kNetworkOrNotMasterErrors);
+    _runBatchWriteCommand(txn, request, &response, ShardRegistry::kAllRetriableErrors);
 
     return response.toStatus();
 }
@@ -1135,7 +1134,7 @@ Status CatalogManagerReplicaSet::_createCappedConfigCollection(OperationContext*
                                                                int cappedSize) {
     BSONObj createCmd = BSON("create" << collName << "capped" << true << "size" << cappedSize);
     auto result = grid.shardRegistry()->runCommandOnConfigWithRetries(
-        txn, "config", createCmd, ShardRegistry::kNetworkOrNotMasterErrors);
+        txn, "config", createCmd, ShardRegistry::kAllRetriableErrors);
     if (!result.isOK()) {
         return result.getStatus();
     }
@@ -1314,7 +1313,7 @@ StatusWith<BSONObj> CatalogManagerReplicaSet::_runReadCommand(
             return response;
         }
 
-        if (ShardRegistry::kNetworkOrNotMasterErrors.count(response.getStatus().code()) &&
+        if (ShardRegistry::kAllRetriableErrors.count(response.getStatus().code()) &&
             retry < kMaxReadRetry) {
             continue;
         }

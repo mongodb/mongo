@@ -122,9 +122,13 @@ BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
 
 const ShardRegistry::ErrorCodesSet ShardRegistry::kNotMasterErrors{ErrorCodes::NotMaster,
                                                                    ErrorCodes::NotMasterNoSlaveOk};
-const ShardRegistry::ErrorCodesSet ShardRegistry::kNetworkOrNotMasterErrors{
+const ShardRegistry::ErrorCodesSet ShardRegistry::kAllRetriableErrors{
     ErrorCodes::NotMaster,
     ErrorCodes::NotMasterNoSlaveOk,
+    // If write concern failed to be satisfied on the remote server, this most probably means that
+    // some of the secondary nodes were unreachable or otherwise unresponsive, so the call is safe
+    // to be retried if idempotency can be guaranteed.
+    ErrorCodes::WriteConcernFailed,
     ErrorCodes::HostUnreachable,
     ErrorCodes::HostNotFound,
     ErrorCodes::NetworkTimeout,
@@ -531,8 +535,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
             return result;
         }
 
-        if (kNetworkOrNotMasterErrors.count(result.getStatus().code()) &&
-            retry < kOnErrorNumRetries) {
+        if (kAllRetriableErrors.count(result.getStatus().code()) && retry < kOnErrorNumRetries) {
             continue;
         }
 

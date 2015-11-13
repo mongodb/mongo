@@ -114,6 +114,10 @@ var ShardingTest = function(params) {
     // Used for counting the test duration
     var _startTime = new Date();
 
+    // Populated with the paths of all shard hosts (config servers + hosts) and is used for
+    // cleaning up the data files on shutdown
+    var _alldbpaths = [];
+
     // ShardingTest API
 
     this.getRSEntry = function(setName) {
@@ -243,8 +247,8 @@ var ShardingTest = function(params) {
             }
         }
 
-        for (var i = 0; i < this._alldbpaths.length; i++) {
-            resetDbpath(MongoRunner.dataPath + this._alldbpaths[i]);
+        for (var i = 0; i < _alldbpaths.length; i++) {
+            resetDbpath(MongoRunner.dataPath + _alldbpaths[i]);
         }
 
         var timeMillis = new Date().getTime() - _startTime.getTime();
@@ -756,7 +760,7 @@ var ShardingTest = function(params) {
     this._testName = testName
     this._otherParams = otherParams
     
-    var pathOpts = this.pathOpts = { testName : testName }
+    var pathOpts = { testName: testName };
 
     var hasRS = false
     for(var k in otherParams) {
@@ -766,7 +770,6 @@ var ShardingTest = function(params) {
         }
     }
 
-    this._alldbpaths = []
     this._connections = []
     this._shardServers = this._connections
     this._rs = []
@@ -819,7 +822,7 @@ var ShardingTest = function(params) {
 
             this._rsObjects[i] = rs
 
-            this._alldbpaths.push(null);
+            _alldbpaths.push(null);
             this._connections.push(null);
 
             if (otherParams.useBridge) {
@@ -834,8 +837,6 @@ var ShardingTest = function(params) {
                 dbpath: "$testName$shard",
                 keyFile: keyFile
             };
-
-            options = Object.merge(options, ShardingTest.shardOptions || {})
 
             if (otherParams.shardOptions && otherParams.shardOptions.binVersion) {
                 otherParams.shardOptions.binVersion =
@@ -869,7 +870,7 @@ var ShardingTest = function(params) {
                 this._connections.push(conn);
             }
 
-            this._alldbpaths.push(testName + i);
+            _alldbpaths.push(testName + i);
             this["shard" + i] = this._connections[i];
             this["d" + i] = this._connections[i];
 
@@ -962,7 +963,7 @@ var ShardingTest = function(params) {
                 configNames.push(conn.name);
             }
 
-            this._alldbpaths.push(testName + "-config" + i);
+            _alldbpaths.push(testName + "-config" + i);
             this["config" + i] = this._configServers[i];
             this["c" + i] = this._configServers[i];
         }

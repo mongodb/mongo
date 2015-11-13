@@ -394,6 +394,9 @@ public:
      * Updates a single document in the specified namespace on the config server. The document must
      * have an _id index. Must only be used for updates to the 'config' database.
      *
+     * This method retries the operation on NotMaster or network errors, so it should only be used
+     * with modifications which are idempotent.
+     *
      * Returns non-OK status if the command failed to run for some reason. If the command was
      * successful, returns true if a document was actually modified (that is, it did not exist and
      * was upserted or it existed and any of the fields changed) and false otherwise (basically

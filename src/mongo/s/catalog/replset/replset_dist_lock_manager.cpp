@@ -39,6 +39,7 @@
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -55,6 +56,13 @@ using std::string;
 using std::unique_ptr;
 using stdx::chrono::milliseconds;
 using stdx::chrono::duration_cast;
+
+namespace {
+
+// How many times to retry acquiring the lock after the first attempt fails
+const int kMaxNumLockAcquireRetries = 2;
+
+}  // namespace
 
 const stdx::chrono::seconds ReplSetDistLockManager::kDistLockWriteConcernTimeout{5};
 const stdx::chrono::seconds ReplSetDistLockManager::kDistLockPingInterval{30};
@@ -260,15 +268,25 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
     Timer timer(_serviceContext->getTickSource());
     Timer msgTimer(_serviceContext->getTickSource());
 
+    // Distributed lock acquisition works by tring to update the state of the lock to 'taken'. If
+    // the lock is currently taken, we will back off and try the acquisition again, repeating this
+    // until the lockTryInterval has been reached. If a network error occurs at each lock
+    // acquisition attempt, the lock acquisition will be retried immediately.
     while (waitFor <= milliseconds::zero() || milliseconds(timer.millis()) < waitFor) {
-        OID lockSessionID = OID::gen();
-        string who = str::stream() << _processID << ":" << getThreadName();
+        const OID lockSessionID = OID::gen();
+        const string who = str::stream() << _processID << ":" << getThreadName();
+
+        // Counts how many attempts have been made to grab the lock, which have failed with network
+        // error. This value is reset for each lock acquisition attempt because these are
+        // independent write operations.
+        int networkErrorRetries = 0;
 
         auto lockExpiration = _lockExpiration;
         MONGO_FAIL_POINT_BLOCK(setDistLockTimeout, customTimeout) {
             const BSONObj& data = customTimeout.getData();
             lockExpiration = stdx::chrono::milliseconds(data["timeoutMs"].numberInt());
         }
+
         LOG(1) << "trying to acquire new distributed lock for " << name
                << " ( lock timeout : " << durationCount<Milliseconds>(lockExpiration)
                << " ms, ping interval : " << durationCount<Milliseconds>(_pingInterval)
@@ -283,9 +301,32 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
         if (status.isOK()) {
             // Lock is acquired since findAndModify was able to successfully modify
             // the lock document.
-            LOG(0) << "distributed lock '" << name << "' acquired for '" << whyMessage
-                   << "', ts : " << lockSessionID;
+            log() << "distributed lock '" << name << "' acquired for '" << whyMessage
+                  << "', ts : " << lockSessionID;
             return ScopedDistLock(txn, lockSessionID, this);
+        }
+
+        // If a network error occurred, unlock the lock synchronously and try again
+        if (ShardRegistry::kAllRetriableErrors.count(status.code()) &&
+            networkErrorRetries < kMaxNumLockAcquireRetries) {
+            LOG(1) << "Failed to acquire distributed lock because of retriable error. Retrying "
+                      "acquisition by first unlocking the stale entry, which possibly exists now"
+                   << causedBy(status);
+
+            networkErrorRetries++;
+
+            status = _catalog->unlock(txn, lockSessionID);
+            if (status.isOK()) {
+                // We certainly do not own the lock, so we can retry
+                continue;
+            }
+
+            // Fall-through to the error checking logic below
+            invariant(status != ErrorCodes::LockStateChangeFailed);
+
+            LOG(1)
+                << "Failed to retry acqusition of distributed lock. No more attempts will be made"
+                << causedBy(status);
         }
 
         if (status != ErrorCodes::LockStateChangeFailed) {
@@ -357,7 +398,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
             msgTimer.reset();
         }
 
-        milliseconds timeRemaining =
+        const milliseconds timeRemaining =
             std::max(milliseconds::zero(), waitFor - milliseconds(timer.millis()));
         sleepFor(std::min(lockTryInterval, timeRemaining));
     }

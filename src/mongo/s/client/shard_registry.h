@@ -316,10 +316,11 @@ public:
     static const ErrorCodesSet kNotMasterErrors;
 
     /**
-     * Set of error codes which includes NotMaster and any network exceptions. Retries on errors
-     * from this set are not always safe and may require some additional idempotency guarantees.
+     * Set of error codes which includes NotMaster and all other exceptions on which it is okay to
+     * retry the operation, but the retries may require some additional idempotency guarantees
+     * imposed by the calling code.
      */
-    static const ErrorCodesSet kNetworkOrNotMasterErrors;
+    static const ErrorCodesSet kAllRetriableErrors;
 
 private:
     using ShardMap = std::unordered_map<ShardId, std::shared_ptr<Shard>>;
