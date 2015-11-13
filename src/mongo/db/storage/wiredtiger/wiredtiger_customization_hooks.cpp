@@ -34,6 +34,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/data_protector.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -75,6 +76,11 @@ bool EmptyWiredTigerCustomizationHooks::restartRequired() {
 
 std::string EmptyWiredTigerCustomizationHooks::getOpenConfig(StringData tableName) {
     return "";
+}
+
+
+std::unique_ptr<DataProtector> EmptyWiredTigerCustomizationHooks::getDataProtector() {
+    return std::unique_ptr<DataProtector>();
 }
 
 Status EmptyWiredTigerCustomizationHooks::protectTmpData(
