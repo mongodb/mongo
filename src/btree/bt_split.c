@@ -311,7 +311,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 		/*
 		 * Row-store keys: if it's not yet instantiated, instantiate it.
 		 * If already instantiated, check for overflow cleanup (overflow
-		 * keys are always instantiated.
+		 * keys are always instantiated).
 		 */
 		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL) {
 			__wt_ref_key(from_home, ref, &key, &size);
