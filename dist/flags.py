@@ -26,6 +26,7 @@ flags = {
         'LOG_DSYNC',
         'LOG_FLUSH',
         'LOG_FSYNC',
+        'LOG_SYNC_ENABLED',
     ],
     'page_read' : [
         'READ_CACHE',
