@@ -745,7 +745,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	complete = true;
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-	    "%p: %s %ssplit into parent %p, %" PRIu32 " -> %" PRIu32
+	    "%p: %s %s" "split into parent %p, %" PRIu32 " -> %" PRIu32
 	    " (%" PRIu32 ")",
 	    ref->page, __wt_page_type_string(ref->page->type),
 	    ref_new == NULL ? "reverse " : "", parent,
