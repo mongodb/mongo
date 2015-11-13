@@ -33,20 +33,21 @@
 #include <pthread.h>
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
 StackLocator::StackLocator() {
     pthread_t self = pthread_self();
     pthread_attr_t selfAttrs;
-    pthread_attr_init(&selfAttrs);
-    pthread_getattr_np(self, &selfAttrs);
+    invariant(pthread_attr_init(&selfAttrs) == 0);
+    invariant(pthread_getattr_np(self, &selfAttrs) == 0);
+    ON_BLOCK_EXIT(pthread_attr_destroy, &selfAttrs);
 
     void* base = nullptr;
     size_t size = 0;
 
     auto result = pthread_attr_getstack(&selfAttrs, &base, &size);
-    pthread_attr_destroy(&selfAttrs);
 
     invariant(result == 0);
     invariant(base != nullptr);

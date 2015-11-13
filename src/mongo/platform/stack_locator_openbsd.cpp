@@ -26,4 +26,29 @@
  *    it in the license file.
  */
 
-#include "stack_locator_unknown.cpp"
+#include "mongo/platform/basic.h"
+
+#include "mongo/platform/stack_locator.h"
+
+#include <pthread_np.h>
+#include <sys/signal.h>
+
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+
+namespace mongo {
+
+StackLocator::StackLocator() {
+    stack_t stack_info;
+
+    pthread_t self = pthread_self();
+
+    invariant(pthread_stackseg_np(self, &stack_info) == 0);
+
+    _begin = stack_info.ss_sp;
+
+    // TODO: Assumes stack grows downward on OpenBSD
+    _end = static_cast<char*>(_begin) - stack_info.ss_size;
+}
+
+}  // namespace mongo

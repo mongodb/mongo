@@ -36,4 +36,4 @@ namespace mongo {
 
 StackLocator::StackLocator() = default;
 
-// namespace mongo
+}  // namespace mongo
