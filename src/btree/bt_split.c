@@ -353,6 +353,76 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 }
 
 /*
+ * __split_ref_move_cleanup --
+ *	Clean up the moved WT_REF structures after the split succeeds.
+ */
+static void
+__split_ref_move_cleanup(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint32_t entries, WT_PAGE *original_page)
+{
+	WT_PAGE *child;
+	WT_REF *ref, *child_ref;
+	uint32_t i;
+
+	/*
+	 * The WT_REF structures moved to newly allocated child pages reference
+	 * the wrong parent page and we have to fix that up. The problem is
+	 * revealed when a thread of control searches for the child page's
+	 * reference structure slot, and fails to find it because the parent
+	 * page being searched no longer references the child. When that failure
+	 * happens the thread waits for the reference's home page to be updated,
+	 * which we do here: walk the children and fix them up.
+	 *
+	 * We're not acquiring hazard pointers on these pages, they cannot be
+	 * evicted because of the eviction transaction value set when they were
+	 * created.
+	 */
+	for (i = 0; i < entries; ++i, ++refp) {
+		ref = *refp;
+
+		/*
+		 * The page may have been evicted, that's OK, the information
+		 * we're fixing up is for in-memory pages only.
+		 */
+		if (ref->state != WT_REF_MEM)
+			continue;
+
+		child = ref->page;
+#ifdef HAVE_DIAGNOSTIC
+		WT_WITH_PAGE_INDEX(session,
+		    __split_verify_intl_key_order(session, child));
+#endif
+		/*
+		 * We have the parent locked, but there's nothing to prevent
+		 * this child from splitting beneath us; ensure that reading
+		 * the child's page index structure is safe.
+		 */
+		WT_ENTER_PAGE_INDEX(session);
+		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
+			/*
+			 * The page's home reference may not be wrong, as we
+			 * opened up access from the top of the tree already,
+			 * disk pages may have been read in since then, and
+			 * those pages would have correct parent references.
+			 * Only update pages that reference the original page,
+			 * they must be wrong.
+			 */
+			if (child_ref->home == original_page) {
+				child_ref->home = child;
+				child_ref->pindex_hint = 0;
+			}
+		} WT_INTL_FOREACH_END;
+		WT_LEAVE_PAGE_INDEX(session);
+	}
+
+	/*
+	 * Push out the changes: not required for correctness, but don't let
+	 * threads spin on incorrect page references longer than necessary.
+	 */
+	WT_FULL_BARRIER();
+}
+
+/*
  * __split_root --
  *	Split the root page in-memory, deepening the tree.
  */
@@ -364,7 +434,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_PAGE *child;
 	WT_PAGE_INDEX *alloc_index, *child_pindex, *pindex;
 	WT_REF **alloc_refp;
-	WT_REF *child_ref, **child_refp, *ref, **root_refp;
+	WT_REF **child_refp, *ref, **root_refp;
 	size_t child_incr, root_decr, root_incr, size;
 	uint64_t split_gen;
 	uint32_t children, chunk, i, j, remain;
@@ -512,59 +582,12 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_WITH_PAGE_INDEX(session,
 	    __split_verify_intl_key_order(session, root));
 #endif
+	/* Fix up the moved WT_REF structures. */
+	__split_ref_move_cleanup(
+	    session, alloc_index->index, alloc_index->entries, root);
 
-	/*
-	 * The moved reference structures now reference the wrong parent page,
-	 * and we have to fix that up.  The problem is revealed when a thread
-	 * of control searches for a page's reference structure slot, and fails
-	 * to find it because the page it's searching no longer references it.
-	 * When that failure happens, the thread waits for the reference's home
-	 * page to be updated, which we do here: walk the children and fix them
-	 * up.
-	 *
-	 * We're not acquiring hazard pointers on these pages, they cannot be
-	 * evicted because of the eviction transaction value set above.
-	 */
-	for (alloc_refp = alloc_index->index,
-	    i = 0; i < alloc_index->entries; ++alloc_refp, ++i) {
-		ref = *alloc_refp;
-		WT_ASSERT(session, ref->home == root);
-		if (ref->state != WT_REF_MEM)
-			continue;
-
-		child = ref->page;
-#ifdef HAVE_DIAGNOSTIC
-		WT_WITH_PAGE_INDEX(session,
-		    __split_verify_intl_key_order(session, child));
-#endif
-		/*
-		 * We have the root locked, but there's nothing to prevent
-		 * this child from splitting beneath us; ensure that reading
-		 * the child's page index structure is safe.
-		 */
-		WT_ENTER_PAGE_INDEX(session);
-		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
-			/*
-			 * The page's home reference may not be wrong, as we
-			 * opened up access from the top of the tree already,
-			 * pages may have been read in since then.  Check and
-			 * only update pages that reference the original page,
-			 * they must be wrong.
-			 */
-			if (child_ref->home == root) {
-				child_ref->home = child;
-				child_ref->pindex_hint = 0;
-			}
-		} WT_INTL_FOREACH_END;
-		WT_LEAVE_PAGE_INDEX(session);
-	}
+	/* We've installed the allocated page-index, ensure error handling. */
 	alloc_index = NULL;
-
-	/*
-	 * Push out the changes: not required for correctness, but don't let
-	 * threads spin on incorrect page references longer than necessary.
-	 */
-	WT_FULL_BARRIER();
 
 	/*
 	 * We can't free the previous root's index, there may be threads using
@@ -859,7 +882,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_PAGE *child;
 	WT_PAGE_INDEX *alloc_index, *child_pindex, *pindex, *replace_index;
 	WT_REF **alloc_refp;
-	WT_REF *child_ref, **child_refp, *page_ref, **page_refp, *ref;
+	WT_REF **child_refp, *page_ref, **page_refp, *ref;
 	size_t child_incr, page_decr, page_incr, parent_incr, size;
 	uint64_t split_gen;
 	uint32_t children, chunk, i, j, remain;
@@ -1032,51 +1055,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_WITH_PAGE_INDEX(session,
 	    __split_verify_intl_key_order(session, page));
 #endif
-	/*
-	 * The moved reference structures now reference the wrong parent page,
-	 * and we have to fix that up.  The problem is revealed when a thread
-	 * of control searches for a page's reference structure slot, and fails
-	 * to find it because the page it's searching no longer references it.
-	 * When that failure happens, the thread waits for the reference's home
-	 * page to be updated, which we do here: walk the children and fix them
-	 * up.
-	 *
-	 * We're not acquiring hazard pointers on these pages, they cannot be
-	 * evicted because of the eviction transaction value set above.
-	 */
-	for (alloc_refp = alloc_index->index + 1,
-	    i = 1; i < alloc_index->entries; ++alloc_refp, ++i) {
-		ref = *alloc_refp;
-		WT_ASSERT(session, ref->home == parent);
-		if (ref->state != WT_REF_MEM)
-			continue;
 
-		child = ref->page;
-#ifdef HAVE_DIAGNOSTIC
-		WT_WITH_PAGE_INDEX(session,
-		    __split_verify_intl_key_order(session, child));
-#endif
-		/*
-		 * We have the parent locked, but there's nothing to prevent
-		 * this child from splitting beneath us; ensure that reading
-		 * the child's page index structure is safe.
-		 */
-		WT_ENTER_PAGE_INDEX(session);
-		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
-			/*
-			 * The page's home reference may not be wrong, as we
-			 * opened up access from the top of the tree already,
-			 * pages may have been read in since then.  Check and
-			 * only update pages that reference the original page,
-			 * they must be wrong.
-			 */
-			if (child_ref->home == page) {
-				child_ref->home = child;
-				child_ref->pindex_hint = 0;
-			}
-		} WT_INTL_FOREACH_END;
-		WT_LEAVE_PAGE_INDEX(session);
-	}
+	/* Fix up the moved WT_REF structures. */
+	__split_ref_move_cleanup(session,
+	    alloc_index->index + 1, alloc_index->entries - 1, page);
 
 	/*
 	 * We don't care about the page-index we allocated, all we needed was
@@ -1084,12 +1066,6 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * parent page.
 	 */
 	__wt_free(session, alloc_index);
-
-	/*
-	 * Push out the changes: not required for correctness, but don't let
-	 * threads spin on incorrect page references longer than necessary.
-	 */
-	WT_FULL_BARRIER();
 
 	/*
 	 * We can't free the previous page's index, there may be threads using
