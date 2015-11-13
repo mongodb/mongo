@@ -745,9 +745,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	complete = true;
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-	    "%s split into parent %" PRIu32 " -> %" PRIu32
-	    " (%" PRIu32 ")", ref->page == NULL ?
-	    "reverse" : __wt_page_type_string(ref->page->type),
+	    "%p: %s %ssplit into parent %p, %" PRIu32 " -> %" PRIu32
+	    " (%" PRIu32 ")",
+	    ref->page, __wt_page_type_string(ref->page->type),
+	    ref_new == NULL ? "reverse " : "", parent,
 	    parent_entries, result_entries, result_entries - parent_entries));
 
 	/*
@@ -897,9 +898,9 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	remain = pindex->entries - chunk * (children - 1);
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-	    "%p: %" PRIu32 " internal page elements, splitting into %" PRIu32
-	    " children",
-	    page, pindex->entries, children));
+	    "%p: %" PRIu32 " internal page elements, splitting %" PRIu32
+	    " children into parent %p",
+	    page, pindex->entries, children, parent));
 
 	/*
 	 * Ideally, we'd discard the original page, but that's hard since other
@@ -1299,9 +1300,6 @@ __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 		/* If we don't need to split the page, we're done. */
 		if (!__split_internal_should_split(session, ref))
 			break;
-
-		WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
-		    "__split_parent_climb of %p", ref));
 
 		/*
 		 * If we've reached the root page, there are no subsequent pages
@@ -1831,8 +1829,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *parent;
 	bool hazard;
 
-	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
-	    "__wt_split_insert of %p", ref));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_SPLIT, "%p: split-insert", ref->page));
 
 	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
 	if ((ret = __split_insert(session, ref)) != 0) {
@@ -1923,8 +1921,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	WT_PAGE *parent;
 	bool hazard;
 
-	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
-	    "__wt_split_multi of %p", ref));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_SPLIT, "%p: split-multi", ref->page));
 
 	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
 	if ((ret = __split_multi(session, ref, closing)) != 0 || closing) {
@@ -1952,8 +1950,8 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *parent;
 	bool hazard;
 
-	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
-	    "__wt_split_reverse of %p", ref));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_SPLIT, "%p: reverse-split", ref->page));
 
 	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
 	ret = __split_parent(session, ref, NULL, 0, 0, false, true);
@@ -1976,8 +1974,8 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	page = ref->page;
 	mod = page->modify;
 
-	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
-	    "__wt_split_rewrite of %p", ref));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_SPLIT, "%p: split-rewrite", ref->page));
 
 	/*
 	 * This isn't a split: a reconciliation failed because we couldn't write
