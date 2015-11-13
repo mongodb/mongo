@@ -744,16 +744,16 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 */
 	complete = true;
 
-	fprintf(stderr,
+	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %s %s" "split into parent %p, %" PRIu32 " -> %" PRIu32
-	    " (%s%" PRIu32 ")\n",
+	    " (%s%" PRIu32 ")",
 	    ref->page, ref->page == NULL ?
 	    "unknown page type" : __wt_page_type_string(ref->page->type),
 	    ref->page == NULL ? "reverse " : "", parent,
 	    parent_entries, result_entries,
 	    ref->page == NULL ?  "-" : "+",
 	    ref->page == NULL ? 
-	    parent_entries - result_entries : result_entries - parent_entries);
+	    parent_entries - result_entries : result_entries - parent_entries));
 
 	/*
 	 * The new page index is in place, free the WT_REF we were splitting and
