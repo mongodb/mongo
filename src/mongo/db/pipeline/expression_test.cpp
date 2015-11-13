@@ -226,25 +226,31 @@ protected:
     intrusive_ptr<Testable> _associativeAndCommutative;
 };
 
-TEST_F(ExpressionNaryTest, AddOperand) {
+TEST_F(ExpressionNaryTest, AddConstantOperand) {
     _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(Value(9)));
     assertContents(_notAssociativeNorCommutative, BSON_ARRAY(9));
+}
+
+TEST_F(ExpressionNaryTest, AddFieldPathOperand) {
     _notAssociativeNorCommutative->addOperand(ExpressionFieldPath::create("ab.c"));
     assertContents(_notAssociativeNorCommutative, BSON_ARRAY(9 << "$ab.c"));
 }
 
-TEST_F(ExpressionNaryTest, Dependencies) {
+TEST_F(ExpressionNaryTest, ValidateEmptyDependencies) {
     assertDependencies(_notAssociativeNorCommutative, BSONArray());
+}
 
-    // Constant Argument
+TEST_F(ExpressionNaryTest, ValidateConstantExpressionDependency) {
     _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(Value(1)));
     assertDependencies(_notAssociativeNorCommutative, BSONArray());
+}
 
-    // Field Path Argument
+TEST_F(ExpressionNaryTest, ValidateFieldPathExpressionDependency) {
     _notAssociativeNorCommutative->addOperand(ExpressionFieldPath::create("ab.c"));
     assertDependencies(_notAssociativeNorCommutative, BSON_ARRAY("ab.c"));
+}
 
-    // Object Expression
+TEST_F(ExpressionNaryTest, ValidateObjectExpressionDependency) {
     BSONObj spec = BSON("" << BSON("a"
                                    << "$x"
                                    << "q"
@@ -256,8 +262,7 @@ TEST_F(ExpressionNaryTest, Dependencies) {
     _notAssociativeNorCommutative->addOperand(
         Expression::parseObject(specElement.Obj(), &ctx, vps));
     assertDependencies(_notAssociativeNorCommutative,
-                       BSON_ARRAY("ab.c"
-                                  << "r"
+                       BSON_ARRAY("r"
                                   << "x"));
 }
 
@@ -297,84 +302,87 @@ TEST_F(ExpressionNaryTest, AllConstantOperandOptimization) {
 // and then applying the expression to the constant operands to reduce them to
 // one constant operand is only applied if the expression is associative and
 // commutative.
-TEST_F(ExpressionNaryTest, ConstantAndNonConstantGroupingOptimization) {
+TEST_F(ExpressionNaryTest, GroupingOptimizationOnNotCommutativeNorAssociative) {
     BSONArray spec = BSON_ARRAY(55 << 66 << "$path");
-    {
-        addOperandArrayToExpr(_notAssociativeNorCommutative, spec);
-        assertContents(_notAssociativeNorCommutative, spec);
-        intrusive_ptr<Expression> optimized = _notAssociativeNorCommutative->optimize();
-        ASSERT(_notAssociativeNorCommutative == optimized);
-        assertContents(_notAssociativeNorCommutative, spec);
-    }
-    {
-        addOperandArrayToExpr(_associativeOnly, spec);
-        assertContents(_associativeOnly, spec);
-        intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
-        ASSERT(_associativeOnly == optimized);
-        assertContents(_associativeOnly, spec);
-    }
-    {
-        addOperandArrayToExpr(_associativeAndCommutative, spec);
-        assertContents(_associativeAndCommutative, spec);
-        intrusive_ptr<Expression> optimized = _associativeAndCommutative->optimize();
-        ASSERT(_associativeAndCommutative == optimized);
-        assertContents(_associativeAndCommutative, BSON_ARRAY("$path" << BSON_ARRAY(55 << 66)));
-    }
+    addOperandArrayToExpr(_notAssociativeNorCommutative, spec);
+    assertContents(_notAssociativeNorCommutative, spec);
+    intrusive_ptr<Expression> optimized = _notAssociativeNorCommutative->optimize();
+    ASSERT(_notAssociativeNorCommutative == optimized);
+    assertContents(_notAssociativeNorCommutative, spec);
+}
+
+TEST_F(ExpressionNaryTest, GroupingOptimizationOnAssociativeOnly) {
+    BSONArray spec = BSON_ARRAY(55 << 66 << "$path");
+    addOperandArrayToExpr(_associativeOnly, spec);
+    assertContents(_associativeOnly, spec);
+    intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
+    ASSERT(_associativeOnly == optimized);
+    assertContents(_associativeOnly, spec);
+}
+
+TEST_F(ExpressionNaryTest, GroupingOptimizationOnCommutatievAndAssociative) {
+    BSONArray spec = BSON_ARRAY(55 << 66 << "$path");
+    addOperandArrayToExpr(_associativeAndCommutative, spec);
+    assertContents(_associativeAndCommutative, spec);
+    intrusive_ptr<Expression> optimized = _associativeAndCommutative->optimize();
+    ASSERT(_associativeAndCommutative == optimized);
+    assertContents(_associativeAndCommutative, BSON_ARRAY("$path" << BSON_ARRAY(55 << 66)));
 }
 
 // Verify that the flattening of the inner operands that are of the same type as the expression
 // being optimized is done correctly and only if the expression is associative and commutative
 // TODO: This actually can be done if the associativity property is true but not the sorting.
-TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimization) {
+TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnNotCommutativeNorAssociative) {
     BSONArray baseSpec =
         BSON_ARRAY(55 << "$path" << BSON("$add" << BSON_ARRAY(5 << 6 << "$q")) << 66);
     list<BSONElement> baseSpecList;
     baseSpec.elems(baseSpecList);
-    {
-        BSONArrayBuilder arrBuilder;
-        arrBuilder.append(baseSpecList);
+    BSONArrayBuilder arrBuilder;
+    arrBuilder.append(baseSpecList);
 
-        intrusive_ptr<Testable> innerOperand = Testable::create(false, false);
-        addOperandArrayToExpr(innerOperand, BSON_ARRAY(99 << 100 << "$another_path"));
-        arrBuilder.append(expressionToBson(innerOperand));
+    intrusive_ptr<Testable> innerOperand = Testable::create(false, false);
+    addOperandArrayToExpr(innerOperand, BSON_ARRAY(99 << 100 << "$another_path"));
+    arrBuilder.append(expressionToBson(innerOperand));
 
-        BSONArray spec = arrBuilder.arr();
+    BSONArray spec = arrBuilder.arr();
 
-        addOperandArrayToExpr(_notAssociativeNorCommutative, baseSpec);
-        _notAssociativeNorCommutative->addOperand(innerOperand);
+    addOperandArrayToExpr(_notAssociativeNorCommutative, baseSpec);
+    _notAssociativeNorCommutative->addOperand(innerOperand);
 
-        assertContents(_notAssociativeNorCommutative, spec);
-        intrusive_ptr<Expression> optimized = _notAssociativeNorCommutative->optimize();
-        ASSERT(_notAssociativeNorCommutative == optimized);
+    assertContents(_notAssociativeNorCommutative, spec);
+    intrusive_ptr<Expression> optimized = _notAssociativeNorCommutative->optimize();
+    ASSERT(_notAssociativeNorCommutative == optimized);
 
-        BSONArray expectedContent =
-            BSON_ARRAY(55 << "$path" << BSON("$add" << BSON_ARRAY("$q" << 11)) << 66
-                          << expressionToBson(innerOperand));
-        assertContents(_notAssociativeNorCommutative, expectedContent);
-    }
+    BSONArray expectedContent = BSON_ARRAY(55 << "$path" << BSON("$add" << BSON_ARRAY("$q" << 11))
+                                              << 66 << expressionToBson(innerOperand));
+    assertContents(_notAssociativeNorCommutative, expectedContent);
+}
 
-    {
-        BSONArrayBuilder arrBuilder;
-        arrBuilder.append(baseSpecList);
+TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnCommutativeAndAssociative) {
+    BSONArray baseSpec =
+        BSON_ARRAY(55 << "$path" << BSON("$add" << BSON_ARRAY(5 << 6 << "$q")) << 66);
+    list<BSONElement> baseSpecList;
+    baseSpec.elems(baseSpecList);
+    BSONArrayBuilder arrBuilder;
+    arrBuilder.append(baseSpecList);
 
-        intrusive_ptr<Testable> innerOperand = Testable::create(true, true);
-        addOperandArrayToExpr(innerOperand, BSON_ARRAY(99 << 100 << "$another_path"));
-        arrBuilder.append(expressionToBson(innerOperand));
+    intrusive_ptr<Testable> innerOperand = Testable::create(true, true);
+    addOperandArrayToExpr(innerOperand, BSON_ARRAY(99 << 100 << "$another_path"));
+    arrBuilder.append(expressionToBson(innerOperand));
 
-        BSONArray spec = arrBuilder.arr();
+    BSONArray spec = arrBuilder.arr();
 
-        addOperandArrayToExpr(_associativeAndCommutative, baseSpec);
-        _associativeAndCommutative->addOperand(innerOperand);
+    addOperandArrayToExpr(_associativeAndCommutative, baseSpec);
+    _associativeAndCommutative->addOperand(innerOperand);
 
-        assertContents(_associativeAndCommutative, spec);
-        intrusive_ptr<Expression> optimized = _associativeAndCommutative->optimize();
-        ASSERT(_associativeAndCommutative == optimized);
+    assertContents(_associativeAndCommutative, spec);
+    intrusive_ptr<Expression> optimized = _associativeAndCommutative->optimize();
+    ASSERT(_associativeAndCommutative == optimized);
 
-        BSONArray expectedContent =
-            BSON_ARRAY("$path" << BSON("$add" << BSON_ARRAY("$q" << 11)) << "$another_path"
-                               << BSON_ARRAY(55 << 66 << BSON_ARRAY(99 << 100)));
-        assertContents(_associativeAndCommutative, expectedContent);
-    }
+    BSONArray expectedContent =
+        BSON_ARRAY("$path" << BSON("$add" << BSON_ARRAY("$q" << 11)) << "$another_path"
+                           << BSON_ARRAY(55 << 66 << BSON_ARRAY(99 << 100)));
+    assertContents(_associativeAndCommutative, expectedContent);
 }
 
 /* ------------------------- ExpressionCeil -------------------------- */
