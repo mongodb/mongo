@@ -752,7 +752,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	    ref->page == NULL ? "reverse " : "", parent,
 	    parent_entries, result_entries,
 	    ref->page == NULL ?  "-" : "+",
-	    ref->page == NULL ? 
+	    ref->page == NULL ?
 	    parent_entries - result_entries : result_entries - parent_entries));
 
 	/*
