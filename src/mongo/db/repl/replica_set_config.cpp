@@ -422,10 +422,10 @@ Status ReplicaSetConfig::validate() const {
         }
     }
 
-    if (_protocolVersion < 0 || _protocolVersion > std::numeric_limits<int>::max()) {
+    if (_protocolVersion != 0 && _protocolVersion != 1) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << kProtocolVersionFieldName << " field value of "
-                                    << _protocolVersion << " is out of range");
+                                    << _protocolVersion << " is not 1 or 0");
     }
 
     if (_configServer) {

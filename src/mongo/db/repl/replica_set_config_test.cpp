@@ -89,7 +89,7 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
                                                                    << "localhost:12345"
                                                                    << "tags" << BSON("NYC"
                                                                                      << "NY")))
-        << "protocolVersion" << 2 << "settings"
+        << "protocolVersion" << 1 << "settings"
         << BSON("getLastErrorDefaults" << BSON("w"
                                                << "majority") << "getLastErrorModes"
                                        << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed"
@@ -108,7 +108,7 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(Milliseconds(10), config.getElectionTimeoutPeriod());
-    ASSERT_EQUALS(2, config.getProtocolVersion());
+    ASSERT_EQUALS(1, config.getProtocolVersion());
 }
 
 TEST(ReplicaSetConfig, MajorityCalculationThreeVotersNoArbiters) {
@@ -643,6 +643,21 @@ TEST(ReplicaSetConfig, ParseFailsWithNonExistentGetLastErrorModesConstraintTag) 
                                                                           << "yes"))) << "settings"
                                << BSON("getLastErrorModes" << BSON("one" << BSON("tag2" << 1)))));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
+}
+
+TEST(ReplicaSetConfig, ValidateFailsWithBadProtocolVersion) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "protocolVersion" << 3 << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345")
+                                                         << BSON("_id" << 1 << "host"
+                                                                       << "localhost:54321"))));
+    ASSERT_OK(status);
+
+    status = config.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
 TEST(ReplicaSetConfig, ValidateFailsWithDuplicateMemberId) {
