@@ -349,8 +349,10 @@ descend:	/*
 			current = descent;
 			continue;
 		}
-		if (ret == WT_RESTART)
+		if (ret == WT_RESTART) {
+			skiphigh = skiplow = 0;
 			goto restart_page;
+		}
 		return (ret);
 	}
 
