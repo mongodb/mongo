@@ -447,8 +447,8 @@ public:
     }
 
     bool isAssociative() const final {
-        // Return false if a single argument is given to avoid a single array argument being
-        // treated as an array instead of as a list of arguments.
+        // Return false if a single argument is given to avoid a single array argument being treated
+        // as an array instead of as a list of arguments.
         if (this->vpOperand.size() == 1) {
             return false;
         }
@@ -456,8 +456,8 @@ public:
     }
 
     bool isCommutative() const final {
-        // Return false if a single argument is given to avoid a single array argument being
-        // treated as an array instead of as a list of arguments.
+        // Return false if a single argument is given to avoid a single array argument being treated
+        // as an array instead of as a list of arguments.
         if (this->vpOperand.size() == 1) {
             return false;
         }
@@ -526,9 +526,7 @@ public:
 class ExpressionAnd final : public ExpressionVariadic<ExpressionAnd> {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-
     Value evaluateInternal(Variables* vars) const final;
-
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -581,7 +579,6 @@ public:
     static boost::intrusive_ptr<ExpressionCoerceToBool> create(
         const boost::intrusive_ptr<Expression>& pExpression);
 
-
 private:
     explicit ExpressionCoerceToBool(const boost::intrusive_ptr<Expression>& pExpression);
 
@@ -622,14 +619,24 @@ private:
 class ExpressionConcat final : public ExpressionVariadic<ExpressionConcat> {
 public:
     Value evaluateInternal(Variables* vars) const final;
+
     const char* getOpName() const final;
+
+    bool isAssociative() const final {
+        return true;
+    }
 };
 
 
 class ExpressionConcatArrays final : public ExpressionVariadic<ExpressionConcatArrays> {
 public:
     Value evaluateInternal(Variables* vars) const final;
+
     const char* getOpName() const final;
+
+    bool isAssociative() const final {
+        return true;
+    }
 };
 
 
@@ -647,13 +654,17 @@ public:
 class ExpressionConstant final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
+
     void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
+
     Value evaluateInternal(Variables* vars) const final;
+
     Value serialize(bool explain) const final;
 
     const char* getOpName() const;
 
     static boost::intrusive_ptr<ExpressionConstant> create(const Value& pValue);
+
     static boost::intrusive_ptr<Expression> parse(BSONElement bsonExpr,
                                                   const VariablesParseState& vps);
 
@@ -675,8 +686,11 @@ private:
 class ExpressionDateToString final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
+
     Value serialize(bool explain) const final;
+
     Value evaluateInternal(Variables* vars) const final;
+
     void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
