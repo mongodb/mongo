@@ -160,12 +160,11 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	__cursor_pos_clear(cbt);
 
 	/*
-	 * The row-store search routine uses a different comparison API.
-	 * The assumption is we're comparing more than a few keys with
-	 * matching prefixes, and it's a win to avoid the memory fetches
-	 * by skipping over those prefixes.  That's done by tracking the
-	 * length of the prefix match for the lowest and highest keys we
-	 * compare as we descend the tree.
+	 * In some cases we expect we're comparing more than a few keys with
+	 * matching prefixes, so it's faster to avoid the memory fetches by
+	 * skipping over those prefixes. That's done by tracking the length of
+	 * the prefix match for the lowest and highest keys we compare as we
+	 * descend the tree.
 	 */
 	skiphigh = skiplow = 0;
 
@@ -255,7 +254,26 @@ restart_page:	page = current->page;
 				} else if (cmp == 0)
 					goto descend;
 			}
-		else if (collator == NULL)
+		else if (collator == NULL) {
+			/*
+			 * Reset the skipped prefix counts; we'd normally expect
+			 * the parent's skipped prefix values to be larger than
+			 * the child's values and so we'd only increase them as
+			 * we walk down the tree (in other words, if we can skip
+			 * N bytes on the parent, we can skip at least N bytes
+			 * on the child). However, if a child internal page was
+			 * split up into the parent, the child page's key space
+			 * will have been truncated, and the values from the
+			 * parent's search may be wrong for the child. We only
+			 * need to reset the high count because the split-page
+			 * algorithm truncates the end of the internal page's
+			 * key space, the low count is still correct. We also
+			 * don't need to clear either count when transitioning
+			 * to a leaf page, a leaf page's key space can't change
+			 * in flight.
+			 */
+			skiphigh = 0;
+
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
 				descent = pindex->index[indx];
@@ -274,7 +292,7 @@ restart_page:	page = current->page;
 				else
 					goto descend;
 			}
-		else
+		} else
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
 				descent = pindex->index[indx];
@@ -331,10 +349,8 @@ descend:	/*
 			current = descent;
 			continue;
 		}
-		if (ret == WT_RESTART) {
-			skiphigh = skiplow = 0;
+		if (ret == WT_RESTART)
 			goto restart_page;
-		}
 		return (ret);
 	}
 
