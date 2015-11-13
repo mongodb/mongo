@@ -72,7 +72,6 @@ Status CommandReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
     invariant(_state == State::kOutputDocs);
     auto rangeData = outputDocs.data();
     auto dataSize = rangeData.length();
-    invariant(_state == State::kOutputDocs);
     _builder.appendBuf(rangeData.data(), dataSize);
     return Status::OK();
 }
