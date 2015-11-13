@@ -17,6 +17,7 @@ var workerThread = (function() {
     // args.clusterOptions = the configuration of the cluster
     // args.seed = seed for the random number generator
     // args.globalAssertLevel = the global assertion level to use
+    // args.errorLatch = CountDownLatch instance that threads count down when they error
     // run = callback that takes a map of workloads to their associated $config
     function main(workloads, args, run) {
         var myDB;
@@ -103,6 +104,7 @@ var workerThread = (function() {
                 run(configs);
                 return { ok: 1 };
             } catch(e) {
+                args.errorLatch.countDown();
                 return { ok: 0, err: e.toString(), stack: e.stack };
             }
         } finally {

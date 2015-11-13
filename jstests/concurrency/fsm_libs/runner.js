@@ -2,6 +2,7 @@
 
 load('jstests/concurrency/fsm_libs/assert.js');
 load('jstests/concurrency/fsm_libs/cluster.js');
+load('jstests/concurrency/fsm_libs/errors.js'); // for IterationEnd
 load('jstests/concurrency/fsm_libs/parse_config.js');
 load('jstests/concurrency/fsm_libs/thread_mgr.js');
 load('jstests/concurrency/fsm_utils/name_utils.js'); // for uniqueCollName and uniqueDBName
@@ -35,6 +36,7 @@ var runner = (function() {
 
     function validateExecutionOptions(mode, options) {
         var allowedKeys = [
+            'backgroundWorkloads',
             'dbNamePrefix',
             'iterationMultiplier',
             'threadMultiplier'
@@ -78,6 +80,10 @@ var runner = (function() {
             assert.gt(options.composeProb, 0);
             assert.lte(options.composeProb, 1);
         }
+
+        options.backgroundWorkloads = options.backgroundWorkloads || [];
+        assert(Array.isArray(options.backgroundWorkloads),
+               'expected backgroundWorkloads to be an array');
 
         if (typeof options.dbNamePrefix !== 'undefined') {
             assert.eq('string', typeof options.dbNamePrefix,
@@ -252,6 +258,16 @@ var runner = (function() {
         }
     }
 
+    function WorkloadFailure(err, stack, kind) {
+        this.err = err;
+        this.stack = stack;
+        this.kind = kind;
+
+        this.format = function format() {
+            return this.kind + '\n' + this.err + '\n\n' + this.stack;
+        };
+    }
+
     function throwError(workerErrs) {
 
         // Returns an array containing all unique values from the specified array
@@ -307,9 +323,7 @@ var runner = (function() {
 
         if (workerErrs.length > 0) {
             var stackTraces = workerErrs.map(function(e) {
-                // Prepend the error message to the stack trace because it
-                // isn't automatically included in SpiderMonkey stack traces.
-                return e.err + '\n\n' + e.stack;
+                return e.format();
             });
 
             var err = new Error(prepareMsg(stackTraces) + '\n');
@@ -386,6 +400,104 @@ var runner = (function() {
         }
     }
 
+    function loadWorkloadContext(workloads, context, executionOptions) {
+        workloads.forEach(function(workload) {
+            load(workload); // for $config
+            assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
+            context[workload] = { config: parseConfig($config) };
+            setIterations(context[workload].config, executionOptions.iterationMultiplier);
+            setThreadCount(context[workload].config, executionOptions.threadMultiplier);
+        });
+    }
+
+    function printWorkloadSchedule(schedule, backgroundWorkloads) {
+        // Print out the entire schedule of workloads to make it easier to run the same
+        // schedule when debugging test failures.
+        jsTest.log('The entire schedule of FSM workloads:');
+
+        // Note: We use printjsononeline (instead of just plain printjson) to make it
+        // easier to reuse the output in variable assignments.
+        printjsononeline(schedule);
+        if (backgroundWorkloads.length > 0) {
+            jsTest.log('Background Workloads:');
+            printjsononeline(backgroundWorkloads);
+        }
+
+        jsTest.log('End of schedule');
+    }
+
+    function cleanupWorkload(workload, context, cluster, errors, kind) {
+        // Returns true if the workload's teardown succeeds and false if the workload's
+        // teardown fails.
+        try {
+            teardownWorkload(workload, context, cluster);
+        } catch (e) {
+            errors.push(new WorkloadFailure(e.toString(), e.stack, kind + ' Teardown'));
+            return false;
+        }
+        return true;
+    }
+
+    function runWorkloadGroup(threadMgr, workloads, context, cluster, clusterOptions, executionMode,
+                              executionOptions, errors, maxAllowedThreads){
+        var cleanup = [];
+        var teardownFailed = false;
+        var startTime = Date.now(); // Initialize in case setupWorkload fails below.
+        var endTime, totalTime;
+
+        jsTest.log('Workload(s) started: ' + workloads.join(' '));
+
+        prepareCollections(workloads, context, cluster, clusterOptions, executionOptions);
+
+        try {
+            // Call each foreground workload's setup function.
+            workloads.forEach(function(workload) {
+                setupWorkload(workload, context, cluster);
+                cleanup.push(workload);
+            });
+
+            // Set up the thread manager for this set of foreground workloads.
+            startTime = Date.now();
+            threadMgr.init(workloads, context, maxAllowedThreads);
+
+            try {
+                // Start this set of foreground workload threads.
+                threadMgr.spawnAll(cluster, executionOptions);
+                // Allow 20% of foreground threads to fail. This allows the workloads to run on
+                // underpowered test hosts.
+                threadMgr.checkFailed(0.2);
+            } finally {
+                // Threads must be joined before destruction, so do this
+                // even in the presence of exceptions.
+                errors.push(...threadMgr.joinAll().map(e =>
+                    new WorkloadFailure(e.err, e.stack, 'Foreground')));
+            }
+        } finally {
+            endTime = Date.now();
+
+            // Call each foreground workload's teardown function. After all teardowns have completed
+            // check if any of them failed.
+            var cleanupResults = cleanup.map(workload =>
+                cleanupWorkload(workload, context, cluster, errors, 'Foreground'));
+            teardownFailed = cleanupResults.some(success => (success === false));
+
+            totalTime = endTime - startTime;
+            jsTest.log('Workload(s) completed in ' + totalTime + ' ms: ' +
+                        workloads.join(' '));
+        }
+
+        // Only drop the collections/databases if all the workloads ran successfully.
+        if (!errors.length && !teardownFailed) {
+            cleanupWorkloadData(workloads, context, clusterOptions);
+        }
+
+        // Throw any existing errors so that the schedule aborts.
+        throwError(errors);
+
+        // Ensure that secondaries have caught up for workload teardown (SERVER-18878).
+        cluster.awaitReplication();
+    }
+
     function runWorkloads(workloads,
                           clusterOptions,
                           executionMode,
@@ -408,30 +520,28 @@ var runner = (function() {
         }
 
         // Determine how strong to make assertions while simultaneously executing
-        // different workloads
+        // different workloads.
         var assertLevel = AssertLevel.OWN_DB;
         if (clusterOptions.sameDB) {
             // The database is shared by multiple workloads, so only make the asserts
-            // that apply when the collection is owned by an individual workload
+            // that apply when the collection is owned by an individual workload.
             assertLevel = AssertLevel.OWN_COLL;
         }
         if (clusterOptions.sameCollection) {
             // The collection is shared by multiple workloads, so only make the asserts
-            // that always apply
+            // that always apply.
             assertLevel = AssertLevel.ALWAYS;
         }
         globalAssertLevel = assertLevel;
 
         var context = {};
-        workloads.forEach(function(workload) {
-            load(workload); // for $config
-            assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
-            context[workload] = { config: parseConfig($config) };
-            setIterations(context[workload].config, executionOptions.iterationMultiplier);
-            setThreadCount(context[workload].config, executionOptions.threadMultiplier);
-        });
-
+        loadWorkloadContext(workloads, context, executionOptions);
         var threadMgr = new ThreadManager(clusterOptions, executionMode);
+
+        var bgContext = {};
+        var bgWorkloads = executionOptions.backgroundWorkloads;
+        loadWorkloadContext(bgWorkloads, bgContext, executionOptions);
+        var bgThreadMgr = new ThreadManager(clusterOptions, { composed: false });
 
         var cluster = new Cluster(clusterOptions);
         if (cluster.isSharded()) {
@@ -440,9 +550,9 @@ var runner = (function() {
         cluster.setup();
 
         // Clean up the state left behind by other tests in the concurrency suite
-        // to avoid having too many open files
+        // to avoid having too many open files.
 
-        // List of DBs that will not be dropped
+        // List of DBs that will not be dropped.
         var dbBlacklist = ['admin', 'config', 'local', '$external'];
         if (cleanupOptions.dropDatabaseBlacklist) {
             dbBlacklist = dbBlacklist.concat(cleanupOptions.dropDatabaseBlacklist);
@@ -453,84 +563,62 @@ var runner = (function() {
 
         var maxAllowedThreads = 100 * executionOptions.threadMultiplier;
         Random.setRandomSeed(clusterOptions.seed);
+        var bgCleanup = [];
+        var errors = [];
 
         try {
-            var schedule = scheduleWorkloads(workloads, executionMode, executionOptions);
+            prepareCollections(bgWorkloads, bgContext, cluster, clusterOptions, executionOptions);
 
-            // Print out the entire schedule of workloads to make it easier to run the same
-            // schedule when debugging test failures.
-            jsTest.log('The entire schedule of FSM workloads:');
-
-            // Note: We use printjsononeline (instead of just plain printjson) to make it
-            // easier to reuse the output in variable assignments.
-            printjsononeline(schedule);
-
-            jsTest.log('End of schedule');
-
-            schedule.forEach(function(workloads) {
-                var cleanup = [];
-                var errors = [];
-                var teardownFailed = false;
-                var startTime = new Date(); // Initialize in case setupWorkload fails below
-                var endTime, totalTime;
-
-                jsTest.log('Workload(s) started: ' + workloads.join(' '));
-
-                prepareCollections(workloads, context, cluster, clusterOptions, executionOptions);
-
-                try {
-                    workloads.forEach(function(workload) {
-                        setupWorkload(workload, context, cluster);
-                        cleanup.push(workload);
-                    });
-
-                    startTime = new Date();
-                    threadMgr.init(workloads, context, maxAllowedThreads);
-
-                    try {
-                        threadMgr.spawnAll(cluster, executionOptions);
-                        threadMgr.checkFailed(0.2);
-                    } finally {
-                        // Threads must be joined before destruction, so do this
-                        // even in the presence of exceptions.
-                        errors = threadMgr.joinAll();
-                    }
-                } finally {
-                    endTime = new Date();
-                    cleanup.forEach(function(workload) {
-                        try {
-                            teardownWorkload(workload, context, cluster);
-                        } catch (err) {
-                            // Prepend the error message to the stack trace because it
-                            // isn't automatically included in SpiderMonkey stack traces.
-                            var message = err.message + '\n\n' + err.stack;
-
-                            print('Workload teardown function threw an exception:\n' + message);
-                            teardownFailed = true;
-                        }
-                    });
-
-                    totalTime = endTime.getTime() - startTime.getTime();
-                    jsTest.log('Workload(s) completed in ' + totalTime + ' ms: ' +
-                                workloads.join(' '));
-                }
-
-                // Only drop the collections/databases if all the workloads ran successfully
-                if (!errors.length && !teardownFailed) {
-                    cleanupWorkloadData(workloads, context, clusterOptions);
-                }
-
-                throwError(errors);
-
-                if (teardownFailed) {
-                    throw new Error('workload teardown function(s) failed, see logs');
-                }
-
-                // Ensure that secondaries have caught up for workload teardown (SERVER-18878)
-                cluster.awaitReplication();
+            // Call each background workload's setup function.
+            bgWorkloads.forEach(function(bgWorkload) {
+                setupWorkload(bgWorkload, bgContext, cluster);
+                bgCleanup.push(bgWorkload);
             });
+
+            // Set up the background thread manager for background workloads.
+            bgThreadMgr.init(bgWorkloads, bgContext, maxAllowedThreads);
+
+            try {
+                // Start background workload threads.
+                bgThreadMgr.spawnAll(cluster, executionOptions);
+                bgThreadMgr.checkFailed(0);
+
+                var schedule = scheduleWorkloads(workloads, executionMode, executionOptions);
+                printWorkloadSchedule(schedule, bgWorkloads);
+
+                schedule.forEach(function(workloads) {
+                    // Check if any background workloads have failed.
+                    if (bgThreadMgr.checkForErrors()){
+                        var msg = 'Background workload failed before all foreground workloads ran';
+                        throw new IterationEnd(msg);
+                    }
+
+                    // Run the next group of workloads in the schedule.
+                    runWorkloadGroup(threadMgr, workloads, context, cluster, clusterOptions,
+                                     executionMode, executionOptions, errors, maxAllowedThreads);
+                });
+            } finally {
+                // Set a flag so background threads know to terminate.
+                bgThreadMgr.markAllForTermination();
+                errors.push(...bgThreadMgr.joinAll().map(e =>
+                    new WorkloadFailure(e.err, e.stack, 'Background')));
+            }
         } finally {
-            cluster.teardown();
+            try {
+                // Call each background workload's teardown function.
+                bgCleanup.forEach(bgWorkload => cleanupWorkload(bgWorkload, bgContext, cluster,
+                                                                errors, 'Background'));
+                // TODO: Call cleanupWorkloadData() on background workloads here if no background
+                // workload teardown functions fail.
+
+                // Replace the active exception with an exception describing the errors from all
+                // the foreground and background workloads. IterationEnd errors are ignored because
+                // they are thrown when the background workloads are instructed by the thread
+                // manager to terminate.
+                throwError(errors.filter(e => (e.err.startsWith('IterationEnd:') === false)));
+            } finally {
+                cluster.teardown();
+            }
         }
     }
 
