@@ -185,9 +185,8 @@ __wt_row_search(WT_SESSION_IMPL *session,
 		goto leaf_only;
 	}
 
-restart_root:
 	/* Search the internal pages of the tree. */
-	cmp = -1;
+restart_root:
 	current = &btree->root;
 	for (depth = 2, pindex = NULL;; ++depth) {
 		parent_pindex = pindex;
@@ -335,6 +334,7 @@ append:			if (parent_pindex != NULL &&
 				    session, current, 0)) != 0)
 					return (ret);
 
+				skiplow = skiphigh = 0;
 				goto restart_root;
 			}
 		}
