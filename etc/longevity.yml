@@ -171,14 +171,14 @@ functions:
         file: "src/tags.json"
         name: "perf"
     - command: shell.exec
-      # post_run_check.py and override.json for DSI tests is part of dsi repo in dsi/bin
+      # post_run_check.py and longevity_override.json for DSI tests is part of dsi repo in dsi/bin
       type : test
       params:
         working_dir: src
         script: |
           set -o errexit
           set -o verbose
-          python ../dsi/bin/post_run_check.py --rev ${revision} -f longevity_history -t longevity_tag --refTag 3.0.6-Baseline --overrideFile ../dsi/bin/override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
+          python -u ../dsi/bin/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.0.6-Baseline --overrideFile ../dsi/bin/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
 
 
 tasks:
