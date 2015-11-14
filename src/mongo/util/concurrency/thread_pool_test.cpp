@@ -32,18 +32,27 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/base/init.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/thread_pool_test_common.h"
+#include "mongo/util/concurrency/thread_pool_test_fixture.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 namespace {
 using namespace mongo;
+
+MONGO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
+    addTestsForThreadPool("ThreadPoolCommon",
+                          []() { return stdx::make_unique<ThreadPool>(ThreadPool::Options()); });
+    return Status::OK();
+}
 
 class ThreadPoolTest : public unittest::Test {
 protected:
@@ -83,16 +92,6 @@ private:
 
     boost::optional<ThreadPool> _pool;
 };
-
-TEST(ThreadPoolTest, UnusedPool) {
-    ThreadPool pool((ThreadPool::Options()));
-}
-
-TEST(ThreadPoolTest, CannotScheduleAfterShutdown) {
-    ThreadPool pool((ThreadPool::Options()));
-    pool.shutdown();
-    ASSERT_EQ(ErrorCodes::ShutdownInProgress, pool.schedule([] {}));
-}
 
 TEST_F(ThreadPoolTest, MinPoolSize0) {
     ThreadPool::Options options;
@@ -199,47 +198,6 @@ TEST(ThreadPoolTest, LivePoolCleanedByDestructor) {
         sleepmillis(50);
     }
     // Destructor should reap leftover threads.
-}
-
-TEST(ThreadPoolTest, PoolDestructorExecutesRemainingTasks) {
-    ThreadPool::Options options;
-    options.minThreads = options.maxThreads = 1;
-    ThreadPool pool(options);
-    ASSERT_OK(pool.schedule([] { return; }));
-}
-
-TEST(ThreadPoolTest, PoolJoinExecutesRemainingTasks) {
-    ThreadPool::Options options;
-    options.minThreads = options.maxThreads = 1;
-    ThreadPool pool(options);
-    ASSERT_OK(pool.schedule([] { return; }));
-    pool.shutdown();
-    pool.join();
-}
-
-DEATH_TEST(ThreadPoolTest, DieOnDoubleStartUp, "it has already started") {
-    ThreadPool pool((ThreadPool::Options()));
-    pool.startup();
-    pool.startup();
-}
-
-DEATH_TEST(ThreadPoolTest, DieWhenExceptionBubblesUp, "Exception escaped task in thread pool") {
-    ThreadPool pool((ThreadPool::Options()));
-    pool.startup();
-    ASSERT_OK(pool.schedule([] { uassertStatusOK(Status({ErrorCodes::BadValue, "No good"})); }));
-    pool.shutdown();
-    pool.join();
-}
-
-DEATH_TEST(ThreadPoolTest,
-           DieOnDoubleJoin,
-           "Attempted to join pool DoubleJoinPool more than once") {
-    ThreadPool::Options options;
-    options.poolName = "DoubleJoinPool";
-    ThreadPool pool(options);
-    pool.shutdown();
-    pool.join();
-    pool.join();
 }
 
 DEATH_TEST(ThreadPoolTest,

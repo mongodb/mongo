@@ -213,6 +213,10 @@ void NetworkInterfaceImpl::setAlarm(Date_t when, const stdx::function<void()>& a
     }
 }
 
+bool NetworkInterfaceImpl::onNetworkThread() {
+    return true;
+}
+
 void NetworkInterfaceImpl::_processAlarms() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     while (!_inShutdown) {

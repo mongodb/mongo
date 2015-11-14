@@ -342,5 +342,12 @@ bool NetworkInterfaceASIO::inShutdown() const {
     return (_state.load() == State::kShutdown);
 }
 
+bool NetworkInterfaceASIO::onNetworkThread() {
+    auto id = stdx::this_thread::get_id();
+    return std::any_of(_serviceRunners.begin(),
+                       _serviceRunners.end(),
+                       [id](const stdx::thread& thread) { return id == thread.get_id(); });
+}
+
 }  // namespace executor
 }  // namespace mongo

@@ -242,9 +242,31 @@ env.Library(
         'thread_pool_task_executor.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'task_executor_interface',
     ]
+)
+
+env.Library(
+    target='network_interface_thread_pool',
+    source=[
+        'network_interface_thread_pool.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.CppUnitTest(
+    target='network_interface_thread_pool_test',
+    source=[
+        'network_interface_thread_pool_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool_test_fixture',
+        'connection_pool',
+        'network_interface_asio',
+        'network_interface_thread_pool',
+    ],
 )
 
 env.Library(
@@ -253,8 +275,8 @@ env.Library(
         'thread_pool_task_executor_test_fixture.cpp',
         ],
     LIBDEPS=[
-        'thread_pool_task_executor',
         'task_executor_test_fixture',
+        'thread_pool_task_executor',
     ]
 )
 

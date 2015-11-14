@@ -135,8 +135,21 @@ public:
      *
      * "action" should not do anything that requires a lot of computation, or that might block for a
      * long time, as it may execute in a network thread.
+     *
+     * Any callbacks invoked from setAlarm must observe onNetworkThread to
+     * return true. See that method for why.
      */
     virtual void setAlarm(Date_t when, const stdx::function<void()>& action) = 0;
+
+    /**
+     * Returns true if called from a thread dedicated to networking. I.e. not a
+     * calling thread.
+     *
+     * This is meant to be used to avoid context switches, so callers must be
+     * able to rely on this returning true in a callback or completion handler.
+     * In the absence of any actual networking thread, always return true.
+     */
+    virtual bool onNetworkThread() = 0;
 
 protected:
     NetworkInterface();

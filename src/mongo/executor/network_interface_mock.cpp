@@ -147,6 +147,10 @@ void NetworkInterfaceMock::setAlarm(const Date_t when, const stdx::function<void
     _alarms.emplace(when, action);
 }
 
+bool NetworkInterfaceMock::onNetworkThread() {
+    return _currentlyRunning == kNetworkThread;
+}
+
 void NetworkInterfaceMock::startup() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_hasStarted);

@@ -41,6 +41,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/system_error.h"
 #include "mongo/executor/async_stream_factory_interface.h"
+#include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/async_timer_interface.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -114,6 +115,8 @@ public:
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) override;
     void cancelAllCommands() override;
     void setAlarm(Date_t when, const stdx::function<void()>& action) override;
+
+    bool onNetworkThread() override;
 
     bool inShutdown() const;
 

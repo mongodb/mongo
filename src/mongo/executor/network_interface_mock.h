@@ -102,6 +102,8 @@ public:
     void cancelAllCommands() override {}
     virtual void setAlarm(Date_t when, const stdx::function<void()>& action);
 
+    virtual bool onNetworkThread();
+
 
     ////////////////////////////////////////////////////////////////////////////////
     //

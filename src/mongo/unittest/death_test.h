@@ -103,7 +103,9 @@ class DeathTest : public DeathTestImpl {
 public:
     static const std::string pattern;
 
-    DeathTest() : DeathTestImpl(stdx::make_unique<T>()) {}
+    template <typename... Args>
+    DeathTest(Args&&... args)
+        : DeathTestImpl(stdx::make_unique<T>(std::forward<Args>(args)...)) {}
 
 private:
     std::string getPattern() override {

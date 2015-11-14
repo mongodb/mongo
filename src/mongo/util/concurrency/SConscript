@@ -13,10 +13,24 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='thread_pool_test_fixture',
+    source=[
+        'thread_pool_test_common.cpp',
+        'thread_pool_test_fixture.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ]
+)
+
 env.CppUnitTest(
     target='thread_pool_test',
     source=['thread_pool_test.cpp'],
-    LIBDEPS=['thread_pool'])
+    LIBDEPS=[
+        'thread_pool',
+        'thread_pool_test_fixture',
+    ])
 
 env.Library('ticketholder',
             ['ticketholder.cpp'],

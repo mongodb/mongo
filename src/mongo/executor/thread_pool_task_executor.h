@@ -116,19 +116,21 @@ private:
     /**
      * Signals the given event.
      */
-    void signalEvent_inlock(const EventHandle& event);
+    void signalEvent_inlock(const EventHandle& event, stdx::unique_lock<stdx::mutex> lk);
 
     /**
      * Schedules all items from "fromQueue" into the thread pool and moves them into
      * _poolInProgressQueue.
      */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue);
+    void scheduleIntoPool_inlock(WorkQueue* fromQueue, stdx::unique_lock<stdx::mutex> lk);
 
     /**
      * Schedules the given item from "fromQueue" into the thread pool and moves it into
      * _poolInProgressQueue.
      */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue, const WorkQueue::iterator& iter);
+    void scheduleIntoPool_inlock(WorkQueue* fromQueue,
+                                 const WorkQueue::iterator& iter,
+                                 stdx::unique_lock<stdx::mutex> lk);
 
     /**
      * Schedules entries from "begin" through "end" in "fromQueue" into the thread pool
@@ -136,7 +138,8 @@ private:
      */
     void scheduleIntoPool_inlock(WorkQueue* fromQueue,
                                  const WorkQueue::iterator& begin,
-                                 const WorkQueue::iterator& end);
+                                 const WorkQueue::iterator& end,
+                                 stdx::unique_lock<stdx::mutex> lk);
 
     /**
      * Executes the callback specified by "cbState".
