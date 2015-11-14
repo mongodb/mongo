@@ -23,8 +23,6 @@ post:
           cd ./clusters/${cluster}
           if [ ! -f "test.success" ]; then yes yes | ./terraform destroy; fi
           if [ ! -f "test.success" ]; then echo "Cluster DESTROYED."; fi
-          echo "Test Results: "
-          egrep "name|ops_per_sec" ../perf.json
 
 functions:
   "prepare environment":
@@ -179,6 +177,7 @@ functions:
           if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
           cp ../../perf.json .
           cd ..
+          ../../bin/retrieve-diag-data.sh
           rm -rf ../reports
           mv reports ../
     - command: archive.targz_pack
