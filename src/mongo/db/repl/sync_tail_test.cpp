@@ -100,11 +100,10 @@ void SyncTailTest::setUp() {
     Client::initThreadIfNotAlready();
     _txn.reset(new OperationContextReplMock(&cc(), 0));
     _opsApplied = 0;
-    _applyOp = [](OperationContext* txn,
-                  Database* db,
-                  const BSONObj& op,
-                  bool convertUpdateToUpsert,
-                  stdx::function<void()>) { return Status::OK(); };
+    _applyOp =
+        [](OperationContext* txn, Database* db, const BSONObj& op, bool convertUpdateToUpsert) {
+            return Status::OK();
+        };
     _applyCmd = [](OperationContext* txn, const BSONObj& op) { return Status::OK(); };
     _incOps = [this]() { _opsApplied++; };
 }
@@ -160,8 +159,7 @@ TEST_F(SyncTailTest, SyncApplyNoOp) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert,
-                                                   stdx::function<void()>) {
+                                                   bool convertUpdateToUpsert) {
         applyOpCalled = true;
         ASSERT_TRUE(txn);
         ASSERT_TRUE(txn->lockState()->isDbLockedForMode("test", MODE_X));
@@ -181,6 +179,7 @@ TEST_F(SyncTailTest, SyncApplyNoOp) {
     ASSERT_FALSE(documentValidationDisabled(_txn.get()));
     ASSERT_OK(SyncTail::syncApply(_txn.get(), op, false, applyOp, applyCmd, _incOps));
     ASSERT_TRUE(applyOpCalled);
+    ASSERT_EQUALS(1U, _opsApplied);
 }
 
 TEST_F(SyncTailTest, SyncApplyNoOpApplyOpThrowsException) {
@@ -192,8 +191,7 @@ TEST_F(SyncTailTest, SyncApplyNoOpApplyOpThrowsException) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert,
-                                                   stdx::function<void()>) {
+                                                   bool convertUpdateToUpsert) {
         applyOpCalled++;
         if (applyOpCalled < 5) {
             throw WriteConflictException();
@@ -207,6 +205,7 @@ TEST_F(SyncTailTest, SyncApplyNoOpApplyOpThrowsException) {
         };
     ASSERT_OK(SyncTail::syncApply(_txn.get(), op, false, applyOp, applyCmd, _incOps));
     ASSERT_EQUALS(5, applyOpCalled);
+    ASSERT_EQUALS(1U, _opsApplied);
 }
 
 void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
@@ -218,8 +217,7 @@ void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert,
-                                                   stdx::function<void()>) {
+                                                   bool convertUpdateToUpsert) {
         applyOpCalled = true;
         ASSERT_TRUE(txn);
         ASSERT_TRUE(txn->lockState()->isDbLockedForMode("test", expectedMode));
@@ -240,6 +238,7 @@ void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
     ASSERT_FALSE(documentValidationDisabled(_txn.get()));
     ASSERT_OK(SyncTail::syncApply(_txn.get(), op, true, applyOp, applyCmd, _incOps));
     ASSERT_TRUE(applyOpCalled);
+    ASSERT_EQUALS(1U, _opsApplied);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
@@ -279,8 +278,7 @@ TEST_F(SyncTailTest, SyncApplyIndexBuild) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert,
-                                                   stdx::function<void()>) {
+                                                   bool convertUpdateToUpsert) {
         applyOpCalled = true;
         ASSERT_TRUE(txn);
         ASSERT_TRUE(txn->lockState()->isDbLockedForMode("test", MODE_X));
@@ -300,6 +298,7 @@ TEST_F(SyncTailTest, SyncApplyIndexBuild) {
     ASSERT_FALSE(documentValidationDisabled(_txn.get()));
     ASSERT_OK(SyncTail::syncApply(_txn.get(), op, false, applyOp, applyCmd, _incOps));
     ASSERT_TRUE(applyOpCalled);
+    ASSERT_EQUALS(1U, _opsApplied);
 }
 
 TEST_F(SyncTailTest, SyncApplyCommand) {
@@ -311,8 +310,7 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert,
-                                                   stdx::function<void()>) {
+                                                   bool convertUpdateToUpsert) {
         FAIL("applyOperation unexpectedly invoked.");
         return Status::OK();
     };
@@ -342,8 +340,7 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert,
-                                                   stdx::function<void()>) {
+                                                   bool convertUpdateToUpsert) {
         FAIL("applyOperation unexpectedly invoked.");
         return Status::OK();
     };
