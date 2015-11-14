@@ -373,8 +373,11 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 		 */
 		F_SET(txn, WT_TXN_SYNC_SET);
 
+	/*
+	 * If sync is turned off explicitly, clear the transaction's sync field.
+	 */
 	if (cval.val == 0)
-		FLD_CLR(txn->txn_logsync, WT_LOG_FLUSH);
+		txn->txn_logsync = 0;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "snapshot", 0, &cval));
 	if (cval.len > 0)
@@ -481,7 +484,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * explicit setting.
 	 */
 	if (cval.len == 0) {
-		if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) &&
+		if (!FLD_ISSET(txn->txn_logsync, WT_LOG_SYNC_ENABLED) &&
 		    !F_ISSET(txn, WT_TXN_SYNC_SET))
 			txn->txn_logsync = 0;
 	} else {

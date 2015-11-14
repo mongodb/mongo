@@ -8,12 +8,6 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-    'cache_flush' : [
-        'SYNC_CHECKPOINT',
-        'SYNC_CLOSE',
-        'SYNC_DISCARD',
-        'SYNC_WRITE_LEAVES',
-    ],
     'file_types' : [
         'FILE_TYPE_CHECKPOINT',
         'FILE_TYPE_DATA',
@@ -32,6 +26,7 @@ flags = {
         'LOG_DSYNC',
         'LOG_FLUSH',
         'LOG_FSYNC',
+        'LOG_SYNC_ENABLED',
     ],
     'page_read' : [
         'READ_CACHE',

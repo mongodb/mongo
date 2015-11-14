@@ -28,6 +28,7 @@
 
 #include <sys/wait.h>
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,7 +64,7 @@ usage(void)
  * the table until it is killed by the parent.
  */
 static void
-fill_db()
+fill_db(void)
 {
 	FILE *fp;
 	WT_CONNECTION *conn;
