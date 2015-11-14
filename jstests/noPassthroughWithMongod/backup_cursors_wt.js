@@ -20,8 +20,7 @@
     }
 
     var beforeSS = db.serverStatus();
-    var res = db.fsyncLock();
-    assert(res.ok, "fsyncLock command failed");
+    var res = assert.commandWorked(db.fsyncLock());
 
     // Under WiredTiger we will open a backup session and cursor. Confirm that these are opened.
     var afterSS = db.serverStatus().wiredTiger.session
@@ -31,7 +30,7 @@
     assert.gt(afterSS["open cursor count"], beforeSS["open cursor count"],
         "WiredTiger did not open a backup cursor as expected");
 
-    var res = db.fsyncUnlock();
+    var res = assert.commandWorked(db.fsyncUnlock());
     var finalSS = db.serverStatus().wiredTiger.session;
     assert.eq(beforeSS["open session count"], finalSS["open session count"],
         "WiredTiger did not close its backup session as expected");
