@@ -525,12 +525,20 @@ __curtable_insert(WT_CURSOR *cursor)
 	if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 		/*
 		 * !!!
-		 * The insert failure clears these flags, but does not touch the
-		 * items.  We could make a copy each time for overwrite cursors,
-		 * but for now we just reset the flags.
+		 * WT_CURSOR.insert clears the set internally/externally flags
+		 * but doesn't touch the items. We could make a copy each time
+		 * for overwrite cursors, but for now we just reset the flags.
 		 */
 		F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 		ret = __curtable_update(cursor);
+
+		/*
+		 * WT_CURSOR.insert doesn't leave the cursor positioned, and the
+		 * application may want to free the memory used to configure the
+		 * insert; don't read that memory again (matching the underlying
+		 * file object cursor insert semantics).
+		 */
+		F_CLR(primary, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		goto err;
 	}
 	WT_ERR(ret);
