@@ -2516,9 +2516,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 		i = r->entries + 100;
 		WT_RET(__wt_calloc_def(session, i, &r->raw_entries));
 		WT_RET(__wt_calloc_def(session, i, &r->raw_offsets));
-		if (dsk->type == WT_PAGE_COL_INT ||
-		    dsk->type == WT_PAGE_COL_VAR)
-			WT_RET(__wt_calloc_def(session, i, &r->raw_recnos));
+		WT_RET(__wt_calloc_def(session, i, &r->raw_recnos));
 		r->raw_max_slots = i;
 	}
 
