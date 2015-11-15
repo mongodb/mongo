@@ -1379,7 +1379,7 @@ __clsm_insert(WT_CURSOR *cursor)
 	}
 
 	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &buf));
-	ret = __clsm_put(session, clsm, &cursor->key, &value, false);
+	WT_ERR(__clsm_put(session, clsm, &cursor->key, &value, false));
 
 	/*
 	 * WT_CURSOR.insert doesn't leave the cursor positioned, and the

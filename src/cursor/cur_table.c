@@ -530,7 +530,7 @@ __curtable_insert(WT_CURSOR *cursor)
 		 * for overwrite cursors, but for now we just reset the flags.
 		 */
 		F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
-		ret = __curtable_update(cursor);
+		WT_ERR(__curtable_update(cursor));
 
 		/*
 		 * WT_CURSOR.insert doesn't leave the cursor positioned, and the
@@ -539,16 +539,16 @@ __curtable_insert(WT_CURSOR *cursor)
 		 * file object cursor insert semantics).
 		 */
 		F_CLR(primary, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-		goto err;
-	}
-	WT_ERR(ret);
+	} else {
+		WT_ERR(ret);
 
-	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
-		(*cp)->recno = primary->recno;
-		WT_ERR((*cp)->insert(*cp));
-	}
+		for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
+			(*cp)->recno = primary->recno;
+			WT_ERR((*cp)->insert(*cp));
+		}
 
-	WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), false));
+		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), false));
+	}
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
