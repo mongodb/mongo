@@ -50,30 +50,43 @@ namespace {
 // it is better to release memory when it is likely the thread will be blocked for
 // a long time.
 const int kManyClients = 40;
-size_t tcmallocPoolSize = 0;
 
-// Callback to allow TCMalloc to release freed memory to the central list at favorable times.
+stdx::mutex tcmallocCleanupLock;
+
+/**
+ *  Callback to allow TCMalloc to release freed memory to the central list at
+ *  favorable times. Ideally would do some milder cleanup or scavenge...
+ */
 void threadStateChange() {
-    int thread_count = Listener::globalTicketHolder.used();
-    if (thread_count <= kManyClients)
+    if (Listener::globalTicketHolder.used() <= kManyClients)
         return;
 
-#if MONGO_HAVE_GPERFTOOLS_SHRINK_CACHE_SIZE
-    MallocExtension::instance()->ShrinkCacheIfAboveSize(tcmallocPoolSize / thread_count);
-#else
+#if MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE
+    size_t threadCacheSizeBytes = MallocExtension::instance()->GetThreadCacheSize();
+
+    static const size_t kMaxThreadCacheSizeBytes = 0x10000;
+    if (threadCacheSizeBytes < kMaxThreadCacheSizeBytes) {
+        // This number was chosen a bit magically.
+        // At 1000 threads and the current (64mb) thread local cache size, we're "full".
+        // So we may want this number to scale with the number of current clients.
+        return;
+    }
+
+    LOG(1) << "thread over memory limit, cleaning up, current: " << (threadCacheSizeBytes / 1024)
+           << "k";
+
+    // We synchronize as the tcmalloc central list uses a spinlock, and we can cause a really
+    // terrible runaway if we're not careful.
+    stdx::lock_guard<stdx::mutex> lk(tcmallocCleanupLock);
+#endif
     MallocExtension::instance()->MarkThreadIdle();
     MallocExtension::instance()->MarkThreadBusy();
-#endif
 }
 
 // Register threadStateChange callback
 MONGO_INITIALIZER(TCMallocThreadIdleListener)(InitializerContext*) {
-    if (!RUNNING_ON_VALGRIND) {
+    if (!RUNNING_ON_VALGRIND)
         registerThreadIdleCallback(&threadStateChange);
-        invariant(MallocExtension::instance()->GetNumericProperty(
-            "tcmalloc.max_total_thread_cache_bytes", &tcmallocPoolSize));
-    }
-    LOG(1) << "tcmallocPoolSize: " << tcmallocPoolSize << "\n";
     return Status::OK();
 }
 
