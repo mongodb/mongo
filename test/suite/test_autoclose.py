@@ -107,7 +107,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         self.table_name = 'test_autoclose_c4.wt'
         self.create_table()
         inscursor = self.cursor_ss(self.table_name, 'key1', 'value1')
-        inscursor.insert()
+        inscursor.update()
         inscursor2 = self.session.open_cursor(None, inscursor, None)
         self.session.truncate(None, inscursor, inscursor2, '')
         inscursor.close()
@@ -122,7 +122,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         self.create_table()
 
         inscursor = self.cursor_ss(self.table_name, 'key1', 'value1')
-        inscursor.insert()
+        inscursor.update()
         inscursor2 = self.session.open_cursor(None, inscursor, None)
         inscursor.compare(inscursor2)
 
