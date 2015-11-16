@@ -115,7 +115,6 @@ Status checkRemoteOplogStart(stdx::function<StatusWith<BSONObj>()> getNextOperat
 }  // namespace
 
 MONGO_FP_DECLARE(rsBgSyncProduce);
-MONGO_FP_DECLARE(stepDownWhileDrainingFailPoint);
 
 BackgroundSync* BackgroundSync::s_instance = 0;
 stdx::mutex BackgroundSync::s_mutex;
@@ -474,10 +473,6 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
         return;
     }
 
-    if (MONGO_FAIL_POINT(stepDownWhileDrainingFailPoint)) {
-        sleepsecs(20);
-    }
-
     // The count of the bytes of the documents read off the network.
     int networkDocumentBytes = 0;
     std::for_each(documents.cbegin(),
@@ -499,10 +494,6 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     if (toApplyDocumentBytes > 0) {
         // Wait for enough space.
         _buffer.waitForSpace(toApplyDocumentBytes);
-
-        if (MONGO_FAIL_POINT(stepDownWhileDrainingFailPoint)) {
-            sleepsecs(20);
-        }
 
         OCCASIONALLY {
             LOG(2) << "bgsync buffer has " << _buffer.size() << " bytes";
