@@ -30,6 +30,33 @@ __wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
 }
 
 /*
+ * __wt_difftime --
+ *	Return the difference between two times in something other than a
+ * double.
+ */
+static inline u_int
+__wt_difftime(time_t time1, time_t time0)
+{
+	return ((u_int)difftime(time1, time0));
+}
+
+/*
+ * __wt_seconds --
+ *	Return the seconds since the Epoch.
+ */
+static inline int
+__wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
+{
+	struct timespec t;
+
+	WT_RET(__wt_epoch(session, &t));
+
+	*timep = t.tv_sec;
+
+	return (0);
+}
+
+/*
  * __wt_verbose --
  * 	Verbose message.
  */

@@ -369,8 +369,8 @@ struct __wt_connection_impl {
 	wt_thread_t	 sweep_tid;	/* Handle sweep thread */
 	int		 sweep_tid_set;	/* Handle sweep thread set */
 	WT_CONDVAR	*sweep_cond;	/* Handle sweep wait mutex */
-	time_t		 sweep_idle_time;/* Handle sweep idle time */
-	time_t		 sweep_interval;/* Handle sweep interval */
+	u_int		 sweep_idle_time;/* Handle sweep idle time */
+	u_int		 sweep_interval;/* Handle sweep interval */
 	u_int		 sweep_handles_min;/* Handle sweep minimum open */
 
 	/*

@@ -136,7 +136,8 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
 		    dhandle->session_inuse != 0 ||
 		    dhandle->timeofdeath == 0 ||
-		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
+		    __wt_difftime(now, dhandle->timeofdeath) >=
+		    conn->sweep_idle_time)
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,
@@ -332,7 +333,7 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Pull out the sweep configurations. */
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_idle_time", &cval));
-	conn->sweep_idle_time = (time_t)cval.val;
+	conn->sweep_idle_time = (u_int)cval.val;
 
 	/* Non-zero sweep idle time is incompatible with in-memory */
 	if (conn->sweep_idle_time != 0) {
@@ -345,7 +346,7 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_scan_interval", &cval));
-	conn->sweep_interval = (time_t)cval.val;
+	conn->sweep_interval = (u_int)cval.val;
 
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_handle_minimum", &cval));

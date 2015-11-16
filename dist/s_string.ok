@@ -507,6 +507,7 @@ dev
 dh
 dhandle
 dhandles
+difftime
 dir
 dirlist
 dlclose
