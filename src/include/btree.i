@@ -1101,16 +1101,17 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 		return (false);
 
 	/*
-	 * If the tree was deepened, there's a requirement that newly created
-	 * internal pages not be evicted until all threads are known to have
-	 * exited the original page index array, because evicting an internal
-	 * page discards its WT_REF array, and a thread traversing the original
-	 * page index array might see a freed WT_REF.  During the split we set
-	 * a transaction value, once that's globally visible, we know we can
-	 * evict the created page.
+	 * If a split created new internal pages, those newly created internal
+	 * pages cannot be evicted until all threads are known to have exited
+	 * the original parent page's index, because evicting an internal page
+	 * discards its WT_REF array, and a thread traversing the original
+	 * parent page index might see a freed WT_REF. During the split we set
+	 * a transaction value, we can evict the created page as soon as that
+	 * transaction value is globally visible.
 	 */
 	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
-	    !__wt_txn_visible_all(session, mod->mod_split_txn))
+	    (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK) ||
+	    !__wt_txn_visible_all(session, mod->mod_split_txn)))
 		return (false);
 
 	/*

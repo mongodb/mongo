@@ -567,7 +567,8 @@ struct __wt_page {
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 #define	WT_PAGE_OVERFLOW_KEYS	0x10	/* Page has overflow keys */
 #define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
-#define	WT_PAGE_UPDATE_IGNORE	0x40	/* Ignore updates on page discard */
+#define	WT_PAGE_SPLIT_BLOCK	0x40	/* Split blocking eviction and splits */
+#define	WT_PAGE_UPDATE_IGNORE	0x80	/* Ignore updates on page discard */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	uint8_t unused[2];		/* Unused padding */
