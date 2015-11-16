@@ -36,26 +36,31 @@ from wtscenario import check_scenarios
 class test_cursor06(wttest.WiredTigerTestCase):
     name = 'reconfigure'
     scenarios = check_scenarios([
-        ('file-r', dict(type='file:',keyfmt='r',complex=0)),
-        ('file-S', dict(type='file:',keyfmt='S',complex=0)),
-        ('lsm-S', dict(type='lsm:',keyfmt='S',complex=0)),
-        ('table-r', dict(type='table:',keyfmt='r',complex=0)),
-        ('table-S', dict(type='table:',keyfmt='S',complex=0)),
-        ('table-r-complex', dict(type='table:',keyfmt='r',complex=1)),
-        ('table-S-complex', dict(type='table:',keyfmt='S',complex=1)),
+        ('file-r', dict(type='file:', config='key_format=r', complex=0)),
+        ('file-S', dict(type='file:', config='key_format=S', complex=0)),
+        ('lsm-S', dict(type='lsm:', config='key_format=S', complex=0)),
+        ('table-r',
+            dict(type='table:', config='key_format=r', complex=0)),
+        ('table-S',
+            dict(type='table:', config='key_format=S', complex=0)),
+        ('table-r-complex',
+            dict(type='table:', config='key_format=r', complex=1)),
+        ('table-S-complex',
+            dict(type='table:', config='key_format=S', complex=1)),
+        ('table-S-complex-lsm',
+            dict(type='table:', config='key_format=S,type=lsm', complex=1)),
     ])
 
-    def pop(self, uri):
-        if self.complex == 1:
-            complex_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+    def populate(self, uri):
+        if self.complex:
+            complex_populate(self, uri, self.config, 100)
         else:
-            simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+            simple_populate(self, uri, self.config, 100)
 
     def set_kv(self, cursor):
         cursor.set_key(key_populate(cursor, 10))
-        if self.complex == 1:
-            v = complex_value_populate(cursor, 10)
-            cursor.set_value(v[0], v[1], v[2], v[3])
+        if self.complex:
+            cursor.set_value(complex_value_populate(cursor, 10))
         else:
             cursor.set_value(value_populate(cursor, 10))
 
@@ -63,7 +68,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
         uri = self.type + self.name
         for open_config in (None, "overwrite=0", "overwrite=1"):
             self.session.drop(uri, "force")
-            self.pop(uri)
+            self.populate(uri)
             cursor = self.session.open_cursor(uri, None, open_config)
             if open_config != "overwrite=0":
                 self.set_kv(cursor)
@@ -82,7 +87,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
         uri = self.type + self.name
         for open_config in (None, "readonly=0", "readonly=1"):
             self.session.drop(uri, "force")
-            self.pop(uri)
+            self.populate(uri)
             cursor = self.session.open_cursor(uri, None, open_config)
             if open_config == "readonly=1":
                 self.set_kv(cursor)

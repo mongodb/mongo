@@ -80,8 +80,8 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
             if self.pop == simple_populate:
                 cursor[key_populate(cursor, i)] = value_populate(cursor, i)
             else:
-                v = complex_value_populate(cursor, i)
-                cursor[key_populate(cursor, i)] = (v[0], v[1], v[2], v[3])
+                cursor[key_populate(cursor, i)] = \
+                        complex_value_populate(cursor, i)
         cursor.close()
         self.openAndWalkStatCursor()
 

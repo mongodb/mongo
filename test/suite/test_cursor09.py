@@ -34,43 +34,39 @@ from wtscenario import check_scenarios
 # test_cursor09.py
 #    JIRA WT-2217: insert resets key/value "set".
 class test_cursor09(wttest.WiredTigerTestCase):
-
     scenarios = check_scenarios([
-        ('file-r', dict(type='file:',keyfmt='r',complex=0)),
-        ('file-S', dict(type='file:',keyfmt='S',complex=0)),
-        ('lsm-S', dict(type='lsm:',keyfmt='S',complex=0)),
-        ('table-r', dict(type='table:',keyfmt='r',complex=0)),
-        ('table-S', dict(type='table:',keyfmt='S',complex=0)),
-        ('table-r-complex', dict(type='table:',keyfmt='r',complex=1)),
-        ('table-S-complex', dict(type='table:',keyfmt='S',complex=1)),
+        ('file-r', dict(type='file:', config='key_format=r', complex=0)),
+        ('file-S', dict(type='file:', config='key_format=S', complex=0)),
+        ('lsm-S', dict(type='lsm:', config='key_format=S', complex=0)),
+        ('table-r',
+            dict(type='table:', config='key_format=r', complex=0)),
+        ('table-S',
+            dict(type='table:', config='key_format=S', complex=0)),
+        ('table-r-complex',
+            dict(type='table:', config='key_format=r', complex=1)),
+        ('table-S-complex',
+            dict(type='table:', config='key_format=S', complex=1)),
+        ('table-S-complex-lsm',
+            dict(type='table:', config='key_format=S,type=lsm', complex=1)),
     ])
-
-    def pop(self, uri):
-        if self.complex == 1:
-            complex_populate(self, uri, 'key_format=' + self.keyfmt, 100)
-        else:
-            simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
-
-    def set_kv(self, cursor):
-        cursor.set_key(key_populate(cursor, 10))
-        if self.complex == 1:
-            v = complex_value_populate(cursor, 10)
-            cursor.set_value(v[0], v[1], v[2], v[3])
-        else:
-            cursor.set_value(value_populate(cursor, 10))
 
     # WT_CURSOR.insert doesn't leave the cursor positioned, verify any
     # subsequent cursor operation fails with a "key not set" message.
     def test_cursor09(self):
         uri = self.type + 'cursor09'
-        self.pop(uri)
+
+        if self.complex:
+            complex_populate(self, uri, self.config, 100)
+        else:
+            simple_populate(self, uri, self.config, 100)
+
         cursor = self.session.open_cursor(uri, None, None)
-        self.set_kv(cursor)
-        cursor.insert()
+        cursor[key_populate(cursor, 10)] = \
+            complex_value_populate(cursor, 10) if self.complex \
+            else value_populate(cursor, 10)
         msg = '/requires key be set/'
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, cursor.search, msg)
-
 
 if __name__ == '__main__':
     wttest.run()
