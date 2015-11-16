@@ -336,9 +336,9 @@ config_in_memory(void)
 	if (!config_is_perm("verify"))
 		g.c_verify = 0;
 
-	/* Ensure there is 100MB of cache per thread. */
+	/* Ensure there is 250MB of cache per thread. */
 	if (!config_is_perm("cache"))
-		g.c_cache = g.c_threads * 100;
+		g.c_cache = g.c_threads * 250;
 }
 
 /*
