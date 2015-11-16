@@ -2505,7 +2505,10 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	 * the page: the offset is the byte offset to the possible split-point
 	 * (adjusted for an initial chunk that cannot be compressed), entries
 	 * is the cumulative page entries covered by the byte offset, recnos is
-	 * the cumulative rows covered by the byte offset.
+	 * the cumulative rows covered by the byte offset. Allocate to handle
+	 * both column- and row-store regardless of this page type, structures
+	 * are potentially reused for subsequent reconciliations of different
+	 * page types.
 	 */
 	if (r->entries >= r->raw_max_slots) {
 		__wt_free(session, r->raw_entries);
