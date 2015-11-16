@@ -66,6 +66,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         var r = st.adminCommand({enableSharding: "test"});
         assert.eq(r, true, "error enabling sharding for this configuration");
 
+        st.ensurePrimaryShard("test", "shard0000");
         r = st.adminCommand({ movePrimary: 'test', to: 'shard0001' });
 
         var db1 = st.getDB("test");

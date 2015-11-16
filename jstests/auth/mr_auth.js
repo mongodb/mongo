@@ -1,4 +1,7 @@
 // MapReduce executed by a read-only user when --auth enabled should only be able to use inline mode. Other modes require writing to an output collection which is not allowed. SERVER-3345
+//
+// This test requires users to persist across a restart.
+// @tags: [requires_persistence]
 
 baseName = "jstests_mr_auth";
 dbName = "test";

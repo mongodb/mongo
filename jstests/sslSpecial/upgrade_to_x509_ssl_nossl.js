@@ -5,6 +5,9 @@
  * NOTE: This test is similar to upgrade_to_x509_ssl.js in the
  * ssl test suite. This test cannot use ssl communication
  * and therefore cannot test modes that only allow ssl.
+ *
+ * This test requires users to persist across a restart.
+ * @tags: [requires_persistence]
  */
 
 load("jstests/ssl/libs/ssl_helpers.js");

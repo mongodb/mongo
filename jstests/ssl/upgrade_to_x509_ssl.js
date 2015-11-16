@@ -5,6 +5,9 @@
  * NOTE: This test is similar to upgrade_to_x509_ssl_nossl.js in the
  * sslSpecial test suite. This test uses ssl communication
  * and therefore cannot test modes that do not allow ssl.
+ *
+ * This test requires users to persist across a restart.
+ * @tags: [requires_persistence]
  */
 
 function authAllNodes() {
