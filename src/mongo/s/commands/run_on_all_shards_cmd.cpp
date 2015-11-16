@@ -122,8 +122,8 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
         if (result["errmsg"].type() || result["code"].numberInt() != 0) {
             result = specialErrorHandler(res->getServer(), dbName, cmdObj, result);
 
-            BSONElement errmsg = result["errmsg"];
-            if (errmsg.eoo() || errmsg.String().empty()) {
+            BSONElement errmsgObj = result["errmsg"];
+            if (errmsgObj.eoo() || errmsgObj.String().empty()) {
                 // it was fixed!
                 results.emplace_back(*shardIdsIt, result);
                 subobj.append(res->getServer(), result);
