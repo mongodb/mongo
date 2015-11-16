@@ -178,10 +178,10 @@ def simple_populate_check(self, uri, rows):
 
 # Return the value stored in a complex object.
 def complex_value_populate(cursor, i):
-    return (str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
+    return [str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
         i,
         str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
-        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18]]
 
 # Return the number of column groups used
 def complex_populate_colgroup_count():
@@ -223,7 +223,8 @@ def complex_populate_type(self, uri, config, rows, type):
         indxname + ':indx4', 'columns=(column2,column4)' + ',' + type)
     cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows + 1):
-        cursor[key_populate(cursor, i)] = complex_value_populate(cursor, i)
+        cursor[key_populate(cursor, i)] = \
+                tuple(complex_value_populate(cursor, i))
     cursor.close()
     # add some indices after populating
     self.session.create(

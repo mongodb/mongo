@@ -81,7 +81,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
                 cursor[key_populate(cursor, i)] = value_populate(cursor, i)
             else:
                 cursor[key_populate(cursor, i)] = \
-                        complex_value_populate(cursor, i)
+                        tuple(complex_value_populate(cursor, i))
         cursor.close()
         self.openAndWalkStatCursor()
 

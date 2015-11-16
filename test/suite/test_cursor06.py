@@ -60,7 +60,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
     def set_kv(self, cursor):
         cursor.set_key(key_populate(cursor, 10))
         if self.complex:
-            cursor.set_value(complex_value_populate(cursor, 10))
+            cursor.set_value(tuple(complex_value_populate(cursor, 10)))
         else:
             cursor.set_value(value_populate(cursor, 10))
 

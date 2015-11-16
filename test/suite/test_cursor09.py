@@ -62,7 +62,7 @@ class test_cursor09(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(uri, None, None)
         cursor[key_populate(cursor, 10)] = \
-            complex_value_populate(cursor, 10) if self.complex \
+            tuple(complex_value_populate(cursor, 10)) if self.complex \
             else value_populate(cursor, 10)
         msg = '/requires key be set/'
         self.assertRaisesWithMessage(
