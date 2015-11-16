@@ -35,34 +35,27 @@ class test_autoclose(wttest.WiredTigerTestCase):
     error thrown, and that when a handle is closed, any subordinate
     handles are also closed.
     """
-    table_name = 'test_autoclose.wt'
+    uri = 'table:test_autoclose'
 
     def create_table(self):
-        self.session.create('table:' + self.table_name,
+        self.session.create(self.uri,
                             'key_format=S,value_format=S')
 
     def drop_table(self):
-        self.session.drop('table:' + self.table_name, None)
+        self.session.drop(self.uri, None)
 
-    def cursor_s(self, tablename, key):
-        cursor = self.session.open_cursor('table:' + tablename, None, None)
-        cursor.set_key(key)
-        return cursor
-
-    def cursor_ss(self, tablename, key, val):
-        cursor = self.cursor_s(tablename, key)
-        cursor.set_value(val)
+    def open_cursor(self):
+        cursor = self.session.open_cursor(self.uri, None, None)
         return cursor
 
     def test_close_cursor1(self):
         """
         Use a cursor handle after it is explicitly closed.
         """
-        self.table_name = 'test_autoclose_c1.wt'
         self.create_table()
 
-        inscursor = self.cursor_ss(self.table_name, 'key1', 'value1')
-        inscursor.insert()
+        inscursor = self.open_cursor()
+        inscursor['key1'] = 'value1'
         inscursor.close()
         self.assertRaisesHavingMessage(exceptions.RuntimeError,
                                        lambda: inscursor.next(),
@@ -74,11 +67,10 @@ class test_autoclose(wttest.WiredTigerTestCase):
         """
         Use a cursor handle after its session is closed.
         """
-        self.table_name = 'test_autoclose_c2.wt'
         self.create_table()
 
-        inscursor = self.cursor_ss(self.table_name, 'key1', 'value1')
-        inscursor.insert()
+        inscursor = self.open_cursor()
+        inscursor['key1'] = 'value1'
         self.session.close()
         self.assertRaisesHavingMessage(exceptions.RuntimeError,
                                        lambda: inscursor.next(),
@@ -89,11 +81,10 @@ class test_autoclose(wttest.WiredTigerTestCase):
         """
         Use a cursor handle after the connection is closed.
         """
-        self.table_name = 'test_autoclose_c3.wt'
         self.create_table()
 
-        inscursor = self.cursor_ss(self.table_name, 'key1', 'value1')
-        inscursor.insert()
+        inscursor = self.open_cursor()
+        inscursor['key1'] = 'value1'
         self.close_conn()
         self.assertRaisesHavingMessage(exceptions.RuntimeError,
                                        lambda: inscursor.next(),
@@ -104,25 +95,25 @@ class test_autoclose(wttest.WiredTigerTestCase):
         The truncate call allows both of its cursor args
         to be null, so we don't expect null checking.
         """
-        self.table_name = 'test_autoclose_c4.wt'
         self.create_table()
-        inscursor = self.cursor_ss(self.table_name, 'key1', 'value1')
-        inscursor.update()
+        inscursor = self.open_cursor()
+        inscursor['key1'] = 'value1'
+        inscursor.set_key('key1')
         inscursor2 = self.session.open_cursor(None, inscursor, None)
         self.session.truncate(None, inscursor, inscursor2, '')
         inscursor.close()
         inscursor2.close()
-        self.session.truncate('table:' + self.table_name, None, None, '')
+        self.session.truncate(self.uri, None, None, '')
 
     def test_close_cursor5(self):
         """
         Test Cursor.compare() which should not allow a null cursor arg.
         """
-        self.table_name = 'test_autoclose_c5.wt'
         self.create_table()
 
-        inscursor = self.cursor_ss(self.table_name, 'key1', 'value1')
-        inscursor.update()
+        inscursor = self.open_cursor()
+        inscursor['key1'] = 'value1'
+        inscursor.set_key('key1')
         inscursor2 = self.session.open_cursor(None, inscursor, None)
         inscursor.compare(inscursor2)
 
@@ -151,7 +142,6 @@ class test_autoclose(wttest.WiredTigerTestCase):
         """
         Use a session handle after the connection is closed.
         """
-        self.table_name = 'test_autoclose_s2.wt'
         self.close_conn()
         self.assertRaisesHavingMessage(exceptions.RuntimeError,
                                        lambda: self.create_table(),
