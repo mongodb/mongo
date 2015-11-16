@@ -757,7 +757,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
         cmdResponse.visibleOpTime = replMetadata.getLastOpVisible();
     }
 
-    return {std::move(cmdResponse)};
+    return StatusWith<CommandResponse>(std::move(cmdResponse));
 }
 
 void ShardRegistry::updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter,
