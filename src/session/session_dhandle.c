@@ -390,7 +390,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 	 * do it again.
 	 */
 	WT_RET(__wt_seconds(session, &now));
-	if (__wt_difftime(now, session->last_sweep) < conn->sweep_interval)
+	if (difftime(now, session->last_sweep) < conn->sweep_interval)
 		return (0);
 	session->last_sweep = now;
 
@@ -404,7 +404,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		    dhandle->session_inuse == 0 &&
 		    (WT_DHANDLE_INACTIVE(dhandle) ||
 		    (dhandle->timeofdeath != 0 &&
-		    __wt_difftime(now, dhandle->timeofdeath) >
+		    difftime(now, dhandle->timeofdeath) >
 		    conn->sweep_idle_time))) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
 			WT_ASSERT(session, !WT_IS_METADATA(dhandle));

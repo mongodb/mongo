@@ -136,7 +136,7 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
 		    dhandle->session_inuse != 0 ||
 		    dhandle->timeofdeath == 0 ||
-		    __wt_difftime(now, dhandle->timeofdeath) >=
+		    difftime(now, dhandle->timeofdeath) >=
 		    conn->sweep_idle_time)
 			continue;
 
