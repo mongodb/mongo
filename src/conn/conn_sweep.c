@@ -331,7 +331,7 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * A non-zero idle time is incompatible with in-memory, and the default
-	 * is non-zero; set the idle time to zero in in-memory configurations.
+	 * is non-zero; set the in-memory configuration idle time to zero.
 	 */
 	conn->sweep_idle_time = 0;
 	WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
