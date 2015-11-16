@@ -1379,7 +1379,15 @@ __clsm_insert(WT_CURSOR *cursor)
 	}
 
 	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &buf));
-	ret = __clsm_put(session, clsm, &cursor->key, &value, false);
+	WT_ERR(__clsm_put(session, clsm, &cursor->key, &value, false));
+
+	/*
+	 * WT_CURSOR.insert doesn't leave the cursor positioned, and the
+	 * application may want to free the memory used to configure the
+	 * insert; don't read that memory again (matching the underlying
+	 * file object cursor insert semantics).
+	 */
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	__wt_scr_free(session, &buf);
 	__clsm_leave(clsm);
