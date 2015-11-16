@@ -38,8 +38,8 @@ namespace repl {
 
 struct BatchBoundaries {
     BatchBoundaries(const OpTime s, const OpTime e) : start(s), end(e) {}
-    const OpTime start;
-    const OpTime end;
+    OpTime start;
+    OpTime end;
 };
 
 enum class DurableRequirement {

@@ -484,7 +484,10 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
 }
 
 namespace {
-void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* replCoord) {
+void tryToGoLiveAsASecondary(OperationContext* txn,
+                             ReplicationCoordinator* replCoord,
+                             const BatchBoundaries& minValidBoundaries,
+                             const OpTime& lastWriteOpTime) {
     if (replCoord->isInPrimaryOrSecondaryState()) {
         return;
     }
@@ -503,8 +506,15 @@ void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* repl
         return;
     }
 
-    BatchBoundaries boundaries = getMinValid(txn);
-    if (!boundaries.start.isNull() || boundaries.end > replCoord->getMyLastOptime()) {
+    // If an apply batch is active then we cannot transition.
+    if (!minValidBoundaries.start.isNull()) {
+        return;
+    }
+
+    // Must have applied/written to minvalid, so return if not.
+    // -- If 'lastWriteOpTime' is null/uninitialized then we can't transition.
+    // -- If 'lastWriteOpTime' is less than the end of the last batch then we can't transition.
+    if (lastWriteOpTime.isNull() || minValidBoundaries.end > lastWriteOpTime) {
         return;
     }
 
@@ -621,7 +631,9 @@ void SyncTail::oplogApplication() {
     auto replCoord = ReplicationCoordinator::get(&txn);
     ApplyBatchFinalizer finalizer(replCoord);
 
-    OpTime originalEndOpTime(getMinValid(&txn).end);
+    auto minValidBoundaries = getMinValid(&txn);
+    OpTime originalEndOpTime(minValidBoundaries.end);
+    OpTime lastWriteOpTime{replCoord->getMyLastOptime()};
     while (!inShutdown()) {
         OpQueue ops;
 
@@ -631,7 +643,7 @@ void SyncTail::oplogApplication() {
                 return;
             }
 
-            tryToGoLiveAsASecondary(&txn, replCoord);
+            tryToGoLiveAsASecondary(&txn, replCoord, minValidBoundaries, lastWriteOpTime);
 
             // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
             // ready in time, we'll loop again so we can do the above checks periodically.
@@ -682,11 +694,13 @@ void SyncTail::oplogApplication() {
         // This write will not journal/checkpoint.
         setMinValid(&txn, {start, end});
 
-        OpTime finalOpTime = multiApply(&txn, ops);
-        setNewTimestamp(finalOpTime.getTimestamp());
+        lastWriteOpTime = multiApply(&txn, ops);
+        setNewTimestamp(lastWriteOpTime.getTimestamp());
 
         setMinValid(&txn, end, DurableRequirement::None);
-        finalizer.record(finalOpTime);
+        minValidBoundaries.start = {};
+        minValidBoundaries.end = end;
+        finalizer.record(lastWriteOpTime);
     }
 }
 

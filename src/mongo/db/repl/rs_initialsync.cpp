@@ -439,6 +439,11 @@ Status _initialSync() {
     // Clear the initial sync flag -- cannot be done under a db lock, or recursive.
     clearInitialSyncFlag(&txn);
 
+    // Clear maint. mode.
+    while (replCoord->getMaintenanceMode()) {
+        replCoord->setMaintenanceMode(false);
+    }
+
     log() << "initial sync done";
     return Status::OK();
 }
