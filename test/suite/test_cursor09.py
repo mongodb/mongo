@@ -28,13 +28,12 @@
 
 import wiredtiger, wttest
 from helper import key_populate, value_populate, simple_populate
-from helper import complex_value_populate, complex_populate
+from helper import complex_populate, complex_value_populate
 from wtscenario import check_scenarios
 
-# test_cursor06.py
-#    Test cursor reconfiguration.
-class test_cursor06(wttest.WiredTigerTestCase):
-    name = 'reconfigure'
+# test_cursor09.py
+#    JIRA WT-2217: insert resets key/value "set".
+class test_cursor09(wttest.WiredTigerTestCase):
     scenarios = check_scenarios([
         ('file-r', dict(type='file:', config='key_format=r', complex=0)),
         ('file-S', dict(type='file:', config='key_format=S', complex=0)),
@@ -51,52 +50,23 @@ class test_cursor06(wttest.WiredTigerTestCase):
             dict(type='table:', config='key_format=S,type=lsm', complex=1)),
     ])
 
-    def populate(self, uri):
+    # WT_CURSOR.insert doesn't leave the cursor positioned, verify any
+    # subsequent cursor operation fails with a "key not set" message.
+    def test_cursor09(self):
+        uri = self.type + 'cursor09'
+
         if self.complex:
             complex_populate(self, uri, self.config, 100)
         else:
             simple_populate(self, uri, self.config, 100)
 
-    def set_kv(self, cursor):
-        cursor.set_key(key_populate(cursor, 10))
-        if self.complex:
-            cursor.set_value(tuple(complex_value_populate(cursor, 10)))
-        else:
-            cursor.set_value(value_populate(cursor, 10))
-
-    def test_reconfigure_overwrite(self):
-        uri = self.type + self.name
-        for open_config in (None, "overwrite=0", "overwrite=1"):
-            self.session.drop(uri, "force")
-            self.populate(uri)
-            cursor = self.session.open_cursor(uri, None, open_config)
-            if open_config != "overwrite=0":
-                self.set_kv(cursor)
-                cursor.insert()
-            for i in range(0, 10):
-                cursor.reconfigure("overwrite=0")
-                self.set_kv(cursor)
-                self.assertRaises(wiredtiger.WiredTigerError,
-                                  lambda: cursor.insert())
-                cursor.reconfigure("overwrite=1")
-                self.set_kv(cursor)
-                cursor.insert()
-            cursor.close()
-
-    def test_reconfigure_readonly(self):
-        uri = self.type + self.name
-        for open_config in (None, "readonly=0", "readonly=1"):
-            self.session.drop(uri, "force")
-            self.populate(uri)
-            cursor = self.session.open_cursor(uri, None, open_config)
-            if open_config == "readonly=1":
-                self.set_kv(cursor)
-                self.assertRaises(wiredtiger.WiredTigerError,
-                                  lambda: cursor.update())
-            else:
-                self.set_kv(cursor)
-                cursor.update()
-            cursor.close()
+        cursor = self.session.open_cursor(uri, None, None)
+        cursor[key_populate(cursor, 10)] = \
+            tuple(complex_value_populate(cursor, 10)) if self.complex \
+            else value_populate(cursor, 10)
+        msg = '/requires key be set/'
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, cursor.search, msg)
 
 if __name__ == '__main__':
     wttest.run()

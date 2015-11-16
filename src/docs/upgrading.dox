@@ -11,7 +11,21 @@ was relying on this behavior, a connection will be opened with different
 settings after upgrading, which could lead to errors or unexpected behavior.
 </dd>
 
-<dl>
+<dt>Change to WT_CURSOR::insert</dt>
+<dd>
+The WT_CURSOR::insert method in this release has slightly different semantics
+with respect to referencing application memory. In previous releases,
+WT_CURSOR::insert continued to reference application-memory specified to
+either WT_CURSOR::set_key or WT_CURSOR::set_value after a successful return,
+which could potentially lead to a core dump if the application freed that
+memory before a subsequent call to a WT_CURSOR:: method without an intermediate
+WT_CURSOR::set_key or WT_CURSOR::set_value call. In the 2.6.2 release,
+WT_CURSOR::insert behaves like the other cursor methods and does not reference
+application memory after a successful return. Applications depending on the
+previous semantic will require modifications to set the cursor's key and/or
+value after a successful WT_CURSOR::insert call.
+</dd>
+
 <dt>WT_SESSION.verify</dt>
 <dd>
 The WT_SESSION.verify method in this release has a new configuration

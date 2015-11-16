@@ -83,8 +83,7 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
         if self.pop == simple_populate:
             c.set_value(value_populate(c, 200))
         else:
-            v = complex_value_populate(c, 200)
-            c.set_value(v[0], v[1], v[2], v[3])
+            c.set_value(tuple(complex_value_populate(c, 200)))
         c.insert()
 
         # Test that cursor reset re-loads the values.
