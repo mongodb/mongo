@@ -683,6 +683,14 @@ public:
         invariant(WiredTigerRecoveryUnit::get(_txn)->getSession(_txn) == _cursor->getSession());
 
         if (!_eof) {
+            // Unique indices *don't* include the record id in their KeyStrings. If we seek to the
+            // same key with a new record id, seeking will successfully find the key and will return
+            // true. This will cause us to skip the key with the new record id, since we set
+            // _lastMoveWasRestore to false.
+            //
+            // Standard (non-unique) indices *do* include the record id in their KeyStrings. This
+            // means that restoring to the same key with a new record id will return false, and we
+            // will *not* skip the key with the new record id.
             _lastMoveWasRestore = !seekWTCursor(_key);
             TRACE_CURSOR << "restore _lastMoveWasRestore:" << _lastMoveWasRestore;
         }
@@ -857,38 +865,6 @@ class WiredTigerIndexUniqueCursor final : public WiredTigerIndexCursorBase {
 public:
     WiredTigerIndexUniqueCursor(const WiredTigerIndex& idx, OperationContext* txn, bool forward)
         : WiredTigerIndexCursorBase(idx, txn, forward) {}
-
-    void restore() override {
-        WiredTigerIndexCursorBase::restore();
-
-        // In addition to seeking to the correct key, we also need to make sure that the id is
-        // on the correct side of _id.
-        if (_lastMoveWasRestore)
-            return;  // We are on a different key so no need to check id.
-        if (_eof)
-            return;
-
-        // If we get here we need to look at the actual RecordId for this key and make sure we
-        // are supposed to see it.
-        WT_CURSOR* c = _cursor->get();
-        WT_ITEM item;
-        invariantWTOK(c->get_value(c, &item));
-
-        BufReader br(item.data, item.size);
-        RecordId idInIndex = KeyString::decodeRecordId(&br);
-
-        TRACE_CURSOR << "restore"
-                     << " _id:" << _id << " idInIndex:" << idInIndex;
-
-        if (idInIndex == _id)
-            return;
-
-        _lastMoveWasRestore = true;
-        if (_forward && (idInIndex < _id))
-            advanceWTCursor();
-        if (!_forward && (idInIndex > _id))
-            advanceWTCursor();
-    }
 
     void updateIdAndTypeBits() override {
         // We assume that cursors can only ever see unique indexes in their "pristine" state,

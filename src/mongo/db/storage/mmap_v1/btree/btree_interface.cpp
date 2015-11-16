@@ -242,7 +242,8 @@ public:
             }
 
             _lastMoveWasRestore = isEOF()  // We weren't EOF but now are.
-                || getDiskLoc() != _saved.loc || compareKeys(getKey(), _saved.key) != 0;
+                || (!_btree->isUnique() && getDiskLoc() != _saved.loc) ||
+                compareKeys(getKey(), _saved.key) != 0;
         }
 
         void detachFromOperationContext() final {

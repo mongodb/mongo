@@ -400,10 +400,10 @@ TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Reverse_S
 }
 
 // Make sure we restore to a RecordId at or ahead of save point if same key.
-void testSaveAndRestorePositionConsidersRecordId_Forward(bool unique) {
+TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Forward) {
     auto harnessHelper = newHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(unique,
+    auto sorted = harnessHelper->newSortedDataInterface(/*isUnique*/ false,
                                                         {
                                                          {key1, loc1}, {key2, loc1}, {key3, loc1},
                                                         });
@@ -437,18 +437,52 @@ void testSaveAndRestorePositionConsidersRecordId_Forward(bool unique) {
     // Advances from restore point since restore didn't move position.
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
 }
-TEST(SortedDataInterface, SaveAndRestorePositionConsidersRecordId_Forward_Standard) {
-    testSaveAndRestorePositionConsidersRecordId_Forward(false);
-}
-TEST(SortedDataInterface, SaveAndRestorePositionConsidersRecordId_Forward_Unique) {
-    testSaveAndRestorePositionConsidersRecordId_Forward(true);
+
+// Test that cursors over unique indices will never return the same key twice.
+TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Forward) {
+    auto harnessHelper = newHarnessHelper();
+    auto opCtx = harnessHelper->newOperationContext();
+    auto sorted = harnessHelper->newSortedDataInterface(
+        /*isUnique*/ true, {{key1, loc1}, {key2, loc2}, {key3, loc2}, {key4, loc2}});
+
+    auto cursor = sorted->newCursor(opCtx.get());
+
+    ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
+
+    cursor->save();
+    removeFromIndex(opCtx, sorted, {{key1, loc1}});
+    insertToIndex(opCtx, sorted, {{key1, loc2}});
+    cursor->restore();
+
+    // We should skip over (key1, loc2) since we already returned (key1, loc1).
+    ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc2));
+
+    cursor->save();
+    removeFromIndex(opCtx, sorted, {{key2, loc2}});
+    insertToIndex(opCtx, sorted, {{key2, loc1}});
+    cursor->restore();
+
+    // We should skip over (key2, loc1) since we already returned (key2, loc2).
+    ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc2));
+
+    // If the key we just returned is removed, we should simply return the next key after restoring.
+    cursor->save();
+    removeFromIndex(opCtx, sorted, {{key3, loc2}});
+    cursor->restore();
+    ASSERT_EQ(cursor->next(), IndexKeyEntry(key4, loc2));
+
+    // If a key is inserted just ahead of our position, we should return it after restoring.
+    cursor->save();
+    insertToIndex(opCtx, sorted, {{key5, loc2}});
+    cursor->restore();
+    ASSERT_EQ(cursor->next(), IndexKeyEntry(key5, loc2));
 }
 
 // Make sure we restore to a RecordId at or ahead of save point if same key on reverse cursor.
-void testSaveAndRestorePositionConsidersRecordId_Reverse(bool unique) {
+TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Reverse) {
     auto harnessHelper = newHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(unique,
+    auto sorted = harnessHelper->newSortedDataInterface(/*isUnique*/ false,
                                                         {
                                                          {key0, loc1}, {key1, loc1}, {key2, loc2},
                                                         });
@@ -482,11 +516,45 @@ void testSaveAndRestorePositionConsidersRecordId_Reverse(bool unique) {
     // Advances from restore point since restore didn't move position.
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key0, loc1));
 }
-TEST(SortedDataInterface, SaveAndRestorePositionConsidersRecordId_Reverse_Standard) {
-    testSaveAndRestorePositionConsidersRecordId_Reverse(false);
-}
-TEST(SortedDataInterface, SaveAndRestorePositionConsidersRecordId_Reverse_Unique) {
-    testSaveAndRestorePositionConsidersRecordId_Reverse(true);
+
+// Test that reverse cursors over unique indices will never return the same key twice.
+TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Reverse) {
+    auto harnessHelper = newHarnessHelper();
+    auto opCtx = harnessHelper->newOperationContext();
+    auto sorted = harnessHelper->newSortedDataInterface(
+        /*isUnique*/ true, {{key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc2}});
+
+    auto cursor = sorted->newCursor(opCtx.get(), false);
+
+    ASSERT_EQ(cursor->seek(key4, true), IndexKeyEntry(key4, loc2));
+
+    cursor->save();
+    removeFromIndex(opCtx, sorted, {{key4, loc2}});
+    insertToIndex(opCtx, sorted, {{key4, loc1}});
+    cursor->restore();
+
+    // We should skip over (key4, loc1) since we already returned (key4, loc2).
+    ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
+
+    cursor->save();
+    removeFromIndex(opCtx, sorted, {{key3, loc1}});
+    insertToIndex(opCtx, sorted, {{key3, loc2}});
+    cursor->restore();
+
+    // We should skip over (key3, loc2) since we already returned (key3, loc1).
+    ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
+
+    // If the key we just returned is removed, we should simply return the next key after restoring.
+    cursor->save();
+    removeFromIndex(opCtx, sorted, {{key2, loc1}});
+    cursor->restore();
+    ASSERT_EQ(cursor->next(), IndexKeyEntry(key1, loc1));
+
+    // If a key is inserted just ahead of our position, we should return it after restoring.
+    cursor->save();
+    insertToIndex(opCtx, sorted, {{key0, loc1}});
+    cursor->restore();
+    ASSERT_EQ(cursor->next(), IndexKeyEntry(key0, loc1));
 }
 
 // Ensure that SaveUnpositioned allows later use of the cursor.

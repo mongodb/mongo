@@ -317,8 +317,18 @@ public:
             // Need to find our position from the root.
             locate(_savedKey, _savedLoc);
 
-            _lastMoveWasRestore = _isEOF  // We weren't EOF but now are.
-                || _data.value_comp().compare(*_it, {_savedKey, _savedLoc}) != 0;
+            _lastMoveWasRestore = _isEOF;  // We weren't EOF but now are.
+            if (!_lastMoveWasRestore) {
+                // For standard (non-unique) indices, restoring to either a new key or a new record
+                // id means that the next key should be the one we just restored to.
+                //
+                // Cursors for unique indices should never return the same key twice, so we don't
+                // consider the restore as having moved the cursor position if the record id
+                // changes. In this case we use a null record id so that only the keys are compared.
+                auto savedLocToUse = _isUnique ? RecordId() : _savedLoc;
+                _lastMoveWasRestore =
+                    (_data.value_comp().compare(*_it, {_savedKey, savedLocToUse}) != 0);
+            }
         }
 
         void detachFromOperationContext() final {
