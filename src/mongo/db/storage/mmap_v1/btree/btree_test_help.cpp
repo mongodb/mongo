@@ -63,7 +63,12 @@ BSONObj simpleKey(char c, int n) {
 template <class OnDiskFormat>
 BtreeLogicTestHelper<OnDiskFormat>::BtreeLogicTestHelper(const BSONObj& order)
     : recordStore("TestRecordStore"),
-      btree(&headManager, &recordStore, &cursorRegistry, Ordering::make(order), "TestIndex") {
+      btree(&headManager,
+            &recordStore,
+            &cursorRegistry,
+            Ordering::make(order),
+            "TestIndex",
+            /*isUnique*/ false) {
     static const string randomData("RandomStuff");
 
     // Generate a valid record location for a "fake" record, which we will repeatedly use

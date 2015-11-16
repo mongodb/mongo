@@ -76,7 +76,8 @@ SortedDataInterface* EphemeralForTestEngine::getSortedDataInterface(OperationCon
                                                                     StringData ident,
                                                                     const IndexDescriptor* desc) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return getEphemeralForTestBtreeImpl(Ordering::make(desc->keyPattern()), &_dataMap[ident]);
+    return getEphemeralForTestBtreeImpl(
+        Ordering::make(desc->keyPattern()), desc->unique(), &_dataMap[ident]);
 }
 
 Status EphemeralForTestEngine::dropIdent(OperationContext* opCtx, StringData ident) {

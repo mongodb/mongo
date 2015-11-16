@@ -83,12 +83,14 @@ public:
                RecordStore* store,
                SavedCursorRegistry* cursors,
                const Ordering& ordering,
-               const std::string& indexName)
+               const std::string& indexName,
+               bool isUnique)
         : _headManager(head),
           _recordStore(store),
           _cursorRegistry(cursors),
           _ordering(ordering),
-          _indexName(indexName) {}
+          _indexName(indexName),
+          _isUnique(isUnique) {}
 
     //
     // Public-facing
@@ -243,6 +245,10 @@ public:
     int customBSONCmp(const BSONObj& inIndex_left,
                       const IndexSeekPoint& seekPoint_right,
                       int direction) const;
+
+    bool isUnique() const {
+        return _isUnique;
+    }
 
 private:
     friend class BtreeLogic::Builder;
@@ -571,6 +577,9 @@ private:
     Ordering _ordering;
 
     std::string _indexName;
+
+    // True if this is a unique index, i.e. if duplicate key values are disallowed.
+    const bool _isUnique;
 };
 
 }  // namespace mongo

@@ -43,7 +43,8 @@ public:
     EphemeralForTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) final {
-        return std::unique_ptr<SortedDataInterface>(getEphemeralForTestBtreeImpl(_order, &_data));
+        return std::unique_ptr<SortedDataInterface>(
+            getEphemeralForTestBtreeImpl(_order, unique, &_data));
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {

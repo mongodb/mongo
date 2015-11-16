@@ -42,6 +42,7 @@ class IndexCatalogEntry;
  * All permanent data will be stored and fetch from dataInOut.
  */
 SortedDataInterface* getEphemeralForTestBtreeImpl(const Ordering& ordering,
+                                                  bool isUnique,
                                                   std::shared_ptr<void>* dataInOut);
 
 }  // namespace mongo

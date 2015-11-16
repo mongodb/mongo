@@ -711,7 +711,8 @@ IndexAccessMethod* MMAPV1DatabaseCatalogEntry::getIndex(OperationContext* txn,
                            &rs->savedCursors,
                            entry->ordering(),
                            entry->descriptor()->indexNamespace(),
-                           entry->descriptor()->version()));
+                           entry->descriptor()->version(),
+                           entry->descriptor()->unique()));
 
     if (IndexNames::HASHED == type)
         return new HashAccessMethod(entry, btree.release());

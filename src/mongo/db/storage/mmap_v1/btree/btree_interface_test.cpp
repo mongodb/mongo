@@ -42,8 +42,13 @@ public:
     MyHarnessHelper() : _recordStore("a.b"), _order(Ordering::make(BSONObj())) {}
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) final {
-        std::unique_ptr<SortedDataInterface> sorted(
-            getMMAPV1Interface(&_headManager, &_recordStore, &_cursorRegistry, _order, "a_1", 1));
+        std::unique_ptr<SortedDataInterface> sorted(getMMAPV1Interface(&_headManager,
+                                                                       &_recordStore,
+                                                                       &_cursorRegistry,
+                                                                       _order,
+                                                                       "a_1",  // indexName
+                                                                       1,      // version
+                                                                       unique));
         OperationContextNoop op;
         massertStatusOK(sorted->initAsEmpty(&op));
         return sorted;

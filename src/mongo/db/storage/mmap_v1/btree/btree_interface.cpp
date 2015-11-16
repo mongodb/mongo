@@ -68,9 +68,10 @@ public:
                        RecordStore* recordStore,
                        SavedCursorRegistry* cursorRegistry,
                        const Ordering& ordering,
-                       const string& indexName) {
+                       const string& indexName,
+                       bool isUnique) {
         _btree.reset(new BtreeLogic<OnDiskFormat>(
-            headManager, recordStore, cursorRegistry, ordering, indexName));
+            headManager, recordStore, cursorRegistry, ordering, indexName, isUnique));
     }
 
     virtual ~BtreeInterfaceImpl() {}
@@ -413,14 +414,15 @@ SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
                                         SavedCursorRegistry* cursorRegistry,
                                         const Ordering& ordering,
                                         const string& indexName,
-                                        int version) {
+                                        int version,
+                                        bool isUnique) {
     if (0 == version) {
         return new BtreeInterfaceImpl<BtreeLayoutV0>(
-            headManager, recordStore, cursorRegistry, ordering, indexName);
+            headManager, recordStore, cursorRegistry, ordering, indexName, isUnique);
     } else {
         invariant(1 == version);
         return new BtreeInterfaceImpl<BtreeLayoutV1>(
-            headManager, recordStore, cursorRegistry, ordering, indexName);
+            headManager, recordStore, cursorRegistry, ordering, indexName, isUnique);
     }
 }
 

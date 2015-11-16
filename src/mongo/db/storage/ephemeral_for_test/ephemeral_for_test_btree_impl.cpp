@@ -138,7 +138,7 @@ private:
 
 class EphemeralForTestBtreeImpl : public SortedDataInterface {
 public:
-    EphemeralForTestBtreeImpl(IndexSet* data) : _data(data) {
+    EphemeralForTestBtreeImpl(IndexSet* data, bool isUnique) : _data(data), _isUnique(isUnique) {
         _currentKeySize = 0;
     }
 
@@ -224,8 +224,8 @@ public:
 
     class Cursor final : public SortedDataInterface::Cursor {
     public:
-        Cursor(OperationContext* txn, const IndexSet& data, bool isForward)
-            : _txn(txn), _data(data), _forward(isForward), _it(data.end()) {}
+        Cursor(OperationContext* txn, const IndexSet& data, bool isForward, bool isUnique)
+            : _txn(txn), _data(data), _forward(isForward), _isUnique(isUnique), _it(data.end()) {}
 
         boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
             if (_lastMoveWasRestore) {
@@ -425,6 +425,7 @@ public:
         OperationContext* _txn;  // not owned
         const IndexSet& _data;
         const bool _forward;
+        const bool _isUnique;
         bool _isEOF = true;
         IndexSet::const_iterator _it;
 
@@ -449,7 +450,7 @@ public:
 
     virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
                                                                    bool isForward) const {
-        return stdx::make_unique<Cursor>(txn, *_data, isForward);
+        return stdx::make_unique<Cursor>(txn, *_data, isForward, _isUnique);
     }
 
     virtual Status initAsEmpty(OperationContext* txn) {
@@ -479,18 +480,20 @@ private:
 
     IndexSet* _data;
     long long _currentKeySize;
+    const bool _isUnique;
 };
 }  // namespace
 
 // IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
 // factories. We don't actually modify it.
 SortedDataInterface* getEphemeralForTestBtreeImpl(const Ordering& ordering,
+                                                  bool isUnique,
                                                   std::shared_ptr<void>* dataInOut) {
     invariant(dataInOut);
     if (!*dataInOut) {
         *dataInOut = std::make_shared<IndexSet>(IndexEntryComparison(ordering));
     }
-    return new EphemeralForTestBtreeImpl(static_cast<IndexSet*>(dataInOut->get()));
+    return new EphemeralForTestBtreeImpl(static_cast<IndexSet*>(dataInOut->get()), isUnique);
 }
 
 }  // namespace mongo
