@@ -336,9 +336,17 @@ config_in_memory(void)
 	if (!config_is_perm("verify"))
 		g.c_verify = 0;
 
-	/* Ensure there is 250MB of cache per thread. */
+	/*
+	 * Ensure there is 250MB of cache per thread; keep keys/values small,
+	 * overflow items aren't an issue for in-memory configurations and it
+	 * keeps us from overflowing the cache.
+	 */
 	if (!config_is_perm("cache"))
 		g.c_cache = g.c_threads * 250;
+	if (!config_is_perm("key_max"))
+		g.c_value_max = 64;
+	if (!config_is_perm("value_max"))
+		g.c_value_max = 128;
 }
 
 /*
