@@ -1,8 +1,11 @@
-/*
+/**
  * Regression test for SERVER-4892.
  *
  * Verify that a client can delete cursors that it creates, when mongod is running with "auth"
  * enabled.
+ *
+ * This test requires users to persist across a restart.
+ * @tags: [requires_persistence]
  */
 
 var baseName = 'jstests_auth_server4892';

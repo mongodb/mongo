@@ -1,6 +1,9 @@
 //
 // Tests the use of the wOpTime option in getLastError
 //
+// This test requires fsync to lock the secondary, so cannot be run on storage engines which do not
+// support the command.
+// @tags: [requires_fsync]
 
 var rst = new ReplSetTest({ nodes : 2 });
 rst.startSet();
@@ -18,7 +21,7 @@ assert.eq( null, gleObj.err );
 var opTimeBeforeFailure = gleObj.lastOp;
 
 // Lock the secondary
-secondary.getDB("admin").fsyncLock();
+assert.commandWorked(secondary.getDB("admin").fsyncLock());
 
 // Insert a doc and replicate it to the primary only
 coll.insert({ some : "doc" });
