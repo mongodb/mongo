@@ -657,6 +657,7 @@ __session_truncate(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_TXN_API_CALL(session, truncate, config, cfg);
+	WT_STAT_FAST_CONN_INCR(session, cursor_truncate);
 
 	/*
 	 * If the URI is specified, we don't need a start/stop, if start/stop

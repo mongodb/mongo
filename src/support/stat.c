@@ -76,6 +76,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"cursor: restarted searches",
 	"cursor: search calls",
 	"cursor: search near calls",
+	"cursor: truncate calls",
 	"cursor: update calls",
 	"cursor: cursor-update value bytes updated",
 	"LSM: sleep for LSM checkpoint throttle",
@@ -194,6 +195,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cursor_restart = 0;
 	stats->cursor_search = 0;
 	stats->cursor_search_near = 0;
+	stats->cursor_truncate = 0;
 	stats->cursor_update = 0;
 	stats->bloom_false_positive = 0;
 	stats->bloom_hit = 0;
@@ -311,6 +313,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->cursor_restart += from->cursor_restart;
 	to->cursor_search += from->cursor_search;
 	to->cursor_search_near += from->cursor_search_near;
+	to->cursor_truncate += from->cursor_truncate;
 	to->cursor_update += from->cursor_update;
 	to->bloom_false_positive += from->bloom_false_positive;
 	to->bloom_hit += from->bloom_hit;
@@ -442,6 +445,7 @@ __wt_stat_dsrc_aggregate(
 	to->cursor_restart += WT_STAT_READ(from, cursor_restart);
 	to->cursor_search += WT_STAT_READ(from, cursor_search);
 	to->cursor_search_near += WT_STAT_READ(from, cursor_search_near);
+	to->cursor_truncate += WT_STAT_READ(from, cursor_truncate);
 	to->cursor_update += WT_STAT_READ(from, cursor_update);
 	to->bloom_false_positive += WT_STAT_READ(from, bloom_false_positive);
 	to->bloom_hit += WT_STAT_READ(from, bloom_hit);
@@ -554,6 +558,7 @@ static const char * const __stats_connection_desc[] = {
 	"cursor: cursor restarted searches",
 	"cursor: cursor search calls",
 	"cursor: cursor search near calls",
+	"cursor: truncate calls",
 	"cursor: cursor update calls",
 	"data-handle: connection data handles currently active",
 	"data-handle: session dhandles swept",
@@ -745,6 +750,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cursor_search = 0;
 	stats->cursor_search_near = 0;
 	stats->cursor_update = 0;
+	stats->cursor_truncate = 0;
 		/* not clearing dh_conn_handle_count */
 	stats->dh_sweep_ref = 0;
 	stats->dh_sweep_close = 0;
@@ -930,6 +936,7 @@ __wt_stat_connection_aggregate(
 	to->cursor_search += WT_STAT_READ(from, cursor_search);
 	to->cursor_search_near += WT_STAT_READ(from, cursor_search_near);
 	to->cursor_update += WT_STAT_READ(from, cursor_update);
+	to->cursor_truncate += WT_STAT_READ(from, cursor_truncate);
 	to->dh_conn_handle_count += WT_STAT_READ(from, dh_conn_handle_count);
 	to->dh_sweep_ref += WT_STAT_READ(from, dh_sweep_ref);
 	to->dh_sweep_close += WT_STAT_READ(from, dh_sweep_close);

@@ -349,6 +349,7 @@ connection_stats = [
     CursorStat('cursor_restart', 'cursor restarted searches'),
     CursorStat('cursor_search', 'cursor search calls'),
     CursorStat('cursor_search_near', 'cursor search near calls'),
+    CursorStat('cursor_truncate', 'truncate calls'),
     CursorStat('cursor_update', 'cursor update calls'),
 
     ##########################################
@@ -390,6 +391,7 @@ dsrc_stats = [
     CursorStat('cursor_restart', 'restarted searches'),
     CursorStat('cursor_search', 'search calls'),
     CursorStat('cursor_search_near', 'search near calls'),
+    CursorStat('cursor_truncate', 'truncate calls'),
     CursorStat('cursor_update', 'update calls'),
     CursorStat('cursor_update_bytes', 'cursor-update value bytes updated'),
 

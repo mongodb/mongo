@@ -297,6 +297,7 @@ struct __wt_connection_stats {
 	int64_t cursor_restart;
 	int64_t cursor_search;
 	int64_t cursor_search_near;
+	int64_t cursor_truncate;
 	int64_t cursor_update;
 	int64_t dh_conn_handle_count;
 	int64_t dh_session_handles;
@@ -461,6 +462,7 @@ struct __wt_dsrc_stats {
 	int64_t cursor_restart;
 	int64_t cursor_search;
 	int64_t cursor_search_near;
+	int64_t cursor_truncate;
 	int64_t cursor_update;
 	int64_t cursor_update_bytes;
 	int64_t lsm_checkpoint_throttle;
