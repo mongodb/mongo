@@ -277,8 +277,8 @@ __sweep_server(void *arg)
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(conn, WT_CONN_SERVER_SWEEP)) {
 		/* Wait until the next event. */
-		WT_ERR(__wt_cond_wait(session, conn->sweep_cond,
-		    (uint64_t)conn->sweep_interval * WT_MILLION));
+		WT_ERR(__wt_cond_wait(session,
+		    conn->sweep_cond, conn->sweep_interval * WT_MILLION));
 		WT_ERR(__wt_seconds(session, &now));
 
 		WT_STAT_FAST_CONN_INCR(session, dh_sweeps);
@@ -333,7 +333,7 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Pull out the sweep configurations. */
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_idle_time", &cval));
-	conn->sweep_idle_time = (u_int)cval.val;
+	conn->sweep_idle_time = (uint64_t)cval.val;
 
 	/* Non-zero sweep idle time is incompatible with in-memory */
 	if (conn->sweep_idle_time != 0) {
@@ -346,11 +346,11 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_scan_interval", &cval));
-	conn->sweep_interval = (u_int)cval.val;
+	conn->sweep_interval = (uint64_t)cval.val;
 
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_handle_minimum", &cval));
-	conn->sweep_handles_min = (u_int)cval.val;
+	conn->sweep_handles_min = (uint64_t)cval.val;
 
 	return (0);
 }
