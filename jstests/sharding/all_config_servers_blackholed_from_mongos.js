@@ -1,10 +1,10 @@
-// Ensures that if the config server's primary is black-holed and not contactable from MongoS,
-// metadata operations do not get stuck forever.
+// Ensures that if the config servers are blackholed from the point of view of MongoS, metadata
+// operations do not get stuck forever.
 (function() {
 'use strict';
 
 var st = new ShardingTest({
-    name: 'blackhole_first_config_server',
+    name: 'all_config_servers_blackholed_from_mongos',
     shards: 2,
     mongos: 1,
     useBridge: true,
@@ -20,7 +20,7 @@ assert.commandWorked(testDB.adminCommand({
 
 assert.writeOK(testDB.ShardedColl.insert({ a: 1 }));
 
-jsTest.log('Making the first config server appear as a blackhole to mongos');
+jsTest.log('Making all the config servers appear as a blackhole to mongos');
 st._configServers.forEach(function(configSvr) {
     configSvr.discardMessagesFrom(st.s, 1.0);
 });
