@@ -191,7 +191,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		    syncop == WT_SYNC_WRITE_LEAVES ?
 		    "WRITE_LEAVES" : "CHECKPOINT",
 		    leaf_bytes, leaf_pages, internal_bytes, internal_pages,
-		    WT_TIMEDIFF(end, start) / WT_MILLION));
+		    WT_TIMEDIFF_MS(end, start)));
 	}
 
 err:	/* On error, clear any left-over tree walk. */

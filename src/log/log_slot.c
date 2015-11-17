@@ -380,7 +380,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	 * There should almost always be a slot open.
 	 */
 #ifdef	HAVE_DIAGNOSTIC
-	unbuf_force = (++log->write_calls % 1000) == 0;
+	unbuf_force = (++log->write_calls % WT_THOUSAND) == 0;
 #endif
 	for (;;) {
 		WT_BARRIER();

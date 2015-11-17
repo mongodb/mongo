@@ -94,7 +94,7 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_RET(__wt_epoch(session, &now));
 	msec_since_last_merge =
-	    WT_TIMEDIFF(now, lsm_tree->merge_aggressive_ts) / WT_MILLION;
+	    WT_TIMEDIFF_MS(now, lsm_tree->merge_aggressive_ts);
 
 	/*
 	 * If there is no estimate for how long it's taking to fill chunks
@@ -457,7 +457,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
 
-#define	LSM_MERGE_CHECK_INTERVAL	1000
+#define	LSM_MERGE_CHECK_INTERVAL	WT_THOUSAND
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
