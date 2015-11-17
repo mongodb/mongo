@@ -5470,6 +5470,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	case 0:						/* Page delete */
 		WT_RET(__wt_verbose(
 		    session, WT_VERB_RECONCILE, "page %p empty", page));
+		WT_STAT_FAST_CONN_INCR(session, rec_page_delete);
 		WT_STAT_FAST_DATA_INCR(session, rec_page_delete);
 
 		/* If this is the root page, we need to create a sync point. */

@@ -620,6 +620,7 @@ static const char * const __stats_connection_desc[] = {
 	"thread-yield: page acquire read blocked",
 	"thread-yield: page acquire time sleeping (usecs)",
 	"connection: total read I/Os",
+	"reconciliation: pages deleted",
 	"reconciliation: page reconciliation calls",
 	"reconciliation: page reconciliation calls for eviction",
 	"reconciliation: split bytes currently awaiting free",
@@ -803,6 +804,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lsm_work_queue_max = 0;
 	stats->rec_pages = 0;
 	stats->rec_pages_eviction = 0;
+	stats->rec_page_delete = 0;
 		/* not clearing rec_split_stashed_bytes */
 		/* not clearing rec_split_stashed_objects */
 		/* not clearing session_cursor_open */
@@ -997,6 +999,7 @@ __wt_stat_connection_aggregate(
 	to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
 	to->rec_pages += WT_STAT_READ(from, rec_pages);
 	to->rec_pages_eviction += WT_STAT_READ(from, rec_pages_eviction);
+	to->rec_page_delete += WT_STAT_READ(from, rec_page_delete);
 	to->rec_split_stashed_bytes +=
 	    WT_STAT_READ(from, rec_split_stashed_bytes);
 	to->rec_split_stashed_objects +=

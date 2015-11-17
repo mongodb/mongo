@@ -278,6 +278,7 @@ connection_stats = [
     # Reconciliation statistics
     ##########################################
     RecStat('rec_pages', 'page reconciliation calls'),
+    RecStat('rec_page_delete', 'pages deleted'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
     RecStat('rec_split_stashed_bytes',
         'split bytes currently awaiting free', 'no_clear,no_scale'),
