@@ -50,7 +50,7 @@ struct ServerGlobalParams {
           defaultProfile(0),
           slowMS(100),
           defaultLocalThresholdMillis(15),
-          moveParanoia(true),
+          moveParanoia(false),
           noUnixSocket(false),
           doFork(0),
           socket("/tmp"),
