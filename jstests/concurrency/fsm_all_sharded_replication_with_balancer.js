@@ -30,6 +30,10 @@ var blacklist = [
     'map_reduce_replace.js',
     'map_reduce_replace_nonexistent.js',
 
+    // Disabled due to SERVER-13364, 'The geoNear command doesn't handle shard versioning, so a
+    // concurrent chunk migration may cause duplicate or missing results'
+    'yield_geo_near_dedup.js',
+
     // Disabled due to MongoDB restrictions and/or workload restrictions
 
     // These workloads sometimes trigger 'Could not lock auth data update lock'
