@@ -1,0 +1,382 @@
+stepback: false
+command_type: system
+
+pre:
+    - command: shell.track
+
+post:
+    - command: attach.results
+      params:
+        file_location: src/report.json
+    - command: shell.cleanup
+    - command: shell.exec
+      # destroy the cluster
+      params:
+        working_dir: dsi
+        script: |
+          set -e
+          set -v
+          cd ./clusters/${cluster}
+          if [ ! -f "test.success" ]; then yes yes | ./terraform destroy; fi
+
+functions:
+  "prepare environment":
+    - command: shell.exec
+      params:
+        script: |
+          rm -rf ./*
+          mkdir src
+    - command: shell.exec
+      # checkout dsi code
+      params:
+        script: |
+          set -e
+          set -v
+          git clone git@github.com:10gen/dsi.git
+          cd dsi
+          # setup execution environment
+          ./bin/setup-dsi-env.sh
+    - command: shell.exec
+      params:
+        working_dir: dsi
+        # configure environment, has private information, no logging
+        silent: true
+        script: |
+          cd ./clusters/${cluster}
+          # stage aws credential for terraform
+          cp ../../terraform/* .
+          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/dsi/${version_id}/${revision}/mongod-${version_id}.tar.gz
+          # generate aws private key file
+          echo "${ec2_pem}" > ../../keys/aws.pem
+          chmod 400 ../../keys/aws.pem
+
+  "bring up cluster":
+    - command: shell.exec
+      # bring up the cluster
+      params:
+        working_dir: dsi
+        silent: true
+        script: |
+          # to create a mongod EC2 cluster
+          set -e
+          set -v
+          cd ./clusters/${cluster}
+          # create all resources and instances
+          ./setup-cluster.sh
+          echo "EC2 Cluster CREATED."
+          tar -czvf cluster_config.tgz ips.sh terraform.tfstate.backup terraform.tfstate
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "dsi/clusters/${cluster}/cluster_config.tgz"
+        remote_file: dsi/${build_variant}/${revision}/cluster_configs/cluster_config-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: ${cluster}-cluster-config
+
+  "restore cluster":
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: dsi/${build_variant}/${revision}/cluster_configs/cluster_config-${build_id}.tgz
+        bucket: mciuploads
+        local_file: "dsi/clusters/${cluster}/cluster_config.tgz"
+    - command: shell.exec
+      params:
+        working_dir: dsi
+        silent: true
+        script: |
+          set -e
+          set -v
+          cd ./clusters/${cluster}
+          tar -xf cluster_config.tgz
+
+  "configure mongodb cluster":
+    - command: shell.exec
+      # bring up the mongod
+      params:
+        working_dir: dsi
+        script: |
+          set -e
+          set -v
+          cd ./clusters/${cluster}
+          # configure mongodb cluster with ${storageEngine}
+          ../../bin/config-${setup}.sh mongodb ${storageEngine} ${numShard}
+          echo "${cluster} MongoDB Cluster STARTED."
+
+  "run test":
+    - command: shell.exec
+      params:
+        working_dir: dsi
+        script: |
+          set -e
+          set -v
+          cd ./clusters/${cluster}
+          cat ips.sh
+          cat run-${test}.json
+          ./update_run_config.sh
+          cat run-${test}.json
+          rm -rf ./reports
+          rm -f ../../reports.tgz
+          echo "Run test for ${test} with setup ${setup}"
+          # run test
+          ./run-${test}.sh ${storageEngine} ${setup}
+          rm -f ../perf.json
+          chmod 766 perf.json
+          cp ./perf.json ..
+          cd ..
+          pwd
+          cat perf.json
+          echo "Done test for ${test} with setup ${setup}!"
+    - command: "json.send"
+      params:
+         name: "perf"
+         file: "dsi/clusters/perf.json"
+    - command: shell.exec
+      params:
+        working_dir: dsi
+        script: |
+          set -e
+          set -v
+          cd ./clusters/${cluster}
+          touch test.success
+
+  "destroy cluster":
+    - command: shell.exec
+      # destroy the cluster
+      params:
+        working_dir: dsi
+        script: |
+          set -e
+          set -v
+          cd ./clusters/${cluster}
+          # destroy the EC2 cluster
+          yes yes | ./terraform destroy
+          echo "Cluster DESTROYED."
+
+  "make test log artifact":
+    - command: shell.exec
+      params:
+        working_dir: dsi
+        script: |
+          set -e
+          set -v
+          cd ./clusters/${cluster}/reports
+          # move additional file here
+          cp ../ips.sh .
+          if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
+          cp ../../perf.json .
+          cd ..
+          rm -rf ../reports
+          mv reports ../
+    - command: archive.targz_pack
+      params:
+        target: "reports.tgz"
+        source_dir: "dsi/clusters"
+        include:
+          - "reports/**"
+
+  "upload log file":
+    - command: s3.put
+      params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            local_file: reports.tgz
+            remote_file: dsi/${build_variant}/${execution}/${revision}/logs/${test}-${build_id}.${ext|tgz}
+            bucket: mciuploads
+            permissions: public-read
+            content_type: ${content_type|application/x-gzip}
+            display_name: ${test}-test-log - Execution ${execution}
+
+  "analyze":
+    - command: json.get_history
+      params:
+        task: ${task_name}
+        file: "src/history.json"
+        name: "perf"
+    - command: json.get_history
+      params:
+        tags: true
+        task: ${task_name}
+        file: "src/tags.json"
+        name: "perf"
+    - command: shell.exec
+      # post_run_check.py and override.json for DSI tests is part of dsi repo in dsi/bin
+      type : test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -v
+          python ../dsi/bin/distributed_correctness_analyze.py
+
+#######################################
+#               Tasks                 #
+#######################################
+
+tasks:
+- name: compile
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -v
+          ${scons|scons} ${compile_flags|} core
+          mkdir -p mongodb/bin
+          mv mongo mongodb/bin
+          mv mongod mongodb/bin
+          mv mongos mongodb/bin
+          tar cvf mongodb.tar mongodb
+          gzip mongodb.tar
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb.tar.gz
+        remote_file: dsi/${version_id}/${revision}/mongod-${version_id}.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongodb.tar.gz
+
+# The distributed_correctness_suite_1 task runs the "bring up cluster" task and is
+# the only one to do so - all other tasks run "restore cluster".  As such,
+# all buildvariants must run distributed_correctness_suite_1 and run it first.
+
+# When adding or removing tasks, you also must ensure that the final task
+# and only the final task runs the "destroy cluster" function.
+
+- name: distributed_correctness_suite_1_wiredTiger
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+    - func: "bring up cluster"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "distributed_correctness_suite_1"
+
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "distributed_correctness_suite_1_wiredTiger"
+    - func: "analyze"
+
+- name: distributed_correctness_suite_1_MMAPv1
+  depends_on:
+    - name: distributed_correctness_suite_2_wiredTiger
+      status : "*"
+  commands:
+    - func: "prepare environment"
+    - func: "restore cluster"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "distributed_correctness_suite_1"
+
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "distributed_correctness_suite_1_MMAPv1"
+    - func: "analyze"
+
+- name: distributed_correctness_suite_2_wiredTiger
+  depends_on:
+    - name: distributed_correctness_suite_1_wiredTiger
+      status : "*"
+  commands:
+    - func: "prepare environment"
+    - func: "restore cluster"
+
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "distributed_correctness_suite_2"
+
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "distributed_correctness_suite_2_wiredTiger"
+    - func: "analyze"
+
+- name: distributed_correctness_suite_2_MMAPv1
+  depends_on:
+    - name: distributed_correctness_suite_1_MMAPv1
+      status : "*"
+  commands:
+    - func: "prepare environment"
+    - func: "restore cluster"
+
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "distributed_correctness_suite_2"
+
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "distributed_correctness_suite_2_MMAPv1"
+    - func: "destroy cluster"
+    - func: "analyze"
+
+#######################################
+#            Buildvariants            #
+#######################################
+
+buildvariants:
+
+- name: linux-standalone
+  display_name: Linux Standalone
+  batchtime: 1440 # 24 hours
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    setup: standalone
+    cluster: single
+    numShard: 0
+  run_on:
+      - "linux-64-amzn-perf-standalone"
+  tasks:
+    - name: compile
+      distros:
+      - rhel55
+    - name: distributed_correctness_suite_1_wiredTiger
+    - name: distributed_correctness_suite_2_wiredTiger
+    - name: distributed_correctness_suite_1_MMAPv1
+    - name: distributed_correctness_suite_2_MMAPv1
+
+- name: linux-3-node-replSet
+  display_name: Linux 3-Node ReplSet
+  batchtime: 1440 # 24 hours
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    setup: replica
+    cluster: replica
+    numMember: 3
+  run_on:
+      - "linux-64-amzn-perf-replset"
+  tasks:
+    - name: distributed_correctness_suite_1_wiredTiger
+    - name: distributed_correctness_suite_2_wiredTiger
+    - name: distributed_correctness_suite_1_MMAPv1
+    - name: distributed_correctness_suite_2_MMAPv1
