@@ -747,7 +747,7 @@ __wt_lsm_tree_throttle(
 		WT_ASSERT(session,
 		    WT_TIMECMP(last_chunk->create_ts, ondisk->create_ts) >= 0);
 		timediff =
-		    WT_TIMEDIFF(last_chunk->create_ts, ondisk->create_ts);
+		    WT_TIMEDIFF_NS(last_chunk->create_ts, ondisk->create_ts);
 		lsm_tree->ckpt_throttle =
 		    (in_memory - 2) * timediff / (20 * record_count);
 
@@ -798,11 +798,12 @@ __wt_lsm_tree_throttle(
 		WT_ASSERT(session, prev_chunk->generation == 0);
 		WT_ASSERT(session, WT_TIMECMP(
 		    last_chunk->create_ts, prev_chunk->create_ts) >= 0);
-		timediff =
-		    WT_TIMEDIFF(last_chunk->create_ts, prev_chunk->create_ts);
+		timediff = WT_TIMEDIFF_NS(
+		    last_chunk->create_ts, prev_chunk->create_ts);
 		WT_ASSERT(session,
 		    WT_TIMECMP(prev_chunk->create_ts, ondisk->create_ts) >= 0);
-		oldtime = WT_TIMEDIFF(prev_chunk->create_ts, ondisk->create_ts);
+		oldtime = WT_TIMEDIFF_NS(
+		    prev_chunk->create_ts, ondisk->create_ts);
 		if (timediff < 10 * oldtime)
 			lsm_tree->chunk_fill_ms =
 			    (3 * lsm_tree->chunk_fill_ms +

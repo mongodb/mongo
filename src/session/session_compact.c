@@ -133,8 +133,7 @@ __session_compact_check_timeout(
 		return (0);
 
 	WT_RET(__wt_epoch(session, &end));
-	if (session->compact->max_time <
-	    WT_TIMEDIFF(end, begin) / WT_BILLION)
+	if (session->compact->max_time < WT_TIMEDIFF_SEC(end, begin))
 		WT_RET(ETIMEDOUT);
 	return (0);
 }

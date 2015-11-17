@@ -94,7 +94,7 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_RET(__wt_epoch(session, &now));
 	msec_since_last_merge =
-	    WT_TIMEDIFF(now, lsm_tree->merge_aggressive_ts) / WT_MILLION;
+	    WT_TIMEDIFF_MS(now, lsm_tree->merge_aggressive_ts);
 
 	/*
 	 * If there is no estimate for how long it's taking to fill chunks

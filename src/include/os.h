@@ -65,9 +65,14 @@ typedef enum {
 	}								\
 } while (0)
 
-#define	WT_TIMEDIFF(end, begin)						\
+#define	WT_TIMEDIFF_NS(end, begin)					\
 	(1000000000 * (uint64_t)((end).tv_sec - (begin).tv_sec) +	\
 	    (uint64_t)(end).tv_nsec - (uint64_t)(begin).tv_nsec)
+#define	WT_TIMEDIFF_MS(end, begin)					\
+	(WT_TIMEDIFF_NS((end), (begin)) / WT_MILLION)
+#define	WT_TIMEDIFF_SEC(end, begin)					\
+	(WT_TIMEDIFF_NS((end), (begin)) / WT_BILLION)
+
 #define	WT_TIMECMP(t1, t2)						\
 	((t1).tv_sec < (t2).tv_sec ? -1 :				\
 	     (t1).tv_sec == (t2.tv_sec) ?				\
