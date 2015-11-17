@@ -12,7 +12,7 @@ load('jstests/top/util/mongotop_common.js');
   var runTests = function(topology, passthrough) {
     var readShell = '\nprint(\'starting read\'); \n' +
       'for (var i = 0; i < 1000000; ++i) \n{ ' +
-      '  db.getSiblingDB(\'foo\').bar.find({ x: i }).forEach(); \n' +
+      '  db.getSiblingDB(\'foo\').bar.find({ x: i }).forEach(function(){}); \n' +
       '  sleep(1); \n' +
       '}\n';
 
@@ -24,14 +24,9 @@ load('jstests/top/util/mongotop_common.js');
 
     var readWriteShell = '\nprint(\'starting read/write\'); \n' +
       'for (var i = 0; i < 1000000; ++i) \n{ ' +
-      '  db.getSiblingDB(\'foo\').bar.find({ x: i }).forEach(); \n' +
-      '  db.runCommand({ \n' +
-      '   findAndModify: \'bar\', \n' +
-      '   query: { name: \'mongo\', state: \'top\', rating: 100 }, \n' +
-      '   sort: { rating: 1 }, \n' +
-      '   update: { $inc: { score: 1 } }, \n' +
-      '   upsert: true \n' +
-      '  }) \n' +
+      '  db.getSiblingDB(\'foo\').bar.insert({ x: i }); \n' +
+      '  db.getSiblingDB(\'foo\').bar.find({ x: i }).forEach(function(){}); \n' +
+      '  sleep(1); \n' +
       '}\n';
 
     var testSpaces = [
