@@ -702,14 +702,14 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	uint64_t split_gen;
 	uint32_t i, j;
 	uint32_t deleted_entries, parent_entries, result_entries;
-	bool complete;
+	bool complete, empty_parent;
 
 	parent = ref->home;
 
 	alloc_index = pindex = NULL;
 	parent_decr = 0;
 	parent_entries = 0;
-	complete = false;
+	complete = empty_parent = false;
 
 	/* The parent page will be marked dirty, make sure that will succeed. */
 	WT_RET(__wt_page_modify_init(session, parent));
@@ -745,11 +745,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	result_entries = (parent_entries + new_entries) - (deleted_entries + 1);
 
 	/*
-	 * If the entire (sub)tree is empty, give up: we can't leave an empty
-	 * internal page.  Mark it to be evicted soon and clean up any
-	 * references that have changed state.
+	 * If there are no remaining entries on the parent, give up, we can't
+	 * leave an empty internal page. Mark it to be evicted soon and clean
+	 * up any references that have changed state.
 	 */
 	if (result_entries == 0) {
+		empty_parent = true;
 		__wt_page_evict_soon(parent);
 		goto err;
 	}
@@ -918,6 +919,14 @@ err:	/*
 		}
 
 		__wt_free_ref_index(session, NULL, alloc_index, false);
+
+		/*
+		 * The split couldn't proceed because the parent would be empty,
+		 * return EBUSY so our caller knows to unlock the WT_REF that's
+		 * being deleted, but don't be noisy, there's nothing wrong.
+		 */
+		if (empty_parent)
+			return (EBUSY);
 	}
 
 	if (ret != 0 && ret != WT_PANIC)
