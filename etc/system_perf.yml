@@ -407,6 +407,8 @@ tasks:
 
 - name: industry_benchmarks_MMAPv1_oplog_comp
   depends_on:
+    - name: core_workloads_WT_oplog_comp
+      status: "*"
     - name: industry_benchmarks_MMAPv1
       variant: linux-standalone
       status: "*"
@@ -423,6 +425,8 @@ tasks:
 
 - name: core_workloads_WT_oplog_comp
   depends_on:
+    - name: industry_benchmarks_WT_oplog_comp
+      status: "*"
     - name: core_workloads_WT
       variant: linux-standalone
       status: "*"
@@ -439,6 +443,8 @@ tasks:
 
 - name: core_workloads_MMAPv1_oplog_comp
   depends_on:
+    - name: industry_benchmarks_MMAPv1_oplog_comp
+      status: "*"
     - name: core_workloads_MMAPv1
       variant: linux-standalone
       status: "*"
