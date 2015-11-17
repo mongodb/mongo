@@ -4185,6 +4185,19 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2094
 /*! transaction: update conflicts */
 #define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2095
+
+/*!
+ * @}
+ * @name Statistics for join cursors
+ * @anchor statistics_join
+ * @{
+ */
+/*! : accesses */
+#define	WT_STAT_JOIN_ACCESSES				3000
+/*! : actual count of items */
+#define	WT_STAT_JOIN_ACTUAL_COUNT			3001
+/*! : bloom filter false positives */
+#define	WT_STAT_JOIN_BLOOM_FALSE_POSITIVE		3002
 /*! @} */
 /*
  * Statistics section: END

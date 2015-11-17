@@ -300,9 +300,11 @@ struct __wt_cursor_join_entry {
 #define	WT_CURJOIN_ENTRY_OWN_BLOOM	0x04	/* this entry owns the bloom */
 	uint8_t			 flags;
 
-	WT_CURSOR_JOIN_ENDPOINT	*ends;		 /* reference endpoints */
+	WT_CURSOR_JOIN_ENDPOINT	*ends;		/* reference endpoints */
 	size_t			 ends_allocated;
 	size_t			 ends_next;
+
+	WT_JOIN_STATS		 stats;		/* Join statistics */
 };
 
 struct __wt_cursor_join {
@@ -356,6 +358,13 @@ struct __wt_cursor_metadata {
 	uint32_t flags;
 };
 
+struct __wt_join_stats_group {
+	const char *desc_prefix;	/* Prefix appears before description */
+	WT_CURSOR_JOIN *join_cursor;
+	size_t join_cursor_entry;	/* Position in entries */
+	WT_JOIN_STATS join_stats;
+};
+
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
@@ -365,14 +374,19 @@ struct __wt_cursor_stat {
 	int64_t	     *stats;		/* Statistics */
 	int	      stats_base;	/* Base statistics value */
 	int	      stats_count;	/* Count of statistics values */
-	const char *(*stats_desc)(int);	/* Statistics descriptions */
+	int	     (*stats_desc)(WT_CURSOR_STAT *, int, const char **);
+					/* Statistics descriptions */
+	int	     (*next_set)(WT_SESSION_IMPL *, WT_CURSOR_STAT *, bool,
+			 bool);		/* Advance to next set */
 
 	union {				/* Copies of the statistics */
 		WT_DSRC_STATS dsrc_stats;
 		WT_CONNECTION_STATS conn_stats;
+		WT_JOIN_STATS_GROUP join_stats_group;
 	} u;
 
 	const char **cfg;		/* Original cursor configuration */
+	char	*desc_buf;		/* Saved description string */
 
 	int	 key;			/* Current stats key */
 	uint64_t v;			/* Current stats value */

@@ -98,6 +98,7 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 	WT_CURSOR *firstcg_cur;
 	WT_CURSOR_JOIN *cjoin;
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	uint64_t r;
 
 	if (iter->advance)
@@ -105,6 +106,7 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 	else
 		iter->advance = true;
 
+	session = iter->session;
 	cjoin = iter->cjoin;
 
 	/*
@@ -117,7 +119,7 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 		firstcg_cur = ((WT_CURSOR_TABLE *)iter->cursor)->cg_cursors[0];
 	if (WT_CURSOR_RECNO(&cjoin->iface)) {
 		r = *(uint64_t *)firstcg_cur->key.data;
-		WT_ERR(__curjoin_pack_recno(iter->session, r, cjoin->recno_buf,
+		WT_ERR(__curjoin_pack_recno(session, r, cjoin->recno_buf,
 		    sizeof(cjoin->recno_buf), primkey));
 		*rp = r;
 	} else {
@@ -125,6 +127,8 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 		*rp = 0;
 	}
 	iter->curkey = primkey;
+	iter->entry->stats.actual_count++;
+	iter->entry->stats.accesses++;
 
 err:	return (ret);
 }
@@ -144,6 +148,7 @@ __curjoin_entry_iter_reset(WT_CURSOR_JOIN_ITER *iter)
 		WT_ERR(__wt_cursor_dup_position(
 		    iter->cjoin->entries[0].ends[0].cursor, iter->cursor));
 		iter->advance = false;
+		iter->entry->stats.actual_count = 0;
 	}
 
 err:	return (ret);
@@ -342,6 +347,7 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		else
 			c->get_key(c, &curvalue);
 		WT_ERR(__wt_bloom_insert(bloom, &curvalue));
+		entry->stats.actual_count++;
 advance:
 		if ((ret = c->next(c)) == WT_NOTFOUND)
 			break;
@@ -427,6 +433,7 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 
 	jeend = &cjoin->entries[cjoin->entries_next];
 	for (je = cjoin->entries; je < jeend; je++) {
+		__wt_stat_join_init_single(&je->stats);
 		for (end = &je->ends[0]; end < &je->ends[je->ends_next];
 		     end++)
 			WT_ERR(__curjoin_endpoint_init_key(session, je, end));
@@ -615,8 +622,11 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_DECL_RET;
 	WT_INDEX *index;
 	WT_ITEM *key, v;
+	bool bloom_found;
 
 	key = cjoin->iter->curkey;
+	entry->stats.accesses++;
+	bloom_found = false;
 
 	if (entry->bloom != NULL) {
 		/*
@@ -633,6 +643,7 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		 * long way.
 		 */
 		WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
+		bloom_found = true;
 	}
 	if (entry->index != NULL) {
 		c = entry->main;
@@ -659,7 +670,11 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			WT_ERR(WT_NOTFOUND);
 	} else
 		WT_ERR(__curjoin_entry_in_range(session, entry, &v, skip_left));
-err:
+
+	if (0) {
+err:		if (ret == WT_NOTFOUND && bloom_found)
+			entry->stats.bloom_false_positive++;
+	}
 	return (ret);
 }
 

@@ -486,4 +486,14 @@ struct __wt_dsrc_stats {
 	int64_t txn_update_conflict;
 };
 
+/*
+ * Statistics entries for join cursors.
+ */
+#define	WT_JOIN_STATS_BASE	3000
+struct __wt_join_stats {
+	int64_t accesses;
+	int64_t actual_count;
+	int64_t bloom_false_positive;
+};
+
 /* Statistics section: END */

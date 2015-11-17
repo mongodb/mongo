@@ -240,12 +240,12 @@ err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
- * __wt_open_cursor --
- *	Internal version of WT_SESSION::open_cursor.
+ * __session_open_cursor_int --
+ *	Internal version of WT_SESSION::open_cursor, with second cursor arg.
  */
-int
-__wt_open_cursor(WT_SESSION_IMPL *session,
-    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
+static int
+__session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri,
+    WT_CURSOR *owner, WT_CURSOR *other, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_COLGROUP *colgroup;
 	WT_DATA_SOURCE *dsrc;
@@ -322,7 +322,8 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 		break;
 	case 's':
 		if (WT_PREFIX_MATCH(uri, "statistics:"))
-			WT_RET(__wt_curstat_open(session, uri, cfg, cursorp));
+			WT_RET(__wt_curstat_open(session, uri, other, cfg,
+			    cursorp));
 		break;
 	default:
 		break;
@@ -352,6 +353,18 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_open_cursor --
+ *	Internal version of WT_SESSION::open_cursor.
+ */
+int
+__wt_open_cursor(WT_SESSION_IMPL *session,
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
+{
+	return (__session_open_cursor_int(session, uri, owner, NULL, cfg,
+	    cursorp));
+}
+
+/*
  * __session_open_cursor --
  *	WT_SESSION->open_cursor method.
  */
@@ -362,18 +375,22 @@ __session_open_cursor(WT_SESSION *wt_session,
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	bool statjoin;
 
 	cursor = *cursorp = NULL;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
 
-	if ((to_dup == NULL && uri == NULL) || (to_dup != NULL && uri != NULL))
+	statjoin = (to_dup != NULL && uri != NULL &&
+	    WT_STREQ(uri, "statistics:join"));
+	if ((to_dup == NULL && uri == NULL) ||
+	    (to_dup != NULL && uri != NULL && !statjoin))
 		WT_ERR_MSG(session, EINVAL,
 		    "should be passed either a URI or a cursor to duplicate, "
 		    "but not both");
 
-	if (to_dup != NULL) {
+	if (to_dup != NULL && !statjoin) {
 		uri = to_dup->uri;
 		if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
 		    !WT_PREFIX_MATCH(uri, "index:") &&
@@ -385,8 +402,9 @@ __session_open_cursor(WT_SESSION *wt_session,
 			WT_ERR(__wt_bad_object_type(session, uri));
 	}
 
-	WT_ERR(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
-	if (to_dup != NULL)
+	WT_ERR(__session_open_cursor_int(session, uri, NULL,
+	    statjoin ? to_dup : NULL, cfg, &cursor));
+	if (to_dup != NULL && !statjoin)
 		WT_ERR(__wt_cursor_dup_position(to_dup, cursor));
 
 	*cursorp = cursor;

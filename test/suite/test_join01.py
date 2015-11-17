@@ -41,6 +41,12 @@ class test_join01(wttest.WiredTigerTestCase):
         ('index', dict(ref='index'))
     ]
 
+    # Override WiredTigerTestCase, we have statistics tests.
+    def setUpConnectionOpen(self, dir):
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,statistics=(all),' + 'error_prefix="%s: "' % self.shortid())
+        return conn
+
     def gen_key(self, i):
         return [ i + 1 ]
 
@@ -68,9 +74,51 @@ class test_join01(wttest.WiredTigerTestCase):
             expect.remove(i)
         self.assertEquals(0, len(expect))
 
+    # Stats are collected twice: after iterating
+    # through the join cursor once, and secondly after resetting
+    # the join cursor and iterating again.
+    def stats(self, jc, which):
+        statcur = self.session.open_cursor('statistics:join', jc, None)
+        self.check_stats(statcur, 0, 'join: index:join01:index1: ' +
+                         'bloom filter false positives')
+        statcur.close()
+
+    def statstr_to_int(self, str):
+        """
+        Convert a statistics value string, which may be in either form:
+        '12345' or '33M (33604836)'
+        """
+        parts = str.rpartition('(')
+        return int(parts[2].rstrip(')'))
+
+    # string should appear with a minimum value of least "min".
+    def check_stats(self, statcursor, min, lookfor):
+        stringclass = ''.__class__
+        intclass = (0).__class__
+
+        # Reset the cursor, we're called multiple times.
+        statcursor.reset()
+
+        found = False
+        foundval = 0
+        self.printVerbose(3, 'statistics:')
+        for id, desc, valstr, val in statcursor:
+            self.assertEqual(type(desc), stringclass)
+            self.assertEqual(type(valstr), stringclass)
+            self.assertEqual(type(val), intclass)
+            self.assertEqual(val, self.statstr_to_int(valstr))
+            self.printVerbose(3, '  stat: \'' + desc + '\', \'' +
+                              valstr + '\', ' + str(val))
+            if desc == lookfor:
+                found = True
+                foundval = val
+
+        self.assertTrue(found, 'in stats, did not see: ' + lookfor)
+        self.assertTrue(foundval >= min)
+
     # Common function for testing the most basic functionality
     # of joins
-    def join_common(self, joincfg0, joincfg1, do_proj):
+    def join_common(self, joincfg0, joincfg1, do_proj, do_stats):
         #self.tty('join_common(' + joincfg0 + ',' + joincfg1 + ',' +
         #         str(do_proj) + ')')
         self.session.create('table:join01', 'key_format=r' +
@@ -130,9 +178,15 @@ class test_join01(wttest.WiredTigerTestCase):
         #    [73, 82, 62, 83, 92].
         #
         # After iterating, we should be able to reset and iterate again.
+        if do_stats:
+            self.stats(jc, 0)
         self.iter_common(jc, do_proj)
+        if do_stats:
+            self.stats(jc, 1)
         jc.reset()
         self.iter_common(jc, do_proj)
+        if do_stats:
+            self.stats(jc, 2)
         jc.reset()
         self.iter_common(jc, do_proj)
 
@@ -153,7 +207,7 @@ class test_join01(wttest.WiredTigerTestCase):
                     #self.tty('cfga=' + cfga +
                     #         ', cfgb=' + cfgb +
                     #         ', doproj=' + str(do_proj))
-                    self.join_common(cfga, cfgb, do_proj)
+                    self.join_common(cfga, cfgb, do_proj, False)
 
     def test_join_errors(self):
         self.session.create('table:join01', 'key_format=r,value_format=SS'
@@ -327,6 +381,16 @@ class test_join01(wttest.WiredTigerTestCase):
 
     def test_cursor_close2(self):
         self.cursor_close_common(False)
+
+    def test_stats(self):
+        bloomcfg1000 = ',strategy=bloom,count=1000'
+        bloomcfg10 = ',strategy=bloom,count=10'
+        self.join_common(bloomcfg1000, bloomcfg1000, False, True)
+
+        # Intentially run with an underconfigured Bloom filter,
+        # statistics should pick up some false positives.
+        self.join_common(bloomcfg10, bloomcfg10, False, True)
+
 
 if __name__ == '__main__':
     wttest.run()
