@@ -56,6 +56,8 @@ namespace {
 const std::size_t kIOServiceWorkers = 1;
 }  // namespace
 
+NetworkInterfaceASIO::Options::Options() = default;
+
 #if defined(_MSC_VER) && _MSC_VER < 1900
 NetworkInterfaceASIO::Options::Options(Options&& other)
     : connectionPoolOptions(std::move(other.connectionPoolOptions)),
@@ -107,7 +109,8 @@ void NetworkInterfaceASIO::startup() {
                     kIOServiceWorkers,
                     [&] {
                         return stdx::thread([this]() {
-                            setThreadName("NetworkInterfaceASIO");
+                            setThreadName(_options.instanceName + "-" +
+                                          std::to_string(_serviceRunners.size()));
                             try {
                                 LOG(2) << "The NetworkInterfaceASIO worker thread is spinning up";
                                 asio::io_service::work work(_io_service);

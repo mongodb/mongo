@@ -127,9 +127,10 @@ std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<Network
 std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkInterface> fixedNet) {
     std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
     for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
-        auto net =
-            executor::makeNetworkInterface(stdx::make_unique<ShardingNetworkConnectionHook>(),
-                                           stdx::make_unique<ShardingEgressMetadataHook>());
+        auto net = executor::makeNetworkInterface(
+            "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
+            stdx::make_unique<ShardingNetworkConnectionHook>(),
+            stdx::make_unique<ShardingEgressMetadataHook>());
         auto netPtr = net.get();
         auto exec = stdx::make_unique<ThreadPoolTaskExecutor>(
             stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
@@ -157,14 +158,16 @@ Status initializeGlobalShardingState(OperationContext* txn,
             return ShardingNetworkConnectionHook::validateHostImpl(target, isMasterReply);
         });
     auto network =
-        executor::makeNetworkInterface(stdx::make_unique<ShardingNetworkConnectionHook>(),
+        executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",
+                                       stdx::make_unique<ShardingNetworkConnectionHook>(),
                                        stdx::make_unique<ShardingEgressMetadataHook>());
     auto networkPtr = network.get();
     auto shardRegistry(
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
                                          makeTaskExecutorPool(std::move(network)),
                                          networkPtr,
-                                         makeTaskExecutor(executor::makeNetworkInterface()),
+                                         makeTaskExecutor(executor::makeNetworkInterface(
+                                             "NetworkInterfaceASIO-ShardRegistry-TaskExecutor")),
                                          configCS));
 
     std::unique_ptr<ForwardingCatalogManager> catalogManager =

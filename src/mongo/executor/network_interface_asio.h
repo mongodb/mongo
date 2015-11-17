@@ -80,7 +80,7 @@ class NetworkInterfaceASIO final : public NetworkInterface {
 
 public:
     struct Options {
-        Options() = default;
+        Options();
 
 // Explicit move construction and assignment to support MSVC
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -91,6 +91,7 @@ public:
         Options& operator=(Options&&) = default;
 #endif
 
+        std::string instanceName = "NetworkInterfaceASIO";
         ConnectionPool::Options connectionPoolOptions;
         std::unique_ptr<AsyncTimerFactoryInterface> timerFactory;
         std::unique_ptr<NetworkConnectionHook> networkConnectionHook;

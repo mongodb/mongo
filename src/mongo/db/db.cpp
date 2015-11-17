@@ -793,7 +793,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         getGlobalReplSettings(),
         new repl::ReplicationCoordinatorExternalStateImpl,
-        executor::makeNetworkInterface().release(),
+        executor::makeNetworkInterface("NetworkInterfaceASIO-Replication").release(),
         new repl::StorageInterfaceImpl{},
         new repl::TopologyCoordinatorImpl(topoCoordOptions),
         static_cast<int64_t>(curTimeMillis64()));

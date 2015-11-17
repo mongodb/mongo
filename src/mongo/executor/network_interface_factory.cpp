@@ -45,14 +45,16 @@
 namespace mongo {
 namespace executor {
 
-std::unique_ptr<NetworkInterface> makeNetworkInterface() {
-    return makeNetworkInterface(nullptr, nullptr);
+std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string instanceName) {
+    return makeNetworkInterface(std::move(instanceName), nullptr, nullptr);
 }
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
+    std::string instanceName,
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
     NetworkInterfaceASIO::Options options{};
+    options.instanceName = std::move(instanceName);
     options.networkConnectionHook = std::move(hook);
     options.metadataHook = std::move(metadataHook);
     options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();

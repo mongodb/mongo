@@ -155,7 +155,8 @@ size_t getSize(const BSONObj& o) {
 
 BackgroundSync::BackgroundSync()
     : _buffer(bufferMaxSizeGauge, &getSize),
-      _threadPoolTaskExecutor(makeThreadPool(), executor::makeNetworkInterface()),
+      _threadPoolTaskExecutor(makeThreadPool(),
+                              executor::makeNetworkInterface("NetworkInterfaceASIO-BGSync")),
       _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
                          std::numeric_limits<long long>::max()),
       _lastFetchedHash(0),
