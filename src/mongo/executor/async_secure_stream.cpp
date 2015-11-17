@@ -69,6 +69,11 @@ void AsyncSecureStream::connect(const asio::ip::tcp::resolver::iterator endpoint
                 return _userHandler(ec);
             }
 
+            ec = setStreamNoDelay(&_stream.next_layer());
+            if (ec) {
+                return _userHandler(ec);
+            }
+
             _connected = true;
             return _handleConnect(std::move(iter));
         }));

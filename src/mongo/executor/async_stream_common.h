@@ -81,6 +81,7 @@ void cancelStream(ASIOStream* stream, bool connected) {
 }
 
 void logFailureInSetStreamNonBlocking(std::error_code ec);
+void logFailureInSetStreamNoDelay(std::error_code ec);
 
 template <typename ASIOStream>
 std::error_code setStreamNonBlocking(ASIOStream* stream) {
@@ -88,6 +89,16 @@ std::error_code setStreamNonBlocking(ASIOStream* stream) {
     stream->non_blocking(true, ec);
     if (ec) {
         logFailureInSetStreamNonBlocking(ec);
+    }
+    return ec;
+}
+
+template <typename ASIOStream>
+std::error_code setStreamNoDelay(ASIOStream* stream) {
+    std::error_code ec;
+    stream->set_option(asio::ip::tcp::no_delay(true), ec);
+    if (ec) {
+        logFailureInSetStreamNoDelay(ec);
     }
     return ec;
 }
