@@ -22,7 +22,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
-	WT_PAGE_INDEX *pindex;
+	WT_PAGE_INDEX *pindex, *parent_pindex;
 	WT_REF *current, *descent;
 	uint32_t base, indx, limit;
 	int depth;
@@ -37,10 +37,12 @@ __wt_col_search(WT_SESSION_IMPL *session,
 		goto leaf_only;
 	}
 
+restart_root:
 	/* Search the internal pages of the tree. */
 	current = &btree->root;
-	for (depth = 2;; ++depth) {
-restart:	page = current->page;
+	for (depth = 2, pindex = NULL;; ++depth) {
+		parent_pindex = pindex;
+restart_page:	page = current->page;
 		if (page->type != WT_PAGE_COL_INT)
 			break;
 
@@ -51,8 +53,19 @@ restart:	page = current->page;
 		descent = pindex->index[base - 1];
 
 		/* Fast path appends. */
-		if (recno >= descent->key.recno)
+		if (recno >= descent->key.recno) {
+			/*
+			 * If on the last slot (the key is larger than any key
+			 * on the page), check for an internal page split race.
+			 */
+			if (parent_pindex != NULL &&
+			    __wt_split_intl_race(
+			    session, current->home, parent_pindex)) {
+				WT_RET(__wt_page_release(session, current, 0));
+				goto restart_root;
+			}
 			goto descend;
+		}
 
 		/* Binary search of internal pages. */
 		for (base = 0,
@@ -90,15 +103,13 @@ descend:	/*
 		 * page; otherwise return on error, the swap call ensures we're
 		 * holding nothing on failure.
 		 */
-		switch (ret = __wt_page_swap(session, current, descent, 0)) {
-		case 0:
+		if ((ret = __wt_page_swap(session, current, descent, 0)) == 0) {
 			current = descent;
-			break;
-		case WT_RESTART:
-			goto restart;
-		default:
-			return (ret);
+			continue;
 		}
+		if (ret == WT_RESTART)
+			goto restart_page;
+		return (ret);
 	}
 
 	/* Track how deep the tree gets. */
