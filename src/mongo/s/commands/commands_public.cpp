@@ -86,6 +86,10 @@ bool cursorCommandPassthrough(OperationContext* txn,
                               int options,
                               BSONObjBuilder* out) {
     const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
+    if (!shard) {
+        return Command::appendCommandStatus(
+            *out, {ErrorCodes::ShardNotFound, "failed to find a valid shard"});
+    }
     ScopedDbConnection conn(shard->getConnString());
     auto cursor = conn->query(str::stream() << conf->name() << ".$cmd",
                               cmdObj,
