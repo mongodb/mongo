@@ -13,6 +13,7 @@
 #define	WT_UNUSED(var)		(void)(var)
 
 /* Basic constants. */
+#define	WT_THOUSAND	(1000)
 #define	WT_MILLION	(1000000)
 #define	WT_BILLION	(1000000000)
 
