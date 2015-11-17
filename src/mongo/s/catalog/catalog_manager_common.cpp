@@ -559,6 +559,11 @@ Status CatalogManagerCommon::enableSharding(OperationContext* txn, const std::st
         db.setPrimary(newShardId);
         db.setSharded(true);
     } else if (status.code() == ErrorCodes::NamespaceExists) {
+        if (db.getSharded()) {
+            return Status(ErrorCodes::AlreadyInitialized,
+                          str::stream() << "sharding already enabled for database " << dbName);
+        }
+
         // Database exists, so just update it
         db.setSharded(true);
     } else {

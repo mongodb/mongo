@@ -21,6 +21,7 @@
     ];
 
     DB.prototype.getCollection = function() {
+        var dbName = this.getName();
         var collection = originalGetCollection.apply(this, arguments);
         var fullName = collection.getFullName();
 
@@ -36,8 +37,12 @@
             }
         }
 
-        var res = this.adminCommand({enableSharding: this.getName()});
-        assert.commandWorked(res, "enabling sharding on the '" + this.getName() + "' db failed");
+        var res = this.adminCommand({enableSharding: dbName});
+
+        // enableSharding may only be called once for a database.
+        if (res.code !== ErrorCodes.AlreadyInitialized) {
+            assert.commandWorked(res, "enabling sharding on the '" + dbName + "' db failed");
+        }
 
         res = this.adminCommand({shardCollection: fullName, key: {_id: 'hashed'}});
         assert.commandWorked(res, "sharding '" + fullName + "' with a hashed _id key failed");

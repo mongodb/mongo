@@ -2197,6 +2197,34 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExists) {
     future.timed_get(kFutureTimeout);
 }
 
+TEST_F(CatalogManagerReplSetTest, EnableShardingFailsWhenTheDatabaseIsAlreadySharded) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    vector<ShardType> shards;
+    ShardType shard;
+    shard.setName("shard0");
+    shard.setHost("shard0:12");
+
+    setupShards(vector<ShardType>{shard});
+
+    distLock()->expectLock(
+        [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
+        Status::OK());
+
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->enableSharding(operationContext(), "test");
+        ASSERT_EQ(status.code(), ErrorCodes::AlreadyInitialized);
+    });
+
+    // Query to find if db already exists in config and it is sharded.
+    onFindCommand([](const RemoteCommandRequest& request) {
+        BSONObj existingDoc(fromjson(R"({ _id: "test", primary: "shard2", partitioned: true })"));
+        return vector<BSONObj>{existingDoc};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
 TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsInvalidFormat) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
