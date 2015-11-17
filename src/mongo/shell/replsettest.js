@@ -46,6 +46,9 @@
  *     useBridge {boolean}: If true, then a mongobridge process is started for each node in the
  *        replica set. Both the replica set configuration and the connections returned by startSet()
  *        will be references to the proxied connections. Defaults to false.
+ *     settings {object}: Setting used in the replica set config document.
+ *        Example:
+ *              settings: { chainingAllowed: false, ... }
  *   }
  * 
  * Member variables:
@@ -62,6 +65,7 @@ ReplSetTest = function(opts) {
     this.shardSvr = opts.shardSvr || false;
     this.protocolVersion = opts.protocolVersion;
     this.useBridge = opts.useBridge || false;
+    this.configSettings = opts.settings || false;
 
     this.nodeOptions = {};
 
@@ -193,6 +197,10 @@ ReplSetTest.prototype.getReplSetConfig = function() {
 
     if (jsTestOptions().useLegacyReplicationProtocol) {
         cfg.protocolVersion = 0;
+    }
+
+    if (this.configSettings) {
+        cfg.settings = this.configSettings;
     }
     return cfg;
 }
