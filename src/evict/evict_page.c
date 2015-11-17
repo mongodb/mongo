@@ -184,7 +184,10 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 				return (0);
 			WT_RET_BUSY_OK(ret);
 
-			/* If a reverse split fails, unlock the child. */
+			/*
+			 * The child must be locked after a failed reverse
+			 * split.
+			 */
 			WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 		}
 	}
