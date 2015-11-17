@@ -523,7 +523,6 @@ extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg);
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid);
 extern void __wt_thread_id(char *buf, size_t buflen);
-extern int __wt_seconds(WT_SESSION_IMPL *session, time_t *timep);
 extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern void __wt_yield(void);
 extern int __wt_ext_struct_pack(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, void *buffer, size_t size, const char *fmt, ...);

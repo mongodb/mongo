@@ -336,6 +336,11 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
+	/* In-memory configurations don't make sense for LSM. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_RET_MSG(session, EINVAL,
+		    "LSM trees not supported by in-memory configurations");
+
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
 	if (WT_STRING_MATCH("r", cval.str, cval.len))
 		WT_RET_MSG(session, EINVAL,

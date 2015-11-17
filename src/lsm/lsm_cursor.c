@@ -1530,6 +1530,10 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	if (!WT_PREFIX_MATCH(uri, "lsm:"))
 		return (EINVAL);
 
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_RET_MSG(session, EINVAL,
+		    "LSM trees not supported by in-memory configurations");
+
 	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
 	if (cval.len != 0)
 		WT_RET_MSG(session, EINVAL,
