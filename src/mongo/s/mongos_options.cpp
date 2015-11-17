@@ -264,7 +264,18 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
                                         << configdbConnectionString.getStatus().toString());
         }
 
-        mongosGlobalParams.configdbs = configdbConnectionString.getValue();
+        std::vector<HostAndPort> seedServers;
+        for (const auto& host : configdbConnectionString.getValue().getServers()) {
+            seedServers.push_back(host);
+            if (!seedServers.back().hasPort()) {
+                seedServers.back() = HostAndPort{host.host(), ServerGlobalParams::ConfigServerPort};
+            }
+        }
+
+        mongosGlobalParams.configdbs =
+            ConnectionString{configdbConnectionString.getValue().type(),
+                             seedServers,
+                             configdbConnectionString.getValue().getSetName()};
     }
 
     std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
