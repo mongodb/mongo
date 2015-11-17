@@ -538,8 +538,8 @@ restart:
 	while (i < WT_SLOT_POOL) {
 		save_i = i;
 		slot = &log->slot_pool[i++];
-			WT_ASSERT(session, slot->slot_state != 0 ||
-			    slot->slot_release_lsn.file >= log->write_lsn.file);
+		WT_ASSERT(session, slot->slot_state != 0 ||
+		    slot->slot_release_lsn.file >= log->write_lsn.file);
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 			continue;
 		written[written_i].slot_index = save_i;
