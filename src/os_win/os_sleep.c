@@ -19,7 +19,7 @@ __wt_sleep(uint64_t seconds, uint64_t micro_seconds)
 	 * If the caller wants a small pause, set to our
 	 * smallest granularity.
 	 */
-	if (seconds == 0 && micro_seconds < 1000)
-		micro_seconds = 1000;
-	Sleep(seconds * 1000 + micro_seconds / 1000);
+	if (seconds == 0 && micro_seconds < WT_THOUSAND)
+		micro_seconds = WT_THOUSAND;
+	Sleep(seconds * WT_THOUSAND + micro_seconds / WT_THOUSAND);
 }

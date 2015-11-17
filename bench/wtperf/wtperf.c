@@ -653,7 +653,7 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 					goto err;
 				}
 				++trk->latency_ops;
-				usecs = ns_to_us(WT_TIMEDIFF_NS(stop, start));
+				usecs = WT_TIMEDIFF_US(stop, start);
 				track_operation(trk, usecs);
 			}
 			/* Increment operation count */
@@ -936,7 +936,7 @@ populate_thread(void *arg)
 				goto err;
 			}
 			++trk->latency_ops;
-			usecs = ns_to_us(WT_TIMEDIFF_NS(stop, start));
+			usecs = WT_TIMEDIFF_US(stop, start);
 			track_operation(trk, usecs);
 		}
 		++thread->insert.ops;	/* Same as trk->ops */
@@ -1068,7 +1068,7 @@ populate_async(void *arg)
 			goto err;
 		}
 		++trk->latency_ops;
-		usecs = ns_to_us(WT_TIMEDIFF_NS(stop, start));
+		usecs = WT_TIMEDIFF_US(stop, start);
 		track_operation(trk, usecs);
 	}
 	if ((ret = session->close(session, NULL)) != 0) {
@@ -2423,7 +2423,7 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 	 * If we did enough operations in less than a second, sleep for
 	 * the rest of the second.
 	 */
-	usecs_to_complete = ns_to_us(WT_TIMEDIFF_NS(now, *interval));
+	usecs_to_complete = WT_TIMEDIFF_US(now, *interval);
 	if (usecs_to_complete < USEC_PER_SEC)
 		(void)usleep((useconds_t)(USEC_PER_SEC - usecs_to_complete));
 

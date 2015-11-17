@@ -201,7 +201,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 		 * Don't sleep long when waiting on a read lock, hopefully we're
 		 * waiting on another read thread to increment the reader count.
 		 */
-		if (++pause_cnt < 1000)
+		if (++pause_cnt < WT_THOUSAND)
 			WT_PAUSE();
 		else
 			__wt_sleep(0, 10);
@@ -300,7 +300,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 		 * situation happens if there are more threads than cores in the
 		 * system and we're thrashing on shared resources.
 		 */
-		if (++pause_cnt < 1000)
+		if (++pause_cnt < WT_THOUSAND)
 			WT_PAUSE();
 		else
 			__wt_sleep(0, 10);

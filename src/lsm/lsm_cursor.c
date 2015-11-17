@@ -81,7 +81,7 @@ __wt_clsm_await_switch(WT_CURSOR_LSM *clsm)
 	    lsm_tree->nchunks == 0 ||
 	    clsm->dsk_gen == lsm_tree->dsk_gen;
 	    ++waited) {
-		if (waited % 1000 == 0)
+		if (waited % WT_THOUSAND == 0)
 			WT_RET(__wt_lsm_manager_push_entry(
 			    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
 		__wt_sleep(0, 10);
