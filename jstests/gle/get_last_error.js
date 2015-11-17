@@ -1,26 +1,15 @@
 // Check that the wtime and writtenTo fields are set or unset depending on the writeConcern used.
 // First check on a replica set with different combinations of writeConcern
 var name = "SERVER-9005";
-var replTest = new ReplSetTest( {name: name, oplogSize: 1, nodes: 3} );
+var replTest = new ReplSetTest({name: name, oplogSize: 1, nodes: 3,
+                                settings: {chainingAllowed: false}});
 var nodes = replTest.startSet();
-replTest.initiate({
-    _id: name,
-    members: [
-        { _id: 0, host: replTest.nodeList()[0] },
-        { _id: 1, host: replTest.nodeList()[1] },
-        { _id: 2, host: replTest.nodeList()[2] }
-    ],
-    settings: { chainingAllowed: false }
-});
+replTest.initiate();
 var master = replTest.getMaster();
 var mdb = master.getDB("test");
 
 // synchronize replication
-mdb.foo.insert({ _id: "1" });
-replTest.awaitReplication();
-
-// do a second write to do gle tests on
-mdb.foo.insert({ _id: "2" });
+assert.writeOK(mdb.foo.insert({ _id: "1" }, {writeConcern: {w: 3, wtimeout:30000}}));
 
 var gle = master.getDB("test").runCommand({getLastError : 1, j : true});
 print('Trying j=true');
@@ -62,7 +51,8 @@ assert.eq(gle.wtimeout, null);
 replTest.stop(2);
 master = replTest.getMaster();
 mdb = master.getDB("test");
-mdb.foo.insert({_id: "3"});
+// do w:2 write so secondary is caught up before calling {gle w:3}.
+assert.writeOK(mdb.foo.insert({_id: "3"}, {writeConcern: {w: 2, wtimeout:30000}}));
 gle = mdb.getLastErrorObj(3, 1000);
 print('Trying w=3 with 2 nodes up, 1000ms timeout.');
 printjson(gle);
@@ -79,7 +69,7 @@ printjson(gle);
 assert.eq(gle.ok, 1);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo.length, 2);
-assert.eq(gle.wtime, 0);
+assert.lt(gle.wtime, 5);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
@@ -93,7 +83,7 @@ var mongod = MongoRunner.runMongod({});
 var sdb = mongod.getDB("test");
 
 sdb.foo.drop();
-sdb.foo.insert({ _id: "1" });
+assert.writeOK(sdb.foo.insert({ _id: "1" }));
 
 gle = sdb.getLastErrorObj(1);
 print('Trying standalone server with w=1.');
