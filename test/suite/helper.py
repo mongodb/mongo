@@ -223,8 +223,8 @@ def complex_populate_type(self, uri, config, rows, type):
         indxname + ':indx4', 'columns=(column2,column4)' + ',' + type)
     cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows + 1):
-        v = complex_value_populate(cursor, i)
-        cursor[key_populate(cursor, i)] = (v[0], v[1], v[2], v[3])
+        cursor[key_populate(cursor, i)] = \
+                tuple(complex_value_populate(cursor, i))
     cursor.close()
     # add some indices after populating
     self.session.create(

@@ -139,8 +139,8 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 		cursor->set_key(cursor, "key001");
 	cursor->set_value(cursor, big);
 
-	/* Insert the record. */
-	if ((ret = cursor->insert(cursor)) != 0)
+	/* Insert the record (use update, insert discards the key). */
+	if ((ret = cursor->update(cursor)) != 0)
 		testutil_die(ret, "WT_CURSOR.insert");
 
 	/* Retrieve the record and check it. */
