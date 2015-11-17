@@ -2384,10 +2384,13 @@ struct __wt_connection {
  * string\, chosen from the following options: \c "dsync"\, \c "fsync"\, \c
  * "none"; default \c fsync.}
  * @config{ ),,}
+ * @config{use_environment, use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME
+ * environment variables if the process is not running with special privileges.
+ * See @ref home for more information., a boolean flag; default \c true.}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
- * WIREDTIGER_HOME environment variables regardless of whether or not the
- * process is running with special privileges.  See @ref home for more
- * information., a boolean flag; default \c false.}
+ * WIREDTIGER_HOME environment variables even if the process is running with
+ * special privileges.  See @ref home for more information., a boolean flag;
+ * default \c false.}
  * @config{verbose, enable messages for various events.  Only available if
  * WiredTiger is configured with --enable-verbose.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with

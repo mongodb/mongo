@@ -511,6 +511,7 @@ dev
 dh
 dhandle
 dhandles
+difftime
 dir
 dirlist
 disjunction

@@ -705,10 +705,15 @@ wiredtiger_open = wiredtiger_open_common + [
     Config('in_memory', 'false', r'''
         keep data in-memory only, minimize disk I/O''',
         type='boolean', undoc=True),
+    Config('use_environment', 'true', r'''
+        use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
+        variables if the process is not running with special privileges.
+        See @ref home for more information''',
+        type='boolean'),
     Config('use_environment_priv', 'false', r'''
         use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
-        variables regardless of whether or not the process is running
-        with special privileges.  See @ref home for more information''',
+        variables even if the process is running with special privileges.
+        See @ref home for more information''',
         type='boolean'),
 ]
 

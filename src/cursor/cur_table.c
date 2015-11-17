@@ -502,29 +502,38 @@ __curtable_insert(WT_CURSOR *cursor)
 	if (ctable->table->nindices > 0)
 		F_CLR(primary, WT_CURSTD_OVERWRITE);
 	ret = primary->insert(primary);
-	F_SET(primary, flag_orig);
 
-	if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
-		/*
-		 * !!!
-		 * The insert failure clears these flags, but does not touch the
-		 * items.  We could make a copy each time for overwrite cursors,
-		 * but for now we just reset the flags.
-		 */
-		F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
-		ret = __curtable_update(cursor);
-		goto err;
+	/*
+	 * !!!
+	 * WT_CURSOR.insert clears the set internally/externally flags
+	 * but doesn't touch the items. We could make a copy each time
+	 * for overwrite cursors, but for now we just reset the flags.
+	 */
+	F_SET(primary, flag_orig | WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+
+	if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+		WT_ERR(__curtable_update(cursor));
+	else {
+		WT_ERR(ret);
+
+		for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
+			(*cp)->recno = primary->recno;
+			WT_ERR((*cp)->insert(*cp));
+		}
+
+		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), false));
 	}
-	WT_ERR(ret);
 
-	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
-		(*cp)->recno = primary->recno;
-		WT_ERR((*cp)->insert(*cp));
-	}
-
-	WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), false));
+	/*
+	 * WT_CURSOR.insert doesn't leave the cursor positioned, and the
+	 * application may want to free the memory used to configure the
+	 * insert; don't read that memory again (matching the underlying
+	 * file object cursor insert semantics).
+	 */
+	F_CLR(primary, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
+
 	return (ret);
 }
 
