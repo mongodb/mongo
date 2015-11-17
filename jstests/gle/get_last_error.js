@@ -83,7 +83,7 @@ var mongod = MongoRunner.runMongod({});
 var sdb = mongod.getDB("test");
 
 sdb.foo.drop();
-assert.writeOK(sdb.foo.insert({ _id: "1" }));
+sdb.foo.insert({ _id: "1" });
 
 gle = sdb.getLastErrorObj(1);
 print('Trying standalone server with w=1.');

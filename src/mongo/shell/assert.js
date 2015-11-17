@@ -402,8 +402,10 @@ assert.writeOK = function(res, msg) {
         errMsg = "write command failed: " + tojson(res);
     }
     else {
-        errMsg = "unknown type of write result, cannot check ok: " 
-                 + tojson(res);
+        if (!res || !res.ok) {
+            errMsg = "unknown type of write result, cannot check ok: "
+                     + tojson(res);
+        }
     }
     
     if (errMsg) {
@@ -435,8 +437,10 @@ assert.writeError = function(res, msg) {
         // No-op since we're expecting an error
     }
     else {
-        errMsg = "unknown type of write result, cannot check error: "
-                 + tojson(res);
+        if (!res || res.ok) {
+            errMsg = "unknown type of write result, cannot check error: "
+                     + tojson(res);
+        }
     }
     
     if (errMsg) {
