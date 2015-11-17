@@ -416,9 +416,14 @@ Status Collection::_insertDocuments(OperationContext* txn,
                                     bool enforceQuota) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
-    // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
-    //       under the RecordStore, this feels broken since that should be a
-    //       collection access method probably
+    if (isCapped() && _indexCatalog.haveAnyIndexes() && std::distance(begin, end) > 1) {
+        // We require that inserts to indexed capped collections be done one-at-a-time to avoid the
+        // possibility that a later document causes an earlier document to be deleted before it can
+        // be indexed.
+        // TODO SERVER-21512 It would be better to handle this here by just doing single inserts.
+        return {ErrorCodes::OperationCannotBeBatched,
+                "Can't batch inserts into indexed capped collections"};
+    }
 
     std::vector<Record> records;
     for (auto it = begin; it != end; it++) {

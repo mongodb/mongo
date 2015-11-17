@@ -252,7 +252,7 @@ public:
     /*
      * Inserts all documents inside one WUOW.
      * Caller should ensure vector is appropriately sized for this.
-     * If errors occor (including WCE), caller should retry documents individually.
+     * If any errors occur (including WCE), caller should retry documents individually.
      */
     Status insertDocuments(OperationContext* txn,
                            std::vector<BSONObj>::const_iterator begin,

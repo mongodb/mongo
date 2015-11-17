@@ -150,6 +150,7 @@ error_code("ZLibError", 147)
 error_code("ReadConcernMajorityNotEnabled", 148)
 error_code("NoConfigMaster", 149)
 error_code("StaleEpoch", 150)
+error_code("OperationCannotBeBatched", 151)
 
 # Non-sequential error codes (for compatibility only)
 error_code("RecvStaleConfig", 9996)
