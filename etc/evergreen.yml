@@ -601,6 +601,24 @@ tasks:
         resmoke_args: --suites=jstestfuzz
         should_shuffle: false
 
+## jstestfuzz replica set ##
+- name: jstestfuzz_replication_WT
+  exec_timeout_secs: 7200 # Time out the task if it runs for more than 2 hours.
+  depends_on:
+  - name: compile
+  commands:
+    - func: "do setup"
+    - func: "run jstestfuzz"
+    - func: "run tests"
+      # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
+      # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
+      # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
+      # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
+      timeout_secs: 1800
+      vars:
+        resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger
+        should_shuffle: false
+
 ## jstestfuzz sharded cluster ##
 - name: jstestfuzz_sharded_WT
   exec_timeout_secs: 7200 # Time out the task if it runs for more than 2 hours.
@@ -2193,6 +2211,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -2393,6 +2412,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -2448,6 +2468,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod_WT
@@ -2524,6 +2545,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mongosTest
   - name: mmap
@@ -2624,6 +2646,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -2709,6 +2732,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_WT_ese
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: noPassthrough
@@ -2796,6 +2820,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -2956,6 +2981,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3050,6 +3076,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3199,6 +3226,7 @@ buildvariants:
   - name: sharding_WT_ese
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -3257,6 +3285,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3628,6 +3657,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -3717,6 +3747,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3803,6 +3834,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -3876,6 +3908,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3977,6 +4010,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4078,6 +4112,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4158,6 +4193,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -4204,6 +4240,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -4254,6 +4291,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
   - name: sasl
@@ -4325,6 +4363,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4401,6 +4440,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
   - name: sasl
@@ -4472,6 +4512,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4629,6 +4670,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -4700,6 +4742,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4782,6 +4825,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: bulk_gle_passthrough
   - name: parallel
@@ -4820,6 +4864,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: bulk_gle_passthrough
   - name: parallel
@@ -5011,6 +5056,7 @@ buildvariants:
   tasks:
   - name: compile
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: unittests
 
@@ -5067,6 +5113,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
