@@ -405,7 +405,7 @@ public:
 
         WT_CURSOR* c = _cursor->get();
 
-        bool mustAdvance = true;
+        bool mustAdvance = !_skipNextAdvance;
         if (_lastReturnedId.isNull() && !_forward && _rs._isCapped) {
             // In this case we need to seek to the highest visible record.
             const RecordId reverseCappedInitialSeekPoint =
@@ -441,6 +441,7 @@ public:
             invariantWTOK(advanceRet);
         }
 
+        _skipNextAdvance = false;
         int64_t key;
         invariantWTOK(c->get_key(c, &key));
         const RecordId id = _fromKey(key);
@@ -458,6 +459,7 @@ public:
     }
 
     boost::optional<Record> seekExact(const RecordId& id) final {
+        _skipNextAdvance = false;
         WT_CURSOR* c = _cursor->get();
         c->set_key(c, _makeKey(id));
         // Nothing after the next line can throw WCEs.
@@ -497,6 +499,7 @@ public:
 
         // This will ensure an active session exists, so any restored cursors will bind to it
         invariant(WiredTigerRecoveryUnit::get(_txn)->getSession(_txn) == _cursor->getSession());
+        _skipNextAdvance = false;
 
         // If we've hit EOF, then this iterator is done and need not be restored.
         if (_eof)
@@ -529,15 +532,11 @@ public:
         }
 
         if (_forward && cmp > 0) {
-            // We landed after where we were. Move back one so that next() will return this
-            // document.
-            ret = WT_OP_CHECK(c->prev(c));
+            // We landed after where we were. Return our new location on the next call to next().
+            _skipNextAdvance = true;
         } else if (!_forward && cmp < 0) {
-            // Do the opposite for reverse cursors.
-            ret = WT_OP_CHECK(c->next(c));
+            _skipNextAdvance = true;
         }
-        if (ret != WT_NOTFOUND)
-            invariantWTOK(ret);
 
         return true;
     }
@@ -574,6 +573,7 @@ private:
     const WiredTigerRecordStore& _rs;
     OperationContext* _txn;
     const bool _forward;
+    bool _skipNextAdvance = false;
     boost::optional<WiredTigerCursor> _cursor;
     bool _eof = false;
     RecordId _lastReturnedId;  // If null, need to seek to first/last record.
