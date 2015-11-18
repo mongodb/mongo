@@ -64,6 +64,7 @@ functions:
           # create all resources and instances
           ./setup-cluster.sh
           echo "EC2 Cluster CREATED."
+          touch terraform.tfstate.backup
           tar -czvf cluster_config.tgz ips.sh terraform.tfstate.backup terraform.tfstate
     - command: s3.put
       params:
@@ -116,9 +117,7 @@ functions:
           set -v
           cd ./clusters/${cluster}
           cat ips.sh
-          cat run-${test}.json
           ./update_run_config.sh
-          cat run-${test}.json
           rm -rf ./reports
           rm -f ../../reports.tgz
           echo "Run test for ${test} with setup ${setup}"
@@ -234,6 +233,9 @@ tasks:
           set -v
           ${scons|scons} ${compile_flags|} core
           mkdir -p mongodb/bin
+          strip mongo
+          strip mongod
+          strip mongos
           mv mongo mongodb/bin
           mv mongod mongodb/bin
           mv mongos mongodb/bin
@@ -352,7 +354,7 @@ buildvariants:
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: standalone
-    cluster: single
+    cluster: single-correctness
     numShard: 0
   run_on:
       - "linux-64-amzn-perf-standalone"
