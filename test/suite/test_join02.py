@@ -57,9 +57,9 @@ class test_join02(wttest.WiredTigerTestCase):
 
     def gen_key(self, i):
         if self.keyformat == 'S':
-            return [ 'key{:06}'.format(i) ]  # zero pad so it sorts expectedly
+            return [ 'key%06d' % i ]  # zero pad so it sorts expectedly
         elif self.keyformat == 'iS':
-            return [ i, 'key{:06}'.format(i) ]
+            return [ i, 'key%06d' % i ]
         else:
             return [ i ]
 
