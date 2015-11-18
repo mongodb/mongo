@@ -41,8 +41,8 @@ StatusWithMatchExpression ExtensionsCallbackNoop::parseText(BSONElement text) co
         return textParams.getStatus();
     }
 
-    auto expr = stdx::make_unique<TextNoOpMatchExpression>(std::move(textParams.getValue()));
-    Status initStatus = expr->init();
+    auto expr = stdx::make_unique<TextNoOpMatchExpression>();
+    Status initStatus = expr->init(std::move(textParams.getValue()));
     if (!initStatus.isOK()) {
         return initStatus;
     }

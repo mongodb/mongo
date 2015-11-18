@@ -58,6 +58,16 @@ baseEnv.Library('base', [
                     "$BUILD_DIR/third_party/shim_stemmer",
                     ])
 
+env.Library(
+    target='fts_query_noop',
+    source=[
+        'fts_query_noop.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.Library( 'server_common', [
              'fts_enabled.cpp'
              ],
@@ -95,6 +105,9 @@ env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
 
 env.CppUnitTest( "fts_query_impl_test", "fts_query_impl_test.cpp",
                  LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_query_noop_test", "fts_query_noop_test.cpp",
+                 LIBDEPS=["fts_query_noop"] )
 
 env.CppUnitTest( "fts_spec_test", "fts_spec_test.cpp",
                  LIBDEPS=["base"] )

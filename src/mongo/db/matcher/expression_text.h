@@ -30,17 +30,27 @@
 
 #pragma once
 
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/matcher/expression_text_base.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
+class NamespaceString;
+class OperationContext;
+
 class TextMatchExpression : public TextMatchExpressionBase {
 public:
-    TextMatchExpression(TextParams params);
+    Status init(OperationContext* txn, const NamespaceString& nss, TextParams params);
 
-    Status init();
+    const fts::FTSQuery& getFTSQuery() const final {
+        return _ftsQuery;
+    }
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
+
+private:
+    fts::FTSQueryImpl _ftsQuery;
 };
 
 }  // namespace mongo

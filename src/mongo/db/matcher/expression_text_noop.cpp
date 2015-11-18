@@ -34,21 +34,24 @@
 
 namespace mongo {
 
-TextNoOpMatchExpression::TextNoOpMatchExpression(TextParams params)
-    : TextMatchExpressionBase(std::move(params)) {}
-
-Status TextNoOpMatchExpression::init() {
+Status TextNoOpMatchExpression::init(TextParams params) {
+    _ftsQuery.setQuery(std::move(params.query));
+    _ftsQuery.setLanguage(std::move(params.language));
+    _ftsQuery.setCaseSensitive(params.caseSensitive);
+    _ftsQuery.setDiacriticSensitive(params.diacriticSensitive);
+    invariantOK(_ftsQuery.parse(fts::TEXT_INDEX_VERSION_INVALID));
     return initPath("_fts");
 }
 
 std::unique_ptr<MatchExpression> TextNoOpMatchExpression::shallowClone() const {
     TextParams params;
-    params.query = getQuery();
-    params.language = getLanguage();
-    params.caseSensitive = getCaseSensitive();
-    params.diacriticSensitive = getDiacriticSensitive();
-    auto expr = stdx::make_unique<TextNoOpMatchExpression>(std::move(params));
-    expr->init();
+    params.query = _ftsQuery.getQuery();
+    params.language = _ftsQuery.getLanguage();
+    params.caseSensitive = _ftsQuery.getCaseSensitive();
+    params.diacriticSensitive = _ftsQuery.getDiacriticSensitive();
+
+    auto expr = stdx::make_unique<TextNoOpMatchExpression>();
+    invariantOK(expr->init(std::move(params)));
     if (getTag()) {
         expr->setTag(getTag()->clone());
     }

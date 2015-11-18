@@ -560,10 +560,8 @@ void ChunkManager::getAllShardIds(set<ShardId>* all) const {
 
 IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
                                                  const CanonicalQuery& canonicalQuery) {
-    // $text is not allowed in planning since we don't have text index on mongos.
-    //
-    // TODO: Treat $text query as a no-op in planning. So with shard key {a: 1},
-    //       the query { a: 2, $text: { ... } } will only target to {a: 2}.
+    // TODO: special-casing TEXT here is no longer necessary.  The work to remove this special case
+    // is being tracked at SERVER-21511.
     if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::TEXT)) {
         IndexBounds bounds;
         IndexBoundsBuilder::allValuesBounds(key, &bounds);  // [minKey, maxKey]

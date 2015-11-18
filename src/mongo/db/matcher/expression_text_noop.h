@@ -28,17 +28,23 @@
 
 #pragma once
 
+#include "mongo/db/fts/fts_query_noop.h"
 #include "mongo/db/matcher/expression_text_base.h"
 
 namespace mongo {
 
 class TextNoOpMatchExpression : public TextMatchExpressionBase {
 public:
-    TextNoOpMatchExpression(TextParams params);
+    Status init(TextParams params);
 
-    Status init();
+    const fts::FTSQuery& getFTSQuery() const final {
+        return _ftsQuery;
+    }
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
+
+private:
+    fts::FTSQueryNoop _ftsQuery;
 };
 
 }  // namespace mongo

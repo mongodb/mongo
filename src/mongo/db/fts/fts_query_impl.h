@@ -30,31 +30,23 @@
 
 #pragma once
 
+#include <set>
 #include <string>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/db/fts/stemmer.h"
-#include "mongo/db/fts/stop_words.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/db/fts/fts_query.h"
 
 namespace mongo {
 
 namespace fts {
 
-class FTSQueryImpl {
+class FTSTokenizer;
+
+class FTSQueryImpl final : public FTSQuery {
 public:
-    // Initializes an FTSQueryImpl.  Note that the parsing of "language" depends on the text
-    // index version, since a query which doesn't specify a language and is against a
-    // version 1 text index with a version 1 default language string needs to be parsed as
-    // version 1 (see fts_language.cpp for a list of language strings specific to version
-    // 1). Note that the diacritic sensitive option has no effect on FTS queries below index version
-    // 3.
-    Status parse(const std::string& query,
-                 StringData language,
-                 bool caseSensitive,
-                 bool diacriticSensitive,
-                 TextIndexVersion textIndexVersion);
+    Status parse(TextIndexVersion textIndexVersion) final;
+
+    std::unique_ptr<FTSQuery> clone() const final;
 
     const std::set<std::string>& getPositiveTerms() const {
         return _positiveTerms;
@@ -73,16 +65,6 @@ public:
         return _termsForBounds;
     }
 
-    const FTSLanguage& getLanguage() const {
-        return *_language;
-    }
-    bool getCaseSensitive() const {
-        return _caseSensitive;
-    }
-    bool getDiacriticSensitive() const {
-        return _diacriticSensitive;
-    }
-
     std::string toString() const;
 
     std::string debugString() const;
@@ -92,23 +74,10 @@ public:
 private:
     void _addTerms(FTSTokenizer* tokenizer, const std::string& tokens, bool negated);
 
-    const FTSLanguage* _language;
-    bool _caseSensitive;
-    bool _diacriticSensitive;
-
-    // Positive terms.
     std::set<std::string> _positiveTerms;
-
-    // Negated terms.
     std::set<std::string> _negatedTerms;
-
-    // Positive phrases.
     std::vector<std::string> _positivePhrases;
-
-    // Negated phrases.
     std::vector<std::string> _negatedPhrases;
-
-    // Terms for bounds.
     std::set<std::string> _termsForBounds;
 };
 }

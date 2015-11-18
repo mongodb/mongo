@@ -32,6 +32,10 @@
 
 namespace mongo {
 
+namespace fts {
+class FTSQuery;
+}  // namespace fts
+
 /**
  * Common base class for $text match expression implementations.
  */
@@ -47,23 +51,12 @@ public:
     static const bool kCaseSensitiveDefault;
     static const bool kDiacriticSensitiveDefault;
 
-    TextMatchExpressionBase(TextParams params);
+    TextMatchExpressionBase();
 
-    const std::string& getQuery() const {
-        return _query;
-    }
-
-    const std::string& getLanguage() const {
-        return _language;
-    }
-
-    bool getCaseSensitive() const {
-        return _caseSensitive;
-    }
-
-    bool getDiacriticSensitive() const {
-        return _diacriticSensitive;
-    }
+    /**
+     * Returns a reference to the parsed text query that this TextMatchExpressionBase owns.
+     */
+    virtual const fts::FTSQuery& getFTSQuery() const = 0;
 
     //
     // Methods inherited from MatchExpression.
@@ -89,12 +82,6 @@ public:
     void toBSON(BSONObjBuilder* out) const final;
 
     bool equivalent(const MatchExpression* other) const final;
-
-private:
-    const std::string _query;
-    const std::string _language;
-    const bool _caseSensitive;
-    const bool _diacriticSensitive;
 };
 
 }  // namespace mongo

@@ -30,23 +30,21 @@
 
 #include "mongo/db/matcher/expression_text_base.h"
 
+#include "mongo/db/fts/fts_query.h"
+
 namespace mongo {
 
 const bool TextMatchExpressionBase::kCaseSensitiveDefault = false;
 const bool TextMatchExpressionBase::kDiacriticSensitiveDefault = false;
 
-TextMatchExpressionBase::TextMatchExpressionBase(TextParams params)
-    : LeafMatchExpression(TEXT),
-      _query(std::move(params.query)),
-      _language(std::move(params.language)),
-      _caseSensitive(params.caseSensitive),
-      _diacriticSensitive(params.diacriticSensitive) {}
+TextMatchExpressionBase::TextMatchExpressionBase() : LeafMatchExpression(TEXT) {}
 
 void TextMatchExpressionBase::debugString(StringBuilder& debug, int level) const {
+    const fts::FTSQuery& ftsQuery = getFTSQuery();
     _debugAddSpace(debug, level);
-    debug << "TEXT : query=" << _query << ", language=" << _language
-          << ", caseSensitive=" << _caseSensitive << ", diacriticSensitive=" << _diacriticSensitive
-          << ", tag=";
+    debug << "TEXT : query=" << ftsQuery.getQuery() << ", language=" << ftsQuery.getLanguage()
+          << ", caseSensitive=" << ftsQuery.getCaseSensitive()
+          << ", diacriticSensitive=" << ftsQuery.getDiacriticSensitive() << ", tag=";
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
         td->debugString(&debug);
@@ -57,9 +55,11 @@ void TextMatchExpressionBase::debugString(StringBuilder& debug, int level) const
 }
 
 void TextMatchExpressionBase::toBSON(BSONObjBuilder* out) const {
+    const fts::FTSQuery& ftsQuery = getFTSQuery();
     out->append("$text",
-                BSON("$search" << _query << "$language" << _language << "$caseSensitive"
-                               << _caseSensitive << "$diacriticSensitive" << _diacriticSensitive));
+                BSON("$search" << ftsQuery.getQuery() << "$language" << ftsQuery.getLanguage()
+                               << "$caseSensitive" << ftsQuery.getCaseSensitive()
+                               << "$diacriticSensitive" << ftsQuery.getDiacriticSensitive()));
 }
 
 bool TextMatchExpressionBase::equivalent(const MatchExpression* other) const {
@@ -68,19 +68,7 @@ bool TextMatchExpressionBase::equivalent(const MatchExpression* other) const {
     }
     const TextMatchExpressionBase* realOther = static_cast<const TextMatchExpressionBase*>(other);
 
-    if (realOther->getQuery() != _query) {
-        return false;
-    }
-    if (realOther->getLanguage() != _language) {
-        return false;
-    }
-    if (realOther->getCaseSensitive() != _caseSensitive) {
-        return false;
-    }
-    if (realOther->getDiacriticSensitive() != _diacriticSensitive) {
-        return false;
-    }
-    return true;
+    return getFTSQuery().equivalent(realOther->getFTSQuery());
 }
 
 }  // namespace mongo

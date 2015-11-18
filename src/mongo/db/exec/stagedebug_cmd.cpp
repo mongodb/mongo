@@ -459,11 +459,11 @@ public:
 
             params.spec = fam->getSpec();
 
-            if (!params.query.parse(search,
-                                    fam->getSpec().defaultLanguage().str().c_str(),
-                                    TextMatchExpressionBase::kCaseSensitiveDefault,
-                                    TextMatchExpressionBase::kDiacriticSensitiveDefault,
-                                    fam->getSpec().getTextIndexVersion()).isOK()) {
+            params.query.setQuery(search);
+            params.query.setLanguage(fam->getSpec().defaultLanguage().str());
+            params.query.setCaseSensitive(TextMatchExpressionBase::kCaseSensitiveDefault);
+            params.query.setDiacriticSensitive(TextMatchExpressionBase::kDiacriticSensitiveDefault);
+            if (!params.query.parse(fam->getSpec().getTextIndexVersion()).isOK()) {
                 return NULL;
             }
 

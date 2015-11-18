@@ -73,13 +73,13 @@ void TextNode::appendToString(mongoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "keyPattern = " << indexKeyPattern.toString() << '\n';
     addIndent(ss, indent + 1);
-    *ss << "query = " << query << '\n';
+    *ss << "query = " << ftsQuery->getQuery() << '\n';
     addIndent(ss, indent + 1);
-    *ss << "language = " << language << '\n';
+    *ss << "language = " << ftsQuery->getLanguage() << '\n';
     addIndent(ss, indent + 1);
-    *ss << "caseSensitive= " << caseSensitive << '\n';
+    *ss << "caseSensitive= " << ftsQuery->getCaseSensitive() << '\n';
     addIndent(ss, indent + 1);
-    *ss << "diacriticSensitive= " << diacriticSensitive << '\n';
+    *ss << "diacriticSensitive= " << ftsQuery->getDiacriticSensitive() << '\n';
     addIndent(ss, indent + 1);
     *ss << "indexPrefix = " << indexPrefix.toString() << '\n';
     if (NULL != filter) {
@@ -95,10 +95,7 @@ QuerySolutionNode* TextNode::clone() const {
 
     copy->_sort = this->_sort;
     copy->indexKeyPattern = this->indexKeyPattern;
-    copy->query = this->query;
-    copy->language = this->language;
-    copy->caseSensitive = this->caseSensitive;
-    copy->diacriticSensitive = this->diacriticSensitive;
+    copy->ftsQuery = this->ftsQuery->clone();
     copy->indexPrefix = this->indexPrefix;
 
     return copy;

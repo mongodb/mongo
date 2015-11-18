@@ -256,40 +256,22 @@ PlanStage* buildStages(OperationContext* txn,
         return new GeoNear2DSphereStage(params, txn, ws, collection, s2Index);
     } else if (STAGE_TEXT == root->getType()) {
         const TextNode* node = static_cast<const TextNode*>(root);
-
-        if (NULL == collection) {
-            warning() << "Null collection for text";
-            return NULL;
-        }
-        vector<IndexDescriptor*> idxMatches;
-        collection->getIndexCatalog()->findIndexByType(txn, "text", idxMatches);
-        if (1 != idxMatches.size()) {
-            warning() << "No text index, or more than one text index";
-            return NULL;
-        }
-        IndexDescriptor* index = idxMatches[0];
+        IndexDescriptor* desc =
+            collection->getIndexCatalog()->findIndexByKeyPattern(txn, node->indexKeyPattern);
+        invariant(desc);
         const FTSAccessMethod* fam =
-            static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(index));
-        TextStageParams params(fam->getSpec());
+            static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
+        invariant(fam);
 
-        // params.collection = collection;
-        params.index = index;
+        TextStageParams params(fam->getSpec());
+        params.index = desc;
         params.spec = fam->getSpec();
         params.indexPrefix = node->indexPrefix;
-
-        const std::string& language =
-            ("" == node->language ? fam->getSpec().defaultLanguage().str() : node->language);
-
-        Status parseStatus = params.query.parse(node->query,
-                                                language,
-                                                node->caseSensitive,
-                                                node->diacriticSensitive,
-                                                fam->getSpec().getTextIndexVersion());
-        if (!parseStatus.isOK()) {
-            warning() << "Can't parse text search query";
-            return NULL;
-        }
-
+        // We assume here that node->ftsQuery is an FTSQueryImpl, not an FTSQueryNoop. In practice,
+        // this means that it is illegal to use the StageBuilder on a QuerySolution created by
+        // planning a query that contains "no-op" expressions. TODO: make StageBuilder::build()
+        // fail in this case (this improvement is being tracked by SERVER-21510).
+        params.query = static_cast<FTSQueryImpl&>(*node->ftsQuery);
         return new TextStage(txn, params, ws, node->filter.get());
     } else if (STAGE_SHARDING_FILTER == root->getType()) {
         const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);

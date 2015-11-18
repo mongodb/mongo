@@ -194,13 +194,10 @@ QuerySolutionNode* QueryPlannerAccess::makeLeafNode(
     } else if (MatchExpression::TEXT == expr->matchType()) {
         // We must not keep the expression node around.
         *tightnessOut = IndexBoundsBuilder::EXACT;
-        TextMatchExpression* textExpr = static_cast<TextMatchExpression*>(expr);
+        TextMatchExpressionBase* textExpr = static_cast<TextMatchExpressionBase*>(expr);
         TextNode* ret = new TextNode();
         ret->indexKeyPattern = index.keyPattern;
-        ret->query = textExpr->getQuery();
-        ret->language = textExpr->getLanguage();
-        ret->caseSensitive = textExpr->getCaseSensitive();
-        ret->diacriticSensitive = textExpr->getDiacriticSensitive();
+        ret->ftsQuery = textExpr->getFTSQuery().clone();
         return ret;
     } else {
         // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()

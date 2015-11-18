@@ -26,45 +26,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/matcher/extensions_callback_real.h"
-
-#include "mongo/db/matcher/expression_text.h"
-#include "mongo/db/matcher/expression_where.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/fts/fts_query.h"
 
 namespace mongo {
+namespace fts {
 
-ExtensionsCallbackReal::ExtensionsCallbackReal(OperationContext* txn, const NamespaceString* nss)
-    : _txn(txn), _nss(nss) {}
-
-StatusWithMatchExpression ExtensionsCallbackReal::parseText(BSONElement text) const {
-    auto textParams = extractTextMatchExpressionParams(text);
-    if (!textParams.isOK()) {
-        return textParams.getStatus();
+/**
+ * A no-op implementation of FTSQuery.
+ */
+class FTSQueryNoop final : public FTSQuery {
+public:
+    Status parse(TextIndexVersion textIndexVersion) final {
+        return Status::OK();
     }
 
-    auto exp = stdx::make_unique<TextMatchExpression>();
-    Status status = exp->init(_txn, *_nss, std::move(textParams.getValue()));
-    if (!status.isOK()) {
-        return status;
-    }
-    return {std::move(exp)};
-}
+    std::unique_ptr<FTSQuery> clone() const final;
+};
 
-StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(BSONElement where) const {
-    auto whereParams = extractWhereMatchExpressionParams(where);
-    if (!whereParams.isOK()) {
-        return whereParams.getStatus();
-    }
-
-    auto exp = stdx::make_unique<WhereMatchExpression>(_txn, std::move(whereParams.getValue()));
-    Status status = exp->init(_nss->db());
-    if (!status.isOK()) {
-        return status;
-    }
-    return {std::move(exp)};
-}
-
+}  // namespace fts
 }  // namespace mongo

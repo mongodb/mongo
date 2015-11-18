@@ -58,7 +58,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/matcher/expressions_geo',
-        '$BUILD_DIR/mongo/db/matcher/expressions_text',
         '$BUILD_DIR/mongo/db/repl/isself',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/db/server_options',

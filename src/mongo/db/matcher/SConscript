@@ -47,6 +47,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/fts/fts_query_noop',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         'path',
     ],
@@ -123,26 +124,19 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='expressions_text',
-    source=[
-        'expression_text.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/fts/base',
-        'expressions',
-    ],
-)
-
-env.Library(
     target='expressions_mongod_only',
     source=[
         'extensions_callback_real.cpp',
+        'expression_text.cpp',
         'expression_where.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/scripting/scripting_server',
         'expressions',
-        'expressions_text',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on symbols from serverOnlyFiles.
+        'incomplete',
     ],
 )

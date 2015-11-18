@@ -37,6 +37,7 @@
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -49,18 +50,11 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-Status FTSQueryImpl::parse(const string& query,
-                           StringData language,
-                           bool caseSensitive,
-                           bool diacriticSensitive,
-                           TextIndexVersion textIndexVersion) {
-    StatusWithFTSLanguage swl = FTSLanguage::make(language, textIndexVersion);
-    if (!swl.getStatus().isOK()) {
-        return swl.getStatus();
+Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
+    StatusWithFTSLanguage ftsLanguage = FTSLanguage::make(getLanguage(), textIndexVersion);
+    if (!ftsLanguage.getStatus().isOK()) {
+        return ftsLanguage.getStatus();
     }
-    _language = swl.getValue();
-    _caseSensitive = caseSensitive;
-    _diacriticSensitive = diacriticSensitive;
 
     // Build a space delimited list of words to have the FtsTokenizer tokenize
     string positiveTermSentence;
@@ -71,7 +65,7 @@ Status FTSQueryImpl::parse(const string& query,
 
     unsigned quoteOffset = 0;
 
-    FTSQueryParser i(query);
+    FTSQueryParser i(getQuery());
     while (i.more()) {
         QueryToken t = i.next();
 
@@ -105,7 +99,7 @@ Status FTSQueryImpl::parse(const string& query,
                     // end of a phrase
                     unsigned phraseStart = quoteOffset + 1;
                     unsigned phraseLength = t.offset - phraseStart;
-                    StringData phrase = StringData(query).substr(phraseStart, phraseLength);
+                    StringData phrase = StringData(getQuery()).substr(phraseStart, phraseLength);
                     if (inNegation) {
                         _negatedPhrases.push_back(phrase.toString());
                     } else {
@@ -124,12 +118,26 @@ Status FTSQueryImpl::parse(const string& query,
         }
     }
 
-    std::unique_ptr<FTSTokenizer> tokenizer(_language->createTokenizer());
+    std::unique_ptr<FTSTokenizer> tokenizer(ftsLanguage.getValue()->createTokenizer());
 
     _addTerms(tokenizer.get(), positiveTermSentence, false);
     _addTerms(tokenizer.get(), negativeTermSentence, true);
 
     return Status::OK();
+}
+
+std::unique_ptr<FTSQuery> FTSQueryImpl::clone() const {
+    auto clonedQuery = stdx::make_unique<FTSQueryImpl>();
+    clonedQuery->setQuery(getQuery());
+    clonedQuery->setLanguage(getLanguage());
+    clonedQuery->setCaseSensitive(getCaseSensitive());
+    clonedQuery->setDiacriticSensitive(getDiacriticSensitive());
+    clonedQuery->_positiveTerms = _positiveTerms;
+    clonedQuery->_negatedTerms = _negatedTerms;
+    clonedQuery->_positivePhrases = _positivePhrases;
+    clonedQuery->_negatedPhrases = _negatedPhrases;
+    clonedQuery->_termsForBounds = _termsForBounds;
+    return std::move(clonedQuery);
 }
 
 void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bool negated) {
@@ -150,21 +158,21 @@ void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bo
         // Compute the string corresponding to 'token' that will be used for the matcher.
         // For case and diacritic insensitive queries, this is the same string as 'boundsTerm'
         // computed above.
-        if (!_caseSensitive && !_diacriticSensitive) {
+        if (!getCaseSensitive() && !getDiacriticSensitive()) {
             activeTerms.insert(word);
         }
     }
 
-    if (!_caseSensitive && !_diacriticSensitive) {
+    if (!getCaseSensitive() && !getDiacriticSensitive()) {
         return;
     }
 
     FTSTokenizer::Options newOptions = FTSTokenizer::kFilterStopWords;
 
-    if (_caseSensitive) {
+    if (getCaseSensitive()) {
         newOptions |= FTSTokenizer::kGenerateCaseSensitiveTokens;
     }
-    if (_diacriticSensitive) {
+    if (getDiacriticSensitive()) {
         newOptions |= FTSTokenizer::kGenerateDiacriticSensitiveTokens;
     }
 

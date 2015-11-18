@@ -32,14 +32,12 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/fts/fts_query_impl.h"
+#include "mongo/db/fts/fts_query.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo {
-
-using mongo::fts::FTSQueryImpl;
 
 class GeoNearExpression;
 
@@ -247,10 +245,7 @@ struct TextNode : public QuerySolutionNode {
     BSONObjSet _sort;
 
     BSONObj indexKeyPattern;
-    std::string query;
-    std::string language;
-    bool caseSensitive;
-    bool diacriticSensitive;
+    std::unique_ptr<fts::FTSQuery> ftsQuery;
 
     // "Prefix" fields of a text index can handle equality predicates.  We group them with the
     // text node while creating the text leaf node and convert them into a BSONObj index prefix
