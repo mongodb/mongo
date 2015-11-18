@@ -643,7 +643,10 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: transaction failures due to cache overflow",
 	"transaction: transaction range of IDs currently pinned by a checkpoint",
 	"transaction: transaction range of IDs currently pinned",
+	"transaction: transaction range of IDs currently pinned by named snapshots",
 	"transaction: transactions rolled back",
+	"transaction: number of named snapshots created",
+	"transaction: number of named snapshots dropped",
 	"transaction: transaction sync calls",
 	"connection: total write I/Os",
 };
@@ -815,6 +818,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->page_locked_blocked = 0;
 	stats->page_read_blocked = 0;
 	stats->page_sleep = 0;
+		/* not clearing txn_snapshots_created */
+		/* not clearing txn_snapshots_dropped */
 	stats->txn_begin = 0;
 		/* not clearing txn_checkpoint_running */
 		/* not clearing txn_checkpoint_generation */
@@ -826,6 +831,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->txn_fail_cache = 0;
 		/* not clearing txn_pinned_range */
 		/* not clearing txn_pinned_checkpoint_range */
+		/* not clearing txn_pinned_snapshot_range */
 	stats->txn_sync = 0;
 	stats->txn_commit = 0;
 	stats->txn_rollback = 0;
@@ -1014,6 +1020,10 @@ __wt_stat_connection_aggregate(
 	to->page_locked_blocked += WT_STAT_READ(from, page_locked_blocked);
 	to->page_read_blocked += WT_STAT_READ(from, page_read_blocked);
 	to->page_sleep += WT_STAT_READ(from, page_sleep);
+	to->txn_snapshots_created +=
+	    WT_STAT_READ(from, txn_snapshots_created);
+	to->txn_snapshots_dropped +=
+	    WT_STAT_READ(from, txn_snapshots_dropped);
 	to->txn_begin += WT_STAT_READ(from, txn_begin);
 	to->txn_checkpoint_running +=
 	    WT_STAT_READ(from, txn_checkpoint_running);
@@ -1032,6 +1042,8 @@ __wt_stat_connection_aggregate(
 	to->txn_pinned_range += WT_STAT_READ(from, txn_pinned_range);
 	to->txn_pinned_checkpoint_range +=
 	    WT_STAT_READ(from, txn_pinned_checkpoint_range);
+	to->txn_pinned_snapshot_range +=
+	    WT_STAT_READ(from, txn_pinned_snapshot_range);
 	to->txn_sync += WT_STAT_READ(from, txn_sync);
 	to->txn_commit += WT_STAT_READ(from, txn_commit);
 	to->txn_rollback += WT_STAT_READ(from, txn_rollback);

@@ -379,7 +379,10 @@ struct __wt_connection_stats {
 	int64_t txn_fail_cache;
 	int64_t txn_pinned_checkpoint_range;
 	int64_t txn_pinned_range;
+	int64_t txn_pinned_snapshot_range;
 	int64_t txn_rollback;
+	int64_t txn_snapshots_created;
+	int64_t txn_snapshots_dropped;
 	int64_t txn_sync;
 	int64_t write_io;
 };
