@@ -94,6 +94,7 @@
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
@@ -1196,6 +1197,9 @@ void Command::execCommand(OperationContext* txn,
             stdx::lock_guard<Client> lk(*txn->getClient());
             CurOp::get(txn)->setCommand_inlock(command);
         }
+
+        rpc::setOperationProtocol(txn, request.getProtocol());  // SERVER-21485.  Remove after 3.2
+
         // TODO: move this back to runCommands when mongos supports OperationContext
         // see SERVER-18515 for details.
         uassertStatusOK(rpc::readRequestMetadata(txn, request.getMetadata()));
