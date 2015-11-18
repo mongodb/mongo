@@ -190,6 +190,7 @@ typedef struct {
 	char	*c_file_type;
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;
+	uint32_t c_in_memory;
 	uint32_t c_insert_pct;
 	uint32_t c_internal_key_truncation;
 	uint32_t c_intl_page_max;

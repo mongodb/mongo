@@ -183,10 +183,10 @@ __evict_server(void *arg)
 			    session, &conn->dhandle_lock)) == EBUSY &&
 			    !F_ISSET(cache, WT_CACHE_CLEAR_WALKS);
 			    spins++) {
-				if (spins < 1000)
+				if (spins < WT_THOUSAND)
 					__wt_yield();
 				else
-					__wt_sleep(0, 1000);
+					__wt_sleep(0, WT_THOUSAND);
 			}
 			/*
 			 * If we gave up acquiring the lock, that indicates a
@@ -210,7 +210,7 @@ __evict_server(void *arg)
 		else {
 			/* After being stuck for 5 minutes, give up. */
 			WT_ERR(__wt_epoch(session, &now));
-			if (WT_TIMEDIFF(now, stuck_ts) / WT_BILLION > 300) {
+			if (WT_TIMEDIFF_SEC(now, stuck_ts) > 300) {
 				__wt_errx(session,
 				    "Cache stuck for too long, giving up");
 				(void)__wt_cache_dump(session, NULL);
@@ -601,7 +601,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 			 * that can free space in cache, such as LSM discarding
 			 * handles.
 			 */
-			__wt_sleep(0, 1000 * (uint64_t)loop);
+			__wt_sleep(0, WT_THOUSAND * (uint64_t)loop);
 			if (loop == 100) {
 				/*
 				 * Mark the cache as stuck if we need space
@@ -992,10 +992,10 @@ retry:	while (slot < max_entries && ret == 0) {
 			    session, &conn->dhandle_lock)) == EBUSY &&
 			    !F_ISSET(cache, WT_CACHE_CLEAR_WALKS);
 			    spins++) {
-				if (spins < 1000)
+				if (spins < WT_THOUSAND)
 					__wt_yield();
 				else
-					__wt_sleep(0, 1000);
+					__wt_sleep(0, WT_THOUSAND);
 			}
 			if (ret != 0)
 				break;

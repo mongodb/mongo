@@ -365,13 +365,13 @@ struct __wt_connection_impl {
 
 	WT_SESSION_IMPL *meta_ckpt_session;/* Metadata checkpoint session */
 
-	WT_SESSION_IMPL *sweep_session;	/* Handle sweep session */
-	wt_thread_t	 sweep_tid;	/* Handle sweep thread */
-	int		 sweep_tid_set;	/* Handle sweep thread set */
-	WT_CONDVAR	*sweep_cond;	/* Handle sweep wait mutex */
-	time_t		 sweep_idle_time;/* Handle sweep idle time */
-	time_t		 sweep_interval;/* Handle sweep interval */
-	u_int		 sweep_handles_min;/* Handle sweep minimum open */
+	WT_SESSION_IMPL *sweep_session;	   /* Handle sweep session */
+	wt_thread_t	 sweep_tid;	   /* Handle sweep thread */
+	int		 sweep_tid_set;	   /* Handle sweep thread set */
+	WT_CONDVAR      *sweep_cond;	   /* Handle sweep wait mutex */
+	uint64_t         sweep_idle_time;  /* Handle sweep idle time */
+	uint64_t         sweep_interval;   /* Handle sweep interval */
+	uint64_t         sweep_handles_min;/* Handle sweep minimum open */
 
 	/*
 	 * Shared lookaside lock, session and cursor, used by threads accessing

@@ -960,7 +960,7 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, bool destroy)
 	 * than 10,000 boundary structure elements, discard the boundary array
 	 * entirely and start over next time.
 	 */
-	if (destroy || r->bnd_entries > 10 * 1000) {
+	if (destroy || r->bnd_entries > 10 * WT_THOUSAND) {
 		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
 			__wt_free(session, bnd->addr.addr);
 			__wt_free(session, bnd->disk_image);

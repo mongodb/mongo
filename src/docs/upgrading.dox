@@ -11,6 +11,13 @@ was relying on this behavior, a connection will be opened with different
 settings after upgrading, which could lead to errors or unexpected behavior.
 </dd>
 
+<dt>Statistic change</dt>
+<dd>
+The statistic "pages split during eviction" was replaced. It has been
+replaced by a pair of statistics "internal pages split during eviction" and
+"leaf pages split during eviction".
+</dd>
+
 <dt>Change to WT_CURSOR::insert</dt>
 <dd>
 The WT_CURSOR::insert method in this release has slightly different semantics
