@@ -1,4 +1,4 @@
-// fts_query.h
+// fts_query_impl.h
 
 /**
 *    Copyright (C) 2012 10gen Inc.
@@ -42,9 +42,9 @@ namespace mongo {
 
 namespace fts {
 
-class FTSQuery {
+class FTSQueryImpl {
 public:
-    // Initializes an FTSQuery.  Note that the parsing of "language" depends on the text
+    // Initializes an FTSQueryImpl.  Note that the parsing of "language" depends on the text
     // index version, since a query which doesn't specify a language and is against a
     // version 1 text index with a version 1 default language string needs to be parsed as
     // version 1 (see fts_language.cpp for a list of language strings specific to version

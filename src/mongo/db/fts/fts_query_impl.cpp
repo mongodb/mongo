@@ -1,4 +1,4 @@
-// fts_query.cpp
+// fts_query_impl.cpp
 
 /**
 *    Copyright (C) 2012 10gen Inc.
@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_query_impl.h"
 
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_query_parser.h"
@@ -49,11 +49,11 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-Status FTSQuery::parse(const string& query,
-                       StringData language,
-                       bool caseSensitive,
-                       bool diacriticSensitive,
-                       TextIndexVersion textIndexVersion) {
+Status FTSQueryImpl::parse(const string& query,
+                           StringData language,
+                           bool caseSensitive,
+                           bool diacriticSensitive,
+                           TextIndexVersion textIndexVersion) {
     StatusWithFTSLanguage swl = FTSLanguage::make(language, textIndexVersion);
     if (!swl.getStatus().isOK()) {
         return swl.getStatus();
@@ -132,7 +132,7 @@ Status FTSQuery::parse(const string& query,
     return Status::OK();
 }
 
-void FTSQuery::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bool negated) {
+void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bool negated) {
     tokenizer->reset(sentence.c_str(), FTSTokenizer::kFilterStopWords);
 
     auto& activeTerms = negated ? _negatedTerms : _positiveTerms;
@@ -196,9 +196,9 @@ void _debugHelp(stringstream& ss, const vector<string>& v, const string& sep) {
 }
 }
 
-string FTSQuery::toString() const {
+string FTSQueryImpl::toString() const {
     stringstream ss;
-    ss << "FTSQuery\n";
+    ss << "FTSQueryImpl\n";
 
     ss << "  terms: ";
     _debugHelp(ss, getPositiveTerms(), ", ");
@@ -219,7 +219,7 @@ string FTSQuery::toString() const {
     return ss.str();
 }
 
-string FTSQuery::debugString() const {
+string FTSQueryImpl::debugString() const {
     stringstream ss;
 
     _debugHelp(ss, getPositiveTerms(), "|");
@@ -236,7 +236,7 @@ string FTSQuery::debugString() const {
     return ss.str();
 }
 
-BSONObj FTSQuery::toBSON() const {
+BSONObj FTSQueryImpl::toBSON() const {
     BSONObjBuilder bob;
     bob.append("terms", getPositiveTerms());
     bob.append("negatedTerms", getNegatedTerms());

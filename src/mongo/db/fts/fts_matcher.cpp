@@ -41,7 +41,8 @@ namespace fts {
 
 using std::string;
 
-FTSMatcher::FTSMatcher(const FTSQuery& query, const FTSSpec& spec) : _query(query), _spec(spec) {}
+FTSMatcher::FTSMatcher(const FTSQueryImpl& query, const FTSSpec& spec)
+    : _query(query), _spec(spec) {}
 
 bool FTSMatcher::matches(const BSONObj& obj) const {
     if (canSkipPositiveTermCheck()) {

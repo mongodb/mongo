@@ -35,7 +35,7 @@ baseEnv.InjectThirdPartyIncludePaths(libraries=['stemmer'])
 baseEnv.Library('base', [
         'fts_index_format.cpp',
         'fts_matcher.cpp',
-        'fts_query.cpp',
+        'fts_query_impl.cpp',
         'fts_query_parser.cpp',
         'fts_spec.cpp',
         'fts_spec_legacy.cpp',
@@ -93,7 +93,7 @@ env.CppUnitTest( "fts_language_test", "fts_language_test.cpp",
 env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
                  LIBDEPS=["base"] )
 
-env.CppUnitTest( "fts_query_test", "fts_query_test.cpp",
+env.CppUnitTest( "fts_query_impl_test", "fts_query_impl_test.cpp",
                  LIBDEPS=["base"] )
 
 env.CppUnitTest( "fts_spec_test", "fts_spec_test.cpp",

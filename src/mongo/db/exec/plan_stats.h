@@ -601,7 +601,7 @@ struct TextStats : public SpecificStats {
 
     std::string indexName;
 
-    // Human-readable form of the FTSQuery associated with the text stage.
+    // Human-readable form of the FTSQueryImpl associated with the text stage.
     BSONObj parsedTextQuery;
 
     // Index keys that precede the "text" index key.

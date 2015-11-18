@@ -41,8 +41,8 @@ TextMatchExpression::TextMatchExpression(TextParams params)
     : TextMatchExpressionBase(std::move(params)) {}
 
 Status TextMatchExpression::init() {
-    // Validate language, but defer construction of FTSQuery (which requires access to the target
-    // namespace) until stage building time.
+    // Validate language, but defer construction of FTSQueryImpl (which requires access to the
+    // target namespace) until stage building time.
     if (!getLanguage().empty()) {
         if (!fts::FTSLanguage::make(getLanguage(), fts::TEXT_INDEX_VERSION_2).isOK()) {
             return {ErrorCodes::BadValue, "$language specifies unsupported language"};

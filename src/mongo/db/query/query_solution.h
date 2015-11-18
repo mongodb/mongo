@@ -32,14 +32,14 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo {
 
-using mongo::fts::FTSQuery;
+using mongo::fts::FTSQueryImpl;
 
 class GeoNearExpression;
 

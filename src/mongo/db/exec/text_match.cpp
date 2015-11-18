@@ -47,7 +47,7 @@ const char* TextMatchStage::kStageType = "TEXT_MATCH";
 
 TextMatchStage::TextMatchStage(OperationContext* opCtx,
                                unique_ptr<PlanStage> child,
-                               const FTSQuery& query,
+                               const FTSQueryImpl& query,
                                const FTSSpec& spec,
                                WorkingSet* ws)
     : PlanStage(kStageType, opCtx), _ftsMatcher(query, spec), _ws(ws) {
