@@ -31,6 +31,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 
@@ -64,6 +66,12 @@ BSONObj ShardingServerStatus::generateSection(OperationContext* txn,
     }
     BSONObjBuilder result;
     result.append("configsvrConnectionString", shardingState->getConfigServer(txn).toString());
+
+    auto catalogManager = grid.catalogManager(txn);
+    if (catalogManager->getMode() == CatalogManager::ConfigServerMode::CSRS) {
+        grid.shardRegistry()->getConfigOpTime().append(&result, "lastSeenConfigServerOpTime");
+    }
+
     return result.obj();
 }
 

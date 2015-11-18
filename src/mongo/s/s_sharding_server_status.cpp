@@ -64,6 +64,12 @@ BSONObj ShardingServerStatus::generateSection(OperationContext* txn,
     BSONObjBuilder result;
     result.append("configsvrConnectionString",
                   grid.shardRegistry()->getConfigServerConnectionString().toString());
+
+    auto catalogManager = grid.catalogManager(txn);
+    if (catalogManager->getMode() == CatalogManager::ConfigServerMode::CSRS) {
+        grid.shardRegistry()->getConfigOpTime().append(&result, "lastSeenConfigServerOpTime");
+    }
+
     return result.obj();
 }
 
