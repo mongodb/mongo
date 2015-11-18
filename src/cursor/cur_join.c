@@ -903,6 +903,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 
 	entry = NULL;
 	hasins = needbloom = false;
+	ins = 0; /* -Wuninitialized */
 	main_uri = NULL;
 	nonbloom = 0; /* -Wuninitialized */
 	namesize = strlen(cjoin->table->name);
