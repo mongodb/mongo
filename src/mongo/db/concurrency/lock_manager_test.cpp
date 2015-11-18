@@ -816,4 +816,43 @@ TEST(LockManager, CompatibleFirstCancelWaiting) {
     ASSERT(lockMgr.unlock(&requestX));
 }
 
+TEST(LockManager, Fairness) {
+    LockManager lockMgr;
+    const ResourceId resId(RESOURCE_GLOBAL, 0);
+
+    // Start with some 'regular' intent locks
+    MMAPV1LockerImpl lockerIS;
+    LockRequestCombo requestIS(&lockerIS);
+    ASSERT(LOCK_OK == lockMgr.lock(resId, &requestIS, MODE_IS));
+
+    MMAPV1LockerImpl lockerIX;
+    LockRequestCombo requestIX(&lockerIX);
+    ASSERT(LOCK_OK == lockMgr.lock(resId, &requestIX, MODE_IX));
+
+    // Now a conflicting lock comes
+    MMAPV1LockerImpl lockerX;
+    LockRequestCombo requestX(&lockerX);
+    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestX, MODE_X));
+
+    // Now, whoever comes next should be blocked
+    MMAPV1LockerImpl lockerIX1;
+    LockRequestCombo requestIX1(&lockerIX1);
+    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestIX1, MODE_IX));
+
+    // Freeing the first two locks should grant the X lock
+    ASSERT(lockMgr.unlock(&requestIS));
+    ASSERT(lockMgr.unlock(&requestIX));
+    ASSERT_EQ(LOCK_OK, requestX.lastResult);
+    ASSERT_EQ(1, requestX.numNotifies);
+    ASSERT_EQ(LOCK_INVALID, requestIX1.lastResult);
+    ASSERT_EQ(0, requestIX1.numNotifies);
+
+    ASSERT(lockMgr.unlock(&requestX));
+    ASSERT_EQ(LOCK_OK, requestIX1.lastResult);
+    ASSERT_EQ(1, requestIX1.numNotifies);
+
+    // Unlock all locks so we don't assert for leaked locks
+    ASSERT(lockMgr.unlock(&requestIX1));
+}
+
 }  // namespace mongo

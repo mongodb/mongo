@@ -736,15 +736,20 @@ void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
     }
 
     // Grant any conflicting requests, which might now be unblocked. Note that the loop below
-    // slightly violates fairness in that it will grant *all* compatible requests on the line
-    // even though there might be conflicting ones interspersed between them. For example,
-    // consider an X lock was just freed and the conflict queue looked like this:
+    // slightly violates fairness in that it will grant *all* compatible requests on the line even
+    // though there might be conflicting ones interspersed between them. For example, assume that an
+    // X lock was just freed and the conflict queue looks like this:
     //
     //      IS -> IS -> X -> X -> S -> IS
     //
-    // In strict FIFO, we should grant the first two IS modes and then stop when we reach the
-    // first X mode (the third request on the queue). However, the loop below would actually
-    // grant all IS + S modes and once they all drain it will grant X.
+    // In strict FIFO, we should grant the first two IS modes and then stop when we reach the first
+    // X mode (the third request on the queue). However, the loop below would actually grant all IS
+    // + S modes and once they all drain it will grant X. The reason for this behaviour is
+    // increasing system throughput in the scenario where mutually compatible requests are
+    // interspersed with conflicting ones. For example, this would be a worst-case scenario for
+    // strict FIFO, because it would make the execution sequential:
+    //
+    //      S -> X -> S -> X -> S -> X
 
     LockRequest* iterNext = NULL;
 
@@ -757,6 +762,13 @@ void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
         iterNext = iter->next;
 
         if (conflicts(iter->mode, lock->grantedModes)) {
+            // If iter doesn't have a previous pointer, this means that it is at the front of the
+            // queue. If we continue scanning the queue beyond this point, we will starve it by
+            // granting more and more requests.
+            if (!iter->prev) {
+                break;
+            }
+
             continue;
         }
 
@@ -783,8 +795,8 @@ void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
 
     // This is a convenient place to check that the state of the two request queues is in sync
     // with the bitmask on the modes.
-    invariant((lock->grantedModes == 0) ^ (lock->grantedList._front != NULL));
-    invariant((lock->conflictModes == 0) ^ (lock->conflictList._front != NULL));
+    dassert((lock->grantedModes == 0) ^ (lock->grantedList._front != NULL));
+    dassert((lock->conflictModes == 0) ^ (lock->conflictList._front != NULL));
 }
 
 LockManager::LockBucket* LockManager::_getBucket(ResourceId resId) const {
