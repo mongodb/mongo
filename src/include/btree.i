@@ -1101,16 +1101,17 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 		return (false);
 
 	/*
-	 * If the tree was deepened, there's a requirement that newly created
-	 * internal pages not be evicted until all threads are known to have
-	 * exited the original page index array, because evicting an internal
-	 * page discards its WT_REF array, and a thread traversing the original
-	 * page index array might see a freed WT_REF.  During the split we set
-	 * a transaction value, once that's globally visible, we know we can
-	 * evict the created page.
+	 * If a split created new internal pages, those newly created internal
+	 * pages cannot be evicted until all threads are known to have exited
+	 * the original parent page's index, because evicting an internal page
+	 * discards its WT_REF array, and a thread traversing the original
+	 * parent page index might see a freed WT_REF. During the split we set
+	 * a transaction value, we can evict the created page as soon as that
+	 * transaction value is globally visible.
 	 */
 	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
-	    !__wt_txn_visible_all(session, mod->mod_split_txn))
+	    (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK) ||
+	    !__wt_txn_visible_all(session, mod->mod_split_txn)))
 		return (false);
 
 	/*
@@ -1373,4 +1374,35 @@ __wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 		return (true);
 
 	return (child->memory_footprint > maxsize);
+}
+
+/*
+ * __wt_split_intl_race --
+ *	Return if we raced with an internal page split when descending the tree.
+ */
+static inline bool
+__wt_split_intl_race(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE_INDEX *saved_pindex)
+{
+	WT_PAGE_INDEX *pindex;
+
+	/*
+	 * A place to hang this comment...
+	 *
+	 * There's a page-split race when we walk the tree: if we're splitting
+	 * an internal page into its parent, we update the parent's page index
+	 * and then update the page being split, and it's not an atomic update.
+	 * A thread could read the parent page's original page index, and then
+	 * read the page's replacement index. Because internal page splits work
+	 * by replacing the original page with the initial part of the original
+	 * page, the result of this race is we will have a key that's past the
+	 * end of the current page, and the parent's page index will have moved.
+	 *
+	 * It's also possible a thread could read the parent page's replacement
+	 * page index, and then read the page's original index. Because internal
+	 * splits work by truncating the original page, the original page's old
+	 * content is compatible, this isn't a problem and we ignore this race.
+	 */
+	WT_INTL_INDEX_GET(session, parent, pindex);
+	return (pindex != saved_pindex);
 }

@@ -260,8 +260,8 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	const char *raw_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 	const char *mainkey_str, *p;
-	int cmp, mainkey_len, skip;
-	size_t i, size;
+	int cmp, skip;
+	size_t i, mainkey_len, size;
 	void *allocbuf;
 
 	c = NULL;
@@ -281,7 +281,7 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		     p != NULL && i < maintable->nkey_columns; i++)
 			p = strchr(p + 1, ',');
 		WT_ASSERT(session, p != 0);
-		mainkey_len = p - mainkey_str;
+		mainkey_len = WT_PTRDIFF(p, mainkey_str);
 		size = strlen(entry->index->name) + mainkey_len + 3;
 		WT_ERR(__wt_calloc(session, size, 1, &uri));
 		snprintf(uri, size, "%s(%.*s)", entry->index->name,
@@ -894,33 +894,32 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_CURSOR_JOIN_ENTRY *entry;
 	WT_DECL_RET;
 	WT_CURSOR_JOIN_ENDPOINT *end, *newend;
-	bool range_eq;
-	int nonbloom;
-	size_t i;
-	ssize_t ins;
+	bool hasins, needbloom, range_eq;
+	u_int i, ins, nonbloom;
 	const char *raw_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 	char *main_uri;
 	size_t namesize, newsize;
 
 	entry = NULL;
-	ins = -1;
+	hasins = needbloom = false;
 	main_uri = NULL;
-	nonbloom = -1;
 	namesize = strlen(cjoin->table->name);
 	for (i = 0; i < cjoin->entries_next; i++) {
 		if (cjoin->entries[i].index == index) {
 			entry = &cjoin->entries[i];
 			break;
 		}
-		if (nonbloom == -1 && i > 0 &&
-		    !F_ISSET(&cjoin->entries[i], WT_CURJOIN_ENTRY_BLOOM))
+		if (!needbloom && i > 0 &&
+		    !F_ISSET(&cjoin->entries[i], WT_CURJOIN_ENTRY_BLOOM)) {
+			needbloom = true;
 			nonbloom = i;
+		}
 	}
 	if (entry == NULL) {
 		WT_ERR(__wt_realloc_def(session, &cjoin->entries_allocated,
 		    cjoin->entries_next + 1, &cjoin->entries));
-		if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) && nonbloom != -1) {
+		if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) && needbloom) {
 			/*
 			 * Reorder the list so that after the first entry,
 			 * the Bloom filtered entries come next, followed by
@@ -1001,11 +1000,13 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			 * Sort "gt"/"ge" to the front, followed by any number
 			 * of "eq", and finally "lt"/"le".
 			 */
-			if (ins == -1 &&
+			if (!hasins &&
 			    ((range & WT_CURJOIN_END_GT) != 0 ||
 			    (range == WT_CURJOIN_END_EQ &&
-			    !F_ISSET(end, WT_CURJOIN_END_GT))))
+			    !F_ISSET(end, WT_CURJOIN_END_GT)))) {
 				ins = i;
+				hasins = true;
+			}
 		}
 		/* All checks completed, merge any new configuration now */
 		entry->count = count;
@@ -1016,7 +1017,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	}
 	WT_ERR(__wt_realloc_def(session, &entry->ends_allocated,
 	    entry->ends_next + 1, &entry->ends));
-	if (ins == -1)
+	if (!hasins)
 		ins = entry->ends_next;
 	newend = &entry->ends[ins];
 	memmove(newend + 1, newend,

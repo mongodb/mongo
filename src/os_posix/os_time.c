@@ -28,7 +28,7 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 	WT_SYSCALL_RETRY(gettimeofday(&v, NULL), ret);
 	if (ret == 0) {
 		tsp->tv_sec = v.tv_sec;
-		tsp->tv_nsec = v.tv_usec * 1000;
+		tsp->tv_nsec = v.tv_usec * WT_THOUSAND;
 		return (0);
 	}
 	WT_RET_MSG(session, ret, "gettimeofday");

@@ -315,7 +315,7 @@ struct __wt_cursor_join {
 	WT_CURSOR_JOIN_ITER	*iter;
 	WT_CURSOR_JOIN_ENTRY	*entries;
 	size_t			 entries_allocated;
-	size_t			 entries_next;
+	u_int			 entries_next;
 	uint8_t			 recno_buf[10];	/* holds packed recno */
 
 #define	WT_CURJOIN_ERROR		0x01	/* Error in initialization */
@@ -361,7 +361,7 @@ struct __wt_cursor_metadata {
 struct __wt_join_stats_group {
 	const char *desc_prefix;	/* Prefix appears before description */
 	WT_CURSOR_JOIN *join_cursor;
-	size_t join_cursor_entry;	/* Position in entries */
+	ssize_t join_cursor_entry;	/* Position in entries */
 	WT_JOIN_STATS join_stats;
 };
 

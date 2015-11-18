@@ -388,8 +388,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				continue;
 			WT_ERR(__wt_epoch(session, &now));
 			pushms = lsm_tree->work_push_ts.tv_sec == 0 ? 0 :
-			    WT_TIMEDIFF(
-			    now, lsm_tree->work_push_ts) / WT_MILLION;
+			    WT_TIMEDIFF_MS(now, lsm_tree->work_push_ts);
 			fillms = 3 * lsm_tree->chunk_fill_ms;
 			if (fillms == 0)
 				fillms = 10000;

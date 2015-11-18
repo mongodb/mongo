@@ -47,7 +47,8 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache: data source pages selected for eviction unable to be evicted",
 	"cache: hazard pointer blocked page eviction",
 	"cache: internal pages evicted",
-	"cache: pages split during eviction",
+	"cache: internal pages split during eviction",
+	"cache: leaf pages split during eviction",
 	"cache: in-memory page splits",
 	"cache: in-memory page passed criteria to be split",
 	"cache: overflow values cached in memory",
@@ -165,6 +166,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cache_inmem_splittable = 0;
 	stats->cache_inmem_split = 0;
 	stats->cache_eviction_internal = 0;
+	stats->cache_eviction_split_internal = 0;
+	stats->cache_eviction_split_leaf = 0;
 	stats->cache_eviction_dirty = 0;
 	stats->cache_read_overflow = 0;
 	stats->cache_overflow_value = 0;
@@ -172,7 +175,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cache_write_lookaside = 0;
 	stats->cache_read = 0;
 	stats->cache_read_lookaside = 0;
-	stats->cache_eviction_split = 0;
 	stats->cache_write = 0;
 	stats->cache_write_restore = 0;
 	stats->cache_eviction_clean = 0;
@@ -282,6 +284,9 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_inmem_splittable += from->cache_inmem_splittable;
 	to->cache_inmem_split += from->cache_inmem_split;
 	to->cache_eviction_internal += from->cache_eviction_internal;
+	to->cache_eviction_split_internal +=
+	    from->cache_eviction_split_internal;
+	to->cache_eviction_split_leaf += from->cache_eviction_split_leaf;
 	to->cache_eviction_dirty += from->cache_eviction_dirty;
 	to->cache_read_overflow += from->cache_read_overflow;
 	to->cache_overflow_value += from->cache_overflow_value;
@@ -289,7 +294,6 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_write_lookaside += from->cache_write_lookaside;
 	to->cache_read += from->cache_read;
 	to->cache_read_lookaside += from->cache_read_lookaside;
-	to->cache_eviction_split += from->cache_eviction_split;
 	to->cache_write += from->cache_write;
 	to->cache_write_restore += from->cache_write_restore;
 	to->cache_eviction_clean += from->cache_eviction_clean;
@@ -409,6 +413,10 @@ __wt_stat_dsrc_aggregate(
 	to->cache_inmem_split += WT_STAT_READ(from, cache_inmem_split);
 	to->cache_eviction_internal +=
 	    WT_STAT_READ(from, cache_eviction_internal);
+	to->cache_eviction_split_internal +=
+	    WT_STAT_READ(from, cache_eviction_split_internal);
+	to->cache_eviction_split_leaf +=
+	    WT_STAT_READ(from, cache_eviction_split_leaf);
 	to->cache_eviction_dirty += WT_STAT_READ(from, cache_eviction_dirty);
 	to->cache_read_overflow += WT_STAT_READ(from, cache_read_overflow);
 	to->cache_overflow_value += WT_STAT_READ(from, cache_overflow_value);
@@ -418,7 +426,6 @@ __wt_stat_dsrc_aggregate(
 	    WT_STAT_READ(from, cache_write_lookaside);
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
-	to->cache_eviction_split += WT_STAT_READ(from, cache_eviction_split);
 	to->cache_write += WT_STAT_READ(from, cache_write);
 	to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
 	to->cache_eviction_clean += WT_STAT_READ(from, cache_eviction_clean);
@@ -531,7 +538,8 @@ static const char * const __stats_connection_desc[] = {
 	"cache: eviction server evicting pages",
 	"cache: eviction server populating queue, but not evicting pages",
 	"cache: eviction server unable to reach eviction goal",
-	"cache: pages split during eviction",
+	"cache: internal pages split during eviction",
+	"cache: leaf pages split during eviction",
 	"cache: pages walked for eviction",
 	"cache: eviction worker thread evicting pages",
 	"cache: in-memory page splits",
@@ -705,6 +713,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_inmem_splittable = 0;
 	stats->cache_inmem_split = 0;
 	stats->cache_eviction_internal = 0;
+	stats->cache_eviction_split_internal = 0;
+	stats->cache_eviction_split_leaf = 0;
 	stats->cache_lookaside_insert = 0;
 	stats->cache_lookaside_remove = 0;
 		/* not clearing cache_bytes_max */
@@ -719,7 +729,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_read = 0;
 	stats->cache_read_lookaside = 0;
 	stats->cache_eviction_fail = 0;
-	stats->cache_eviction_split = 0;
 	stats->cache_eviction_walk = 0;
 	stats->cache_write = 0;
 	stats->cache_write_restore = 0;
@@ -884,6 +893,10 @@ __wt_stat_connection_aggregate(
 	to->cache_inmem_split += WT_STAT_READ(from, cache_inmem_split);
 	to->cache_eviction_internal +=
 	    WT_STAT_READ(from, cache_eviction_internal);
+	to->cache_eviction_split_internal +=
+	    WT_STAT_READ(from, cache_eviction_split_internal);
+	to->cache_eviction_split_leaf +=
+	    WT_STAT_READ(from, cache_eviction_split_leaf);
 	to->cache_lookaside_insert +=
 	    WT_STAT_READ(from, cache_lookaside_insert);
 	to->cache_lookaside_remove +=
@@ -904,7 +917,6 @@ __wt_stat_connection_aggregate(
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
 	to->cache_eviction_fail += WT_STAT_READ(from, cache_eviction_fail);
-	to->cache_eviction_split += WT_STAT_READ(from, cache_eviction_split);
 	to->cache_eviction_walk += WT_STAT_READ(from, cache_eviction_walk);
 	to->cache_write += WT_STAT_READ(from, cache_write);
 	to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);

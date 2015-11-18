@@ -711,7 +711,7 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	}
 	WT_ERR(__wt_config_gets(session, cfg, "count", &cval));
 	if (cval.len != 0)
-		count = cval.val;
+		count = (uint64_t)cval.val;
 
 	WT_ERR(__wt_config_gets(session, cfg, "strategy", &cval));
 	if (cval.len != 0) {
@@ -1150,7 +1150,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
 		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
 		WT_ERR(__wt_epoch(session, &now));
-		waited_ms = WT_TIMEDIFF(now, start) / WT_MILLION;
+		waited_ms = WT_TIMEDIFF_MS(now, start);
 		if (forever || waited_ms < timeout_ms)
 			/*
 			 * Note, we will wait an increasing amount of time

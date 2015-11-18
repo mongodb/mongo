@@ -132,7 +132,7 @@ __wt_struct_unpack_size(WT_SESSION_IMPL *session,
 	if (ret != WT_NOTFOUND)
 		return (ret);
 
-	*resultp = (p - (uint8_t *)buffer);
+	*resultp = WT_PTRDIFF(p, buffer);
 	return (0);
 }
 
@@ -190,7 +190,7 @@ __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt,
 				WT_ERR(ENOTSUP);
 		}
 		if (pout != NULL) {
-			memcpy(pout, before, p - before);
+			memcpy(pout, before, WT_PTRDIFF(p, before));
 			pout += p - before;
 		} else if (start == NULL)
 			start = before;
@@ -202,10 +202,10 @@ __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt,
 
 	if (pout != NULL) {
 		outbuf->data = *reallocp;
-		outbuf->size = (pout - (uint8_t *)*reallocp);
+		outbuf->size = WT_PTRDIFF(pout, *reallocp);
 	} else {
 		outbuf->data = start;
-		outbuf->size = (p - (uint8_t *)start);
+		outbuf->size = WT_PTRDIFF(p, start);
 	}
 
 err:	return (ret);
