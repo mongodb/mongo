@@ -904,7 +904,9 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	entry = NULL;
 	hasins = needbloom = false;
 	main_uri = NULL;
+	nonbloom = 0; /* -Wuninitialized */
 	namesize = strlen(cjoin->table->name);
+
 	for (i = 0; i < cjoin->entries_next; i++) {
 		if (cjoin->entries[i].index == idx) {
 			entry = &cjoin->entries[i];
