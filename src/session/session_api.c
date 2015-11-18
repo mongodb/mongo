@@ -651,7 +651,7 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR_JOIN *cjoin;
 	WT_CURSOR_TABLE *ctable;
-	WT_INDEX *index;
+	WT_INDEX *idx;
 	WT_TABLE *table;
 	uint32_t flags, range;
 	uint64_t count;
@@ -669,11 +669,11 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 
 	if (WT_PREFIX_MATCH(ref_cursor->uri, "index:")) {
 		cindex = (WT_CURSOR_INDEX *)ref_cursor;
-		index = cindex->index;
+		idx = cindex->index;
 		table = cindex->table;
 		WT_CURSOR_CHECKKEY(ref_cursor);
 	} else if (WT_PREFIX_MATCH(ref_cursor->uri, "table:")) {
-		index = NULL;
+		idx = NULL;
 		ctable = (WT_CURSOR_TABLE *)ref_cursor;
 		table = ctable->table;
 		WT_CURSOR_CHECKKEY(ctable->cg_cursors[0]);
@@ -736,7 +736,7 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		    WT_ERR(EINVAL);
 	    }
 	}
-	WT_ERR(__wt_curjoin_join(session, cjoin, index, ref_cursor, flags,
+	WT_ERR(__wt_curjoin_join(session, cjoin, idx, ref_cursor, flags,
 	    range, count, bloom_bit_count, bloom_hash_count));
 	/*
 	 * There's an implied ownership ordering that isn't
