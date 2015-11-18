@@ -693,6 +693,7 @@ static int
 __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
     uint32_t new_entries, size_t parent_incr, bool exclusive, bool discard)
 {
+	WT_DECL_ITEM(scr);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_PAGE *parent;
@@ -701,14 +702,15 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	size_t parent_decr, size;
 	uint64_t split_gen;
 	uint32_t i, j;
-	uint32_t deleted_entries, parent_entries, result_entries;
+	uint32_t deleted_entries, orig_slot, parent_entries, result_entries;
+	uint32_t *deleted_refs;
 	bool complete, empty_parent;
 
 	parent = ref->home;
 
 	alloc_index = pindex = NULL;
 	parent_decr = 0;
-	parent_entries = 0;
+	orig_slot = parent_entries = 0;
 	complete = empty_parent = false;
 
 	/* The parent page will be marked dirty, make sure that will succeed. */
@@ -727,14 +729,21 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * array anyway.  Switch them to the special split state, so that any
 	 * reading thread will restart.
 	 */
+	WT_RET(__wt_scr_alloc(session, 10 * sizeof(uint32_t), &scr));
 	for (deleted_entries = 0, i = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
+		if (next_ref == ref)
+			orig_slot = i;
 		if (next_ref->state == WT_REF_DELETED &&
 		    __wt_delete_page_skip(session, next_ref, true) &&
 		    __wt_atomic_casv32(
-		    &next_ref->state, WT_REF_DELETED, WT_REF_SPLIT))
-			deleted_entries++;
+		    &next_ref->state, WT_REF_DELETED, WT_REF_SPLIT)) {
+			WT_ERR(__wt_buf_grow(session, scr,
+			    (deleted_entries + 1) * sizeof(uint32_t)));
+			deleted_refs = scr->mem;
+			deleted_refs[deleted_entries++] = i;
+		}
 	}
 
 	/*
@@ -803,8 +812,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * parent page's index.
 	 */
 	if (discard) {
-		++deleted_entries;
+		WT_ASSERT(session, pindex->index[orig_slot] == ref);
 		WT_PUBLISH(ref->state, WT_REF_SPLIT);
+		WT_ERR(__wt_buf_grow(session, scr,
+		    (deleted_entries + 1) * sizeof(uint32_t)));
+		deleted_refs = scr->mem;
+		deleted_refs[deleted_entries++] = orig_slot;
 	}
 
 	/*
@@ -842,11 +855,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * Acquire a new split generation.
 	 */
 	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
-	for (i = 0; deleted_entries > 0 && i < parent_entries; ++i) {
-		next_ref = pindex->index[i];
-		if (next_ref->state != WT_REF_SPLIT)
-			continue;
-		--deleted_entries;
+	for (i = 0, deleted_refs = scr->mem; i < deleted_entries; ++i) {
+		next_ref = pindex->index[deleted_refs[i]];
+		WT_ASSERT(session, next_ref->state == WT_REF_SPLIT);
 
 		/*
 		 * We set the WT_REF to split, discard it, freeing any resources
@@ -928,6 +939,8 @@ err:	/*
 		if (empty_parent)
 			return (EBUSY);
 	}
+
+	__wt_scr_free(session, &scr);
 
 	if (ret != 0 && ret != WT_PANIC)
 		__wt_err(session, ret,
