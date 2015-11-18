@@ -54,12 +54,18 @@ void AsyncStream::connect(tcp::resolver::iterator iter, ConnectHandler&& connect
         // We need to wrap this with a lambda of the right signature so it compiles, even
         // if we don't actually use the resolver iterator.
         _strand->wrap([this, connectHandler](std::error_code ec, tcp::resolver::iterator iter) {
-            if (!ec) {
-                // We assume that our owner is responsible for keeping us alive until we call
-                // connectHandler, so _connected should always be a valid memory location.
-                _connected = true;
-                setStreamNonBlocking(&_stream, _connected);
+            if (ec) {
+                return connectHandler(ec);
             }
+
+            // We assume that our owner is responsible for keeping us alive until we call
+            // connectHandler, so _connected should always be a valid memory location.
+            ec = setStreamNonBlocking(&_stream);
+            if (ec) {
+                return connectHandler(ec);
+            }
+
+            _connected = true;
             return connectHandler(ec);
         }));
 }

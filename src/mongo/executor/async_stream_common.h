@@ -83,14 +83,13 @@ void cancelStream(ASIOStream* stream, bool connected) {
 void logFailureInSetStreamNonBlocking(std::error_code ec);
 
 template <typename ASIOStream>
-void setStreamNonBlocking(ASIOStream* stream, bool connected) {
-    invariant(connected);
+std::error_code setStreamNonBlocking(ASIOStream* stream) {
     std::error_code ec;
     stream->non_blocking(true, ec);
     if (ec) {
         logFailureInSetStreamNonBlocking(ec);
     }
-    invariant(!ec);
+    return ec;
 }
 
 void logUnexpectedErrorInCheckOpen(std::error_code ec);
