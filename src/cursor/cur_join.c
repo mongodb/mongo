@@ -620,7 +620,7 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	    __wt_cursor_notsup,		/* remove */
 	    __wt_cursor_notsup);	/* close */
 	WT_DECL_RET;
-	WT_INDEX *index;
+	WT_INDEX *idx;
 	WT_ITEM *key, v;
 	bool bloom_found;
 
@@ -658,13 +658,13 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	} else
 		v = *key;
 
-	if ((index = entry->index) != NULL && index->extractor) {
+	if ((idx = entry->index) != NULL && idx->extractor != NULL) {
 		extract_cursor.iface = iface;
 		extract_cursor.iface.session = &session->iface;
-		extract_cursor.iface.key_format = index->exkey_format;
+		extract_cursor.iface.key_format = idx->exkey_format;
 		extract_cursor.ismember = 0;
 		extract_cursor.entry = entry;
-		WT_ERR(index->extractor->extract(index->extractor,
+		WT_ERR(idx->extractor->extract(idx->extractor,
 		    &session->iface, key, &v, &extract_cursor.iface));
 		if (!extract_cursor.ismember)
 			WT_ERR(WT_NOTFOUND);
@@ -888,7 +888,7 @@ err:		WT_TRET(__curjoin_close(cursor));
  */
 int
 __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
-    WT_INDEX *index, WT_CURSOR *ref_cursor, uint32_t flags, uint32_t range,
+    WT_INDEX *idx, WT_CURSOR *ref_cursor, uint32_t flags, uint32_t range,
     uint64_t count, uint64_t bloom_bit_count, uint64_t bloom_hash_count)
 {
 	WT_CURSOR_JOIN_ENTRY *entry;
@@ -906,7 +906,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	main_uri = NULL;
 	namesize = strlen(cjoin->table->name);
 	for (i = 0; i < cjoin->entries_next; i++) {
-		if (cjoin->entries[i].index == index) {
+		if (cjoin->entries[i].index == idx) {
 			entry = &cjoin->entries[i];
 			break;
 		}
@@ -937,7 +937,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		}
 		else
 			entry = &cjoin->entries[cjoin->entries_next];
-		entry->index = index;
+		entry->index = idx;
 		entry->flags = flags;
 		entry->count = count;
 		entry->bloom_bit_count = bloom_bit_count;
