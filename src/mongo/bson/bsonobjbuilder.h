@@ -45,6 +45,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/itoa.h"
 
 namespace mongo {
 
@@ -776,12 +777,14 @@ public:
 
     template <typename T>
     BSONArrayBuilder& append(const T& x) {
-        _b.append(num(), x);
+        ItoA itoa(_i++);
+        _b.append(itoa, x);
         return *this;
     }
 
     BSONArrayBuilder& append(const BSONElement& e) {
-        _b.appendAs(e, num());
+        ItoA itoa(_i++);
+        _b.appendAs(e, itoa);
         return *this;
     }
 
@@ -791,16 +794,19 @@ public:
 
     template <typename T>
     BSONArrayBuilder& operator<<(const T& x) {
-        _b << num().c_str() << x;
+        ItoA itoa(_i++);
+        _b << itoa << x;
         return *this;
     }
 
     void appendNull() {
-        _b.appendNull(num());
+        ItoA itoa(_i++);
+        _b.appendNull(itoa);
     }
 
     void appendUndefined() {
-        _b.appendUndefined(num());
+        ItoA itoa(_i++);
+        _b.appendUndefined(itoa);
     }
 
     /**
@@ -830,49 +836,59 @@ public:
 
     // These two just use next position
     BufBuilder& subobjStart() {
-        return _b.subobjStart(num());
+        ItoA itoa(_i++);
+        return _b.subobjStart(itoa);
     }
     BufBuilder& subarrayStart() {
-        return _b.subarrayStart(num());
+        ItoA itoa(_i++);
+        return _b.subarrayStart(itoa);
     }
 
     BSONArrayBuilder& appendRegex(StringData regex, StringData options = "") {
-        _b.appendRegex(num(), regex, options);
+        ItoA itoa(_i++);
+        _b.appendRegex(itoa, regex, options);
         return *this;
     }
 
     BSONArrayBuilder& appendBinData(int len, BinDataType type, const void* data) {
-        _b.appendBinData(num(), len, type, data);
+        ItoA itoa(_i++);
+        _b.appendBinData(itoa, len, type, data);
         return *this;
     }
 
     BSONArrayBuilder& appendCode(StringData code) {
-        _b.appendCode(num(), code);
+        ItoA itoa(_i++);
+        _b.appendCode(itoa, code);
         return *this;
     }
 
     BSONArrayBuilder& appendCodeWScope(StringData code, const BSONObj& scope) {
-        _b.appendCodeWScope(num(), code, scope);
+        ItoA itoa(_i++);
+        _b.appendCodeWScope(itoa, code, scope);
         return *this;
     }
 
     BSONArrayBuilder& appendTimeT(time_t dt) {
-        _b.appendTimeT(num(), dt);
+        ItoA itoa(_i++);
+        _b.appendTimeT(itoa, dt);
         return *this;
     }
 
     BSONArrayBuilder& appendDate(Date_t dt) {
-        _b.appendDate(num(), dt);
+        ItoA itoa(_i++);
+        _b.appendDate(itoa, dt);
         return *this;
     }
 
     BSONArrayBuilder& appendBool(bool val) {
-        _b.appendBool(num(), val);
+        ItoA itoa(_i++);
+        _b.appendBool(itoa, val);
         return *this;
     }
 
     BSONArrayBuilder& appendTimestamp(unsigned long long ts) {
-        _b.appendTimestamp(num(), ts);
+        ItoA itoa(_i++);
+        _b.appendTimestamp(itoa, ts);
         return *this;
     }
 
@@ -892,10 +908,7 @@ public:
     }
 
 private:
-    std::string num() {
-        return _b.numStr(_i++);
-    }
-    int _i;
+    std::uint32_t _i;
     BSONObjBuilder _b;
 };
 

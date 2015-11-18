@@ -434,3 +434,13 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
 )
+
+env.CppUnitTest(
+    target='itoa_test',
+    source=[
+        'itoa_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
