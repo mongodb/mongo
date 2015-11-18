@@ -78,7 +78,7 @@ public:
      * Returns the maximum size addition when doing transforming temp data.
      */
     size_t additionalBytesForProtectedBuffer() {
-        return 32;
+        return 33;
     }
 
     /**
