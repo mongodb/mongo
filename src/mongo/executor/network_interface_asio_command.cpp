@@ -279,9 +279,18 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
     }
 
     if (op->_inSetup) {
+        // If we are in setup we should only be here if we failed to connect.
+        invariant(!resp.isOK());
         // If we fail during connection, we won't be able to access any of our members after calling
         // op->finish().
-        log() << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
+        LOG(1) << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
+    }
+
+    if (!resp.isOK()) {
+        // In the case that resp is not OK, but _inSetup is false, we are using a connection that
+        // we got from the pool to execute a command, but it failed for some reason.
+        LOG(2) << "Failed to execute command: " << op->request().toString()
+               << " reason: " << resp.getStatus();
     }
 
     op->finish(resp);
@@ -300,11 +309,6 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
 
         ownedOp = std::move(iter->second);
         _inProgress.erase(iter);
-    }
-
-    if (!resp.isOK()) {
-        LOG(2) << "Failed to execute command: " << op->request().toString()
-               << " reason: " << resp.getStatus();
     }
 
     invariant(ownedOp);
