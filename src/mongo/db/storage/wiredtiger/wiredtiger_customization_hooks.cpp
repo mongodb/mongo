@@ -31,6 +31,8 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 
+#include <boost/filesystem/path.hpp>
+
 #include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
@@ -81,6 +83,10 @@ std::string EmptyWiredTigerCustomizationHooks::getOpenConfig(StringData tableNam
 
 std::unique_ptr<DataProtector> EmptyWiredTigerCustomizationHooks::getDataProtector() {
     return std::unique_ptr<DataProtector>();
+}
+
+boost::filesystem::path EmptyWiredTigerCustomizationHooks::getProtectedPathSuffix() {
+    return "";
 }
 
 Status EmptyWiredTigerCustomizationHooks::protectTmpData(

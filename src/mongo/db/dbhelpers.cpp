@@ -588,6 +588,7 @@ Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string
     auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
     if (hooks->enabled()) {
         _protector = hooks->getDataProtector();
+        _file += hooks->getProtectedPathSuffix();
     }
 }
 

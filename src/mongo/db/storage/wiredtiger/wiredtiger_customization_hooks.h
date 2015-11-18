@@ -35,6 +35,12 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 
+namespace boost {
+namespace filesystem {
+class path;
+}  // namespace filesystem
+}  // namespace boost
+
 namespace mongo {
 class DataProtector;
 class StringData;
@@ -81,6 +87,11 @@ public:
     virtual std::unique_ptr<DataProtector> getDataProtector() = 0;
 
     /**
+     * Get an implementation specific path suffix to tag files with
+     */
+    virtual boost::filesystem::path getProtectedPathSuffix() = 0;
+
+    /**
      * Transform temp data to non-readable form before writing it to disk.
      */
     virtual Status protectTmpData(
@@ -105,6 +116,8 @@ public:
     std::string getOpenConfig(StringData tableName) override;
 
     std::unique_ptr<DataProtector> getDataProtector() override;
+
+    boost::filesystem::path getProtectedPathSuffix() override;
 
     Status protectTmpData(
         const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) override;
