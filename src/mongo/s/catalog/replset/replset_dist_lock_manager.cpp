@@ -268,6 +268,11 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
     Timer timer(_serviceContext->getTickSource());
     Timer msgTimer(_serviceContext->getTickSource());
 
+    // Counts how many attempts have been made to grab the lock, which have failed with network
+    // error. This value is reset for each lock acquisition attempt because these are
+    // independent write operations.
+    int networkErrorRetries = 0;
+
     // Distributed lock acquisition works by tring to update the state of the lock to 'taken'. If
     // the lock is currently taken, we will back off and try the acquisition again, repeating this
     // until the lockTryInterval has been reached. If a network error occurs at each lock
@@ -275,11 +280,6 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
     while (waitFor <= milliseconds::zero() || milliseconds(timer.millis()) < waitFor) {
         const OID lockSessionID = OID::gen();
         const string who = str::stream() << _processID << ":" << getThreadName();
-
-        // Counts how many attempts have been made to grab the lock, which have failed with network
-        // error. This value is reset for each lock acquisition attempt because these are
-        // independent write operations.
-        int networkErrorRetries = 0;
 
         auto lockExpiration = _lockExpiration;
         MONGO_FAIL_POINT_BLOCK(setDistLockTimeout, customTimeout) {
@@ -397,6 +397,10 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
 
             msgTimer.reset();
         }
+
+        // A new lock acquisition attempt will begin now (because the previous found the lock to be
+        // busy, so reset the retries counter)
+        networkErrorRetries = 0;
 
         const milliseconds timeRemaining =
             std::max(milliseconds::zero(), waitFor - milliseconds(timer.millis()));
