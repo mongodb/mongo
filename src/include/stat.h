@@ -361,6 +361,7 @@ struct __wt_connection_stats {
 	int64_t page_sleep;
 	int64_t read_io;
 	int64_t rec_page_delete;
+	int64_t rec_page_delete_fast;
 	int64_t rec_pages;
 	int64_t rec_pages_eviction;
 	int64_t rec_split_stashed_bytes;
@@ -481,6 +482,7 @@ struct __wt_dsrc_stats {
 	int64_t rec_overflow_key_leaf;
 	int64_t rec_overflow_value;
 	int64_t rec_page_delete;
+	int64_t rec_page_delete_fast;
 	int64_t rec_page_match;
 	int64_t rec_pages;
 	int64_t rec_pages_eviction;

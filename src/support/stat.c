@@ -93,6 +93,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"reconciliation: leaf-page overflow keys",
 	"reconciliation: overflow values written",
 	"reconciliation: pages deleted",
+	"reconciliation: fast-path pages deleted",
 	"reconciliation: page checksum matches",
 	"reconciliation: page reconciliation calls",
 	"reconciliation: page reconciliation calls for eviction",
@@ -212,6 +213,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->lsm_merge_throttle = 0;
 	stats->bloom_size = 0;
 	stats->rec_dictionary = 0;
+	stats->rec_page_delete_fast = 0;
 	stats->rec_suffix_compression = 0;
 	stats->rec_multiblock_internal = 0;
 	stats->rec_overflow_key_internal = 0;
@@ -333,6 +335,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->lsm_merge_throttle += from->lsm_merge_throttle;
 	to->bloom_size += from->bloom_size;
 	to->rec_dictionary += from->rec_dictionary;
+	to->rec_page_delete_fast += from->rec_page_delete_fast;
 	to->rec_suffix_compression += from->rec_suffix_compression;
 	to->rec_multiblock_internal += from->rec_multiblock_internal;
 	to->rec_overflow_key_internal += from->rec_overflow_key_internal;
@@ -470,6 +473,7 @@ __wt_stat_dsrc_aggregate(
 	to->lsm_merge_throttle += WT_STAT_READ(from, lsm_merge_throttle);
 	to->bloom_size += WT_STAT_READ(from, bloom_size);
 	to->rec_dictionary += WT_STAT_READ(from, rec_dictionary);
+	to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
 	to->rec_suffix_compression +=
 	    WT_STAT_READ(from, rec_suffix_compression);
 	to->rec_multiblock_internal +=
@@ -629,6 +633,7 @@ static const char * const __stats_connection_desc[] = {
 	"thread-yield: page acquire time sleeping (usecs)",
 	"connection: total read I/Os",
 	"reconciliation: pages deleted",
+	"reconciliation: fast-path pages deleted",
 	"reconciliation: page reconciliation calls",
 	"reconciliation: page reconciliation calls for eviction",
 	"reconciliation: split bytes currently awaiting free",
@@ -811,6 +816,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lsm_work_units_done = 0;
 	stats->lsm_work_units_created = 0;
 	stats->lsm_work_queue_max = 0;
+	stats->rec_page_delete_fast = 0;
 	stats->rec_pages = 0;
 	stats->rec_pages_eviction = 0;
 	stats->rec_page_delete = 0;
@@ -1009,6 +1015,7 @@ __wt_stat_connection_aggregate(
 	to->lsm_work_units_created +=
 	    WT_STAT_READ(from, lsm_work_units_created);
 	to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
+	to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
 	to->rec_pages += WT_STAT_READ(from, rec_pages);
 	to->rec_pages_eviction += WT_STAT_READ(from, rec_pages_eviction);
 	to->rec_page_delete += WT_STAT_READ(from, rec_page_delete);

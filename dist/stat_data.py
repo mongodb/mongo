@@ -281,6 +281,7 @@ connection_stats = [
     ##########################################
     RecStat('rec_pages', 'page reconciliation calls'),
     RecStat('rec_page_delete', 'pages deleted'),
+    RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
     RecStat('rec_split_stashed_bytes',
         'split bytes currently awaiting free', 'no_clear,no_scale'),
@@ -525,6 +526,7 @@ dsrc_stats = [
     RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_overflow_value', 'overflow values written'),
     RecStat('rec_page_delete', 'pages deleted'),
+    RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_page_match', 'page checksum matches'),
     RecStat('rec_pages', 'page reconciliation calls'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
