@@ -45,6 +45,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/curop.h"
@@ -402,19 +403,58 @@ void applyOps(const std::vector<std::vector<BSONObj>>& writerVectors,
     }
 }
 
-void fillWriterVectors(const std::deque<SyncTail::OplogEntry>& ops,
+/**
+ * A caching functor that returns true if a namespace refers to a capped collection.
+ * Collections that don't exist are implicitly not capped.
+ */
+class CachingCappedChecker {
+public:
+    bool operator()(OperationContext* txn, const StringMapTraits::HashedKey& ns) {
+        auto it = _cache.find(ns);
+        if (it != _cache.end()) {
+            return it->second;
+        }
+
+        bool isCapped = isCappedImpl(txn, ns.key());
+        _cache[ns] = isCapped;
+        return isCapped;
+    }
+
+private:
+    bool isCappedImpl(OperationContext* txn, StringData ns) {
+        auto db = dbHolder().get(txn, ns);
+        if (!db)
+            return false;
+
+        auto collection = db->getCollection(ns);
+        return collection && collection->isCapped();
+    }
+
+    StringMap<bool> _cache;
+};
+
+void fillWriterVectors(OperationContext* txn,
+                       const std::deque<SyncTail::OplogEntry>& ops,
                        std::vector<std::vector<BSONObj>>* writerVectors) {
     const bool supportsDocLocking =
         getGlobalServiceContext()->getGlobalStorageEngine()->supportsDocLocking();
     const uint32_t numWriters = writerVectors->size();
 
+    Lock::GlobalRead globalReadLock(txn->lockState());
+
+    CachingCappedChecker isCapped;
+
     for (auto&& op : ops) {
-        uint32_t hash = 0;
-        MurmurHash3_x86_32(op.ns.rawData(), op.ns.size(), 0, &hash);
+        StringMapTraits::HashedKey hashedNs(op.ns);
+        uint32_t hash = hashedNs.hash();
 
         const char* opType = op.opType.rawData();
 
-        if (supportsDocLocking && isCrudOpType(opType)) {
+        // For doc locking engines, include the _id of the document in the hash so we get
+        // parallelism even if all writes are to a single collection. We can't do this for capped
+        // collections because the order of inserts is a guaranteed property, unlike for normal
+        // collections.
+        if (supportsDocLocking && isCrudOpType(opType) && !isCapped(txn, hashedNs)) {
             BSONElement id;
             switch (opType[0]) {
                 case 'u':
@@ -448,7 +488,7 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
 
     std::vector<std::vector<BSONObj>> writerVectors(replWriterThreadCount);
 
-    fillWriterVectors(ops.getDeque(), &writerVectors);
+    fillWriterVectors(txn, ops.getDeque(), &writerVectors);
     LOG(2) << "replication batch size is " << ops.getDeque().size() << endl;
     // We must grab this because we're going to grab write locks later.
     // We hold this mutex the entire time we're writing; it doesn't matter
