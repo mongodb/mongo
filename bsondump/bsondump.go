@@ -45,7 +45,7 @@ func (bd *BSONDump) Open() error {
 }
 
 func printJSON(doc *bson.Raw, out io.Writer, pretty bool) error {
-	decodedDoc := bson.M{}
+	decodedDoc := bson.D{}
 	err := bson.Unmarshal(doc.Data, &decodedDoc)
 	if err != nil {
 		return err
