@@ -49,13 +49,44 @@ exportToMongoHelpers = {
         var lastStatement = parseTree.body.length - 1;
         var lastStatementType = parseTree.body[lastStatement].type;
         if (lastStatementType == 'ExpressionStatement') {
-            var lines = fnSrc.split('\n');
+            var prevExprEnd = 0;
             var loc = parseTree.body[lastStatement].loc.start;
-            var mod_line = lines[loc.line - 1];
-            mod_line = mod_line.substr(0, loc.column) + 'return ' + mod_line.substr(loc.column);
-            lines[loc.line - 1] = mod_line;
-            fnSrc = 'function() { ' + lines.join('\n') + ' }'
-            return fnSrc;
+
+            // When we're actually doing the pre-pending of return later on we need to know
+            // whether we've reached the beginning of the line, or the end of the 2nd-to-last
+            // expression.
+            if (lastStatement > 0) {
+                prevExprEnd = parseTree.body[lastStatement - 1].loc.end;
+                if (prevExprEnd.line != loc.line) {
+                    prevExprEnd = 0;
+                }
+                else {
+                    prevExprEnd = prevExprEnd.column;
+                }
+            }
+
+            var lines = fnSrc.split('\n');
+            var col = loc.column;
+            var fnSrc;
+            var origLine = lines[loc.line - 1];
+
+            // The parser has a weird behavior where sometimes if you have an expression like
+            // ((x == 5)), it says that the expression string is "x == 5))", so we may need to
+            // adjust where we prepend "return".
+            while(col >= prevExprEnd) {
+                var modLine = origLine.substr(0, col) + "return " + origLine.substr(col);
+                lines[loc.line - 1] = modLine;
+                fnSrc = '{ ' + lines.join('\n') + ' }';
+                try {
+                    tmpTree = this.Reflect.parse("function x() " + fnSrc);
+                } catch (e) {
+                    col -= 1;
+                    continue;
+                }
+                break;
+            }
+
+            return "function() " + fnSrc;
         } else if(lastStatementType == 'FunctionDeclaration') {
             return fnSrc;
         } else {
