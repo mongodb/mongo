@@ -69,27 +69,30 @@ ReplSetTest = function(opts) {
 
     this.nodeOptions = {};
 
+    var i;
     if (isObject(opts.nodes )) {
         var len = 0;
 
-        for(var i in opts.nodes) {
-            var options = this.nodeOptions[ "n" + len ] = Object.merge(opts.nodeOptions, 
+        for(i in opts.nodes) {
+            var options = this.nodeOptions[ "n" + len ] = Object.merge(opts.nodeOptions,
                                                                        opts.nodes[i]);
-            if( i.startsWith( "a" ) ) options.arbiter = true;
-            len++
+            if( i.startsWith( "a" ) ) {
+                options.arbiter = true;
+            }
+            len++;
         }
 
-        this.numNodes = len
+        this.numNodes = len;
     }
     else if (Array.isArray(opts.nodes)) {
-        for(var i = 0; i < opts.nodes.length; i++) {
+        for(i = 0; i < opts.nodes.length; i++) {
             this.nodeOptions[ "n" + i ] = Object.merge(opts.nodeOptions, opts.nodes[i]);
         }
 
-        this.numNodes = opts.nodes.length
+        this.numNodes = opts.nodes.length;
     }
     else {
-        for (var i = 0; i < opts.nodes; i++) {
+        for (i = 0; i < opts.nodes; i++) {
             this.nodeOptions[ "n" + i ] = opts.nodeOptions;
         }
 
@@ -104,59 +107,67 @@ ReplSetTest = function(opts) {
         this._unbridgedNodes = [];
     }
 
-    this.initLiveNodes()
+    this.initLiveNodes();
 
-    Object.extend( this, ReplSetTest.Health )
-    Object.extend( this, ReplSetTest.State )
-}
+    Object.extend( this, ReplSetTest.Health );
+    Object.extend( this, ReplSetTest.State );
+};
 
 // List of nodes as host:port strings.
 ReplSetTest.prototype.nodeList = function() {
     var list = [];
     for(var i=0; i<this.ports.length; i++) {
-      list.push( this.host + ":" + this.ports[i]);
+        list.push( this.host + ":" + this.ports[i]);
     }
 
     return list;
-}
+};
 
 // Here we store a reference to all reachable nodes.
 ReplSetTest.prototype.initLiveNodes = function() {
-    this.liveNodes = { master: null, slaves: [] }
-}
+    this.liveNodes = { master: null, slaves: [] };
+};
 
 ReplSetTest.prototype.getNodeId = function(node) {
     
-    if( node.toFixed ) return parseInt( node )
-    
-    for( var i = 0; i < this.nodes.length; i++ ){
-        if( this.nodes[i] == node ) return i
+    if( node.toFixed ) {
+        return parseInt( node );
     }
     
-    if( node instanceof ObjectId ){
-        for( var i = 0; i < this.nodes.length; i++ ){
-            if( this.nodes[i].runId == node ) return i
+    for( var i = 0; i < this.nodes.length; i++ ){
+        if( this.nodes[i] == node ) {
+            return i;
         }
     }
     
-    if( node.nodeId != null ) return parseInt( node.nodeId )
+    if( node instanceof ObjectId ) {
+        for(i = 0; i < this.nodes.length; i++){
+            if( this.nodes[i].runId == node ) {
+                return i;
+            }
+        }
+    }
     
-    return undefined
+    if( node.nodeId != null ) {
+        return parseInt( node.nodeId );
+    }
     
-}
+    return undefined;
+    
+};
 
 ReplSetTest.prototype.getPort = function( n ){
     
-    n = this.getNodeId( n )
+    n = this.getNodeId( n );
     
     print( "ReplSetTest n: " + n + " ports: " + tojson( this.ports ) + "\t" + this.ports[n] + " " + typeof(n) );
     return this.ports[ n ];
-}
+};
 
 ReplSetTest.prototype.getPath = function( n ){
     
     if( n.host )
-        n = this.getNodeId( n )
+        n = this.getNodeId( n );
 
     var p = MongoRunner.dataPath + this.name + "-"+n;
     if ( ! this._alldbpaths )
@@ -164,12 +175,12 @@ ReplSetTest.prototype.getPath = function( n ){
     else
         this._alldbpaths.push( p );
     return p;
-}
+};
 
 ReplSetTest.prototype.getReplSetConfig = function() {
     var cfg = {};
 
-    cfg['_id']  = this.name;
+    cfg._id = this.name;
     if (this.protocolVersion !== undefined && this.protocolVersion !== null) {
         cfg.protocolVersion = this.protocolVersion;
     }
@@ -178,15 +189,15 @@ ReplSetTest.prototype.getReplSetConfig = function() {
 
     for (var i=0; i<this.ports.length; i++) {
         member = {};
-        member['_id']  = i;
+        member._id = i;
 
         var port = this.ports[i];
 
-        member['host'] = this.host + ":" + port;
+        member.host = this.host + ":" + port;
         var nodeOpts = this.nodeOptions[ "n" + i ];
         if (nodeOpts) {
             if (nodeOpts.arbiter) {
-                member['arbiterOnly'] = true;
+                member.arbiterOnly = true;
             }
             if (nodeOpts.rsConfig) {
                 Object.extend(member, nodeOpts.rsConfig);
@@ -203,7 +214,7 @@ ReplSetTest.prototype.getReplSetConfig = function() {
         cfg.settings = this.configSettings;
     }
     return cfg;
-}
+};
 
 ReplSetTest.prototype.getURL = function(){
     var hosts = [];
@@ -219,20 +230,20 @@ ReplSetTest.prototype.getURL = function(){
     }
     
     return this.name + "/" + hosts.join(",");
-}
+};
 
 ReplSetTest.prototype.startSet = function( options ) {
     var nodes = [];
     print( "ReplSetTest Starting Set" );
 
     for( var n = 0 ; n < this.ports.length; n++ ) {
-        node = this.start(n, options)
+        node = this.start(n, options);
         nodes.push(node);
     }
 
     this.nodes = nodes;
     return this.nodes;
-}
+};
 
 ReplSetTest.prototype.callIsMaster = function() {
   
@@ -240,19 +251,17 @@ ReplSetTest.prototype.callIsMaster = function() {
   this.initLiveNodes();
     
   for(var i=0; i<this.nodes.length; i++) {
-
     try {
       var n = this.nodes[i].getDB('admin').runCommand({ismaster:1});
       
-      if(n['ismaster'] == true) {
-        master = this.nodes[i]
-        this.liveNodes.master = master
+      if(n.ismaster == true) {
+        master = this.nodes[i];
+        this.liveNodes.master = master;
       }
       else {
         this.nodes[i].setSlaveOk();
         this.liveNodes.slaves.push(this.nodes[i]);
       }
-
     }
     catch (err) {
       print("ReplSetTest Could not call ismaster on node " + i + ": " + tojson(err));
@@ -260,7 +269,7 @@ ReplSetTest.prototype.callIsMaster = function() {
   }
 
   return master || false;
-}
+};
 
 ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs, timeout ) {
     var hostCount = host.length;
@@ -273,26 +282,26 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs, timeout ) {
     
     timeout = timeout || 60 * 1000;
     
-    if( hostOk == undefined ) hostOk = { ok : true }
-    if( host.host ) host = host.host
-    if( rs && rs.getMaster ) rs = rs.name
+    if( hostOk == undefined ) hostOk = { ok : true };
+    if( host.host ) host = host.host;
+    if( rs && rs.getMaster ) rs = rs.name;
     
-    print( "Awaiting " + host + " to be " + tojson( hostOk ) + " for " + conn + " (rs: " + rs + ")" )
+    print( "Awaiting " + host + " to be " + tojson( hostOk ) + " for " + conn + " (rs: " + rs + ")" );
     
-    var tests = 0
+    var tests = 0;
     assert.soon( function() {
-        var rsClientHosts = conn.getDB( "admin" ).runCommand( "connPoolStats" )[ "replicaSets" ]
+        var rsClientHosts = conn.getDB( "admin" ).runCommand( "connPoolStats" ).replicaSets;
         if( tests++ % 10 == 0 ) 
-            printjson( rsClientHosts )
+            printjson( rsClientHosts );
         
-        for ( rsName in rsClientHosts ){
-            if( rs && rs != rsName ) continue
+        for ( var rsName in rsClientHosts ){
+            if( rs && rs != rsName ) continue;
             for ( var i = 0; i < rsClientHosts[rsName].hosts.length; i++ ){
                 var clientHost = rsClientHosts[rsName].hosts[ i ];
-                if( clientHost.addr != host ) continue
+                if( clientHost.addr != host ) continue;
                 
                 // Check that *all* host properties are set correctly
-                var propOk = true
+                var propOk = true;
                 for( var prop in hostOk ){
                     if ( isObject( hostOk[prop] )) {
                         if ( !friendlyEqual( hostOk[prop], clientHost[prop] )){
@@ -311,9 +320,9 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs, timeout ) {
             }
         }
         return false;
-    }, "timed out waiting for replica set client to recognize hosts", timeout )
+    }, "timed out waiting for replica set client to recognize hosts", timeout );
     
-}
+};
 
 ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
   this.getMaster(); // Wait for a primary to be selected.
@@ -327,8 +336,8 @@ ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
           var ready = true;
           for(var i=0; i<len; i++) {
               var isMaster = slaves[i].getDB("admin").runCommand({ismaster: 1});
-              var arbiter = isMaster['arbiterOnly'] == undefined ? false : isMaster['arbiterOnly'];
-              ready = ready && ( isMaster['secondary'] || arbiter );
+              var arbiter = isMaster.arbiterOnly == undefined ? false : isMaster.arbiterOnly;
+              ready = ready && ( isMaster.secondary || arbiter );
           }
           return ready;
       }, "Awaiting secondaries", tmo);
@@ -353,9 +362,9 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
     throw err;
   }
   return master;
-}
+};
 
-ReplSetTest.prototype.getPrimary = ReplSetTest.prototype.getMaster
+ReplSetTest.prototype.getPrimary = ReplSetTest.prototype.getMaster;
 
 ReplSetTest.prototype.awaitNoPrimary = function(msg, timeout) {
     msg = msg || "Timed out waiting for there to be no primary in replset: " + this.name;
@@ -365,28 +374,28 @@ ReplSetTest.prototype.awaitNoPrimary = function(msg, timeout) {
                     return self.callIsMaster() == false;
                 }, msg, timeout);
 
-}
+};
 
 ReplSetTest.prototype.getSecondaries = function( timeout ){
-    var master = this.getMaster( timeout )
-    var secs = []
+    var master = this.getMaster( timeout );
+    var secs = [];
     for( var i = 0; i < this.nodes.length; i++ ){
         if( this.nodes[i] != master ){
-            secs.push( this.nodes[i] )
+            secs.push( this.nodes[i] );
         }
     }
-    return secs
-}
+    return secs;
+};
 
 ReplSetTest.prototype.getSecondary = function( timeout ){
     return this.getSecondaries( timeout )[0];
-}
+};
 
 ReplSetTest.prototype.status = function( timeout ){
-    var master = this.callIsMaster()
-    if( ! master ) master = this.liveNodes.slaves[0]
-    return master.getDB("admin").runCommand({replSetGetStatus: 1})
-}
+    var master = this.callIsMaster();
+    if( ! master ) master = this.liveNodes.slaves[0];
+    return master.getDB("admin").runCommand({replSetGetStatus: 1});
+};
 
 // Add a node to the test set
 ReplSetTest.prototype.add = function(config) {
@@ -405,10 +414,10 @@ ReplSetTest.prototype.add = function(config) {
 
     print("ReplSetTest nextId: " + nextId);
     return this.start(nextId, config);
-}
+};
 
 ReplSetTest.prototype.remove = function( nodeId ) {
-    nodeId = this.getNodeId( nodeId )
+    nodeId = this.getNodeId( nodeId );
     this.nodes.splice( nodeId, 1 );
     this.ports.splice( nodeId, 1 );
 
@@ -416,14 +425,14 @@ ReplSetTest.prototype.remove = function( nodeId ) {
         this._unbridgedNodes.splice(nodeId, 1);
         this._unbridgedPorts.splice(nodeId, 1);
     }
-}
+};
 
 ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var master  = this.nodes[0].getDB("admin");
     var config  = cfg || this.getReplSetConfig();
     var cmd     = {};
     var cmdKey  = initCmd || 'replSetInitiate';
-    var timeout = timeout || 60000;
+    timeout = timeout || 60000;
     if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
         config.protocolVersion = 0;
     }
@@ -438,7 +447,7 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
         master = this.getMaster();
         jsTest.authenticateNodes(this.nodes);
     }
-}
+};
 
 /**
  * Gets the current replica set config from the primary.
@@ -448,7 +457,7 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
 ReplSetTest.prototype.getConfigFromPrimary = function() {
     var primary = this.getPrimary(90 * 1000 /* 90 sec timeout */);
     return assert.commandWorked(primary.getDB("admin").adminCommand("replSetGetConfig")).config;
-}
+};
 
 // alias to match rs.conf* behavior in the shell.
 ReplSetTest.prototype.conf = ReplSetTest.prototype.getConfigFromPrimary;
@@ -472,13 +481,13 @@ ReplSetTest.prototype.reInitiate = function() {
             throw e;
         }
     }
-}
+};
 
 ReplSetTest.prototype.getLastOpTime = function(conn) {
     var replStatus = conn.getDB("admin").runCommand("replSetGetStatus");
     var myOpTime = replStatus.members.filter(m=>m.self)[0].optime;
     return myOpTime.ts ? myOpTime.ts : myOpTime;
-}
+};
 
 ReplSetTest.prototype.getLastOpTimeWritten = function() {
     var master = this.getMaster();
@@ -542,10 +551,10 @@ ReplSetTest.prototype.awaitLastOpCommitted = function() {
             }
         }
         return true;
-    }
+    };
     assert.soon(isLastOpCommitted,
                 "Op failed to become committed on all secondaries: " + tojson(lastOp));
-}
+};
 
 ReplSetTest.prototype.awaitReplication = function(timeout) {
     timeout = timeout || 30000;
@@ -588,9 +597,9 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                         slave.getDB("local")['system.replset'].findOne().version;
 
                  if (configVersion != slaveConfigVersion) {
-                    print("ReplSetTest awaitReplication: secondary #" + secondaryCount
-                           + ", " + slaveName + ", has config version #" + slaveConfigVersion
-                           + ", but expected config version #" + configVersion);
+                    print("ReplSetTest awaitReplication: secondary #" + secondaryCount +
+                           ", " + slaveName + ", has config version #" + slaveConfigVersion +
+                           ", but expected config version #" + configVersion);
 
                     if (slaveConfigVersion > configVersion) {
                         master = this.getMaster();
@@ -598,9 +607,9 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                         masterOpTime = self.getLastOpTime(master);
                         masterName = master.toString().substr(14); // strip "connection to "
 
-                        print("ReplSetTest awaitReplication: timestamp for primary, " + masterName
-                                + ", is " + tojson(this.latest)
-                                + ", last oplog entry is " + tojsononeline(masterOpTime));
+                        print("ReplSetTest awaitReplication: timestamp for primary, " +
+                                masterName + ", is " + tojson(this.latest) +
+                                ", last oplog entry is " + tojsononeline(masterOpTime));
                     }
 
                     return false;
@@ -655,15 +664,15 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
              return false;
          }
      }, "awaiting replication", timeout);
-}
+};
 
 ReplSetTest.prototype.getHashes = function( db ){
     this.getMaster();
     var res = {};
-    res.master = this.liveNodes.master.getDB( db ).runCommand( "dbhash" )
-    res.slaves = this.liveNodes.slaves.map( function(z){ return z.getDB( db ).runCommand( "dbhash" ); } )
+    res.master = this.liveNodes.master.getDB( db ).runCommand( "dbhash" );
+    res.slaves = this.liveNodes.slaves.map( function(z){ return z.getDB( db ).runCommand( "dbhash" ); } );
     return res;
-}
+};
 
 /**
  * Starts up a server.  Options are saved by default for subsequent starts.
@@ -682,22 +691,22 @@ ReplSetTest.prototype.getHashes = function( db ){
  */
 ReplSetTest.prototype.start = function( n , options , restart , wait ) {
     if( n.length ) {
-        var nodes = n
-        var started = []
+        var nodes = n;
+        var started = [];
         
         for( var i = 0; i < nodes.length; i++ ){
             if( this.start( nodes[i], Object.merge({}, options), restart, wait ) ){
-                started.push( nodes[i] )
+                started.push( nodes[i] );
             }
         }
         
-        return started
+        return started;
     }
 
     // TODO: should we do something special if we don't currently know about this node?
     n = this.getNodeId(n);
     
-    print( "ReplSetTest n is : " + n )
+    print( "ReplSetTest n is : " + n );
     
     defaults = { useHostName : this.useHostName,
                  oplogSize : this.oplogSize, 
@@ -706,9 +715,9 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
                  noprealloc : "",
                  smallfiles : "",
                  replSet : this.useSeedList ? this.getURL() : this.name,
-                 dbpath : "$set-$node" }
+                 dbpath : "$set-$node" };
     
-    defaults = Object.merge( defaults, ReplSetTest.nodeOptions || {} )
+    defaults = Object.merge( defaults, ReplSetTest.nodeOptions || {} );
     
     //
     // Note : this replaces the binVersion of the shared startSet() options the first time 
@@ -717,20 +726,20 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
     //
     if( options && options.binVersion ){
         options.binVersion = 
-            MongoRunner.versionIterator( options.binVersion )
+            MongoRunner.versionIterator( options.binVersion );
     }
     
-    options = Object.merge( defaults, options )
-    options = Object.merge( options, this.nodeOptions[ "n" + n ] )
+    options = Object.merge( defaults, options );
+    options = Object.merge( options, this.nodeOptions[ "n" + n ] );
     delete options.rsConfig;
 
-    options.restart = options.restart || restart
+    options.restart = options.restart || restart;
 
-    var pathOpts = { node : n, set : this.name }
-    options.pathOpts = Object.merge( options.pathOpts || {}, pathOpts )
+    var pathOpts = { node : n, set : this.name };
+    options.pathOpts = Object.merge( options.pathOpts || {}, pathOpts );
     
     if( tojson(options) != tojson({}) )
-        printjson(options)
+        printjson(options);
 
     // make sure to call getPath, otherwise folders wont be cleaned
     this.getPath(n);
@@ -760,14 +769,14 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
     }
     
     // Add replica set specific attributes.
-    this.nodes[n].nodeId = n
+    this.nodes[n].nodeId = n;
             
-    printjson( this.nodes )
+    printjson( this.nodes );
         
-    wait = wait || false
+    wait = wait || false;
     if( ! wait.toFixed ){
-        if( wait ) wait = 0
-        else wait = -1
+        if( wait ) wait = 0;
+        else wait = -1;
     }
 
     if (wait >= 0) {
@@ -776,7 +785,7 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
     }
 
     return this.nodes[n];
-}
+};
 
 
 /**
@@ -792,8 +801,8 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
 ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     // Can specify wait as third parameter, if using default signal
     if( signal == true || signal == false ){
-        wait = signal
-        signal = undefined
+        wait = signal;
+        signal = undefined;
     }
     
     this.stop(n, signal, options);
@@ -810,13 +819,13 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
         }
     }
     return started;
-}
+};
 
 ReplSetTest.prototype.stopMaster = function(signal, opts) {
     var master = this.getMaster();
     var master_id = this.getNodeId( master );
     return this.stop(master_id, signal, opts);
-}
+};
 
 /**
  * Stops a particular node or nodes, specified by conn or id
@@ -829,20 +838,20 @@ ReplSetTest.prototype.stop = function(n, signal, opts) {
         
     // Flatten array of nodes to stop
     if( n.length ){
-        nodes = n
+        nodes = n;
         
-        var stopped = []
+        var stopped = [];
         for( var i = 0; i < nodes.length; i++ ){
             if (this.stop(nodes[i], signal, opts))
-                stopped.push( nodes[i] )
+                stopped.push( nodes[i] );
         }
         
-        return stopped
+        return stopped;
     }
     
     // Can specify wait as second parameter, if using default signal
     if( signal == true || signal == false ){
-        signal = undefined
+        signal = undefined;
     }
     
     n = this.getNodeId(n);
@@ -874,13 +883,13 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
     if ( forRestart ) { return; }
     if ( this._alldbpaths ){
         print("ReplSetTest stopSet deleting all dbpaths");
-        for( var i=0; i<this._alldbpaths.length; i++ ){
+        for(i=0; i<this._alldbpaths.length; i++) {
             resetDbpath( this._alldbpaths[i] );
         }
     }
     _forgetReplSet(this.name);
 
-    print('ReplSetTest stopSet *** Shut down repl set - test worked ****' )
+    print('ReplSetTest stopSet *** Shut down repl set - test worked ****' );
 };
 
 /**
@@ -914,7 +923,7 @@ ReplSetTest.prototype.ensureOplogsMatch = function() {
             this.query = function(ts) {
                 var coll = this.getOplogColl();
                 var query = {"ts": {"$gte": ts ? ts : new Timestamp()}};
-                this.cursor = coll.find(query).sort({$natural:1})
+                this.cursor = coll.find(query).sort({$natural:1});
                 this.cursor.addOption(DBQuery.Option.oplogReplay);
             };
             
@@ -924,7 +933,7 @@ ReplSetTest.prototype.ensureOplogsMatch = function() {
             
             this.getOplogColl = function () {
                 return this.mongo.getDB("local")["oplog.rs"];
-            }
+            };
             
             this.lastDoc = null;
             this.cursor = null;
@@ -938,49 +947,49 @@ ReplSetTest.prototype.ensureOplogsMatch = function() {
         var rsSize = nodes.length;
         for (var i = 0; i < rsSize; i++) {
             readers[i] = new OplogReader(nodes[i]);
-            var currTS = readers[i].getFirstDoc()["ts"];
+            var currTS = readers[i].getFirstDoc().ts;
             if (currTS.t > largestTS.t || (currTS.t == largestTS.t && currTS.i > largestTS.i) ) {
                 largestTS = currTS;
             }
         }
         
         // start all oplogReaders at the same place. 
-        for (var i = 0; i < rsSize; i++) {
+        for (i = 0; i < rsSize; i++) {
             readers[i].query(largestTS);
         }
 
         var firstReader = readers[0];
         while (firstReader.hasNext()) {
-            var ts = firstReader.next()["ts"];
-            for(var i = 1; i < rsSize; i++) { 
+            var ts = firstReader.next().ts;
+            for(i = 1; i < rsSize; i++) {
                 assert.eq(ts, 
-                          readers[i].next()["ts"], 
+                          readers[i].next().ts,
                           " non-matching ts for node: " + readers[i].mongo);
             }
         }
         
         // ensure no other node has more oplog
-        for (var i = 1; i < rsSize; i++) { 
+        for (i = 1; i < rsSize; i++) {
             assert.eq(false, 
                       readers[i].hasNext(),
                       "" + readers[i] + " shouldn't have more oplog.");
         }
     }
-}
+};
 /**
  * Waits until there is a master node
  */
 ReplSetTest.prototype.waitForMaster = function( timeout ){
     
-    var master = undefined
+    var master;
     
     var self = this;
     assert.soon(function() {
         return ( master = self.getMaster() );
     }, "waiting for master", timeout);
     
-    return master
-}
+    return master;
+};
 
 
 /**
@@ -992,8 +1001,8 @@ ReplSetTest.prototype.waitForMaster = function( timeout ){
  *     respond to the isMaster command.
  */
 ReplSetTest.prototype.waitForHealth = function( node, state, timeout ){
-    this.waitForIndicator( node, state, "health", timeout )    
-}
+    this.waitForIndicator( node, state, "health", timeout );
+};
 
 /**
  * Wait for a state indicator to go to a particular state or states.
@@ -1003,8 +1012,8 @@ ReplSetTest.prototype.waitForHealth = function( node, state, timeout ){
  * 
  */
 ReplSetTest.prototype.waitForState = function( node, state, timeout ){
-    this.waitForIndicator( node, state, "state", timeout )
-}
+    this.waitForIndicator( node, state, "state", timeout );
+};
 
 /**
  * Wait for a rs indicator to go to a particular state or states.
@@ -1018,12 +1027,12 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     
     if( node.length ){
         
-        var nodes = node        
+        var nodes = node;
         for( var i = 0; i < nodes.length; i++ ){
             if( states.length )
-                this.waitForIndicator( nodes[i], states[i], ind, timeout )
+                this.waitForIndicator( nodes[i], states[i], ind, timeout );
             else
-                this.waitForIndicator( nodes[i], states, ind, timeout )
+                this.waitForIndicator( nodes[i], states, ind, timeout );
         }
         
         return;
@@ -1032,18 +1041,18 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     timeout = timeout || 30000;
     
     if( ! node.getDB ){
-        node = this.nodes[node]
+        node = this.nodes[node];
     }
     
-    if( ! states.length ) states = [ states ]
+    if( ! states.length ) states = [ states ];
     
-    print( "ReplSetTest waitForIndicator " + ind + " on " + node )
-    printjson( states )
-    print( "ReplSetTest waitForIndicator from node " + node )
+    print( "ReplSetTest waitForIndicator " + ind + " on " + node );
+    printjson( states );
+    print( "ReplSetTest waitForIndicator from node " + node );
     
-    var lastTime = null
-    var currTime = new Date().getTime()
-    var status = undefined;
+    var lastTime = null;
+    var currTime = new Date().getTime();
+    var status;
 
     var self = this;
     assert.soon(function() {
@@ -1067,7 +1076,7 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
             return false;
         }
 
-        var printStatus = false
+        var printStatus = false;
         if( lastTime == null || ( currTime = new Date().getTime() ) - (1000 * 5) > lastTime ) {
             if( lastTime == null ) {
                 print( "ReplSetTest waitForIndicator Initial status ( timeout : " +
@@ -1095,8 +1104,8 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
                     }
 
                     if (typeof(states[j]) != "number") {
-                        throw new Error("State was not an number -- type:"
-                                        + typeof(states[j]) + ", value:" + states[j]);
+                        throw new Error("State was not an number -- type:" +
+                                        typeof(states[j]) + ", value:" + states[j]);
                     }
                     if( status.members[i][ind] == states[j] ) {
                         return true;
@@ -1109,8 +1118,8 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
 
     }, "waiting for state indicator " + ind + " for " + timeout + "ms", timeout);
 
-    print( "ReplSetTest waitForIndicator final status:" )
-    printjson( status )
+    print( "ReplSetTest waitForIndicator final status:" );
+    printjson( status );
 };
 
 ReplSetTest.Health = {};
@@ -1134,10 +1143,10 @@ ReplSetTest.State.REMOVED = 10;
  */
 ReplSetTest.prototype.overflow = function( secondaries ) {
     // Create a new collection to overflow, allow secondaries to replicate
-    var master = this.getMaster()
-    var overflowColl = master.getCollection( "_overflow.coll" )
-    overflowColl.insert({ replicated : "value" })
-    this.awaitReplication()
+    var master = this.getMaster();
+    var overflowColl = master.getCollection( "_overflow.coll" );
+    overflowColl.insert({ replicated : "value" });
+    this.awaitReplication();
 
     this.stop(secondaries);
 
@@ -1168,6 +1177,6 @@ ReplSetTest.prototype.overflow = function( secondaries ) {
         overflowColl.insert({ overflow: "Last overflow value" }, { writeConcern: { w: 2 } }));
 
     // Restart all our secondaries and wait for recovery state
-    this.start( secondaries, { remember : true }, true, true )
-    this.waitForState( secondaries, this.RECOVERING, 5 * 60 * 1000 )
-}
+    this.start( secondaries, { remember : true }, true, true );
+    this.waitForState( secondaries, this.RECOVERING, 5 * 60 * 1000 );
+};
