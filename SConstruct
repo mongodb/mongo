@@ -798,6 +798,7 @@ if not serverJs and not usemozjs:
 envDict = dict(BUILD_ROOT=buildDir,
                BUILD_DIR=make_variant_dir_generator(),
                DIST_ARCHIVE_SUFFIX='.tgz',
+               DIST_BINARIES=[],
                MODULE_BANNERS=[],
                ARCHIVE_ADDITION_DIR_MAP={},
                ARCHIVE_ADDITIONS=[],

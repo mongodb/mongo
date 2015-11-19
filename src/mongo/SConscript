@@ -520,6 +520,9 @@ for full_dir, archive_dir in env["ARCHIVE_ADDITION_DIR_MAP"].items():
   archive_addition_transforms.append("--transform \"%s=$SERVER_DIST_BASENAME/%s\"" %
                                      (full_dir, archive_dir))
 
+for target in env["DIST_BINARIES"]:
+    installBinary(env, "db/modules/" + target)
+
 # "dist" target is valid only when --use-new-tools is specified
 # Attempts to build release artifacts without tools must fail
 if has_option("use-new-tools"):
@@ -531,6 +534,8 @@ if has_option("use-new-tools"):
             archive_addition_transforms +
             module_banner_transforms +
             [
+                '--transform $BUILD_DIR/mongo/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/mongo/stripped/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
                 '--transform $BUILD_DIR/mongo/stripped=$SERVER_DIST_BASENAME/bin',
                 '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME/bin',
                 '--transform $BUILD_DIR/mongo/stripped/src/mongo-tools=$SERVER_DIST_BASENAME/bin',
@@ -551,7 +556,14 @@ else:
 debug_symbols_dist = env.Command(
     target='#/${SERVER_DIST_BASENAME}-debugsymbols${DIST_ARCHIVE_SUFFIX}',
     source=['#buildscripts/make_archive.py'] + distDebugSymbols,
-    action='$PYTHON ${SOURCES[0]} -o $TARGET --transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME ${TEMPFILE(SOURCES[1:])}',
+    action=' '.join(
+        [
+            '$PYTHON ${SOURCES[0]} -o $TARGET',
+            '--transform $BUILD_DIR/mongo/db/modules/enterprise=$SERVER_DIST_BASENAME',
+            '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME',
+            '${TEMPFILE(SOURCES[1:])}',
+        ]
+    ),
     BUILD_DIR=env.Dir('$BUILD_DIR').path
 )
 env.Alias('dist-debugsymbols', debug_symbols_dist)
