@@ -673,9 +673,13 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
 
     _externalState->dropAllTempCollections(txn);
 
-    _externalState->logTransitionToPrimaryToOplog(txn);
+    // This is done for compatibility with PV0 replicas wrt how "n" ops are processed.
+    if (isV1ElectionProtocol()) {
+        _externalState->logTransitionToPrimaryToOplog(txn);
+    }
+
     StatusWith<OpTime> lastOpTime = _externalState->loadLastOpTime(txn);
-    fassert(28665, lastOpTime.getStatus().isOK());
+    fassertStatusOK(28665, lastOpTime.getStatus());
     _setFirstOpTimeOfMyTerm(lastOpTime.getValue());
 
     lk.lock();

@@ -155,6 +155,8 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
         HostAndPort("node1", 12345));
 
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+    // Fake OpTime from initiate, or a write op.
+    getExternalState()->setLastOpTime(OpTime{{0, 0}, 0});
 
     ASSERT(getReplCoord()->getMemberState().secondary())
         << getReplCoord()->getMemberState().toString();
@@ -200,6 +202,9 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
 
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
 
+    // Fake OpTime from initiate, or a write op.
+    getExternalState()->setLastOpTime(OpTime{{0, 0}, 0});
+
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
     ASSERT(getReplCoord()->isWaitingForApplierToDrain());
@@ -227,7 +232,9 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenAllNodesVoteYea) {
                                                          << "node3:12345")));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop txn;
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
+    getReplCoord()->setMyLastOptime(OpTime{{100, 1}, 0});
+    getExternalState()->setLastOpTime(OpTime{{100, 1}, 0});
+
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     startCapturingLogMessages();
     simulateSuccessfulElection();
