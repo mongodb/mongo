@@ -657,12 +657,10 @@ live_update:
 			break;
 	if ((a = ckpt->bpriv) == NULL)
 		a = &block->live;
-	if (a->discard.entries != 0) {
-		__wt_errx(session,
+	if (a->discard.entries != 0)
+		WT_ERR_MSG(session, WT_ERROR,
 		    "first checkpoint incorrectly has blocks on the discard "
 		    "list");
-		WT_ERR(WT_ERROR);
-	}
 #endif
 
 	block->ckpt_inprogress = true;
