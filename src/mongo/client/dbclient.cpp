@@ -926,6 +926,15 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress) {
 
     _setServerRPCProtocols(swProtocolSet.getValue());
 
+    auto negotiatedProtocol =
+        rpc::negotiate(getServerRPCProtocols(),
+                       rpc::computeProtocolSet(WireSpec::instance().minWireVersionOutgoing,
+                                               WireSpec::instance().maxWireVersionOutgoing));
+
+    if (!negotiatedProtocol.isOK()) {
+        return negotiatedProtocol.getStatus();
+    }
+
     if (_hook) {
         auto validationStatus = _hook(swIsMasterReply.getValue());
         if (!validationStatus.isOK()) {

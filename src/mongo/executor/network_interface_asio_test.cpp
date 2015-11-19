@@ -54,20 +54,32 @@ namespace {
 
 HostAndPort testHost{"localhost", 20000};
 
+void initWireSpecMongoD() {
+    WireSpec& spec = WireSpec::instance();
+    // accept from any version
+    spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
+    spec.maxWireVersionIncoming = FIND_COMMAND;
+    // connect to any version
+    spec.minWireVersionOutgoing = RELEASE_2_4_AND_BEFORE;
+    spec.maxWireVersionOutgoing = FIND_COMMAND;
+}
+
 // Utility function to use with mock streams
 RemoteCommandResponse simulateIsMaster(RemoteCommandRequest request) {
     ASSERT_EQ(std::string{request.cmdObj.firstElementFieldName()}, "isMaster");
     ASSERT_EQ(request.dbname, "admin");
 
     RemoteCommandResponse response;
-    response.data = BSON("minWireVersion" << mongo::kMinWireVersion << "maxWireVersion"
-                                          << mongo::kMaxWireVersion);
+    response.data = BSON("minWireVersion" << mongo::WireSpec::instance().minWireVersionIncoming
+                                          << "maxWireVersion"
+                                          << mongo::WireSpec::instance().maxWireVersionIncoming);
     return response;
 }
 
 class NetworkInterfaceASIOTest : public mongo::unittest::Test {
 public:
     void setUp() override {
+        initWireSpecMongoD();
         NetworkInterfaceASIO::Options options;
 
         // Use mock timer factory
@@ -557,15 +569,17 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
     ConnectEvent{stream}.skip();
 
     // simulate isMaster reply.
-    stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               RemoteCommandResponse response;
-                               response.data = BSON("minWireVersion"
-                                                    << mongo::kMinWireVersion << "maxWireVersion"
-                                                    << mongo::kMaxWireVersion << "TESTKEY"
-                                                    << "TESTVALUE");
-                               return response;
-                           });
+    stream->simulateServer(
+        rpc::Protocol::kOpQuery,
+        [](RemoteCommandRequest request) -> RemoteCommandResponse {
+            RemoteCommandResponse response;
+            response.data =
+                BSON("minWireVersion"
+                     << mongo::WireSpec::instance().minWireVersionIncoming << "maxWireVersion"
+                     << mongo::WireSpec::instance().maxWireVersionIncoming << "TESTKEY"
+                     << "TESTVALUE");
+            return response;
+        });
 
     // we should stop here.
     auto& res = deferred.get();

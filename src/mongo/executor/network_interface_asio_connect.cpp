@@ -36,6 +36,7 @@
 
 #include "mongo/base/system_error.h"
 #include "mongo/config.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/executor/async_stream.h"
 #include "mongo/executor/async_stream_factory.h"
 #include "mongo/executor/async_stream_interface.h"
@@ -50,7 +51,10 @@ using asio::ip::tcp;
 
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(std::unique_ptr<AsyncStreamInterface> stream,
                                                        rpc::ProtocolSet protocols)
-    : _stream(std::move(stream)), _serverProtocols(protocols) {}
+    : _stream(std::move(stream)),
+      _serverProtocols(protocols),
+      _clientProtocols(rpc::computeProtocolSet(WireSpec::instance().minWireVersionOutgoing,
+                                               WireSpec::instance().maxWireVersionOutgoing)) {}
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(AsyncConnection&& other)

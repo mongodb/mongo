@@ -237,8 +237,8 @@ public:
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
-        result.append("maxWireVersion", kMaxWireVersion);
-        result.append("minWireVersion", kMinWireVersion);
+        result.append("maxWireVersion", WireSpec::instance().maxWireVersionIncoming);
+        result.append("minWireVersion", WireSpec::instance().minWireVersionIncoming);
         return true;
     }
 } cmdismaster;

@@ -10,6 +10,8 @@ load('./jstests/multiVersion/libs/verify_versions.js');
 var versionsToCheck = [ "last-stable",
                         "latest" ];
                        
+var versionsToCheckMongos = [ "last-stable" ];
+                       
 jsTest.log( "Testing legacy versions..." );
 
 for( var i = 0; i < versionsToCheck.length; i++ ){
@@ -50,7 +52,7 @@ st = new ShardingTest({ shards : 2,
                                 // Three config servers
                                 sync : true,
                                 
-                                mongosOptions : { binVersion : versionsToCheck },
+                                mongosOptions : { binVersion : versionsToCheckMongos },
                                 configOptions : { binVersion : versionsToCheck },
                                 shardOptions : { binVersion : versionsToCheck }
 
@@ -71,7 +73,7 @@ versionsFound = [];
 for ( j = 0; j < mongoses.length; j++ ) 
     versionsFound.push( mongoses[j].getBinVersion() );
 
-assert.allBinVersions( versionsToCheck, versionsFound );
+assert.allBinVersions( versionsToCheckMongos, versionsFound );
     
 versionsFound = [];
 for ( j = 0; j < configs.length; j++ ) 
@@ -96,7 +98,7 @@ st = new ShardingTest({ shards : 2,
                                 // Replica set shards
                                 rs : true,
                                 
-                                mongosOptions : { binVersion : versionsToCheck },
+                                mongosOptions : { binVersion : versionsToCheckMongos },
                                 configOptions : { binVersion : versionsToCheck },
                                 rsOptions : { binVersion : versionsToCheck, protocolVersion: 0 }
                             } });
@@ -128,7 +130,7 @@ versionsFound = [];
 for ( j = 0; j < mongoses.length; j++ )
     versionsFound.push( mongoses[j].getBinVersion() );
 
-assert.allBinVersions( versionsToCheck, versionsFound );
+assert.allBinVersions( versionsToCheckMongos, versionsFound );
 
 versionsFound = [];
 for ( j = 0; j < configs.length; j++ )

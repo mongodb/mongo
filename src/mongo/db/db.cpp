@@ -95,6 +95,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/ttl.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/scripting/engine.h"
@@ -405,9 +406,21 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
     LOG(1) << "done repairDatabases" << endl;
 }
 
+static void _initWireSpec() {
+    WireSpec& spec = WireSpec::instance();
+    // accept from any version
+    spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
+    spec.maxWireVersionIncoming = FIND_COMMAND;
+    // connect to any version
+    spec.minWireVersionOutgoing = RELEASE_2_4_AND_BEFORE;
+    spec.maxWireVersionOutgoing = FIND_COMMAND;
+}
+
+
 static void _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
+    _initWireSpec();
     getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserver>());
 
     const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();

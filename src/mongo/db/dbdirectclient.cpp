@@ -90,11 +90,14 @@ std::string DBDirectClient::getServerAddress() const {
     return "localhost";  // TODO: should this have the port?
 }
 
+// Returned version should match the incoming connections restrictions.
 int DBDirectClient::getMinWireVersion() {
-    return kMinWireVersion;
+    return WireSpec::instance().minWireVersionIncoming;
 }
+
+// Returned version should match the incoming connections restrictions.
 int DBDirectClient::getMaxWireVersion() {
-    return kMaxWireVersion;
+    return WireSpec::instance().maxWireVersionIncoming;
 }
 
 bool DBDirectClient::callRead(Message& toSend, Message& response) {

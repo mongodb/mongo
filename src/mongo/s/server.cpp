@@ -56,6 +56,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/startup_warnings_common.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
 #include "mongo/s/catalog/forwarding_catalog_manager.h"
@@ -198,9 +199,21 @@ static Status initializeSharding(OperationContext* txn) {
     return Status::OK();
 }
 
+static void _initWireSpec() {
+    WireSpec& spec = WireSpec::instance();
+    // accept from any version
+    spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
+    spec.maxWireVersionIncoming = FIND_COMMAND;
+    // connect to version supporting Find Command only
+    spec.minWireVersionOutgoing = FIND_COMMAND;
+    spec.maxWireVersionOutgoing = FIND_COMMAND;
+}
+
 static ExitCode runMongosServer() {
     Client::initThread("mongosMain");
     printShardingVersionInfo(false);
+
+    _initWireSpec();
 
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
     globalConnPool.addHook(new ShardingConnectionHook(false));

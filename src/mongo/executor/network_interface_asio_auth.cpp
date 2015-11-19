@@ -90,21 +90,13 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
         auto commandReply = std::move(swCommandReply.getValue());
 
-        if (_hook) {
-            // Run the validation hook.
-            auto validHost = callNoexcept(
-                *_hook, &NetworkConnectionHook::validateHost, op->request().target, commandReply);
-            if (!validHost.isOK()) {
-                return _completeOperation(op, validHost);
-            }
-        }
-
         auto protocolSet = rpc::parseProtocolSetFromIsMasterReply(commandReply.data);
         if (!protocolSet.isOK())
             return _completeOperation(op, protocolSet.getStatus());
 
         op->connection().setServerProtocols(protocolSet.getValue());
 
+        invariant(op->connection().clientProtocols() != rpc::supports::kNone);
         // Set the operation protocol
         auto negotiatedProtocol =
             rpc::negotiate(op->connection().serverProtocols(), op->connection().clientProtocols());
@@ -114,6 +106,15 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
         }
 
         op->setOperationProtocol(negotiatedProtocol.getValue());
+
+        if (_hook) {
+            // Run the validation hook.
+            auto validHost = callNoexcept(
+                *_hook, &NetworkConnectionHook::validateHost, op->request().target, commandReply);
+            if (!validHost.isOK()) {
+                return _completeOperation(op, validHost);
+            }
+        }
 
         return _authenticate(op);
 

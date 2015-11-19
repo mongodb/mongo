@@ -60,12 +60,30 @@ enum WireVersion {
     FIND_COMMAND = 4,
 };
 
-// Latest version that the server accepts. This should always be at the latest entry in
-// WireVersion.
-static const int kMaxWireVersion = FIND_COMMAND;
+struct WireSpec {
+    MONGO_DISALLOW_COPYING(WireSpec);
 
-// Minimum version that the server accepts. We should bump this whenever we don't want
-// to allow communication with too old agents.
-static const int kMinWireVersion = RELEASE_2_4_AND_BEFORE;
+    static WireSpec& instance() {
+        static WireSpec instance;
+        return instance;
+    }
+
+    // Minimum version that the server accepts on incoming requests. We should bump this whenever
+    // we don't want to allow incoming connections from clients that are too old.
+    int minWireVersionIncoming;
+    // Latest version that the server accepts on incoming requests. This should always be at the
+    // latest entry in WireVersion.
+    int maxWireVersionIncoming;
+
+    // Minimum version allowed on remote nodes when the server sends requests. We should bump this
+    // whenever we don't want to connect to clients that are too old.
+    int minWireVersionOutgoing;
+    // Latest version allowed on remote nodes when the server sends requests.
+    int maxWireVersionOutgoing;
+
+private:
+    WireSpec() = default;
+};
+
 
 }  // namespace mongo

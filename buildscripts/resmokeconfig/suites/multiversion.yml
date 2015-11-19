@@ -2,6 +2,9 @@ selector:
   js_test:
     roots:
     - jstests/multiVersion/*.js
+    exclude_files: 
+# TODO: SERVER-21578
+    - jstests/multiVersion/balancer_multiVersion_detect.js
 
 # Multiversion tests start their own mongod's.
 executor:

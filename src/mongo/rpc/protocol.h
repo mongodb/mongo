@@ -106,5 +106,10 @@ StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMaste
  */
 bool supportsWireVersionForOpCommandInMongod(int minWireVersion, int maxWireVersion);
 
+/**
+  * Computes supported protocols from wire versions.
+  */
+ProtocolSet computeProtocolSet(int minWireVersion, int maxWireVersion);
+
 }  // namespace rpc
 }  // namespace mongo

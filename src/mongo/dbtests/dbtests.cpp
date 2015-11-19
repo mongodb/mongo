@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/framework.h"
@@ -55,6 +56,16 @@ namespace mongo {
 namespace dbtests {
 // This specifies default dbpath for our testing framework
 const std::string default_test_dbpath = "/tmp/unittest";
+
+void initWireSpec() {
+    WireSpec& spec = WireSpec::instance();
+    // accept from any version
+    spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
+    spec.maxWireVersionIncoming = FIND_COMMAND;
+    // connect to any version
+    spec.minWireVersionOutgoing = RELEASE_2_4_AND_BEFORE;
+    spec.maxWireVersionOutgoing = FIND_COMMAND;
+}
 
 Status createIndex(OperationContext* txn, StringData ns, const BSONObj& keys, bool unique) {
     BSONObjBuilder specBuilder;
@@ -100,6 +111,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     static StaticObserver StaticObserver;
     Command::testCommandsEnabled = true;
     ::mongo::setupSynchronousSignalHandlers();
+    mongo::dbtests::initWireSpec();
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     repl::ReplSettings replSettings;
     replSettings.oplogSize = 10 * 1024 * 1024;

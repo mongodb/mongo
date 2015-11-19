@@ -158,7 +158,10 @@ private:
         std::unique_ptr<AsyncStreamInterface> _stream;
 
         rpc::ProtocolSet _serverProtocols;
-        rpc::ProtocolSet _clientProtocols{rpc::supports::kAll};
+
+        // Dynamically initialized from [min max]WireVersionOutgoing.
+        // Its expected that isMaster response is checked only on the caller.
+        rpc::ProtocolSet _clientProtocols{rpc::supports::kNone};
     };
 
     /**

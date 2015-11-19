@@ -151,5 +151,18 @@ bool supportsWireVersionForOpCommandInMongod(int minWireVersion, int maxWireVers
         (maxWireVersion >= WireVersion::FIND_COMMAND);
 }
 
+ProtocolSet computeProtocolSet(int minWireVersion, int maxWireVersion) {
+    ProtocolSet result = supports::kNone;
+    if (minWireVersion <= maxWireVersion) {
+        if (maxWireVersion >= WireVersion::FIND_COMMAND) {
+            result |= supports::kOpCommandOnly;
+        }
+        if (minWireVersion <= WireVersion::RELEASE_2_4_AND_BEFORE) {
+            result |= supports::kOpQueryOnly;
+        }
+    }
+    return result;
+}
+
 }  // namespace rpc
 }  // namespace mongo
