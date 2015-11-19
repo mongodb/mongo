@@ -298,6 +298,7 @@ struct __wt_connection_stats {
 	int64_t cursor_restart;
 	int64_t cursor_search;
 	int64_t cursor_search_near;
+	int64_t cursor_truncate;
 	int64_t cursor_update;
 	int64_t dh_conn_handle_count;
 	int64_t dh_session_handles;
@@ -359,6 +360,8 @@ struct __wt_connection_stats {
 	int64_t page_read_blocked;
 	int64_t page_sleep;
 	int64_t read_io;
+	int64_t rec_page_delete;
+	int64_t rec_page_delete_fast;
 	int64_t rec_pages;
 	int64_t rec_pages_eviction;
 	int64_t rec_split_stashed_bytes;
@@ -466,6 +469,7 @@ struct __wt_dsrc_stats {
 	int64_t cursor_restart;
 	int64_t cursor_search;
 	int64_t cursor_search_near;
+	int64_t cursor_truncate;
 	int64_t cursor_update;
 	int64_t cursor_update_bytes;
 	int64_t lsm_checkpoint_throttle;
@@ -481,6 +485,7 @@ struct __wt_dsrc_stats {
 	int64_t rec_overflow_key_leaf;
 	int64_t rec_overflow_value;
 	int64_t rec_page_delete;
+	int64_t rec_page_delete_fast;
 	int64_t rec_page_match;
 	int64_t rec_pages;
 	int64_t rec_pages_eviction;
@@ -489,6 +494,16 @@ struct __wt_dsrc_stats {
 	int64_t session_compact;
 	int64_t session_cursor_open;
 	int64_t txn_update_conflict;
+};
+
+/*
+ * Statistics entries for join cursors.
+ */
+#define	WT_JOIN_STATS_BASE	3000
+struct __wt_join_stats {
+	int64_t accesses;
+	int64_t actual_count;
+	int64_t bloom_false_positive;
 };
 
 /* Statistics section: END */

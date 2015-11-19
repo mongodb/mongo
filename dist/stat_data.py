@@ -67,6 +67,10 @@ class DhandleStat(Stat):
     prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
+class JoinStat(Stat):
+    prefix = ''  # prefix is inserted dynamically
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, JoinStat.prefix, desc, flags)
 class LogStat(Stat):
     prefix = 'log'
     def __init__(self, name, desc, flags=''):
@@ -280,6 +284,8 @@ connection_stats = [
     # Reconciliation statistics
     ##########################################
     RecStat('rec_pages', 'page reconciliation calls'),
+    RecStat('rec_page_delete', 'pages deleted'),
+    RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
     RecStat('rec_split_stashed_bytes',
         'split bytes currently awaiting free', 'no_clear,no_scale'),
@@ -358,6 +364,7 @@ connection_stats = [
     CursorStat('cursor_restart', 'cursor restarted searches'),
     CursorStat('cursor_search', 'cursor search calls'),
     CursorStat('cursor_search_near', 'cursor search near calls'),
+    CursorStat('cursor_truncate', 'truncate calls'),
     CursorStat('cursor_update', 'cursor update calls'),
 
     ##########################################
@@ -399,6 +406,7 @@ dsrc_stats = [
     CursorStat('cursor_restart', 'restarted searches'),
     CursorStat('cursor_search', 'search calls'),
     CursorStat('cursor_search_near', 'search near calls'),
+    CursorStat('cursor_truncate', 'truncate calls'),
     CursorStat('cursor_update', 'update calls'),
     CursorStat('cursor_update_bytes', 'cursor-update value bytes updated'),
 
@@ -529,6 +537,7 @@ dsrc_stats = [
     RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_overflow_value', 'overflow values written'),
     RecStat('rec_page_delete', 'pages deleted'),
+    RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_page_match', 'page checksum matches'),
     RecStat('rec_pages', 'page reconciliation calls'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
@@ -544,3 +553,14 @@ dsrc_stats = [
 ]
 
 dsrc_stats = sorted(dsrc_stats, key=attrgetter('name'))
+
+##########################################
+# Cursor Join statistics
+##########################################
+join_stats = [
+    JoinStat('accesses', 'accesses'),
+    JoinStat('actual_count', 'actual count of items'),
+    JoinStat('bloom_false_positive', 'bloom filter false positives'),
+]
+
+join_stats = sorted(join_stats, key=attrgetter('name'))

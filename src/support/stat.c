@@ -77,6 +77,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"cursor: restarted searches",
 	"cursor: search calls",
 	"cursor: search near calls",
+	"cursor: truncate calls",
 	"cursor: update calls",
 	"cursor: cursor-update value bytes updated",
 	"LSM: sleep for LSM checkpoint throttle",
@@ -92,6 +93,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"reconciliation: leaf-page overflow keys",
 	"reconciliation: overflow values written",
 	"reconciliation: pages deleted",
+	"reconciliation: fast-path pages deleted",
 	"reconciliation: page checksum matches",
 	"reconciliation: page reconciliation calls",
 	"reconciliation: page reconciliation calls for eviction",
@@ -102,10 +104,12 @@ static const char * const __stats_dsrc_desc[] = {
 	"transaction: update conflicts",
 };
 
-const char *
-__wt_stat_dsrc_desc(int slot)
+int
+__wt_stat_dsrc_desc(WT_CURSOR_STAT *cst, int slot, const char **p)
 {
-	return (__stats_dsrc_desc[slot]);
+	WT_UNUSED(cst);
+	*p = __stats_dsrc_desc[slot];
+	return (0);
 }
 
 void
@@ -196,6 +200,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cursor_restart = 0;
 	stats->cursor_search = 0;
 	stats->cursor_search_near = 0;
+	stats->cursor_truncate = 0;
 	stats->cursor_update = 0;
 	stats->bloom_false_positive = 0;
 	stats->bloom_hit = 0;
@@ -210,6 +215,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->lsm_merge_throttle = 0;
 	stats->bloom_size = 0;
 	stats->rec_dictionary = 0;
+	stats->rec_page_delete_fast = 0;
 	stats->rec_suffix_compression = 0;
 	stats->rec_multiblock_internal = 0;
 	stats->rec_overflow_key_internal = 0;
@@ -315,6 +321,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->cursor_restart += from->cursor_restart;
 	to->cursor_search += from->cursor_search;
 	to->cursor_search_near += from->cursor_search_near;
+	to->cursor_truncate += from->cursor_truncate;
 	to->cursor_update += from->cursor_update;
 	to->bloom_false_positive += from->bloom_false_positive;
 	to->bloom_hit += from->bloom_hit;
@@ -330,6 +337,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->lsm_merge_throttle += from->lsm_merge_throttle;
 	to->bloom_size += from->bloom_size;
 	to->rec_dictionary += from->rec_dictionary;
+	to->rec_page_delete_fast += from->rec_page_delete_fast;
 	to->rec_suffix_compression += from->rec_suffix_compression;
 	to->rec_multiblock_internal += from->rec_multiblock_internal;
 	to->rec_overflow_key_internal += from->rec_overflow_key_internal;
@@ -449,6 +457,7 @@ __wt_stat_dsrc_aggregate(
 	to->cursor_restart += WT_STAT_READ(from, cursor_restart);
 	to->cursor_search += WT_STAT_READ(from, cursor_search);
 	to->cursor_search_near += WT_STAT_READ(from, cursor_search_near);
+	to->cursor_truncate += WT_STAT_READ(from, cursor_truncate);
 	to->cursor_update += WT_STAT_READ(from, cursor_update);
 	to->bloom_false_positive += WT_STAT_READ(from, bloom_false_positive);
 	to->bloom_hit += WT_STAT_READ(from, bloom_hit);
@@ -466,6 +475,7 @@ __wt_stat_dsrc_aggregate(
 	to->lsm_merge_throttle += WT_STAT_READ(from, lsm_merge_throttle);
 	to->bloom_size += WT_STAT_READ(from, bloom_size);
 	to->rec_dictionary += WT_STAT_READ(from, rec_dictionary);
+	to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
 	to->rec_suffix_compression +=
 	    WT_STAT_READ(from, rec_suffix_compression);
 	to->rec_multiblock_internal +=
@@ -562,6 +572,7 @@ static const char * const __stats_connection_desc[] = {
 	"cursor: cursor restarted searches",
 	"cursor: cursor search calls",
 	"cursor: cursor search near calls",
+	"cursor: truncate calls",
 	"cursor: cursor update calls",
 	"data-handle: connection data handles currently active",
 	"data-handle: session dhandles swept",
@@ -623,6 +634,8 @@ static const char * const __stats_connection_desc[] = {
 	"thread-yield: page acquire read blocked",
 	"thread-yield: page acquire time sleeping (usecs)",
 	"connection: total read I/Os",
+	"reconciliation: pages deleted",
+	"reconciliation: fast-path pages deleted",
 	"reconciliation: page reconciliation calls",
 	"reconciliation: page reconciliation calls for eviction",
 	"reconciliation: split bytes currently awaiting free",
@@ -651,10 +664,12 @@ static const char * const __stats_connection_desc[] = {
 	"connection: total write I/Os",
 };
 
-const char *
-__wt_stat_connection_desc(int slot)
+int
+__wt_stat_connection_desc(WT_CURSOR_STAT *cst, int slot, const char **p)
 {
-	return (__stats_connection_desc[slot]);
+	WT_UNUSED(cst);
+	*p = __stats_connection_desc[slot];
+	return (0);
 }
 
 void
@@ -757,6 +772,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cursor_search = 0;
 	stats->cursor_search_near = 0;
 	stats->cursor_update = 0;
+	stats->cursor_truncate = 0;
 		/* not clearing dh_conn_handle_count */
 	stats->dh_sweep_ref = 0;
 	stats->dh_sweep_close = 0;
@@ -807,8 +823,10 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lsm_work_units_done = 0;
 	stats->lsm_work_units_created = 0;
 	stats->lsm_work_queue_max = 0;
+	stats->rec_page_delete_fast = 0;
 	stats->rec_pages = 0;
 	stats->rec_pages_eviction = 0;
+	stats->rec_page_delete = 0;
 		/* not clearing rec_split_stashed_bytes */
 		/* not clearing rec_split_stashed_objects */
 		/* not clearing session_cursor_open */
@@ -948,6 +966,7 @@ __wt_stat_connection_aggregate(
 	to->cursor_search += WT_STAT_READ(from, cursor_search);
 	to->cursor_search_near += WT_STAT_READ(from, cursor_search_near);
 	to->cursor_update += WT_STAT_READ(from, cursor_update);
+	to->cursor_truncate += WT_STAT_READ(from, cursor_truncate);
 	to->dh_conn_handle_count += WT_STAT_READ(from, dh_conn_handle_count);
 	to->dh_sweep_ref += WT_STAT_READ(from, dh_sweep_ref);
 	to->dh_sweep_close += WT_STAT_READ(from, dh_sweep_close);
@@ -1006,8 +1025,10 @@ __wt_stat_connection_aggregate(
 	to->lsm_work_units_created +=
 	    WT_STAT_READ(from, lsm_work_units_created);
 	to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
+	to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
 	to->rec_pages += WT_STAT_READ(from, rec_pages);
 	to->rec_pages_eviction += WT_STAT_READ(from, rec_pages_eviction);
+	to->rec_page_delete += WT_STAT_READ(from, rec_page_delete);
 	to->rec_split_stashed_bytes +=
 	    WT_STAT_READ(from, rec_split_stashed_bytes);
 	to->rec_split_stashed_objects +=
@@ -1047,4 +1068,50 @@ __wt_stat_connection_aggregate(
 	to->txn_sync += WT_STAT_READ(from, txn_sync);
 	to->txn_commit += WT_STAT_READ(from, txn_commit);
 	to->txn_rollback += WT_STAT_READ(from, txn_rollback);
+}
+
+static const char * const __stats_join_desc[] = {
+	": accesses",
+	": actual count of items",
+	": bloom filter false positives",
+};
+
+int
+__wt_stat_join_desc(WT_CURSOR_STAT *cst, int slot, const char **p)
+{
+	WT_UNUSED(cst);
+	*p = __stats_join_desc[slot];
+	return (0);
+}
+
+void
+__wt_stat_join_init_single(WT_JOIN_STATS *stats)
+{
+	memset(stats, 0, sizeof(*stats));
+}
+
+void
+__wt_stat_join_clear_single(WT_JOIN_STATS *stats)
+{
+	stats->accesses = 0;
+	stats->actual_count = 0;
+	stats->bloom_false_positive = 0;
+}
+
+void
+__wt_stat_join_clear_all(WT_JOIN_STATS **stats)
+{
+	u_int i;
+
+	for (i = 0; i < WT_COUNTER_SLOTS; ++i)
+		__wt_stat_join_clear_single(stats[i]);
+}
+
+void
+__wt_stat_join_aggregate(
+    WT_JOIN_STATS **from, WT_JOIN_STATS *to)
+{
+	to->accesses += WT_STAT_READ(from, accesses);
+	to->actual_count += WT_STAT_READ(from, actual_count);
+	to->bloom_false_positive += WT_STAT_READ(from, bloom_false_positive);
 }

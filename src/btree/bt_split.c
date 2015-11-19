@@ -693,6 +693,7 @@ static int
 __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
     uint32_t new_entries, size_t parent_incr, bool exclusive, bool discard)
 {
+	WT_DECL_ITEM(scr);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_PAGE *parent;
@@ -702,6 +703,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	uint64_t split_gen;
 	uint32_t i, j;
 	uint32_t deleted_entries, parent_entries, result_entries;
+	uint32_t *deleted_refs;
 	bool complete, empty_parent;
 
 	parent = ref->home;
@@ -727,14 +729,20 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * array anyway.  Switch them to the special split state, so that any
 	 * reading thread will restart.
 	 */
+	WT_RET(__wt_scr_alloc(session, 10 * sizeof(uint32_t), &scr));
 	for (deleted_entries = 0, i = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
-		if (next_ref->state == WT_REF_DELETED &&
+		if ((discard && next_ref == ref) ||
+		    (next_ref->state == WT_REF_DELETED &&
 		    __wt_delete_page_skip(session, next_ref, true) &&
 		    __wt_atomic_casv32(
-		    &next_ref->state, WT_REF_DELETED, WT_REF_SPLIT))
-			deleted_entries++;
+		    &next_ref->state, WT_REF_DELETED, WT_REF_SPLIT))) {
+			WT_ERR(__wt_buf_grow(session, scr,
+			    (deleted_entries + 1) * sizeof(uint32_t)));
+			deleted_refs = scr->mem;
+			deleted_refs[deleted_entries++] = i;
+		}
 	}
 
 	/*
@@ -742,7 +750,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * pages, less any WT_REFs we're removing (deleted entries plus the
 	 * entry we're replacing).
 	 */
-	result_entries = (parent_entries + new_entries) - (deleted_entries + 1);
+	result_entries = (parent_entries + new_entries) - deleted_entries;
+	if (!discard)
+		--result_entries;
 
 	/*
 	 * If there are no remaining entries on the parent, give up, we can't
@@ -795,17 +805,14 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 #endif
 
 	/*
-	 * If discarding the page's original WT_REF field, reset it to split and
-	 * increment the number of entries being discarded. Threads cursoring
-	 * through the tree were blocked because that WT_REF state was set to
-	 * locked. Changing the locked state to split unblocks those threads and
-	 * causes them to re-calculate their position based on the just-updated
-	 * parent page's index.
+	 * If discarding the page's original WT_REF field, reset it to split.
+	 * Threads cursoring through the tree were blocked because that WT_REF
+	 * state was set to locked. Changing the locked state to split unblocks
+	 * those threads and causes them to re-calculate their position based
+	 * on the just-updated parent page's index.
 	 */
-	if (discard) {
-		++deleted_entries;
+	if (discard)
 		WT_PUBLISH(ref->state, WT_REF_SPLIT);
-	}
 
 	/*
 	 * Push out the changes: not required for correctness, but don't let
@@ -842,11 +849,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * Acquire a new split generation.
 	 */
 	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
-	for (i = 0; deleted_entries > 0 && i < parent_entries; ++i) {
-		next_ref = pindex->index[i];
-		if (next_ref->state != WT_REF_SPLIT)
-			continue;
-		--deleted_entries;
+	for (i = 0, deleted_refs = scr->mem; i < deleted_entries; ++i) {
+		next_ref = pindex->index[deleted_refs[i]];
+		WT_ASSERT(session, next_ref->state == WT_REF_SPLIT);
 
 		/*
 		 * We set the WT_REF to split, discard it, freeing any resources
@@ -906,7 +911,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 	__wt_page_modify_set(session, parent);
 
-err:	/*
+err:	__wt_scr_free(session, &scr);
+	/*
 	 * A note on error handling: if we completed the split, return success,
 	 * nothing really bad can have happened, and our caller has to proceed
 	 * with the split.
