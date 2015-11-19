@@ -185,9 +185,9 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
     LOG(2) << "startCommand: " << request.toString();
 
-    auto startTime = now();
+    auto getConnectionStartTime = now();
 
-    auto nextStep = [this, startTime, cbHandle, request, onFinish](
+    auto nextStep = [this, getConnectionStartTime, cbHandle, request, onFinish](
         StatusWith<ConnectionPool::ConnectionHandle> swConn) {
 
         if (!swConn.isOK()) {
@@ -244,15 +244,32 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         op->_request = std::move(request);
         op->_onFinish = std::move(onFinish);
         op->_connectionPoolHandle = std::move(swConn.getValue());
-        op->_start = startTime;
+        op->_start = getConnectionStartTime;
 
         // This ditches the lock and gets us onto the strand (so we're
         // threadsafe)
-        op->_strand.post([this, op] {
+        op->_strand.post([this, op, getConnectionStartTime] {
             // Set timeout now that we have the correct request object
             if (op->_request.timeout != RemoteCommandRequest::kNoTimeout) {
-                op->_timeoutAlarm =
-                    op->_owner->_timerFactory->make(&op->_strand, op->_request.timeout);
+                // Subtract the time it took to get the connection from the pool from the request
+                // timeout.
+                auto getConnectionDuration = now() - getConnectionStartTime;
+                if (getConnectionDuration >= op->_request.timeout) {
+                    // We only assume that the request timer is guaranteed to fire *after* the
+                    // timeout duration - but make no stronger assumption. It is thus possible that
+                    // we have already exceeded the timeout. In this case we timeout the operation
+                    // manually.
+                    return _completeOperation(op,
+                                              {ErrorCodes::ExceededTimeLimit,
+                                               "Remote command timed out while waiting to get a "
+                                               "connection from the pool."});
+                }
+
+                // The above conditional guarantees that the adjusted timeout will never underflow.
+                invariant(op->_request.timeout > getConnectionDuration);
+                auto adjustedTimeout = op->_request.timeout - getConnectionDuration;
+
+                op->_timeoutAlarm = op->_owner->_timerFactory->make(&op->_strand, adjustedTimeout);
 
                 std::shared_ptr<AsyncOp::AccessControl> access;
                 std::size_t generation;
@@ -290,9 +307,7 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         });
     };
 
-    // TODO: thread some higher level timeout through, rather than 5 minutes,
-    // once we make timeouts pervasive in this api.
-    _connectionPool.get(request.target, Minutes(5), nextStep);
+    _connectionPool.get(request.target, request.timeout, nextStep);
 }
 
 void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {

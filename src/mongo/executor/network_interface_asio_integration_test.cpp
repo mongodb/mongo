@@ -57,8 +57,7 @@ namespace {
 
 class NetworkInterfaceASIOIntegrationTest : public mongo::unittest::Test {
 public:
-    void setUp() override {
-        NetworkInterfaceASIO::Options options{};
+    void startNet(NetworkInterfaceASIO::Options options = NetworkInterfaceASIO::Options()) {
         options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
         options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
         options.connectionPoolOptions.maxConnections = 256u;
@@ -143,10 +142,12 @@ private:
 };
 
 TEST_F(NetworkInterfaceASIOIntegrationTest, Ping) {
+    startNet();
     assertCommandOK("admin", BSON("ping" << 1));
 }
 
 TEST_F(NetworkInterfaceASIOIntegrationTest, Timeouts) {
+    startNet();
     // This sleep command will take 10 seconds, so we should time out client side first given
     // our timeout of 100 milliseconds.
     assertCommandFailsOnClient("admin",
@@ -241,6 +242,7 @@ private:
 };
 
 TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
+    startNet();
     const std::size_t numOps = 10000;
     std::vector<Deferred<Status>> ops;
 
@@ -297,6 +299,38 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
                          })
                    .get();
     ASSERT_OK(res);
+}
+
+// Hook that intentionally never finishes
+class HangingHook : public executor::NetworkConnectionHook {
+    Status validateHost(const HostAndPort&, const RemoteCommandResponse&) final {
+        return Status::OK();
+    }
+
+    StatusWith<boost::optional<RemoteCommandRequest>> makeRequest(
+        const HostAndPort& remoteHost) final {
+        return {boost::make_optional(RemoteCommandRequest(remoteHost,
+                                                          "admin",
+                                                          BSON("sleep" << 1 << "lock"
+                                                                       << "none"
+                                                                       << "secs" << 100000000),
+                                                          BSONObj()))};
+    }
+
+    Status handleReply(const HostAndPort& remoteHost, RemoteCommandResponse&& response) final {
+        MONGO_UNREACHABLE;
+    }
+};
+
+
+// Test that we time out a command if the connection hook hangs.
+TEST_F(NetworkInterfaceASIOIntegrationTest, HookHangs) {
+    NetworkInterfaceASIO::Options options;
+    options.networkConnectionHook = stdx::make_unique<HangingHook>();
+    startNet(std::move(options));
+
+    assertCommandFailsOnClient(
+        "admin", BSON("ping" << 1), Seconds(1), ErrorCodes::ExceededTimeLimit);
 }
 
 }  // namespace

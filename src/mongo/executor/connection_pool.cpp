@@ -32,6 +32,7 @@
 #include "mongo/executor/connection_pool.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -288,7 +289,12 @@ void ConnectionPool::SpecificPool::getConnection(const HostAndPort& hostAndPort,
                                                  Milliseconds timeout,
                                                  stdx::unique_lock<stdx::mutex> lk,
                                                  GetConnectionCallback cb) {
-    auto expiration = _parent->_factory->now() + timeout;
+    // We need some logic here to handle kNoTimeout, which is defined as -1 Milliseconds. If we just
+    // added the timeout, we would get a time 1MS in the past, which would immediately timeout - the
+    // exact opposite of what we want.
+    auto expiration = (timeout == RemoteCommandRequest::kNoTimeout)
+        ? RemoteCommandRequest::kNoExpirationDate
+        : _parent->_factory->now() + timeout;
 
     _requests.push(make_pair(expiration, std::move(cb)));
 
