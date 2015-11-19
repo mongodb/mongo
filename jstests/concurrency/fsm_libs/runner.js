@@ -359,9 +359,7 @@ var runner = (function() {
         config.teardown.call(config.data, myDB, collName, cluster);
     }
 
-    function setIterations(config, iterationMultiplier) {
-        config.iterations = config.iterations * iterationMultiplier;
-
+    function setIterations(config) {
         // This property must be enumerable because of SERVER-21338, which prevents
         // objects with non-enumerable properties from being serialized properly in
         // ScopedThreads.
@@ -371,9 +369,7 @@ var runner = (function() {
         });
     }
 
-    function setThreadCount(config, threadMultiplier) {
-        config.threadCount = config.threadCount * threadMultiplier;
-
+    function setThreadCount(config) {
         // This property must be enumerable because of SERVER-21338, which prevents
         // objects with non-enumerable properties from being serialized properly in
         // ScopedThreads.
@@ -405,8 +401,8 @@ var runner = (function() {
             load(workload); // for $config
             assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
             context[workload] = { config: parseConfig($config) };
-            setIterations(context[workload].config, executionOptions.iterationMultiplier);
-            setThreadCount(context[workload].config, executionOptions.threadMultiplier);
+            context[workload].config.iterations *= executionOptions.iterationMultiplier;
+            context[workload].config.threadCount *= executionOptions.threadMultiplier;
         });
     }
 
@@ -443,22 +439,29 @@ var runner = (function() {
         var cleanup = [];
         var teardownFailed = false;
         var startTime = Date.now(); // Initialize in case setupWorkload fails below.
-        var endTime, totalTime;
+        var totalTime;
 
         jsTest.log('Workload(s) started: ' + workloads.join(' '));
 
         prepareCollections(workloads, context, cluster, clusterOptions, executionOptions);
 
         try {
-            // Call each foreground workload's setup function.
-            workloads.forEach(function(workload) {
-                setupWorkload(workload, context, cluster);
-                cleanup.push(workload);
-            });
-
             // Set up the thread manager for this set of foreground workloads.
             startTime = Date.now();
             threadMgr.init(workloads, context, maxAllowedThreads);
+
+            // Call each foreground workload's setup function.
+            workloads.forEach(function(workload) {
+                // Define "iterations" and "threadCount" properties on the foreground workload's
+                // $config.data object so that they can be used within its setup(), teardown(), and
+                // state functions. This must happen after calling threadMgr.init() in case the
+                // thread counts needed to be scaled down.
+                setIterations(context[workload].config);
+                setThreadCount(context[workload].config);
+
+                setupWorkload(workload, context, cluster);
+                cleanup.push(workload);
+            });
 
             try {
                 // Start this set of foreground workload threads.
@@ -473,15 +476,13 @@ var runner = (function() {
                     new WorkloadFailure(e.err, e.stack, 'Foreground')));
             }
         } finally {
-            endTime = Date.now();
-
             // Call each foreground workload's teardown function. After all teardowns have completed
             // check if any of them failed.
             var cleanupResults = cleanup.map(workload =>
                 cleanupWorkload(workload, context, cluster, errors, 'Foreground'));
             teardownFailed = cleanupResults.some(success => (success === false));
 
-            totalTime = endTime - startTime;
+            totalTime = Date.now() - startTime;
             jsTest.log('Workload(s) completed in ' + totalTime + ' ms: ' +
                         workloads.join(' '));
         }
@@ -569,14 +570,21 @@ var runner = (function() {
         try {
             prepareCollections(bgWorkloads, bgContext, cluster, clusterOptions, executionOptions);
 
+            // Set up the background thread manager for background workloads.
+            bgThreadMgr.init(bgWorkloads, bgContext, maxAllowedThreads);
+
             // Call each background workload's setup function.
             bgWorkloads.forEach(function(bgWorkload) {
+                // Define "iterations" and "threadCount" properties on the background workload's
+                // $config.data object so that they can be used within its setup(), teardown(), and
+                // state functions. This must happen after calling bgThreadMgr.init() in case the
+                // thread counts needed to be scaled down.
+                setIterations(bgContext[bgWorkload].config);
+                setThreadCount(bgContext[bgWorkload].config);
+
                 setupWorkload(bgWorkload, bgContext, cluster);
                 bgCleanup.push(bgWorkload);
             });
-
-            // Set up the background thread manager for background workloads.
-            bgThreadMgr.init(bgWorkloads, bgContext, maxAllowedThreads);
 
             try {
                 // Start background workload threads.
