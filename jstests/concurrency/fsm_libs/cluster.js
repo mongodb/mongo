@@ -149,10 +149,6 @@ var Cluster = function(options) {
 
             conn = st.s; // mongos
 
-            this.shardCollection = function() {
-                st.shardColl.apply(st, arguments);
-            };
-
             this.teardown = function teardown() {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
                 options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
@@ -319,7 +315,7 @@ var Cluster = function(options) {
 
     this.shardCollection = function shardCollection() {
         assert(this.isSharded(), 'cluster is not sharded');
-        throw new Error('cluster has not been initialized yet');
+        st.shardColl.apply(st, arguments);
     };
 
     // Provide a serializable form of the cluster for use in workload states. This
