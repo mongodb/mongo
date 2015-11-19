@@ -836,8 +836,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->page_locked_blocked = 0;
 	stats->page_read_blocked = 0;
 	stats->page_sleep = 0;
-		/* not clearing txn_snapshots_created */
-		/* not clearing txn_snapshots_dropped */
+	stats->txn_snapshots_created = 0;
+	stats->txn_snapshots_dropped = 0;
 	stats->txn_begin = 0;
 		/* not clearing txn_checkpoint_running */
 		/* not clearing txn_checkpoint_generation */
