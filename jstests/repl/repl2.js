@@ -1,4 +1,17 @@
-// Test resync command
+// Test resync command:
+//   1. Start master/slave deployment.
+//   2. Insert a document to seed the oplog.
+//   3. Assert that the resync command fails when the slave is caught up to the master.
+//   4. Stop the slave.
+//   5. Insert enough documents to rotate the oplog.
+//   6. Restart the slave.
+//   7. Assert the resync command now works on the slave.
+//   8. Assert the slave eventually has the same data.
+//   9. Assert the slave now rejects the resync command.
+//
+// This test cannot be run on ephemeral storage engines, because after restarting, at step 6, the
+// slave will not have any data and will start an initial sync, rejecting the resync command.
+// @tags: [requires_persistence]
 
 soonCount = function( count ) {
     assert.soon( function() {

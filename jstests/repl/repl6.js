@@ -1,4 +1,10 @@
 // Test one master replicating to two slaves
+//
+// There is no automatic fail-over in a master/slave deployment, so if the master goes down, no new
+// master will be elected. Therefore if the master is using an ephemeral storage engine, it cannot
+// be restarted without losing all data. This test expects that restarting the master will maintain
+// the node's data, so cannot be run with ephemeral storage engines.
+// @tags: [requires_persistence]
 
 var baseName = "jstests_repl6test";
 
