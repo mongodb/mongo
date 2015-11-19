@@ -260,9 +260,10 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	const char *raw_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 	const char *mainkey_str, *p;
-	int cmp, skip;
-	size_t i, mainkey_len, size;
 	void *allocbuf;
+	size_t mainkey_len, size;
+	u_int i;
+	int cmp, skip;
 
 	c = NULL;
 	allocbuf = NULL;
@@ -689,7 +690,7 @@ __curjoin_next(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	bool skip_left;
-	size_t count;
+	u_int i;
 
 	cjoin = (WT_CURSOR_JOIN *)cursor;
 
@@ -713,9 +714,9 @@ nextkey:
 		 * using that in our iteration.
 		 */
 		skip_left = F_ISSET(cjoin, WT_CURJOIN_SKIP_FIRST_LEFT);
-		for (count = 0; count < cjoin->entries_next; count++) {
+		for (i = 0; i < cjoin->entries_next; i++) {
 			ret = __curjoin_entry_member(session, cjoin,
-			    &cjoin->entries[count], skip_left);
+			    &cjoin->entries[i], skip_left);
 			if (ret == WT_NOTFOUND)
 				goto nextkey;
 			skip_left = false;
@@ -762,7 +763,7 @@ __curjoin_close(WT_CURSOR *cursor)
 	WT_CURSOR_JOIN_ENTRY *entry;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	size_t i;
+	u_int i;
 
 	cjoin = (WT_CURSOR_JOIN *)cursor;
 
