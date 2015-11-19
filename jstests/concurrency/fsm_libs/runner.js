@@ -593,8 +593,18 @@ var runner = (function() {
                         throw new IterationEnd(msg);
                     }
 
+                    // Make a deep copy of the $config object for each of the workloads that are
+                    // going to be run to ensure the workload starts with a fresh version of its
+                    // $config.data. This is necessary because $config.data keeps track of
+                    // thread-local state that may be updated during a workload's setup(),
+                    // teardown(), and state functions.
+                    var groupContext = {};
+                    workloads.forEach(function(workload) {
+                        groupContext[workload] = Object.extend({}, context[workload], true);
+                    });
+
                     // Run the next group of workloads in the schedule.
-                    runWorkloadGroup(threadMgr, workloads, context, cluster, clusterOptions,
+                    runWorkloadGroup(threadMgr, workloads, groupContext, cluster, clusterOptions,
                                      executionMode, executionOptions, errors, maxAllowedThreads);
                 });
             } finally {

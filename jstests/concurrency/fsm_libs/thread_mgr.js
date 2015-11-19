@@ -42,7 +42,6 @@ var ThreadManager = function(clusterOptions, executionMode) {
 
     var initialized = false;
     var threads = [];
-    var threadCounts = {};
 
     var _workloads, _context;
 
@@ -59,14 +58,9 @@ var ThreadManager = function(clusterOptions, executionMode) {
                 return 0;
             }
             return Array.sum(workloads.map(function(workload) {
-                return threadCounts[workload];
+                return context[workload].config.threadCount;
             }));
         }
-
-        workloads.forEach(function(workload) {
-            var config = context[workload].config;
-            threadCounts[workload] = config.threadCount;
-        });
 
         var requestedNumThreads = computeNumThreads();
         if (requestedNumThreads > maxAllowedThreads) {
@@ -74,10 +68,11 @@ var ThreadManager = function(clusterOptions, executionMode) {
             // them sum to less than 'maxAllowedThreads'
             var factor = maxAllowedThreads / requestedNumThreads;
             workloads.forEach(function(workload) {
-                var threadCount = threadCounts[workload];
+                var config = context[workload].config;
+                var threadCount = config.threadCount;
                 threadCount = Math.floor(factor * threadCount);
                 threadCount = Math.max(1, threadCount); // ensure workload is executed
-                threadCounts[workload] = threadCount;
+                config.threadCount = threadCount;
             });
         }
 
@@ -104,13 +99,14 @@ var ThreadManager = function(clusterOptions, executionMode) {
         var workloadData = {};
         var tid = 0;
         _workloads.forEach(function(workload) {
-            workloadData[workload] = _context[workload].config.data;
+            var config = _context[workload].config;
+            workloadData[workload] = config.data;
             var workloads = [workload]; // worker thread only needs to load 'workload'
             if (executionMode.composed) {
                 workloads = _workloads; // worker thread needs to load all workloads
             }
 
-            for (var i = 0; i < threadCounts[workload]; ++i) {
+            for (var i = 0; i < config.threadCount; ++i) {
                 var args = {
                     tid: tid++,
                     data: workloadData,
@@ -188,7 +184,6 @@ var ThreadManager = function(clusterOptions, executionMode) {
 
         initialized = false;
         threads = [];
-        threadCounts = {};
 
         return errors;
     };
