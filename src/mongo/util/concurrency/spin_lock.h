@@ -32,84 +32,72 @@
 
 #ifdef _WIN32
 #include "mongo/platform/windows_basic.h"
+#else
+#include <atomic>
 #endif
 
-#include "mutex.h"
+#include "mongo/base/disallow_copying.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-/**
- * The spinlock currently requires late GCC support routines to be efficient.
- * Other platforms default to a mutex implemenation.
- */
+#if defined(_WIN32)
 class SpinLock {
     MONGO_DISALLOW_COPYING(SpinLock);
 
 public:
-    SpinLock();
-    ~SpinLock();
+    SpinLock() {
+        InitializeCriticalSectionAndSpinCount(&_cs, 4000);
+    }
 
-    static bool isfast();  // true if a real spinlock on this platform
+    ~SpinLock() {
+        DeleteCriticalSection(&_cs);
+    }
 
-private:
-#if defined(_WIN32)
-    CRITICAL_SECTION _cs;
-
-public:
     void lock() {
         EnterCriticalSection(&_cs);
     }
+
     void unlock() {
         LeaveCriticalSection(&_cs);
     }
-#elif defined(__USE_XOPEN2K)
-    pthread_spinlock_t _lock;
-    void _lk();
 
-public:
-    void unlock() {
-        pthread_spin_unlock(&_lock);
-    }
-    void lock() {
-        if (MONGO_likely(pthread_spin_trylock(&_lock) == 0))
-            return;
-        _lk();
-    }
-#elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
-    volatile bool _locked;
-
-public:
-    void unlock() {
-        __sync_lock_release(&_locked);
-    }
-    void lock();
-#else
-    // default to a mutex if not implemented
-    SimpleMutex _mutex;
-
-public:
-    void unlock() {
-        _mutex.unlock();
-    }
-    void lock() {
-        _mutex.lock();
-    }
-#endif
+private:
+    CRITICAL_SECTION _cs;
 };
 
-class scoped_spinlock {
-    MONGO_DISALLOW_COPYING(scoped_spinlock);
+#else
+
+class SpinLock {
+    MONGO_DISALLOW_COPYING(SpinLock);
 
 public:
-    scoped_spinlock(SpinLock& l) : _l(l) {
-        _l.lock();
+    SpinLock() = default;
+
+    void unlock() {
+        _locked.clear(std::memory_order_release);
     }
-    ~scoped_spinlock() {
-        _l.unlock();
+
+    void lock() {
+        if (MONGO_likely(_tryLock()))
+            return;
+        _lockSlowPath();
     }
 
 private:
-    SpinLock& _l;
+    bool _tryLock() {
+        bool wasLocked = _locked.test_and_set(std::memory_order_acquire);
+        return !wasLocked;
+    }
+
+    void _lockSlowPath();
+
+    // Initializes to the cleared state.
+    std::atomic_flag _locked = ATOMIC_FLAG_INIT;  // NOLINT
 };
+#endif
+
+using scoped_spinlock = stdx::lock_guard<SpinLock>;
 
 }  // namespace mongo
