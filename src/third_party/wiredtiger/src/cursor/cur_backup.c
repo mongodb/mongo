@@ -17,8 +17,7 @@ static int __backup_list_append(
 static int __backup_start(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[]);
 static int __backup_stop(WT_SESSION_IMPL *);
-static int __backup_uri(
-    WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[], bool *, bool *);
+static int __backup_uri(WT_SESSION_IMPL *, const char *[], bool *, bool *);
 
 /*
  * __curbackup_next --
@@ -197,6 +196,7 @@ __backup_start(
 
 	cb->next = 0;
 	cb->list = NULL;
+	cb->list_next = 0;
 
 	/*
 	 * Single thread hot backups: we're holding the schema lock, so we
@@ -235,7 +235,7 @@ __backup_start(
 	 * a checkpoint that completes during the backup.
 	 */
 	target_list = false;
-	WT_ERR(__backup_uri(session, cb, cfg, &target_list, &log_only));
+	WT_ERR(__backup_uri(session, cfg, &target_list, &log_only));
 
 	if (!target_list) {
 		WT_ERR(__backup_log_append(session, cb, true));
@@ -391,7 +391,7 @@ err:	if (cursor != NULL)
  */
 static int
 __backup_uri(WT_SESSION_IMPL *session,
-    WT_CURSOR_BACKUP *cb, const char *cfg[], bool *foundp, bool *log_only)
+    const char *cfg[], bool *foundp, bool *log_only)
 {
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
@@ -408,7 +408,7 @@ __backup_uri(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "target", &cval));
 	WT_RET(__wt_config_subinit(session, &targetconf, &cval));
-	for (cb->list_next = 0, target_list = false;
+	for (target_list = false;
 	    (ret = __wt_config_next(&targetconf, &k, &v)) == 0;
 	    target_list = true) {
 		/* If it is our first time through, allocate. */
@@ -432,9 +432,11 @@ __backup_uri(WT_SESSION_IMPL *session,
 		if (WT_PREFIX_MATCH(uri, "log:")) {
 			*log_only = !target_list;
 			WT_ERR(__wt_backup_list_uri_append(session, uri, NULL));
-		} else
+		} else {
+			*log_only = false;
 			WT_ERR(__wt_schema_worker(session,
 			    uri, NULL, __wt_backup_list_uri_append, cfg, 0));
+		}
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 

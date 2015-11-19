@@ -586,8 +586,8 @@ skip_evict:
 		 * CPU to no purpose.
 		 */
 		if (stalled)
-			wait_cnt += 1000;
-		else if (++wait_cnt < 1000) {
+			wait_cnt += WT_THOUSAND;
+		else if (++wait_cnt < WT_THOUSAND) {
 			__wt_yield();
 			continue;
 		}
@@ -603,7 +603,7 @@ skip_evict:
 			if (cache_work)
 				continue;
 		}
-		sleep_cnt = WT_MIN(sleep_cnt + 1000, 10000);
+		sleep_cnt = WT_MIN(sleep_cnt + WT_THOUSAND, 10000);
 		WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);
 		__wt_sleep(0, sleep_cnt);
 	}

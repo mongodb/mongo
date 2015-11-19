@@ -179,9 +179,17 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 * something is busy, be sure that the page still ends up
 		 * marked deleted.
 		 */
-		if (ndeleted > pindex->entries / 10 && pindex->entries > 1 &&
-		    (ret = __wt_split_reverse(session, ref)) != EBUSY)
-			return (ret);
+		if (ndeleted > pindex->entries / 10 && pindex->entries > 1) {
+			if ((ret = __wt_split_reverse(session, ref)) == 0)
+				return (0);
+			WT_RET_BUSY_OK(ret);
+
+			/*
+			 * The child must be locked after a failed reverse
+			 * split.
+			 */
+			WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+		}
 	}
 
 	WT_PUBLISH(ref->state, WT_REF_DELETED);

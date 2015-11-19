@@ -49,7 +49,8 @@
 typedef struct {
 	WT_EXTRACTOR extractor;		/* Must come first */
 	WT_EXTENSION_API *wt_api;	/* Extension API */
-	int field_num;			/* Field to extract */
+	int field;			/* Field to extract */
+	int format_isnum;		/* Field contents are numeric */
 } CSV_EXTRACTOR;
 
 /*
@@ -61,15 +62,15 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value, WT_CURSOR *result_cursor)
 {
 	char *copy, *p, *pend, *valstr;
-	const CSV_EXTRACTOR *cvs_extractor;
-	int i, ret;
+	const CSV_EXTRACTOR *csv_extractor;
+	int i, ret, val;
 	size_t len;
 	WT_EXTENSION_API *wtapi;
 
 	(void)key;				/* Unused parameters */
 
-	cvs_extractor = (const CSV_EXTRACTOR *)extractor;
-	wtapi = cvs_extractor->wt_api;
+	csv_extractor = (const CSV_EXTRACTOR *)extractor;
+	wtapi = csv_extractor->wt_api;
 
 	/* Unpack the value. */
 	if ((ret = wtapi->struct_unpack(wtapi,
@@ -78,11 +79,11 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 
 	p = valstr;
 	pend = strchr(p, ',');
-	for (i = 0; i < cvs_extractor->field_num && pend != NULL; i++) {
+	for (i = 0; i < csv_extractor->field && pend != NULL; i++) {
 		p = pend + 1;
 		pend = strchr(p, ',');
 	}
-	if (i == cvs_extractor->field_num) {
+	if (i == csv_extractor->field) {
 		if (pend == NULL)
 			pend = p + strlen(p);
 		/*
@@ -95,7 +96,12 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 			return (errno);
 		strncpy(copy, p, len);
 		copy[len] = '\0';
-		result_cursor->set_key(result_cursor, copy);
+		if (csv_extractor->format_isnum) {
+			if ((val = atoi(copy)) < 0)
+				return (EINVAL);
+			result_cursor->set_key(result_cursor, val);
+		} else
+			result_cursor->set_key(result_cursor, copy);
 		ret = result_cursor->insert(result_cursor);
 		free(copy);
 		if (ret != 0)
@@ -107,7 +113,7 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 /*
  * csv_customize --
  *	The customize function creates a customized extractor,
- *	needed to save the field number.
+ *	needed to save the field number and format.
  */
 static int
 csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
@@ -115,20 +121,37 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
 {
 	const CSV_EXTRACTOR *orig;
 	CSV_EXTRACTOR *csv_extractor;
+	WT_CONFIG_ITEM field, format;
+	WT_CONFIG_PARSER *parser;
+	WT_EXTENSION_API *wtapi;
+	int ret;
 	long field_num;
 
 	(void)session;				/* Unused parameters */
 	(void)uri;				/* Unused parameters */
 
 	orig = (const CSV_EXTRACTOR *)extractor;
-	field_num = strtol(appcfg->str, NULL, 10);
+	wtapi = orig->wt_api;
+	if ((ret = wtapi->config_parser_open(wtapi, session, appcfg->str,
+	    appcfg->len, &parser)) != 0)
+		return (ret);
+	if ((ret = parser->get(parser, "field", &field)) != 0 ||
+	    (ret = parser->get(parser, "format", &format)) != 0) {
+		if (ret == WT_NOTFOUND)
+			return (EINVAL);
+		return (ret);
+	}
+	field_num = strtol(field.str, NULL, 10);
 	if (field_num < 0 || field_num > INT_MAX)
+		return (EINVAL);
+	if (format.len != 1 || (format.str[0] != 'S' && format.str[0] != 'i'))
 		return (EINVAL);
 	if ((csv_extractor = calloc(1, sizeof(CSV_EXTRACTOR))) == NULL)
 		return (errno);
 
 	*csv_extractor = *orig;
-	csv_extractor->field_num = (int)field_num;
+	csv_extractor->field = field_num;
+	csv_extractor->format_isnum = (format.str[0] == 'i');
 	*customp = (WT_EXTRACTOR *)csv_extractor;
 	return (0);
 }

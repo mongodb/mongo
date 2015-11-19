@@ -960,7 +960,7 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, bool destroy)
 	 * than 10,000 boundary structure elements, discard the boundary array
 	 * entirely and start over next time.
 	 */
-	if (destroy || r->bnd_entries > 10 * 1000) {
+	if (destroy || r->bnd_entries > 10 * WT_THOUSAND) {
 		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
 			__wt_free(session, bnd->addr.addr);
 			__wt_free(session, bnd->disk_image);
@@ -2505,7 +2505,10 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	 * the page: the offset is the byte offset to the possible split-point
 	 * (adjusted for an initial chunk that cannot be compressed), entries
 	 * is the cumulative page entries covered by the byte offset, recnos is
-	 * the cumulative rows covered by the byte offset.
+	 * the cumulative rows covered by the byte offset. Allocate to handle
+	 * both column- and row-store regardless of this page type, structures
+	 * are potentially reused for subsequent reconciliations of different
+	 * page types.
 	 */
 	if (r->entries >= r->raw_max_slots) {
 		__wt_free(session, r->raw_entries);
@@ -2516,9 +2519,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 		i = r->entries + 100;
 		WT_RET(__wt_calloc_def(session, i, &r->raw_entries));
 		WT_RET(__wt_calloc_def(session, i, &r->raw_offsets));
-		if (dsk->type == WT_PAGE_COL_INT ||
-		    dsk->type == WT_PAGE_COL_VAR)
-			WT_RET(__wt_calloc_def(session, i, &r->raw_recnos));
+		WT_RET(__wt_calloc_def(session, i, &r->raw_recnos));
 		r->raw_max_slots = i;
 	}
 
@@ -5469,6 +5470,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	case 0:						/* Page delete */
 		WT_RET(__wt_verbose(
 		    session, WT_VERB_RECONCILE, "page %p empty", page));
+		WT_STAT_FAST_CONN_INCR(session, rec_page_delete);
 		WT_STAT_FAST_DATA_INCR(session, rec_page_delete);
 
 		/* If this is the root page, we need to create a sync point. */

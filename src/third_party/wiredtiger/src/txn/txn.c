@@ -373,8 +373,11 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 		 */
 		F_SET(txn, WT_TXN_SYNC_SET);
 
+	/*
+	 * If sync is turned off explicitly, clear the transaction's sync field.
+	 */
 	if (cval.val == 0)
-		FLD_CLR(txn->txn_logsync, WT_LOG_FLUSH);
+		txn->txn_logsync = 0;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "snapshot", 0, &cval));
 	if (cval.len > 0)
@@ -481,7 +484,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * explicit setting.
 	 */
 	if (cval.len == 0) {
-		if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) &&
+		if (!FLD_ISSET(txn->txn_logsync, WT_LOG_SYNC_ENABLED) &&
 		    !F_ISSET(txn, WT_TXN_SYNC_SET))
 			txn->txn_logsync = 0;
 	} else {
@@ -650,15 +653,20 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	WT_TXN_GLOBAL *txn_global;
 	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS **stats;
-	uint64_t checkpoint_pinned;
+	uint64_t checkpoint_pinned, snapshot_pinned;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 	stats = conn->stats;
 	checkpoint_pinned = txn_global->checkpoint_pinned;
+	snapshot_pinned = txn_global->nsnap_oldest_id;
 
 	WT_STAT_SET(session, stats, txn_pinned_range,
 	   txn_global->current - txn_global->oldest_id);
+
+	WT_STAT_SET(session, stats, txn_pinned_snapshot_range,
+	    snapshot_pinned == WT_TXN_NONE ?
+	    0 : txn_global->current - snapshot_pinned);
 
 	WT_STAT_SET(session, stats, txn_pinned_checkpoint_range,
 	    checkpoint_pinned == WT_TXN_NONE ?

@@ -23,17 +23,19 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
 	WT_RET(
 	    __wt_config_gets(session, cfg, "transaction_sync.enabled", &cval));
 	if (cval.val)
-		FLD_SET(conn->txn_logsync, WT_LOG_FLUSH);
+		FLD_SET(conn->txn_logsync, WT_LOG_SYNC_ENABLED);
 	else
-		FLD_CLR(conn->txn_logsync, WT_LOG_FLUSH);
+		FLD_CLR(conn->txn_logsync, WT_LOG_SYNC_ENABLED);
 
 	WT_RET(
 	    __wt_config_gets(session, cfg, "transaction_sync.method", &cval));
-	FLD_CLR(conn->txn_logsync, WT_LOG_DSYNC | WT_LOG_FSYNC);
+	FLD_CLR(conn->txn_logsync, WT_LOG_DSYNC | WT_LOG_FLUSH | WT_LOG_FSYNC);
 	if (WT_STRING_MATCH("dsync", cval.str, cval.len))
-		FLD_SET(conn->txn_logsync, WT_LOG_DSYNC);
+		FLD_SET(conn->txn_logsync, WT_LOG_DSYNC | WT_LOG_FLUSH);
 	else if (WT_STRING_MATCH("fsync", cval.str, cval.len))
 		FLD_SET(conn->txn_logsync, WT_LOG_FSYNC);
+	else if (WT_STRING_MATCH("none", cval.str, cval.len))
+		FLD_SET(conn->txn_logsync, WT_LOG_FLUSH);
 	return (0);
 }
 
@@ -536,8 +538,8 @@ restart:
 	while (i < WT_SLOT_POOL) {
 		save_i = i;
 		slot = &log->slot_pool[i++];
-			WT_ASSERT(session, slot->slot_state != 0 ||
-			    slot->slot_release_lsn.file >= log->write_lsn.file);
+		WT_ASSERT(session, slot->slot_state != 0 ||
+		    slot->slot_release_lsn.file >= log->write_lsn.file);
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 			continue;
 		written[written_i].slot_index = save_i;

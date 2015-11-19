@@ -81,7 +81,7 @@ __wt_clsm_await_switch(WT_CURSOR_LSM *clsm)
 	    lsm_tree->nchunks == 0 ||
 	    clsm->dsk_gen == lsm_tree->dsk_gen;
 	    ++waited) {
-		if (waited % 1000 == 0)
+		if (waited % WT_THOUSAND == 0)
 			WT_RET(__wt_lsm_manager_push_entry(
 			    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
 		__wt_sleep(0, 10);
@@ -1379,7 +1379,15 @@ __clsm_insert(WT_CURSOR *cursor)
 	}
 
 	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &buf));
-	ret = __clsm_put(session, clsm, &cursor->key, &value, false);
+	WT_ERR(__clsm_put(session, clsm, &cursor->key, &value, false));
+
+	/*
+	 * WT_CURSOR.insert doesn't leave the cursor positioned, and the
+	 * application may want to free the memory used to configure the
+	 * insert; don't read that memory again (matching the underlying
+	 * file object cursor insert semantics).
+	 */
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	__wt_scr_free(session, &buf);
 	__clsm_leave(clsm);
@@ -1521,6 +1529,10 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 
 	if (!WT_PREFIX_MATCH(uri, "lsm:"))
 		return (EINVAL);
+
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_RET_MSG(session, EINVAL,
+		    "LSM trees not supported by in-memory configurations");
 
 	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
 	if (cval.len != 0)

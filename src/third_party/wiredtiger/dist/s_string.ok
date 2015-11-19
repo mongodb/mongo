@@ -221,6 +221,7 @@ OUTBUFF
 OVFL
 ObWgfvgw
 Obama
+Outfmt
 PARAM
 POSIX
 PREDEFINE
@@ -351,6 +352,7 @@ allocfile
 allocsize
 amd
 ao
+ap
 api
 arg
 argc
@@ -421,6 +423,7 @@ checksums
 chk
 chongo
 cip
+cjoin
 ckpt
 ckptfrag
 ckptlist
@@ -464,6 +467,7 @@ curdump
 curextract
 curfile
 curindex
+curjoin
 curlog
 curmetadata
 cursoring
@@ -507,8 +511,10 @@ dev
 dh
 dhandle
 dhandles
+difftime
 dir
 dirlist
+disjunction
 dlclose
 dlh
 dll
@@ -540,6 +546,7 @@ enqueue
 enqueued
 env
 eof
+eq
 equalp
 errhandler
 errno
@@ -592,6 +599,7 @@ ftruncate
 func
 gcc
 gdb
+ge
 getenv
 getline
 getone
@@ -607,6 +615,7 @@ goesc
 gostring
 gostruct
 goutf
+gt
 hashval
 havesize
 hdr
@@ -632,6 +641,7 @@ indirects
 indx
 infeasible
 inflateInit
+infmt
 init
 initn
 initsize
@@ -650,6 +660,7 @@ io
 ip
 islocked
 ispo
+iter
 iteratively
 jnr
 jrx
@@ -668,6 +679,7 @@ latencies
 lbrace
 lbracket
 ld
+le
 len
 lenp
 level's
@@ -714,6 +726,7 @@ mem
 memalign
 membar
 memcpy
+memget
 memmove
 memset
 memsize
