@@ -27,6 +27,7 @@ selector:
     - jstests/core/notablescan.js  # notablescan.
     - jstests/core/profile*.js  # profiling.
     - jstests/core/stages*.js  # stageDebug.
+    - jstests/core/startup_log.js  # "local" database.
     - jstests/core/storageDetailsCommand.js  # diskStorageStats.
     - jstests/core/top.js  # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain

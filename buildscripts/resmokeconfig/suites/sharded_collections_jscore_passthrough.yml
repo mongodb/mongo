@@ -30,6 +30,7 @@ selector:
     - jstests/core/profile*.js  # profiling.
     - jstests/core/rename*.js # renameCollection.
     - jstests/core/stages*.js  # stageDebug.
+    - jstests/core/startup_log.js  # "local" database.
     - jstests/core/storageDetailsCommand.js  # diskStorageStats.
     - jstests/core/tailable_skip_limit.js # capped collections.
     - jstests/core/top.js  # top.
