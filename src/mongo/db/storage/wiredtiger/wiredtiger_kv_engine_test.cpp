@@ -32,6 +32,7 @@
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
@@ -39,7 +40,8 @@ namespace mongo {
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper() : _dbpath("wt-kv-harness") {
-        _engine.reset(new WiredTigerKVEngine(_dbpath.path(), "", false, false, false));
+        _engine.reset(new WiredTigerKVEngine(
+            kWiredTigerEngineName, _dbpath.path(), "", 1, false, false, false));
     }
 
     virtual ~WiredTigerKVHarnessHelper() {
@@ -48,7 +50,8 @@ public:
 
     virtual KVEngine* restartEngine() {
         _engine.reset(NULL);
-        _engine.reset(new WiredTigerKVEngine(_dbpath.path(), "", false, false, false));
+        _engine.reset(new WiredTigerKVEngine(
+            kWiredTigerEngineName, _dbpath.path(), "", 1, false, false, false));
         return _engine.get();
     }
 

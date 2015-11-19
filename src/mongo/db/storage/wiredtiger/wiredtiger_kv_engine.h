@@ -49,8 +49,10 @@ class WiredTigerSizeStorer;
 
 class WiredTigerKVEngine final : public KVEngine {
 public:
-    WiredTigerKVEngine(const std::string& path,
+    WiredTigerKVEngine(const std::string& canonicalName,
+                       const std::string& path,
                        const std::string& extraOpenOptions,
+                       size_t cacheSizeGB,
                        bool durable,
                        bool ephemeral,
                        bool repair);
@@ -154,6 +156,7 @@ private:
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
+    std::string _canonicalName;
     std::string _path;
 
     bool _durable;

@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -74,7 +75,8 @@ public:
 
         IndexDescriptor desc(NULL, "", spec);
 
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", "", desc);
+        StatusWith<std::string> result =
+            WiredTigerIndex::generateCreateString(kWiredTigerEngineName, "", "", desc);
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;

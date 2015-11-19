@@ -112,31 +112,19 @@ private:
     std::atomic<bool> _shuttingDown{false};  // NOLINT
 };
 
-WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
+WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
+                                       const std::string& path,
                                        const std::string& extraOpenOptions,
+                                       size_t cacheSizeGB,
                                        bool durable,
                                        bool ephemeral,
                                        bool repair)
     : _eventHandler(WiredTigerUtil::defaultEventHandlers()),
+      _canonicalName(canonicalName),
       _path(path),
       _durable(durable),
       _ephemeral(ephemeral),
       _sizeStorerSyncTracker(100000, 60 * 1000) {
-    size_t cacheSizeGB = wiredTigerGlobalOptions.cacheSizeGB;
-    if (cacheSizeGB == 0) {
-        // Since the user didn't provide a cache size, choose a reasonable default value.
-        // We want to reserve 1GB for the system and binaries, but it's not bad to
-        // leave a fair amount left over for pagecache since that's compressed storage.
-        ProcessInfo pi;
-        double memSizeMB = pi.getMemSizeMB();
-        if (memSizeMB > 0) {
-            double cacheMB = (memSizeMB - 1024) * 0.6;
-            cacheSizeGB = static_cast<size_t>(cacheMB / 1024);
-            if (cacheSizeGB < 1)
-                cacheSizeGB = 1;
-        }
-    }
-
     boost::filesystem::path journalPath = path;
     journalPath /= "journal";
     if (_durable) {
@@ -377,7 +365,7 @@ Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
     auto returnSession = MakeGuard([&] { _sessionCache->releaseSession(session); });
 
     StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(ns, options, _rsOptions);
+        WiredTigerRecordStore::generateCreateString(_canonicalName, ns, options, _rsOptions);
     if (!result.isOK()) {
         return result.getStatus();
     }
@@ -397,6 +385,7 @@ RecordStore* WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
         return new WiredTigerRecordStore(opCtx,
                                          ns,
                                          _uri(ident),
+                                         _canonicalName,
                                          options.capped,
                                          _ephemeral,
                                          options.cappedSize ? options.cappedSize : 4096,
@@ -404,8 +393,16 @@ RecordStore* WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
                                          NULL,
                                          _sizeStorer.get());
     } else {
-        return new WiredTigerRecordStore(
-            opCtx, ns, _uri(ident), false, _ephemeral, -1, -1, NULL, _sizeStorer.get());
+        return new WiredTigerRecordStore(opCtx,
+                                         ns,
+                                         _uri(ident),
+                                         _canonicalName,
+                                         false,
+                                         _ephemeral,
+                                         -1,
+                                         -1,
+                                         NULL,
+                                         _sizeStorer.get());
     }
 }
 
@@ -429,13 +426,13 @@ Status WiredTigerKVEngine::createSortedDataInterface(OperationContext* opCtx,
 
         if (!collOptions.indexOptionDefaults["storageEngine"].eoo()) {
             BSONObj storageEngineOptions = collOptions.indexOptionDefaults["storageEngine"].Obj();
-            collIndexOptions =
-                storageEngineOptions.getFieldDotted("wiredTiger.configString").valuestrsafe();
+            collIndexOptions = storageEngineOptions.getFieldDotted(_canonicalName + ".configString")
+                                   .valuestrsafe();
         }
     }
 
-    StatusWith<std::string> result =
-        WiredTigerIndex::generateCreateString(_indexOptions, collIndexOptions, *desc);
+    StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
+        _canonicalName, _indexOptions, collIndexOptions, *desc);
     if (!result.isOK()) {
         return result.getStatus();
     }

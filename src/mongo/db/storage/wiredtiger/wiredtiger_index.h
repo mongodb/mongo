@@ -62,7 +62,8 @@ public:
      * Note that even if this function returns an OK status, WT_SESSION:create() may still
      * fail with the constructed configuration string.
      */
-    static StatusWith<std::string> generateCreateString(const std::string& sysIndexConfig,
+    static StatusWith<std::string> generateCreateString(const std::string& engineName,
+                                                        const std::string& sysIndexConfig,
                                                         const std::string& collIndexConfig,
                                                         const IndexDescriptor& desc);
 

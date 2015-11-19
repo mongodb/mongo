@@ -669,7 +669,10 @@ private:
 
 // static
 StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
-    StringData ns, const CollectionOptions& options, StringData extraStrings) {
+    const std::string& engineName,
+    StringData ns,
+    const CollectionOptions& options,
+    StringData extraStrings) {
     // Separate out a prefix and suffix in the default string. User configuration will
     // override values in the prefix, but not values in the suffix.
     str::stream ss;
@@ -693,7 +696,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     ss << extraStrings << ",";
 
     StatusWith<std::string> customOptions =
-        parseOptionsField(options.storageEngine.getObjectField(kWiredTigerEngineName));
+        parseOptionsField(options.storageEngine.getObjectField(engineName));
     if (!customOptions.isOK())
         return customOptions;
 
@@ -724,6 +727,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
                                              StringData ns,
                                              StringData uri,
+                                             std::string engineName,
                                              bool isCapped,
                                              bool isEphemeral,
                                              int64_t cappedMaxSize,
@@ -733,6 +737,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
     : RecordStore(ns),
       _uri(uri.toString()),
       _tableId(WiredTigerSession::genTableId()),
+      _engineName(engineName),
       _isCapped(isCapped),
       _isEphemeral(isEphemeral),
       _isOplog(NamespaceString::oplog(ns)),
@@ -817,7 +822,7 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
 }
 
 const char* WiredTigerRecordStore::name() const {
-    return kWiredTigerEngineName.c_str();
+    return _engineName.c_str();
 }
 
 bool WiredTigerRecordStore::inShutdown() const {
@@ -1496,7 +1501,7 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* txn,
     }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
     WT_SESSION* s = session->getSession();
-    BSONObjBuilder bob(result->subobjStart(kWiredTigerEngineName));
+    BSONObjBuilder bob(result->subobjStart(_engineName));
     {
         BSONObjBuilder metadata(bob.subobjStart("metadata"));
         Status status = WiredTigerUtil::getApplicationMetadata(txn, getURI(), &metadata);

@@ -148,7 +148,8 @@ StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& option
 }
 
 // static
-StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string& sysIndexConfig,
+StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string& engineName,
+                                                              const std::string& sysIndexConfig,
                                                               const std::string& collIndexConfig,
                                                               const IndexDescriptor& desc) {
     str::stream ss;
@@ -176,7 +177,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     if (storageEngineElement.isABSONObj()) {
         BSONObj storageEngine = storageEngineElement.Obj();
         StatusWith<std::string> parseStatus =
-            parseIndexOptions(storageEngine.getObjectField(kWiredTigerEngineName));
+            parseIndexOptions(storageEngine.getObjectField(engineName));
         if (!parseStatus.isOK()) {
             return parseStatus;
         }

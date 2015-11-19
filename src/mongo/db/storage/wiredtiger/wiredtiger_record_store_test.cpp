@@ -95,8 +95,8 @@ public:
         OperationContextNoop txn(ru);
         string uri = "table:" + ns;
 
-        StatusWith<std::string> result =
-            WiredTigerRecordStore::generateCreateString(ns, CollectionOptions(), "");
+        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
+            kWiredTigerEngineName, ns, CollectionOptions(), "");
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 
@@ -107,7 +107,8 @@ public:
             uow.commit();
         }
 
-        return stdx::make_unique<WiredTigerRecordStore>(&txn, ns, uri, false, false);
+        return stdx::make_unique<WiredTigerRecordStore>(
+            &txn, ns, uri, kWiredTigerEngineName, false, false);
     }
 
     std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
@@ -126,7 +127,7 @@ public:
         options.capped = true;
 
         StatusWith<std::string> result =
-            WiredTigerRecordStore::generateCreateString(ns, options, "");
+            WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName, ns, options, "");
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 
@@ -138,7 +139,7 @@ public:
         }
 
         return stdx::make_unique<WiredTigerRecordStore>(
-            &txn, ns, uri, true, false, cappedMaxSize, cappedMaxDocs);
+            &txn, ns, uri, kWiredTigerEngineName, true, false, cappedMaxSize, cappedMaxDocs);
     }
 
     RecoveryUnit* newRecoveryUnit() final {
@@ -345,8 +346,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-        rs.reset(
-            new WiredTigerRecordStore(opCtx.get(), "a.b", uri, false, false, -1, -1, NULL, &ss));
+        rs.reset(new WiredTigerRecordStore(
+            opCtx.get(), "a.b", uri, kWiredTigerEngineName, false, false, -1, -1, NULL, &ss));
     }
 
     {
@@ -501,8 +502,16 @@ TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
 
     unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
     sizeStorer->storeToCache(uri, expectedNumRecords * 2, expectedDataSize * 2);
-    rs.reset(new WiredTigerRecordStore(
-        opCtx.get(), "a.b", uri, false, false, -1, -1, NULL, sizeStorer.get()));
+    rs.reset(new WiredTigerRecordStore(opCtx.get(),
+                                       "a.b",
+                                       uri,
+                                       kWiredTigerEngineName,
+                                       false,
+                                       false,
+                                       -1,
+                                       -1,
+                                       NULL,
+                                       sizeStorer.get()));
     ASSERT_EQUALS(expectedNumRecords * 2, rs->numRecords(NULL));
     ASSERT_EQUALS(expectedDataSize * 2, rs->dataSize(NULL));
 

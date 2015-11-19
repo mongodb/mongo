@@ -79,13 +79,15 @@ public:
      * Note that even if this function returns an OK status, WT_SESSION:create() may still
      * fail with the constructed configuration string.
      */
-    static StatusWith<std::string> generateCreateString(StringData ns,
+    static StatusWith<std::string> generateCreateString(const std::string& engineName,
+                                                        StringData ns,
                                                         const CollectionOptions& options,
                                                         StringData extraStrings);
 
     WiredTigerRecordStore(OperationContext* txn,
                           StringData ns,
                           StringData uri,
+                          std::string engineName,
                           bool isCapped,
                           bool isEphemeral,
                           int64_t cappedMaxSize = -1,
@@ -262,6 +264,8 @@ private:
     const std::string _uri;
     const uint64_t _tableId;  // not persisted
 
+    // Canonical engine name to use for retrieving options
+    const std::string _engineName;
     // The capped settings should not be updated once operations have started
     const bool _isCapped;
     // True if the storage engine is an in-memory storage engine
