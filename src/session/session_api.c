@@ -703,7 +703,7 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		else if (WT_STRING_MATCH("lt", cval.str, cval.len))
 			range = WT_CURJOIN_END_LT;
 		else if (WT_STRING_MATCH("le", cval.str, cval.len))
-			range = WT_CURJOIN_END_LT | WT_CURJOIN_END_EQ;
+			range = WT_CURJOIN_END_LE;
 		else if (WT_STRING_MATCH("eq", cval.str, cval.len))
 			range = WT_CURJOIN_END_EQ;
 		else if (!WT_STRING_MATCH("ge", cval.str, cval.len))
