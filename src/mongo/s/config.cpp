@@ -428,11 +428,9 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     return ci.getCM();
 }
 
-void DBConfig::setPrimary(OperationContext* txn, const std::string& s) {
-    const auto shard = grid.shardRegistry()->getShard(txn, s);
-
+void DBConfig::setPrimary(OperationContext* txn, const ShardId& newPrimaryId) {
     stdx::lock_guard<stdx::mutex> lk(_lock);
-    _primaryId = shard->getId();
+    _primaryId = newPrimaryId;
     _save(txn);
 }
 

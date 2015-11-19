@@ -233,7 +233,7 @@ shared_ptr<Shard> ShardRegistry::getShardNoReload(const ShardId& shardId) {
     return _findUsingLookUp(shardId);
 }
 
-shared_ptr<Shard> ShardRegistry::getShardNoReload(const HostAndPort& host) {
+shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort& host) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return mapFindWithDefault(_hostLookup, host);
 }

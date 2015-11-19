@@ -1,6 +1,8 @@
 // Tests for sharded limit + batchSize. Make sure that various combinations
 // of limit and batchSize with sort return the correct results, and do not issue
 // unnecessary getmores (see SERVER-14299).
+(function() {
+'use strict';
 
 /**
  * Test the correctness of queries with sort and batchSize on a sharded cluster,
@@ -49,7 +51,6 @@ var st = new ShardingTest({
     shards: 2,
     other: {shardOptions: {setParameter: "enableTestCommands=1"}}
 });
-st.stopBalancer();
 
 var db = st.s.getDB("test");
 var shardedCol = db.getCollection("sharded_limit_batchsize");
@@ -59,7 +60,7 @@ unshardedCol.drop();
 
 // Enable sharding and pre-split the sharded collection.
 assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-db.adminCommand({movePrimary: db.getName(), to: "shard0000"});
+st.ensurePrimaryShard(db.getName(), "shard0000");
 db.adminCommand({shardCollection: shardedCol.getFullName(), key: {_id: 1}});
 assert.commandWorked(db.adminCommand({split: shardedCol.getFullName(), middle: {_id: 0}}));
 assert.commandWorked(db.adminCommand({moveChunk: shardedCol.getFullName(),
@@ -114,3 +115,5 @@ jsTest.log("Running limit tests against non-sharded collection.");
 testLimit(unshardedCol, st.shard0);
 
 st.stop();
+
+})();

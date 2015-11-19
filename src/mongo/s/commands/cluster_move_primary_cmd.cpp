@@ -188,7 +188,7 @@ public:
 
         ScopedDbConnection fromconn(fromShard->getConnString());
 
-        config->setPrimary(txn, toShard->getConnString().toString());
+        config->setPrimary(txn, toShard->getId());
         config->reload(txn);
 
         if (shardedColls.empty()) {

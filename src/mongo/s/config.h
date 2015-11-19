@@ -164,7 +164,7 @@ public:
      */
     const ShardId& getShardId(OperationContext* txn, const std::string& ns);
 
-    void setPrimary(OperationContext* txn, const std::string& s);
+    void setPrimary(OperationContext* txn, const ShardId& newPrimaryId);
 
     /**
      * Returns true if it is successful at loading the DBConfig, false if the database is not found,

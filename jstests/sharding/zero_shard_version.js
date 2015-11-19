@@ -2,13 +2,14 @@
  * Tests the setShardVersion logic on the this shard side, specifically when comparing
  * against a major version of zero or incompatible epochs.
  */
+(function() {
+'use strict';
 
 var st = new ShardingTest({ shards: 2, mongos: 4 });
-st.stopBalancer();
 
 var testDB_s0 = st.s.getDB('test');
 testDB_s0.adminCommand({ enableSharding: 'test' });
-testDB_s0.adminCommand({ movePrimary: 'test', to: 'shard0001' });
+st.ensurePrimaryShard('test', 'shard0001');
 testDB_s0.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
 
 var checkShardMajorVersion = function(conn, expectedVersion) {
@@ -176,3 +177,4 @@ checkShardMajorVersion(st.d1, 0);
 
 st.stop();
 
+})();

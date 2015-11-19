@@ -341,7 +341,7 @@ TEST_F(DropColl2ShardTest, FirstShardDropCmdError) {
 
 TEST_F(DropColl2ShardTest, SecondShardTargeterError) {
     auto shard2Targeter = RemoteCommandTargeterMock::get(
-        shardRegistry()->getShard(operationContext(), shard2().getHost())->getTargeter());
+        shardRegistry()->getShard(operationContext(), shard2().getName())->getTargeter());
     shard2Targeter->setFindHostReturnValue({ErrorCodes::HostUnreachable, "bad test network"});
 
     auto future = launchAsync([this] {

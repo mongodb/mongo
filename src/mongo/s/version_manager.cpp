@@ -109,7 +109,7 @@ private:
  * Sends the setShardVersion command on the specified connection.
  */
 bool setShardVersion(OperationContext* txn,
-                     DBClientBase& conn,
+                     DBClientBase* conn,
                      const string& ns,
                      const ConnectionString& configServer,
                      ChunkVersion version,
@@ -119,7 +119,12 @@ bool setShardVersion(OperationContext* txn,
     ShardId shardId;
     ConnectionString shardCS;
     {
-        const auto shard = grid.shardRegistry()->getShard(txn, conn.getServerAddress());
+        const auto shard = grid.shardRegistry()->getShardForHostNoReload(
+            uassertStatusOK(HostAndPort::parse(conn->getServerAddress())));
+        uassert(ErrorCodes::ShardNotFound,
+                str::stream() << conn->getServerAddress() << " is not recognized as a shard",
+                shard);
+
         shardId = shard->getId();
         shardCS = shard->getConnString();
     }
@@ -133,15 +138,14 @@ bool setShardVersion(OperationContext* txn,
     } else {
         SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioning(
             configServer, shardId, shardCS, NamespaceString(ns), version, authoritative);
-
         cmd = ssv.toBSON();
     }
 
-    LOG(1) << "    setShardVersion  " << shardId << " " << conn.getServerAddress() << "  " << ns
+    LOG(1) << "    setShardVersion  " << shardId << " " << conn->getServerAddress() << "  " << ns
            << "  " << cmd
            << (manager ? string(str::stream() << " " << manager->getSequenceNumber()) : "");
 
-    return conn.runCommand("admin", cmd, result, 0);
+    return conn->runCommand("admin", cmd, result, 0);
 }
 
 /**
@@ -185,12 +189,9 @@ DBClientBase* getVersionable(DBClientBase* conn) {
  * mongos-specific behavior on mongod (auditing and replication information in commands)
  */
 bool initShardVersionEmptyNS(OperationContext* txn, DBClientBase* conn_in) {
-    bool ok;
-    BSONObj result;
-    DBClientBase* conn = NULL;
     try {
         // May throw if replica set primary is down
-        conn = getVersionable(conn_in);
+        DBClientBase* const conn = getVersionable(conn_in);
         dassert(conn);  // errors thrown above
 
         // Check to see if we've already initialized this connection. This avoids sending
@@ -199,24 +200,20 @@ bool initShardVersionEmptyNS(OperationContext* txn, DBClientBase* conn_in) {
             return false;
         }
 
-        // Check to see if this is actually a shard and not a single config server
-        // NOTE: Config servers are registered only by the name "config" in the shard cache, not
-        // by host, so lookup by host will fail unless the host is also a shard.
-        const auto shard = grid.shardRegistry()->getShard(txn, conn->getServerAddress());
-        if (!shard) {
-            return false;
-        }
+        BSONObj result;
+        const bool ok = setShardVersion(txn,
+                                        conn,
+                                        "",
+                                        grid.shardRegistry()->getConfigServerConnectionString(),
+                                        ChunkVersion(),
+                                        NULL,
+                                        true,
+                                        result);
 
-        LOG(1) << "initializing shard connection to " << shard->toString();
+        LOG(3) << "initial sharding result : " << result;
 
-        ok = setShardVersion(txn,
-                             *conn,
-                             "",
-                             grid.shardRegistry()->getConfigServerConnectionString(),
-                             ChunkVersion(),
-                             NULL,
-                             true,
-                             result);
+        connectionShardStatus.setSequence(conn, "", 0);
+        return ok;
     } catch (const DBException&) {
         // NOTE: Replica sets may fail to initShardVersion because future calls relying on
         // correct versioning must later call checkShardVersion on the primary.
@@ -237,11 +234,6 @@ bool initShardVersionEmptyNS(OperationContext* txn, DBClientBase* conn_in) {
 
         return false;
     }
-
-    LOG(3) << "initial sharding result : " << result;
-
-    connectionShardStatus.setSequence(conn, "", 0);
-    return ok;
 }
 
 /**
@@ -279,7 +271,7 @@ bool checkShardVersion(OperationContext* txn,
         return false;
     }
 
-    DBClientBase* conn = getVersionable(conn_in);
+    DBClientBase* const conn = getVersionable(conn_in);
     verify(conn);  // errors thrown above
 
     shared_ptr<DBConfig> conf = status.getValue();
@@ -303,7 +295,8 @@ bool checkShardVersion(OperationContext* txn,
         return false;
     }
 
-    const auto shard = grid.shardRegistry()->getShard(txn, conn->getServerAddress());
+    const auto shard = grid.shardRegistry()->getShardForHostNoReload(
+        uassertStatusOK(HostAndPort::parse(conn->getServerAddress())));
     uassert(ErrorCodes::ShardNotFound,
             str::stream() << conn->getServerAddress() << " is not recognized as a shard",
             shard);
@@ -359,7 +352,7 @@ bool checkShardVersion(OperationContext* txn,
 
     BSONObj result;
     if (setShardVersion(txn,
-                        *conn,
+                        conn,
                         ns,
                         grid.shardRegistry()->getConfigServerConnectionString(),
                         version,
