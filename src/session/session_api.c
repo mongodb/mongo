@@ -653,9 +653,9 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	WT_CURSOR_TABLE *ctable;
 	WT_INDEX *idx;
 	WT_TABLE *table;
-	uint32_t flags, range;
+	uint8_t flags;
+	uint32_t bloom_bit_count, bloom_hash_count, range;
 	uint64_t count;
-	uint64_t bloom_bit_count, bloom_hash_count;
 
 	count = 0;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -721,9 +721,17 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 			WT_ERR(EINVAL);
 	}
 	WT_ERR(__wt_config_gets(session, cfg, "bloom_bit_count", &cval));
-	bloom_bit_count = (uint64_t)cval.val;
+	if ((uint64_t)cval.val > UINT32_MAX) {
+		__wt_errx(session, "bloom_bit_count: value too large");
+		WT_ERR(EINVAL);
+	}
+	bloom_bit_count = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "bloom_hash_count", &cval));
-	bloom_hash_count = (uint64_t)cval.val;
+	if ((uint64_t)cval.val > UINT32_MAX) {
+		__wt_errx(session, "bloom_hash_count: value too large");
+		WT_ERR(EINVAL);
+	}
+	bloom_hash_count = (uint32_t)cval.val;
 	if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM)) {
 	    if (count == 0) {
 		    __wt_errx(session, "count must be nonzero when "

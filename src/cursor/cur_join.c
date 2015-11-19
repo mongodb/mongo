@@ -312,7 +312,7 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	}
 	collator = (entry->index == NULL) ? NULL : entry->index->collator;
 	while (ret == 0) {
-		c->get_key(c, &curkey);
+		WT_ERR(c->get_key(c, &curkey));
 		if (entry->index != NULL) {
 			cindex = (WT_CURSOR_INDEX *)c;
 			if (cindex->index->extractor == NULL) {
@@ -348,9 +348,9 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			}
 		}
 		if (entry->index != NULL)
-			c->get_value(c, &curvalue);
+			WT_ERR(c->get_value(c, &curvalue));
 		else
-			c->get_key(c, &curvalue);
+			WT_ERR(c->get_key(c, &curvalue));
 		WT_ERR(__wt_bloom_insert(bloom, &curvalue));
 		entry->stats.actual_count++;
 advance:
@@ -426,7 +426,7 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 	WT_DECL_RET;
 	WT_CURSOR_JOIN_ENTRY *je, *jeend, *je2;
 	WT_CURSOR_JOIN_ENDPOINT *end;
-	uint64_t k, m;
+	uint32_t f, k;
 
 	if (cjoin->entries_next == 0) {
 		__wt_errx(session, "join cursor has not yet been joined "
@@ -461,21 +461,21 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 				 * pick compatible numbers for bit counts
 				 * and number of hashes.
 				 */
-				m = je->bloom_bit_count;
+				f = je->bloom_bit_count;
 				k = je->bloom_hash_count;
 				for (je2 = je + 1; je2 < jeend; je2++)
 					if (F_ISSET(je2,
 					    WT_CURJOIN_ENTRY_BLOOM) &&
 					    je2->count == je->count) {
-						m = WT_MAX(
-						    je2->bloom_bit_count, m);
+						f = WT_MAX(
+						    je2->bloom_bit_count, f);
 						k = WT_MAX(
 						    je2->bloom_hash_count, k);
 					}
-				je->bloom_bit_count = m;
+				je->bloom_bit_count = f;
 				je->bloom_hash_count = k;
 				WT_RET(__wt_bloom_create(session, NULL,
-				    NULL, je->count, m, k, &je->bloom));
+				    NULL, je->count, f, k, &je->bloom));
 				F_SET(je, WT_CURJOIN_ENTRY_OWN_BLOOM);
 				WT_RET(__curjoin_init_bloom(session, cjoin,
 				    je, je->bloom));
@@ -490,7 +490,7 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 						WT_ASSERT(session,
 						    je2->bloom == NULL);
 						je2->bloom = je->bloom;
-						je2->bloom_bit_count = m;
+						je2->bloom_bit_count = f;
 						je2->bloom_hash_count = k;
 					}
 			} else {
@@ -651,14 +651,15 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		bloom_found = true;
 	}
 	if (entry->index != NULL) {
+		memset(&v, 0, sizeof(v));  /* Keep lint quiet. */
 		c = entry->main;
 		c->set_key(c, key);
-		if ((ret  = c->search(c)) == 0)
+		if ((ret = c->search(c)) == 0)
 			ret = c->get_value(c, &v);
 		else if (ret == WT_NOTFOUND)
 			WT_ERR_MSG(session, WT_ERROR,
 			    "main table for join is missing entry.");
-		c->reset(c);
+		WT_TRET(c->reset(c));
 		WT_ERR(ret);
 	} else
 		v = *key;
@@ -894,8 +895,8 @@ err:		WT_TRET(__curjoin_close(cursor));
  */
 int
 __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
-    WT_INDEX *idx, WT_CURSOR *ref_cursor, uint32_t flags, uint32_t range,
-    uint64_t count, uint64_t bloom_bit_count, uint64_t bloom_hash_count)
+    WT_INDEX *idx, WT_CURSOR *ref_cursor, uint8_t flags, uint8_t range,
+    uint64_t count, uint32_t bloom_bit_count, uint32_t bloom_hash_count)
 {
 	WT_CURSOR_JOIN_ENTRY *entry;
 	WT_DECL_RET;
@@ -960,8 +961,8 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			    count, entry->count);
 			WT_ERR(EINVAL);
 		}
-		if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) !=
-		    F_ISSET(entry, WT_CURJOIN_ENTRY_BLOOM)) {
+		if (LF_MASK(WT_CURJOIN_ENTRY_BLOOM) !=
+		    F_MASK(entry, WT_CURJOIN_ENTRY_BLOOM)) {
 			__wt_errx(session, "join has incompatible strategy "
 			    "values for the same index");
 			WT_ERR(EINVAL);
