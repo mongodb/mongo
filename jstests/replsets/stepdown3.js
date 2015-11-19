@@ -1,4 +1,7 @@
-// Test that GLE asserts when the primary steps down while we're waiting for w:
+// Test that GLE asserts when the primary steps down while we're waiting for a replicated write.
+//
+// This test requires the fsync command to force a secondary to be stale.
+// @tags: [requires_fsync]
 
 var replTest = new ReplSetTest({ name: 'testSet', nodes: 2 });
 var nodes = replTest.startSet();

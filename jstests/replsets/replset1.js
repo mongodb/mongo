@@ -104,6 +104,7 @@ var doTest = function( signal ) {
     // And that both slave nodes have all the updates
     new_master = replTest.getMaster();
     assert.eq( 1000 , new_master.getDB( "bar" ).runCommand( { count:"bar"} ).n , "assumption 2");
+    replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
 
     var slaves = replTest.liveNodes.slaves;

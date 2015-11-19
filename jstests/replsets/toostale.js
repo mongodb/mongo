@@ -1,10 +1,14 @@
-
-// this tests that:
+// This tests that:
 // * stale members get into state 3 (recovering)
 // * they stay in state 3 after restarting
 // * they can recover and go into state 2 if someone less up-to-date becomes primary
+//
+// This test requires persistence in order for a restarted node with a stale oplog to stay in the
+// RECOVERING state. A restarted node with an ephemeral storage engine will not have an oplog upon
+// restart, so will immediately resync.
+// @tags: [requires_persistence]
 
-/*
+/**
  * 1: initial insert
  * 2: initial sync
  * 3: blind s2

@@ -1,3 +1,13 @@
+// Tests that the creation of a user replicates to secondaries, and survives a restart of all
+// data-bearing nodes.
+//
+// If all data-bearing nodes in a replica set are using an ephemeral storage engine, the set will
+// not be able to survive a scenario where all data-bearing nodes are down simultaneously. In such a
+// scenario, none of the members will have any data, and upon restart will each look for a member to
+// inital sync from, so no primary will be elected. This test induces such a scenario, so cannot be
+// run on ephemeral storage engines.
+// @tags: [requires_persistence]
+
 (function () {
     "use strict";
     var keyfile = "jstests/libs/key1";
@@ -18,7 +28,7 @@
         master = rs.getMaster();
         master.getDB("admin").auth("foo", "bar");
         assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-    }
+    };
 
     jsTest.log("authing");
     for (var i=0; i<2; i++) {
@@ -31,7 +41,7 @@
     safeInsert();
     authutil.asCluster(rs.nodes, keyfile, function() { rs.awaitReplication(); });
 
-    jsTest.log("write stuff to 0&2")
+    jsTest.log("write stuff to 0&2");
     rs.stop(1);
 
     master = rs.getMaster();
@@ -40,7 +50,7 @@
     jsTest.log("last op: " +
                tojson(master.getDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next()));
 
-    jsTest.log("write stuff to 1&2")
+    jsTest.log("write stuff to 1&2");
     rs.stop(0);
     rs.restart(1);
 

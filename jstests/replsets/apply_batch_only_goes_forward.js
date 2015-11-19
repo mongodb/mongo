@@ -8,6 +8,11 @@
  * -- Ensure restarted primary (node0) comes up in recovering
  * -- Ensure node0 replicates a batch, and keeps the old minvalid
  * -- Success!
+ *
+ * This test requires persistence to test that a restarted primary will stay in the RECOVERING state
+ * when minvalid is set to the future. An ephemeral storage engine will not have a minvalid after
+ * restarting, so will initial sync in this scenario, invalidating the test.
+ * @tags: [requires_persistence]
  */
 (function() {
     "use strict";

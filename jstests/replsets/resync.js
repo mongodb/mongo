@@ -1,6 +1,11 @@
 // test that the resync command works with replica sets and that one does not need to manually
 // force a replica set resync by deleting all datafiles
 // Also tests that you can do this from a node that is "too stale"
+//
+// This test requires persistence in order for a restarted node with a stale oplog to stay in the
+// RECOVERING state. A restarted node with an ephemeral storage engine will not have an oplog upon
+// restart, so will immediately resync.
+// @tags: [requires_persistence]
 (function() {
     "use strict";
     var replTest = new ReplSetTest({name: 'resync', nodes: 3, oplogSize: 1});

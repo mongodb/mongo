@@ -5,6 +5,10 @@
  * --replSet to the startup configuration directives, the node can immediately transition into
  * PRIMARY rather than waiting in STARTUP for the operator to run replSetInitiate. This should
  * only be allowed for single-node replica set configurations.
+ *
+ * This test cannot be run on ephemeral storage engines, since their replica set config document
+ * will not persist across a restart and they will not transition to PRIMARY as described above.
+ * @tags: [requires_persistence]
  */
 (function () {
     "use strict";

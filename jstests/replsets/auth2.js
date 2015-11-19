@@ -1,3 +1,7 @@
+// Tests authentication with replica sets using key files.
+//
+// This test requires users to persist across a restart.
+// @tags: [requires_persistence]
 
 var testInvalidAuthStates = function() {
     print("check that 0 is in recovering");

@@ -1,4 +1,7 @@
 // check replica set authentication
+//
+// This test requires users to persist across a restart.
+// @tags: [requires_persistence]
 
 load("jstests/replsets/rslib.js");
 

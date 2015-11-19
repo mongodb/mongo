@@ -1,5 +1,14 @@
 load("jstests/replsets/rslib.js");
 
+// Tests that the replica set's term increases once per election, and persists across a restart of
+// the entire set.
+//
+// If all data-bearing nodes in a replica set are using an ephemeral storage engine, the set will
+// not be able to survive a scenario where all data-bearing nodes are down simultaneously. In such a
+// scenario, none of the members will have any replica set configuration document after a restart,
+// so cannot elect a primary. This test induces such a scenario, so cannot be run on ephemeral
+// storage engines.
+// @tags: [requires_persistence]
 (function() {
 "use strict";
 

@@ -1,6 +1,13 @@
 /* test initial sync options
  *
  * Make sure member can't sync from a member with a different buildIndexes setting.
+ *
+ * If all nodes in a replica set are using an ephemeral storage engine, the set will not be able to
+ * survive a scenario where all index-building members are down simultaneously. In such a
+ * scenario, none of the members will have any data, and upon restart will each look for a member to
+ * inital sync from. They cannot sync from a member which does not build indexes, so no primary will
+ * be elected. This test induces such a scenario, so cannot be run on ephemeral storage engines.
+ * @tags: [requires_persistence]
  */
 
 

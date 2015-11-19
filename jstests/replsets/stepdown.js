@@ -1,9 +1,12 @@
-/* check that on a loss of primary, another node doesn't assume primary if it is stale
-   we force a stepDown to test this
-   we use lock+fsync to force secondary to be stale
-*/
+/**
+ * Check that on a loss of primary, another node doesn't assume primary if it is stale. We force a
+ * stepDown to test this.
+ *
+ * This test requires the fsync command to force a secondary to be stale.
+ * @tags: [requires_fsync]
+ */
 
-load("jstests/replsets/rslib.js")
+load("jstests/replsets/rslib.js");
 
 // utility to check if an error was due to connection failure.
 var errorWasDueToConnectionFailure = function(error) {

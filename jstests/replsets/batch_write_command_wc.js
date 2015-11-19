@@ -1,6 +1,8 @@
-//
 // Tests write-concern-related batch write protocol functionality
 //
+// This test asserts that a journaled write to a mongod running with --nojournal should be rejected,
+// so cannot be run on the ephemeralForTest storage engine, as it accepts all journaled writes.
+// @tags: [SERVER-21420]
 
 var request;
 var result;

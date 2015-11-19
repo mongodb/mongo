@@ -1,4 +1,7 @@
 // Test that setting maxSyncSourceLagSecs causes the set to change sync target
+//
+// This test requires the fsync command to ensure members experience a delay.
+// @tags: [requires_fsync]
 (function() {
     "use strict";
     var name = "maxSyncSourceLagSecs";

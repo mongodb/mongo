@@ -2,10 +2,20 @@
  * This test will ensure that a failed a batch apply will remove the any oplog
  * entries from that batch.
  *
- * To do this we: -- Create single node replica set -- Set minvalid manually on
- * primary way ahead (5 minutes) -- Write some oplog entries newer than
- * minvalid.start -- Ensure restarted primary comes up in recovering and
- * truncates the oplog -- Success!
+ * To do this we:
+ * -- Create single node replica set
+ * -- Set minvalid manually on primary way ahead (5 minutes)
+ * -- Write some oplog entries newer than minvalid.start
+ * -- Ensure restarted primary comes up in recovering and truncates the oplog
+ * -- Success!
+ *
+ * This test requires persistence for two reasons:
+ *  1. To test that a restarted primary will stay in the RECOVERING state when minvalid is set to
+ *     the future. An ephemeral storage engine will not have a minvalid after a restart, so the node
+ *     will start an initial sync in this scenario, invalidating the test.
+ *  2. It uses a single node replica set, which cannot be restarted in any meaningful way with an
+ *     ephemeral storage engine.
+ * @tags: [requires_persistence]
  */
 (function() {
     "use strict";
