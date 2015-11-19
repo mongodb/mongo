@@ -653,9 +653,9 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
-	uint8_t flags;
-	uint32_t bloom_bit_count, bloom_hash_count, range;
 	uint64_t count;
+	uint32_t bloom_bit_count, bloom_hash_count;
+	uint8_t flags, range;
 
 	count = 0;
 	session = (WT_SESSION_IMPL *)wt_session;
