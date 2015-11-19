@@ -200,10 +200,9 @@ __curjoin_get_key(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
 	if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED) ||
-	    !__curjoin_entry_iter_ready(cjoin->iter)) {
-		__wt_errx(session, "join cursor must be advanced with next()");
-		WT_ERR(EINVAL);
-	}
+	    !__curjoin_entry_iter_ready(cjoin->iter))
+		WT_ERR_MSG(session, EINVAL,
+		    "join cursor must be advanced with next()");
 	WT_ERR(__wt_cursor_get_keyv(cursor, cursor->flags, ap));
 
 err:	va_end(ap);
@@ -230,10 +229,9 @@ __curjoin_get_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED) ||
-	    !__curjoin_entry_iter_ready(iter)) {
-		__wt_errx(session, "join cursor must be advanced with next()");
-		WT_ERR(EINVAL);
-	}
+	    !__curjoin_entry_iter_ready(iter))
+		WT_ERR_MSG(session, EINVAL,
+		    "join cursor must be advanced with next()");
 	if (iter->entry->index != NULL)
 		WT_ERR(__wt_curindex_get_valuev(iter->cursor, ap));
 	else
@@ -428,11 +426,10 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 	WT_CURSOR_JOIN_ENDPOINT *end;
 	uint64_t k, m;
 
-	if (cjoin->entries_next == 0) {
-		__wt_errx(session, "join cursor has not yet been joined "
-		    "with any other cursors");
-		return (EINVAL);
-	}
+	if (cjoin->entries_next == 0)
+		WT_RET_MSG(session, EINVAL,
+		    "join cursor has not yet been joined with any other "
+		    "cursors");
 
 	je = &cjoin->entries[0];
 	WT_RET(__curjoin_entry_iter_init(session, cjoin, je, &cjoin->iter));
@@ -700,10 +697,9 @@ __curjoin_next(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
-	if (F_ISSET(cjoin, WT_CURJOIN_ERROR)) {
-		__wt_errx(session, "join cursor encountered previous error");
-		WT_ERR(WT_ERROR);
-	}
+	if (F_ISSET(cjoin, WT_CURJOIN_ERROR))
+		WT_ERR_MSG(session, WT_ERROR,
+		    "join cursor encountered previous error");
 	if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED))
 		WT_ERR(__curjoin_init_iter(session, cjoin));
 
@@ -954,18 +950,16 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		++cjoin->entries_next;
 	} else {
 		/* Merge the join into an existing entry for this index */
-		if (count != 0 && entry->count != 0 && entry->count != count) {
-			__wt_errx(session, "count=%" PRIu64 " does not match "
+		if (count != 0 && entry->count != 0 && entry->count != count)
+			WT_ERR_MSG(session, EINVAL,
+			    "count=%" PRIu64 " does not match "
 			    "previous count=%" PRIu64 " for this index",
 			    count, entry->count);
-			WT_ERR(EINVAL);
-		}
 		if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) !=
-		    F_ISSET(entry, WT_CURJOIN_ENTRY_BLOOM)) {
-			__wt_errx(session, "join has incompatible strategy "
-			    "values for the same index");
-			WT_ERR(EINVAL);
-		}
+		    F_ISSET(entry, WT_CURJOIN_ENTRY_BLOOM))
+			WT_ERR_MSG(session, EINVAL,
+			    "join has incompatible strategy values for the "
+			    "same index");
 		/*
 		 * Check against other comparisons (we call them endpoints)
 		 * already set up for this index.
@@ -991,19 +985,15 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			    ((range & WT_CURJOIN_END_LT) != 0 || range_eq)) ||
 			    (end->flags == WT_CURJOIN_END_EQ &&
 			    (range & (WT_CURJOIN_END_LT | WT_CURJOIN_END_GT))
-			    != 0)) {
-				__wt_errx(session,
+			    != 0))
+				WT_ERR_MSG(session, EINVAL,
 				    "join has overlapping ranges");
-				WT_ERR(EINVAL);
-			}
 			if (range == WT_CURJOIN_END_EQ &&
 			    end->flags == WT_CURJOIN_END_EQ &&
-			    !F_ISSET(entry, WT_CURJOIN_ENTRY_DISJUNCTION)) {
-				__wt_errx(session,
+			    !F_ISSET(entry, WT_CURJOIN_ENTRY_DISJUNCTION))
+				WT_ERR_MSG(session, EINVAL,
 				    "compare=eq can only be combined "
 				    "using operation=or");
-				WT_ERR(EINVAL);
-			}
 
 			/*
 			 * Sort "gt"/"ge" to the front, followed by any number
