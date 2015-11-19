@@ -33,6 +33,7 @@
 
 #include "mongo/util/concurrency/spin_lock.h"
 
+#include <sched.h>
 #include <time.h>
 
 
@@ -59,7 +60,7 @@ void SpinLock::_lockSlowPath() {
     for (int i = 0; i < 1000; i++) {
         if (_tryLock())
             return;
-        pthread_yield();
+        sched_yield();
     }
 
     struct timespec t;
