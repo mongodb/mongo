@@ -452,7 +452,7 @@ __curstat_join_next_set(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst,
 	join_group = &cst->u.join_stats_group;
 	cjoin = join_group->join_cursor;
 	if (init)
-		pos = forw ? 0 : cjoin->entries_next - 1;
+		pos = forw ? 0 : (ssize_t)cjoin->entries_next - 1;
 	else
 		pos = join_group->join_cursor_entry + (forw ? 1 : -1);
 	if (pos < 0 || (size_t)pos >= cjoin->entries_next)

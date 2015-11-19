@@ -291,8 +291,8 @@ struct __wt_cursor_join_entry {
 	WT_INDEX		*index;
 	WT_CURSOR		*main;		/* raw main table cursor */
 	WT_BLOOM		*bloom;		/* Bloom filter handle */
-	uint64_t		 bloom_bit_count; /* bits per item in bloom */
-	uint64_t		 bloom_hash_count; /* hash functions in bloom */
+	uint32_t		 bloom_bit_count; /* bits per item in bloom */
+	uint32_t		 bloom_hash_count; /* hash functions in bloom */
 	uint64_t		 count;		/* approx number of matches */
 
 #define	WT_CURJOIN_ENTRY_BLOOM		0x01	/* use a bloom filter */
