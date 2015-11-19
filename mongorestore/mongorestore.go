@@ -371,17 +371,9 @@ func (restore *MongoRestore) Restore() error {
 
 	// Restore users/roles
 	if restore.ShouldRestoreUsersAndRoles() {
-		if restore.manager.Users() != nil {
-			err = restore.RestoreUsersOrRoles(Users, restore.manager.Users())
-			if err != nil {
-				return fmt.Errorf("restore error: %v", err)
-			}
-		}
-		if restore.manager.Roles() != nil {
-			err = restore.RestoreUsersOrRoles(Roles, restore.manager.Roles())
-			if err != nil {
-				return fmt.Errorf("restore error: %v", err)
-			}
+		err = restore.RestoreUsersOrRoles(restore.manager.Users(), restore.manager.Roles())
+		if err != nil {
+			return fmt.Errorf("restore error: %v", err)
 		}
 	}
 

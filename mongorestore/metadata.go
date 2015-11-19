@@ -270,75 +270,99 @@ func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bs
 	return nil
 }
 
-// RestoreUsersOrRoles accepts a collection type (Users or Roles) and restores the intent
-// in the appropriate collection.
-func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *intents.Intent) error {
-	log.Logf(log.Always, "restoring %v from %v", collectionType, intent.BSONPath)
+// RestoreUsersOrRoles accepts a users intent and a roles intent, and restores
+// them via _mergeAuthzCollections. Either or both can be nil. In the latter case
+// nothing is done.
+func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) error {
 
-	if intent.Size == 0 {
-		// MongoDB complains if we try and remove a non-existent collection, so we should
-		// just skip auth collections with empty .bson files to avoid gnarly logic later on.
-		log.Logf(log.Always, "%v file '%v' is empty; skipping %v restoration",
-			collectionType, intent.BSONPath, collectionType)
+	type loopArg struct {
+		intent             *intents.Intent
+		intentType         string
+		mergeParamName     string
+		tempCollectionName string
+	}
+
+	if users == nil && roles == nil {
 		return nil
 	}
 
-	var tempCol, tempColCommandField string
-	switch collectionType {
-	case Users:
-		tempCol = restore.tempUsersCol
-		tempColCommandField = "tempUsersCollection"
-	case Roles:
-		tempCol = restore.tempRolesCol
-		tempColCommandField = "tempRolesCollection"
-	default:
-		return fmt.Errorf("cannot use %v as a collection type in RestoreUsersOrRoles", collectionType)
+	if users != nil && roles != nil && users.DB != roles.DB {
+		return fmt.Errorf("can't restore users and roles to different databases, %v and %v", users.DB, roles.DB)
 	}
 
-	err := intent.BSONFile.Open()
+	args := []loopArg{}
+	mergeArgs := bson.D{}
+	userTargetDB := ""
+
+	if users != nil {
+		args = append(args, loopArg{users, "users", "tempUsersCollection", restore.tempUsersCol})
+	}
+	if roles != nil {
+		args = append(args, loopArg{roles, "roles", "tempRolesCollection", restore.tempRolesCol})
+	}
+
+	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
-		return err
+		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	defer intent.BSONFile.Close()
-	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
-	defer bsonSource.Close()
+	defer session.Close()
 
-	tempColExists, err := restore.CollectionExists(&intents.Intent{DB: "admin", C: tempCol})
-	if err != nil {
-		return err
-	}
-	if tempColExists {
-		return fmt.Errorf("temporary collection admin.%v already exists. "+
-			"Drop it or specify new temporary collections with --tempUsersColl "+
-			"and --tempRolesColl", tempCol)
-	}
+	// For each of the users and roles intents:
+	//   build up the mergeArgs component of the _mergeAuthzCollections command
+	//   upload the BSONFile to a temporary collection
+	for _, arg := range args {
 
-	log.Logf(log.DebugLow, "restoring %v to temporary collection", collectionType)
-	if _, err = restore.RestoreCollectionToDB("admin", tempCol, bsonSource, 0); err != nil {
-		return fmt.Errorf("error restoring %v: %v", collectionType, err)
-	}
-
-	// make sure we always drop the temporary collection
-	defer func() {
-		session, err := restore.SessionProvider.GetSession()
-		if err != nil {
-			// logging errors here because this has no way of returning that doesn't mask other errors
-			log.Logf(log.Always, "error establishing connection to drop temporary collection %v: %v", tempCol, err)
-			return
+		if arg.intent.Size == 0 {
+			// MongoDB complains if we try and remove a non-existent collection, so we should
+			// just skip auth collections with empty .bson files to avoid gnarly logic later on.
+			log.Logf(log.Always, "%v file '%v' is empty; skipping %v restoration", arg.intentType, arg.intent.BSONPath, arg.intentType)
 		}
-		defer session.Close()
-		log.Logf(log.DebugHigh, "dropping temporary collection %v", tempCol)
-		err = session.DB("admin").C(tempCol).DropCollection()
-		if err != nil {
-			log.Logf(log.Always, "error dropping temporary collection %v: %v", tempCol, err)
-		}
-	}()
+		log.Logf(log.Always, "restoring %v from %v", arg.intentType, arg.intent.BSONPath)
+		mergeArgs = append(mergeArgs, bson.DocElem{arg.mergeParamName, "admin." + arg.tempCollectionName})
 
-	// If we are restoring a single database (--restoreDBUsersAndRoles), then the
-	// target database will be that database, and the _mergeAuthzCollections command
-	// will only restore users/roles of that database. If we are restoring the admin db or
-	// doing a full restore, we tell the command to merge users/roles of all databases.
-	userTargetDB := intent.DB
+		err := arg.intent.BSONFile.Open()
+		if err != nil {
+			return err
+		}
+		defer arg.intent.BSONFile.Close()
+		bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(arg.intent.BSONFile))
+		defer bsonSource.Close()
+
+		tempCollectionNameExists, err := restore.CollectionExists(&intents.Intent{DB: "admin", C: arg.tempCollectionName})
+		if err != nil {
+			return err
+		}
+		if tempCollectionNameExists {
+			log.Logf(log.Info, "dropping preexisting temporary collection admin.%v", arg.tempCollectionName)
+			err = session.DB("admin").C(arg.tempCollectionName).DropCollection()
+			if err != nil {
+				return fmt.Errorf("error dropping preexisting temporary collection %v: %v", arg.tempCollectionName, err)
+			}
+		}
+
+		log.Logf(log.DebugLow, "restoring %v to temporary collection", arg.intentType)
+		if _, err = restore.RestoreCollectionToDB("admin", arg.tempCollectionName, bsonSource, 0); err != nil {
+			return fmt.Errorf("error restoring %v: %v", arg.intentType, err)
+		}
+
+		// make sure we always drop the temporary collection
+		defer func() {
+			session, e := restore.SessionProvider.GetSession()
+			if e != nil {
+				// logging errors here because this has no way of returning that doesn't mask other errors
+				log.Logf(log.Info, "error establishing connection to drop temporary collection admin.%v: %v", arg.tempCollectionName, e)
+				return
+			}
+			defer session.Close()
+			log.Logf(log.DebugHigh, "dropping temporary collection admin.%v", arg.tempCollectionName)
+			e = session.DB("admin").C(arg.tempCollectionName).DropCollection()
+			if e != nil {
+				log.Logf(log.Info, "error dropping temporary collection admin.%v: %v", arg.tempCollectionName, e)
+			}
+		}()
+		userTargetDB = arg.intent.DB
+	}
+
 	if userTargetDB == "admin" {
 		// _mergeAuthzCollections uses an empty db string as a sentinel for "all databases"
 		userTargetDB = ""
@@ -356,21 +380,17 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		}
 	}
 
-	command := bsonutil.MarshalD{
-		{"_mergeAuthzCollections", 1},
-		{tempColCommandField, "admin." + tempCol},
-		{"drop", restore.OutputOptions.Drop},
-		{"writeConcern", writeConcern},
-		{"db", userTargetDB},
-	}
+	command := bsonutil.MarshalD{}
+	command = append(command,
+		bson.DocElem{"_mergeAuthzCollections", 1})
+	command = append(command,
+		mergeArgs...)
+	command = append(command,
+		bson.DocElem{"drop", restore.OutputOptions.Drop},
+		bson.DocElem{"writeConcern", writeConcern},
+		bson.DocElem{"db", userTargetDB})
 
-	session, err := restore.SessionProvider.GetSession()
-	if err != nil {
-		return fmt.Errorf("error establishing connection: %v", err)
-	}
-	defer session.Close()
-
-	log.Logf(log.DebugLow, "merging %v from temp collection '%v'", collectionType, tempCol)
+	log.Logf(log.DebugLow, "merging users/roles from temp collections")
 	res := bson.M{}
 	err = session.Run(command, &res)
 	if err != nil {
