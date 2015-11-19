@@ -137,6 +137,12 @@ std::string MozJSImplScope::getError() {
 
 void MozJSImplScope::registerOperation(OperationContext* txn) {
     invariant(_opId == 0);
+
+    // getPooledScope may call registerOperation with a nullptr, so we have to
+    // check for that here.
+    if (!txn)
+        return;
+
     _opId = txn->getOpID();
 
     _engine->registerOperation(txn, this);

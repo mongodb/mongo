@@ -41,8 +41,8 @@ for( var i = 0; i < st._shardServers.length; i++ ){
         ops[ "" + (i * 2 + j) ] = { op : "command", ns : "admin", 
                                     command : { moveChunk : "" + coll, 
                                                      find : { _id : ( j == 0 ? 0 : halfId ) },
-                                                       to : st._shardServers[i].shardName } } // , check : checkMigrate }
-        // TODO: Re-enable the checkMigrate check when SERVER-21359 is fixed.
+                                                       to : st._shardServers[i].shardName },
+                                    check : checkMigrate };
     }
 }
 
