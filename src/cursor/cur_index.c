@@ -8,6 +8,20 @@
 
 #include "wt_internal.h"
 
+ /*
+ * __wt_curindex_joined --
+ *	Produce an error that this cursor is being used in a join call.
+ */
+int
+__wt_curindex_joined(WT_CURSOR *cursor)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+	__wt_errx(session, "index cursor is being used in a join");
+	return (ENOTSUP);
+}
+
 /*
  * __curindex_get_value --
  *	WT_CURSOR->get_value implementation for index cursors.
@@ -15,32 +29,16 @@
 static int
 __curindex_get_value(WT_CURSOR *cursor, ...)
 {
-	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
-	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 
-	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(cursor);
-
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
-		ret = __wt_schema_project_merge(session,
-		    cindex->cg_cursors, cindex->value_plan,
-		    cursor->value_format, &cursor->value);
-		if (ret == 0) {
-			item = va_arg(ap, WT_ITEM *);
-			item->data = cursor->value.data;
-			item->size = cursor->value.size;
-		}
-	} else
-		ret = __wt_schema_project_out(session,
-		    cindex->cg_cursors, cindex->value_plan, ap);
-	va_end(ap);
+	JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
+	WT_ERR(__wt_curindex_get_valuev(cursor, ap));
 
-err:	API_END_RET(session, ret);
+err:	va_end(ap);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -53,7 +51,7 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL(cursor, session, set_value, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
 	ret = ENOTSUP;
 err:	cursor->saved_err = ret;
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
@@ -72,7 +70,7 @@ __curindex_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)a;
-	CURSOR_API_CALL(a, session, compare, NULL);
+	JOINABLE_CURSOR_API_CALL(a, session, compare, NULL);
 
 	/* Check both cursors are "index:" type. */
 	if (!WT_PREFIX_MATCH(a->uri, "index:") ||
@@ -150,7 +148,7 @@ __curindex_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, next, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	if ((ret = cindex->child->next(cindex->child)) == 0)
@@ -171,7 +169,7 @@ __curindex_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, prev, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, prev, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	if ((ret = cindex->child->prev(cindex->child)) == 0)
@@ -194,7 +192,7 @@ __curindex_reset(WT_CURSOR *cursor)
 	u_int i;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, reset, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, reset, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	WT_TRET(cindex->child->reset(cindex->child));
@@ -225,7 +223,7 @@ __curindex_search(WT_CURSOR *cursor)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	child = cindex->child;
-	CURSOR_API_CALL(cursor, session, search, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
 
 	/*
 	 * We are searching using the application-specified key, which
@@ -284,7 +282,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, search_near, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, search_near, NULL);
 	__wt_cursor_set_raw_key(cindex->child, &cursor->key);
 	if ((ret = cindex->child->search_near(cindex->child, exact)) == 0)
 		ret = __curindex_move(cindex);
@@ -311,7 +309,7 @@ __curindex_close(WT_CURSOR *cursor)
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	idx = cindex->index;
 
-	CURSOR_API_CALL(cursor, session, close, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, close, NULL);
 
 	if ((cp = cindex->cg_cursors) != NULL)
 		for (i = 0, cp = cindex->cg_cursors;

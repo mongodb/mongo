@@ -329,7 +329,7 @@ __curdump_close(WT_CURSOR *cursor)
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
 
-	CURSOR_API_CALL(cursor, session, get_key, NULL);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 	if (child != NULL)
 		WT_TRET(child->close(child));
 	/* We shared the child's URI. */

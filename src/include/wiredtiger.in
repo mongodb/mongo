@@ -574,11 +574,12 @@ struct __wt_cursor {
 #define	WT_CURSTD_KEY_EXT	0x0020	/* Key points out of the tree. */
 #define	WT_CURSTD_KEY_INT	0x0040	/* Key points into the tree. */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
-#define	WT_CURSTD_OPEN		0x0080
-#define	WT_CURSTD_OVERWRITE	0x0100
-#define	WT_CURSTD_RAW		0x0200
-#define	WT_CURSTD_VALUE_EXT	0x0400	/* Value points out of the tree. */
-#define	WT_CURSTD_VALUE_INT	0x0800	/* Value points into the tree. */
+#define	WT_CURSTD_JOINED	0x0080
+#define	WT_CURSTD_OPEN		0x0100
+#define	WT_CURSTD_OVERWRITE	0x0200
+#define	WT_CURSTD_RAW		0x0400
+#define	WT_CURSTD_VALUE_EXT	0x0800	/* Value points out of the tree. */
+#define	WT_CURSTD_VALUE_INT	0x1000	/* Value points into the tree. */
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
 	uint32_t flags;
 #endif
@@ -1234,6 +1235,61 @@ struct __wt_session {
 	 */
 	int __F(drop)(WT_SESSION *session,
 	    const char *name, const char *config);
+
+	/*!
+	 * Join a join cursor with a reference cursor.
+	 *
+	 * @snippet ex_schema.c Join cursors
+	 *
+	 * @param session the session handle
+	 * @param join_cursor a cursor that was opened using a
+	 * \c "join:" URI. It may not have been used for any operations
+	 * other than other join calls.
+	 * @param ref_cursor either an index cursor having the same base table
+	 * as the join_cursor, or a table cursor open on the same base table.
+	 * The ref_cursor must be positioned.
+	 *
+	 * The ref_cursor limits the results seen by iterating the
+	 * join_cursor to table items referred to by the key in this
+	 * index. The set of keys referred to is modified by the compare
+	 * config option.
+	 *
+	 * Multiple join calls builds up a set of ref_cursors, and the
+	 * results seen by iteration are the intersection of the cursor
+	 * ranges participating in the join.
+	 *
+	 * After the join call completes, the ref_cursor cursor may not be
+	 * used for any purpose other than get_key and get_value. Any other
+	 * cursor method (e.g. next, prev,close) will fail. When the
+	 * join_cursor is closed, the ref_cursor is made available for
+	 * general use again. The application should close ref_cursor when
+	 * finished with it, although not before the join_cursor is closed.
+	 *
+	 * @configstart{WT_SESSION.join, see dist/api_data.py}
+	 * @config{bloom_bit_count, the number of bits used per item for the
+	 * bloom filter., an integer between 2 and 1000; default \c 16.}
+	 * @config{bloom_hash_count, the number of hash values per item for the
+	 * bloom filter., an integer between 2 and 100; default \c 8.}
+	 * @config{compare, modifies the set of items to be returned so that the
+	 * index key satisfies the given comparison relative to the key set in
+	 * this cursor., a string\, chosen from the following options: \c "eq"\,
+	 * \c "ge"\, \c "gt"\, \c "le"\, \c "lt"; default \c "eq".}
+	 * @config{count, set an approximate count of the elements that would be
+	 * included in the join.  This is used in sizing the bloom filter\, and
+	 * also influences evaluation order for cursors in the join.  When the
+	 * count is equal for multiple bloom filters in a composition of joins\,
+	 * the bloom filter may be shared., an integer; default \c .}
+	 * @config{strategy, when set to bloom\, a bloom filter is created and
+	 * populated for this index.  This has an up front cost but may reduce
+	 * the number of accesses to the main table when iterating the joined
+	 * cursor.  The bloom setting requires that count be set., a string\,
+	 * chosen from the following options: \c "bloom"\, \c "default"; default
+	 * empty.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(join)(WT_SESSION *session, WT_CURSOR *join_cursor,
+	    WT_CURSOR *ref_cursor, const char *config);
 
 	/*!
 	 * Flush the log.
@@ -4146,6 +4202,19 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2097
 /*! transaction: update conflicts */
 #define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2098
+
+/*!
+ * @}
+ * @name Statistics for join cursors
+ * @anchor statistics_join
+ * @{
+ */
+/*! : accesses */
+#define	WT_STAT_JOIN_ACCESSES				3000
+/*! : actual count of items */
+#define	WT_STAT_JOIN_ACTUAL_COUNT			3001
+/*! : bloom filter false positives */
+#define	WT_STAT_JOIN_BLOOM_FALSE_POSITIVE		3002
 /*! @} */
 /*
  * Statistics section: END

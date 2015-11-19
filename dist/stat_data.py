@@ -67,6 +67,10 @@ class DhandleStat(Stat):
     prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
+class JoinStat(Stat):
+    prefix = ''  # prefix is inserted dynamically
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, JoinStat.prefix, desc, flags)
 class LogStat(Stat):
     prefix = 'log'
     def __init__(self, name, desc, flags=''):
@@ -542,3 +546,14 @@ dsrc_stats = [
 ]
 
 dsrc_stats = sorted(dsrc_stats, key=attrgetter('name'))
+
+##########################################
+# Cursor Join statistics
+##########################################
+join_stats = [
+    JoinStat('accesses', 'accesses'),
+    JoinStat('actual_count', 'actual count of items'),
+    JoinStat('bloom_false_positive', 'bloom filter false positives'),
+]
+
+join_stats = sorted(join_stats, key=attrgetter('name'))
