@@ -6,6 +6,12 @@ var name = "rs_auth1";
 var port = allocatePorts(5);
 var path = "jstests/libs/";
 
+// These keyFiles have their permissions set to 600 later in the test.
+var key1_600 = path+"key1";
+var key2_600 = path+"key2";
+
+// This keyFile has its permissions set to 644 later in the test.
+var key1_644 = path+"key1_644";
 
 print("try starting mongod with auth");
 var m = MongoRunner.runMongod({auth : "", port : port[4], dbpath : MongoRunner.dataDir + "/wrong-auth"});
@@ -16,23 +22,16 @@ MongoRunner.stopMongod(m);
 
 
 print("reset permissions");
-run("chmod", "644", path+"key1");
-run("chmod", "644", path+"key2");
+run("chmod", "644", key1_644);
 
 
 print("try starting mongod");
-m = runMongoProgram( "mongod", "--keyFile", path+"key1", "--port", port[0], "--dbpath", MongoRunner.dataPath + name);
+m = runMongoProgram( "mongod", "--keyFile", key1_644, "--port", port[0], "--dbpath", MongoRunner.dataPath + name);
 
 
 print("should fail with wrong permissions");
 assert.eq(m, _isWindows()? 100 : 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
 MongoRunner.stopMongod(port[0]);
-
-
-print("change permissions on #1 & #2");
-run("chmod", "600", path+"key1");
-run("chmod", "600", path+"key2");
-
 
 print("add a user to server0: foo");
 m = MongoRunner.runMongod({dbpath: MongoRunner.dataPath + name + "-0"});
@@ -44,11 +43,11 @@ MongoRunner.stopMongod(m);
 print("start up rs");
 var rs = new ReplSetTest({"name" : name, "nodes" : 3, "startPort" : port[0]});
 print("restart 0 with keyFile");
-m = rs.restart(0, {"keyFile" : path+"key1"});
+m = rs.restart(0, {"keyFile" : key1_600});
 print("restart 1 with keyFile");
-rs.start(1, {"keyFile" : path+"key1"});
+rs.start(1, {"keyFile" : key1_600});
 print("restart 2 with keyFile");
-rs.start(2, {"keyFile" : path+"key1"});
+rs.start(2, {"keyFile" : key1_600});
 
 var result = m.getDB("admin").auth("foo", "bar");
 assert.eq(result, 1, "login failed");
@@ -116,7 +115,7 @@ for (var i=0; i<1000; i++) {
 assert.writeOK(bulk.execute({ w: 2 }));
 
 print("resync");
-rs.restart(mId, {"keyFile" : path+"key1"});
+rs.restart(mId, {"keyFile" : key1_600});
 master = rs.getMaster();
 
 print("add some more data 2");
@@ -131,7 +130,7 @@ var conn = MongoRunner.runMongod({dbpath: MongoRunner.dataPath + name + "-3",
                                   port: port[3],
                                   replSet: "rs_auth1",
                                   oplogSize: 2,
-                                  keyFile: path + "key2"});
+                                  keyFile: key2_600});
 
 
 master.getDB("admin").auth("foo", "bar");
@@ -167,7 +166,7 @@ var conn = MongoRunner.runMongod({dbpath: MongoRunner.dataPath + name + "-3",
                                   port: port[3],
                                   replSet: "rs_auth1",
                                   oplogSize: 2,
-                                  keyFile: path + "key1"});
+                                  keyFile: key1_600});
 
 wait(function() {
     try {
