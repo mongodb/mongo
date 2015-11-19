@@ -38,6 +38,29 @@ variables:
       run_multiple_jobs: false
       max_jobs: 0  # If set in combination with run_multiple_jobs, will cap the number of jobs used.
 
+- &run_jstestfuzz_tests
+  func: "run tests"
+  # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
+  # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
+  # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
+  # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
+  timeout_secs: 1800
+  vars:
+    resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
+    should_shuffle: false
+
+# Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
+- &jstestfuzz_template
+  name: jstestfuzz_template
+  exec_timeout_secs: 7200 # Time out the task if it runs for more than 2 hours.
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - *run_jstestfuzz_tests
+
+
 - &debug_symbol_variants
   - enterprise-linux-64-amazon-ami
   - enterprise-rhel-57-64-bit
@@ -583,59 +606,49 @@ tasks:
           set -o verbose
           ${scons|scons} ${compile_flags|} lint
 
-## jstestfuzz ##
-- name: jstestfuzz
-  exec_timeout_secs: 7200 # Time out the task if it runs for more than 2 hours.
-  depends_on:
-  - name: compile
+## jstestfuzz mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz
   commands:
-    - func: "do setup"
-    - func: "run jstestfuzz"
-    - func: "run tests"
-      # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
-      # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
-      # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
-      # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
-      timeout_secs: 1800
-      vars:
-        resmoke_args: --suites=jstestfuzz
-        should_shuffle: false
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      resmoke_args: --suites=jstestfuzz --storageEngine=mmapv1
+      should_shuffle: false
+
+## jstestfuzz WT ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_WT
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      resmoke_args: --suites=jstestfuzz --storageEngine=wiredTiger
+      should_shuffle: false
 
 ## jstestfuzz replica set ##
-- name: jstestfuzz_replication_WT
-  exec_timeout_secs: 7200 # Time out the task if it runs for more than 2 hours.
-  depends_on:
-  - name: compile
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_WT
   commands:
-    - func: "do setup"
-    - func: "run jstestfuzz"
-    - func: "run tests"
-      # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
-      # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
-      # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
-      # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
-      timeout_secs: 1800
-      vars:
-        resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger
-        should_shuffle: false
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger
+      should_shuffle: false
 
 ## jstestfuzz sharded cluster ##
-- name: jstestfuzz_sharded_WT
-  exec_timeout_secs: 7200 # Time out the task if it runs for more than 2 hours.
-  depends_on:
-  - name: compile
+- <<: *jstestfuzz_template
+  name: jstestfuzz_sharded_WT
   commands:
-    - func: "do setup"
-    - func: "run jstestfuzz"
-    - func: "run tests"
-      # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
-      # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
-      # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
-      # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
-      timeout_secs: 1800
-      vars:
-        resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger
-        should_shuffle: false
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger
+      should_shuffle: false
 
 ## unit tests ##
 - <<: *task_template
@@ -2211,6 +2224,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2412,6 +2426,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2468,6 +2483,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: noPassthrough_WT
@@ -2545,6 +2561,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mongosTest
@@ -2646,6 +2663,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2732,6 +2750,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_WT_ese
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2820,6 +2839,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2981,6 +3001,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3076,6 +3097,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3226,6 +3248,7 @@ buildvariants:
   - name: sharding_WT_ese
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3285,6 +3308,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3657,6 +3681,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3747,6 +3772,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3834,6 +3860,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3908,6 +3935,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4010,6 +4038,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4112,6 +4141,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4193,6 +4223,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4240,6 +4271,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4291,6 +4323,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
@@ -4363,6 +4396,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4440,6 +4474,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
@@ -4512,6 +4547,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4670,6 +4706,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4742,6 +4779,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4825,6 +4863,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: bulk_gle_passthrough
@@ -4869,6 +4908,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: bulk_gle_passthrough
@@ -5066,6 +5106,7 @@ buildvariants:
   tasks:
   - name: compile
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: unittests
@@ -5123,6 +5164,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
+  - name: jstestfuzz_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
