@@ -317,6 +317,11 @@ connection_stats = [
             'no_clear,no_scale'),
     TxnStat('txn_pinned_range',
         'transaction range of IDs currently pinned', 'no_clear,no_scale'),
+    TxnStat('txn_pinned_snapshot_range',
+        'transaction range of IDs currently pinned by named snapshots',
+            'no_clear,no_scale'),
+    TxnStat('txn_snapshots_created', 'number of named snapshots created'),
+    TxnStat('txn_snapshots_dropped', 'number of named snapshots dropped'),
     TxnStat('txn_rollback', 'transactions rolled back'),
     TxnStat('txn_sync', 'transaction sync calls'),
 

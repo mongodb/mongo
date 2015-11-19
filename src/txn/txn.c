@@ -653,15 +653,20 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	WT_TXN_GLOBAL *txn_global;
 	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS **stats;
-	uint64_t checkpoint_pinned;
+	uint64_t checkpoint_pinned, snapshot_pinned;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 	stats = conn->stats;
 	checkpoint_pinned = txn_global->checkpoint_pinned;
+	snapshot_pinned = txn_global->nsnap_oldest_id;
 
 	WT_STAT_SET(session, stats, txn_pinned_range,
 	   txn_global->current - txn_global->oldest_id);
+
+	WT_STAT_SET(session, stats, txn_pinned_snapshot_range,
+	    snapshot_pinned == WT_TXN_NONE ?
+	    0 : txn_global->current - snapshot_pinned);
 
 	WT_STAT_SET(session, stats, txn_pinned_checkpoint_range,
 	    checkpoint_pinned == WT_TXN_NONE ?
