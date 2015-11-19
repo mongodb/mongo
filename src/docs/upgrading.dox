@@ -1,6 +1,6 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_262 Upgrading to Version 2.7.0
+@section version_270 Upgrading to Version 2.7.0
 
 <dl>
 <dt>Change to config_base=false</dt>
