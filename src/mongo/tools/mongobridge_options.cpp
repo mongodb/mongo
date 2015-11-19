@@ -26,12 +26,16 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kBridge
+
 #include "mongo/tools/mongobridge_options.h"
 
+#include <algorithm>
 #include <iostream>
 
 #include "mongo/base/status.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/log.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
@@ -47,12 +51,15 @@ Status addMongoBridgeOptions(moe::OptionSection* options) {
 
     options->addOptionChaining("dest", "dest", moe::String, "URI of remote MongoDB process");
 
+    options->addOptionChaining("verbose", "verbose", moe::String, "log more verbose output")
+        .setImplicit(moe::Value(std::string("v")));
+
     return Status::OK();
 }
 
 void printMongoBridgeHelp(std::ostream* out) {
-    *out << "Usage: mongobridge --port <port> --dest <dest> [ --seed <seed> ] [ --help ]"
-         << std::endl;
+    *out << "Usage: mongobridge --port <port> --dest <dest> [ --seed <seed> ] [ --verbose <vvv> ]"
+            " [ --help ]" << std::endl;
     *out << moe::startupOptions.helpString();
     *out << std::flush;
 }
@@ -68,11 +75,11 @@ bool handlePreValidationMongoBridgeOptions(const moe::Environment& params) {
 Status storeMongoBridgeOptions(const moe::Environment& params,
                                const std::vector<std::string>& args) {
     if (!params.count("port")) {
-        return Status(ErrorCodes::BadValue, "Missing required option: \"--port\"");
+        return {ErrorCodes::BadValue, "Missing required option: --port"};
     }
 
     if (!params.count("dest")) {
-        return Status(ErrorCodes::BadValue, "Missing required option: \"--dest\"");
+        return {ErrorCodes::BadValue, "Missing required option: --dest"};
     }
 
     mongoBridgeGlobalParams.port = params["port"].as<int>();
@@ -83,6 +90,16 @@ Status storeMongoBridgeOptions(const moe::Environment& params,
         mongoBridgeGlobalParams.seed = seedSource->nextInt64();
     } else {
         mongoBridgeGlobalParams.seed = static_cast<int64_t>(params["seed"].as<long>());
+    }
+
+    if (params.count("verbose")) {
+        std::string verbosity = params["verbose"].as<std::string>();
+        if (std::any_of(verbosity.cbegin(), verbosity.cend(), [](char ch) { return ch != 'v'; })) {
+            return {ErrorCodes::BadValue,
+                    "The string for the --verbose option cannot contain characters other than 'v'"};
+        }
+        logger::globalLogDomain()->setMinimumLoggedSeverity(
+            logger::LogSeverity::Debug(verbosity.length()));
     }
 
     return Status::OK();
