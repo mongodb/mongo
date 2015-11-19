@@ -186,34 +186,16 @@ __wt_curtable_get_key(WT_CURSOR *cursor, ...)
 int
 __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 {
-	WT_CURSOR *primary;
-	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
-	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 
-	ctable = (WT_CURSOR_TABLE *)cursor;
-	primary = *ctable->cg_cursors;
-	CURSOR_API_CALL(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(primary);
-
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
-		ret = __wt_schema_project_merge(session,
-		    ctable->cg_cursors, ctable->plan,
-		    cursor->value_format, &cursor->value);
-		if (ret == 0) {
-			item = va_arg(ap, WT_ITEM *);
-			item->data = cursor->value.data;
-			item->size = cursor->value.size;
-		}
-	} else
-		ret = __wt_schema_project_out(session,
-		    ctable->cg_cursors, ctable->plan, ap);
-	va_end(ap);
+	JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
+	WT_ERR(__wt_curtable_get_valuev(cursor, ap));
 
-err:	API_END_RET(session, ret);
+err:	va_end(ap);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -264,7 +246,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, set_value, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON)) {
@@ -332,7 +314,7 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL(a, session, compare, NULL);
+	JOINABLE_CURSOR_API_CALL(a, session, compare, NULL);
 
 	/*
 	 * Confirm both cursors refer to the same source and have keys, then
@@ -362,7 +344,7 @@ __curtable_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, next, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
 	APPLY_CG(ctable, next);
 
 err:	API_END_RET(session, ret);
@@ -383,7 +365,7 @@ __curtable_next_random(WT_CURSOR *cursor)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, next, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
 	cp = ctable->cg_cursors;
 
 	/* Split out the first next, it retrieves the random record. */
@@ -414,7 +396,7 @@ __curtable_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, prev, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, prev, NULL);
 	APPLY_CG(ctable, prev);
 
 err:	API_END_RET(session, ret);
@@ -432,7 +414,7 @@ __curtable_reset(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, reset, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, reset, NULL);
 	APPLY_CG(ctable, reset);
 
 err:	API_END_RET(session, ret);
@@ -450,7 +432,7 @@ __curtable_search(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, search, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
 	APPLY_CG(ctable, search);
 
 err:	API_END_RET(session, ret);
@@ -470,7 +452,7 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, search_near, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, search_near, NULL);
 	cp = ctable->cg_cursors;
 	primary = *cp;
 	WT_ERR(primary->search_near(primary, exact));
@@ -501,7 +483,7 @@ __curtable_insert(WT_CURSOR *cursor)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
+	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
 	WT_ERR(__curtable_open_indices(ctable));
 
 	/*
@@ -520,29 +502,38 @@ __curtable_insert(WT_CURSOR *cursor)
 	if (ctable->table->nindices > 0)
 		F_CLR(primary, WT_CURSTD_OVERWRITE);
 	ret = primary->insert(primary);
-	F_SET(primary, flag_orig);
 
-	if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
-		/*
-		 * !!!
-		 * The insert failure clears these flags, but does not touch the
-		 * items.  We could make a copy each time for overwrite cursors,
-		 * but for now we just reset the flags.
-		 */
-		F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
-		ret = __curtable_update(cursor);
-		goto err;
+	/*
+	 * !!!
+	 * WT_CURSOR.insert clears the set internally/externally flags
+	 * but doesn't touch the items. We could make a copy each time
+	 * for overwrite cursors, but for now we just reset the flags.
+	 */
+	F_SET(primary, flag_orig | WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+
+	if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+		WT_ERR(__curtable_update(cursor));
+	else {
+		WT_ERR(ret);
+
+		for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
+			(*cp)->recno = primary->recno;
+			WT_ERR((*cp)->insert(*cp));
+		}
+
+		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), false));
 	}
-	WT_ERR(ret);
 
-	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
-		(*cp)->recno = primary->recno;
-		WT_ERR((*cp)->insert(*cp));
-	}
-
-	WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), false));
+	/*
+	 * WT_CURSOR.insert doesn't leave the cursor positioned, and the
+	 * application may want to free the memory used to configure the
+	 * insert; don't read that memory again (matching the underlying
+	 * file object cursor insert semantics).
+	 */
+	F_CLR(primary, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
+
 	return (ret);
 }
 
@@ -559,7 +550,7 @@ __curtable_update(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
+	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
 	WT_ERR(__curtable_open_indices(ctable));
 
 	/*
@@ -610,7 +601,7 @@ __curtable_remove(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_REMOVE_API_CALL(cursor, session, NULL);
+	JOINABLE_CURSOR_REMOVE_API_CALL(cursor, session, NULL);
 	WT_ERR(__curtable_open_indices(ctable));
 
 	/* Find the old record so it can be removed from indices */
@@ -650,6 +641,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 	/* Open any indices. */
 	WT_RET(__curtable_open_indices(ctable));
 	WT_RET(__wt_scr_alloc(session, 128, &key));
+	WT_STAT_FAST_DATA_INCR(session, cursor_truncate);
 
 	/*
 	 * Step through the cursor range, removing the index entries.
@@ -721,7 +713,7 @@ __curtable_close(WT_CURSOR *cursor)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, close, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, close, NULL);
 
 	if (ctable->cg_cursors != NULL)
 		for (i = 0, cp = ctable->cg_cursors;
@@ -844,7 +836,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
  */
 int
 __wt_curtable_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
 	    __wt_curtable_get_key,	/* get-key */
@@ -935,7 +927,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	}
 
 	WT_ERR(__wt_cursor_init(
-	    cursor, cursor->internal_uri, NULL, cfg, cursorp));
+	    cursor, cursor->internal_uri, owner, cfg, cursorp));
 
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
 		WT_ERR(__wt_json_column_init(cursor, table->key_format,

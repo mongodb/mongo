@@ -705,10 +705,15 @@ wiredtiger_open = wiredtiger_open_common + [
     Config('in_memory', 'false', r'''
         keep data in-memory only, minimize disk I/O''',
         type='boolean', undoc=True),
+    Config('use_environment', 'true', r'''
+        use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
+        variables if the process is not running with special privileges.
+        See @ref home for more information''',
+        type='boolean'),
     Config('use_environment_priv', 'false', r'''
         use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
-        variables regardless of whether or not the process is running
-        with special privileges.  See @ref home for more information''',
+        variables even if the process is running with special privileges.
+        See @ref home for more information''',
         type='boolean'),
 ]
 
@@ -765,6 +770,33 @@ methods = {
     Config('remove_files', 'true', r'''
         should the underlying files be removed?''',
         type='boolean'),
+]),
+
+'WT_SESSION.join' : Method([
+    Config('compare', '"eq"', r'''
+        modifies the set of items to be returned so that the index key
+        satisfies the given comparison relative to the key set in this
+        cursor''',
+        choices=['eq', 'ge', 'gt', 'le', 'lt']),
+    Config('count', '', r'''
+        set an approximate count of the elements that would be included in
+        the join.  This is used in sizing the bloom filter, and also influences
+        evaluation order for cursors in the join. When the count is equal
+        for multiple bloom filters in a composition of joins, the bloom
+        filter may be shared''',
+        type='int'),
+    Config('bloom_bit_count', '16', r'''
+        the number of bits used per item for the bloom filter''',
+        min='2', max='1000'),
+    Config('bloom_hash_count', '8', r'''
+        the number of hash values per item for the bloom filter''',
+        min='2', max='100'),
+    Config('strategy', '', r'''
+        when set to bloom, a bloom filter is created and populated for
+        this index. This has an up front cost but may reduce the number
+        of accesses to the main table when iterating the joined cursor.
+        The bloom setting requires that count be set''',
+        choices=['bloom', 'default']),
 ]),
 
 'WT_SESSION.log_flush' : Method([

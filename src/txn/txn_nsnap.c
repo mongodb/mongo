@@ -47,6 +47,7 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 		    TAILQ_NEXT(found, q)->snap_min : WT_TXN_NONE;
 	TAILQ_REMOVE(&txn_global->nsnaph, found, q);
 	__nsnap_destroy(session, found);
+	WT_STAT_FAST_CONN_INCR(session, txn_snapshots_dropped);
 
 	return (ret);
 }
@@ -111,6 +112,7 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, bool inclusive)
 		WT_ASSERT(session, nsnap != NULL);
 		TAILQ_REMOVE(&txn_global->nsnaph, nsnap, q);
 		__nsnap_destroy(session, nsnap);
+		WT_STAT_FAST_CONN_INCR(session, txn_snapshots_dropped);
 	/* Last will be NULL in the all case so it will never match */
 	} while (nsnap != last && !TAILQ_EMPTY(&txn_global->nsnaph));
 
@@ -176,6 +178,7 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	if (TAILQ_EMPTY(&txn_global->nsnaph))
 		txn_global->nsnap_oldest_id = nsnap_new->snap_min;
 	TAILQ_INSERT_TAIL(&txn_global->nsnaph, nsnap_new, q);
+	WT_STAT_FAST_CONN_INCR(session, txn_snapshots_created);
 	nsnap_new = NULL;
 
 err:	if (started_txn)

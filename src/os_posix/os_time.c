@@ -9,22 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_seconds --
- *	Return the seconds since the Epoch.
- */
-int
-__wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
-{
-	struct timespec t;
-
-	WT_RET(__wt_epoch(session, &t));
-
-	*timep = t.tv_sec;
-
-	return (0);
-}
-
-/*
  * __wt_epoch --
  *	Return the time since the Epoch.
  */
@@ -44,7 +28,7 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 	WT_SYSCALL_RETRY(gettimeofday(&v, NULL), ret);
 	if (ret == 0) {
 		tsp->tv_sec = v.tv_sec;
-		tsp->tv_nsec = v.tv_usec * 1000;
+		tsp->tv_nsec = v.tv_usec * WT_THOUSAND;
 		return (0);
 	}
 	WT_RET_MSG(session, ret, "gettimeofday");

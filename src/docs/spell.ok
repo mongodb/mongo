@@ -197,6 +197,7 @@ endinternal
 english
 env
 eof
+eq
 erlang
 errno
 exe
@@ -220,6 +221,7 @@ freelist
 fsync
 gcc
 gdbm
+ge
 getKey
 getValue
 getopt
@@ -260,6 +262,7 @@ keyvalue
 kvs
 lang
 lastname
+le
 len
 leveldb
 li

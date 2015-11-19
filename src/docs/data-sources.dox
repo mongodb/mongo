@@ -13,6 +13,10 @@ The following are the builtin basic cursor types:
 	index cursor,
 	key=index key\, value=table value(s) with optional projection
 	of columns}
+@row{<tt>join:table:\<table name\>[\<projection\>]</tt>,
+	join cursor,
+	key=table key\, value=table value(s) with optional projection
+	of columns}
 </table>
 Some administrative tasks can be accomplished using the following special
 cursor types that give access to data managed by WiredTiger:

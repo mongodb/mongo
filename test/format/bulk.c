@@ -36,7 +36,8 @@ wts_load(void)
 	WT_ITEM key, value;
 	WT_SESSION *session;
 	uint8_t *keybuf, *valbuf;
-	int is_bulk, ret;
+	bool is_bulk;
+	int ret;
 
 	conn = g.wts_conn;
 	keybuf = valbuf = NULL;
@@ -49,12 +50,23 @@ wts_load(void)
 		    "=============== bulk load start ===============");
 
 	/*
-	 * Avoid bulk load with KVS (there's no bulk load support for a
-	 * data-source); avoid bulk load with a custom collator, because
-	 * the order of insertion will not match the collation order.
+	 * No bulk load with data-sources.
+	 *
+	 * XXX
+	 * No bulk load with in-memory configurations (currently, WiredTiger
+	 * fails in the column-store case unless you specify the key).
+	 *
+	 * No bulk load with custom collators, the order of insertion will not
+	 * match the collation order.
 	 */
-	is_bulk = !g.c_reverse &&
-	    !DATASOURCE("kvsbdb") && !DATASOURCE("helium");
+	is_bulk = true;
+	if (DATASOURCE("kvsbdb") && DATASOURCE("helium"))
+		is_bulk = false;
+	if (g.c_in_memory)
+		is_bulk = false;
+	if (g.c_reverse)
+		is_bulk = false;
+
 	if ((ret = session->open_cursor(session, g.uri, NULL,
 	    is_bulk ? "bulk" : NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");

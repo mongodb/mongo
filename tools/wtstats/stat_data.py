@@ -32,6 +32,7 @@ no_scale_per_second_list = [
     'transaction: transaction checkpoint total time (msecs)',
     'transaction: transaction range of IDs currently pinned',
     'transaction: transaction range of IDs currently pinned by a checkpoint',
+    'transaction: transaction range of IDs currently pinned by named snapshots',
     'block-manager: checkpoint size',
     'block-manager: file allocation unit size',
     'block-manager: file magic number',
@@ -95,6 +96,7 @@ no_clear_list = [
     'transaction: transaction checkpoint total time (msecs)',
     'transaction: transaction range of IDs currently pinned',
     'transaction: transaction range of IDs currently pinned by a checkpoint',
+    'transaction: transaction range of IDs currently pinned by named snapshots',
     'btree: btree checkpoint generation',
     'session: open cursor count',
 ]

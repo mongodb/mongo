@@ -64,7 +64,7 @@ usage(void)
  * the table until it is killed by the parent.
  */
 static void
-fill_db()
+fill_db(void)
 {
 	FILE *fp;
 	WT_CONNECTION *conn;

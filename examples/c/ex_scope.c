@@ -46,15 +46,16 @@ static int
 cursor_scope_ops(WT_CURSOR *cursor)
 {
 	struct {
+		const char *op;
 		const char *key;
 		const char *value;
 		int (*apply)(WT_CURSOR *);
 	} *op, ops[] = {
-		{ "key1", "value1", cursor->insert, },
-		{ "key1", "value2", cursor->update, },
-		{ "key1", "value2", cursor->search, },
-		{ "key1", "value2", cursor->remove, },
-		{ NULL, NULL, NULL }
+		{ "insert", "key1", "value1", cursor->insert, },
+		{ "update", "key1", "value2", cursor->update, },
+		{ "search", "key1", "value2", cursor->search, },
+		{ "remove", "key1", "value2", cursor->remove, },
+		{ NULL, NULL, NULL, NULL }
 	};
 	WT_SESSION *session;
 	const char *key, *value;
@@ -73,61 +74,96 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		cursor->set_value(cursor, valuebuf);
 
 		/*
-		 * The application must keep the key and value memory valid
-		 * until the next operation that positions the cursor.
+		 * The application must keep key and value memory valid until
+		 * the next operation that positions the cursor, modifies the
+		 * data, or resets or closes the cursor.
+		 *
 		 * Modifying either the key or value buffers is not permitted.
 		 */
 
 		/* Apply the operation (insert, update, search or remove). */
 		if ((ret = op->apply(cursor)) != 0) {
-			fprintf(stderr, "Error performing the operation: %s\n",
-			    session->strerror(session, ret));
+			fprintf(stderr,
+			    "%s: error performing the operation: %s\n",
+			    op->op, session->strerror(session, ret));
 			return (ret);
 		}
 
 		/*
-		 * Except for WT_CURSOR::insert, the cursor has been positioned
-		 * and no longer references application memory, so application
-		 * buffers can be safely overwritten.
+		 * The cursor no longer references application memory, so
+		 * application buffers can be safely overwritten.
 		 */
-		if (op->apply != cursor->insert) {
-			strcpy(keybuf, "no key");
-			strcpy(valuebuf, "no value");
-		}
+		strcpy(keybuf, "no key");
+		strcpy(valuebuf, "no value");
 
 		/*
 		 * Check that get_key/value behave as expected after the
 		 * operation.
 		 */
-		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
-		    (op->apply != cursor->remove &&
-		    (ret = cursor->get_value(cursor, &value)) != 0)) {
-			fprintf(stderr, "Error in get_key/value: %s\n",
-			     session->strerror(session, ret));
-			return (ret);
+		if (op->apply == cursor->insert) {
+			/*
+			 * WT_CURSOR::insert no longer references application
+			 * memory, but as it does not position the cursor, it
+			 * doesn't reference memory owned by the cursor, either.
+			 */
+			if ((ret = cursor->get_key(cursor, &key)) == 0 ||
+			    (ret = cursor->get_value(cursor, &value)) == 0) {
+				fprintf(stderr,
+				    "%s: error in s get_key/value: %s\n",
+				     op->op, session->strerror(session, ret));
+				return (ret);
+			}
+			continue;
+		}
+		if (op->apply == cursor->remove) {
+			/*
+			 * WT_CURSOR::remove no longer references application
+			 * memory; as it does not position the cursor, it will
+			 * reference key memory owned by the cursor, but has no
+			 * value.
+			 */
+			if ((ret = cursor->get_key(cursor, &key)) != 0 ||
+			    (ret = cursor->get_value(cursor, &value)) == 0) {
+				fprintf(stderr,
+				    "%s: error in get_key/value: %s\n",
+				     op->op, session->strerror(session, ret));
+				return (ret);
+			}
+		} else /* search, update */{
+			/*
+			 * WT_CURSOR::search and WT_CURSOR::update no longer
+			 * reference application memory; as they position the
+			 * cursor, they will reference key/value memory owned
+			 * by the cursor.
+			 */
+			if ((ret = cursor->get_key(cursor, &key)) != 0 ||
+			    (ret = cursor->get_value(cursor, &value)) != 0) {
+				fprintf(stderr,
+				    "%s: error in get_key/value: %s\n",
+				     op->op, session->strerror(session, ret));
+				return (ret);
+			}
 		}
 
 		/*
-		 * Except for WT_CURSOR::insert (which does not position the
-		 * cursor), the application now has pointers to memory owned
-		 * by the cursor.  Modifying the memory referenced by either
-		 * key or value is not permitted.
+		 * Modifying the memory referenced by either key or value is
+		 * not permitted.
+		 *
+		 * Check that the cursor's key and value are what we expect.
 		 */
-
-		/* Check that the cursor's key and value are what we expect. */
-		if (op->apply != cursor->insert)
-			if (key == keybuf ||
-			    (op->apply != cursor->remove &&
-			    value == valuebuf)) {
-				fprintf(stderr,
-				    "Cursor points at application memory!\n");
-				return (EINVAL);
-			}
+		if (key == keybuf ||
+		    (op->apply != cursor->remove && value == valuebuf)) {
+			fprintf(stderr,
+			    "%s: cursor points at application memory!\n",
+			    op->op);
+			return (EINVAL);
+		}
 
 		if (strcmp(key, op->key) != 0 ||
 		    (op->apply != cursor->remove &&
 		    strcmp(value, op->value) != 0)) {
-			fprintf(stderr, "Unexpected key / value!\n");
+			fprintf(stderr,
+			    "%s: unexpected key / value!\n", op->op);
 			return (EINVAL);
 		}
 		/*! [cursor scope operation] */

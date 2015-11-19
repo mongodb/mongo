@@ -34,6 +34,7 @@ static void	   config_compression(const char *);
 static void	   config_encryption(void);
 static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
+static void	   config_in_memory(void);
 static int	   config_is_perm(const char *);
 static void	   config_isolation(void);
 static void	   config_lrt(void);
@@ -56,6 +57,13 @@ config_setup(void)
 	config_clear();
 
 	/*
+	 * Periodically, run in-memory; don't do it on the first run, all our
+	 * smoke tests would hit it.
+	 */
+	if (!config_is_perm("in_memory") && g.run_cnt % 20 == 19)
+		g.c_in_memory = 1;
+
+	/*
 	 * Choose a data source type and a file type: they're interrelated (LSM
 	 * trees are only compatible with row-store) and other items depend on
 	 * them.
@@ -66,8 +74,11 @@ config_setup(void)
 			config_single("data_source=file", 0);
 			break;
 		case 2:
-			config_single("data_source=lsm", 0);
-			break;
+			if (!g.c_in_memory) {
+				config_single("data_source=lsm", 0);
+				break;
+			}
+			/* FALLTHROUGH */
 		case 3:
 			config_single("data_source=table", 0);
 			break;
@@ -147,6 +158,7 @@ config_setup(void)
 	config_compression("compression");
 	config_compression("logging_compression");
 	config_encryption();
+	config_in_memory();
 	config_isolation();
 	config_lrt();
 
@@ -301,6 +313,43 @@ config_encryption(void)
 }
 
 /*
+ * config_in_memory --
+ *	In-memory configuration.
+ */
+static void
+config_in_memory(void)
+{
+	if (g.c_in_memory == 0)
+		return;
+
+	/* Turn off a lot of stuff. */
+	if (!config_is_perm("backups"))
+		g.c_backups = 0;
+	if (!config_is_perm("checkpoints"))
+		g.c_checkpoints = 0;
+	if (!config_is_perm("compression"))
+		g.c_compression = 0;
+	if (!config_is_perm("logging"))
+		g.c_logging = 0;
+	if (!config_is_perm("salvage"))
+		g.c_salvage = 0;
+	if (!config_is_perm("verify"))
+		g.c_verify = 0;
+
+	/*
+	 * Ensure there is 250MB of cache per thread; keep keys/values small,
+	 * overflow items aren't an issue for in-memory configurations and it
+	 * keeps us from overflowing the cache.
+	 */
+	if (!config_is_perm("cache"))
+		g.c_cache = g.c_threads * 250;
+	if (!config_is_perm("key_max"))
+		g.c_value_max = 64;
+	if (!config_is_perm("value_max"))
+		g.c_value_max = 128;
+}
+
+/*
  * config_isolation --
  *	Isolation configuration.
  */
@@ -341,8 +390,8 @@ static void
 config_lrt(void)
 {
 	/*
-	 * The underlying engine doesn't support a lookaside file for
-	 * fixed-length column stores.
+	 * WiredTiger doesn't support a lookaside file for fixed-length column
+	 * stores.
 	 */
 	if (g.type == FIX) {
 		if (config_is_perm("long_running_txn"))

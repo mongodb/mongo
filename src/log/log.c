@@ -1313,7 +1313,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
 			__wt_spin_unlock(session, &log->log_slot_lock);
 		WT_ERR(__wt_cond_signal(session, conn->log_wrlsn_cond));
-		if (++yield_count < 1000)
+		if (++yield_count < WT_THOUSAND)
 			__wt_yield();
 		else
 			ret = __wt_cond_wait(session, log->log_write_cond, 200);

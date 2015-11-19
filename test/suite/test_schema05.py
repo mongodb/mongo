@@ -89,9 +89,10 @@ class test_schema05(wttest.WiredTigerTestCase):
         # Create self.nindices index files, each with a column from the CSV
         for i in range(0, self.nindices):
             si = str(i)
-            self.session.create("index:schema05:x" + si,
-                                "key_format=S,columns=(key),"
-                                "extractor=csv,app_metadata=" + si)
+            self.session.create('index:schema05:x' + si,
+                                'key_format=S,columns=(key),'
+                                'extractor=csv,app_metadata={"format" : "S",' +
+                                '"field" : "' + si + '"}')
 
     def drop_indices(self):
         for i in range(0, self.nindices):

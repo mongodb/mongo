@@ -138,6 +138,8 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	WT_ERR(__wt_txn_modify_ref(session, ref));
 
 	*skipp = true;
+	WT_STAT_FAST_CONN_INCR(session, rec_page_delete_fast);
+	WT_STAT_FAST_DATA_INCR(session, rec_page_delete_fast);
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (0);
 

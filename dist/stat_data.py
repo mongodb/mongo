@@ -67,6 +67,10 @@ class DhandleStat(Stat):
     prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
+class JoinStat(Stat):
+    prefix = ''  # prefix is inserted dynamically
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, JoinStat.prefix, desc, flags)
 class LogStat(Stat):
     prefix = 'log'
     def __init__(self, name, desc, flags=''):
@@ -199,7 +203,9 @@ connection_stats = [
         'eviction server populating queue, but not evicting pages'),
     CacheStat('cache_eviction_slow',
         'eviction server unable to reach eviction goal'),
-    CacheStat('cache_eviction_split', 'pages split during eviction'),
+    CacheStat('cache_eviction_split_internal',
+        'internal pages split during eviction'),
+    CacheStat('cache_eviction_split_leaf', 'leaf pages split during eviction'),
     CacheStat('cache_eviction_walk', 'pages walked for eviction'),
     CacheStat('cache_eviction_worker_evicting',
         'eviction worker thread evicting pages'),
@@ -278,6 +284,8 @@ connection_stats = [
     # Reconciliation statistics
     ##########################################
     RecStat('rec_pages', 'page reconciliation calls'),
+    RecStat('rec_page_delete', 'pages deleted'),
+    RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
     RecStat('rec_split_stashed_bytes',
         'split bytes currently awaiting free', 'no_clear,no_scale'),
@@ -309,6 +317,11 @@ connection_stats = [
             'no_clear,no_scale'),
     TxnStat('txn_pinned_range',
         'transaction range of IDs currently pinned', 'no_clear,no_scale'),
+    TxnStat('txn_pinned_snapshot_range',
+        'transaction range of IDs currently pinned by named snapshots',
+            'no_clear,no_scale'),
+    TxnStat('txn_snapshots_created', 'number of named snapshots created'),
+    TxnStat('txn_snapshots_dropped', 'number of named snapshots dropped'),
     TxnStat('txn_rollback', 'transactions rolled back'),
     TxnStat('txn_sync', 'transaction sync calls'),
 
@@ -349,6 +362,7 @@ connection_stats = [
     CursorStat('cursor_restart', 'cursor restarted searches'),
     CursorStat('cursor_search', 'cursor search calls'),
     CursorStat('cursor_search_near', 'cursor search near calls'),
+    CursorStat('cursor_truncate', 'truncate calls'),
     CursorStat('cursor_update', 'cursor update calls'),
 
     ##########################################
@@ -390,6 +404,7 @@ dsrc_stats = [
     CursorStat('cursor_restart', 'restarted searches'),
     CursorStat('cursor_search', 'search calls'),
     CursorStat('cursor_search_near', 'search near calls'),
+    CursorStat('cursor_truncate', 'truncate calls'),
     CursorStat('cursor_update', 'update calls'),
     CursorStat('cursor_update_bytes', 'cursor-update value bytes updated'),
 
@@ -476,7 +491,9 @@ dsrc_stats = [
         'data source pages selected for eviction unable to be evicted'),
     CacheStat('cache_eviction_hazard', 'hazard pointer blocked page eviction'),
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
-    CacheStat('cache_eviction_split', 'pages split during eviction'),
+    CacheStat('cache_eviction_split_internal',
+        'internal pages split during eviction'),
+    CacheStat('cache_eviction_split_leaf', 'leaf pages split during eviction'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
     CacheStat('cache_inmem_splittable',
         'in-memory page passed criteria to be split'),
@@ -518,6 +535,7 @@ dsrc_stats = [
     RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_overflow_value', 'overflow values written'),
     RecStat('rec_page_delete', 'pages deleted'),
+    RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_page_match', 'page checksum matches'),
     RecStat('rec_pages', 'page reconciliation calls'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
@@ -533,3 +551,14 @@ dsrc_stats = [
 ]
 
 dsrc_stats = sorted(dsrc_stats, key=attrgetter('name'))
+
+##########################################
+# Cursor Join statistics
+##########################################
+join_stats = [
+    JoinStat('accesses', 'accesses'),
+    JoinStat('actual_count', 'actual count of items'),
+    JoinStat('bloom_false_positive', 'bloom filter false positives'),
+]
+
+join_stats = sorted(join_stats, key=attrgetter('name'))

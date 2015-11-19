@@ -199,7 +199,8 @@ __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain,
 		    "[%" PRIuMAX ":%" PRIuMAX "][%s]",
-		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000, tid);
+		    (uintmax_t)ts.tv_sec,
+		    (uintmax_t)ts.tv_nsec / WT_THOUSAND, tid);
 		p = wlen >= remain ? end : p + wlen;
 		prefix_cnt = 1;
 	}

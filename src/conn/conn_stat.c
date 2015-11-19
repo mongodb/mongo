@@ -83,7 +83,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
 	/* Only start the server if wait time is non-zero */
 	*runp = cval.val != 0;
-	conn->stat_usecs = (uint64_t)cval.val * 1000000;
+	conn->stat_usecs = (uint64_t)cval.val * WT_MILLION;
 
 	WT_RET(__wt_config_gets(
 	    session, cfg, "statistics_log.on_close", &cval));
@@ -154,7 +154,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 	WT_DECL_RET;
 	int64_t *stats;
 	int i;
-	const char *uri;
+	const char *desc, *uri;
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
 
@@ -175,16 +175,19 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 	 * If we don't find an underlying object, silently ignore it, the object
 	 * may exist only intermittently.
 	 */
-	switch (ret = __wt_curstat_open(session, uri, cfg, &cursor)) {
+	switch (ret = __wt_curstat_open(session, uri, NULL, cfg, &cursor)) {
 	case 0:
 		cst = (WT_CURSOR_STAT *)cursor;
-		for (stats = cst->stats, i = 0; i <  cst->stats_count; ++i)
+		for (stats = cst->stats, i = 0; i <  cst->stats_count; ++i) {
+			if (conn_stats)
+				WT_ERR(__wt_stat_connection_desc(cst, i,
+				    &desc));
+			else
+				WT_ERR(__wt_stat_dsrc_desc(cst, i, &desc));
 			WT_ERR(__wt_fprintf(conn->stat_fp,
 			    "%s %" PRId64 " %s %s\n",
-			    conn->stat_stamp, stats[i],
-			    name, conn_stats ?
-			    __wt_stat_connection_desc(i) :
-			    __wt_stat_dsrc_desc(i)));
+			    conn->stat_stamp, stats[i], name, desc));
+		}
 		WT_ERR(cursor->close(cursor));
 		break;
 	case EBUSY:

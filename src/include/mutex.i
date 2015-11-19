@@ -18,7 +18,7 @@
 
 /* Default to spinning 1000 times before yielding. */
 #ifndef WT_SPIN_COUNT
-#define	WT_SPIN_COUNT 1000
+#define	WT_SPIN_COUNT WT_THOUSAND
 #endif
 
 /*
@@ -300,7 +300,7 @@ __wt_fair_lock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 		 * situation happens if there are more threads than cores in the
 		 * system and we're thrashing on shared resources.
 		 */
-		if (++pause_cnt < 1000)
+		if (++pause_cnt < WT_THOUSAND)
 			WT_PAUSE();
 		else
 			__wt_sleep(0, 10);
@@ -329,7 +329,7 @@ __wt_fair_unlock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_fair_islocked --
- *	Test whether the lock is currently held
+ *	Test whether the lock is currently held.
  */
 static inline bool
 __wt_fair_islocked(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)

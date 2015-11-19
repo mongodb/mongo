@@ -111,7 +111,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * other schema level operations will return EBUSY, even though
 		 * we're dropping the schema lock here.
 		 */
-		if (i % 1000 == 0) {
+		if (i % WT_THOUSAND == 0) {
 			WT_WITHOUT_LOCKS(session, ret =
 			    __wt_lsm_manager_clear_tree(session, lsm_tree));
 			WT_RET(ret);
@@ -335,6 +335,11 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		return (exclusive ? EEXIST : 0);
 	}
 	WT_RET_NOTFOUND_OK(ret);
+
+	/* In-memory configurations don't make sense for LSM. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_RET_MSG(session, EINVAL,
+		    "LSM trees not supported by in-memory configurations");
 
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
 	if (WT_STRING_MATCH("r", cval.str, cval.len))
@@ -747,7 +752,7 @@ __wt_lsm_tree_throttle(
 		WT_ASSERT(session,
 		    WT_TIMECMP(last_chunk->create_ts, ondisk->create_ts) >= 0);
 		timediff =
-		    WT_TIMEDIFF(last_chunk->create_ts, ondisk->create_ts);
+		    WT_TIMEDIFF_NS(last_chunk->create_ts, ondisk->create_ts);
 		lsm_tree->ckpt_throttle =
 		    (in_memory - 2) * timediff / (20 * record_count);
 
@@ -783,8 +788,8 @@ __wt_lsm_tree_throttle(
 	}
 
 	/* Put an upper bound of 1s on both throttle calculations. */
-	lsm_tree->ckpt_throttle = WT_MIN(1000000, lsm_tree->ckpt_throttle);
-	lsm_tree->merge_throttle = WT_MIN(1000000, lsm_tree->merge_throttle);
+	lsm_tree->ckpt_throttle = WT_MIN(WT_MILLION, lsm_tree->ckpt_throttle);
+	lsm_tree->merge_throttle = WT_MIN(WT_MILLION, lsm_tree->merge_throttle);
 
 	/*
 	 * Update our estimate of how long each in-memory chunk stays active.
@@ -798,15 +803,16 @@ __wt_lsm_tree_throttle(
 		WT_ASSERT(session, prev_chunk->generation == 0);
 		WT_ASSERT(session, WT_TIMECMP(
 		    last_chunk->create_ts, prev_chunk->create_ts) >= 0);
-		timediff =
-		    WT_TIMEDIFF(last_chunk->create_ts, prev_chunk->create_ts);
+		timediff = WT_TIMEDIFF_NS(
+		    last_chunk->create_ts, prev_chunk->create_ts);
 		WT_ASSERT(session,
 		    WT_TIMECMP(prev_chunk->create_ts, ondisk->create_ts) >= 0);
-		oldtime = WT_TIMEDIFF(prev_chunk->create_ts, ondisk->create_ts);
+		oldtime = WT_TIMEDIFF_NS(
+		    prev_chunk->create_ts, ondisk->create_ts);
 		if (timediff < 10 * oldtime)
 			lsm_tree->chunk_fill_ms =
 			    (3 * lsm_tree->chunk_fill_ms +
-			    timediff / 1000000) / 4;
+			    timediff / WT_MILLION) / 4;
 	}
 }
 
