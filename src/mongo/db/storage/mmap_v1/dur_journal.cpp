@@ -676,7 +676,11 @@ void Journal::removeUnneededJournalFiles() {
     while (!_oldJournalFiles.empty()) {
         JFile f = _oldJournalFiles.front();
 
-        if (f.lastEventTimeMs < _lastFlushTime + ExtraKeepTimeMs) {
+        // 'f.lastEventTimeMs' is the timestamp of the last thing in the journal file.
+        // '_lastFlushTime' is the start time of the last successful flush of the data files to
+        // disk. We can't delete this journal file until the last successful flush time is at least
+        // 10 seconds after 'f.lastEventTimeMs'.
+        if (f.lastEventTimeMs + ExtraKeepTimeMs < _lastFlushTime) {
             // eligible for deletion
             boost::filesystem::path p(f.filename);
             log() << "old journal file will be removed: " << f.filename << endl;
