@@ -67,34 +67,30 @@ CollectionInfo::CollectionInfo(OperationContext* txn,
     : _configOpTime(std::move(opTime)) {
     _dropped = coll.getDropped();
 
-    shard(txn, new ChunkManager(coll));
+    // Do this *first* so we're invisible to everyone else
+    std::unique_ptr<ChunkManager> manager(stdx::make_unique<ChunkManager>(coll));
+    manager->loadExistingRanges(txn, nullptr);
+
+    // Collections with no chunks are unsharded, no matter what the collections entry says. This
+    // helps prevent errors when dropping in a different process.
+    if (manager->numChunks() != 0) {
+        useChunkManager(std::move(manager));
+    } else {
+        warning() << "no chunks found for collection " << manager->getns()
+                  << ", assuming unsharded";
+        unshard();
+    }
+
     _dirty = false;
 }
 
-CollectionInfo::~CollectionInfo() {}
+CollectionInfo::~CollectionInfo() = default;
 
 void CollectionInfo::resetCM(ChunkManager* cm) {
     invariant(cm);
     invariant(_cm);
 
     _cm.reset(cm);
-}
-
-void CollectionInfo::shard(OperationContext* txn, ChunkManager* manager) {
-    // Do this *first* so we're invisible to everyone else
-    manager->loadExistingRanges(txn, nullptr);
-
-    // Collections with no chunks are unsharded, no matter what the collections entry says
-    // This helps prevent errors when dropping in a different process
-    //
-
-    if (manager->numChunks() != 0) {
-        useChunkManager(ChunkManagerPtr(manager));
-    } else {
-        warning() << "no chunks found for collection " << manager->getns()
-                  << ", assuming unsharded";
-        unshard();
-    }
 }
 
 void CollectionInfo::unshard() {

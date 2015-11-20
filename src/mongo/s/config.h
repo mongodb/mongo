@@ -62,8 +62,6 @@ struct CollectionInfo {
 
     void resetCM(ChunkManager* cm);
 
-    void shard(OperationContext* txn, ChunkManager* cm);
-
     void unshard();
 
     bool isDirty() const {
