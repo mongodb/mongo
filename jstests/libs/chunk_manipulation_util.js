@@ -197,8 +197,10 @@ function configureMigrateFailPoint( shardConnection, stepNumber, mode ) {
 // Wait for moveChunk to reach a step (1 through 6).
 //
 function waitForMigrateStep( shardConnection, stepNumber ) {
-    var searchString = 'step ' + stepNumber,
-        admin = shardConnection.getDB( 'admin' );
+    var migrateThreadPrefix = 'migrateThread-';
+    var searchStringPrefix = 'step ' + stepNumber;
+
+    var admin = shardConnection.getDB('admin');
 
     assert( stepNumber >= 1);
     assert( stepNumber <= 5 );
@@ -214,8 +216,8 @@ function waitForMigrateStep( shardConnection, stepNumber ) {
         var in_progress = admin.currentOp(true).inprog;
         for ( var i = 0; i < in_progress.length; ++i ) {
             var op = in_progress[i];
-            if ( op.desc && op.desc === 'migrateThread' ) {
-                return op.msg.startsWith( searchString );
+            if (op.desc && op.desc.startsWith(migrateThreadPrefix)) {
+                return op.msg.startsWith(searchStringPrefix);
             }
         }
 
