@@ -227,7 +227,7 @@ __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 void
 __wt_free_ref(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, bool free_pages)
+    WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pages)
 {
 	WT_IKEY *ikey;
 
@@ -246,8 +246,15 @@ __wt_free_ref(
 		__wt_page_out(session, &ref->page);
 	}
 
-	/* Free any key allocation. */
-	switch (page->type) {
+	/*
+	 * Optionally free row-store WT_REF key allocation. Historic versions of
+	 * this code looked in a passed-in page argument, but that is dangerous,
+	 * some of our error-path callers create WT_REF structures without ever
+	 * setting WT_REF.home or having a parent page to which the WT_REF will
+	 * be linked. Those WT_REF structures invariably have instantiated keys,
+	 * (they obviously cannot be on-page keys), and we must free the memory.
+	 */
+	switch (page_type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
@@ -255,8 +262,12 @@ __wt_free_ref(
 		break;
 	}
 
-	/* Free any address allocation. */
-	if (ref->addr != NULL && __wt_off_page(page, ref->addr)) {
+	/*
+	 * Free any address allocation; if there's no linke WT_REF page, it must
+	 * be allocated.
+	 */
+	if (ref->addr != NULL &&
+	    (ref->home == NULL || __wt_off_page(ref->page, ref->addr))) {
 		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 		__wt_free(session, ref->addr);
 	}
@@ -272,7 +283,7 @@ __wt_free_ref(
 
 /*
  * __wt_free_ref_index --
- *	Discard a page index and it's references.
+ *	Discard a page index and its references.
  */
 void
 __wt_free_ref_index(WT_SESSION_IMPL *session,
@@ -284,7 +295,8 @@ __wt_free_ref_index(WT_SESSION_IMPL *session,
 		return;
 
 	for (i = 0; i < pindex->entries; ++i)
-		__wt_free_ref(session, page, pindex->index[i], free_pages);
+		__wt_free_ref(
+		    session, pindex->index[i], page->type, free_pages);
 	__wt_free(session, pindex);
 }
 
