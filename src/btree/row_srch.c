@@ -132,6 +132,54 @@ __wt_search_insert(
 }
 
 /*
+ * __row_check_leaf_key_range --
+ *	Check the search key is in the leaf page's key range.
+ */
+static inline int
+__row_check_leaf_key_range(WT_SESSION_IMPL *session,
+    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
+{
+	WT_BTREE *btree;
+	WT_COLLATOR *collator;
+	WT_ITEM *item;
+	WT_PAGE_INDEX *pindex;
+	uint32_t indx;
+	int cmp;
+
+	btree = S2BT(session);
+	collator = btree->collator;
+	item = cbt->tmp;
+
+	/*
+	 * Check the parent's starting key for this page.
+	 */
+	__wt_ref_key(leaf->home, leaf, &item->data, &item->size);
+	WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
+	if (cmp < 0) {
+		cbt->compare = -1;
+		return (0);
+	}
+
+	/*
+	 * Check the starting key for the parent's next page.
+	 */
+	WT_INTL_INDEX_GET(session, leaf->home, pindex);
+	indx = leaf->pindex_hint;
+	if (pindex->index[indx] == leaf && indx + 1 < pindex->entries) {
+		__wt_ref_key(
+		    leaf->home, pindex->index[indx], &item->data, &item->size);
+		WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
+		if (cmp > 0) {
+			cbt->compare = 1;
+			return (0);
+		}
+	}
+
+	cbt->compare = 0;
+	return (0);
+}
+
+/*
  * __wt_row_search --
  *	Search a row-store tree for a specific key.
  */
@@ -179,8 +227,20 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	append_check = insert && cbt->append_tree;
 	descend_right = true;
 
-	/* We may only be searching a single leaf page, not the full tree. */
+	/*
+	 * We may be searching only a single leaf page, not the full tree. If
+	 * the page links to a parent (in other words, if it's a cursor with
+	 * a pinned page, not a page be re-instantiated in memory by the split
+	 * code), check the page's parent keys before doing the full search,
+	 * it's faster when the cursor is being re-positioned.
+	 */
 	if (leaf != NULL) {
+		if (leaf->home)
+		WT_RET(
+		    __row_check_leaf_key_range(session, srch_key, leaf, cbt));
+		if (cbt->compare != 0)
+			return (0);
+
 		current = leaf;
 		goto leaf_only;
 	}
