@@ -217,6 +217,36 @@ static inline char* js_strdup(const char* s)
 
 JS_DECLARE_NEW_METHODS(js_new, js_malloc, static MOZ_ALWAYS_INLINE)
 
+namespace js {
+
+/*
+ * Calculate the number of bytes needed to allocate |numElems| contiguous
+ * instances of type |T|.  Return false if the calculation overflowed.
+ */
+template <typename T>
+MOZ_WARN_UNUSED_RESULT inline bool
+CalculateAllocSize(size_t numElems, size_t* bytesOut)
+{
+    *bytesOut = numElems * sizeof(T);
+    return (numElems & mozilla::tl::MulOverflowMask<sizeof(T)>::value) == 0;
+}
+
+/*
+ * Calculate the number of bytes needed to allocate a single instance of type
+ * |T| followed by |numExtra| contiguous instances of type |Extra|.  Return
+ * false if the calculation overflowed.
+ */
+template <typename T, typename Extra>
+MOZ_WARN_UNUSED_RESULT inline bool
+CalculateAllocSizeWithExtra(size_t numExtra, size_t* bytesOut)
+{
+    *bytesOut = sizeof(T) + numExtra * sizeof(Extra);
+    return (numExtra & mozilla::tl::MulOverflowMask<sizeof(Extra)>::value) == 0 &&
+           *bytesOut >= sizeof(T);
+}
+
+} /* namespace js */
+
 template <class T>
 static MOZ_ALWAYS_INLINE void
 js_delete(T* p)
@@ -242,32 +272,34 @@ template <class T>
 static MOZ_ALWAYS_INLINE T*
 js_pod_malloc()
 {
-    return (T*)js_malloc(sizeof(T));
+    return static_cast<T*>(js_malloc(sizeof(T)));
 }
 
 template <class T>
 static MOZ_ALWAYS_INLINE T*
 js_pod_calloc()
 {
-    return (T*)js_calloc(sizeof(T));
+    return static_cast<T*>(js_calloc(sizeof(T)));
 }
 
 template <class T>
 static MOZ_ALWAYS_INLINE T*
 js_pod_malloc(size_t numElems)
 {
-    if (MOZ_UNLIKELY(numElems & mozilla::tl::MulOverflowMask<sizeof(T)>::value))
+    size_t bytes;
+    if (MOZ_UNLIKELY(!js::CalculateAllocSize<T>(numElems, &bytes)))
         return nullptr;
-    return (T*)js_malloc(numElems * sizeof(T));
+    return static_cast<T*>(js_malloc(bytes));
 }
 
 template <class T>
 static MOZ_ALWAYS_INLINE T*
 js_pod_calloc(size_t numElems)
 {
-    if (MOZ_UNLIKELY(numElems & mozilla::tl::MulOverflowMask<sizeof(T)>::value))
+    size_t bytes;
+    if (MOZ_UNLIKELY(!js::CalculateAllocSize<T>(numElems, &bytes)))
         return nullptr;
-    return (T*)js_calloc(numElems * sizeof(T));
+    return static_cast<T*>(js_calloc(bytes));
 }
 
 template <class T>
@@ -275,9 +307,10 @@ static MOZ_ALWAYS_INLINE T*
 js_pod_realloc(T* prior, size_t oldSize, size_t newSize)
 {
     MOZ_ASSERT(!(oldSize & mozilla::tl::MulOverflowMask<sizeof(T)>::value));
-    if (MOZ_UNLIKELY(newSize & mozilla::tl::MulOverflowMask<sizeof(T)>::value))
+    size_t bytes;
+    if (MOZ_UNLIKELY(!js::CalculateAllocSize<T>(newSize, &bytes)))
         return nullptr;
-    return (T*)js_realloc(prior, newSize * sizeof(T));
+    return static_cast<T*>(js_realloc(prior, bytes));
 }
 
 namespace js {

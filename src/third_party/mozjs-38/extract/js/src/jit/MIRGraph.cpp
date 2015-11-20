@@ -297,7 +297,7 @@ MBasicBlock::NewAsmJS(MIRGraph& graph, CompileInfo& info, MBasicBlock* pred, Kin
             size_t nphis = block->stackPosition_;
 
             TempAllocator& alloc = graph.alloc();
-            MPhi* phis = (MPhi*)alloc.allocateArray<sizeof(MPhi)>(nphis);
+            MPhi* phis = alloc.allocateArray<MPhi>(nphis);
             if (!phis)
                 return nullptr;
 

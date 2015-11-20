@@ -48,12 +48,13 @@ class TempAllocator
         return p;
     }
 
-    template <size_t ElemSize>
-    void* allocateArray(size_t n)
+    template <typename T>
+    T* allocateArray(size_t n)
     {
-        if (MOZ_UNLIKELY(n & mozilla::tl::MulOverflowMask<ElemSize>::value))
+        size_t bytes;
+        if (MOZ_UNLIKELY(!CalculateAllocSize<T>(n, &bytes)))
             return nullptr;
-        void* p = lifoScope_.alloc().alloc(n * ElemSize);
+        T* p = static_cast<T*>(lifoScope_.alloc().alloc(bytes));
         if (MOZ_UNLIKELY(!ensureBallast()))
             return nullptr;
         return p;
@@ -79,9 +80,10 @@ class JitAllocPolicy
     {}
     template <typename T>
     T* pod_malloc(size_t numElems) {
-        if (MOZ_UNLIKELY(numElems & mozilla::tl::MulOverflowMask<sizeof(T)>::value))
+        size_t bytes;
+        if (MOZ_UNLIKELY(!CalculateAllocSize<T>(numElems, &bytes)))
             return nullptr;
-        return static_cast<T*>(alloc_.allocate(numElems * sizeof(T)));
+        return static_cast<T*>(alloc_.allocate(bytes));
     }
     template <typename T>
     T* pod_calloc(size_t numElems) {
@@ -112,9 +114,10 @@ class OldJitAllocPolicy
     {}
     template <typename T>
     T* pod_malloc(size_t numElems) {
-        if (MOZ_UNLIKELY(numElems & mozilla::tl::MulOverflowMask<sizeof(T)>::value))
+        size_t bytes;
+        if (MOZ_UNLIKELY(!CalculateAllocSize<T>(numElems, &bytes)))
             return nullptr;
-        return static_cast<T*>(GetJitContext()->temp->allocate(numElems * sizeof(T)));
+        return static_cast<T*>(GetJitContext()->temp->allocate(bytes));
     }
     void free_(void* p) {
     }

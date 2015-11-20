@@ -726,6 +726,12 @@ ValueNumberer::visitDefinition(MDefinition* def)
         return true;
     }
 
+    // Skip optimizations on instructions which are recovered on bailout, to
+    // avoid mixing instructions which are recovered on bailouts with
+    // instructions which are not.
+    if (def->isRecoveredOnBailout())
+        return true;
+
     // If this instruction has a dependency() into an unreachable block, we'll
     // need to update AliasAnalysis.
     MInstruction* dep = def->dependency();

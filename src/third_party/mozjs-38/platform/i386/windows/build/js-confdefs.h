@@ -32,10 +32,10 @@
 #define MALLOC_H <malloc.h>
 #define MALLOC_H <malloc.h>
 #define MOZILLA_UAVERSION "38.0"
-#define MOZILLA_VERSION "38.3.0"
-#define MOZILLA_VERSION_U 38.3.0
+#define MOZILLA_VERSION "38.4.0"
+#define MOZILLA_VERSION_U 38.4.0
 #define MOZJS_MAJOR_VERSION 38
-#define MOZJS_MINOR_VERSION 3
+#define MOZJS_MINOR_VERSION 4
 #define MOZ_DEBUG_SYMBOLS 1
 #define MOZ_DLL_SUFFIX ".dll"
 #define MOZ_MEMORY 1
