@@ -811,8 +811,19 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * those threads and causes them to re-calculate their position based
 	 * on the just-updated parent page's index.
 	 */
-	if (discard)
+	if (discard) {
+		/*
+		 * Page-delete information is only read when the WT_REF state is
+		 * WT_REF_DELETED.  The page-delete memory wasn't added to the
+		 * parent's footprint, ignore it here.
+		 */
+		if (ref->page_del != NULL) {
+			__wt_free(session, ref->page_del->update_list);
+			__wt_free(session, ref->page_del);
+		}
+
 		WT_PUBLISH(ref->state, WT_REF_SPLIT);
+	}
 
 	/*
 	 * Push out the changes: not required for correctness, but don't let
