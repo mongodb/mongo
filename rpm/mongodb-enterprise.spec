@@ -253,6 +253,7 @@ fi
 #%doc README GNU-AGPL-3.0.txt
 
 %{_bindir}/bsondump
+%{_bindir}/mongodecrypt
 %{_bindir}/mongodump
 %{_bindir}/mongoexport
 %{_bindir}/mongofiles
