@@ -37,10 +37,10 @@
     // insert into the tempusers collection
     adminDB.tempusers.insert({ _id: 'corruption' });
 
-    // restore the data. it should fail
+    // restore the data. It should succeed
     ret = toolTest.runTool.apply(toolTest, ['restore'].
             concat(getRestoreTarget(dumpTarget)));
-    assert.neq(0, ret);
+    assert.neq(1, ret);
 
     // success
     toolTest.stop();

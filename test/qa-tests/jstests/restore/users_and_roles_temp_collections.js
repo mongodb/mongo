@@ -84,8 +84,8 @@
             concat(commonToolArgs)
     );
     
-    // we should fail with default temp collections
-    assert.neq(0, ret);
+    // we should succeed with default temp collections
+    assert.eq(0, ret);
 
     // try to restore the data with new temp collections
     ret = toolTest.runTool.apply(
