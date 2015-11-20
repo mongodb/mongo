@@ -14,9 +14,6 @@ STARTPWD=$(pwd)
 TOPLEVEL=$(git rev-parse --show-toplevel)
 cd ${TOPLEVEL}/src/third_party
 
-# Begin tracing commands
-set -o xtrace
-
 # Write file according to "Content-Disposition: attachment" header. Example:
 # Content-Disposition: attachment; filename=wiredtiger-wiredtiger-2.4.0-109-ge5aec44.tar.gz
 
@@ -46,10 +43,48 @@ tar -x --strip-components 1 \
     --exclude '*/tools/wtstats/template' \
     -C wiredtiger -f ${TARBALL}
 
+# Add wiredtiger as a remote called 'wt'; ignore errors if it already
+# exists -- fetch will catch any problems
+echo "Fetching latest wiredtiger code; this may take a while..."
+git remote add wt git@github.com:wiredtiger/wiredtiger.git > /dev/null 2>&1 || true
+git fetch wt
+
+# Build a changelog for the revision history
+# - get the githash for this drop from the tarball name
+newhash="`echo $TARBALL | sed -e 's/.*-g\([0-9a-f]*\)\..*/\1/'`"
+[ -z "$newhash" ] && echo "Can't find hash for this drop" && exit 1
+
+# - find the githash from the previous drop from the summary
+oldhash="`git log --format=%s | grep 'Import wiredtiger' | head -n 1 | sed -e's/.*-g\([0-9a-f]*\)\..*/\1/g'`"
+[ -z "$oldhash" ] && echo "Can't find hash for previous drop" && exit 1
+
+# - build the changelog; unfortunately the format is branch-dependant
+case ${REMOTEBRANCH} in
+    "mongodb-3.0") format="--format=\"%h  %s\"" ;;
+    "mongodb-3.2") format="--grep=\"Merge pull\" --format=\"%h  %b\"" ;;
+    *) echo "${REMOTEBRANCH} is not supported; bailing out" ; exit 1 ;;
+esac
+gitlog="git log $format ${oldhash}..${newhash} wt/${REMOTEBRANCH}"
+changelog="`eval $gitlog`"
+
+echo
 git add wiredtiger
-git commit -m "Import ${TARBALL} from wiredtiger branch ${REMOTEBRANCH}"
+git commit -m "Import ${TARBALL} from wiredtiger branch ${REMOTEBRANCH}" \
+ -m "ref: ${oldhash}..${newhash}" \
+ -m "$changelog"
+echo
 git log -n 1
 
 set -o errexit
 cd $STARTPWD
-echo "Done applying $TARBALL to $LOCALBRANCH"
+echo "
+Done applying $TARBALL to $LOCALBRANCH.
+The revision history was computed as follows:
+
+  $gitlog
+
+Please review it before you push. You can edit it with:
+
+  git commit --amend
+
+"
