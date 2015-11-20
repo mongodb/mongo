@@ -1389,6 +1389,18 @@ bool Command::run(OperationContext* txn,
                      repl::ReplicationCoordinator::Mode::modeReplSet ||
                  testingSnapshotBehaviorInIsolation) &&
                 readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+                // ReadConcern Majority is not supported in ProtocolVersion 0.
+                if (!replCoord->isV1ElectionProtocol()) {
+                    auto result = appendCommandStatus(
+                        inPlaceReplyBob,
+                        {ErrorCodes::ReadConcernMajorityNotEnabled,
+                         str::stream() << "Replica sets running protocol version 0 do not support "
+                                          "readConcern: majority"});
+                    inPlaceReplyBob.doneFast();
+                    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+                    return result;
+                }
+
                 Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
 
                 // Wait until a snapshot is available.
