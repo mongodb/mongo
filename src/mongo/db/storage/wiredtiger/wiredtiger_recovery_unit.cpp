@@ -156,8 +156,8 @@ bool WiredTigerRecoveryUnit::waitUntilDurable() {
     if (_sessionCache->isEphemeral()) {
         return true;
     }
-    _ensureSession();
-    _sessionCache->waitUntilDurable(_session);
+    // _session may be nullptr. We cannot _ensureSession() here as that needs shutdown protection.
+    _sessionCache->waitUntilDurable(false);
     return true;
 }
 

@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/memory.h"
@@ -151,7 +152,25 @@ void WiredTigerSessionCache::shuttingDown() {
     _snapshotManager.shutdown();
 }
 
-void WiredTigerSessionCache::waitUntilDurable(WiredTigerSession* session) {
+void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
+    const int shuttingDown = _shuttingDown.fetchAndAdd(1);
+    ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
+
+    uassert(ErrorCodes::ShutdownInProgress,
+            "Cannot wait for durability because a shutdown is in progress",
+            !(shuttingDown & kShuttingDownMask));
+
+    // When forcing a checkpoint with journaling enabled, don't synchronize with other
+    // waiters, as a log flush is much cheaper than a full checkpoint.
+    if (forceCheckpoint && _engine->isDurable()) {
+        WiredTigerSession* session = getSession();
+        ON_BLOCK_EXIT([this, session] { releaseSession(session); });
+        WT_SESSION* s = session->getSession();
+        invariantWTOK(s->checkpoint(s, NULL));
+        LOG(4) << "created checkpoint (forced)";
+        return;
+    }
+
     uint32_t start = _lastSyncTime.load();
     // Do the remainder in a critical section that ensures only a single thread at a time
     // will attempt to synchronize.
@@ -164,6 +183,8 @@ void WiredTigerSessionCache::waitUntilDurable(WiredTigerSession* session) {
     _lastSyncTime.store(current + 1);
 
     // Nobody has synched yet, so we have to sync ourselves.
+    WiredTigerSession* session = getSession();
+    ON_BLOCK_EXIT([this, session] { releaseSession(session); });
     WT_SESSION* s = session->getSession();
 
     // Use the journal when available, or a checkpoint otherwise.

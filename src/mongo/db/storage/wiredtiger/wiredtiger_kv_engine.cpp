@@ -41,6 +41,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <valgrind/valgrind.h>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -85,12 +86,12 @@ public:
 
         LOG(1) << "starting " << name() << " thread";
 
-        auto deleter = [this](WiredTigerSession* ptr) { _sessionCache->releaseSession(ptr); };
-        auto session = std::unique_ptr<WiredTigerSession, decltype(deleter)>(
-            _sessionCache->getSession(), deleter);
-
         while (!_shuttingDown.load()) {
-            _sessionCache->waitUntilDurable(session.get());
+            try {
+                _sessionCache->waitUntilDurable(false);
+            } catch (const UserException& e) {
+                invariant(e.getCode() == ErrorCodes::ShutdownInProgress);
+            }
 
             int ms = storageGlobalParams.journalCommitIntervalMs;
             if (!ms) {
@@ -306,10 +307,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
 int WiredTigerKVEngine::flushAllFiles(bool sync) {
     LOG(1) << "WiredTigerKVEngine::flushAllFiles";
     syncSizeInfo(true);
-
-    WiredTigerSession session(_conn);
-    WT_SESSION* s = session.getSession();
-    invariantWTOK(s->checkpoint(s, NULL));
+    _sessionCache->waitUntilDurable(true);
 
     return 1;
 }

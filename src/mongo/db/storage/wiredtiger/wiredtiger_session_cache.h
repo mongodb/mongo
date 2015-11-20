@@ -154,9 +154,11 @@ public:
 
     bool isEphemeral();
     /**
-     * Waits until all commits that happened before this call are durable.
+     * Waits until all commits that happened before this call are durable, either by flushing
+     * the log or forcing a checkpoint if forceCheckpoint is true or the journal is disabled.
+     * Uses a temporary session. Safe to call without any locks, even during shutdown.
      */
-    void waitUntilDurable(WiredTigerSession* session);
+    void waitUntilDurable(bool forceCheckpoint);
 
     WT_CONNECTION* conn() const {
         return _conn;
