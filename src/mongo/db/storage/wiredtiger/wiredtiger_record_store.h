@@ -177,6 +177,8 @@ public:
                                    BSONObjBuilder* result,
                                    double scale) const;
 
+    virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const;
+
     virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
 
     virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,

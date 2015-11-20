@@ -1536,6 +1536,14 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* txn,
     }
 }
 
+Status WiredTigerRecordStore::touch(OperationContext* txn, BSONObjBuilder* output) const {
+    if (_isEphemeral) {
+        // Everything is already in memory.
+        return Status::OK();
+    }
+    return Status(ErrorCodes::CommandNotSupported, "this storage engine does not support touch");
+}
+
 Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* txn, const Timestamp& opTime) {
     StatusWith<RecordId> id = oploghack::keyForOptime(opTime);
     if (!id.isOK())
