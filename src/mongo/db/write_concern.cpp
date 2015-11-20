@@ -67,7 +67,8 @@ void setupSynchronousCommit(OperationContext* txn) {
 namespace {
 // The consensus protocol requires that w: majority implies j: true on all nodes.
 void addJournalSyncForWMajority(WriteConcernOptions* writeConcern) {
-    if (writeConcern->wMode == WriteConcernOptions::kMajority &&
+    if (repl::getGlobalReplicationCoordinator()->isV1ElectionProtocol() &&
+        writeConcern->wMode == WriteConcernOptions::kMajority &&
         writeConcern->syncMode == WriteConcernOptions::NONE &&
         getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()) {
         writeConcern->syncMode = WriteConcernOptions::JOURNAL;

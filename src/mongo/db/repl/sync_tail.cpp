@@ -183,6 +183,14 @@ ApplyBatchFinalizer::~ApplyBatchFinalizer() {
 }
 
 void ApplyBatchFinalizer::record(OpTime newOp) {
+    const bool mustWaitUntilDurable = _replCoord->isV1ElectionProtocol();
+    if (!mustWaitUntilDurable) {
+        // We have to use setMyLastOptimeForward since this thread races with
+        // logTransitionToPrimaryToOplog.
+        _replCoord->setMyLastOptimeForward(newOp);
+        return;
+    }
+
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _latestOpTime = newOp;
     _cond.notify_all();
