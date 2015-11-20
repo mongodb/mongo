@@ -646,26 +646,24 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
     WT_CURSOR *ref_cursor, const char *config)
 {
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR_JOIN *cjoin;
 	WT_CURSOR_TABLE *ctable;
+	WT_DECL_RET;
 	WT_INDEX *idx;
+	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
-	uint32_t flags, range;
 	uint64_t count;
-	uint64_t bloom_bit_count, bloom_hash_count;
+	uint32_t bloom_bit_count, bloom_hash_count;
+	uint8_t flags, range;
 
 	count = 0;
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, join, config, cfg);
 	table = NULL;
 
-	if (!WT_PREFIX_MATCH(join_cursor->uri, "join:")) {
-		__wt_errx(session, "not a join cursor");
-		WT_ERR(EINVAL);
-	}
+	if (!WT_PREFIX_MATCH(join_cursor->uri, "join:"))
+		WT_ERR_MSG(session, EINVAL, "not a join cursor");
 
 	if (WT_PREFIX_MATCH(ref_cursor->uri, "index:")) {
 		cindex = (WT_CURSOR_INDEX *)ref_cursor;
@@ -677,21 +675,16 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		ctable = (WT_CURSOR_TABLE *)ref_cursor;
 		table = ctable->table;
 		WT_CURSOR_CHECKKEY(ctable->cg_cursors[0]);
-	} else {
-		__wt_errx(session, "not an index or table cursor");
-		WT_ERR(EINVAL);
-	}
+	} else
+		WT_ERR_MSG(session, EINVAL, "not an index or table cursor");
 
 	cjoin = (WT_CURSOR_JOIN *)join_cursor;
-	if (cjoin->table != table) {
-		__wt_errx(session, "table for join cursor does not match "
-		    "table for index");
-		WT_ERR(EINVAL);
-	}
-	if (F_ISSET(ref_cursor, WT_CURSTD_JOINED)) {
-		__wt_errx(session, "index cursor already used in a join");
-		WT_ERR(EINVAL);
-	}
+	if (cjoin->table != table)
+		WT_ERR_MSG(session, EINVAL,
+		    "table for join cursor does not match table for index");
+	if (F_ISSET(ref_cursor, WT_CURSTD_JOINED))
+		WT_ERR_MSG(session, EINVAL,
+		    "index cursor already used in a join");
 
 	/* "ge" is the default */
 	range = WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ;
@@ -721,20 +714,23 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 			WT_ERR(EINVAL);
 	}
 	WT_ERR(__wt_config_gets(session, cfg, "bloom_bit_count", &cval));
-	bloom_bit_count = (uint64_t)cval.val;
+	if ((uint64_t)cval.val > UINT32_MAX)
+		WT_ERR_MSG(session, EINVAL,
+		    "bloom_bit_count: value too large");
+	bloom_bit_count = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "bloom_hash_count", &cval));
-	bloom_hash_count = (uint64_t)cval.val;
+	if ((uint64_t)cval.val > UINT32_MAX)
+		WT_ERR_MSG(session, EINVAL,
+		    "bloom_hash_count: value too large");
+	bloom_hash_count = (uint32_t)cval.val;
 	if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM)) {
-	    if (count == 0) {
-		    __wt_errx(session, "count must be nonzero when "
-			"strategy=bloom");
-		    WT_ERR(EINVAL);
-	    }
-	    if (cjoin->entries_next == 0) {
-		    __wt_errx(session, "the first joined cursor cannot "
-			"specify strategy=bloom");
-		    WT_ERR(EINVAL);
-	    }
+		if (count == 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "count must be nonzero when strategy=bloom");
+		if (cjoin->entries_next == 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "the first joined cursor cannot specify "
+			    "strategy=bloom");
 	}
 	WT_ERR(__wt_curjoin_join(session, cjoin, idx, ref_cursor, flags,
 	    range, count, bloom_bit_count, bloom_hash_count));
@@ -1011,10 +1007,9 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	WT_STAT_FAST_CONN_INCR(session, txn_commit);
 
 	txn = &session->txn;
-	if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0) {
-		__wt_errx(session, "failed transaction requires rollback");
-		ret = EINVAL;
-	}
+	if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "failed transaction requires rollback");
 
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);

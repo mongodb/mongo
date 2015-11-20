@@ -144,19 +144,18 @@ __wt_struct_unpack_size(WT_SESSION_IMPL *session,
  */
 int
 __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt,
-    const char *outfmt, const WT_ITEM *inbuf, WT_ITEM *outbuf,
-    void **reallocp)
+    const char *outfmt, const WT_ITEM *inbuf, WT_ITEM *outbuf, void **reallocp)
 {
 	WT_DECL_PACK_VALUE(pvin);
 	WT_DECL_PACK_VALUE(pvout);
 	WT_DECL_RET;
 	WT_PACK packin, packout;
 	const uint8_t *before, *end, *p;
-	uint8_t *newbuf, *pout;
+	uint8_t *pout;
 	size_t len;
 	const void *start;
 
-	start = newbuf = NULL;
+	start = NULL;
 	p = inbuf->data;
 	end = p + inbuf->size;
 
