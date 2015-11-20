@@ -155,7 +155,7 @@ public:
     virtual Status truncate(OperationContext* txn);
 
     virtual bool compactSupported() const {
-        return true;
+        return !_isEphemeral;
     }
     virtual bool compactsInPlace() const {
         return true;

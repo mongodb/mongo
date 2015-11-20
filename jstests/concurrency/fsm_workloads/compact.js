@@ -9,6 +9,7 @@
  */
 
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isEphemeral
 
 var $config = (function() {
     var data = {
@@ -61,7 +62,11 @@ var $config = (function() {
                 paddingFactor: 1.0,
                 force: true
             });
-            assertAlways.commandWorked(res);
+            if (!isEphemeral(db)) {
+                assertAlways.commandWorked(res);
+            } else {
+                assertAlways.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+            }
         }
 
         function query(db, collName) {
