@@ -402,7 +402,9 @@ MongoRunner.mongoOptions = function(opts) {
     }
 
     // Normalize and get the binary version to use
-    opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
+    if (opts.hasOwnProperty('binVersion')) {
+        opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
+    }
 
     // Default for waitForConnect is true
     opts.waitForConnect =

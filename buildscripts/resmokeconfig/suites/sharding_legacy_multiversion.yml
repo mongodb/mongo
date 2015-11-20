@@ -37,6 +37,9 @@ selector:
     - jstests/sharding/movePrimary1.js
     - jstests/sharding/addshard2.js
     - jstests/sharding/all_config_hosts_down.js # possibly caused by SERVER-21215?
+    - jstests/sharding/auth.js
+    - jstests/sharding/auth_slaveok_routing.js
+    - jstests/sharding/startup_with_all_configs_down.js
 
 executor:
   js_test:
