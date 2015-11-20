@@ -811,8 +811,19 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * those threads and causes them to re-calculate their position based
 	 * on the just-updated parent page's index.
 	 */
-	if (discard)
+	if (discard) {
+		/*
+		 * Page-delete information is only read when the WT_REF state is
+		 * WT_REF_DELETED.  The page-delete memory wasn't added to the
+		 * parent's footprint, ignore it here.
+		 */
+		if (ref->page_del != NULL) {
+			__wt_free(session, ref->page_del->update_list);
+			__wt_free(session, ref->page_del);
+		}
+
 		WT_PUBLISH(ref->state, WT_REF_SPLIT);
+	}
 
 	/*
 	 * Push out the changes: not required for correctness, but don't let
@@ -877,18 +888,13 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				    session, split_gen, exclusive, ikey, size));
 				parent_decr += size;
 			}
-			/*
-			 * The page_del structure can be freed immediately: it
-			 * is only read when the ref state is WT_REF_DELETED.
-			 * The size of the structure wasn't added to the parent,
-			 * don't decrement.
-			 */
-			if (next_ref->page_del != NULL) {
-				__wt_free(session,
-				    next_ref->page_del->update_list);
-				__wt_free(session, next_ref->page_del);
-			}
 		}
+
+		/*
+		 * If this page was fast-truncated, any attached structure
+		 * should have been freed before now.
+		 */
+		WT_ASSERT(session, next_ref->page_del == NULL);
 
 		WT_TRET(__split_safe_free(
 		    session, split_gen, exclusive, next_ref, sizeof(WT_REF)));
@@ -1643,21 +1649,24 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * The first page in the split is the current page, but we still have
 	 * to create a replacement WT_REF, the original WT_REF will be set to
 	 * split status and eventually freed.
-	 */
-	WT_ERR(__wt_calloc_one(session, &split_ref[0]));
-	child = split_ref[0];
-	*child = *ref;
-
-	/*
+	 *
 	 * The new WT_REF is not quite identical: we have to instantiate a key,
 	 * and the new reference is visible to readers once the split completes.
 	 *
-	 * The key-instantiation code checks for races, clear the key fields so
-	 * we don't trigger them.
+	 * The key-instantiation code checks for races, leave the key fields
+	 * zeroed we don't trigger them.
+	 *
+	 * Don't copy any deleted page state: we may be splitting a page that
+	 * was instantiated after a truncate and that history should not be
+	 * carried onto these new child pages.
 	 */
-	child->key.recno = WT_RECNO_OOB;
-	child->key.ikey = NULL;
+	WT_ERR(__wt_calloc_one(session, &split_ref[0]));
+	child = split_ref[0];
+	child->page = ref->page;
+	child->home = ref->home;
+	child->pindex_hint = ref->pindex_hint;
 	child->state = WT_REF_MEM;
+	child->addr = ref->addr;
 
 	/*
 	 * Copy the first key from the original page into first ref in the new

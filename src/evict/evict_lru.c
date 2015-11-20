@@ -211,7 +211,7 @@ __evict_server(void *arg)
 			/* After being stuck for 5 minutes, give up. */
 			WT_ERR(__wt_epoch(session, &now));
 			if (WT_TIMEDIFF_SEC(now, stuck_ts) > 300) {
-				__wt_errx(session,
+				__wt_err(session, ETIMEDOUT,
 				    "Cache stuck for too long, giving up");
 				(void)__wt_cache_dump(session, NULL);
 				WT_ERR(ETIMEDOUT);
