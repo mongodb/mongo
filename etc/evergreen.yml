@@ -1069,6 +1069,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: jsCore_minimum_batch_size_WT
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_minimum_batch_size --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: jsCore_op_query
   depends_on:
   - name: jsCore
@@ -3765,6 +3776,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_minimum_batch_size_WT
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
   - name: jsCore_small_oplog
