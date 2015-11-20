@@ -42,6 +42,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
@@ -322,6 +323,13 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) {
     for (auto&& shard : shards) {
         mapBob.append(shard.first, shard.second);
     }
+}
+
+void ShardRegistry::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
+    // Get stats from the pool of task executors, including fixed executor within.
+    _executorPool->appendConnectionStats(stats);
+    // Get stats from the separate executor for addShard.
+    _executorForAddShard->appendConnectionStats(stats);
 }
 
 void ShardRegistry::_addConfigShard_inlock() {

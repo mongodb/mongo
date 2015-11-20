@@ -34,6 +34,11 @@
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
+
+namespace executor {
+struct ConnectionPoolStats;
+}  // namespace executor
+
 namespace repl {
 
 /**
@@ -135,7 +140,7 @@ public:
 
     virtual void appendSlaveInfoData(BSONObjBuilder* result);
 
-    void appendConnectionStats(BSONObjBuilder* b) override;
+    void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
     virtual ReplicaSetConfig getConfig() const;
 

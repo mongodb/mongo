@@ -48,6 +48,8 @@ class OperationContext;
 
 namespace executor {
 
+struct ConnectionPoolStats;
+
 /**
  * Generic event loop with notions of events and callbacks.
  *
@@ -235,7 +237,7 @@ public:
      * Appends information about the underlying network interface's connections to the given
      * builder.
      */
-    virtual void appendConnectionStats(BSONObjBuilder* b) = 0;
+    virtual void appendConnectionStats(ConnectionPoolStats* stats) const = 0;
 
 protected:
     // Retrieves the Callback from a given CallbackHandle

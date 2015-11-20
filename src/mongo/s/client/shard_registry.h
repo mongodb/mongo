@@ -60,6 +60,7 @@ class StatusWith;
 
 namespace executor {
 
+struct ConnectionPoolStats;
 class NetworkInterface;
 class TaskExecutor;
 
@@ -205,6 +206,11 @@ public:
     void getAllShardIds(std::vector<ShardId>* all) const;
 
     void toBSON(BSONObjBuilder* result);
+
+    /**
+     * Append information about the sharding subsystem's connection pools.
+     */
+    void appendConnectionStats(executor::ConnectionPoolStats* stats) const;
 
     /**
      * If the newly specified optime is newer than the one the ShardRegistry already knows, the

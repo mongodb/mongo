@@ -4,6 +4,16 @@ Import("env")
 
 env.InjectThirdPartyIncludePaths('asio')
 
+env.Library(
+    target='connection_pool_stats',
+    source=[
+        'connection_pool_stats.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+    ])
+
 env.Library(target='remote_command',
             source=[
                 'remote_command_request.cpp',
@@ -79,6 +89,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/net/hostandport',
+        'connection_pool_stats',
         'remote_command',
     ],
 )

@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -63,7 +64,7 @@ std::string NetworkInterfaceMock::getDiagnosticString() {
     return "NetworkInterfaceMock diagnostics here";
 }
 
-void NetworkInterfaceMock::appendConnectionStats(BSONObjBuilder* b) {}
+void NetworkInterfaceMock::appendConnectionStats(ConnectionPoolStats* stats) const {}
 
 Date_t NetworkInterfaceMock::now() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);

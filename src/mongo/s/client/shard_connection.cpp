@@ -36,6 +36,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -115,10 +116,12 @@ public:
                      int options,
                      std::string& errmsg,
                      mongo::BSONObjBuilder& result) {
-        // Base pool info
-        shardConnectionPool.appendInfo(result);
+        // Connection information
+        executor::ConnectionPoolStats stats{};
+        shardConnectionPool.appendConnectionStats(&stats);
+        stats.appendToBSON(result);
 
-        // Thread connection info
+        // Thread connection information
         activeClientConnections.appendInfo(result);
 
         return true;

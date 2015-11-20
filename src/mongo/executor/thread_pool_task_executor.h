@@ -43,6 +43,7 @@ class ThreadPoolInterface;
 
 namespace executor {
 
+struct ConnectionPoolStats;
 class NetworkInterface;
 
 /**
@@ -80,7 +81,7 @@ public:
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle) override;
 
-    void appendConnectionStats(BSONObjBuilder* b) override;
+    void appendConnectionStats(ConnectionPoolStats* stats) const override;
 
     /**
      * Cancels all commands on the network interface.

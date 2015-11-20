@@ -40,6 +40,7 @@
 #include "mongo/executor/async_timer_interface.h"
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/executor/connection_pool_asio.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
@@ -96,8 +97,8 @@ std::string NetworkInterfaceASIO::getDiagnosticString() {
     return output;
 }
 
-void NetworkInterfaceASIO::appendConnectionStats(BSONObjBuilder* b) {
-    _connectionPool.appendConnectionStats(b);
+void NetworkInterfaceASIO::appendConnectionStats(ConnectionPoolStats* stats) const {
+    _connectionPool.appendConnectionStats(stats);
 }
 
 std::string NetworkInterfaceASIO::getHostName() {
