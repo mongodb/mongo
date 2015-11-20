@@ -2,7 +2,7 @@
  * Starts up a sharded cluster with the given specifications. The cluster
  * will be fully operational after the execution of this constructor function.
  * 
- * @param {Object} testName Contains the key value pair for the cluster
+ * @param {Object} params Contains the key-value pairs for the cluster
  *   configuration. Accepted keys are:
  * 
  *   {
@@ -43,6 +43,11 @@
  *           [{ verbose: 5 }, { auth: '' }]
  * 
  *       Note: you can only have single server shards for array format.
+ *
+ *       Note: A special "bridgeOptions" property can be specified in both the object and array
+ *          formats to configure the options for the mongobridge corresponding to that node. These
+ *          options are merged with the params.bridgeOptions options, where the node-specific
+ *          options take precedence.
  * 
  *     other: {
  *       nopreallocj: same as above
@@ -63,6 +68,8 @@
  *
  *       useBridge {boolean}: If true, then a mongobridge process is started for each node in the
  *          sharded cluster. Defaults to false.
+ *
+ *       bridgeOptions {Object}: Options to apply to all mongobridge processes. Defaults to {}.
  *
  *       // replica Set only:
  *       rsOptions {Object}: same as the rs property above. Can be used to
@@ -610,13 +617,18 @@ var ShardingTest = function(params) {
         this.stopMongos(n);
 
         if (otherParams.useBridge) {
-            this._mongos[n] = new MongoBridge({
+            var bridgeOptions = (opts !== mongos) ? opts.bridgeOptions
+                                                  : mongos.fullOptions.bridgeOptions;
+            bridgeOptions = Object.merge(otherParams.bridgeOptions, bridgeOptions || {});
+            bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: otherParams.useHostname ? hostName : "localhost",
                 port: this._mongos[n].port,
                 // The mongos processes identify themselves to mongobridge as host:port, where the
                 // host is the actual hostname of the machine and not localhost.
                 dest: hostName + ":" + opts.port,
             });
+
+            this._mongos[n] = new MongoBridge(bridgeOptions);
         }
 
         var newConn = MongoRunner.runMongos(opts);
@@ -659,13 +671,17 @@ var ShardingTest = function(params) {
         this.stopMongod(n);
 
         if (otherParams.useBridge) {
-            this._connections[n] = new MongoBridge({
+            var bridgeOptions = Object.merge(otherParams.bridgeOptions,
+                                             mongod.fullOptions.bridgeOptions || {});
+            bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: otherParams.useHostname ? hostName : "localhost",
                 port: this._connections[n].port,
                 // The mongod processes identify themselves to mongobridge as host:port, where the
                 // host is the actual hostname of the machine and not localhost.
                 dest: hostName + ":" + mongod.port,
             });
+
+            this._connections[n] = new MongoBridge(bridgeOptions);
         }
 
         mongod.restart = true;
@@ -705,13 +721,17 @@ var ShardingTest = function(params) {
         this.stopConfigServer(n);
 
         if (otherParams.useBridge) {
-            this._configServers[n] = new MongoBridge({
+            var bridgeOptions = Object.merge(otherParams.bridgeOptions,
+                                             mongod.fullOptions.bridgeOptions || {});
+            bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: otherParams.useHostname ? hostName : "localhost",
                 port: this._configServers[n].port,
                 // The mongod processes identify themselves to mongobridge as host:port, where the
                 // host is the actual hostname of the machine and not localhost.
                 dest: hostName + ":" + mongod.port,
             });
+
+            this._configServers[n] = new MongoBridge(bridgeOptions);
         }
 
         mongod.restart = true;
@@ -811,6 +831,7 @@ var ShardingTest = function(params) {
     otherParams.useHostname = otherParams.useHostname == undefined ?
         true : otherParams.useHostname;
     otherParams.useBridge = otherParams.useBridge || false;
+    otherParams.bridgeOptions = otherParams.bridgeOptions || {};
     var keyFile = otherParams.keyFile || otherParams.extraOptions.keyFile
     var hostName = getHostName();
 
@@ -865,6 +886,7 @@ var ShardingTest = function(params) {
                                        nodes : numReplicas,
                                        useHostName : otherParams.useHostname,
                                        useBridge: otherParams.useBridge,
+                                       bridgeOptions: otherParams.bridgeOptions,
                                        keyFile : keyFile,
                                        protocolVersion: protocolVersion,
                                        shardSvr : true });
@@ -906,12 +928,16 @@ var ShardingTest = function(params) {
             options.port = options.port || allocatePort();
 
             if (otherParams.useBridge) {
-                var bridge = new MongoBridge({
+                var bridgeOptions = Object.merge(otherParams.bridgeOptions,
+                                                 options.bridgeOptions || {});
+                bridgeOptions = Object.merge(bridgeOptions, {
                     hostName: otherParams.useHostname ? hostName : "localhost",
                     // The mongod processes identify themselves to mongobridge as host:port, where
                     // the host is the actual hostname of the machine and not localhost.
                     dest: hostName + ":" + options.port,
                 });
+
+                var bridge = new MongoBridge(bridgeOptions);
             }
 
             var conn = MongoRunner.runMongod(options);
@@ -997,12 +1023,16 @@ var ShardingTest = function(params) {
             options.port = options.port || allocatePort();
 
             if (otherParams.useBridge) {
-                var bridge = new MongoBridge({
+                var bridgeOptions = Object.merge(otherParams.bridgeOptions,
+                                                 options.bridgeOptions || {});
+                bridgeOptions = Object.merge(bridgeOptions, {
                     hostName: otherParams.useHostname ? hostName : "localhost",
                     // The mongod processes identify themselves to mongobridge as host:port, where
                     // the host is the actual hostname of the machine and not localhost.
                     dest: hostName + ":" + options.port,
                 });
+
+                var bridge = new MongoBridge(bridgeOptions);
             }
 
             var conn = MongoRunner.runMongod(options);
@@ -1031,6 +1061,7 @@ var ShardingTest = function(params) {
         // Using replica set for config servers
         var rstOptions = { useHostName : otherParams.useHostname,
                            useBridge : otherParams.useBridge,
+                           bridgeOptions : otherParams.bridgeOptions,
                            keyFile : keyFile,
                            name: testName + "-configRS",
                          };
@@ -1122,12 +1153,16 @@ var ShardingTest = function(params) {
         options.port = options.port || allocatePort();
 
         if (otherParams.useBridge) {
-            var bridge = new MongoBridge({
+            var bridgeOptions = Object.merge(otherParams.bridgeOptions,
+                                             options.bridgeOptions || {});
+            bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: otherParams.useHostname ? hostName : "localhost",
                 // The mongos processes identify themselves to mongobridge as host:port, where the
                 // host is the actual hostname of the machine and not localhost.
                 dest: hostName + ":" + options.port,
             });
+
+            var bridge = new MongoBridge(bridgeOptions);
         }
 
         var conn = MongoRunner.runMongos(options);

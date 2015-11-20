@@ -34,8 +34,33 @@ function MongoBridge(options) {
     // A separate (hidden) connection for configuring the mongobridge process.
     var controlConn;
 
-    // Starts the mongobridge on port 'this.port' routing network traffic to 'this.dest'.
-    var pid = _startMongoProgram('mongobridge', '--port', this.port, '--dest', this.dest);
+    // Start the mongobridge on port 'this.port' routing network traffic to 'this.dest'.
+    var args = ['mongobridge', '--port', this.port, '--dest', this.dest];
+    var keysToSkip = [
+        'dest',
+        'hostName',
+        'port',
+    ];
+
+    // Append any command line arguments that are optional for mongobridge.
+    Object.keys(options).forEach(function(key) {
+        if (Array.contains(keysToSkip, key)) {
+            return;
+        }
+
+        var value = options[key];
+        if (value === null || value === undefined) {
+            throw new Error("Value '" + value + "' for '" + key + "' option is ambiguous; specify" +
+                            " {flag: ''} to add --flag command line options'");
+        }
+
+        args.push('--' + key);
+        if (value !== '') {
+            args.push(value.toString());
+        }
+    });
+
+    var pid = _startMongoProgram.apply(null, args);
 
     /**
      * Initializes the mongo shell's connections to the mongobridge process. Throws an error if the

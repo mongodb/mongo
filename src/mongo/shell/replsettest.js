@@ -29,6 +29,11 @@
  * 
  *        Note: For both formats, a special boolean property 'arbiter' can be
  *          specified to denote a member is an arbiter.
+ *
+ *        Note: A special "bridgeOptions" property can be specified in both the object and array
+ *           formats to configure the options for the mongobridge corresponding to that node. These
+ *           options are merged with the opts.bridgeOptions options, where the node-specific options
+ *           take precedence.
  * 
  *     nodeOptions {Object}: Options to apply to all nodes in the replica set.
  *        Format for Object:
@@ -46,6 +51,9 @@
  *     useBridge {boolean}: If true, then a mongobridge process is started for each node in the
  *        replica set. Both the replica set configuration and the connections returned by startSet()
  *        will be references to the proxied connections. Defaults to false.
+ *
+ *     bridgeOptions {Object}: Options to apply to all mongobridge processes. Defaults to {}.
+ *
  *     settings {object}: Setting used in the replica set config document.
  *        Example:
  *              settings: { chainingAllowed: false, ... }
@@ -65,6 +73,7 @@ ReplSetTest = function(opts) {
     this.shardSvr = opts.shardSvr || false;
     this.protocolVersion = opts.protocolVersion;
     this.useBridge = opts.useBridge || false;
+    this.bridgeOptions = opts.bridgeOptions || {};
     this.configSettings = opts.settings || false;
 
     this.nodeOptions = {};
@@ -747,13 +756,16 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
     print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
 
     if (this.useBridge) {
-        this.nodes[n] = new MongoBridge({
+        var bridgeOptions = Object.merge(this.bridgeOptions, options.bridgeOptions || {});
+        bridgeOptions = Object.merge(bridgeOptions, {
             hostName: this.host,
             port: this.ports[n],
             // The mongod processes identify themselves to mongobridge as host:port, where the host
             // is the actual hostname of the machine and not localhost.
             dest: getHostName() + ":" + this._unbridgedPorts[n],
         });
+
+        this.nodes[n] = new MongoBridge(bridgeOptions);
     }
 
     var conn = MongoRunner.runMongod(options);

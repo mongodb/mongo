@@ -175,7 +175,8 @@ MongoRunner.logicalOptions = { runId : true,
                                noJournalPrealloc : true,
                                noJournal : true,
                                binVersion : true,
-                               waitForConnect : true }
+                               waitForConnect : true,
+                               bridgeOptions : true }
 
 MongoRunner.toRealPath = function( path, pathOpts ){
     
