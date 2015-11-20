@@ -267,7 +267,7 @@ __wt_free_ref(
 	 * must be allocated.
 	 */
 	if (ref->addr != NULL &&
-	    (ref->home == NULL || __wt_off_page(ref->page, ref->addr))) {
+	    (ref->home == NULL || __wt_off_page(ref->home, ref->addr))) {
 		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 		__wt_free(session, ref->addr);
 	}
