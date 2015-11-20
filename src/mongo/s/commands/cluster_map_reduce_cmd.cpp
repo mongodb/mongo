@@ -514,6 +514,12 @@ public:
 
             // Do the splitting round
             ChunkManagerPtr cm = confOut->getChunkManagerIfExists(txn, finalColLong);
+
+            uassert(34359,
+                    str::stream() << "Failed to write mapreduce output to " << finalColLong
+                                  << "; expected that collection to be sharded, but it was not",
+                    cm);
+
             for (const auto& chunkSize : chunkSizes) {
                 BSONObj key = chunkSize.first;
                 const int size = chunkSize.second;
