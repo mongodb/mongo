@@ -246,8 +246,7 @@ public:
     void deleteDocument(OperationContext* txn,
                         const RecordId& loc,
                         bool cappedOK = false,
-                        bool noWarn = false,
-                        BSONObj* deletedId = 0);
+                        bool noWarn = false);
 
     /*
      * Inserts all documents inside one WUOW.
