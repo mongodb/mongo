@@ -212,7 +212,7 @@ functions:
             set -o igncr
         fi;
 
-        git checkout r3.2.0-rc3
+        git checkout r3.2.0-rc4
         . ./${set_tools_gopath|set_gopath.sh}
 
         # In RHEL 5.5, /usr/bin/ld can't handle --build-id parameters, so
