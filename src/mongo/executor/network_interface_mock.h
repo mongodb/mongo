@@ -75,7 +75,7 @@ public:
 
     NetworkInterfaceMock();
     virtual ~NetworkInterfaceMock();
-    virtual void appendConnectionStats(BSONObjBuilder* b);
+    virtual void appendConnectionStats(ConnectionPoolStats* stats) const;
     virtual std::string getDiagnosticString();
 
     ////////////////////////////////////////////////////////////////////////////////

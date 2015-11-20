@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -69,32 +70,29 @@ public:
              int,
              std::string&,
              mongo::BSONObjBuilder& result) override {
-        BSONObjBuilder poolStats(result.subobjStart("pools"));
+        executor::ConnectionPoolStats stats{};
 
-        // Global connection pool
-        BSONObjBuilder globalStats(poolStats.subobjStart("DBClient (Global)"));
-        globalConnPool.appendInfo(globalStats);
-        globalStats.append("numClientConnection", DBClientConnection::getNumConnections());
-        globalStats.append("numAScopedConnection", AScopedConnection::getNumConnections());
-        globalStats.doneFast();
+        // Global connection pool connections.
+        globalConnPool.appendConnectionStats(&stats);
+        result.appendNumber("numClientConnections", DBClientConnection::getNumConnections());
+        result.appendNumber("numAScopedConnections", AScopedConnection::getNumConnections());
 
-        // Replication ASIO, if we have one
+        // Replication connections, if we have them.
         auto replCoord = repl::ReplicationCoordinator::get(txn);
         if (replCoord && replCoord->isReplEnabled()) {
-            BSONObjBuilder replStats(poolStats.subobjStart("NetworkInterfaceASIO (Replication)"));
-            replCoord->appendConnectionStats(&replStats);
+            replCoord->appendConnectionStats(&stats);
         }
 
-        // Sharding ASIO, if we have one
+        // Sharding connections, if we have any.
         auto registry = grid.shardRegistry();
         if (registry) {
-            BSONObjBuilder shardStats(poolStats.subobjStart("NetworkInterfaceASIO (Sharding)"));
-            registry->getExecutor()->appendConnectionStats(&shardStats);
+            registry->appendConnectionStats(&stats);
         }
 
-        poolStats.doneFast();
+        // Output to a BSON object.
+        stats.appendToBSON(result);
 
-        // Always report all replica sets being tracked
+        // Always report all replica sets being tracked.
         BSONObjBuilder setStats(result.subobjStart("replicaSets"));
         globalRSMonitorManager.report(&setStats);
         setStats.doneFast();

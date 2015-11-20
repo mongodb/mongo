@@ -55,6 +55,7 @@ class NamespaceString;
 class OperationContext;
 
 namespace executor {
+struct ConnectionPoolStats;
 class NetworkInterface;
 }  // namespace executor
 
@@ -125,7 +126,7 @@ public:
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle) override;
 
-    void appendConnectionStats(BSONObjBuilder* b) override;
+    void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
     /**
      * Executes the run loop. May be called up to one time.

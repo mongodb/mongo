@@ -50,6 +50,10 @@ class SnapshotName;
 class Timestamp;
 struct WriteConcernOptions;
 
+namespace executor {
+struct ConnectionPoolStats;
+}  // namespace executor
+
 namespace rpc {
 
 class ReplSetMetadata;
@@ -726,7 +730,7 @@ public:
     /**
      * Appends connection information to the provided BSONObjBuilder.
      */
-    virtual void appendConnectionStats(BSONObjBuilder* b) = 0;
+    virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const = 0;
 
     /**
      * Gets the number of uncommitted snapshots currently held.

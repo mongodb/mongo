@@ -43,6 +43,8 @@ class BSONObjBuilder;
 
 namespace executor {
 
+struct ConnectionPoolStats;
+
 /**
  * The actual user visible connection pool.
  *
@@ -115,7 +117,7 @@ public:
 
     void get(const HostAndPort& hostAndPort, Milliseconds timeout, GetConnectionCallback cb);
 
-    void appendConnectionStats(BSONObjBuilder* b);
+    void appendConnectionStats(ConnectionPoolStats* stats) const;
 
 private:
     void returnConnection(ConnectionInterface* connection);
@@ -127,7 +129,7 @@ private:
     const std::unique_ptr<DependentTypeFactoryInterface> _factory;
 
     // The global mutex for specific pool access and the generation counter
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
     std::unordered_map<HostAndPort, std::unique_ptr<SpecificPool>> _pools;
 };
 

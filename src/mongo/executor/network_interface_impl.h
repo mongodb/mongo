@@ -43,6 +43,7 @@
 namespace mongo {
 namespace executor {
 
+struct ConnectionPoolStats;
 class NetworkConnectionHook;
 
 /**
@@ -77,7 +78,7 @@ public:
     NetworkInterfaceImpl(std::unique_ptr<NetworkConnectionHook> hook);
     ~NetworkInterfaceImpl();
     std::string getDiagnosticString() override;
-    void appendConnectionStats(BSONObjBuilder* b) override;
+    void appendConnectionStats(ConnectionPoolStats* stats) const override;
     void startup() override;
     void shutdown() override;
     void waitForWork() override;

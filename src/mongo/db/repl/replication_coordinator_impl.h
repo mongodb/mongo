@@ -60,6 +60,10 @@ class Timer;
 template <typename T>
 class StatusWith;
 
+namespace executor {
+struct ConnectionPoolStats;
+}  // namespace executor
+
 namespace rpc {
 class ReplSetMetadata;
 }  // namespace rpc
@@ -307,7 +311,7 @@ public:
     virtual void waitUntilSnapshotCommitted(OperationContext* txn,
                                             const SnapshotName& untilSnapshot) override;
 
-    virtual void appendConnectionStats(BSONObjBuilder* b) override;
+    virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
     virtual size_t getNumUncommittedSnapshots() override;
 

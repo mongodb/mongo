@@ -38,6 +38,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
@@ -369,8 +370,8 @@ void ThreadPoolTaskExecutor::wait(const CallbackHandle& cbHandle) {
     }
 }
 
-void ThreadPoolTaskExecutor::appendConnectionStats(BSONObjBuilder* b) {
-    _net->appendConnectionStats(b);
+void ThreadPoolTaskExecutor::appendConnectionStats(ConnectionPoolStats* stats) const {
+    _net->appendConnectionStats(stats);
 }
 
 void ThreadPoolTaskExecutor::cancelAllCommands() {

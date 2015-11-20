@@ -65,6 +65,7 @@
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/stdx/functional.h"
@@ -283,8 +284,8 @@ OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() {
     return OpTime();
 }
 
-void ReplicationCoordinatorImpl::appendConnectionStats(BSONObjBuilder* b) {
-    _replExecutor.appendConnectionStats(b);
+void ReplicationCoordinatorImpl::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
+    _replExecutor.appendConnectionStats(stats);
 }
 
 void ReplicationCoordinatorImpl::_updateLastVote(const LastVote& lastVote) {

@@ -33,6 +33,7 @@
 #include <algorithm>
 
 #include "mongo/db/server_parameters.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/processinfo.h"
 
@@ -93,6 +94,15 @@ TaskExecutor* TaskExecutorPool::getArbitraryExecutor() {
 TaskExecutor* TaskExecutorPool::getFixedExecutor() {
     invariant(_fixedExecutor);
     return _fixedExecutor.get();
+}
+
+void TaskExecutorPool::appendConnectionStats(ConnectionPoolStats* stats) const {
+    // Get stats from our fixed executor.
+    _fixedExecutor->appendConnectionStats(stats);
+    // Get stats from our pooled executors.
+    for (auto&& executor : _executors) {
+        executor->appendConnectionStats(stats);
+    }
 }
 
 }  // namespace executor

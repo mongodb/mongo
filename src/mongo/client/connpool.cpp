@@ -35,9 +35,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/connpool.h"
+
+#include <string>
+
+#include "mongo/client/connection_string.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
@@ -341,41 +346,28 @@ void DBConnectionPool::onDestroy(DBClientBase* conn) {
     }
 }
 
-void DBConnectionPool::appendInfo(BSONObjBuilder& b) {
-    int totalInUse = 0;
-    int totalAvailable = 0;
-    long long totalCreated = 0;
-
-    BSONObjBuilder bb(b.subobjStart("hosts"));
+void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); ++i) {
+        for (PoolMap::const_iterator i = _pools.begin(); i != _pools.end(); ++i) {
             if (i->second.numCreated() == 0)
                 continue;
 
-            auto inUse = i->second.numInUse();
-            auto available = i->second.numAvailable();
-            auto created = i->second.numCreated();
+            // Mongos may use either a replica set uri or a list of addresses as
+            // the identifier here, so we always take the first server parsed out
+            // as our label for connPoolStats. Note that these stats will collide
+            // with any existing stats for the chosen host.
+            auto uri = ConnectionString::parse(i->first.ident);
+            invariant(uri.isOK());
+            HostAndPort host = uri.getValue().getServers().front();
 
-            string s = str::stream() << i->first.ident << "::" << i->first.timeout;
-            BSONObjBuilder temp(bb.subobjStart(s));
-
-            temp.append("inUse", inUse);
-            temp.append("available", available);
-            temp.appendNumber("created", created);
-
-            temp.done();
-
-            totalInUse += inUse;
-            totalAvailable += available;
-            totalCreated += created;
+            executor::ConnectionStatsPerHost hostStats{
+                static_cast<size_t>(i->second.numInUse()),
+                static_cast<size_t>(i->second.numAvailable()),
+                static_cast<size_t>(i->second.numCreated())};
+            stats->updateStatsForHost(host, hostStats);
         }
     }
-    bb.done();
-
-    b.append("totalInUse", totalInUse);
-    b.append("totalAvailable", totalAvailable);
-    b.appendNumber("totalCreated", totalCreated);
 }
 
 bool DBConnectionPool::serverNameCompare::operator()(const string& a, const string& b) const {

@@ -31,6 +31,7 @@
 
 #include "mongo/executor/connection_pool.h"
 
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/memory.h"
@@ -211,42 +212,18 @@ void ConnectionPool::get(const HostAndPort& hostAndPort,
     pool->getConnection(hostAndPort, timeout, std::move(lk), std::move(cb));
 }
 
-void ConnectionPool::appendConnectionStats(BSONObjBuilder* b) {
-    size_t inUse = 0u;
-    size_t available = 0u;
-    size_t created = 0u;
-
-    BSONObjBuilder hostBuilder(b->subobjStart("hosts"));
-
+void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     for (const auto& kv : _pools) {
-        std::string label = kv.first.toString();
-        BSONObjBuilder hostInfo(hostBuilder.subobjStart(label));
+        HostAndPort host = kv.first;
 
         auto& pool = kv.second;
-        auto inUseConnections = pool->inUseConnections(lk);
-        auto availableConnections = pool->availableConnections(lk);
-        auto createdConnections = pool->createdConnections(lk);
-        hostInfo.appendNumber("inUse", inUseConnections);
-        hostInfo.appendNumber("available", availableConnections);
-        hostInfo.appendNumber("created", createdConnections);
-
-        hostInfo.done();
-
-        // update available and created
-        inUse += inUseConnections;
-        available += availableConnections;
-        created += createdConnections;
+        ConnectionStatsPerHost hostStats{pool->inUseConnections(lk),
+                                         pool->availableConnections(lk),
+                                         pool->createdConnections(lk)};
+        stats->updateStatsForHost(host, hostStats);
     }
-
-    hostBuilder.done();
-
-    b->appendNumber("totalInUse", inUse);
-    b->appendNumber("totalAvailable", available);
-    b->appendNumber("totalCreated", created);
-
-    return;
 }
 
 void ConnectionPool::returnConnection(ConnectionInterface* conn) {

@@ -62,9 +62,9 @@ public:
     virtual std::string getDiagnosticString() = 0;
 
     /**
-     * Appends connection information to the provided BSONObjBuilder.
+     * Appends information about the connections on this NetworkInterface.
      */
-    virtual void appendConnectionStats(BSONObjBuilder* b) = 0;
+    virtual void appendConnectionStats(ConnectionPoolStats* stats) const = 0;
 
     /**
      * Starts up the network interface.

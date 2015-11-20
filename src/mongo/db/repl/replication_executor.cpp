@@ -468,8 +468,8 @@ ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock(const CallbackFn& work)
     return handle;
 }
 
-void ReplicationExecutor::appendConnectionStats(BSONObjBuilder* b) {
-    _networkInterface->appendConnectionStats(b);
+void ReplicationExecutor::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
+    _networkInterface->appendConnectionStats(stats);
 }
 
 std::pair<ReplicationExecutor::WorkItem, ReplicationExecutor::CallbackHandle>

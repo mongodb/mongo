@@ -42,6 +42,10 @@ namespace mongo {
 class BSONObjBuilder;
 class DBConnectionPool;
 
+namespace executor {
+struct ConnectionPoolStats;
+}  // namespace executor
+
 /**
  * not thread safe
  * thread safety is handled by DBConnectionPool
@@ -224,7 +228,7 @@ public:
     void release(const std::string& host, DBClientBase* c);
 
     void addHook(DBConnectionHook* hook);  // we take ownership
-    void appendInfo(BSONObjBuilder& b);
+    void appendConnectionStats(executor::ConnectionPoolStats* stats) const;
 
     /**
      * Clears all connections for all host.
@@ -274,7 +278,7 @@ private:
 
     typedef std::map<PoolKey, PoolForHost, poolKeyCompare> PoolMap;  // servername -> pool
 
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
     std::string _name;
 
     // The maximum number of connections we'll save in the pool per-host

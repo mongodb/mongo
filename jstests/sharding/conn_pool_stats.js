@@ -10,26 +10,10 @@ stats = cluster.s.getDB("admin").runCommand({connPoolStats : 1});
 printjson(stats);
 assert.commandWorked(stats);
 assert("replicaSets" in stats);
-
-assert("pools" in stats);
-var pools = stats["pools"];
-
-// Stats from dbclient pool
-assert("DBClient (Global)" in pools);
-var dbclient = pools["DBClient (Global)"];
-assert("hosts" in dbclient);
-assert("numClientConnection" in dbclient);
-assert("numAScopedConnection" in dbclient);
-assert("totalInUse" in dbclient);
-assert("totalAvailable" in dbclient);
-assert("totalCreated" in dbclient);
-assert.lte(dbclient["totalInUse"] + dbclient["totalAvailable"], dbclient["totalCreated"], tojson(dbclient));
-
-// Stats from ASIO pool
-assert("NetworkInterfaceASIO (Sharding)" in pools);
-var asio = pools["NetworkInterfaceASIO (Sharding)"];
-assert("hosts" in asio);
-assert("totalInUse" in asio);
-assert("totalAvailable" in asio);
-assert("totalCreated" in asio);
-assert.lte(asio["totalInUse"] + asio["totalAvailable"], asio["totalCreated"], tojson(asio));
+assert("hosts" in stats);
+assert("numClientConnections" in stats);
+assert("numAScopedConnections" in stats);
+assert("totalInUse" in stats);
+assert("totalAvailable" in stats);
+assert("totalCreated" in stats);
+assert.lte(stats["totalInUse"] + stats["totalAvailable"], stats["totalCreated"], tojson(stats));
