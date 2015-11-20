@@ -263,8 +263,8 @@ __wt_free_ref(
 	}
 
 	/*
-	 * Free any address allocation; if there's no linke WT_REF page, it must
-	 * be allocated.
+	 * Free any address allocation; if there's no linked WT_REF page, it
+	 * must be allocated.
 	 */
 	if (ref->addr != NULL &&
 	    (ref->home == NULL || __wt_off_page(ref->page, ref->addr))) {
