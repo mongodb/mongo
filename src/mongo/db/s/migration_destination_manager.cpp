@@ -48,8 +48,8 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -309,17 +309,19 @@ void MigrationDestinationManager::_migrateThread(std::string ns,
                                                  std::string fromShard,
                                                  OID epoch,
                                                  WriteConcernOptions writeConcern) {
-    Client::initThread("migrateThread");
+    const std::string migrateThreadName(str::stream() << "migrateThread-" << ns);
+    Client::initThread(migrateThreadName.c_str());
 
-    OperationContextImpl txn;
+    Client* const client = &cc();
+    auto txn = getGlobalServiceContext()->makeOperationContext(client);
 
     if (getGlobalAuthorizationManager()->isAuthEnabled()) {
         ShardedConnectionInfo::addHook();
-        AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
+        AuthorizationSession::get(txn->getClient())->grantInternalAuthorization();
     }
 
     try {
-        _migrateDriver(&txn, ns, min, max, shardKeyPattern, fromShard, epoch, writeConcern);
+        _migrateDriver(txn.get(), ns, min, max, shardKeyPattern, fromShard, epoch, writeConcern);
     } catch (std::exception& e) {
         {
             stdx::lock_guard<stdx::mutex> sl(_mutex);
@@ -335,17 +337,18 @@ void MigrationDestinationManager::_migrateThread(std::string ns,
             _errmsg = "UNKNOWN ERROR";
         }
 
-        error() << "migrate failed with unknown exception" << migrateLog;
+        severe() << "migrate failed with unknown exception" << migrateLog;
     }
 
     if (getState() != DONE) {
         // Unprotect the range if needed/possible on unsuccessful TO migration
-        ScopedTransaction transaction(&txn, MODE_IX);
-        Lock::DBLock dbLock(txn.lockState(), nsToDatabaseSubstring(ns), MODE_IX);
-        Lock::CollectionLock collLock(txn.lockState(), ns, MODE_X);
+        ScopedTransaction transaction(txn.get(), MODE_IX);
+        Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+        Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 
         string errMsg;
-        if (!ShardingState::get(&txn)->forgetPending(&txn, ns, min, max, epoch, &errMsg)) {
+        if (!ShardingState::get(txn.get())
+                 ->forgetPending(txn.get(), ns, min, max, epoch, &errMsg)) {
             warning() << errMsg;
         }
     }
@@ -810,31 +813,54 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* txn,
     bool didAnything = false;
 
     if (xfer["deleted"].isABSONObj()) {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dlk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
-        Helpers::RemoveSaver rs("moveChunk", ns, "removedDuring");
+        boost::optional<Helpers::RemoveSaver> removeSaver;
+        if (serverGlobalParams.moveParanoia) {
+            removeSaver.emplace("moveChunk", ns, "removedDuring");
+        }
+
+        boost::optional<ScopedTransaction> autoXact;
+        boost::optional<AutoGetCollection> autoColl;
+
+        const int maxItersBeforeYield =
+            std::max(static_cast<int>(internalQueryExecYieldIterations), 1);
+        int opCounter = 0;
 
         BSONObjIterator i(xfer["deleted"].Obj());
         while (i.more()) {
-            Lock::CollectionLock clk(txn->lockState(), ns, MODE_X);
-            OldClientContext ctx(txn, ns);
+            if (opCounter % maxItersBeforeYield == 0) {
+                autoXact.reset();
+                autoColl.reset();
+                autoXact.emplace(txn, MODE_IX);
+                autoColl.emplace(txn, NamespaceString(ns), MODE_X);
+            }
+
+            // If the collection does not exist there won't be any documents to remove. This
+            // condition can only happen if deletions are happening for an empty chunk or in the
+            // unlikely event that someone manually deleted the collection.
+            if (!autoColl->getCollection()) {
+                break;
+            }
 
             BSONObj id = i.next().Obj();
 
+            // Increment the counter before doing either the read or delete, so we yield the WT
+            // snapshot more aggressively
+            opCounter++;
+
             // do not apply deletes if they do not belong to the chunk being migrated
             BSONObj fullObj;
-            if (Helpers::findById(txn, ctx.db(), ns.c_str(), id, fullObj)) {
+            if (Helpers::findById(txn, autoColl->getDb(), ns.c_str(), id, fullObj)) {
                 if (!isInRange(fullObj, min, max, shardKeyPattern)) {
                     continue;
                 }
             }
 
-            if (serverGlobalParams.moveParanoia) {
-                rs.goingToDelete(fullObj);
+            if (removeSaver) {
+                removeSaver->goingToDelete(fullObj);
             }
 
             deleteObjects(txn,
-                          ctx.db() ? ctx.db()->getCollection(ns) : nullptr,
+                          autoColl->getCollection(),
                           ns,
                           id,
                           PlanExecutor::YIELD_MANUAL,
