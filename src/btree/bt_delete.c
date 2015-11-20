@@ -252,6 +252,18 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 	    __wt_txn_visible_all(session, ref->page_del->txnid) :
 	    __wt_txn_visible(session, ref->page_del->txnid));
 
+	/*
+	 * The page_del structure can be freed as soon as the delete is stable:
+	 * it is only read when the ref state is WT_REF_DELETED.  It is worth
+	 * checking every time we come through because once this is freed, we
+	 * no longer need synchronization to check the ref.
+	 */
+	if (skip && ref->page_del != NULL && (visible_all ||
+	    __wt_txn_visible_all(session, ref->page_del->txnid))) {
+		__wt_free(session, ref->page_del->update_list);
+		__wt_free(session, ref->page_del);
+	}
+
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (skip);
 }
