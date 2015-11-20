@@ -187,12 +187,6 @@ private:
     // Bumped when all open sessions need to be closed
     AtomicUInt64 _epoch;  // atomic so we can check it outside of the lock
 
-    /**
-     * Counter for number of sessions out. Used to avoid closing a connection while there are active
-     * sessions.
-     */
-    AtomicUInt64 _sessionsOut;
-
     // Counter and critical section mutex for waitUntilDurable
     AtomicUInt32 _lastSyncTime;
     stdx::mutex _lastSyncMutex;

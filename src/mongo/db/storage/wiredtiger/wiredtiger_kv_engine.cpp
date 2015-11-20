@@ -280,9 +280,9 @@ Status WiredTigerKVEngine::repairIdent(OperationContext* opCtx, StringData ident
 }
 
 Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
-    auto sessionWrapper = _sessionCache->getSession();
-    auto returnSession = MakeGuard([&] { _sessionCache->releaseSession(sessionWrapper); });
-    WT_SESSION* session = sessionWrapper->getSession();
+    // Using a side session to avoid transactional issues
+    WiredTigerSession sessionWrapper(_conn);
+    WT_SESSION* session = sessionWrapper.getSession();
 
     int rc = (session->verify)(session, uri, NULL);
     if (rc == 0) {
@@ -307,10 +307,10 @@ int WiredTigerKVEngine::flushAllFiles(bool sync) {
     LOG(1) << "WiredTigerKVEngine::flushAllFiles";
     syncSizeInfo(true);
 
-    auto session = _sessionCache->getSession();
-    auto returnSession = MakeGuard([&] { _sessionCache->releaseSession(session); });
-    WT_SESSION* s = session->getSession();
+    WiredTigerSession session(_conn);
+    WT_SESSION* s = session.getSession();
     invariantWTOK(s->checkpoint(s, NULL));
+
     return 1;
 }
 
@@ -361,8 +361,7 @@ Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
                                              StringData ident,
                                              const CollectionOptions& options) {
     _checkIdentPath(ident);
-    auto session = _sessionCache->getSession();
-    auto returnSession = MakeGuard([&] { _sessionCache->releaseSession(session); });
+    WiredTigerSession session(_conn);
 
     StatusWith<std::string> result =
         WiredTigerRecordStore::generateCreateString(_canonicalName, ns, options, _rsOptions);
@@ -372,7 +371,7 @@ Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
     std::string config = result.getValue();
 
     string uri = _uri(ident);
-    WT_SESSION* s = session->getSession();
+    WT_SESSION* s = session.getSession();
     LOG(2) << "WiredTigerKVEngine::createRecordStore uri: " << uri << " config: " << config;
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
 }
@@ -513,11 +512,10 @@ void WiredTigerKVEngine::dropAllQueued() {
     set<string> deleted;
 
     {
-        auto session = _sessionCache->getSession();
-        auto returnSession = MakeGuard([&] { _sessionCache->releaseSession(session); });
+        WiredTigerSession session(_conn);
         for (set<string>::const_iterator it = mine.begin(); it != mine.end(); ++it) {
             string uri = *it;
-            int ret = session->getSession()->drop(session->getSession(), uri.c_str(), "force");
+            int ret = session.getSession()->drop(session.getSession(), uri.c_str(), "force");
             LOG(1) << "WT queued drop of  " << uri << " res " << ret;
 
             if (ret == 0) {
