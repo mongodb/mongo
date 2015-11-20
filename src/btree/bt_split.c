@@ -877,18 +877,13 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				    session, split_gen, exclusive, ikey, size));
 				parent_decr += size;
 			}
-			/*
-			 * The page_del structure can be freed immediately: it
-			 * is only read when the ref state is WT_REF_DELETED.
-			 * The size of the structure wasn't added to the parent,
-			 * don't decrement.
-			 */
-			if (next_ref->page_del != NULL) {
-				__wt_free(session,
-				    next_ref->page_del->update_list);
-				__wt_free(session, next_ref->page_del);
-			}
 		}
+
+		/*
+		 * If this page was fast-truncated, any attached structure
+		 * should have been freed before now.
+		 */
+		WT_ASSERT(session, next_ref->page_del == NULL);
 
 		WT_TRET(__split_safe_free(
 		    session, split_gen, exclusive, next_ref, sizeof(WT_REF)));
