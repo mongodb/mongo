@@ -457,7 +457,7 @@ public:
         set<RecordId>::iterator it = locs.begin();
         {
             WriteUnitOfWork wuow(&_txn);
-            coll->deleteDocument(&_txn, *it++, false, false, NULL);
+            coll->deleteDocument(&_txn, *it++);
             wuow.commit();
         }
         exec->restoreState();
@@ -473,7 +473,7 @@ public:
         while (it != locs.end()) {
             {
                 WriteUnitOfWork wuow(&_txn);
-                coll->deleteDocument(&_txn, *it++, false, false, NULL);
+                coll->deleteDocument(&_txn, *it++);
                 wuow.commit();
             }
         }
