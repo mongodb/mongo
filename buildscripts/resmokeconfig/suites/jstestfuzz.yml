@@ -11,7 +11,9 @@ executor:
     fixture:
       class: MongoDFixture
       mongod_options:
+        noprealloc: ''
         set_parameters:
           enableTestCommands: 1
+        smallfiles: ''
         verbose: ''
 
