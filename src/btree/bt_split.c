@@ -394,13 +394,13 @@ __split_child_block_evict_and_split(WT_PAGE *child)
  */
 static int
 __split_ref_move_final(
-    WT_SESSION_IMPL *session, WT_REF **refp, uint32_t entries)
+    WT_SESSION_IMPL *session, WT_PAGE_INDEX *pindex, bool skip_first)
 {
 	WT_DECL_RET;
 	WT_PAGE *child;
 	WT_REF *ref, *child_ref;
 	uint64_t txn_new_id;
-	uint32_t i;
+	uint32_t i, j;
 
 	/*
 	 * When creating new internal pages as part of a split, we set a field
@@ -419,8 +419,11 @@ __split_ref_move_final(
 	 * happens the thread waits for the reference's home page to be updated,
 	 * which we do here: walk the children and fix them up.
 	 */
-	for (i = 0; i < entries; ++i, ++refp) {
-		ref = *refp;
+	for (i = skip_first ? 1 : 0; i < pindex->entries; ++i) {
+		ref = pindex->index[i];
+
+		/* Update the WT_REF's page-index hint. */
+		ref->pindex_hint = i;
 
 		/*
 		 * We don't hold hazard pointers on created pages, they cannot
@@ -450,6 +453,7 @@ __split_ref_move_final(
 		 * know about that flag; use the standard macros to ensure that
 		 * reading the child's page index structure is safe.
 		 */
+		j = 0;
 		WT_ENTER_PAGE_INDEX(session);
 		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
 			/*
@@ -460,10 +464,12 @@ __split_ref_move_final(
 			 */
 			if (child_ref->home != child) {
 				child_ref->home = child;
-				child_ref->pindex_hint = 0;
-
 				child->modify->mod_split_txn = txn_new_id;
 			}
+
+			/* Update the WT_REF's page-index hint. */
+			child_ref->pindex_hint = j++;
+
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);
 
@@ -639,8 +645,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	    __split_verify_intl_key_order(session, root));
 #endif
 	/* Fix up the moved WT_REF structures. */
-	WT_ERR(__split_ref_move_final(
-	    session, alloc_index->index, alloc_index->entries));
+	WT_ERR(__split_ref_move_final(session, alloc_index, false));
 
 	/* We've installed the allocated page-index, ensure error handling. */
 	alloc_index = NULL;
@@ -701,7 +706,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_REF **alloc_refp, *next_ref;
 	size_t parent_decr, size;
 	uint64_t split_gen;
-	uint32_t i, j;
+	uint32_t hint, i, j;
 	uint32_t deleted_entries, parent_entries, result_entries;
 	uint32_t *deleted_refs;
 	bool complete, empty_parent;
@@ -769,22 +774,31 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * Allocate and initialize a new page index array for the parent, then
 	 * copy references from the original index array, plus references from
 	 * the newly created split array, into place.
+	 *
+	 * Update the WT_REF's page-index hint as we go. This can race with a
+	 * thread setting the hint based on an older page-index, and the change
+	 * isn't backed out in the case of an error, so there ways for the hint
+	 * to be wrong; OK because it's just a hint.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + result_entries * sizeof(WT_REF *);
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
 	parent_incr += size;
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = result_entries;
-	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i) {
+	for (alloc_refp = alloc_index->index,
+	    hint = i = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		if (next_ref == ref)
 			for (j = 0; j < new_entries; ++j) {
 				ref_new[j]->home = parent;
+				ref_new[j]->pindex_hint = hint++;
 				*alloc_refp++ = ref_new[j];
 			}
-		else if (next_ref->state != WT_REF_SPLIT)
+		else if (next_ref->state != WT_REF_SPLIT) {
 			/* Skip refs we have marked for deletion. */
+			next_ref->pindex_hint = hint++;
 			*alloc_refp++ = next_ref;
+		}
 	}
 
 	/* Check that we filled in all the entries. */
@@ -1128,8 +1142,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 #endif
 
 	/* Fix up the moved WT_REF structures. */
-	WT_ERR(__split_ref_move_final(
-	    session, alloc_index->index + 1, alloc_index->entries - 1));
+	WT_ERR(__split_ref_move_final(session, alloc_index, true));
 
 	/*
 	 * We don't care about the page-index we allocated, all we needed was
