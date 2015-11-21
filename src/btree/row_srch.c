@@ -151,17 +151,19 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 	item = cbt->tmp;
 
 	/*
-	 * Check the parent's starting key for this page.
+	 * Check if the search key is less than the parent's starting key for
+	 * this page.
 	 */
 	__wt_ref_key(leaf->home, leaf, &item->data, &item->size);
 	WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
 	if (cmp < 0) {
-		cbt->compare = -1;
+		cbt->compare = 1;		/* page keys > search key */
 		return (0);
 	}
 
 	/*
-	 * Check the starting key for the parent's next page.
+	 * Check if the search key is greater than or equal to the starting key
+	 * for the parent's next page.
 	 */
 	WT_INTL_INDEX_GET(session, leaf->home, pindex);
 	indx = leaf->pindex_hint;
@@ -170,7 +172,7 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 		    pindex->index[indx + 1], &item->data, &item->size);
 		WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
 		if (cmp >= 0) {
-			cbt->compare = 1;
+			cbt->compare = -1;	/* page keys < search key */
 			return (0);
 		}
 	}
@@ -238,8 +240,15 @@ __wt_row_search(WT_SESSION_IMPL *session,
 		if (leaf->home) {
 			WT_RET(__check_leaf_key_range(
 			    session, srch_key, leaf, cbt));
-			if (cbt->compare != 0)
+			if (cbt->compare != 0) {
+				/*
+				 * !!!
+				 * WT_CURSOR.search_near uses the slot value to
+				 * decide if there was an on-page match.
+				 */
+				cbt->slot = 0;
 				return (0);
+			}
 		}
 
 		current = leaf;
