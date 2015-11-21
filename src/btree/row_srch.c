@@ -132,11 +132,11 @@ __wt_search_insert(
 }
 
 /*
- * __row_check_leaf_key_range --
+ * __check_leaf_key_range --
  *	Check the search key is in the leaf page's key range.
  */
 static inline int
-__row_check_leaf_key_range(WT_SESSION_IMPL *session,
+__check_leaf_key_range(WT_SESSION_IMPL *session,
     WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
@@ -166,10 +166,10 @@ __row_check_leaf_key_range(WT_SESSION_IMPL *session,
 	WT_INTL_INDEX_GET(session, leaf->home, pindex);
 	indx = leaf->pindex_hint;
 	if (pindex->index[indx] == leaf && indx + 1 < pindex->entries) {
-		__wt_ref_key(
-		    leaf->home, pindex->index[indx], &item->data, &item->size);
+		__wt_ref_key(leaf->home,
+		    pindex->index[indx + 1], &item->data, &item->size);
 		WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
-		if (cmp > 0) {
+		if (cmp >= 0) {
 			cbt->compare = 1;
 			return (0);
 		}
@@ -236,8 +236,8 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	 */
 	if (leaf != NULL) {
 		if (leaf->home)
-		WT_RET(
-		    __row_check_leaf_key_range(session, srch_key, leaf, cbt));
+			WT_RET(__check_leaf_key_range(
+			    session, srch_key, leaf, cbt));
 		if (cbt->compare != 0)
 			return (0);
 
