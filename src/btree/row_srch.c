@@ -235,11 +235,12 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	 * it's faster when the cursor is being re-positioned.
 	 */
 	if (leaf != NULL) {
-		if (leaf->home)
+		if (leaf->home) {
 			WT_RET(__check_leaf_key_range(
 			    session, srch_key, leaf, cbt));
-		if (cbt->compare != 0)
-			return (0);
+			if (cbt->compare != 0)
+				return (0);
+		}
 
 		current = leaf;
 		goto leaf_only;
