@@ -2518,3 +2518,18 @@ env.Alias("distsrc", "distsrc-tgz")
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 
 env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests'])
+
+# Substitute environment variables in any build targets so that we can
+# say, for instance:
+#
+# > scons --prefix=/foo/bar '$INSTALL_DIR'
+# or
+# > scons \$BUILD_DIR/mongo/base
+#
+# That way, you can reference targets under the variant dir or install
+# path via an invariant name.
+#
+# We need to replace the values in the BUILD_TARGETS object in-place
+# because SCons wants it to be a particular object.
+for i, s in enumerate(BUILD_TARGETS):
+    BUILD_TARGETS[i] = env.subst(s)
