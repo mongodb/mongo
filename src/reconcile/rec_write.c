@@ -3644,7 +3644,6 @@ __wt_bulk_insert_fix(
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_RECONCILE *r;
-	const uint8_t *data;
 
 	r = cbulk->reconcile;
 	btree = S2BT(session);
