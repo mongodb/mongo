@@ -72,7 +72,7 @@ __curbulk_insert_var(WT_CURSOR *cursor)
 	 * it is only zero before the first row is inserted.
 	 */
 	duplicate = false;
-	if (cbulk->rle != 0) {
+	if (!cbulk->first_insert) {
 		if (cbulk->last.size == cursor->value.size &&
 		    memcmp(cbulk->last.data, cursor->value.data,
 		    cursor->value.size) == 0) {
@@ -80,7 +80,8 @@ __curbulk_insert_var(WT_CURSOR *cursor)
 			duplicate = true;
 		} else
 			WT_ERR(__wt_bulk_insert_var(session, cbulk));
-	}
+	} else
+		cbulk->first_insert = false;
 
 	/*
 	 * Save a copy of the value for the next comparison and reset the RLE
@@ -161,16 +162,14 @@ __curbulk_insert_row(WT_CURSOR *cursor)
 	/*
 	 * If this isn't the first key inserted, compare it against the last key
 	 * to ensure the application doesn't accidentally corrupt the table.
-	 *
-	 * Instead of a "first time" variable, I'm using the RLE count, because
-	 * it is only zero before the first row is inserted.
 	 */
-	if (cbulk->rle != 0) {
+	if (!cbulk->first_insert) {
 		WT_ERR(__wt_compare(session,
 		    btree->collator, &cursor->key, &cbulk->last, &cmp));
 		if (cmp <= 0)
 			WT_ERR(__bulk_row_keycmp_err(cbulk));
-	}
+	} else
+		cbulk->first_insert = false;
 
 	/*
 	 * Save a copy of the key for the next comparison and set the RLE
@@ -178,7 +177,6 @@ __curbulk_insert_row(WT_CURSOR *cursor)
 	 */
 	WT_ERR(__wt_buf_set(session,
 	    &cbulk->last, cursor->key.data, cursor->key.size));
-	cbulk->rle = 1;
 
 	WT_ERR(__wt_bulk_insert_row(session, cbulk));
 
@@ -249,6 +247,7 @@ __wt_curbulk_init(WT_SESSION_IMPL *session,
 	WT_ILLEGAL_VALUE(session);
 	}
 
+	cbulk->first_insert = true;
 	cbulk->bitmap = bitmap;
 	if (bitmap)
 		F_SET(c, WT_CURSTD_RAW);

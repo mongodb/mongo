@@ -207,16 +207,17 @@ struct __wt_cursor_bulk {
 	WT_REF	*ref;			/* The leaf page */
 	WT_PAGE *leaf;
 
+
 	/*
 	 * Variable-length column store compares values during bulk load as
 	 * part of RLE compression, row-store compares keys during bulk load
 	 * to avoid corruption.
 	 */
-	WT_ITEM last;			/* Last key/value seen */
+	bool	first_insert;		/* First insert, else check order  */
+	WT_ITEM	last;			/* Last key/value seen */
 
 	/*
-	 * Variable-length column-store RLE counter (also overloaded to mean
-	 * the first time through the bulk-load insert routine, when set to 0).
+	 * Variable-length column-store RLE counter.
 	 */
 	uint64_t rle;
 
