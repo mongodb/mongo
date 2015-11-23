@@ -92,7 +92,8 @@ public:
      * interfacing with legacy code that adds additional data to a failed command reply and
      * its use is discouraged in new code.
      */
-    ReplyBuilderInterface& setCommandReply(Status nonOKStatus, const BSONObj& extraErrorInfo);
+    virtual ReplyBuilderInterface& setCommandReply(Status nonOKStatus,
+                                                   const BSONObj& extraErrorInfo);
 
     /**
      * Add a range of output documents to the reply. This method can be called multiple times

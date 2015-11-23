@@ -51,6 +51,26 @@ LegacyReplyBuilder::LegacyReplyBuilder(Message&& message) : _message{std::move(m
 
 LegacyReplyBuilder::~LegacyReplyBuilder() {}
 
+LegacyReplyBuilder& LegacyReplyBuilder::setCommandReply(Status nonOKStatus,
+                                                        const BSONObj& extraErrorInfo) {
+    invariant(_state == State::kCommandReply);
+    if (nonOKStatus == ErrorCodes::SendStaleConfig) {
+        _staleConfigError = true;
+        // Need to use the special $err format for SendStaleConfig errors to be backwards
+        // compatible.
+        BSONObjBuilder err;
+        // $err must be the first field in object.
+        err.append("$err", nonOKStatus.reason());
+        err.append("code", nonOKStatus.code());
+        err.appendElements(extraErrorInfo);
+        setRawCommandReply(err.done());
+    } else {
+        // All other errors proceed through the normal path, which also handles state transitions.
+        ReplyBuilderInterface::setCommandReply(std::move(nonOKStatus), extraErrorInfo);
+    }
+    return *this;
+}
+
 LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(const BSONObj& commandReply) {
     invariant(_state == State::kCommandReply);
     commandReply.appendSelfToBufBuilder(_builder);
@@ -116,6 +136,7 @@ void LegacyReplyBuilder::reset() {
     _builder.skip(sizeof(QueryResult::Value));
     _message.reset();
     _state = State::kCommandReply;
+    _staleConfigError = false;
 }
 
 
@@ -124,7 +145,13 @@ Message LegacyReplyBuilder::done() {
 
     QueryResult::View qr = _builder.buf();
 
-    qr.setResultFlagsToOk();
+    if (_staleConfigError) {
+        // For compatibility with legacy mongos, we need to set this result flag on SendStaleConfig
+        qr.setResultFlags(ResultFlag_ErrSet | ResultFlag_ShardConfigStale);
+    } else {
+        qr.setResultFlagsToOk();
+    }
+
     qr.msgdata().setLen(_builder.len());
     qr.msgdata().setOperation(opReply);
     qr.setCursorId(0);

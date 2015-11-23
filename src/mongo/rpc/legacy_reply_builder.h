@@ -49,7 +49,8 @@ public:
     LegacyReplyBuilder(Message&&);
     ~LegacyReplyBuilder() final;
 
-
+    // Override of setCommandReply specifically used to handle SendStaleConfigException.
+    LegacyReplyBuilder& setCommandReply(Status nonOKStatus, const BSONObj& extraErrorInfo) final;
     LegacyReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
 
     BufBuilder& getInPlaceReplyBuilder(std::size_t) final;
@@ -71,6 +72,8 @@ private:
     BufBuilder _builder{};
     Message _message;
     State _state{State::kCommandReply};
+    // For stale config errors we need to set the correct ResultFlag.
+    bool _staleConfigError{false};
 };
 
 }  // namespace rpc

@@ -104,7 +104,7 @@ TEST(LegacyReplyBuilder, MemAccess) {
     BSONObj metadata = buildMetadata();
     BSONObj commandReply = buildEmptyCommand();
     rpc::LegacyReplyBuilder replyBuilder;
-    replyBuilder.setCommandReply(commandReply);
+    replyBuilder.setRawCommandReply(commandReply);
     replyBuilder.setMetadata(metadata);
     auto msg = replyBuilder.done();
 
