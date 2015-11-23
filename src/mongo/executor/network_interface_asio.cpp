@@ -105,23 +105,21 @@ std::string NetworkInterfaceASIO::getHostName() {
 }
 
 void NetworkInterfaceASIO::startup() {
-    std::generate_n(std::back_inserter(_serviceRunners),
-                    kIOServiceWorkers,
-                    [&] {
-                        return stdx::thread([this]() {
-                            setThreadName(_options.instanceName + "-" +
-                                          std::to_string(_serviceRunners.size()));
-                            try {
-                                LOG(2) << "The NetworkInterfaceASIO worker thread is spinning up";
-                                asio::io_service::work work(_io_service);
-                                _io_service.run();
-                            } catch (...) {
-                                severe() << "Uncaught exception in NetworkInterfaceASIO IO "
-                                            "worker thread of type: " << exceptionToStatus();
-                                fassertFailed(28820);
-                            }
-                        });
-                    });
+    _serviceRunners.resize(kIOServiceWorkers);
+    for (std::size_t i = 0; i < kIOServiceWorkers; ++i) {
+        _serviceRunners[i] = stdx::thread([this, i]() {
+            setThreadName(_options.instanceName + "-" + std::to_string(i));
+            try {
+                LOG(2) << "The NetworkInterfaceASIO worker thread is spinning up";
+                asio::io_service::work work(_io_service);
+                _io_service.run();
+            } catch (...) {
+                severe() << "Uncaught exception in NetworkInterfaceASIO IO "
+                            "worker thread of type: " << exceptionToStatus();
+                fassertFailed(28820);
+            }
+        });
+    };
     _state.store(State::kRunning);
 }
 
