@@ -3331,6 +3331,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	WT_SAVE_UPD *list;
 	WT_UPDATE *upd;
 	uint64_t las_counter;
+	int64_t insert_cnt;
 	uint32_t i, session_flags, slot;
 	uint8_t *p;
 
@@ -3338,6 +3339,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	WT_CLEAR(las_addr);
 	WT_CLEAR(las_value);
 	page = r->page;
+	insert_cnt = 0;
 
 	/*
 	 * We're writing lookaside records: start instantiating them on pages
@@ -3434,10 +3436,15 @@ __rec_update_las(WT_SESSION_IMPL *session,
 			    cursor, upd->txnid, upd->size, &las_value);
 
 			WT_ERR(cursor->insert(cursor));
+			++insert_cnt;
 		} while ((upd = upd->next) != NULL);
 	}
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
+
+	if (insert_cnt > 0)
+		(void)__wt_atomic_addi64(
+		    &S2C(session)->las_record_cnt, insert_cnt);
 
 	__wt_scr_free(session, &key);
 	return (ret);
