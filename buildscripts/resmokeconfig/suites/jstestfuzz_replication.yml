@@ -8,6 +8,8 @@ executor:
     config:
       shell_options:
         readMode: commands
+    hooks:
+    - class: CheckReplDBHash
     fixture:
       class: ReplicaSetFixture
       mongod_options:
