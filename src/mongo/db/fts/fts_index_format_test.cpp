@@ -209,7 +209,10 @@ TEST(FTSIndexFormat, LongWordTextIndexVersion2) {
     string longWordCat = longPrefix + "cat";
     // "aaa...aaasat"
     string longWordSat = longPrefix + "sat";
-    string text = mongoutils::str::stream() << longWordCat << " " << longWordSat;
+    // "aaa...aaamongodbfts"
+    string longWordMongoDBFts = longPrefix + "mongodbfts";
+    string text = mongoutils::str::stream() << longWordCat << " " << longWordSat << " "
+                                            << longWordMongoDBFts;
     FTSIndexFormat::getKeys(spec, BSON("data" << text), &keys);
 
     // Hard-coded expected computed keys for future-proofing.
@@ -218,6 +221,8 @@ TEST(FTSIndexFormat, LongWordTextIndexVersion2) {
     expectedKeys.insert("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab8e78455d827ebb87cbe87f392bf45f6");
     // sat
     expectedKeys.insert("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaf2d6f58bb3b81b97e611ae7ccac6dea7");
+    // mongodbfts
+    expectedKeys.insert("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaae1d6b34f5d9c92acecd8cce32f747b27");
 
     assertEqualsIndexKeys(expectedKeys, keys);
 }

@@ -30,6 +30,9 @@
 #include <ostream>
 #include <third_party/murmurhash3/MurmurHash3.h>
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+
 namespace mongo {
 
 namespace {
@@ -39,16 +42,16 @@ size_t murmur3(StringData str);
 
 template <>
 size_t murmur3<4>(StringData str) {
-    uint32_t hash;
+    char hash[4];
     MurmurHash3_x86_32(str.rawData(), str.size(), 0, &hash);
-    return hash;
+    return ConstDataView(hash).read<LittleEndian<std::uint32_t>>();
 }
 
 template <>
 size_t murmur3<8>(StringData str) {
-    uint64_t hash[2];
+    char hash[16];
     MurmurHash3_x64_128(str.rawData(), str.size(), 0, hash);
-    return static_cast<size_t>(hash[0]);
+    return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
 }
 
 }  // namespace
