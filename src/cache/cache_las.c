@@ -305,14 +305,6 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 * but possibly better, alternative might be to review all lookaside
 	 * blocks in the cache in order to get rid of them, and slowly review
 	 * lookaside blocks that have already been evicted.
-	 *
-	 * We can't know for sure how many records are in the lookaside table,
-	 * the cursor insert and remove statistics aren't updated atomically.
-	 * Start with reviewing 100 rows, and if it takes more than the target
-	 * number of calls to finish, increase the number of rows checked on
-	 * each call; if it takes less than the target calls to finish, then
-	 * decrease the number of rows reviewed on each call (but never less
-	 * than 100).
 	 */
 	cnt = (uint64_t)WT_MAX(100, conn->las_record_cnt / 30);
 
