@@ -1,4 +1,7 @@
-// SERVER-21305: reported lock times are way too high
+// SERVER-21305: reported lock times are way too high.
+//
+// This test uses the fsync command to induce locking.
+// @tags: [requires_fsync]
 (function() {
     'use strict';
 

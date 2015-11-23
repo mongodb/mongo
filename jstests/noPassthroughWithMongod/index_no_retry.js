@@ -1,4 +1,7 @@
-// Check index rebuild is disabled with --noIndexBuildRetry when MongoDB is killed
+// Check index rebuild is disabled with --noIndexBuildRetry when MongoDB is killed.
+//
+// This test requires persistence beacuase it assumes data/indices will survive a restart.
+// @tags: [requires_persistence]
 (function() {
     'use strict';
     var baseName = 'index_retry';

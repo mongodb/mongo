@@ -3,6 +3,9 @@
  *   - indexed capped collections
  *   - nonexistent collections
  *   - non-capped collections
+ *
+ * This test fails with the ephemeralForTest storage engine.
+ * @tags: [SERVER-21658]
  */
 (function() {
     'use strict';

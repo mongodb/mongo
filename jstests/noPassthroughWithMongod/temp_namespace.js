@@ -1,4 +1,7 @@
-// this is to make sure that temp collections get cleaned up on restart
+// this is to make sure that temp collections get cleaned up on restart.
+//
+// This test requires persistence beacuase it assumes data will survive a restart.
+// @tags: [requires_persistence]
 
 testname = 'temp_namespace_sw'
 

@@ -1,5 +1,8 @@
 /**
  * SERVER-20617: Tests that journaled write operations survive a kill -9 of the mongod.
+ *
+ * This test requires persistence to ensure data survives a restart.
+ * @tags: [requires_persistence]
  */
 (function() {
     'use strict';

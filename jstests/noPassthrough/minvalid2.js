@@ -9,6 +9,13 @@
  *  7. writes on former slave (now primary)
  *  8. start up master
  *  9. check master does not rollback
+ *
+ * If all data-bearing nodes in a replica set are using an ephemeral storage engine, the set will
+ * not be able to survive a scenario where all data-bearing nodes are down simultaneously. In such a
+ * scenario, none of the members will have any data, and upon restart will each look for a member to
+ * initial sync from, so no primary will be elected. This test induces such a scenario, so cannot be
+ * run on ephemeral storage engines.
+ * @tags: [requires_persistence]
  */
 
 print("1. make 3-member set w/arb (2)");

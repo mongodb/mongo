@@ -1,3 +1,12 @@
+/**
+ * Tests that a mongod started with --directoryperdb will write data for database x into a direcotry
+ * named x inside the dbpath.
+ *
+ * This test does not make sense for in-memory storage engines, since they will not produce any data
+ * files.
+ * @tags: [requires_persistence]
+ */
+
 (function() {
     'use strict';
 
