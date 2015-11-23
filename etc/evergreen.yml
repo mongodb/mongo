@@ -396,7 +396,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: jstests.tgz
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/jstestfuzz/jstestfuzz-${build_id}-${execution}.tgz
+        remote_file: mongodb-mongo-master/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
