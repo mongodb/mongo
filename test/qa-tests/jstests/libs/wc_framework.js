@@ -11,8 +11,16 @@ var runWCTest = function runWCTest(progName, rs, toolTest, testWriteConcern, tes
     return json;
   }
 
-  var member1 = rs.nodes[1].getDB("admin");
-  var member2 = rs.nodes[2].getDB("admin");
+  // grab the two secondary nodes
+  var masterPort = rs.getMaster().port
+  var members = []
+  for (var i = 0; i < rs.nodes.length; i++) {
+    if (rs.nodes[i].port != masterPort) {
+      members.push(rs.nodes[i].getDB("admin"));
+    }
+  }
+  var member1 = members[0];
+  var member2 = members[1];
 
   testWriteConcern(0, [], progName+" without write concern to a fully functioning repl-set should succeed");
 
@@ -24,7 +32,7 @@ var runWCTest = function runWCTest(progName, rs, toolTest, testWriteConcern, tes
 
   jsTest.log("stopping one node from doing any further syncing");
   member1.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
-  sleep(5000);
+  sleep(2000);
 
   testWriteConcern(0, ['--writeConcern={w:2,wtimeout:2000}'], progName+" with w:2,timeout:2000 repl-set with 2 working nodes should succeed");
 
@@ -34,7 +42,7 @@ var runWCTest = function runWCTest(progName, rs, toolTest, testWriteConcern, tes
 
   jsTest.log("stopping the other member");
   member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
-  sleep(5000);
+  sleep(2000);
 
   testWriteConcern(1, [windowsEscape('--writeConcern={w:"majority",wtimeout:2000}')], progName+" with majority with no working nodes should fail");
 
