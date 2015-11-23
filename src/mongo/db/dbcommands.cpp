@@ -1390,7 +1390,7 @@ bool Command::run(OperationContext* txn,
                  testingSnapshotBehaviorInIsolation) &&
                 readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
                 // ReadConcern Majority is not supported in ProtocolVersion 0.
-                if (!replCoord->isV1ElectionProtocol()) {
+                if (!testingSnapshotBehaviorInIsolation && !replCoord->isV1ElectionProtocol()) {
                     auto result = appendCommandStatus(
                         inPlaceReplyBob,
                         {ErrorCodes::ReadConcernMajorityNotEnabled,
