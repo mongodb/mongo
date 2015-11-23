@@ -131,17 +131,6 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_eviction_aggressive --
- *	Return if the eviction server is running in aggressive mode.
- */
-static inline bool
-__wt_eviction_aggressive(WT_SESSION_IMPL *session)
-{
-	return (FLD_ISSET(
-	    S2C(session)->cache->state, WT_EVICT_PASS_AGGRESSIVE));
-}
-
-/*
  * __wt_eviction_dirty_target --
  *	Return if the eviction server is running to reduce the number of dirty
  * pages (versus running to discard pages from the cache).
