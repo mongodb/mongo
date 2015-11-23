@@ -29,6 +29,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/rpc/protocol.h"
 
 namespace mongo {
 class BSONObj;
@@ -53,8 +54,11 @@ public:
 
     /**
      * Writes ShardingMetadata to a metadata builder.
+     * If protocol is OP_QUERY, write the metadata in the old format recognizable by 3.0 mongos.
+     * TODO(SERVER-21631): Remove the 'protocol' argument and downconversion logic from this method
+     *   after 3.2 is out.
      */
-    Status writeToMetadata(BSONObjBuilder* metadataBob) const;
+    Status writeToMetadata(BSONObjBuilder* metadataBob, rpc::Protocol protocol) const;
 
     /**
      * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object

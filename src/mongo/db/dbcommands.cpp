@@ -1446,7 +1446,7 @@ bool Command::run(OperationContext* txn,
         // TODO: refactor out of here as part of SERVER-18326
         if (isShardingAware || serverGlobalParams.configsvr) {
             rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
-                .writeToMetadata(&metadataBob);
+                .writeToMetadata(&metadataBob, request.getProtocol());
         }
     }
 

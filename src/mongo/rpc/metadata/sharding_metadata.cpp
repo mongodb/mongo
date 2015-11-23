@@ -94,9 +94,11 @@ StatusWith<ShardingMetadata> ShardingMetadata::readFromMetadata(const BSONObj& m
     return ShardingMetadata(opTime, lastElectionIdElem.OID());
 }
 
-Status ShardingMetadata::writeToMetadata(BSONObjBuilder* metadataBob) const {
+Status ShardingMetadata::writeToMetadata(BSONObjBuilder* metadataBob,
+                                         rpc::Protocol protocol) const {
     BSONObjBuilder subobj(metadataBob->subobjStart(kGLEStatsFieldName));
-    if (getLastOpTime().getTerm() > repl::OpTime::kUninitializedTerm) {
+    if (getLastOpTime().getTerm() > repl::OpTime::kUninitializedTerm &&
+        protocol == Protocol::kOpCommandV1) {
         getLastOpTime().append(&subobj, kGLEStatsLastOpTimeFieldName);
     } else {
         subobj.append(kGLEStatsLastOpTimeFieldName, getLastOpTime().getTimestamp());
@@ -115,7 +117,7 @@ Status ShardingMetadata::downconvert(const BSONObj& commandReply,
         // We can reuse the same logic to write the sharding metadata out to the legacy
         // command as the element has the same format whether it is there or on the metadata
         // object.
-        swShardingMetadata.getValue().writeToMetadata(legacyCommandReplyBob);
+        swShardingMetadata.getValue().writeToMetadata(legacyCommandReplyBob, Protocol::kOpQuery);
     } else if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
         // It is valid to not have a $gleStats field.
     } else {
@@ -131,7 +133,7 @@ Status ShardingMetadata::upconvert(const BSONObj& legacyCommand,
     // as it has the same format whether it is there or on the metadata object.
     auto swShardingMetadata = readFromMetadata(legacyCommand);
     if (swShardingMetadata.isOK()) {
-        swShardingMetadata.getValue().writeToMetadata(metadataBob);
+        swShardingMetadata.getValue().writeToMetadata(metadataBob, Protocol::kOpCommandV1);
 
         // Write out the command excluding the $gleStats subobject.
         for (const auto& elem : legacyCommand) {

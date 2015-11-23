@@ -206,10 +206,8 @@ TEST(ShardingMetadata, Downconvert) {
             BSON("$gleStats" << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
                                                                << kLastOpTime.getTerm())
                                                   << "electionId" << kElectionId)),
-            BSON("ok" << 1 << "$gleStats"
-                      << BSON("lastOpTime" << BSON("ts" << kLastOpTime.getTimestamp() << "t"
-                                                        << kLastOpTime.getTerm()) << "electionId"
-                                           << kElectionId)));
+            BSON("ok" << 1 << "$gleStats" << BSON("lastOpTime" << kLastOpTime.getTimestamp()
+                                                               << "electionId" << kElectionId)));
     }
     { checkDownconvert(BSON("ok" << 1), BSONObj(), BSON("ok" << 1)); }
 }
