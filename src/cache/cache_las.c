@@ -287,9 +287,19 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 * from the last call (we don't care if we're before or after the key,
 	 * just roughly in the same spot is fine).
 	 */
-	if (key->data != NULL) {
+	if (key->size != 0) {
 		__wt_cursor_set_raw_key(cursor, key);
-		if ((ret = cursor->search_near(cursor, &notused)) != 0)
+		ret = cursor->search_near(cursor, &notused);
+
+		/*
+		 * Don't search for the same key twice; if we don't set a new
+		 * key below, it's because we've reached the end of the table
+		 * and we want the next pass to start at the beginning of the
+		 * table. Searching for the same key could leave us stuck at
+		 * the end of the table, repeatedly checking the same rows.
+		 */
+		key->size = 0;
+		if (ret != 0)
 			goto srch_notfound;
 	}
 
