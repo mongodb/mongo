@@ -135,7 +135,6 @@ private:
 
     WiredTigerSessionCache* _sessionCache;  // not owned
     WiredTigerSession* _session;            // owned, but from pool
-    bool _defaultCommit;
     bool _areWriteUnitOfWorksBanned = false;
     bool _inUnitOfWork;
     bool _active;
