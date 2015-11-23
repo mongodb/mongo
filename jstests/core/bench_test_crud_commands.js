@@ -3,6 +3,8 @@
     "use strict";
 
     var coll = db.bench_test_crud_commands;
+    coll.drop();
+    assert.commandWorked(coll.getDB().createCollection(coll.getName()));
 
     function executeBenchRun(benchOps) {
         var benchArgs = {ops: benchOps, parallel: 2, seconds: 1, host: db.getMongo().host};
