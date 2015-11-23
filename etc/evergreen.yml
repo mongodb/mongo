@@ -4906,9 +4906,11 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
-#  - name: concurrency
-#  - name: concurrency_replication
-#  - name: concurrency_sharded
+  - name: concurrency
+    distros:
+    - rhel62-build  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  - name: concurrency_replication
+  - name: concurrency_sharded
   - name: replicasets_WT
   - name: replicasets_auth
   - name: replicasets_legacy
@@ -4950,9 +4952,11 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
-#  - name: concurrency
-#  - name: concurrency_replication
-#  - name: concurrency_sharded
+  - name: concurrency
+    distros:
+    - rhel62-build  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  - name: concurrency_replication
+  - name: concurrency_sharded
   - name: replicasets_WT
   - name: replicasets_auth
   - name: replicasets_legacy

@@ -42,7 +42,7 @@ var $config = (function() {
             assertWhenOwnDB(!db[this.threadCollName].isCapped());
             assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
             assertWhenOwnDB(db[this.threadCollName].isCapped());
-            assertWhenOwnDB(isMultiple256(db[this.threadCollName].storageSize()));
+            assertWhenOwnDB(isMultiple256(db[this.threadCollName].stats().maxSize));
         }
 
         function convertToCapped(db, collName) {
@@ -52,7 +52,7 @@ var $config = (function() {
 
             assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
             assertWhenOwnDB(db[this.threadCollName].isCapped());
-            assertWhenOwnDB(isMultiple256(db[this.threadCollName].storageSize()));
+            assertWhenOwnDB(isMultiple256(db[this.threadCollName].stats().maxSize));
 
             // only the _id index should remain after running convertToCapped
             var indexKeys = db[this.threadCollName].getIndexKeys();
