@@ -1,6 +1,10 @@
 // Tests that mongos and shard mongods can both be started up successfully when there is no config
 // server, and that they will wait until there is a config server online before handling any
 // sharding operations.
+//
+// This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
+// A restarted standalone will lose all data when using an ephemeral storage engine.
+// @tags: [requires_persistence]
 (function() {
 "use strict";
 

@@ -1,6 +1,10 @@
 /**
  * Tests that the mongod chunk filtering stage properly filters out unowned documents even after
  * the shards are restarted.
+ *
+ * This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
+ * A restarted standalone will lose all data when using an ephemeral storage engine.
+ * @tags: [requires_persistence]
  */
 (function() {
 "use strict";

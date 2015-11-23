@@ -2,6 +2,12 @@
  * This tests whether slaveOk reads are properly routed through mongos in
  * an authenticated environment. This test also includes restarting the
  * entire set, then querying afterwards.
+ *
+ * This test involves a full restart of the replica set, so cannot be run with ephemeral storage
+ * engines. When all nodes in a replica set are using an ephemeral storage engine, the set cannot
+ * recover from a full restart. Once restarted, the nodes will have no knowledge of the replica set
+ * config and will be unable to elect a primary.
+ * @tags: [requires_persistence]
  */
 
 /**

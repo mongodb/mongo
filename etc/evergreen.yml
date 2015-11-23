@@ -4917,6 +4917,12 @@ buildvariants:
   - name: replicasets_legacy
   - name: replication_WT
   - name: replication_auth
+  - name: sharding
+  - name: sharding_auth
+  - name: sharding_auth_audit_WT
+  - name: sharding_legacy
+  - name: sharding_legacy_op_query_WT
+  - name: sharding_op_query_WT
   - name: slow1
 #  - name: slow2
   - name: sharding_jscore_passthrough
@@ -4965,6 +4971,11 @@ buildvariants:
   - name: replicasets_legacy
   - name: replication_WT
   - name: replication_auth
+  - name: sharding
+  - name: sharding_auth
+  - name: sharding_legacy
+  - name: sharding_legacy_op_query_WT
+  - name: sharding_op_query_WT
   - name: slow1
 #  - name: slow2
   - name: sharding_jscore_passthrough

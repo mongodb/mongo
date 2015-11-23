@@ -1,4 +1,9 @@
 // Tests the state of sharding data after a replica set reconfig
+//
+// This test involves restarting a single-node replica set, so cannot be run on ephemeral storage
+// engines. A single node replica set that is using an ephemeral engine will have no knowledge of
+// the replica set configuration once restarted, so will not elect itself as primary.
+// @tags: [requires_persistence]
 
 (function() {
 

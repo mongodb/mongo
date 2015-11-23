@@ -1,3 +1,7 @@
+// This test requires persistence because it assumes standalone shards will still have their data
+// after restarting.
+// @tags: [requires_persistence]
+
 (function() {
 
 'use strict';

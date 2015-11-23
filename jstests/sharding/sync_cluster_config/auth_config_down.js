@@ -1,6 +1,9 @@
 //
 // Tests authorization when a config server is down
 //
+// This test cannot be run on ephemeral storage engines because it requires the users to persist
+// across a restart.
+// @tags: [requires_persistence]
 
 var st = new ShardingTest({ shards : 1,
                             mongos : 1,

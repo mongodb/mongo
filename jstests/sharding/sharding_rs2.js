@@ -1,4 +1,8 @@
 // mostly for testing mongos w/replica sets
+//
+// This test involves using fsync to lock the secondaries, so cannot be run on storage engines which
+// do not support the command.
+// @tags: [requires_fsync]
 (function() {
 
 var s = new ShardingTest({ shards: { rs0: { nodes: 2 }, rs1: { nodes: 2 } },
@@ -185,7 +189,7 @@ printjson( ts.find().batchSize(5).explain() )
 
 // fsyncLock the secondaries
 rs.test.getSecondaries().forEach(function(secondary) {
-    secondary.getDB( "test" ).fsyncLock();
+    assert.commandWorked(secondary.getDB( "test" ).fsyncLock());
 })
 // Modify data only on the primary replica of the primary shard.
 // { x: 60 } goes to the shard of "rs", which is the primary shard.
