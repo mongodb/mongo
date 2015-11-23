@@ -267,12 +267,14 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_ITEM *key;
 	uint64_t cnt, las_counter, las_txnid;
+	int64_t remove_cnt;
 	uint32_t las_id, session_flags;
 	int notused;
 
 	conn = S2C(session);
 	cursor = NULL;
 	key = &conn->las_sweep_key;
+	remove_cnt = 0;
 	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
 
 	WT_ERR(__wt_scr_alloc(session, 0, &las_addr));
@@ -285,9 +287,19 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 * from the last call (we don't care if we're before or after the key,
 	 * just roughly in the same spot is fine).
 	 */
-	if (conn->las_sweep_call != 0 && key->data != NULL) {
+	if (key->size != 0) {
 		__wt_cursor_set_raw_key(cursor, key);
-		if ((ret = cursor->search_near(cursor, &notused)) != 0)
+		ret = cursor->search_near(cursor, &notused);
+
+		/*
+		 * Don't search for the same key twice; if we don't set a new
+		 * key below, it's because we've reached the end of the table
+		 * and we want the next pass to start at the beginning of the
+		 * table. Searching for the same key could leave us stuck at
+		 * the end of the table, repeatedly checking the same rows.
+		 */
+		key->size = 0;
+		if (ret != 0)
 			goto srch_notfound;
 	}
 
@@ -303,20 +315,11 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 * but possibly better, alternative might be to review all lookaside
 	 * blocks in the cache in order to get rid of them, and slowly review
 	 * lookaside blocks that have already been evicted.
-	 *
-	 * We can't know for sure how many records are in the lookaside table,
-	 * the cursor insert and remove statistics aren't updated atomically.
-	 * Start with reviewing 100 rows, and if it takes more than the target
-	 * number of calls to finish, increase the number of rows checked on
-	 * each call; if it takes less than the target calls to finish, then
-	 * decrease the number of rows reviewed on each call (but never less
-	 * than 100).
 	 */
-#define	WT_SWEEP_LOOKASIDE_MIN_CNT	100
-#define	WT_SWEEP_LOOKASIDE_PASS_TARGET	 30
-	++conn->las_sweep_call;
-	if ((cnt = conn->las_sweep_cnt) < WT_SWEEP_LOOKASIDE_MIN_CNT)
-		cnt = conn->las_sweep_cnt = WT_SWEEP_LOOKASIDE_MIN_CNT;
+	cnt = (uint64_t)WT_MAX(100, conn->las_record_cnt / 30);
+
+	/* Discard pages we read as soon as we're done with them. */
+	F_SET(session, WT_SESSION_NO_CACHE);
 
 	/* Walk the file. */
 	for (; cnt > 0 && (ret = cursor->next(cursor)) == 0; --cnt) {
@@ -345,28 +348,13 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * another thread remove the record before we do, and the cursor
 		 * remains positioned in that case.
 		 */
-		if (__wt_txn_visible_all(session, las_txnid))
+		if (__wt_txn_visible_all(session, las_txnid)) {
 			WT_ERR(cursor->remove(cursor));
-	}
-
-	/*
-	 * When reaching the lookaside table end or the target number of calls,
-	 * adjust the row count. Decrease/increase the row count depending on
-	 * if the number of calls is less/more than the target.
-	 */
-	if (ret == WT_NOTFOUND ||
-	    conn->las_sweep_call > WT_SWEEP_LOOKASIDE_PASS_TARGET) {
-		if (conn->las_sweep_call < WT_SWEEP_LOOKASIDE_PASS_TARGET &&
-		    conn->las_sweep_cnt > WT_SWEEP_LOOKASIDE_MIN_CNT)
-			conn->las_sweep_cnt -= WT_SWEEP_LOOKASIDE_MIN_CNT;
-		if (conn->las_sweep_call > WT_SWEEP_LOOKASIDE_PASS_TARGET)
-			conn->las_sweep_cnt += WT_SWEEP_LOOKASIDE_MIN_CNT;
+			++remove_cnt;
+		}
 	}
 
 srch_notfound:
-	if (ret == WT_NOTFOUND)
-		conn->las_sweep_call = 0;
-
 	WT_ERR_NOTFOUND_OK(ret);
 
 	if (0) {
@@ -374,6 +362,18 @@ err:		__wt_buf_free(session, key);
 	}
 
 	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
+
+	/*
+	 * If there were races to remove records, we can over-count.  All
+	 * arithmetic is signed, so underflow isn't fatal, but check anyway so
+	 * we don't skew low over time.
+	 */
+	if (remove_cnt > S2C(session)->las_record_cnt)
+		S2C(session)->las_record_cnt = 0;
+	else if (remove_cnt > 0)
+		(void)__wt_atomic_subi64(&conn->las_record_cnt, remove_cnt);
+
+	F_CLR(session, WT_SESSION_NO_CACHE);
 
 	__wt_scr_free(session, &las_addr);
 	__wt_scr_free(session, &las_key);
