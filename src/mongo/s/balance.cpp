@@ -173,15 +173,17 @@ int Balancer::_moveChunks(OperationContext* txn,
         const NamespaceString nss(migrateInfo->ns);
 
         try {
-            auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
-            fassert(28628, status.getStatus());
-
-            shared_ptr<DBConfig> cfg = status.getValue();
+            shared_ptr<DBConfig> cfg =
+                uassertStatusOK(grid.catalogCache()->getDatabase(txn, nss.db().toString()));
 
             // NOTE: We purposely do not reload metadata here, since _doBalanceRound already
             // tried to do so once.
             shared_ptr<ChunkManager> cm = cfg->getChunkManager(txn, migrateInfo->ns);
-            invariant(cm);
+            uassert(28628,
+                    str::stream()
+                        << "Collection " << migrateInfo->ns
+                        << " was deleted while balancing was active. Aborting balancing round.",
+                    cm);
 
             ChunkPtr c = cm->findIntersectingChunk(txn, migrateInfo->chunk.min);
 
