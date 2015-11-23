@@ -95,6 +95,6 @@
         }, 'secondary should have terminated due to request to build an invalid partial index' +
            ' with options ' + tojson(indexOptions));
 
-        rst.stopSet();
+        rst.stopSet(undefined, undefined, { allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] });
     });
 })();

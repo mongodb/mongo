@@ -682,6 +682,37 @@ MongoRunner.runMongos = function(opts) {
     return mongos
 }
 
+
+MongoRunner.StopError = function(message, returnCode) {
+    this.name = "StopError";
+    this.returnCode = returnCode || "non-zero"
+    this.message = message || "MongoDB process stopped with exit code: " + this.returnCode;
+    this.stack = this.toString() + "\n" + (new Error()).stack;
+};
+
+MongoRunner.StopError.prototype = Object.create(Error.prototype);
+MongoRunner.StopError.prototype.constructor = MongoRunner.StopError;
+
+// Constants for exit codes of MongoDB processes
+MongoRunner.EXIT_CLEAN = 0;
+MongoRunner.EXIT_BADOPTIONS = 2;
+MongoRunner.EXIT_REPLICATION_ERROR = 3;
+MongoRunner.EXIT_NEED_UPGRADE = 4;
+MongoRunner.EXIT_SHARDING_ERROR = 5;
+MongoRunner.EXIT_KILL = 12;
+MongoRunner.EXIT_ABRUPT = 14;
+MongoRunner.EXIT_NTSERVICE_ERROR = 20;
+MongoRunner.EXIT_JAVA = 21;
+MongoRunner.EXIT_OOM_MALLOC = 42;
+MongoRunner.EXIT_OOM_REALLOC = 43;
+MongoRunner.EXIT_FS = 45;
+MongoRunner.EXIT_CLOCK_SKEW = 47;  // OpTime clock skew; deprecated
+MongoRunner.EXIT_NET_ERROR = 48;
+MongoRunner.EXIT_WINDOWS_SERVICE_STOP = 49;
+MongoRunner.EXIT_POSSIBLE_CORRUPTION = 60;
+MongoRunner.EXIT_UNCAUGHT = 100;  // top level exception that wasn't caught
+MongoRunner.EXIT_TEST = 101;
+
 /**
  * Kills a mongod process.
  *
@@ -704,9 +735,27 @@ MongoRunner.stopMongod = function( port, signal, opts ){
         print( "Cannot stop mongo process " + port )
         return
     }
-    
-    signal = signal || 15
-    
+
+    signal = parseInt(signal) || 15;
+    opts = opts || {};
+
+    var allowedExitCodes = [
+        MongoRunner.EXIT_CLEAN
+    ];
+
+    if (_isWindows()) {
+        // Return code of processes killed with TerminateProcess on Windows
+        allowedExitCodes.push(1);
+    }
+    else {
+        // Return code of processes killed with SIGKILL on POSIX systems
+        allowedExitCodes.push(-9);
+    }
+
+    if (opts.allowedExitCodes) {
+        allowedExitCodes = allowedExitCodes.concat(opts.allowedExitCodes);
+    }
+
     if( port.port )
         port = parseInt( port.port )
     
@@ -715,7 +764,16 @@ MongoRunner.stopMongod = function( port, signal, opts ){
         if( opts ) port = parseInt( opts.port )
     }
 
-    return _stopMongoProgram(parseInt(port), parseInt(signal), opts);
+    var returnCode = _stopMongoProgram(parseInt(port), signal, opts);
+
+    if (!Array.contains(allowedExitCodes, returnCode)) {
+        throw new MongoRunner.StopError(
+            `MongoDB process on port ${port} exited with error code ${returnCode}`,
+            returnCode
+        );
+    }
+
+    return returnCode;
 }
 
 MongoRunner.stopMongos = MongoRunner.stopMongod;

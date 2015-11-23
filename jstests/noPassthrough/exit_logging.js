@@ -27,7 +27,7 @@
         }
     }
 
-    function testShutdownLogging(launcher, crashFn, matchFn) {
+    function testShutdownLogging(launcher, crashFn, matchFn, expectedExitCode) {
         var logFileName = MongoRunner.dataPath + "mongod.log";
         var opts = { logpath: logFileName };
         var conn = launcher.start(opts);
@@ -35,27 +35,32 @@
             crashFn(conn);
         }
         finally {
-            launcher.stop(conn);
+            launcher.stop(conn, undefined, { allowedExitCodes: [ expectedExitCode ] });
         }
         var logContents = cat(logFileName);
         matchFn(logContents);
     }
 
     function runAllTests(launcher) {
+        const SIGSEGV = 11;
+        const SIGABRT = 6;
         testShutdownLogging(
             launcher,
             function (conn) { conn.getDB('admin').shutdownServer() },
-            makeRegExMatchFn(/shutdown command received[\s\S]*dbexit:/));
+            makeRegExMatchFn(/shutdown command received[\s\S]*dbexit:/),
+            MongoRunner.EXIT_CLEAN);
 
         testShutdownLogging(
             launcher,
             makeShutdownByCrashFn('fault'),
-            makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/));
+            makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/),
+            -SIGSEGV);
 
         testShutdownLogging(
             launcher,
             makeShutdownByCrashFn('abort'),
-            makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/));
+            makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/),
+            -SIGABRT);
     }
 
     if (_isWindows()) {
@@ -77,6 +82,7 @@
                 Object.extend(actualOpts, opts);
                 return MongoRunner.runMongod(actualOpts);
             },
+
             stop: MongoRunner.stopMongod
         });
     }());

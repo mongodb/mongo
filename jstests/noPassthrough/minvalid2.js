@@ -75,4 +75,4 @@ assert.soon(function(){
     return rawMongoProgramOutput().match("need to rollback, but in inconsistent state");
 });
 
-replTest.stopSet(15);
+replTest.stopSet(undefined, undefined, { allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] });

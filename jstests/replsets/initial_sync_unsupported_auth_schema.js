@@ -52,7 +52,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     assert.soon(assertFn, 'Initial sync should have aborted due to an invalid or unsupported' +
                           ' authSchema version: ' + tojson(schema), 60000);
 
-    rst.stopSet();
+    rst.stopSet(undefined, undefined, { allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] });
 }
 
 function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
@@ -84,7 +84,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     assert.soon(assertFn, 'Initial sync should have aborted due to an existing user document and' +
                           ' a missing auth schema', 60000);
 
-    rst.stopSet();
+    rst.stopSet(undefined, undefined, { allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] });
 }
 
 testInitialSyncAbortsWithUnsupportedAuthSchema({_id: 'authSchema'});

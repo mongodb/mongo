@@ -281,25 +281,25 @@ var ShardingTest = function(params) {
         throw Error("impossible");
     };
 
-    this.stop = function() {
+    this.stop = function(opts) {
         for (var i = 0; i < this._mongos.length; i++) {
-            this.stopMongos(i);
+            this.stopMongos(i, opts);
         }
 
         for (var i = 0; i < this._connections.length; i++) {
             if (this._rs[i]) {
-                this._rs[i].test.stopSet(15);
+                this._rs[i].test.stopSet(15, undefined, opts);
             } else {
-                this.stopMongod(i);
+                this.stopMongod(i, opts);
             }
         }
 
         if (this.configRS) {
-            this.configRS.stopSet();
+            this.configRS.stopSet(undefined, undefined, opts);
         } else {
             // Old style config triplet
             for (var i = 0; i < this._configServers.length; i++) {
-                this.stopConfigServer(i);
+                this.stopConfigServer(i, opts);
             }
         }
 
@@ -627,36 +627,36 @@ var ShardingTest = function(params) {
     /**
      * Kills the mongos with index n.
      */
-    this.stopMongos = function(n) {
+    this.stopMongos = function(n, opts) {
         if (otherParams.useBridge) {
-            MongoRunner.stopMongos(unbridgedMongos[n]);
+            MongoRunner.stopMongos(unbridgedMongos[n], undefined, opts);
             this["s" + n].stop();
         } else {
-            MongoRunner.stopMongos(this["s" + n]);
+            MongoRunner.stopMongos(this["s" + n], undefined, opts);
         }
     };
 
     /**
      * Kills the shard mongod with index n.
      */
-    this.stopMongod = function(n) {
+    this.stopMongod = function(n, opts) {
         if (otherParams.useBridge) {
-            MongoRunner.stopMongod(unbridgedConnections[n]);
+            MongoRunner.stopMongod(unbridgedConnections[n], undefined, opts);
             this["d" + n].stop();
         } else {
-            MongoRunner.stopMongod(this["d" + n]);
+            MongoRunner.stopMongod(this["d" + n], undefined, opts);
         }
     };
 
     /**
      * Kills the config server mongod with index n.
      */
-    this.stopConfigServer = function(n) {
+    this.stopConfigServer = function(n, opts) {
         if (otherParams.useBridge) {
-            MongoRunner.stopMongod(unbridgedConfigServers[n]);
+            MongoRunner.stopMongod(unbridgedConfigServers[n], undefined, opts);
             this._configServers[n].stop();
         } else {
-            MongoRunner.stopMongod(this._configServers[n]);
+            MongoRunner.stopMongod(this._configServers[n], undefined, opts);
         }
     };
 

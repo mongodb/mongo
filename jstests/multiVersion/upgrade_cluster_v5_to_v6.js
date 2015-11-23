@@ -45,7 +45,8 @@ var cantStartMongos = function(options) {
             sleep(1000);
         }
     }
-    MongoRunner.stopMongos(mongos);
+    MongoRunner.stopMongos(mongos, undefined,
+        { allowedExitCodes: [ MongoRunner.EXIT_BADOPTIONS ] });
     return true;
 
 }

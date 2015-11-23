@@ -64,4 +64,4 @@ assert.soon(function() {
     return rawMongoProgramOutput().match(msg);
 }, "Did not see a log entry about skipping the nonrollbackable command during rollback");
 
-replTest.stopSet();
+replTest.stopSet(undefined, undefined, { allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] });
