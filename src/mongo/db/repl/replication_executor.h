@@ -313,13 +313,13 @@ private:
     stdx::mutex _mutex;
     stdx::mutex _terribleExLockSyncMutex;
     stdx::condition_variable _noMoreWaitingThreads;
-    WorkQueue _freeQueue{};
-    WorkQueue _readyQueue{};
-    WorkQueue _dbWorkInProgressQueue{};
-    WorkQueue _exclusiveLockInProgressQueue{};
-    WorkQueue _networkInProgressQueue{};
-    WorkQueue _sleepersQueue{};
-    EventList _unsignaledEvents{};
+    WorkQueue _freeQueue;
+    WorkQueue _readyQueue;
+    WorkQueue _dbWorkInProgressQueue;
+    WorkQueue _exclusiveLockInProgressQueue;
+    WorkQueue _networkInProgressQueue;
+    WorkQueue _sleepersQueue;
+    EventList _unsignaledEvents;
     int64_t _totalEventWaiters = 0;
 
     // Counters for metrics, for the whole life of this instance, protected by _mutex.
