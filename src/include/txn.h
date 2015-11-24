@@ -70,6 +70,7 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_txn_state {
 };
 
 struct __wt_txn_global {
+	uint64_t alloc;			/* Transaction ID to allocate. */
 	volatile uint64_t current;	/* Current transaction ID. */
 
 	/* The oldest running transaction ID (may race). */

@@ -712,8 +712,8 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 
 	txn_global = &conn->txn_global;
-	txn_global->current = txn_global->last_running =
-	    txn_global->oldest_id = WT_TXN_FIRST;
+	txn_global->alloc = txn_global->current =
+	    txn_global->last_running = txn_global->oldest_id = WT_TXN_FIRST;
 
 	WT_RET(__wt_rwlock_alloc(session,
 	    &txn_global->nsnap_rwlock, "named snapshot lock"));
