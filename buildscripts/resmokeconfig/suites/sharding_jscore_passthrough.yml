@@ -40,8 +40,6 @@ selector:
     # TODO: SERVER-18292 remove once OP_COMMAND is implemented in mongos.
     - jstests/core/invalid_db_name.js
     - jstests/core/validate_cmd_ns.js
-    # bench_test_crud_commands.js is temporarily disabled; see SERVER-21387.
-    - jstests/core/bench_test_crud_commands.js
 
 executor:
   js_test:

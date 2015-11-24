@@ -3,8 +3,6 @@ selector:
     roots:
     - jstests/core/*.js
     exclude_files:
-    # bench_test_crud_commands.js is temporarily disabled; see SERVER-21387.
-    - jstests/core/bench_test_crud_commands.js
     # These tests are not expected to pass with replica-sets:
     - jstests/core/dbadmin.js
     - jstests/core/opcounters_write_cmd.js
