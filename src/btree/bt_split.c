@@ -502,7 +502,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * array, a thread might see a freed WT_REF.  Set the eviction
 		 * transaction requirement for the newly created internal pages.
 		 */
-		child->modify->mod_split_txn = __wt_txn_new_id(session);
+		child->modify->mod_split_txn = __wt_txn_id_alloc(session, false);
 
 		/*
 		 * The newly allocated child's page index references the same
@@ -1383,7 +1383,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * threads will not try to forcibly evict the page again until
 	 * all concurrent transactions commit.
 	 */
-	page->modify->inmem_split_txn = __wt_txn_new_id(session);
+	page->modify->inmem_split_txn = __wt_txn_id_alloc(session, false);
 
 	/*
 	 * Update the page accounting.
