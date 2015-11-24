@@ -408,7 +408,7 @@ __split_ref_move_final(
 	 * until all threads are known to have exited the index of the page that
 	 * previously "owned" the WT_REF. Set that field to a safe value.
 	 */
-	txn_new_id = __wt_txn_new_id(session);
+	txn_new_id = __wt_txn_id_alloc(session, false);
 
 	/*
 	 * The WT_REF structures moved to newly allocated child pages reference
@@ -1822,7 +1822,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * threads will not try to forcibly evict the page again until
 	 * all concurrent transactions commit.
 	 */
-	page->modify->inmem_split_txn = __wt_txn_new_id(session);
+	page->modify->inmem_split_txn = __wt_txn_id_alloc(session, false);
 
 	/*
 	 * Update the page accounting.

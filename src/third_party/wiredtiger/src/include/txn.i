@@ -289,23 +289,6 @@ __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_new_id --
- *	Allocate a new transaction ID.
- */
-static inline uint64_t
-__wt_txn_new_id(WT_SESSION_IMPL *session)
-{
-	/*
-	 * We want the global value to lead the allocated values, so that any
-	 * allocated transaction ID eventually becomes globally visible.  When
-	 * there are no transactions running, the oldest_id will reach the
-	 * global current ID, so we want post-increment semantics.  Our atomic
-	 * add primitive does pre-increment, so adjust the result here.
-	 */
-	return (__wt_atomic_addv64(&S2C(session)->txn_global.current, 1) - 1);
-}
-
-/*
  * __wt_txn_idle_cache_check --
  *	If there is no transaction active in this thread and we haven't checked
  *	if the cache is full, do it now.  If we have to block for eviction,
@@ -332,6 +315,59 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_id_alloc --
+ *	Allocate a new transaction ID.
+ */
+static inline uint64_t
+__wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
+{
+	WT_TXN_GLOBAL *txn_global;
+	uint64_t id;
+	u_int i;
+
+	txn_global = &S2C(session)->txn_global;
+
+	/*
+	 * Allocating transaction IDs involves several steps.
+	 *
+	 * Firstly, we do an atomic increment to allocate a unique ID.  The
+	 * field we increment is not used anywhere else.
+	 *
+	 * Then we optionally publish the allocated ID into the global
+	 * transaction table.  It is critical that this becomes visible before
+	 * the global current value moves past our ID, or some concurrent
+	 * reader could get a snapshot that makes our changes visible before we
+	 * commit.
+	 *
+	 * Lastly, we spin to update the current ID.  This is the only place
+	 * that the current ID is updated, and it is in the same cache line as
+	 * the field we allocate from, so we should usually succeed on the
+	 * first try.
+	 *
+	 * We want the global value to lead the allocated values, so that any
+	 * allocated transaction ID eventually becomes globally visible.  When
+	 * there are no transactions running, the oldest_id will reach the
+	 * global current ID, so we want post-increment semantics.  Our atomic
+	 * add primitive does pre-increment, so adjust the result here.
+	 */
+	id = __wt_atomic_addv64(&S2C(session)->txn_global.alloc, 1) - 1;
+
+	if (publish) {
+		session->txn.id = id;
+		WT_SESSION_TXN_STATE(session)->id = id;
+	}
+
+	for (i = 0; txn_global->current != id; i++)
+		if (i < 100)
+			WT_PAUSE();
+		else
+			__wt_yield();
+
+	WT_PUBLISH(txn_global->current, id + 1);
+	return (id);
+}
+
+/*
  * __wt_txn_id_check --
  *	A transaction is going to do an update, start an auto commit
  *	transaction if required and allocate a transaction ID.
@@ -339,57 +375,27 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 static inline int
 __wt_txn_id_check(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
-	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
 
 	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 
+	if (F_ISSET(txn, WT_TXN_HAS_ID))
+		return (0);
+
 	/* If the transaction is idle, check that the cache isn't full. */
 	WT_RET(__wt_txn_idle_cache_check(session));
 
-	if (!F_ISSET(txn, WT_TXN_HAS_ID)) {
-		conn = S2C(session);
-		txn_global = &conn->txn_global;
-		txn_state = WT_SESSION_TXN_STATE(session);
+	(void)__wt_txn_id_alloc(session, true);
 
-		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
-
-		/*
-		 * Allocate a transaction ID.
-		 *
-		 * We use an atomic compare and swap to ensure that we get a
-		 * unique ID that is published before the global counter is
-		 * updated.
-		 *
-		 * If two threads race to allocate an ID, only the latest ID
-		 * will proceed.  The winning thread can be sure its snapshot
-		 * contains all of the earlier active IDs.  Threads that race
-		 * and get an earlier ID may not appear in the snapshot, but
-		 * they will loop and allocate a new ID before proceeding to
-		 * make any updates.
-		 *
-		 * This potentially wastes transaction IDs when threads race to
-		 * begin transactions: that is the price we pay to keep this
-		 * path latch free.
-		 */
-		do {
-			txn_state->id = txn->id = txn_global->current;
-		} while (!__wt_atomic_casv64(
-		    &txn_global->current, txn->id, txn->id + 1) ||
-		    WT_TXNID_LT(txn->id, txn_global->last_running));
-
-		/*
-		 * If we have used 64-bits of transaction IDs, there is nothing
-		 * more we can do.
-		 */
-		if (txn->id == WT_TXN_ABORTED)
-			WT_RET_MSG(session, ENOMEM, "Out of transaction IDs");
-		F_SET(txn, WT_TXN_HAS_ID);
-	}
+	/*
+	 * If we have used 64-bits of transaction IDs, there is nothing
+	 * more we can do.
+	 */
+	if (txn->id == WT_TXN_ABORTED)
+		WT_RET_MSG(session, ENOMEM, "Out of transaction IDs");
+	F_SET(txn, WT_TXN_HAS_ID);
 
 	return (0);
 }
