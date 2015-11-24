@@ -795,10 +795,70 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
     }
 
     {
-        // now we insert 2 docs, but commit the 2nd one fiirst
-        // we make sure we can't find the 2nd until the first is commited
+        // now we insert 2 docs, but commit the 2nd one first.
+        // we make sure we can't find the 2nd until the first is commited.
+        unique_ptr<OperationContext> earlyReader(harnessHelper->newOperationContext());
+        auto earlyCursor = rs->getCursor(earlyReader.get());
+        ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
+        earlyCursor->save();
+        earlyReader->recoveryUnit()->abandonSnapshot();
+
         unique_ptr<OperationContext> t1(harnessHelper->newOperationContext());
-        unique_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
+        WriteUnitOfWork w1(t1.get());
+        _oplogOrderInsertOplog(t1.get(), rs, 20);
+        // do not commit yet
+
+        {  // create 2nd doc
+            unique_ptr<OperationContext> t2(harnessHelper->newOperationContext());
+            {
+                WriteUnitOfWork w2(t2.get());
+                _oplogOrderInsertOplog(t2.get(), rs, 30);
+                w2.commit();
+            }
+        }
+
+        {  // Other operations should not be able to see 2nd doc until w1 commits.
+            earlyCursor->restore();
+            ASSERT(!earlyCursor->next());
+
+            unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+            auto cursor = rs->getCursor(opCtx.get());
+            auto record = cursor->seekExact(id1);
+            ASSERT_EQ(id1, record->id);
+            ASSERT(!cursor->next());
+        }
+
+        w1.commit();
+    }
+
+    {  // now all 3 docs should be visible
+        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursor(opCtx.get());
+        auto record = cursor->seekExact(id1);
+        ASSERT_EQ(id1, record->id);
+        ASSERT(cursor->next());
+        ASSERT(cursor->next());
+        ASSERT(!cursor->next());
+    }
+
+    // Rollback the last two oplog entries, then insert entries with older optimes and ensure that
+    // the visibility rules aren't violated. See SERVER-21645
+    {
+        unique_ptr<OperationContext> txn(harnessHelper->newOperationContext());
+        rs->temp_cappedTruncateAfter(txn.get(), id1, /*inclusive*/ false);
+    }
+
+    {
+        // Now we insert 2 docs with timestamps earlier than before, but commit the 2nd one first.
+        // We make sure we can't find the 2nd until the first is commited.
+        unique_ptr<OperationContext> earlyReader(harnessHelper->newOperationContext());
+        auto earlyCursor = rs->getCursor(earlyReader.get());
+        ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
+        earlyCursor->save();
+        earlyReader->recoveryUnit()->abandonSnapshot();
+
+        unique_ptr<OperationContext> t1(harnessHelper->newOperationContext());
+        WriteUnitOfWork w1(t1.get());
         _oplogOrderInsertOplog(t1.get(), rs, 2);
         // do not commit yet
 
@@ -811,7 +871,10 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
             }
         }
 
-        {  // state should be the same
+        {  // Other operations should not be able to see 2nd doc until w1 commits.
+            ASSERT(earlyCursor->restore());
+            ASSERT(!earlyCursor->next());
+
             unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekExact(id1);
@@ -819,7 +882,7 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
             ASSERT(!cursor->next());
         }
 
-        w1->commit();
+        w1.commit();
     }
 
     {  // now all 3 docs should be visible

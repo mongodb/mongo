@@ -1696,15 +1696,23 @@ void WiredTigerRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
 
     int64_t recordsRemoved = 0;
     int64_t bytesRemoved = 0;
-    RecordId firstRemovedId = end;
+    RecordId lastKeptId;
+    RecordId firstRemovedId;
 
-    if (!inclusive) {
+    if (inclusive) {
+        Cursor reverseCursor(txn, *this, false);
+        invariant(reverseCursor.seekExact(end));
+        auto prev = reverseCursor.next();
+        lastKeptId = prev ? prev->id : RecordId();
+        firstRemovedId = end;
+    } else {
         // If not deleting the record located at 'end', then advance the cursor to the first record
         // that is being deleted.
         record = cursor.next();
         if (!record) {
             return;  // No records to delete.
         }
+        lastKeptId = end;
         firstRemovedId = record->id;
     }
 
@@ -1732,6 +1740,11 @@ void WiredTigerRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
     _increaseDataSize(txn, -bytesRemoved);
 
     wuow.commit();
+
+    if (_useOplogHack) {
+        // Forget that we've ever seen a higher timestamp than we now have.
+        _oplog_highestSeen = lastKeptId;
+    }
 
     if (_oplogStones) {
         _oplogStones->updateStonesAfterCappedTruncateAfter(
