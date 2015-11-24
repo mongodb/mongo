@@ -66,8 +66,7 @@ UpdateResult update(OperationContext* txn,
     invariant(!request.isExplain());
 
     auto client = txn->getClient();
-    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
-    auto lastOpAtOperationStart = lastOpHolder.getLastOp();
+    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
     ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
                                                 txn);
@@ -112,7 +111,7 @@ UpdateResult update(OperationContext* txn,
         uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, opDebug));
 
     uassertStatusOK(exec->executePlan());
-    if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+    if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
         // If this operation has already generated a new lastOp, don't bother setting it here.
         // No-op updates will not generate a new lastOp, so we still need the guard to fire in that
         // case.

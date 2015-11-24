@@ -356,8 +356,7 @@ public:
             maybeDisableValidation.emplace(txn);
 
         auto client = txn->getClient();
-        auto lastOpHolder = repl::ReplClientInfo::forClient(client);
-        auto lastOpAtOperationStart = lastOpHolder.getLastOp();
+        auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
         ScopeGuard lastOpSetterGuard =
             MakeObjGuard(repl::ReplClientInfo::forClient(client),
                          &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
@@ -478,7 +477,7 @@ public:
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "findAndModify", nsString.ns());
 
-        if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+        if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
             // If this operation has already generated a new lastOp, don't bother setting it here.
             // No-op updates will not generate a new lastOp, so we still need the guard to fire in
             // that case.

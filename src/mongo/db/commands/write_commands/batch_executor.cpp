@@ -1117,7 +1117,6 @@ static void multiUpdate(OperationContext* txn,
     }
 
     auto client = txn->getClient();
-    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
     ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
@@ -1240,8 +1239,7 @@ static void multiUpdate(OperationContext* txn,
             PlanSummaryStats summary;
             Explain::getSummaryStats(*exec, &summary);
             collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
-
-            if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+            if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                 // If this operation has already generated a new lastOp, don't bother setting it
                 // here. No-op updates will not generate a new lastOp, so we still need the guard to
                 // fire in that case.
@@ -1300,8 +1298,7 @@ static void multiRemove(OperationContext* txn,
     }
 
     auto client = txn->getClient();
-    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
-    auto lastOpAtOperationStart = lastOpHolder.getLastOp();
+    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
     ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
                                                 txn);
@@ -1350,7 +1347,7 @@ static void multiRemove(OperationContext* txn,
             Explain::getSummaryStats(*exec, &summary);
             collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-            if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+            if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                 // If this operation has already generated a new lastOp, don't bother setting it
                 // here. No-op updates will not generate a new lastOp, so we still need the guard to
                 // fire in that case.

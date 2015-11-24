@@ -650,7 +650,6 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
     int flags = d.pullInt();
     BSONObj query = d.nextJsObj();
     auto client = txn->getClient();
-    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
     ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
@@ -723,7 +722,7 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
                 Explain::getSummaryStats(*exec, &summary);
                 collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-                if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+                if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                     // If this operation has already generated a new lastOp, don't bother setting it
                     // here. No-op updates will not generate a new lastOp, so we still need the
                     // guard to fire in that case.
@@ -780,7 +779,7 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
         Explain::getSummaryStats(*exec, &summary);
         collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-        if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+        if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
             // If this operation has already generated a new lastOp, don't bother setting it
             // here. No-op updates will not generate a new lastOp, so we still need the
             // guard to fire in that case.
@@ -800,7 +799,6 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
     BSONObj pattern = d.nextJsObj();
 
     auto client = txn->getClient();
-    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
     ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
@@ -854,7 +852,7 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
             Explain::getSummaryStats(*exec, &summary);
             collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-            if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+            if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                 // If this operation has already generated a new lastOp, don't bother setting it
                 // here. No-op updates will not generate a new lastOp, so we still need the
                 // guard to fire in that case.
