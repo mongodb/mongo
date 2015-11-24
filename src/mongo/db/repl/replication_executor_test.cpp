@@ -163,12 +163,12 @@ TEST_F(ReplicationExecutorTest, CancelBeforeRunningFutureWork) {
                                 });
     ASSERT_OK(cbhWithStatus.getStatus());
 
-    ASSERT_EQUALS(1, executor.getDiagnosticBSON()["sleeperQueue"].Int());
-    ASSERT_EQUALS(0, executor.getDiagnosticBSON()["ready"].Int());
+    ASSERT_EQUALS(1, executor.getDiagnosticBSON().getFieldDotted("queues.sleepers").Int());
+    ASSERT_EQUALS(0, executor.getDiagnosticBSON().getFieldDotted("queues.ready").Int());
     executor.cancel(cbhWithStatus.getValue());
 
-    ASSERT_EQUALS(0, executor.getDiagnosticBSON()["sleeperQueue"].Int());
-    ASSERT_EQUALS(1, executor.getDiagnosticBSON()["ready"].Int());
+    ASSERT_EQUALS(0, executor.getDiagnosticBSON().getFieldDotted("queues.sleepers").Int());
+    ASSERT_EQUALS(1, executor.getDiagnosticBSON().getFieldDotted("queues.ready").Int());
 }
 
 }  // namespace

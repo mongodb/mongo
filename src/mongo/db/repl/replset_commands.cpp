@@ -40,19 +40,21 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/util/fail_point_service.h"
@@ -64,6 +66,16 @@ namespace repl {
 
 using std::string;
 using std::stringstream;
+
+
+class ReplExecutorSSM : public ServerStatusMetric {
+public:
+    ReplExecutorSSM() : ServerStatusMetric("repl.executor") {}
+    virtual void appendAtLeaf(BSONObjBuilder& b) const {
+        ReplicationExecutor* exec = getGlobalReplicationCoordinator()->getExecutor();
+        b.append("executor", exec->getDiagnosticBSON());
+    }
+} replExecutorSSM;
 
 // Testing only, enabled via command-line.
 class CmdReplSetTest : public ReplSetCommand {

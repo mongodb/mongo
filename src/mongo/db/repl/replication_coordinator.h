@@ -67,6 +67,8 @@ class OplogReader;
 class OpTime;
 class ReadConcernArgs;
 class ReadConcernResponse;
+class ReplicaSetConfig;
+class ReplicationExecutor;
 class ReplSetDeclareElectionWinnerArgs;
 class ReplSetDeclareElectionWinnerResponse;
 class ReplSetHeartbeatArgs;
@@ -75,7 +77,6 @@ class ReplSetHeartbeatResponse;
 class ReplSetHtmlSummary;
 class ReplSetRequestVotesArgs;
 class ReplSetRequestVotesResponse;
-class ReplicaSetConfig;
 class UpdatePositionArgs;
 
 /**
@@ -128,6 +129,11 @@ public:
      * blocking until all replication-related shutdown tasks are complete.
      */
     virtual void shutdown() = 0;
+
+    /**
+     * Returns a pointer to the ReplicationExecutor.
+     */
+    virtual ReplicationExecutor* getExecutor() = 0;
 
     /**
      * Returns a reference to the parsed command line arguments that are related to replication.

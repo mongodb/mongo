@@ -58,14 +58,13 @@ ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface,
     : _random(prngSeed),
       _networkInterface(netInterface),
       _storageInterface(storageInterface),
-      _totalEventWaiters(0),
       _inShutdown(false),
       _dblockWorkers(OldThreadPool::DoNotStartThreadsTag(), 3, "replExecDBWorker-"),
       _dblockTaskRunner(&_dblockWorkers,
                         stdx::bind(&StorageInterface::createOperationContext, storageInterface)),
       _dblockExclusiveLockTaskRunner(
-          &_dblockWorkers, stdx::bind(&StorageInterface::createOperationContext, storageInterface)),
-      _nextId(0) {}
+          &_dblockWorkers,
+          stdx::bind(&StorageInterface::createOperationContext, storageInterface)) {}
 
 ReplicationExecutor::~ReplicationExecutor() {
     // join must have been called
@@ -75,12 +74,31 @@ ReplicationExecutor::~ReplicationExecutor() {
 BSONObj ReplicationExecutor::getDiagnosticBSON() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     BSONObjBuilder builder;
-    builder.appendIntOrLL("networkInProgress", _networkInProgressQueue.size());
-    builder.appendIntOrLL("dbWorkInProgress", _dbWorkInProgressQueue.size());
-    builder.appendIntOrLL("exclusiveInProgress", _exclusiveLockInProgressQueue.size());
-    builder.appendIntOrLL("sleeperQueue", _sleepersQueue.size());
-    builder.appendIntOrLL("ready", _readyQueue.size());
-    builder.appendIntOrLL("free", _freeQueue.size());
+
+    // Counters
+    BSONObjBuilder counters(builder.subobjStart("counters"));
+    counters.appendIntOrLL("eventCreated", _counterCreatedEvents);
+    counters.appendIntOrLL("eventWait", _counterCreatedEvents);
+    counters.appendIntOrLL("cancels", _counterCancels);
+    counters.appendIntOrLL("waits", _counterWaits);
+    counters.appendIntOrLL("scheduledNetCmd", _counterScheduledCommands);
+    counters.appendIntOrLL("scheduledDBWork", _counterScheduledDBWorks);
+    counters.appendIntOrLL("scheduledXclWork", _counterScheduledExclusiveWorks);
+    counters.appendIntOrLL("scheduledWorkAt", _counterScheduledWorkAts);
+    counters.appendIntOrLL("scheduledWork", _counterScheduledWorks);
+    counters.appendIntOrLL("schedulingFailures", _counterSchedulingFailures);
+    counters.done();
+
+    // Queues
+    BSONObjBuilder queues(builder.subobjStart("queues"));
+    queues.appendIntOrLL("networkInProgress", _networkInProgressQueue.size());
+    queues.appendIntOrLL("dbWorkInProgress", _dbWorkInProgressQueue.size());
+    queues.appendIntOrLL("exclusiveInProgress", _exclusiveLockInProgressQueue.size());
+    queues.appendIntOrLL("sleepers", _sleepersQueue.size());
+    queues.appendIntOrLL("ready", _readyQueue.size());
+    queues.appendIntOrLL("free", _freeQueue.size());
+    queues.done();
+
     builder.appendIntOrLL("unsignaledEvents", _unsignaledEvents.size());
     builder.appendIntOrLL("eventWaiters", _totalEventWaiters);
     builder.append("shuttingDown", _inShutdown);
@@ -207,6 +225,7 @@ void ReplicationExecutor::maybeNotifyShutdownComplete_inlock() {
 
 StatusWith<ReplicationExecutor::EventHandle> ReplicationExecutor::makeEvent() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    ++_counterCreatedEvents;
     return makeEvent_inlock();
 }
 
@@ -232,14 +251,17 @@ void ReplicationExecutor::signalEvent_inlock(const EventHandle& eventHandle) {
 }
 
 void ReplicationExecutor::waitForEvent(const EventHandle& event) {
+    ++_counterWaitEvents;
     _getEventFromHandle(event)->waitUntilSignaled();
 }
 
 void ReplicationExecutor::cancel(const CallbackHandle& cbHandle) {
+    ++_counterCancels;
     _getCallbackFromHandle(cbHandle)->cancel();
 };
 
 void ReplicationExecutor::wait(const CallbackHandle& cbHandle) {
+    ++_counterWaits;
     _getCallbackFromHandle(cbHandle)->waitForCompletion();
 };
 
@@ -330,6 +352,7 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleRem
                        _getCallbackFromHandle(handle.getValue())->_iter->generation,
                        cb));
     }
+    ++_counterScheduledCommands;
     return handle;
 }
 
@@ -337,7 +360,11 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleWor
     const CallbackFn& work) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _networkInterface->signalWorkAvailable();
-    return enqueueWork_inlock(&_readyQueue, work);
+    const auto status = enqueueWork_inlock(&_readyQueue, work);
+    if (status.isOK()) {
+        ++_counterScheduledWorks;
+    }
+    return status;
 }
 
 StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleWorkAt(
@@ -354,6 +381,7 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleWor
     while (insertBefore != _sleepersQueue.end() && insertBefore->readyDate <= when)
         ++insertBefore;
     _sleepersQueue.splice(insertBefore, temp, temp.begin());
+    ++_counterScheduledWorkAts;
     return cbHandle;
 }
 
@@ -384,6 +412,7 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleDBW
             _dblockTaskRunner.schedule(DatabaseTask::makeCollectionLockTask(task, nss, mode));
         }
     }
+    ++_counterScheduledDBWorks;
     return handle;
 }
 
@@ -435,6 +464,7 @@ ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock(const CallbackFn& work)
                 return TaskRunner::NextAction::kDisposeOperationContext;
             }));
     }
+    ++_counterScheduledExclusiveWorks;
     return handle;
 }
 

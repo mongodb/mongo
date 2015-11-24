@@ -51,6 +51,10 @@ public:
 
     virtual void shutdown();
 
+    virtual ReplicationExecutor* getExecutor() override {
+        return nullptr;
+    };
+
     virtual const ReplSettings& getSettings() const;
 
     virtual bool isReplEnabled() const;

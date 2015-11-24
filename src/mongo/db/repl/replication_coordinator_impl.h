@@ -109,6 +109,10 @@ public:
 
     virtual void shutdown() override;
 
+    virtual ReplicationExecutor* getExecutor() override {
+        return &_replExecutor;
+    }
+
     virtual const ReplSettings& getSettings() const override;
 
     virtual Mode getReplicationMode() const override;
