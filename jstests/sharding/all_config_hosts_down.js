@@ -31,7 +31,8 @@ for( var i = 0; i < 2; i++ ){
         printjson( e )
 
         // Make sure we get a transport error, and not a no-primary error
-        assert(e.code == 10276 ||       // Transport error
+        assert(e.code == 8002 ||        // SCCC config down, for v3.0 compatibility.
+               e.code == 10276 ||       // Transport error
                e.code == 13328 ||       // Connect error
                e.code == 13639 ||       // Connect error to replSet primary
                e.code == ErrorCodes.HostUnreachable ||

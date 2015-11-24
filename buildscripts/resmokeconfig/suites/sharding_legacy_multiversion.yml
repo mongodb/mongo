@@ -2,44 +2,52 @@ selector:
   js_test:
     roots:
     - jstests/sharding/*.js
+    - jstests/sharding/sync_cluster_config/*.js
     exclude_files:
     # The following tests fails because a certain command or functionality is not supported in v3.0
     # version of mongos:
     - jstests/sharding/csrs_upgrade.js
     - jstests/sharding/csrs_upgrade_during_migrate.js
     - jstests/sharding/find_getmore_cmd.js
-    # explain format changed. In v3.0, read pref is inside explain sub document. In master,
-    # it is on top level.
+
+    # The following tests fail because explain format changed. In v3.0, read pref is inside
+    # explain sub document. In v3.2, it is on top level. See SERVER-21660.
+    - jstests/sharding/auth_slaveok_routing.js
+    - jstests/sharding/explain_read_pref.js
     - jstests/sharding/read_pref.js
-    # This is testing latest mongos options
+
+    # This is testing latest mongos options.
     - jstests/sharding/sharding_options.js
     # This tests the new sharding section in server status.
     - jstests/sharding/server_status.js
+    # v3.0 does not support explain on findAndModify.
+    - jstests/sharding/explain_find_and_modify_sharded.js
+    # Tests new functionality added to the printShardingStatus shell helper.
+    - jstests/sharding/printShardingStatus.js
+    # v3.2 responds with a new error code (just errmsg in v3.0).
+    - jstests/sharding/drop_configdb.js
+    # v3.2 has new fields, "DBClient (Global)" and "NetworkInterfaceASIO (Sharding)".
+    - jstests/sharding/conn_pool_stats.js
+    # v3.2 returns a named ErrorCode, whereas v3.0 returns a uassert location.
+    - jstests/sharding/movePrimary1.js
+    # v3.0 responds with $err, v3.2 returns err code for inprog and killop.
+    - jstests/sharding/auth.js
 
     # The following tests fails because of bugs in v3.0 that were already fixed in v3.2:
-    - jstests/sharding/index1.js # SERVER-17915, fixed in v3.1.3
-    - jstests/sharding/zero_shard_version.js # SERVER-20530, fixed in v3.1.9
-    - jstests/sharding/unowned_doc_filtering.js # SERVER-19608, fixed in v3.1.8
+    - jstests/sharding/addshard2.js # SERVER-17231, fixed in v3.1.1
+    - jstests/sharding/all_config_servers_blackholed_from_mongos.js # SERVER-21293, fixed in v3.2.0-rc4
     - jstests/sharding/features1.js # SERVER-21193, fixed in v3.2.0-rc3
+    - jstests/sharding/find_and_modify_after_multi_write.js # SERVER-20407, backported to v3.0.8
+    - jstests/sharding/index1.js # SERVER-17915, fixed in v3.1.3
     - jstests/sharding/listDatabases.js # SERVER-21193, fixed in v3.2.0-rc3
-    - jstests/sharding/all_config_servers_blackholed_from_mongos.js # SERVER-21293, 3.2.0-rc4
+    - jstests/sharding/query_config.js # SERVER-11877, fixed in v3.1.8
+    - jstests/sharding/read_does_not_create_namespaces.js # SERVER-17723, fixed in v3.1.2
+    - jstests/sharding/startup_with_all_configs_down.js # SERVER-21215, fixed in v3.2.0-rc4
+    - jstests/sharding/unowned_doc_filtering.js # SERVER-19608, fixed in v3.1.8
+    - jstests/sharding/zero_shard_version.js # SERVER-20530, fixed in v3.1.9
 
-    # TODO: Investigate why these are failing:
-    - jstests/sharding/find_and_modify_after_multi_write.js
-    - jstests/sharding/explain_find_and_modify_sharded.js
-    - jstests/sharding/printShardingStatus.js
-    - jstests/sharding/rename.js
-    - jstests/sharding/drop_configdb.js
-    - jstests/sharding/query_config.js
-    - jstests/sharding/explain_read_pref.js
-    - jstests/sharding/conn_pool_stats.js
-    - jstests/sharding/read_does_not_create_namespaces.js
-    - jstests/sharding/movePrimary1.js
-    - jstests/sharding/addshard2.js
-    - jstests/sharding/all_config_hosts_down.js # possibly caused by SERVER-21215?
-    - jstests/sharding/auth.js
-    - jstests/sharding/auth_slaveok_routing.js
-    - jstests/sharding/startup_with_all_configs_down.js
+    # The following tests fail because of known bugs:
+    - jstests/sharding/sync_cluster_config/sync6.js # SERVER-21660
 
 executor:
   js_test:
@@ -47,6 +55,7 @@ executor:
       shell_options:
         global_vars:
           TestData:
+            useLegacyReplicationProtocol: true
             useLegacyConfigServers: true
             mongosBinVersion: 'last-stable'
         nodb: ''
