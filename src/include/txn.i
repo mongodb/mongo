@@ -327,22 +327,22 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 	txn_global = &S2C(session)->txn_global;
 
 	/*
-         * Allocating transaction IDs involves several steps.
-         * 
-         * Firstly, we do an atomic increment to allocate a unique ID.  The
-         * field we increment is not used anywhere else.
-         *
-         * Then we optionally publish the allocated ID into the global
-         * transaction table.  It is critical that this becomes visible before
-         * the global current value moves past our ID, or some concurrent
-         * reader could get a snapshot that makes our changes visible before we
-         * commit.
-         *
-         * Lastly, we spin to update the current ID.  This is the only place
-         * that the current ID is updated, and it is in the same cache line as
-         * the field we allocate from, so we should usually succeed on the
-         * first try.
-         *
+	 * Allocating transaction IDs involves several steps.
+	 *
+	 * Firstly, we do an atomic increment to allocate a unique ID.  The
+	 * field we increment is not used anywhere else.
+	 *
+	 * Then we optionally publish the allocated ID into the global
+	 * transaction table.  It is critical that this becomes visible before
+	 * the global current value moves past our ID, or some concurrent
+	 * reader could get a snapshot that makes our changes visible before we
+	 * commit.
+	 *
+	 * Lastly, we spin to update the current ID.  This is the only place
+	 * that the current ID is updated, and it is in the same cache line as
+	 * the field we allocate from, so we should usually succeed on the
+	 * first try.
+	 *
 	 * We want the global value to lead the allocated values, so that any
 	 * allocated transaction ID eventually becomes globally visible.  When
 	 * there are no transactions running, the oldest_id will reach the
