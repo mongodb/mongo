@@ -319,10 +319,11 @@ private:
 
     int _magic;
 
-    NamespaceString _ns;
-    CollectionCatalogEntry* _details;
-    RecordStore* _recordStore;
-    DatabaseCatalogEntry* _dbce;
+    const NamespaceString _ns;
+    CollectionCatalogEntry* const _details;
+    RecordStore* const _recordStore;
+    DatabaseCatalogEntry* const _dbce;
+    const bool _needCappedLock;
     CollectionInfoCache _infoCache;
     IndexCatalog _indexCatalog;
 
