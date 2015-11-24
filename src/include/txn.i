@@ -323,6 +323,7 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 {
 	WT_TXN_GLOBAL *txn_global;
 	uint64_t id;
+	u_int i;
 
 	txn_global = &S2C(session)->txn_global;
 
@@ -353,14 +354,17 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 
 	if (publish) {
 		session->txn.id = id;
-		WT_PUBLISH(WT_SESSION_TXN_STATE(session)->id, id);
+		WT_SESSION_TXN_STATE(session)->id = id;
 	}
 
-	while (txn_global->current != id ||
-	    !__wt_atomic_casv64(&txn_global->current, id, id + 1))
-		__wt_yield();
+	for (i = 0; txn_global->current != id; i++)
+		if (i < 100)
+			WT_PAUSE();
+		else
+			__wt_yield();
 
-	 return (id);
+	WT_PUBLISH(txn_global->current, id + 1);
+	return (id);
 }
 
 /*
