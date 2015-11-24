@@ -22,8 +22,9 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_DECL_RET;
 	const char *raw_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "raw", NULL };
+	/* Coverity needs cfg arrays to be sized at least 3. */
 	const char *def_cfg[] = { WT_CONFIG_BASE(
-	    session, WT_SESSION_open_cursor), NULL };
+	    session, WT_SESSION_open_cursor), NULL, NULL };
 	const char *uri, **config;
 	char *uribuf;
 	WT_CURSOR_JOIN_ITER *iter;
