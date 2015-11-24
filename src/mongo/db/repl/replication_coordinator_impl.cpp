@@ -1460,8 +1460,7 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
         return;
     }
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _cancelHeartbeats_inlock();
-    _startHeartbeats_inlock(cbData);
+    _restartHeartbeats_inlock(cbData);
 }
 
 void ReplicationCoordinatorImpl::_handleTimePassing(
@@ -2643,18 +2642,17 @@ void ReplicationCoordinatorImpl::_chooseNewSyncSource(
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
+
+    HostAndPort oldSyncSource = _topCoord->getSyncSourceAddress();
+
     *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), lastTimestampFetched);
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    // If no sync source is found, schedule new heartbeats immediately to update our member state,
-    // allowing us to make informed sync source decisions.
-    if (newSyncSource->empty() && _justLostSyncSource && _selfIndex >= 0 &&
+    // If we lost our sync source, schedule new heartbeats immediately to update our knowledge
+    // of other members's state, allowing us to make informed sync source decisions.
+    if (newSyncSource->empty() && !oldSyncSource.empty() && _selfIndex >= 0 &&
         !_getMemberState_inlock().primary()) {
-        _cancelHeartbeats_inlock();
-        _startHeartbeats_inlock(cbData);
-        _justLostSyncSource = false;
-    } else {
-        _justLostSyncSource = true;
+        _restartHeartbeats_inlock(cbData);
     }
 }
 
@@ -3358,8 +3356,7 @@ void ReplicationCoordinatorImpl::_scheduleElectionWinNotification() {
             return;
         }
 
-        _cancelHeartbeats_inlock();
-        _startHeartbeats_inlock(cbData);
+        _restartHeartbeats_inlock(cbData);
     };
 
     auto cbStatus = _replExecutor.scheduleWork(electionWinNotificationCallback);

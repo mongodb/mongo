@@ -526,6 +526,12 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
     }
 }
 
+void ReplicationCoordinatorImpl::_restartHeartbeats_inlock(
+    const ReplicationExecutor::CallbackArgs& cbData) {
+    _cancelHeartbeats_inlock();
+    _startHeartbeats_inlock(cbData);
+}
+
 void ReplicationCoordinatorImpl::_startHeartbeats_inlock(
     const ReplicationExecutor::CallbackArgs& cbData) {
     const Date_t now = _replExecutor.now();
@@ -575,8 +581,8 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
             slaveInfo.down = true;
 
             if (_memberState.primary()) {
-                // Only adjust hbdata if we are primary, since only the primary has a full view of
-                // the entire cluster.
+                // Only adjust hbdata if we are primary, since only the primary has a full view
+                // of the entire cluster.
                 // Secondaries might not see other secondaries in the cluster if they are not
                 // downstream.
                 HeartbeatResponseAction action =
@@ -604,7 +610,8 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock(
     if (!isV1ElectionProtocol()) {
         return;
     }
-    // Scan liveness table for earliest date; schedule a run at (that date plus election timeout).
+    // Scan liveness table for earliest date; schedule a run at (that date plus election
+    // timeout).
     Date_t earliestDate = Date_t::max();
     int earliestMemberId = -1;
     for (auto&& slaveInfo : _slaveInfo) {
@@ -710,7 +717,8 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTake
         return;
     }
 
-    // We should always reschedule this callback even if we do not make it to the election process.
+    // We should always reschedule this callback even if we do not make it to the election
+    // process.
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _cancelPriorityTakeover_inlock();
@@ -719,7 +727,8 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTake
 
     if (!_topCoord->becomeCandidateIfElectable(_replExecutor.now(), getMyLastOptime())) {
         if (isPriorityTakeOver) {
-            log() << "Not starting an election for a priority takeover, since we are not electable";
+            log() << "Not starting an election for a priority takeover, since we are not "
+                     "electable";
         } else {
             log() << "Not starting an election, since we are not electable";
         }

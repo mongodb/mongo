@@ -778,6 +778,12 @@ private:
     void _cancelHeartbeats_inlock();
 
     /**
+     * Cancels all heartbeats, then starts a heartbeat for each member in the current config.
+     * Called within the executor context.
+     */
+    void _restartHeartbeats_inlock(const ReplicationExecutor::CallbackArgs& cbData);
+
+    /**
      * Asynchronously sends a heartbeat to "target". "targetIndex" is the index
      * into the replica set config members array that corresponds to the "target", or -1 if
      * we don't have a valid replica set config.
@@ -1380,9 +1386,6 @@ private:
 
     // Cached copy of the current config protocol version.
     AtomicInt64 _protVersion;  // (S)
-
-    // Prevents a busy loop of cancelling heartbeats when we have no sync source.
-    bool _justLostSyncSource = true;  // (M)
 };
 
 }  // namespace repl
