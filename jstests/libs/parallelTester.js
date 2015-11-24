@@ -160,10 +160,6 @@ if ( typeof _threadInject != "undefined" ){
                                    // This overwrites MinKey/MaxKey's singleton which breaks
                                    // any other test that uses MinKey/MaxKey
                                    "type6.js",
-
-                                   // bench_test_crud_commands.js is temporarily disabled; see
-                                   // SERVER-21387.
-                                   "bench_test_crud_commands.js",
                                ] );
         
         var parallelFilesDir = "jstests/core";
