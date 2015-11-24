@@ -1003,7 +1003,7 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (count > WT_MIN_SPLIT_COUNT &&
 		    size > (size_t)btree->maxleafpage)
 			return (true);
-        }
+	}
 	return (false);
 }
 
