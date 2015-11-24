@@ -42,6 +42,7 @@
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/rpc/protocol.h"
 
 namespace mongo {
 
@@ -78,7 +79,8 @@ void addJournalSyncForWMajority(WriteConcernOptions* writeConcern) {
 const std::string kLocalDB = "local";
 }  // namespace
 
-StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj,
+StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
+                                                    const BSONObj& cmdObj,
                                                     const std::string& dbName) {
     // The default write concern if empty is w : 1
     // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
@@ -111,7 +113,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj,
         return wcStatus;
     }
 
-    wcStatus = validateWriteConcern(writeConcern, dbName);
+    wcStatus = validateWriteConcern(txn, writeConcern, dbName);
     if (!wcStatus.isOK()) {
         return wcStatus;
     }
@@ -121,7 +123,9 @@ StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj,
 
     return writeConcern;
 }
-Status validateWriteConcern(const WriteConcernOptions& writeConcern, const std::string& dbName) {
+Status validateWriteConcern(OperationContext* txn,
+                            const WriteConcernOptions& writeConcern,
+                            const std::string& dbName) {
     const bool isJournalEnabled = getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();
 
     if (writeConcern.syncMode == WriteConcernOptions::JOURNAL && !isJournalEnabled) {
@@ -135,6 +139,15 @@ Status validateWriteConcern(const WriteConcernOptions& writeConcern, const std::
         repl::getGlobalReplicationCoordinator()->getReplicationMode();
 
     if (isConfigServer) {
+        auto protocol = rpc::getOperationProtocol(txn);
+        // This here only for v3.0 backwards compatibility.
+        if (serverGlobalParams.configsvrMode != CatalogManager::ConfigServerMode::CSRS &&
+            replMode != repl::ReplicationCoordinator::modeReplSet &&
+            protocol == rpc::Protocol::kOpQuery && writeConcern.wNumNodes == 0 &&
+            writeConcern.wMode.empty()) {
+            return Status::OK();
+        }
+
         if (!writeConcern.validForConfigServers()) {
             return Status(
                 ErrorCodes::BadValue,
@@ -224,7 +237,7 @@ Status waitForWriteConcern(OperationContext* txn,
                            WriteConcernResult* result) {
     // We assume all options have been validated earlier, if not, programming error.
     // Passing localDB name is a hack to avoid more rigorous check that performed for non local DB.
-    dassert(validateWriteConcern(writeConcern, kLocalDB).isOK());
+    dassert(validateWriteConcern(txn, writeConcern, kLocalDB).isOK());
 
     // We should never be waiting for write concern while holding any sort of lock, because this may
     // lead to situations where the replication heartbeats are stalled.

@@ -344,7 +344,7 @@ public:
         const FindAndModifyRequest& args = parseStatus.getValue();
         const NamespaceString& nsString = args.getNamespaceString();
 
-        StatusWith<WriteConcernOptions> wcResult = extractWriteConcern(cmdObj, dbName);
+        StatusWith<WriteConcernOptions> wcResult = extractWriteConcern(txn, cmdObj, dbName);
         if (!wcResult.isOK()) {
             return appendCommandStatus(result, wcResult.getStatus());
         }
