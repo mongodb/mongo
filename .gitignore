@@ -150,6 +150,9 @@ src/third_party/v8/src/libraries.cc
 .idea
 CMakeLists.txt
 
+# XCode projects
+.xcworkspace
+
 # old things that should be removed
 # maybe remove this mid 2012
 src/mongo/buildinfo.cpp
