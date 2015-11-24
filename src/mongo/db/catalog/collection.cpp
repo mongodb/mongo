@@ -174,6 +174,7 @@ Collection::Collection(OperationContext* txn,
       _details(details),
       _recordStore(recordStore),
       _dbce(dbce),
+      _needCappedLock(supportsDocLocking() && _recordStore->isCapped() && _ns.db() != "local"),
       _infoCache(this),
       _indexCatalog(this),
       _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
@@ -425,6 +426,13 @@ Status Collection::_insertDocuments(OperationContext* txn,
                 "Can't batch inserts into indexed capped collections"};
     }
 
+    if (_needCappedLock) {
+        // X-lock the metadata resource for this capped collection until the end of the WUOW. This
+        // prevents the primary from executing with more concurrency than secondaries.
+        // See SERVER-21646.
+        Lock::ResourceLock{txn->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
+    }
+
     std::vector<Record> records;
     for (auto it = begin; it != end; it++) {
         Record record = {RecordId(), RecordData(it->objdata(), it->objsize())};
@@ -528,6 +536,13 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
 
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(oldDoc.snapshotId() == txn->recoveryUnit()->getSnapshotId());
+
+    if (_needCappedLock) {
+        // X-lock the metadata resource for this capped collection until the end of the WUOW. This
+        // prevents the primary from executing with more concurrency than secondaries.
+        // See SERVER-21646.
+        Lock::ResourceLock{txn->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
+    }
 
     SnapshotId sid = txn->recoveryUnit()->getSnapshotId();
 

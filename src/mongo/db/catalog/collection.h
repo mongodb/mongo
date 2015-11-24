@@ -448,10 +448,11 @@ private:
 
     int _magic;
 
-    NamespaceString _ns;
-    CollectionCatalogEntry* _details;
-    RecordStore* _recordStore;
-    DatabaseCatalogEntry* _dbce;
+    const NamespaceString _ns;
+    CollectionCatalogEntry* const _details;
+    RecordStore* const _recordStore;
+    DatabaseCatalogEntry* const _dbce;
+    const bool _needCappedLock;
     CollectionInfoCache _infoCache;
     IndexCatalog _indexCatalog;
 
@@ -474,7 +475,7 @@ private:
     // on this object until notified of the arrival of new data.
     //
     // This is non-null if and only if the collection is a capped collection.
-    std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
+    const std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
 
     const bool _mustTakeCappedLockOnInsert;
 
