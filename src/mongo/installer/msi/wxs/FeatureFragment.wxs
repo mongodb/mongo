@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
+    <?if $(var.Edition) = Enterprise ?>
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongodecrypt, mongofiles, mongooplog, mongoperf)" />
+    <?else?>
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongofiles, mongooplog, mongoperf)" />
+    <?endif?>
     <FeatureGroup Id="fg_MongoDBAll">
       <Feature Id="ProductFeature"
                Title="!(wix.ProductName)"
@@ -79,7 +84,7 @@
         </Feature>     
         <Feature Id="MiscellaneousTools"
                 Title ="Miscellaneous Tools"
-                Description="Miscellaneous MongoDB tools (bsondump, mongofiles, mongooplog, mongoperf)"
+                Description="!(wix.MiscToolsDesc)"
                 Level ="1">
           <ComponentRef Id="c_bsondump"/>
           <ComponentRef Id="c_mongofiles"/>
@@ -87,6 +92,7 @@
           <ComponentRef Id="c_mongoperf"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
+            <ComponentRef Id="c_mongodecrypt"/>
           <?endif ?>
           <?if $(var.Edition) = SSL ?>
             <ComponentGroupRef Id="cg_SSLBase" />

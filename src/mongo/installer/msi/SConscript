@@ -31,6 +31,7 @@ else:
 	toolBuildDir = buildDir + r'\mongo'
 
 enterprisebase = 'src\mongo\db\modules\enterprise'
+enterpriseToolBuildDir = buildDir + r'\mongo\db\modules\enterprise'
 
 # Set up parameters to pass to wix -
 #
@@ -106,6 +107,7 @@ env.Command(objects,
             r' -dEnterpriseBase=' + enterprisebase + '\\'
             ' -dBinarySource=' + buildDir + r'\mongo'
             ' -dToolBinarySource=' + toolBuildDir +
+            ' -dEnterpriseToolBinarySource=' + enterpriseToolBuildDir +
             ' -dMergeModulesBasePath="$MERGEMODULESBASEPATH"'
             ' -dEdition=' + msi_edition +
             ' -d"ProductId=*\"'
