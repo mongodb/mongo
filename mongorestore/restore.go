@@ -135,6 +135,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		if err != nil {
 			return fmt.Errorf("error parsing metadata from %v: %v", intent.MetadataLocation, err)
 		}
+
 		if !restore.OutputOptions.NoOptionsRestore {
 			if options != nil {
 				if !collectionExists {
@@ -153,7 +154,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 			log.Log(log.Info, "skipping options restoration")
 		}
 	}
-
+	
 	var documentCount int64
 	if intent.BSONFile != nil {
 		err = intent.BSONFile.Open()
@@ -189,11 +190,13 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 	return nil
 }
 
+
 // RestoreCollectionToDB pipes the given BSON data into the database.
 // Returns the number of documents restored and any errors that occured.
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	bsonSource *db.DecodedBSONSource, file PosReader, fileSize int64) (int64, error) {
 
+	
 	var termErr error
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {

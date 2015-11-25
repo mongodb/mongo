@@ -142,6 +142,13 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	} else {
 		restore.tempRolesCol = *restore.ToolOptions.HiddenOptions.TempRolesColl
 	}
+	
+	if len(restore.OutputOptions.ExcludedCollections) > 0 && restore.ToolOptions.Namespace.Collection != "" {
+		return fmt.Errorf("--collection is not allowed when --excludeCollection is specified")
+	}
+	if len(restore.OutputOptions.ExcludedCollectionPrefixes) > 0 && restore.ToolOptions.Namespace.Collection != "" {
+		return fmt.Errorf("--collection is not allowed when --excludeCollectionsWithPrefix is specified")
+	}
 
 	if restore.OutputOptions.NumInsertionWorkers < 0 {
 		return fmt.Errorf(

@@ -347,6 +347,13 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 							"has .metadata.json files", db)
 					skip = true
 				}
+
+				// TOOLS-976: skip restoring the collections should be excluded 
+				if filterCollection == "" && restore.shouldSkipCollection(collection) {
+					log.Logf(log.DebugLow, "skipping restoring %v.%v, it is excluded", db, collection)
+					skip = true
+				}
+
 				if filterCollection != "" && filterCollection != collection {
 					skip = true
 				}
@@ -384,11 +391,18 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 				log.Logf(log.Info, "found collection %v bson to restore", intent.Namespace())
 				restore.manager.Put(intent)
 			case MetadataFileType:
+				// TOOLS-976: skip restoring the collections should be excluded 
+				if filterCollection == "" && restore.shouldSkipCollection(collection) {
+					log.Logf(log.DebugLow, "skipping restoring %v.%v metadata, it is excluded", db, collection)
+					continue	
+				}
+
 				usesMetadataFiles = true
 				intent := &intents.Intent{
 					DB: db,
 					C:  collection,
 				}
+				
 				if restore.InputOptions.Archive != "" {
 					if restore.InputOptions.Archive == "-" {
 						intent.MetadataLocation = "archive on stdin"
@@ -486,6 +500,24 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 	restore.manager.Put(intent)
 
 	return nil
+}
+
+func (restore *MongoRestore) shouldSkipCollection(colName string) bool {
+	if restore.OutputOptions != nil && len(restore.OutputOptions.ExcludedCollections) > 0 {
+		for _, excludedCollection := range restore.OutputOptions.ExcludedCollections {
+			if colName == excludedCollection {
+				return true
+			}
+		}
+	}
+	if restore.OutputOptions != nil && len(restore.OutputOptions.ExcludedCollectionPrefixes) > 0 {
+		for _, excludedCollectionPrefix := range restore.OutputOptions.ExcludedCollectionPrefixes {
+			if strings.HasPrefix(colName, excludedCollectionPrefix) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // helper for searching a list of FileInfo for metadata files
