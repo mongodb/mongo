@@ -134,7 +134,11 @@ __conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
 	 * eviction and drain any blocks already queued.
 	 */
 	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
+
+	/* The handle is dead, and reset its eviction priority. */
 	F_SET(session->dhandle, WT_DHANDLE_DEAD);
+	__wt_evict_priority_clear(session);
+
 	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
 	return (0);

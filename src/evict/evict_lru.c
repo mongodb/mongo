@@ -48,8 +48,8 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 		return (WT_READGEN_OLDEST);
 
 	/*
-	 * Skew the read generation for internal pages, we prefer to evict leaf
-	 * pages.
+	 * The base read-generation is skewed by the eviction priority.
+	 * Internal pages are also adjusted, we prefer to evict leaf pages.
 	 */
 	read_gen = page->read_gen + btree->evict_priority;
 	if (WT_PAGE_IS_INTERNAL(page))
@@ -1580,6 +1580,26 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 			txn_busy = true;
 	}
 	/* NOTREACHED */
+}
+
+/*
+ * __wt_evict_priority_set --
+ *	Set a tree's eviction priority.
+ */
+void
+__wt_evict_priority_set(WT_SESSION_IMPL *session, uint64_t v)
+{
+	S2BT(session)->evict_priority = v;
+}
+
+/*
+ * __wt_evict_priority_clear --
+ *	Clear a tree's eviction priority.
+ */
+void
+__wt_evict_priority_clear(WT_SESSION_IMPL *session)
+{
+	S2BT(session)->evict_priority = 0;
 }
 
 #ifdef HAVE_DIAGNOSTIC
