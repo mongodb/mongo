@@ -620,6 +620,8 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::InternalError, errmsg);
     }
 
+    ScriptEngine::runConnectCallback(*conn);
+
     JS::RootedObject thisv(cx);
     scope->getProto<MongoExternalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
