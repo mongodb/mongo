@@ -135,9 +135,15 @@ __conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
 	 */
 	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
 
-	/* The handle is dead, and reset its eviction priority. */
+	/* The handle is dead. */
 	F_SET(session->dhandle, WT_DHANDLE_DEAD);
+
+	/*
+	 * Reset the tree's eviction priority, and the tree is evictable by
+	 * definition.
+	 */
 	__wt_evict_priority_clear(session);
+	F_CLR(S2BT(session), WT_BTREE_NO_EVICTION);
 
 	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
