@@ -962,12 +962,12 @@ __evict_walk(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	u_int max_entries, prev_slot, retries, slot, start_slot, spins;
-	bool dhandle_locked, incr;
+	bool dhandle_locked, dead_next, incr;
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
 	dhandle = NULL;
-	dhandle_locked = incr = false;
+	dead_next = dhandle_locked = incr = false;
 	retries = 0;
 
 	if (cache->evict_current == NULL)
@@ -1019,7 +1019,7 @@ retry:	while (slot < max_entries && ret == 0) {
 				cache->evict_file_next = NULL;
 			else
 				dhandle = TAILQ_FIRST(&conn->dhqh);
-		} else {
+		} else if (!F_ISSET(dhandle, WT_DHANDLE_DEAD) || dead_next) {
 			if (incr) {
 				WT_ASSERT(session, dhandle->session_inuse > 0);
 				(void)__wt_atomic_subi32(
@@ -1028,6 +1028,7 @@ retry:	while (slot < max_entries && ret == 0) {
 			}
 			dhandle = TAILQ_NEXT(dhandle, q);
 		}
+		dead_next = false;
 
 		/* If we reach the end of the list, we're done. */
 		if (dhandle == NULL)
@@ -1088,13 +1089,15 @@ retry:	while (slot < max_entries && ret == 0) {
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
 		/*
-		 * If we didn't find any candidates in the file, skip it next
-		 * time.
+		 * If we didn't find any candidates in the tree, skip it next
+		 * time. This is true even for dead trees, they'll eventually
+		 * be empty.
 		 */
-		if (slot == prev_slot)
+		if (slot == prev_slot) {
+			dead_next = true;
 			btree->evict_walk_period = WT_MIN(
 			    WT_MAX(1, 2 * btree->evict_walk_period), 100);
-		else
+		} else
 			btree->evict_walk_period = 0;
 	}
 
