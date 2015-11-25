@@ -4,7 +4,7 @@ var rt = new ReplSetTest( { name : "replset9tests" , nodes: 1, oplogSize: 300 } 
 
 var nodes = rt.startSet();
 rt.initiate();
-var master = rt.getMaster();
+var master = rt.getPrimary();
 var bigstring = Array(5000).toString();
 var md = master.getDB( 'd' );
 var mdc = md[ 'c' ];
@@ -57,7 +57,7 @@ var slave = rt.add();
 print ("initiation complete!");
 var sc = slave.getDB( 'd' )[ 'c' ];
 slave.setSlaveOk();
-master = rt.getMaster();
+master = rt.getPrimary();
 
 print ("updating and deleting documents");
 bulk = master.getDB('d')['c'].initializeUnorderedBulkOp();

@@ -19,14 +19,14 @@ var rst = new ReplSetTest({ name: 'sslSet', nodes: 3, nodeOptions : opts });
 rst.startSet();
 rst.initiate();
 
-var rstConn1 = rst.getMaster();
+var rstConn1 = rst.getPrimary();
 rstConn1.getDB("test").a.insert({a:1, str:"TESTTESTTEST"});
 assert.eq(1, rstConn1.getDB("test").a.count(), "Error interacting with replSet");
 
 print("===== UPGRADE allowSSL -> preferSSL =====");
 opts.sslMode = "preferSSL";
 rst.upgradeSet(opts);
-var rstConn2 = rst.getMaster();
+var rstConn2 = rst.getPrimary();
 rstConn2.getDB("test").a.insert({a:2, str:"CHECKCHECK"});
 assert.eq(2, rstConn2.getDB("test").a.count(), "Error interacting with replSet");
 
@@ -37,7 +37,7 @@ assert.eq(0, canConnectNoSSL, "non-SSL Connection attempt failed when it should 
 print("===== UPGRADE preferSSL -> requireSSL =====");
 opts.sslMode = "requireSSL";
 rst.upgradeSet(opts);
-var rstConn3 = rst.getMaster();
+var rstConn3 = rst.getPrimary();
 rstConn3.getDB("test").a.insert({a:3, str:"GREENEGGSANDHAM"});
 assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");
 

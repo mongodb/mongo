@@ -15,7 +15,7 @@ var doTest = function (signal) {
     replTest.initiate();
 
     // Get master node
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
 
     // Write some data to master
     // NOTE: this test fails unless we write some data.
@@ -35,7 +35,7 @@ var doTest = function (signal) {
     print(phase++);
 
     try {
-        var new_master = replTest.getMaster();
+        var new_master = replTest.getPrimary();
     }
     catch (err) {
         throw ("Could not elect new master before timeout.");

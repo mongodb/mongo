@@ -11,7 +11,7 @@ config.members[1].slaveDelay = 5;
 config.members[2].priority = 0;
 
 replTest.initiate(config);
-var master = replTest.getMaster().getDB(name);
+var master = replTest.getPrimary().getDB(name);
 replTest.awaitReplication();
 
 var slaveConns = replTest.liveNodes.slaves;

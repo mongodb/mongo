@@ -17,7 +17,7 @@ var doTest = function(useDollarQuerySyntax) {
                                     rs0: { nodes: NODES, oplogSize: 10, useHostName: true }
                                 }});
     var replTest = st.rs0;
-    var primaryNode = replTest.getMaster();
+    var primaryNode = replTest.getPrimary();
 
     // The $-prefixed query syntax is only legal for compatibility mode reads, not for the
     // find/getMore commands.

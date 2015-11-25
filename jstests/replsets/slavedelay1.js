@@ -16,7 +16,7 @@ doTest = function( signal ) {
 
   replTest.initiate(config);
 
-  var master = replTest.getMaster().getDB(name);
+  var master = replTest.getPrimary().getDB(name);
   var slaveConns = replTest.liveNodes.slaves;
   var slaves = [];
   for (var i in slaveConns) {
@@ -88,7 +88,7 @@ doTest = function( signal ) {
   config.members[3].slaveDelay = 15;
 
   reconfig(replTest, config);
-  master = replTest.getMaster().getDB(name);
+  master = replTest.getPrimary().getDB(name);
   assert.soon(function() {
           return conn.getDB("local").system.replset.findOne().version == config.version;
       });

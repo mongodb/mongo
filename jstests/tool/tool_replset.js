@@ -23,7 +23,7 @@
     config.members[0].priority = 3;
     config.members[1].priority = 0;
     replTest.initiate(config);
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     assert.eq(nodes[0], master, "incorrect master elected");
     for (var i = 0; i < 100; i++) {
         assert.writeOK(master.getDB("foo").bar.insert({ a: i }));

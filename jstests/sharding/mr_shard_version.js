@@ -36,12 +36,12 @@ var migrateOp = { op : "command", ns : "admin", command : { moveChunk : "" + col
 var checkMigrate = function(){ print( "Result of migrate : " ); printjson( this ) }
 
 var ops = {}
-for( var i = 0; i < st._shardServers.length; i++ ){
+for( var i = 0; i < st._connections.length; i++ ){
     for( var j = 0; j < 2; j++ ){
         ops[ "" + (i * 2 + j) ] = { op : "command", ns : "admin", 
                                     command : { moveChunk : "" + coll, 
                                                      find : { _id : ( j == 0 ? 0 : halfId ) },
-                                                       to : st._shardServers[i].shardName },
+                                                       to : st._connections[i].shardName },
                                     check : checkMigrate };
     }
 }

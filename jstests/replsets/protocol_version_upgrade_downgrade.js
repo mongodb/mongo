@@ -18,7 +18,7 @@ conf.members[2].priority = 0;
 rst.initiate(conf);
 rst.awaitSecondaryNodes();
 
-var primary = rst.getMaster();
+var primary = rst.getPrimary();
 var primaryColl = primary.getDB("test").coll;
 
 // Set verbosity for replication on all nodes.

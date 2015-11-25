@@ -25,9 +25,9 @@ var doTest = function( signal ) {
     // This will wait for initiation
     replTest.initiate();
 
-    // Call getMaster to return a reference to the node that's been
+    // Call getPrimary to return a reference to the node that's been
     // elected master.
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
 
     var isPV1 = (replTest.getConfigFromPrimary().protocolVersion == 1);
     if (isPV1) {
@@ -36,7 +36,7 @@ var doTest = function( signal ) {
         assert.eq("new primary", oplog_entry["o"]["msg"]);
         assert.eq("n", oplog_entry["op"]);
     }
-    // Calling getMaster also makes available the liveNodes structure,
+    // Calling getPrimary also makes available the liveNodes structure,
     // which looks like this:
     // liveNodes = {master: masterNode,
     //              slaves: [slave1, slave2]
@@ -68,7 +68,7 @@ var doTest = function( signal ) {
     replTest.stop( master_id );
 
     // Now let's see who the new master is:
-    var new_master = replTest.getMaster();
+    var new_master = replTest.getPrimary();
 
     // Is the new master the same as the old master?
     var new_master_id = replTest.getNodeId( new_master );
@@ -104,7 +104,7 @@ var doTest = function( signal ) {
     });
 
     // And that both slave nodes have all the updates
-    new_master = replTest.getMaster();
+    new_master = replTest.getPrimary();
     assert.eq( 1000 , new_master.getDB( "bar" ).runCommand( { count:"bar"} ).n , "assumption 2");
     replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
@@ -119,7 +119,7 @@ var doTest = function( signal ) {
     });
 
     // last error
-    master = replTest.getMaster();
+    master = replTest.getPrimary();
     slaves = replTest.liveNodes.slaves;
     printjson(replTest.liveNodes);
 

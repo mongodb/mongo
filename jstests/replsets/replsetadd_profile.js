@@ -12,7 +12,7 @@ var replTest = new ReplSetTest({name: 'ReplSetAddProfileTestSet',
                                 nodes: [{profile: 2}]});
 replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var masterCollection = master.getDB('test').getCollection(collectionName);
 masterCollection.save({a: 1});
 

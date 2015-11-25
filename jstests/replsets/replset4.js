@@ -6,7 +6,7 @@ doTest = function (signal) {
     replTest.startSet();
     replTest.initiate();
 
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
 
     // Kill both slaves, simulating a network partition
     var slaves = replTest.liveNodes.slaves;

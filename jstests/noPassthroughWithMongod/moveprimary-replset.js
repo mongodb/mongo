@@ -26,7 +26,7 @@ var replSet1 = shardingTest.rs0;
 var replSet2 = shardingTest.rs1;
 
 jsTest.log("Adding data to our first replica set");
-var repset1DB = replSet1.getMaster().getDB(testDBName);
+var repset1DB = replSet1.getPrimary().getDB(testDBName);
 for (var i = 1; i <= numDocs; i++) {
     repset1DB[testCollName].insert({ x : i });
 }
@@ -48,13 +48,13 @@ jsTest.log("Adding replSet2 as second shard");
 mongosConn.adminCommand({ addshard : replSet2.getURL() });
 
 mongosConn.getDB('admin').printShardingStatus();
-printjson(replSet2.getMaster().getDBs());
+printjson(replSet2.getPrimary().getDBs());
 
 jsTest.log("Moving test db from replSet1 to replSet2");
 assert.commandWorked(mongosConn.getDB('admin').runCommand({ moveprimary: testDBName,
                                                             to: replSet2.getURL() }));
 mongosConn.getDB('admin').printShardingStatus();
-printjson(replSet2.getMaster().getDBs());
+printjson(replSet2.getPrimary().getDBs());
 assert.eq(testDB.getSiblingDB("config").databases.findOne({ "_id" : testDBName }).primary,
           replSet2.name, "Failed to change primary shard for unsharded database.");
 

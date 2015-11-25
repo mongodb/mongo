@@ -40,7 +40,7 @@ else {
     config.members[0].priority = 1;
     replTest.initiate(config);
 
-    var masterDB = replTest.getMaster().getDB("test");
+    var masterDB = replTest.getPrimary().getDB("test");
     var secondary1 = replTest.liveNodes.slaves[0];
 
     jsTestLog("add some data to collection foo");

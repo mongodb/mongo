@@ -3,7 +3,7 @@ var replTest = new ReplSetTest( {name: 'testSet', nodes: 2} );
 var nodes = replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 db = master.getDB("foo")
 db.foo.save({a: 1000});
 replTest.awaitReplication();

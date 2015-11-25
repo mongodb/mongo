@@ -9,7 +9,7 @@
 var replTest = new ReplSetTest( { nodes: 1, oplogSize:2, nodeOptions: {smallfiles:""}} );
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var coll = master.getDB("o").fake;
 var cdb = coll.getDB();
 

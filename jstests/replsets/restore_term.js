@@ -30,7 +30,7 @@ conf.protocolVersion = 1;
 rst.initiate(conf);
 rst.awaitSecondaryNodes();
 
-var primary = rst.getMaster();
+var primary = rst.getPrimary();
 var primaryColl = primary.getDB("test").coll;
 
 // Current term may be greater than 1 if election race happens.
@@ -53,13 +53,13 @@ try {
 rst.awaitSecondaryNodes();
 // The secondary became the new primary now with a higher term.
 // Since there's only one secondary who may run for election, the new term is higher by 1.
-assert.eq(getCurrentTerm(rst.getMaster()), firstSuccessfulTerm + 1);
+assert.eq(getCurrentTerm(rst.getPrimary()), firstSuccessfulTerm + 1);
 
 // Restart the replset and verify the term is the same.
 rst.stopSet(null /* signal */, true /* forRestart */);
 rst.startSet({restart: true});
 rst.awaitSecondaryNodes();
-primary = rst.getMaster();
+primary = rst.getPrimary();
 
 assert.eq(primary.getDB("test").coll.find().itcount(), 1);
 // After restart, the new primary stands up with the newer term.

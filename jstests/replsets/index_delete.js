@@ -39,7 +39,7 @@ replTest.initiate({"_id" : "fgIndex",
                        {"_id" : 1, "host" : nodes[1]},
                        {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]});
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var second = replTest.getSecondary();
 var masterDB = master.getDB('fgIndexSec');
 var secondDB = second.getDB('fgIndexSec');

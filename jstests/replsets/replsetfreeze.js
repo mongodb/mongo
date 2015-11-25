@@ -48,7 +48,7 @@ var config = {"_id" : "unicomplex", "members" : [
     {"_id" : 1, "host" : nodes[1] },
     {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]};
 var r = replTest.initiate(config);
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var secondary = replTest.getSecondary();
 
 replTest.awaitSecondaryNodes();
@@ -79,7 +79,7 @@ while ((new Date()).getTime() - start < (28 * 1000) ) { // we need less 30 since
 
 
 print("5: check for new master");
-master = replTest.getMaster();
+master = replTest.getPrimary();
 
 
 print("6: step down new master");
@@ -102,7 +102,7 @@ master.getDB("admin").runCommand({replSetFreeze : 0});
 
 
 print("9: check we get a new master within 30 seconds");
-master = replTest.getMaster();
+master = replTest.getPrimary();
 
 
 replTest.stopSet( 15 );

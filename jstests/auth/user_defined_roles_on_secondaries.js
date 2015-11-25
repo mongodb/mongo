@@ -95,7 +95,7 @@ m0.getDB("db1").createRole({
 rstest.add();
 rstest.reInitiate();
 
-rstest.getMaster().getDB("db1").createRole({
+rstest.getPrimary().getDB("db1").createRole({
     role: "r3",
     roles: [ "r1", "r2" ],
     privileges: [
@@ -116,8 +116,8 @@ rstest.nodes.forEach(function (node) {
 });
 
 // Verify that updating roles propagates.
-rstest.getMaster().getDB("db1").revokeRolesFromRole("r1", [ "read" ], { w: 2 });
-rstest.getMaster().getDB("db1").grantRolesToRole("r1", [ "dbAdmin" ], { w: 2 });
+rstest.getPrimary().getDB("db1").revokeRolesFromRole("r1", [ "read" ], { w: 2 });
+rstest.getPrimary().getDB("db1").grantRolesToRole("r1", [ "dbAdmin" ], { w: 2 });
 rstest.nodes.forEach(function (node) {
     var role = node.getDB("db1").getRole("r1");
     assert.eq(1, role.roles.length, node);
@@ -125,7 +125,7 @@ rstest.nodes.forEach(function (node) {
 });
 
 // Verify that dropping roles propagates.
-rstest.getMaster().getDB("db1").dropRole("r2", { w: 2});
+rstest.getPrimary().getDB("db1").dropRole("r2", { w: 2});
 rstest.nodes.forEach(function (node) {
     assert.eq(null, node.getDB("db1").getRole("r2"));
     var role = node.getDB("db1").getRole("r3");
@@ -137,8 +137,8 @@ rstest.nodes.forEach(function (node) {
 });
 
 // Verify that dropping the admin database propagates.
-assert.commandWorked(rstest.getMaster().getDB("admin").dropDatabase());
-assert.commandWorked(rstest.getMaster().getDB("admin").getLastErrorObj(2));
+assert.commandWorked(rstest.getPrimary().getDB("admin").dropDatabase());
+assert.commandWorked(rstest.getPrimary().getDB("admin").getLastErrorObj(2));
 rstest.nodes.forEach(function (node) {
     var roles = node.getDB("db1").getRoles();
     assert.eq(0, roles.length, node);
@@ -146,7 +146,7 @@ rstest.nodes.forEach(function (node) {
 
 // Verify that applyOps commands propagate.
 // NOTE: This section of the test depends on the oplog and roles schemas.
-assert.commandWorked(rstest.getMaster().getDB("admin").runCommand({ applyOps: [
+assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand({ applyOps: [
     {
         op: "c",
         ns: "admin.$cmd",
@@ -214,7 +214,7 @@ assert.commandWorked(rstest.getMaster().getDB("admin").runCommand({ applyOps: [
     }
 ] }));
 
-assert.commandWorked(rstest.getMaster().getDB("admin").getLastErrorObj(2));
+assert.commandWorked(rstest.getPrimary().getDB("admin").getLastErrorObj(2));
 rstest.nodes.forEach(function (node) {
     var role = node.getDB("db1").getRole("t1");
     assert.eq(1, role.roles.length, node);

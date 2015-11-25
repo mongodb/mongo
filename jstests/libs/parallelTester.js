@@ -1,22 +1,18 @@
 /**
  * The ParallelTester class is used to test more than one test concurrently 
  */
-
-
-if ( typeof _threadInject != "undefined" ){
-    //print( "fork() available!" );
-    
+if (typeof _threadInject != "undefined") {
     Thread = function(){
         this.init.apply( this, arguments );
     }
     _threadInject( Thread.prototype );
-    
+
     ScopedThread = function() {
         this.init.apply( this, arguments );
     }
     ScopedThread.prototype = new Thread( function() {} );
     _scopedThreadInject( ScopedThread.prototype );
-    
+
     fork = function() {
         var t = new Thread( function() {} );
         Thread.apply( t, arguments );
@@ -29,7 +25,7 @@ if ( typeof _threadInject != "undefined" ){
         if (host == undefined) host = db.getMongo().host;
         this.events = new Array( me, collectionName, host );
     }
-    
+
     EventGenerator.prototype._add = function( action ) {
         this.events.push( [ Random.genExp( this.mean ), action ] );
     }

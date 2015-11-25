@@ -1,5 +1,7 @@
 // Test for splitting a chunk with a very large shard key value should not be allowed
 // and does not corrupt the config.chunks metadata.
+(function() {
+'use strict';
 
 function verifyChunk(keys, expectFail) {
     // If split failed then there's only 1 chunk
@@ -13,30 +15,6 @@ function verifyChunk(keys, expectFail) {
         assert.eq(2, configDB.chunks.find().count(), "Chunks count split");
     }
 }
-
-function runTest(test) {
-    var collName = "split_large_key_"+test.name;
-    var midKey = {};
-    var chunkKeys = {min: {}, max: {}};
-    for (var k in test.key) {
-        // new Array with join creates string length 1 less than size, so add 1
-        midKey[k] = new Array(test.keyFieldSize+1).join('a');
-        // min & max keys for each field in the index
-        chunkKeys.min[k] = MinKey;
-        chunkKeys.max[k] = MaxKey;
-    }
-    configDB.adminCommand({ shardCollection: "test."+collName, key: test.key});
-    res = configDB.adminCommand({ split: "test."+collName, middle: midKey});
-    if (test.expectFail) {
-        assert(!res.ok, "Split: "+collName);
-        assert(res.errmsg !== null, "Split errmsg: "+collName);
-    } else {
-        assert(res.ok, "Split: "+collName+" "+res.errmsg);
-    }
-    verifyChunk(chunkKeys, test.expectFail);
-    st.s0.getCollection("test."+collName).drop();
-}
-
 
 // Tests
 //  - name: Name of test, used in collection name
@@ -55,11 +33,36 @@ var tests = [
 var st = new ShardingTest({ shards: 1 });
 var configDB = st.s.getDB('config');
 
-configDB.adminCommand({ enableSharding: 'test' });
+assert.commandWorked(configDB.adminCommand({ enableSharding: 'test' }));
 
 tests.forEach(function(test){
-    runTest(test);
+    var collName = "split_large_key_" + test.name;
+    var midKey = {};
+    var chunkKeys = {min: {}, max: {}};
+    for (var k in test.key) {
+        // new Array with join creates string length 1 less than size, so add 1
+        midKey[k] = new Array(test.keyFieldSize+1).join('a');
+        // min & max keys for each field in the index
+        chunkKeys.min[k] = MinKey;
+        chunkKeys.max[k] = MaxKey;
+    }
+
+    assert.commandWorked(
+        configDB.adminCommand({ shardCollection: "test." + collName, key: test.key }));
+
+    var res = configDB.adminCommand({ split: "test."+collName, middle: midKey});
+    if (test.expectFail) {
+        assert(!res.ok, "Split: " + collName);
+        assert(res.errmsg !== null, "Split errmsg: " + collName);
+    } else {
+        assert(res.ok, "Split: " + collName + " " + res.errmsg);
+    }
+
+    verifyChunk(chunkKeys, test.expectFail);
+
+    st.s0.getCollection("test." + collName).drop();
 });
 
 st.stop();
 
+})();

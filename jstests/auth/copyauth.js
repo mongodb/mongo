@@ -60,7 +60,7 @@ function ClusterSpawnHelper(clusterType, startWithAuth) {
         else {
             replSetTest.awaitReplication();
         }
-        this.conn = replSetTest.getMaster();
+        this.conn = replSetTest.getPrimary();
         this.connString = replSetTest.getURL();
     }
     else {

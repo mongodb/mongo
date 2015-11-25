@@ -32,7 +32,7 @@ var replTest = new ReplSetTest( { name : "replStatus" , nodes: 3, oplogSize: 1 }
 
 replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 replTest.awaitReplication();
 replTest.awaitSecondaryNodes();
 

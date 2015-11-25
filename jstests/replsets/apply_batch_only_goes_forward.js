@@ -25,7 +25,7 @@
 
     var nodes = replTest.startSet();
     replTest.initiate();
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     var mTest = master.getDB("test");
     var mLocal = master.getDB("local");
     var mMinvalid = mLocal["replset.minvalid"];
@@ -66,7 +66,7 @@
     replTest.waitForState(master, replTest.RECOVERING, 90000);
 
     // Slave is now master... so do a write to get a minvalid entry on the secondary.
-    assert.writeOK(replTest.getMaster().getDB("test").foo.save({}, {writeConcern: {w: 3}}));
+    assert.writeOK(replTest.getPrimary().getDB("test").foo.save({}, {writeConcern: {w: 3}}));
 
     assert.soon(function() {
         var mv;

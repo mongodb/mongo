@@ -25,7 +25,7 @@ var replTest = new ReplSetTest( {name: basename, nodes: 2} );
 var conns = replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var origMaster = master;
 var foo = master.getDB("foo");
 var admin = master.getDB("admin");
