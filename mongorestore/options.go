@@ -37,8 +37,8 @@ type OutputOptions struct {
 	NumParallelCollections     int      `long:"numParallelCollections" short:"j" description:"number of collections to restore in parallel (4 by default)" default:"4" default-mask:"-"`
 	NumInsertionWorkers        int      `long:"numInsertionWorkersPerCollection" description:"number of insert operations to run concurrently per collection (1 by default)" default:"1" default-mask:"-"`
 	StopOnError                bool     `long:"stopOnError" description:"stop restoring if an error is encountered on insert (off by default)"`
-	ExcludedCollections        []string `long:"excludeCollection" value-name:"<collection-name>" description:"collection to exclude from the dump (may be specified multiple times to exclude additional collections)"`
-	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" value-name:"<collection-prefix>" description:"exclude all collections from the dump that have the given prefix (may be specified multiple times to exclude additional prefixes)"`
+	ExcludedCollections        []string `long:"excludeCollection" value-name:"<collection-name>" description:"collection to skip over during restore (may be specified multiple times to exclude additional collections)"`
+	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" value-name:"<collection-prefix>" description:"collections to skip over during restore that have the given prefix (may be specified multiple times to exclude additional prefixes)"`
 	BypassDocumentValidation   bool     `long:"bypassDocumentValidation" description:"bypass document validation"`
 }
 
