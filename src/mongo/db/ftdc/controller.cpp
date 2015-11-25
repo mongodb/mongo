@@ -115,7 +115,7 @@ void FTDCController::start() {
 }
 
 void FTDCController::stop() {
-    log() << "Shuting down full-time diagnostic data capture";
+    log() << "Shutting down full-time diagnostic data capture";
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
