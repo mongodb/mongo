@@ -1231,7 +1231,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			continue;
 
 		/* Pages we no longer need (clean or dirty), are found money. */
-		if (__wt_page_is_empty(page))
+		if (__wt_page_is_empty(page) ||
+		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 			goto fast;
 
 		/* Skip clean pages if appropriate. */
