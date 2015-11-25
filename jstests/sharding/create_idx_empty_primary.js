@@ -2,15 +2,14 @@
  * Test to make sure that the createIndex command gets sent to all shards.
  */
 (function() {
-"use strict";
+'use strict';
 
 var st = new ShardingTest({ shards: 2 });
+assert.commandWorked(st.s.adminCommand({ enablesharding: 'test' }));
+st.ensurePrimaryShard('test', 'shard0001');
 
 var testDB = st.s.getDB('test');
-
-testDB.adminCommand({ enablesharding: 'test' });
-var res = testDB.adminCommand({ movePrimary: 'test', to: 'shard0001' });
-testDB.adminCommand({ shardcollection: 'test.user', key: { _id: 1 }});
+assert.commandWorked(testDB.adminCommand({ shardcollection: 'test.user', key: { _id: 1 }}));
 
 // Move only chunk out of primary shard.
 assert.commandWorked(testDB.adminCommand({ movechunk: 'test.user',

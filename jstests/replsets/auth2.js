@@ -39,7 +39,7 @@ rs.initiate({ "_id" : name,
                         {"_id" : 2, "host" : hostnames[2], priority: 0}
                     ]});
 
-var master = rs.getMaster();
+var master = rs.getPrimary();
 
 print("add an admin user");
 master.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},

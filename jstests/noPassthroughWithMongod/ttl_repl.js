@@ -14,7 +14,7 @@ var rt = new ReplSetTest( { name : "ttl_repl" , nodes: 2 } );
 // setup set
 var nodes = rt.startSet();
 rt.initiate();
-var master = rt.getMaster();
+var master = rt.getPrimary();
 rt.awaitSecondaryNodes();
 var slave1 = rt.liveNodes.slaves[0];
 

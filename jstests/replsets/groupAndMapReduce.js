@@ -18,9 +18,9 @@ doTest = function( signal ) {
     // This will wait for initiation
     replTest.initiate();
 
-    // Call getMaster to return a reference to the node that's been
+    // Call getPrimary to return a reference to the node that's been
     // elected master.
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
 
     // save some records
     var len = 100

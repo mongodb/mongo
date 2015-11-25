@@ -22,7 +22,7 @@ var r = replTest.initiate({ "_id": "rollback5",
 
 // Make sure we have a master
 replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var a_conn = conns[0];
 var b_conn = conns[1];
 a_conn.setSlaveOk();
@@ -46,13 +46,13 @@ var options = { writeConcern: { w: 2, wtimeout: 60000 }, upsert: true };
 assert.writeOK(A.foo.update({ key: 'value1' }, { $set: { req: 'req' }}, options));
 replTest.stop(AID);
 
-master = replTest.getMaster();
+master = replTest.getPrimary();
 assert(b_conn.host == master.host);
 options = { writeConcern: { w: 1, wtimeout: 60000 }, upsert: true };
 assert.writeOK(B.foo.update({key:'value1'}, {$set: {res: 'res'}}, options));
 replTest.stop(BID);
 replTest.restart(AID);
-master = replTest.getMaster();
+master = replTest.getPrimary();
 assert(a_conn.host == master.host);
 options = { writeConcern: { w: 1, wtimeout: 60000 }, upsert: true };
 assert.writeOK(A.foo.update({ key: 'value2' }, { $set: { req: 'req' }}, options));

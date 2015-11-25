@@ -81,7 +81,7 @@ print("Start replica set with two nodes");
 var replTest = new ReplSetTest({name: name, nodes: 2});
 var nodes = replTest.startSet();
 replTest.initiate();
-var primary = replTest.getMaster();
+var primary = replTest.getPrimary();
 
 // Insert a document and let it sync to the secondary.
 print("Initial sync");

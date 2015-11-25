@@ -54,7 +54,7 @@ doTest = function (signal) {
         return result['ok'] == 1;
     });
 
-    var a = replTest.getMaster().getDB("two");
+    var a = replTest.getPrimary().getDB("two");
     for (var i = 0; i < 20000; i++)
         a.coll.insert({ i: i, s: "a                                                                       b" });
 

@@ -20,13 +20,13 @@ replTest.initiate(
     }
 );
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 replTest.awaitReplication();
 
 
 var breakNetwork = function() {
     nodes[0].disconnect(nodes[2]);
-    master = replTest.getMaster();
+    master = replTest.getPrimary();
 };
 
 var checkNoChaining = function() {

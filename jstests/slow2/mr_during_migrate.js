@@ -40,14 +40,14 @@ var checkMigrate = function(){ print( "Result of migrate : " ); printjson( this 
 
 // Creates a number of migrations of random chunks to diff shard servers
 var ops = []
-for(var i = 0; i < st._shardServers.length; i++) {
+for(var i = 0; i < st._connections.length; i++) {
     ops.push({
         op: "command",
         ns: "admin",
         command: {
             moveChunk: "" + coll,
             find: { _id: { "#RAND_INT" : [ 0, numDocs ] }},
-            to: st._shardServers[i].shardName,
+            to: st._connections[i].shardName,
             _waitForDelete: true
         },
         showResult: true

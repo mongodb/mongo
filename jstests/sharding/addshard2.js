@@ -13,12 +13,12 @@ var conn2 = MongoRunner.runMongod({useHostname: true});
 var rs1 = new ReplSetTest( { "name" : "add_shard2_rs1", nodes : 3 } );
 rs1.startSet();
 rs1.initiate();
-var master1 = rs1.getMaster();
+var master1 = rs1.getPrimary();
 
 var rs2 = new ReplSetTest( { "name" : "add_shard2_rs2", nodes : 3 } );
 rs2.startSet();
 rs2.initiate();
-var master2 = rs2.getMaster();
+var master2 = rs2.getPrimary();
 
 // replica set with set name = 'config'
 var rs3 = new ReplSetTest({ 'name': 'config', nodes: 3 });
@@ -95,7 +95,7 @@ assert.commandFailed(s.admin.runCommand({ addshard: 'dummy:12345' }));
 //
 // SERVER-17231 Adding replica set w/ set name = 'config'
 //
-var configReplURI = 'config/' + getHostName() + ':' + rs3.getMaster().port;
+var configReplURI = 'config/' + getHostName() + ':' + rs3.getPrimary().port;
 
 assert(!s.admin.runCommand({ 'addshard': configReplURI }).ok,
        'accepted replica set shard with set name "config"');
@@ -109,7 +109,7 @@ assert(shard, 'shard with name "not_config" not found');
 //
 // SERVER-17232 Try inserting into shard with name 'admin'
 //
-assert(s.admin.runCommand({ 'addshard': 'admin/' + getHostName() + ':' + rs4.getMaster().port}).ok,
+assert(s.admin.runCommand({ 'addshard': 'admin/' + getHostName() + ':' + rs4.getPrimary().port}).ok,
        'adding replica set with name "admin" should work');
 var wRes = s.getDB('test').foo.insert({ x: 1 });
 assert(!wRes.hasWriteError() && wRes.nInserted === 1,

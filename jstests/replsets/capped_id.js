@@ -18,9 +18,9 @@ var nodes = replTest.startSet();
 // This will wait for initiation
 replTest.initiate();
 
-// Call getMaster to return a reference to the node that's been
+// Call getPrimary to return a reference to the node that's been
 // elected master
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 
 // wait for secondaries to be up, since we'll be reading from them
 replTest.awaitSecondaryNodes();
@@ -28,7 +28,7 @@ replTest.awaitSecondaryNodes();
 var slave1 = replTest.liveNodes.slaves[0];
 var slave2 = replTest.liveNodes.slaves[1];
 
-// Calling getMaster made available the liveNodes structure,
+// Calling getPrimary made available the liveNodes structure,
 // which looks like this:
 // liveNodes = {master: masterNode, slaves: [slave1, slave2] }
 printjson( replTest.liveNodes );

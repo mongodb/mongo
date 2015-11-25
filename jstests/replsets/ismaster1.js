@@ -116,7 +116,7 @@ var agreeOnPrimaryAndSetVersion = function( setVersion ) {
     return true;
 }
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 assert.soon( function() { return agreeOnPrimaryAndSetVersion( 1 ); },
              "Nodes did not initiate in less than a minute", 60000 );
 
@@ -199,7 +199,7 @@ catch(e) {
     print(e);
 }
 
-master = replTest.getMaster();
+master = replTest.getPrimary();
 assert.soon( function() { return agreeOnPrimaryAndSetVersion( 2 ); },
              "Nodes did not sync in less than a minute", 60000 );
 

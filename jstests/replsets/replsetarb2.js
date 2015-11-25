@@ -15,7 +15,7 @@
                                 ]});
 
     // Make sure we have a master
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
 
     // Make sure we have an arbiter
     assert.soon(function() {
@@ -37,7 +37,7 @@
     replTest.stop(mId);
 
     // And make sure that the slave is promoted
-    var new_master = replTest.getMaster();
+    var new_master = replTest.getPrimary();
 
     var newMasterId = replTest.getNodeId(new_master);
     assert.neq(newMasterId, mId, "Secondary wasn't promoted to new primary");

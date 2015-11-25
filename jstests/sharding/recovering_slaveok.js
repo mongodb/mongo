@@ -25,8 +25,8 @@ var collSOk = mongosSOK.getCollection( "" + coll );
 var rsA = shardTest._rs[0].test;
 var rsB = shardTest._rs[1].test;
 
-rsA.getMaster().getDB( "test_a" ).dummy.insert({ x : 1 });
-rsB.getMaster().getDB( "test_b" ).dummy.insert({ x : 1 });
+rsA.getPrimary().getDB( "test_a" ).dummy.insert({ x : 1 });
+rsB.getPrimary().getDB( "test_b" ).dummy.insert({ x : 1 });
 
 rsA.awaitReplication();
 rsB.awaitReplication();

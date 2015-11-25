@@ -24,7 +24,7 @@
             // so it cannot vote while fsync locked in PV1. Use PV0 explicitly here.
             protocolVersion: 0});
     replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
 
     // do a write
     assert.writeOK(master.getDB("foo").bar.insert({x:1}, {writeConcern: {w: 3}}));

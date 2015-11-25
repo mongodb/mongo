@@ -35,9 +35,9 @@
     // DOWN, later.
     replTest.awaitSecondaryNodes();
 
-    // Call getMaster to return a reference to the node that's been
+    // Call getPrimary to return a reference to the node that's been
     // elected master.
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     var config1 = master.getDB("local").system.replset.findOne();
 
     // Now we're going to shut down all nodes
@@ -60,7 +60,7 @@
     replTest.restart( s2Id );
 
     // Make sure that a new master comes up
-    master = replTest.getMaster();
+    master = replTest.getPrimary();
     replTest.awaitSecondaryNodes();
     var config2 = master.getDB("local").system.replset.findOne();
     compare_configs(config1, config2);

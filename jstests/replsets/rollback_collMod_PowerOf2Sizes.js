@@ -25,7 +25,7 @@ replTest.initiate({"_id": name,
                        { "_id": 2, "host": nodes[2], arbiterOnly: true}]
                   });
 // Get master and do an initial write.
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var a_conn = master;
 var slaves = replTest.liveNodes.slaves;
 var b_conn = slaves[0];
@@ -63,7 +63,7 @@ assert.eq(getOptions(a_conn), {flags: 2,
 // Shut down A and fail over to B.
 replTest.stop(AID);
 replTest.restart(BID);
-master = replTest.getMaster();
+master = replTest.getPrimary();
 assert.eq(b_conn.host, master.host, "b_conn assumed to be master");
 b_conn = master;
 

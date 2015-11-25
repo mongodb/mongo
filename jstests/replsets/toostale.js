@@ -58,7 +58,7 @@ replTest.initiate({_id : name, members : [
     {_id : 1, host : host+":"+replTest.ports[1], arbiterOnly : true},
     {_id : 2, host : host+":"+replTest.ports[2], priority: 0}
 ]});
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var mdb = master.getDB("foo");
 
 

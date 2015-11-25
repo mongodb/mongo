@@ -4,7 +4,7 @@ var nodes = replTest.startSet();
 
 replTest.initiate();
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 replTest.awaitSecondaryNodes()
 
 var slaves = replTest.liveNodes.slaves;

@@ -22,7 +22,7 @@ function shardingTestUsingObjects() {
     assert.eq( c0, st._configServers[0] );
 
     var d0 = st.d0;
-    assert.eq( d0, st._shardServers[0] );
+    assert.eq( d0, st._connections[0] );
 
     var rs1 = st.rs1;
     assert.eq( rs1, st._rsObjects[1] );
@@ -57,10 +57,10 @@ function shardingTestUsingArrays() {
     assert.eq( c0, st._configServers[0] );
 
     var d0 = st.d0;
-    assert.eq( d0, st._shardServers[0] );
+    assert.eq( d0, st._connections[0] );
 
     var d1 = st.d1;
-    assert.eq( d1, st._shardServers[1] );
+    assert.eq( d1, st._connections[1] );
 
     assert.contains( "-vvvvv", s0.commandLine );
     assert.contains( "-vvvv", s1.commandLine );

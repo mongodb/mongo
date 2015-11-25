@@ -8,7 +8,7 @@ var c = replTest.getReplSetConfig();
 c.members[1].priority = 0; // not electable
 replTest.initiate(c);
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var testDB = master.getDB('test');
 var firstPrimary = testDB.isMaster().primary
 

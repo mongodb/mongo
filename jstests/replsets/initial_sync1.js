@@ -26,7 +26,7 @@ var replTest = new ReplSetTest({name: basename,
 var conns = replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var foo = master.getDB("foo");
 var admin = master.getDB("admin");
 
@@ -98,7 +98,7 @@ reconnect(slave1);
 replTest.waitForState(slave1, [replTest.PRIMARY, replTest.SECONDARY], 60 * 1000);
 
 print("10. Insert some stuff");
-master = replTest.getMaster();
+master = replTest.getPrimary();
 bulk = foo.bar.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
   bulk.insert({ date: new Date(), x: i, str: "all the talk on the market" });

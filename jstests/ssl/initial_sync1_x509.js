@@ -16,7 +16,7 @@ function runInitialSyncTest() {
     var conns = replTest.startSet();
     replTest.initiate();
 
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     var foo = master.getDB("foo");
     var admin = master.getDB("admin");
 
@@ -40,7 +40,7 @@ function runInitialSyncTest() {
     replTest.awaitReplication();
 
     print("5. Insert some stuff");
-    master = replTest.getMaster();
+    master = replTest.getPrimary();
     bulk = foo.bar.initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
       bulk.insert({ date: new Date(), x: i, str: "all the talk on the market" });

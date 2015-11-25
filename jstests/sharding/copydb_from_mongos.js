@@ -1,3 +1,5 @@
+(function() {
+
 var st = new ShardingTest({ shards: 1 });
 
 var testDB = st.s.getDB('test');
@@ -20,3 +22,5 @@ assert.commandFailed(testDB.adminCommand({ copydb: 1,
                                            todb: 'test/copy' }));
 
 st.stop();
+
+})();

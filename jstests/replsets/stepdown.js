@@ -36,7 +36,7 @@ var replTest = new ReplSetTest({
 var nodes = replTest.startSet();
 replTest.initiate();
 replTest.waitForState(nodes[0], replTest.PRIMARY, 60 * 1000);
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 
 // do a write
 print("\ndo a write");
@@ -80,7 +80,7 @@ replTest.liveNodes.slaves.forEach(function(slave) {
 
 print("\nreset stepped down time");
 assert.commandWorked(master.getDB("admin").runCommand({replSetFreeze:0}));
-master = replTest.getMaster();
+master = replTest.getPrimary();
 
 print("\nawait");
 replTest.awaitSecondaryNodes(90000);
@@ -97,7 +97,7 @@ assert.soon(function() {
     }
 }, "wait for n0 to be primary", 60000);
 
-master = replTest.getMaster();
+master = replTest.getPrimary();
 var firstMaster = master;
 print("\nmaster is now "+firstMaster);
 
@@ -113,10 +113,10 @@ catch (e) {
 }
 
 print("\nget a master");
-replTest.getMaster();
+replTest.getPrimary();
 
 assert.soon(function() {
-    var secondMaster = replTest.getMaster();
+    var secondMaster = replTest.getPrimary();
     return firstMaster.host !== secondMaster.host;
 }, "making sure " + firstMaster.host + " isn't still master", 60000);
 
@@ -135,7 +135,7 @@ catch (e) {
 }
 
 
-master = replTest.getMaster();
+master = replTest.getPrimary();
 assert.soon(function() {
     try {
         var result = master.getDB("admin").runCommand({replSetGetStatus:1});
@@ -149,7 +149,7 @@ assert.soon(function() {
     }
     catch (e) {
         print("error getting status from master: " + e);
-        master = replTest.getMaster();
+        master = replTest.getPrimary();
         return false;
     }
 }, 'make sure master knows that slave is down before proceeding');
@@ -166,7 +166,7 @@ assert.gte((new Date()) - now, 2750);
 
 print("\nsend shutdown command");
 
-var currentMaster = replTest.getMaster();
+var currentMaster = replTest.getPrimary();
 try {
     printjson(currentMaster.getDB("admin").runCommand({shutdown : 1, force : true}));
 }

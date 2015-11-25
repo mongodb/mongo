@@ -37,7 +37,7 @@ var BID = replTest.getNodeId(b_conn);
 replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
 
 // get master and do an initial write
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 assert(master === conns[0], "conns[0] assumed to be master");
 assert(a_conn.host === master.host, "a_conn assumed to be master");
 var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
@@ -47,7 +47,7 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
 replTest.stop(AID);
 
 // change the h value of the most recent entry on B
-master = replTest.getMaster();
+master = replTest.getPrimary();
 assert(b_conn.host === master.host, "b_conn assumed to be master");
 options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
 var oplog_entry = b_conn.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
@@ -62,7 +62,7 @@ assert.writeOK(b_conn.getDB(name).foo.insert({x: 123}));
 // shut down B and bring back the original master
 replTest.stop(BID);
 replTest.restart(AID);
-master = replTest.getMaster();
+master = replTest.getPrimary();
 assert(a_conn.host === master.host, "a_conn assumed to be master");
 
 // do a write so that B will have to roll back

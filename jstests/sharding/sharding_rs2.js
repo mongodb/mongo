@@ -47,7 +47,7 @@ catch ( e ){
 assert.soon( 
     function(){
         try {
-            printjson( rs.test.getMaster().getDB("admin").runCommand( "isMaster" ) )
+            printjson( rs.test.getPrimary().getDB("admin").runCommand( "isMaster" ) )
             s.config.shards.find().forEach( printjsononeline );
             return countNodes() == 3;
         }
@@ -80,7 +80,7 @@ rs.test.waitForState( rs.test.getSecondaries(), rs.test.SECONDARY, 180 * 1000 )
 m = new Mongo( s.s.name );
 ts = m.getDB( "test" ).foo
 
-before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+before = rs.test.getPrimary().adminCommand( "serverStatus" ).opcounters
 
 for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne().x , "B1" )
@@ -89,7 +89,7 @@ m.setSlaveOk()
 for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne().x , "B2" )
 
-after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+after = rs.test.getPrimary().adminCommand( "serverStatus" ).opcounters
 
 printjson( before )
 printjson( after )
@@ -141,14 +141,14 @@ assert.commandWorked(s.getDB('admin').runCommand({ moveChunk: "test.foo",
                                                    _waitForDelete: true }));
 assert.eq( 100 , t.count() , "C3" )
 
-assert.eq( 50 , rs.test.getMaster().getDB( "test" ).foo.count() , "C4" )
+assert.eq( 50 , rs.test.getPrimary().getDB( "test" ).foo.count() , "C4" )
 
 // by non-shard key
 
 m = new Mongo( s.s.name );
 ts = m.getDB( "test" ).foo
 
-before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+before = rs.test.getPrimary().adminCommand( "serverStatus" ).opcounters
 
 for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne( { _id : 5 } ).x , "D1" )
@@ -157,7 +157,7 @@ m.setSlaveOk()
 for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne( { _id : 5 } ).x , "D2" )
 
-after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+after = rs.test.getPrimary().adminCommand( "serverStatus" ).opcounters
 
 assert.lte( before.query + 10 , after.query , "D3" )
 
@@ -170,7 +170,7 @@ db.printShardingStatus()
 
 ts = m.getDB( "test" ).foo
 
-before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+before = rs.test.getPrimary().adminCommand( "serverStatus" ).opcounters
 
 for ( i=0; i<10; i++ )
     assert.eq( 57 , ts.findOne( { x : 57 } ).x , "E1" )
@@ -179,7 +179,7 @@ m.setSlaveOk()
 for ( i=0; i<10; i++ )
     assert.eq( 57 , ts.findOne( { x : 57 } ).x , "E2" )
 
-after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+after = rs.test.getPrimary().adminCommand( "serverStatus" ).opcounters
 
 assert.lte( before.query + 10 , after.query , "E3" )
 

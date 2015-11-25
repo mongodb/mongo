@@ -1,13 +1,14 @@
 /**
  * Tests the auto split will be triggered when using write commands.
  */
+(function() {
+'use strict';
 
 var st = new ShardingTest({ shards: 1, other: { chunkSize: 1 }});
-st.stopBalancer();
 
 var configDB = st.s.getDB('config');
-configDB.adminCommand({ enableSharding: 'test' });
-configDB.adminCommand({ shardCollection: 'test.insert', key: { x: 1 }});
+assert.commandWorked(configDB.adminCommand({ enableSharding: 'test' }));
+assert.commandWorked(configDB.adminCommand({ shardCollection: 'test.insert', key: { x: 1 }}));
 
 var doc1k = (new Array(1024)).join('x');
 var testDB = st.s.getDB('test');
@@ -151,3 +152,4 @@ assert.eq(1, configDB.chunks.find().itcount());
 
 st.stop();
 
+})();

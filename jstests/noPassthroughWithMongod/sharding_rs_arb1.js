@@ -12,7 +12,7 @@ replTest.initiate({_id : name, members :
 
 replTest.awaitReplication();
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var db = master.getDB( "test" );
 printjson( rs.status() );
 

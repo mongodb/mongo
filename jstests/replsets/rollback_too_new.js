@@ -27,7 +27,7 @@
     var CID = replTest.getNodeId(c_conn);
 
     // get master and do an initial write
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     var options = {writeConcern: {w: 2, wtimeout: 60000}};
     assert.writeOK(master.getDB(name).foo.insert({x: 1}, options));
 

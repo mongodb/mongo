@@ -3,11 +3,9 @@
 // @tags: [requires_persistence]
 
 (function() {
-
 'use strict';
 
 var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2 });
-st.stopBalancer();
 
 var dbTestName = 'WriteCommandsTestDB';
 

@@ -27,7 +27,7 @@ replTest.initiate({
     ]
 });
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 
 print("Initial sync");
 master.getDB("foo").bar.baz.insert({x:1});
@@ -48,7 +48,7 @@ assert(!result.secondary, tojson(result));
 print("bring 0 back up");
 replTest.restart(0);
 print("0 should become primary");
-master = replTest.getMaster();
+master = replTest.getPrimary();
 
 print("now 1 should be able to initial sync");
 assert.soon(function() {
