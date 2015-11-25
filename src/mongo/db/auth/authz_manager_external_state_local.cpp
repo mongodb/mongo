@@ -37,7 +37,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/rpc/protocol.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -157,14 +156,13 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* txn,
         return status;
 
     mutablebson::Document resultDoc(*result, mutablebson::Document::kInPlaceDisabled);
-    _resolveUserRoles(txn, &resultDoc, directRoles);
+    _resolveUserRoles(&resultDoc, directRoles);
     *result = resultDoc.getObject();
 
     return Status::OK();
 }
 
-void AuthzManagerExternalStateLocal::_resolveUserRoles(OperationContext* txn,
-                                                       mutablebson::Document* userDoc,
+void AuthzManagerExternalStateLocal::_resolveUserRoles(mutablebson::Document* userDoc,
                                                        const std::vector<RoleName>& directRoles) {
     unordered_set<RoleName> indirectRoles;
     PrivilegeVector allPrivileges;
@@ -194,8 +192,6 @@ void AuthzManagerExternalStateLocal::_resolveUserRoles(OperationContext* txn,
         }
     }
 
-    _redactPrivilegesForBackwardsCompatibilityIfNeeded(txn, &allPrivileges);
-
     mutablebson::Element inheritedRolesElement = userDoc->makeElementArray("inheritedRoles");
     mutablebson::Element privilegesElement = userDoc->makeElementArray("inheritedPrivileges");
     mutablebson::Element warningsElement = userDoc->makeElementArray("warnings");
@@ -211,20 +207,6 @@ void AuthzManagerExternalStateLocal::_resolveUserRoles(OperationContext* txn,
     addPrivilegeObjectsOrWarningsToArrayElement(privilegesElement, warningsElement, allPrivileges);
     if (warningsElement.hasChildren()) {
         fassert(17161, userDoc->root().pushBack(warningsElement));
-    }
-}
-
-void AuthzManagerExternalStateLocal::_redactPrivilegesForBackwardsCompatibilityIfNeeded(
-    OperationContext* txn, PrivilegeVector* privileges) {
-    auto protocol = rpc::getOperationProtocol(txn);
-    if (protocol == rpc::Protocol::kOpCommandV1) {
-        return;
-    }
-
-    for (auto& privilege : *privileges) {
-        ActionSet toRedact;
-        toRedact.addAction(ActionType::bypassDocumentValidation);
-        privilege.removeActions(toRedact);
     }
 }
 

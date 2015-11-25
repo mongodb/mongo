@@ -131,21 +131,8 @@ private:
      * resolve roles and add the 'inheritedRoles', 'inheritedPrivileges',
      * and 'warnings' fields.
      */
-    void _resolveUserRoles(OperationContext* txn,
-                           mutablebson::Document* userDoc,
+    void _resolveUserRoles(mutablebson::Document* userDoc,
                            const std::vector<RoleName>& directRoles);
-
-    /**
-     * Gets the Protocol from 'txn' of the operation being run to determine if it was from
-     * OP_COMMAND or OP_QUERY.  If OP_COMMAND, does nothing.  If OP_QUERY, assumes that means it is
-     * a 3.0 mongos talking to us, and modifies the input PrivilegeVector to remove all references
-     * to any ActionTypes that didn't exist 3.0.  This is because when a 3.0 mongos parses the
-     * privileges from a user document at authentication time, it skips any privileges containing
-     * any actions it doesn't know about. See SERVER-2146 for more details.
-     * TODO(SERVER-21561): Remove this after 3.2
-     */
-    void _redactPrivilegesForBackwardsCompatibilityIfNeeded(OperationContext* txn,
-                                                            PrivilegeVector* privileges);
 
     /**
      * Eventually consistent, in-memory representation of all roles in the system (both
