@@ -27,14 +27,21 @@ static int  __evict_server_work(WT_SESSION_IMPL *);
 static inline uint64_t
 __evict_read_gen(const WT_EVICT_ENTRY *entry)
 {
+	WT_BTREE *btree;
 	WT_PAGE *page;
 	uint64_t read_gen;
+
+	btree = entry->btree;
 
 	/* Never prioritize empty slots. */
 	if (entry->ref == NULL)
 		return (UINT64_MAX);
 
 	page = entry->ref->page;
+
+	/* Any page from a dead tree is a great choice. */
+	if (F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
+		return (WT_READGEN_OLDEST);
 
 	/* Any empty page (leaf or internal), is a good choice. */
 	if (__wt_page_is_empty(page))
@@ -44,7 +51,7 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 	 * Skew the read generation for internal pages, we prefer to evict leaf
 	 * pages.
 	 */
-	read_gen = page->read_gen + entry->btree->evict_priority;
+	read_gen = page->read_gen + btree->evict_priority;
 	if (WT_PAGE_IS_INTERNAL(page))
 		read_gen += WT_EVICT_INT_SKEW;
 
