@@ -41,11 +41,7 @@ __cursor_pos_clear(WT_CURSOR_BTREE *cbt)
 	cbt->cip_saved = NULL;
 	cbt->rip_saved = NULL;
 
-	/*
-	 * Don't clear the active flag, it's owned by the cursor enter/leave
-	 * functions.
-	 */
-	F_CLR(cbt, ~WT_CBT_ACTIVE);
+	F_CLR(cbt, WT_CBT_POSITION_MASK);
 }
 
 /*

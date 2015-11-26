@@ -200,6 +200,11 @@ struct __wt_cursor_btree {
 #define	WT_CBT_NO_TXN   	0x20	/* Non-transactional cursor
 					   (e.g. on a checkpoint) */
 #define	WT_CBT_SEARCH_SMALLEST	0x40	/* Row-store: small-key insert list */
+
+#define	WT_CBT_POSITION_MASK		/* Flags associated with position */ \
+	(WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV | \
+	WT_CBT_MAX_RECORD | WT_CBT_SEARCH_SMALLEST)
+
 	uint8_t flags;
 };
 
