@@ -60,8 +60,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	 * - a page queued for eviction, or
 	 * - a locked page.
 	 */
-	WT_ASSERT(session, !__wt_page_is_modified(page) ||
-	    F_ISSET(session->dhandle, WT_DHANDLE_DEAD));
+	WT_ASSERT(session, !__wt_page_is_modified(page));
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 	WT_ASSERT(session, !__wt_fair_islocked(session, &page->page_lock));
 
