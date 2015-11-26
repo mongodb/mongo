@@ -1005,7 +1005,7 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * reconciliation will be wrong, so we can't evict immediately).
 	 */
 	if (page->type != WT_PAGE_ROW_LEAF ||
-	    page->memory_footprint < btree->maxmempage ||
+	    page->memory_footprint < btree->splitmempage ||
 	    !__wt_page_is_modified(page))
 		return (false);
 
