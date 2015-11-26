@@ -302,7 +302,7 @@ struct __wt_cursor_join_entry {
 
 	WT_CURSOR_JOIN_ENDPOINT	*ends;		/* reference endpoints */
 	size_t			 ends_allocated;
-	size_t			 ends_next;
+	u_int			 ends_next;
 
 	WT_JOIN_STATS		 stats;		/* Join statistics */
 };
