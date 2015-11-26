@@ -93,7 +93,8 @@ __curfile_enter(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	WT_RET(__cursor_enter(session));
+	if (!F_ISSET(cbt, WT_CBT_NO_TXN))
+		WT_RET(__cursor_enter(session));
 	F_SET(cbt, WT_CBT_ACTIVE);
 	return (0);
 }
@@ -112,7 +113,8 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 
 	/* If the cursor was active, deactivate it. */
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
-		__cursor_leave(session);
+		if (!F_ISSET(cbt, WT_CBT_NO_TXN))
+			__cursor_leave(session);
 		F_CLR(cbt, WT_CBT_ACTIVE);
 	}
 
@@ -262,7 +264,13 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
 		WT_RET(__curfile_enter(cbt));
-	__wt_txn_cursor_op(session);
+
+	/*
+	 * If this is an ordinary transactional cursor, make sure we are set up
+	 * to read.
+	 */
+	if (!F_ISSET(cbt, WT_CBT_NO_TXN))
+		__wt_txn_cursor_op(session);
 	return (0);
 }
 

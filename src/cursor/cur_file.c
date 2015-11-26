@@ -439,6 +439,9 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor->value_format = btree->value_format;
 	cbt->btree = btree;
 
+	if (session->dhandle->checkpoint != NULL)
+		F_SET(cbt, WT_CBT_NO_TXN);
+
 	if (bulk) {
 		F_SET(cursor, WT_CURSTD_BULK);
 

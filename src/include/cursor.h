@@ -197,7 +197,9 @@ struct __wt_cursor_btree {
 #define	WT_CBT_ITERATE_NEXT	0x04	/* Next iteration configuration */
 #define	WT_CBT_ITERATE_PREV	0x08	/* Prev iteration configuration */
 #define	WT_CBT_MAX_RECORD	0x10	/* Col-store: past end-of-table */
-#define	WT_CBT_SEARCH_SMALLEST	0x20	/* Row-store: small-key insert list */
+#define	WT_CBT_NO_TXN   	0x20	/* Non-transactional cursor
+					   (e.g. on a checkpoint) */
+#define	WT_CBT_SEARCH_SMALLEST	0x40	/* Row-store: small-key insert list */
 	uint8_t flags;
 };
 
