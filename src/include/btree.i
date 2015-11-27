@@ -1103,7 +1103,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 * transaction value is globally visible.
 	 */
 	if (WT_PAGE_IS_INTERNAL(page) &&
-            F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
+	    F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
 		return (false);
 
 	return (true);
