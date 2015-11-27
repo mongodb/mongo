@@ -50,8 +50,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	page = *pagep;
 	*pagep = NULL;
 
-	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD) &&
-	    __wt_page_is_modified(page))
+	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 		__wt_page_modify_clear(session, page);
 
 	/*
