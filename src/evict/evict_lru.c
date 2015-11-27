@@ -1254,7 +1254,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			page->read_gen = __wt_cache_read_gen_new(session);
 
 fast:		/* If the page can't be evicted, give up. */
-		if (!__wt_page_can_evict(session, ref, true, &would_split))
+		if (!__wt_page_can_evict(session, ref, &would_split))
 			continue;
 
 		/*

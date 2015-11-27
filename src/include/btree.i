@@ -1041,13 +1041,11 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Check whether a page can be evicted.
  */
 static inline bool
-__wt_page_can_evict(WT_SESSION_IMPL *session,
-    WT_REF *ref, bool check_splits, bool *inmem_splitp)
+__wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	WT_TXN_GLOBAL *txn_global;
 
 	if (inmem_splitp != NULL)
 		*inmem_splitp = false;
@@ -1104,24 +1102,9 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * a transaction value, we can evict the created page as soon as that
 	 * transaction value is globally visible.
 	 */
-	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
-	    (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK) ||
-	    !__wt_txn_visible_all(session, mod->mod_split_txn)))
+	if (WT_PAGE_IS_INTERNAL(page) &&
+            F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
 		return (false);
-
-	/*
-	 * If the page was recently split in-memory, don't evict it immediately:
-	 * we want to give application threads that are appending a chance to
-	 * move to the new leaf page created by the split.
-	 *
-	 * Note the check here is similar to __wt_txn_visible_all, but ignores
-	 * the checkpoint's transaction.
-	 */
-	if (check_splits) {
-		txn_global = &S2C(session)->txn_global;
-		if (WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
-			return (false);
-	}
 
 	return (true);
 }
@@ -1216,7 +1199,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    !__wt_page_can_evict(session, ref, true, NULL))
+	    !__wt_page_can_evict(session, ref, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));

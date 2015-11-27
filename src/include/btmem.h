@@ -201,9 +201,6 @@ struct __wt_page_modify {
 	/* The first unwritten transaction ID (approximate). */
 	uint64_t first_dirty_txn;
 
-	/* In-memory split transaction ID. */
-	uint64_t inmem_split_txn;
-
 	/* Avoid checking for obsolete updates during checkpoints. */
 	uint64_t obsolete_check_txn;
 
@@ -303,17 +300,8 @@ struct __wt_page_modify {
 		 * so they can be discarded when no longer needed.
 		 */
 		WT_PAGE *root_split;	/* Linked list of root split pages */
-
-		/*
-		 * When we deepen the tree, newly created internal pages cannot
-		 * be evicted until all threads have exited the original page
-		 * index structure.  We set a transaction value during the split
-		 * that's checked during eviction.
-		 */
-		uint64_t split_txn;	/* Split eviction transaction value */
 	} intl;
 #define	mod_root_split		u2.intl.root_split
-#define	mod_split_txn		u2.intl.split_txn
 	struct {
 		/*
 		 * Appended items to column-stores: there is only a single one
