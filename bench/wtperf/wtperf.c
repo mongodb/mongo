@@ -559,6 +559,8 @@ worker(void *arg)
 					trk = &thread->truncate;
 				else
 					trk = &thread->truncate_sleep;
+				/* Pause between truncate attempts */
+				(void)usleep(1000);
 				break;
 			}
 			goto op_err;

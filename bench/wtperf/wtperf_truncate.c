@@ -54,7 +54,10 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	    session, cfg->uris[0], NULL, NULL, &cursor)) != 0)
 		goto err;
 
-	/* If we find the workload getting behind we multiply the stone gap */
+	/*
+	 * If we find the workload getting behind we multiply the number of
+	 * records to be truncated.
+	 */
 	trunc_cfg->catchup_multiplier = 1;
 
 	/* How many entries between each stone. */
@@ -152,7 +155,6 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	if (trunc_cfg->expected_total <= thread->workload->truncate_count)
 		return (0);
 
-	used_stone_gap = trunc_cfg->stone_gap;
 	/*
 	 * If we are falling behind and using more than one stone per lap we
 	 * should widen the stone gap for this lap to try and catch up quicker.
@@ -161,13 +163,12 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	    thread->workload->truncate_count + trunc_cfg->stone_gap) {
 		if (trunc_cfg->catchup_multiplier < trunc_cfg->needed_stones-1)
 			trunc_cfg->catchup_multiplier++;
-		used_stone_gap =
-		    trunc_cfg->stone_gap * trunc_cfg->catchup_multiplier;
 	} else {
 		/* Back off if we start seeing an improvement */
 		if (trunc_cfg->catchup_multiplier > 1)
 			trunc_cfg->catchup_multiplier--;
 	}
+	used_stone_gap = trunc_cfg->stone_gap * trunc_cfg->catchup_multiplier;
 
 	while (trunc_cfg->num_stones < trunc_cfg->needed_stones) {
 		trunc_cfg->last_key += used_stone_gap;
