@@ -152,7 +152,7 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
 		return (errno);
 
 	*csv_extractor = *orig;
-	csv_extractor->field = field_num;
+	csv_extractor->field = (int)field_num;
 	csv_extractor->format_isnum = (format.str[0] == 'i');
 	*customp = (WT_EXTRACTOR *)csv_extractor;
 	return (0);
