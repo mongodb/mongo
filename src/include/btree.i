@@ -1003,7 +1003,7 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (count > WT_MIN_SPLIT_COUNT &&
 		    size > (size_t)btree->maxleafpage)
 			return (true);
-        }
+	}
 	return (false);
 }
 
@@ -1208,13 +1208,9 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
 #endif
 	    );
 
-	/* An expected failure: WT_NOTFOUND when doing a cache-only read. */
-	if (LF_ISSET(WT_READ_CACHE) && ret == WT_NOTFOUND)
-		return (WT_NOTFOUND);
-
-	/* An expected failure: WT_RESTART */
-	if (ret == WT_RESTART)
-		return (WT_RESTART);
+	/* Expected failures: page not found or restart. */
+	if (ret == WT_NOTFOUND || ret == WT_RESTART)
+		return (ret);
 
 	/* Discard the original held page. */
 	acquired = ret == 0;

@@ -94,6 +94,9 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
 	 */
 	WT_ENTER_PAGE_INDEX(session);
 
+	/* Walk should never instantiate deleted pages. */
+	LF_SET(WT_READ_NO_EMPTY);
+
 	/*
 	 * !!!
 	 * Fast-truncate currently only works on row-store trees.
@@ -174,9 +177,10 @@ ascend:	/*
 
 			/*
 			 * If we got all the way through an internal page and
-			 * all of the child pages were deleted, evict it.
+			 * all of the child pages were deleted, mark it for
+			 * eviction.
 			 */
-			if (empty_internal) {
+			if (empty_internal && pindex->entries > 1) {
 				__wt_page_evict_soon(ref->page);
 				empty_internal = false;
 			}
@@ -257,7 +261,7 @@ ascend:	/*
 				 * to delete it again.
 				 */
 				if (ref->state == WT_REF_DELETED &&
-				    __wt_delete_page_skip(session, ref))
+				    __wt_delete_page_skip(session, ref, false))
 					break;
 				/*
 				 * If deleting a range, try to delete the page
@@ -294,7 +298,7 @@ ascend:	/*
 				 * Try to skip deleted pages visible to us.
 				 */
 				if (ref->state == WT_REF_DELETED &&
-				    __wt_delete_page_skip(session, ref))
+				    __wt_delete_page_skip(session, ref, false))
 					break;
 			}
 
@@ -302,7 +306,7 @@ ascend:	/*
 
 			/*
 			 * Not-found is an expected return when only walking
-			 * in-cache pages.
+			 * in-cache pages, or if we see a deleted page.
 			 */
 			if (ret == WT_NOTFOUND) {
 				ret = 0;
