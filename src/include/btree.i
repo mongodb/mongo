@@ -349,13 +349,6 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_cache_dirty_incr(session, page);
 
 		/*
-		 * The page can never end up with changes older than the oldest
-		 * running transaction.
-		 */
-		if (F_ISSET(&session->txn, WT_TXN_HAS_SNAPSHOT))
-			page->modify->disk_snap_min = session->txn.snap_min;
-
-		/*
 		 * We won the race to dirty the page, but another thread could
 		 * have committed in the meantime, and the last_running field
 		 * been updated past it.  That is all very unlikely, but not

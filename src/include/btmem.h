@@ -198,14 +198,6 @@ struct __wt_ovfl_txnc {
  *	When a page is modified, there's additional information to maintain.
  */
 struct __wt_page_modify {
-	/*
-	 * Track the highest transaction ID at which the page was written to
-	 * disk.  This can be used to avoid trying to write the page multiple
-	 * times if a snapshot is keeping old versions pinned (e.g., in a
-	 * checkpoint).
-	 */
-	uint64_t disk_snap_min;
-
 	/* The first unwritten transaction ID (approximate). */
 	uint64_t first_dirty_txn;
 
@@ -221,10 +213,8 @@ struct __wt_page_modify {
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
 
-#ifdef HAVE_DIAGNOSTIC
 	/* Check that transaction time moves forward. */
 	uint64_t last_oldest_id;
-#endif
 
 	/* Dirty bytes added to the cache. */
 	size_t bytes_dirty;
