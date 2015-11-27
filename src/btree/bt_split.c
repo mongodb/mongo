@@ -352,6 +352,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
+		ref->addr = addr;
 	}
 
 	/* And finally, copy the WT_REF pointer itself. */
