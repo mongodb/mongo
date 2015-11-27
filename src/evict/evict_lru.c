@@ -39,8 +39,12 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 
 	page = entry->ref->page;
 
-	/* Any page from a dead tree is a great choice. */
-	if (F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
+	/*
+	 * Any leaf page from a dead tree is a great choice (not internal pages,
+	 * they may have children and are not yet evictable).
+	 */
+	if (!WT_PAGE_IS_INTERNAL(page) &&
+	    F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
 		return (WT_READGEN_OLDEST);
 
 	/* Any empty page (leaf or internal), is a good choice. */
