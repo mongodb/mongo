@@ -1185,15 +1185,17 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	conn = S2C(session);
 	btree = S2BT(session);
 	cache = conn->cache;
-	start = cache->evict_queue + *slotp;
-	end = WT_MIN(start + WT_EVICT_WALK_PER_FILE,
-	    cache->evict_queue + cache->evict_slots);
 	internal_pages = restarts = 0;
 	enough = false;
 
-	walk_flags = WT_READ_CACHE | WT_READ_NO_EVICT |
-	    WT_READ_NO_GEN | WT_READ_NO_WAIT;
+	start = cache->evict_queue + *slotp;
+	end = start + WT_EVICT_WALK_PER_FILE;
+	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
+	    end > cache->evict_queue + cache->evict_slots)
+		end = cache->evict_queue + cache->evict_slots;
 
+	walk_flags =
+	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
 	if (F_ISSET(cache, WT_CACHE_WALK_REVERSE))
 		walk_flags |= WT_READ_PREV;
 
