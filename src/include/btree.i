@@ -963,11 +963,11 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_page_can_split --
+ * __wt_leaf_page_can_split --
  *	Check whether a page can be split in memory.
  */
 static inline bool
-__wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_INSERT_HEAD *ins_head;
@@ -1064,7 +1064,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 * detailed eviction tests. We don't need further tests since the page
 	 * won't be written or discarded from the cache.
 	 */
-	if (__wt_page_can_split(session, page)) {
+	if (__wt_leaf_page_can_split(session, page)) {
 		if (inmem_splitp != NULL)
 			*inmem_splitp = true;
 		return (true);

@@ -1634,7 +1634,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 *
 	 * Note this page has already been through an in-memory split.
 	 */
-	WT_ASSERT(session, __wt_page_can_split(session, page));
+	WT_ASSERT(session, __wt_leaf_page_can_split(session, page));
 	WT_ASSERT(session, __wt_page_is_modified(page));
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 

@@ -322,7 +322,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (page->memory_footprint < btree->splitmempage)
 		return (0);
 	else if (page->memory_footprint < btree->maxmempage)
-		return (__wt_page_can_split(session, page));
+		return (__wt_leaf_page_can_split(session, page));
 
 	/* Trigger eviction on the next page release. */
 	__wt_page_evict_soon(page);
