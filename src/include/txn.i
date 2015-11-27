@@ -323,7 +323,6 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 {
 	WT_TXN_GLOBAL *txn_global;
 	uint64_t id;
-	u_int i;
 
 	txn_global = &S2C(session)->txn_global;
 
@@ -350,20 +349,16 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 	 * global current ID, so we want post-increment semantics.  Our atomic
 	 * add primitive does pre-increment, so adjust the result here.
 	 */
-	id = __wt_atomic_addv64(&S2C(session)->txn_global.alloc, 1) - 1;
+	 __wt_spin_lock(session, &txn_global->id_lock);
+	id = txn_global->current;
 
 	if (publish) {
 		session->txn.id = id;
-		WT_SESSION_TXN_STATE(session)->id = id;
+		WT_PUBLISH(WT_SESSION_TXN_STATE(session)->id, id);
 	}
 
-	for (i = 0; txn_global->current != id; i++)
-		if (i < 100)
-			WT_PAUSE();
-		else
-			__wt_yield();
-
-	WT_PUBLISH(txn_global->current, id + 1);
+	++txn_global->current;
+	 __wt_spin_unlock(session, &txn_global->id_lock);
 	return (id);
 }
 

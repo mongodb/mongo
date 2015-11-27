@@ -340,8 +340,18 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 			return (ret);
 		}
 		addr->size = (uint8_t)unpack.size;
-		addr->type =
-		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
+		switch (unpack.raw) {
+		case WT_CELL_ADDR_INT:
+			addr->type = WT_ADDR_INT;
+			break;
+		case WT_CELL_ADDR_LEAF:
+			addr->type = WT_ADDR_LEAF;
+			break;
+		case WT_CELL_ADDR_LEAF_NO:
+			addr->type = WT_ADDR_LEAF_NO;
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
 		ref->addr = addr;
 	}
 
@@ -1527,7 +1537,7 @@ __split_multi_inmem_final(WT_PAGE *orig, WT_MULTI *multi)
  *	Discard allocated pages after failure.
  */
 static void
-__split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_REF *ref)
+__split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref)
 {
 	/*
 	 * We failed creating new in-memory pages. For error-handling reasons,
@@ -1537,7 +1547,7 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	if (ref->page != NULL) {
 		F_SET_ATOMIC(ref->page, WT_PAGE_UPDATE_IGNORE);
-		__wt_free_ref(session, ref->page, ref, true);
+		__wt_free_ref(session, ref, orig->type, true);
 	}
 }
 
@@ -1962,7 +1972,7 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 
 	if (0) {
 err:		for (i = 0; i < new_entries; ++i)
-			__split_multi_inmem_fail(session, ref_new[i]);
+			__split_multi_inmem_fail(session, page, ref_new[i]);
 	}
 
 	__wt_free(session, ref_new);
@@ -2072,6 +2082,6 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	return (0);
 
-err:	__split_multi_inmem_fail(session, &new);
+err:	__split_multi_inmem_fail(session, page, &new);
 	return (ret);
 }

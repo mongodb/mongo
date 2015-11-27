@@ -122,7 +122,7 @@ extern bool __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool vi
 extern int __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
-extern void __wt_free_ref( WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, bool free_pages);
+extern void __wt_free_ref( WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pages);
 extern void __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pindex, bool free_pages);
 extern void __wt_free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd);
 extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]);
