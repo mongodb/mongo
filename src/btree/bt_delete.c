@@ -99,8 +99,8 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	/*
 	 * We cannot fast-delete pages that have overflow key/value items as
 	 * the overflow blocks have to be discarded.  The way we figure that
-	 * out is to check the on-page cell type for the page, cells for leaf
-	 * pages that have no overflow items are special.
+	 * out is to check the page's cell type, cells for leaf pages without
+	 * overflow items are special.
 	 *
 	 * To look at an on-page cell, we need to look at the parent page, and
 	 * that's dangerous, our parent page could change without warning if
