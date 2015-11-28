@@ -379,7 +379,7 @@ __curfile_close(WT_CURSOR *cursor)
 	 * updated correctly.
 	 */
 	if (session->dhandle != NULL) {
-		/* Increment the data-source's in-use counter. */
+		/* Decrement the data-source's in-use counter. */
 		__wt_cursor_dhandle_decr_use(session);
 		WT_TRET(__wt_session_release_btree(session));
 	}
