@@ -305,7 +305,7 @@ struct __wt_page_modify {
 	struct {
 		/*
 		 * Appended items to column-stores: there is only a single one
-		 * of these per column-store tree.
+		 * of these active at a time per column-store tree.
 		 */
 		WT_INSERT_HEAD **append;
 
