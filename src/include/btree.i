@@ -991,15 +991,17 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * do it without making the appending threads wait. See if it's worth
 	 * doing a split to let the threads continue before doing eviction.
 	 *
-	 * Ignore anything other than large, dirty row-store leaf pages. The
-	 * split code only supports row-store pages, and we depend on the page
-	 * being dirty for correctness (the page must be reconciled again
-	 * before being evicted after the split, information from a previous
-	 * reconciliation will be wrong, so we can't evict immediately).
+	 * Ignore anything other than large, dirty row-store or variable-length
+	 * column-store leaf pages. We depend on the page being dirty for
+	 * correctness (the page must be reconciled again before being evicted
+	 * after the split, information from a previous reconciliation will be
+	 * wrong, so we can't evict immediately).
 	 */
-	if (page->type != WT_PAGE_ROW_LEAF ||
-	    page->memory_footprint < btree->splitmempage ||
-	    !__wt_page_is_modified(page))
+	if (page->memory_footprint < btree->splitmempage)
+		return (false);
+	if (page->type != WT_PAGE_ROW_LEAF && page->type != WT_PAGE_COL_VAR)
+		return (false);
+	if (!__wt_page_is_modified(page))
 		return (false);
 
 	/*
@@ -1016,9 +1018,11 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 #define	WT_MIN_SPLIT_COUNT	30
 #define	WT_MIN_SPLIT_MULTIPLIER 16      /* At level 2, we see 1/16th entries */
 
-	ins_head = page->pg_row_entries == 0 ?
+	ins_head = page->type == WT_PAGE_ROW_LEAF ?
+	    (page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
-	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
+	    WT_COL_APPEND(page);
 	if (ins_head == NULL)
 		return (false);
 	for (count = 0, size = 0, ins = ins_head->head[WT_MIN_SPLIT_DEPTH];
