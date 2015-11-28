@@ -1454,17 +1454,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 	if (page->read_gen != WT_READGEN_OLDEST)
 		page->read_gen = __wt_cache_read_gen_bump(session);
 
-	/*
-	 * If we are evicting in a dead tree, don't write dirty pages.
-	 *
-	 * Force pages clean to keep statistics correct and to let the
-	 * page-discard function assert that no dirty pages are ever
-	 * discarded.
-	 */
-	if (F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
-		__wt_page_modify_clear(session, page);
-
-	WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, 0));
+	WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, false));
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 

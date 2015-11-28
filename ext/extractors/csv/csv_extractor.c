@@ -97,8 +97,10 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 		strncpy(copy, p, len);
 		copy[len] = '\0';
 		if (csv_extractor->format_isnum) {
-			if ((val = atoi(copy)) < 0)
+			if ((val = atoi(copy)) < 0) {
+				free(copy);
 				return (EINVAL);
+			}
 			result_cursor->set_key(result_cursor, val);
 		} else
 			result_cursor->set_key(result_cursor, copy);
@@ -150,7 +152,7 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
 		return (errno);
 
 	*csv_extractor = *orig;
-	csv_extractor->field = field_num;
+	csv_extractor->field = (int)field_num;
 	csv_extractor->format_isnum = (format.str[0] == 'i');
 	*customp = (WT_EXTRACTOR *)csv_extractor;
 	return (0);
