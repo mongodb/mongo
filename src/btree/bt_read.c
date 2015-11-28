@@ -20,8 +20,11 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(las_key);
 	WT_DECL_RET;
 	uint64_t las_counter, las_txnid;
+	int64_t remove_cnt;
 	uint32_t las_id;
 	int exact;
+
+	remove_cnt = 0;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &las_addr));
 	WT_ERR(__wt_scr_alloc(session, 0, &las_key));
@@ -56,11 +59,24 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 		 * remains positioned in that case.
 		 */
 		WT_ERR(cursor->remove(cursor));
+		++remove_cnt;
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
 err:	__wt_scr_free(session, &las_addr);
 	__wt_scr_free(session, &las_key);
+
+	/*
+	 * If there were races to remove records, we can over-count.  All
+	 * arithmetic is signed, so underflow isn't fatal, but check anyway so
+	 * we don't skew low over time.
+	 */
+	if (remove_cnt > S2C(session)->las_record_cnt)
+		S2C(session)->las_record_cnt = 0;
+	else if (remove_cnt > 0)
+		(void)__wt_atomic_subi64(
+		    &S2C(session)->las_record_cnt, remove_cnt);
+
 	return (ret);
 }
 

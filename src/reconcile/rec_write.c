@@ -2944,8 +2944,8 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		break;
 	case SPLIT_TRACKING_RAW:
 		/*
-		 * We were configured for raw compression, but never actually
-		 * wrote anything.
+		 * We were configured for raw compression, and either we never
+		 * wrote anything, or there's a remaindered block of data.
 		 */
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -2998,14 +2998,27 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 static int
 __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
-	/* We're done reconciling - write the final page */
-	if (r->raw_compression && r->entries != 0) {
-		while (r->entries != 0)
-			WT_RET(__rec_split_raw_worker(session, r, 0, true));
-	} else
-		WT_RET(__rec_split_finish_std(session, r));
+	WT_BTREE *btree;
+	size_t data_size;
 
-	return (0);
+	btree = S2BT(session);
+
+	/*
+	 * We're done reconciling, write the final page. Call raw compression
+	 * until/unless there's not enough data to compress.
+	 */
+	if (r->raw_compression && r->entries != 0) {
+		while (r->entries != 0) {
+			data_size =
+			    WT_PTRDIFF32(r->first_free, r->disk_image.mem);
+			if (data_size <= btree->allocsize)
+				break;
+			WT_RET(__rec_split_raw_worker(session, r, 0, true));
+		}
+		if (r->entries == 0)
+			return (0);
+	}
+	return (__rec_split_finish_std(session, r));
 }
 
 /*
@@ -3331,6 +3344,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	WT_SAVE_UPD *list;
 	WT_UPDATE *upd;
 	uint64_t las_counter;
+	int64_t insert_cnt;
 	uint32_t i, session_flags, slot;
 	uint8_t *p;
 
@@ -3338,6 +3352,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	WT_CLEAR(las_addr);
 	WT_CLEAR(las_value);
 	page = r->page;
+	insert_cnt = 0;
 
 	/*
 	 * We're writing lookaside records: start instantiating them on pages
@@ -3434,10 +3449,15 @@ __rec_update_las(WT_SESSION_IMPL *session,
 			    cursor, upd->txnid, upd->size, &las_value);
 
 			WT_ERR(cursor->insert(cursor));
+			++insert_cnt;
 		} while ((upd = upd->next) != NULL);
 	}
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
+
+	if (insert_cnt > 0)
+		(void)__wt_atomic_addi64(
+		    &S2C(session)->las_record_cnt, insert_cnt);
 
 	__wt_scr_free(session, &key);
 	return (ret);
