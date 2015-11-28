@@ -77,7 +77,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 		}
 
 		(void)__wt_atomic_addv32(&S2BT(session)->evict_busy, 1);
-		ret = __wt_evict(session, ref, 0);
+		ret = __wt_evict(session, ref, false);
 		(void)__wt_atomic_subv32(&S2BT(session)->evict_busy, 1);
 		WT_RET_BUSY_OK(ret);
 	}
@@ -99,25 +99,18 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	/*
 	 * We cannot fast-delete pages that have overflow key/value items as
 	 * the overflow blocks have to be discarded.  The way we figure that
-	 * out is to check the on-page cell type for the page, cells for leaf
-	 * pages that have no overflow items are special.
-	 *
-	 * In some cases, the reference address may not reference an on-page
-	 * cell (for example, some combination of page splits), in which case
-	 * we can't check the original cell value and we fail.
+	 * out is to check the page's cell type, cells for leaf pages without
+	 * overflow items are special.
 	 *
 	 * To look at an on-page cell, we need to look at the parent page, and
 	 * that's dangerous, our parent page could change without warning if
 	 * the parent page were to split, deepening the tree.  It's safe: the
 	 * page's reference will always point to some valid page, and if we find
 	 * any problems we simply fail the fast-delete optimization.
-	 *
-	 * !!!
-	 * I doubt it's worth the effort, but we could copy the cell's type into
-	 * the reference structure, and then we wouldn't need an on-page cell.
 	 */
 	parent = ref->home;
-	if (__wt_off_page(parent, ref->addr) ||
+	if (__wt_off_page(parent, ref->addr) ?
+	    ((WT_ADDR *)ref->addr)->type != WT_ADDR_LEAF_NO :
 	    __wt_cell_type_raw(ref->addr) != WT_CELL_ADDR_LEAF_NO)
 		goto err;
 

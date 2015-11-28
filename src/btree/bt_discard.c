@@ -50,15 +50,18 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	page = *pagep;
 	*pagep = NULL;
 
+	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+		__wt_page_modify_clear(session, page);
+
 	/*
-	 * We should never discard ...
+	 * We should never discard:
+	 * - a dirty page,
+	 * - a page queued for eviction, or
+	 * - a locked page.
 	 */
-	WT_ASSERT(		/* ... a dirty page */
-	    session, !__wt_page_is_modified(page));
-	WT_ASSERT(		/* ... a page queued for LRU eviction */
-	    session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
-	WT_ASSERT(		/* ... a locked page */
-	    session, !__wt_fair_islocked(session, &page->page_lock));
+	WT_ASSERT(session, !__wt_page_is_modified(page));
+	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
+	WT_ASSERT(session, !__wt_fair_islocked(session, &page->page_lock));
 
 #ifdef HAVE_DIAGNOSTIC
 	{
@@ -227,7 +230,7 @@ __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 void
 __wt_free_ref(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, bool free_pages)
+    WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pages)
 {
 	WT_IKEY *ikey;
 
@@ -246,8 +249,15 @@ __wt_free_ref(
 		__wt_page_out(session, &ref->page);
 	}
 
-	/* Free any key allocation. */
-	switch (page->type) {
+	/*
+	 * Optionally free row-store WT_REF key allocation. Historic versions of
+	 * this code looked in a passed-in page argument, but that is dangerous,
+	 * some of our error-path callers create WT_REF structures without ever
+	 * setting WT_REF.home or having a parent page to which the WT_REF will
+	 * be linked. Those WT_REF structures invariably have instantiated keys,
+	 * (they obviously cannot be on-page keys), and we must free the memory.
+	 */
+	switch (page_type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
@@ -255,8 +265,12 @@ __wt_free_ref(
 		break;
 	}
 
-	/* Free any address allocation. */
-	if (ref->addr != NULL && __wt_off_page(page, ref->addr)) {
+	/*
+	 * Free any address allocation; if there's no linked WT_REF page, it
+	 * must be allocated.
+	 */
+	if (ref->addr != NULL &&
+	    (ref->home == NULL || __wt_off_page(ref->home, ref->addr))) {
 		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 		__wt_free(session, ref->addr);
 	}
@@ -272,7 +286,7 @@ __wt_free_ref(
 
 /*
  * __wt_free_ref_index --
- *	Discard a page index and it's references.
+ *	Discard a page index and its references.
  */
 void
 __wt_free_ref_index(WT_SESSION_IMPL *session,
@@ -284,7 +298,8 @@ __wt_free_ref_index(WT_SESSION_IMPL *session,
 		return;
 
 	for (i = 0; i < pindex->entries; ++i)
-		__wt_free_ref(session, page, pindex->index[i], free_pages);
+		__wt_free_ref(
+		    session, pindex->index[i], page->type, free_pages);
 	__wt_free(session, pindex);
 }
 
