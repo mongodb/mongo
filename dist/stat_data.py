@@ -8,7 +8,7 @@
 # NOTE: All statistics descriptions must have a prefix string followed by ':'.
 #
 # Data-source statistics are normally aggregated across the set of underlying
-# objects. Additional optionaly configuration flags are available:
+# objects. Additional optional configuration flags are available:
 #       no_aggregate    Ignore the value when aggregating statistics
 #       max_aggregate   Take the maximum value when aggregating statistics
 #
