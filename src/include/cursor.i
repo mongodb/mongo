@@ -202,7 +202,7 @@ err:	return (ret);
 
 /*
  * __wt_cursor_dhandle_incr_use --
- *	Increment the in-use counter in cursor's data source.
+ *	Increment the in-use counter in the cursor's data source.
  */
 static inline void
 __wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
@@ -219,7 +219,7 @@ __wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
 
 /*
  * __wt_cursor_dhandle_decr_use --
- *	Decrement the in-use counter in cursor's data source.
+ *	Decrement the in-use counter in the cursor's data source.
  */
 static inline void
 __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)

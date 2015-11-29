@@ -206,6 +206,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	__wt_spin_unlock(session, &conn->api_lock);
 
+	/* We no longer have a session, don't try to update it. */
+	session = NULL;
+
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
