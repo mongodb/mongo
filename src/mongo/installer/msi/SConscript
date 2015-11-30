@@ -133,11 +133,14 @@ env.Command(objects,
 
 #light: link .objs into an msi
 pre_msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.pre.msi"
-env.Command(pre_msi,
+pre_msi_cmd = env.Command(pre_msi,
             objects,
             '"$WIXLIGHT" -out ${TARGET} -wx -cultures:null -sice:ICE82 '
             ' -ext "$WIXUIEXT"'
             ' ${SOURCES}')
+
+if 'enterprise' in env['MONGO_MODULES']:
+    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongodecrypt.exe")
 
 msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
 env.Command(msi,
