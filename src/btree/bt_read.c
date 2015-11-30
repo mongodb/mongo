@@ -20,8 +20,11 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(las_key);
 	WT_DECL_RET;
 	uint64_t las_counter, las_txnid;
+	int64_t remove_cnt;
 	uint32_t las_id;
 	int exact;
+
+	remove_cnt = 0;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &las_addr));
 	WT_ERR(__wt_scr_alloc(session, 0, &las_key));
@@ -56,11 +59,24 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 		 * remains positioned in that case.
 		 */
 		WT_ERR(cursor->remove(cursor));
+		++remove_cnt;
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
 err:	__wt_scr_free(session, &las_addr);
 	__wt_scr_free(session, &las_key);
+
+	/*
+	 * If there were races to remove records, we can over-count.  All
+	 * arithmetic is signed, so underflow isn't fatal, but check anyway so
+	 * we don't skew low over time.
+	 */
+	if (remove_cnt > S2C(session)->las_record_cnt)
+		S2C(session)->las_record_cnt = 0;
+	else if (remove_cnt > 0)
+		(void)__wt_atomic_subi64(
+		    &S2C(session)->las_record_cnt, remove_cnt);
+
 	return (ret);
 }
 
@@ -291,10 +307,6 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	btree = S2BT(session);
 	page = ref->page;
 
-	/* Pages are usually small enough, check that first. */
-	if (page->memory_footprint < btree->maxmempage)
-		return (0);
-
 	/* Leaf pages only. */
 	if (WT_PAGE_IS_INTERNAL(page))
 		return (0);
@@ -306,6 +318,12 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (page->modify == NULL)
 		return (0);
 
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->splitmempage)
+		return (0);
+	else if (page->memory_footprint < btree->maxmempage)
+		return (__wt_leaf_page_can_split(session, page));
+
 	/* Trigger eviction on the next page release. */
 	__wt_page_evict_soon(page);
 
@@ -313,7 +331,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_txn_update_oldest(session, false);
 
 	/* If eviction cannot succeed, don't try. */
-	return (__wt_page_can_evict(session, ref, true, NULL));
+	return (__wt_page_can_evict(session, ref, NULL));
 }
 
 /*

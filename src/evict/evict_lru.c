@@ -1169,7 +1169,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	uint64_t pages_walked;
 	uint32_t walk_flags;
 	int internal_pages, restarts;
-	bool enough, modified;
+	bool enough, modified, would_split;
 
 	conn = S2C(session);
 	btree = S2BT(session);
@@ -1254,8 +1254,14 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			page->read_gen = __wt_cache_read_gen_new(session);
 
 fast:		/* If the page can't be evicted, give up. */
-		if (!__wt_page_can_evict(session, ref, true, NULL))
+		if (!__wt_page_can_evict(session, ref, &would_split))
 			continue;
+
+		/*
+		 * Note: take care with ordering: if we detected that
+		 * the page is modified above, we expect mod != NULL.
+		 */
+		mod = page->modify;
 
 		/*
 		 * Additional tests if eviction is likely to succeed.
@@ -1270,32 +1276,26 @@ fast:		/* If the page can't be evicted, give up. */
 		if (!FLD_ISSET(cache->state,
 		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK)) {
 			/*
-			 * Note: take care with ordering: if we detected that
-			 * the page is modified above, we expect mod != NULL.
-			 */
-			mod = page->modify;
-
-			/*
 			 * If the page is clean but has modifications that
 			 * appear too new to evict, skip it.
 			 */
 			if (!modified && mod != NULL &&
 			    !__wt_txn_visible_all(session, mod->rec_max_txn))
 				continue;
-
-			/*
-			 * If the oldest transaction hasn't changed since the
-			 * last time this page was written, it's unlikely we
-			 * can make progress.  Similarly, if the most recent
-			 * update on the page is not yet globally visible,
-			 * eviction will fail.  These heuristics attempt to
-			 * avoid repeated attempts to evict the same page.
-			 */
-			if (modified &&
-			    (mod->disk_snap_min == conn->txn_global.oldest_id ||
-			    !__wt_txn_visible_all(session, mod->update_txn)))
-				continue;
 		}
+
+		/*
+		 * If the oldest transaction hasn't changed since the last time
+		 * this page was written, it's unlikely we can make progress.
+		 * Similarly, if the most recent update on the page is not yet
+		 * globally visible, eviction will fail.  These heuristics
+		 * attempt to avoid repeated attempts to evict the same page.
+		 */
+		if (modified && !would_split &&
+		    !FLD_ISSET(cache->state, WT_CACHE_STUCK) &&
+		    (mod->last_oldest_id == __wt_txn_oldest_id(session) ||
+		    !__wt_txn_visible_all(session, mod->update_txn)))
+			continue;
 
 		WT_ASSERT(session, evict->ref == NULL);
 		__evict_init_candidate(session, evict, ref);
@@ -1454,17 +1454,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 	if (page->read_gen != WT_READGEN_OLDEST)
 		page->read_gen = __wt_cache_read_gen_bump(session);
 
-	/*
-	 * If we are evicting in a dead tree, don't write dirty pages.
-	 *
-	 * Force pages clean to keep statistics correct and to let the
-	 * page-discard function assert that no dirty pages are ever
-	 * discarded.
-	 */
-	if (F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
-		__wt_page_modify_clear(session, page);
-
-	WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, 0));
+	WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, false));
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
