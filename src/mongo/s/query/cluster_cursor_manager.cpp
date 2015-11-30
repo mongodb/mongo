@@ -371,8 +371,15 @@ ClusterCursorManager::Stats ClusterCursorManager::stats() const {
             const CursorEntry& entry = cursorIdEntryPair.second;
 
             if (entry.getKillPending()) {
+                // Killed cursors do not count towards the number of pinned cursors or the number of
+                // open cursors.
                 continue;
             }
+
+            if (!entry.isCursorOwned()) {
+                ++stats.cursorsPinned;
+            }
+
             switch (entry.getCursorType()) {
                 case CursorType::NamespaceNotSharded:
                     ++stats.cursorsNotSharded;

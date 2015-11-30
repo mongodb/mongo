@@ -56,6 +56,7 @@
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -407,6 +408,10 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
         return pinnedCursor.getStatus();
     }
     invariant(request.cursorid == pinnedCursor.getValue().getCursorId());
+
+    // If the fail point is enabled, busy wait until it is disabled.
+    while (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
+    }
 
     if (request.awaitDataTimeout) {
         auto status = pinnedCursor.getValue().setAwaitDataTimeout(*request.awaitDataTimeout);

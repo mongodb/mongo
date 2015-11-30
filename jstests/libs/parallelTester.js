@@ -160,6 +160,9 @@ if ( typeof _threadInject != "undefined" ){
                                    // This overwrites MinKey/MaxKey's singleton which breaks
                                    // any other test that uses MinKey/MaxKey
                                    "type6.js",
+
+                                   // Assumes that other tests are not creating cursors.
+                                   "kill_cursors.js",
                                ] );
         
         var parallelFilesDir = "jstests/core";

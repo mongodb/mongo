@@ -218,6 +218,10 @@ public:
                        str::stream() << "Cursor not found, cursor id: " << request.cursorid));
         }
 
+        // If the fail point is enabled, busy wait until it is disabled.
+        while (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
+        }
+
         if (request.nss.ns() != cursor->ns()) {
             return appendCommandStatus(
                 result,
