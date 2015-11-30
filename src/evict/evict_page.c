@@ -434,7 +434,7 @@ __evict_review(
 		if (modified)
 			__wt_txn_update_oldest(session, true);
 
-		if (!__wt_page_can_evict(session, ref, false, inmem_splitp))
+		if (!__wt_page_can_evict(session, ref, inmem_splitp))
 			return (EBUSY);
 
 		/*
