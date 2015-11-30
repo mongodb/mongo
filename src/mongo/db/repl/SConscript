@@ -32,7 +32,7 @@ env.Library(
 )
 
 env.Library('repl_settings',
-            'repl_settings.cpp',
+            'repl_settings_init.cpp',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base',
                 '$BUILD_DIR/mongo/db/server_parameters'
