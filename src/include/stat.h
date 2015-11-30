@@ -139,8 +139,8 @@ __wt_stats_clear(void *stats_arg, int slot)
  */
 #define	WT_STAT_READ(stats, fld)					\
 	__wt_stats_aggregate(stats, WT_STATS_FIELD_TO_SLOT(stats, fld))
-#define	WT_STAT_WRITE(session, stats, fld)				\
-	((stats)[WT_STATS_SLOT_ID(session)]->fld);
+#define	WT_STAT_WRITE(stats, fld, v)					\
+	(stats)->fld = (int64_t)(v)
 
 #define	WT_STAT_DECRV(session, stats, fld, value)			\
 	(stats)[WT_STATS_SLOT_ID(session)]->fld -= (int64_t)(value)
