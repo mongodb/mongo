@@ -9,10 +9,7 @@
 #
 # Data-source statistics are normally aggregated across the set of underlying
 # objects. Additional optional configuration flags are available:
-#       no_aggregate    Ignore the value when aggregating statistics
 #       max_aggregate   Take the maximum value when aggregating statistics
-#
-# Optional configuration flags:
 #       no_clear        Value not cleared when statistics cleared
 #       no_scale        Don't scale value per second in the logging tool script
 #
@@ -360,7 +357,7 @@ dsrc_stats = [
     BtreeStat('btree_column_variable', 'column-store variable-size leaf pages', 'no_scale'),
     BtreeStat('btree_compact_rewrite', 'pages rewritten by compaction'),
     BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale'),
-    BtreeStat('btree_fixed_len', 'fixed-record size', 'no_aggregate,no_scale'),
+    BtreeStat('btree_fixed_len', 'fixed-record size', 'max_aggregate,no_scale'),
     BtreeStat('btree_maximum_depth', 'maximum tree depth', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxintlkey', 'maximum internal page key size', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxintlpage', 'maximum internal page size', 'max_aggregate,no_scale'),
@@ -390,14 +387,14 @@ dsrc_stats = [
     ##########################################
     # Block manager statistics
     ##########################################
-    BlockStat('allocation_size', 'file allocation unit size', 'no_aggregate,no_scale'),
+    BlockStat('allocation_size', 'file allocation unit size', 'max_aggregate,no_scale'),
     BlockStat('block_alloc', 'blocks allocated'),
     BlockStat('block_checkpoint_size', 'checkpoint size', 'no_scale'),
     BlockStat('block_extension', 'allocations requiring file extension'),
     BlockStat('block_free', 'blocks freed'),
-    BlockStat('block_magic', 'file magic number', 'no_aggregate,no_scale'),
-    BlockStat('block_major', 'file major version number', 'no_aggregate,no_scale'),
-    BlockStat('block_minor', 'minor version number', 'no_aggregate,no_scale'),
+    BlockStat('block_magic', 'file magic number', 'max_aggregate,no_scale'),
+    BlockStat('block_major', 'file major version number', 'max_aggregate,no_scale'),
+    BlockStat('block_minor', 'minor version number', 'max_aggregate,no_scale'),
     BlockStat('block_reuse_bytes', 'file bytes available for reuse'),
     BlockStat('block_size', 'file size in bytes', 'no_scale'),
 
