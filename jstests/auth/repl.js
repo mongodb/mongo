@@ -76,7 +76,7 @@ var AuthReplTest = function(spec) {
             privileges: [
                 { resource: {cluster: true}, actions: ["listDatabases"] }
             ],
-            writeConcern: {w: 2, wtimeout: 5000}
+            writeConcern: {w: 2, wtimeout: 15000}
         });
         assert.commandWorked(res);
     };
@@ -85,7 +85,7 @@ var AuthReplTest = function(spec) {
         var res = adminPri.runCommand({
             updateUser: testUser,
             roles: [testRole2],
-            writeConcern: {w: 2, wtimeout: 5000}
+            writeConcern: {w: 2, wtimeout: 15000}
         });
         assert.commandWorked(res);
     };
@@ -109,10 +109,10 @@ var AuthReplTest = function(spec) {
      */
     var cleanup = function() {
         var res = adminPri.runCommand({dropUser: testUser,
-                                       writeConcern: {w: 2, wtimeout: 5000}});
+                                       writeConcern: {w: 2, wtimeout: 15000}});
         assert.commandWorked(res);
         res = adminPri.runCommand({dropAllRolesFromDatabase: 1,
-                                   writeConcern: {w: 2, wtimeout: 5000}});
+                                   writeConcern: {w: 2, wtimeout: 15000}});
         assert.commandWorked(res);
     };
 
@@ -239,7 +239,7 @@ masterDB.createUser({user: "root", pwd: "pass", roles: ["root"]});
 masterDB.auth("root", "pass");
 
 // ensure that master/slave replication is up and running
-masterDB.foo.save({}, { writeConcern: { w: 2, wtimeout: 5000 }});
+masterDB.foo.save({}, { writeConcern: { w: 2, wtimeout: 15000 }});
 masterDB.foo.drop();
 
 authReplTest = AuthReplTest({
