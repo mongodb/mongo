@@ -712,9 +712,11 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 
 	txn_global = &conn->txn_global;
-	txn_global->alloc = txn_global->current =
-	    txn_global->last_running = txn_global->oldest_id = WT_TXN_FIRST;
+	txn_global->current = txn_global->last_running =
+	    txn_global->oldest_id = WT_TXN_FIRST;
 
+	WT_RET(__wt_spin_init(session,
+	    &txn_global->id_lock, "transaction id lock"));
 	WT_RET(__wt_rwlock_alloc(session,
 	    &txn_global->nsnap_rwlock, "named snapshot lock"));
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
@@ -747,6 +749,7 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 	if (txn_global == NULL)
 		return (0);
 
+	__wt_spin_destroy(session, &txn_global->id_lock);
 	WT_TRET(__wt_rwlock_destroy(session, &txn_global->nsnap_rwlock));
 	__wt_free(session, txn_global->states);
 

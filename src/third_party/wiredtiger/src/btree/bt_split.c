@@ -340,8 +340,18 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 			return (ret);
 		}
 		addr->size = (uint8_t)unpack.size;
-		addr->type =
-		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
+		switch (unpack.raw) {
+		case WT_CELL_ADDR_INT:
+			addr->type = WT_ADDR_INT;
+			break;
+		case WT_CELL_ADDR_LEAF:
+			addr->type = WT_ADDR_LEAF;
+			break;
+		case WT_CELL_ADDR_LEAF_NO:
+			addr->type = WT_ADDR_LEAF_NO;
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
 		ref->addr = addr;
 	}
 
@@ -399,16 +409,7 @@ __split_ref_move_final(
 	WT_DECL_RET;
 	WT_PAGE *child;
 	WT_REF *ref, *child_ref;
-	uint64_t txn_new_id;
 	uint32_t i;
-
-	/*
-	 * When creating new internal pages as part of a split, we set a field
-	 * in those pages modify structure to prevent them from being evicted
-	 * until all threads are known to have exited the index of the page that
-	 * previously "owned" the WT_REF. Set that field to a safe value.
-	 */
-	txn_new_id = __wt_txn_id_alloc(session, false);
 
 	/*
 	 * The WT_REF structures moved to newly allocated child pages reference
@@ -461,8 +462,6 @@ __split_ref_move_final(
 			if (child_ref->home != child) {
 				child_ref->home = child;
 				child_ref->pindex_hint = 0;
-
-				child->modify->mod_split_txn = txn_new_id;
 			}
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);
@@ -1527,7 +1526,7 @@ __split_multi_inmem_final(WT_PAGE *orig, WT_MULTI *multi)
  *	Discard allocated pages after failure.
  */
 static void
-__split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_REF *ref)
+__split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref)
 {
 	/*
 	 * We failed creating new in-memory pages. For error-handling reasons,
@@ -1537,7 +1536,7 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	if (ref->page != NULL) {
 		F_SET_ATOMIC(ref->page, WT_PAGE_UPDATE_IGNORE);
-		__wt_free_ref(session, ref->page, ref, true);
+		__wt_free_ref(session, ref, orig->type, true);
 	}
 }
 
@@ -1635,7 +1634,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 *
 	 * Note this page has already been through an in-memory split.
 	 */
-	WT_ASSERT(session, __wt_page_can_split(session, page));
+	WT_ASSERT(session, __wt_leaf_page_can_split(session, page));
 	WT_ASSERT(session, __wt_page_is_modified(page));
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
@@ -1818,13 +1817,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 #endif
 
 	/*
-	 * Save the transaction ID when the split happened.  Application
-	 * threads will not try to forcibly evict the page again until
-	 * all concurrent transactions commit.
-	 */
-	page->modify->inmem_split_txn = __wt_txn_id_alloc(session, false);
-
-	/*
 	 * Update the page accounting.
 	 *
 	 * XXX
@@ -1962,7 +1954,7 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 
 	if (0) {
 err:		for (i = 0; i < new_entries; ++i)
-			__split_multi_inmem_fail(session, ref_new[i]);
+			__split_multi_inmem_fail(session, page, ref_new[i]);
 	}
 
 	__wt_free(session, ref_new);
@@ -2072,6 +2064,6 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	return (0);
 
-err:	__split_multi_inmem_fail(session, &new);
+err:	__split_multi_inmem_fail(session, page, &new);
 	return (ret);
 }

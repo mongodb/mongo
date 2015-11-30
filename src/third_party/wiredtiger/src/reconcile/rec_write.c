@@ -351,6 +351,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
+	uint64_t oldest_id;
 
 	page = ref->page;
 	mod = page->modify;
@@ -361,21 +362,14 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	/* We shouldn't get called with a clean page, that's an error. */
 	WT_ASSERT(session, __wt_page_is_modified(page));
 
-#ifdef HAVE_DIAGNOSTIC
-	{
 	/*
 	 * Check that transaction time always moves forward for a given page.
 	 * If this check fails, reconciliation can free something that a future
 	 * reconciliation will need.
 	 */
-	uint64_t oldest_id = __wt_txn_oldest_id(session);
+	oldest_id = __wt_txn_oldest_id(session);
 	WT_ASSERT(session, WT_TXNID_LE(mod->last_oldest_id, oldest_id));
 	mod->last_oldest_id = oldest_id;
-	}
-#endif
-
-	/* Record the most recent transaction ID we will *not* write. */
-	mod->disk_snap_min = session->txn.snap_min;
 
 	/* Initialize the reconciliation structure for each new run. */
 	WT_RET(__rec_write_init(
@@ -2944,8 +2938,8 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		break;
 	case SPLIT_TRACKING_RAW:
 		/*
-		 * We were configured for raw compression, but never actually
-		 * wrote anything.
+		 * We were configured for raw compression, and either we never
+		 * wrote anything, or there's a remaindered block of data.
 		 */
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -2998,14 +2992,27 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 static int
 __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
-	/* We're done reconciling - write the final page */
-	if (r->raw_compression && r->entries != 0) {
-		while (r->entries != 0)
-			WT_RET(__rec_split_raw_worker(session, r, 0, true));
-	} else
-		WT_RET(__rec_split_finish_std(session, r));
+	WT_BTREE *btree;
+	size_t data_size;
 
-	return (0);
+	btree = S2BT(session);
+
+	/*
+	 * We're done reconciling, write the final page. Call raw compression
+	 * until/unless there's not enough data to compress.
+	 */
+	if (r->raw_compression && r->entries != 0) {
+		while (r->entries != 0) {
+			data_size =
+			    WT_PTRDIFF32(r->first_free, r->disk_image.mem);
+			if (data_size <= btree->allocsize)
+				break;
+			WT_RET(__rec_split_raw_worker(session, r, 0, true));
+		}
+		if (r->entries == 0)
+			return (0);
+	}
+	return (__rec_split_finish_std(session, r));
 }
 
 /*

@@ -330,6 +330,8 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	uint64_t last_running;
 
+	WT_ASSERT(session, !F_ISSET(session->dhandle, WT_DHANDLE_DEAD));
+
 	last_running = 0;
 	if (page->modify->write_gen == 0)
 		last_running = S2C(session)->txn_global.last_running;
@@ -345,13 +347,6 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	if (__wt_atomic_add32(&page->modify->write_gen, 1) == 1) {
 		__wt_cache_dirty_incr(session, page);
-
-		/*
-		 * The page can never end up with changes older than the oldest
-		 * running transaction.
-		 */
-		if (F_ISSET(&session->txn, WT_TXN_HAS_SNAPSHOT))
-			page->modify->disk_snap_min = session->txn.snap_min;
 
 		/*
 		 * We won the race to dirty the page, but another thread could
@@ -968,11 +963,11 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_page_can_split --
+ * __wt_leaf_page_can_split --
  *	Check whether a page can be split in memory.
  */
 static inline bool
-__wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_INSERT_HEAD *ins_head;
@@ -1003,7 +998,7 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * reconciliation will be wrong, so we can't evict immediately).
 	 */
 	if (page->type != WT_PAGE_ROW_LEAF ||
-	    page->memory_footprint < btree->maxmempage ||
+	    page->memory_footprint < btree->splitmempage ||
 	    !__wt_page_is_modified(page))
 		return (false);
 
@@ -1046,13 +1041,11 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Check whether a page can be evicted.
  */
 static inline bool
-__wt_page_can_evict(WT_SESSION_IMPL *session,
-    WT_REF *ref, bool check_splits, bool *inmem_splitp)
+__wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	WT_TXN_GLOBAL *txn_global;
 
 	if (inmem_splitp != NULL)
 		*inmem_splitp = false;
@@ -1071,7 +1064,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * detailed eviction tests. We don't need further tests since the page
 	 * won't be written or discarded from the cache.
 	 */
-	if (__wt_page_can_split(session, page)) {
+	if (__wt_leaf_page_can_split(session, page)) {
 		if (inmem_splitp != NULL)
 			*inmem_splitp = true;
 		return (true);
@@ -1105,28 +1098,11 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * pages cannot be evicted until all threads are known to have exited
 	 * the original parent page's index, because evicting an internal page
 	 * discards its WT_REF array, and a thread traversing the original
-	 * parent page index might see a freed WT_REF. During the split we set
-	 * a transaction value, we can evict the created page as soon as that
-	 * transaction value is globally visible.
+	 * parent page index might see a freed WT_REF.
 	 */
-	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
-	    (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK) ||
-	    !__wt_txn_visible_all(session, mod->mod_split_txn)))
+	if (WT_PAGE_IS_INTERNAL(page) &&
+	    F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
 		return (false);
-
-	/*
-	 * If the page was recently split in-memory, don't evict it immediately:
-	 * we want to give application threads that are appending a chance to
-	 * move to the new leaf page created by the split.
-	 *
-	 * Note the check here is similar to __wt_txn_visible_all, but ignores
-	 * the checkpoint's transaction.
-	 */
-	if (check_splits) {
-		txn_global = &S2C(session)->txn_global;
-		if (WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
-			return (false);
-	}
 
 	return (true);
 }
@@ -1162,7 +1138,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
 	too_big = page->memory_footprint > btree->maxmempage;
-	if ((ret = __wt_evict(session, ref, 0)) == 0) {
+	if ((ret = __wt_evict(session, ref, false)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
@@ -1221,7 +1197,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    !__wt_page_can_evict(session, ref, true, NULL))
+	    !__wt_page_can_evict(session, ref, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
