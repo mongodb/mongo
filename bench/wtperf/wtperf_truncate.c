@@ -161,12 +161,13 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	 */
 	if (trunc_cfg->expected_total >
 	    thread->workload->truncate_count + trunc_cfg->stone_gap) {
-		if (trunc_cfg->catchup_multiplier < trunc_cfg->needed_stones-1)
-			trunc_cfg->catchup_multiplier++;
+		trunc_cfg->catchup_multiplier =
+		    WT_MIN(trunc_cfg->catchup_multiplier + 1,
+		    trunc_cfg->needed_stones - 1);
 	} else {
 		/* Back off if we start seeing an improvement */
-		if (trunc_cfg->catchup_multiplier > 1)
-			trunc_cfg->catchup_multiplier--;
+		trunc_cfg->catchup_multiplier =
+		    WT_MAX(trunc_cfg->catchup_multiplier - 1, 1);
 	}
 	used_stone_gap = trunc_cfg->stone_gap * trunc_cfg->catchup_multiplier;
 
