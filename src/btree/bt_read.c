@@ -307,10 +307,6 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	btree = S2BT(session);
 	page = ref->page;
 
-	/* Pages are usually small enough, check that first. */
-	if (page->memory_footprint < btree->maxmempage)
-		return (0);
-
 	/* Leaf pages only. */
 	if (WT_PAGE_IS_INTERNAL(page))
 		return (0);
@@ -322,6 +318,12 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (page->modify == NULL)
 		return (0);
 
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->splitmempage)
+		return (0);
+	else if (page->memory_footprint < btree->maxmempage)
+		return (__wt_leaf_page_can_split(session, page));
+
 	/* Trigger eviction on the next page release. */
 	__wt_page_evict_soon(page);
 
@@ -329,7 +331,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_txn_update_oldest(session, false);
 
 	/* If eviction cannot succeed, don't try. */
-	return (__wt_page_can_evict(session, ref, true, NULL));
+	return (__wt_page_can_evict(session, ref, NULL));
 }
 
 /*
