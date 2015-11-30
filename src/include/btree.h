@@ -88,7 +88,8 @@ struct __wt_btree {
 	uint32_t maxleafpage;		/* Leaf page max size */
 	uint32_t maxleafkey;		/* Leaf page max key size */
 	uint32_t maxleafvalue;		/* Leaf page max value size */
-	uint64_t maxmempage;		/* In memory page max size */
+	uint64_t maxmempage;		/* In-memory page max size */
+	uint64_t splitmempage;		/* In-memory split trigger size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */

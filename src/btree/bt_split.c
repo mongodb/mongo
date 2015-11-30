@@ -409,16 +409,7 @@ __split_ref_move_final(
 	WT_DECL_RET;
 	WT_PAGE *child;
 	WT_REF *ref, *child_ref;
-	uint64_t txn_new_id;
 	uint32_t i, j;
-
-	/*
-	 * When creating new internal pages as part of a split, we set a field
-	 * in those pages modify structure to prevent them from being evicted
-	 * until all threads are known to have exited the index of the page that
-	 * previously "owned" the WT_REF. Set that field to a safe value.
-	 */
-	txn_new_id = __wt_txn_id_alloc(session, false);
 
 	/*
 	 * The WT_REF structures moved to newly allocated child pages reference
@@ -472,14 +463,11 @@ __split_ref_move_final(
 			 * disk pages may have been read in since then, and
 			 * those pages would have correct parent references.
 			 */
-			if (child_ref->home != child) {
+			if (child_ref->home != child)
 				child_ref->home = child;
-				child->modify->mod_split_txn = txn_new_id;
-			}
 
 			/* Update the WT_REF's page-index hint. */
 			child_ref->pindex_hint = j++;
-
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);
 
@@ -1658,7 +1646,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 *
 	 * Note this page has already been through an in-memory split.
 	 */
-	WT_ASSERT(session, __wt_page_can_split(session, page));
+	WT_ASSERT(session, __wt_leaf_page_can_split(session, page));
 	WT_ASSERT(session, __wt_page_is_modified(page));
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
@@ -1839,13 +1827,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		for (ins = *insp; ins != NULL; ins = ins->next[i])
 			WT_ASSERT(session, ins != moved_ins);
 #endif
-
-	/*
-	 * Save the transaction ID when the split happened.  Application
-	 * threads will not try to forcibly evict the page again until
-	 * all concurrent transactions commit.
-	 */
-	page->modify->inmem_split_txn = __wt_txn_id_alloc(session, false);
 
 	/*
 	 * Update the page accounting.
