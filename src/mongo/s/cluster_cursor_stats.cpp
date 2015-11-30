@@ -48,6 +48,7 @@ public:
 
         openBob.append("multiTarget", static_cast<long long>(stats.cursorsSharded));
         openBob.append("singleTarget", static_cast<long long>(stats.cursorsNotSharded));
+        openBob.append("pinned", static_cast<long long>(stats.cursorsPinned));
         openBob.append("total",
                        static_cast<long long>(stats.cursorsSharded + stats.cursorsNotSharded));
         openBob.done();

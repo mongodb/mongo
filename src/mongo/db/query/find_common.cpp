@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+MONGO_FP_DECLARE(keepCursorPinnedDuringGetMore);
+
 bool FindCommon::enoughForFirstBatch(const LiteParsedQuery& pq,
                                      long long numDocs,
                                      int bytesBuffered) {

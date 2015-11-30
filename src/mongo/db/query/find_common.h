@@ -26,10 +26,16 @@
  *    it in the license file.
  */
 
+#include "mongo/util/fail_point_service.h"
+
 namespace mongo {
 
 class BSONObj;
 class LiteParsedQuery;
+
+// Enabling this fail point will cause the getMore command to busy wait after pinning the cursor,
+// until the fail point is disabled.
+MONGO_FP_FORWARD_DECLARE(keepCursorPinnedDuringGetMore);
 
 /**
  * Suite of find/getMore related functions used in both the mongod and mongos query paths.
