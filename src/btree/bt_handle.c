@@ -697,6 +697,13 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	}
 
 	/*
+	 * Try in-memory splits once we hit 80% of the maximum in-memory page
+	 * size.  This gives multi-threaded append workloads a better chance of
+	 * not stalling.
+	 */
+	btree->splitmempage = 8 * btree->maxmempage / 10;
+
+	/*
 	 * Get the split percentage (reconciliation splits pages into smaller
 	 * than the maximum page size chunks so we don't split every time a
 	 * new entry is added). Determine how large newly split pages will be.
