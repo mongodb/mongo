@@ -58,7 +58,7 @@ NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry(
       _namespacesRecordStore(namespacesRecordStore),
       _indexRecordStore(indexRecordStore),
       _db(db) {
-    setNamespacesRecordId(namespacesRecordId);
+    setNamespacesRecordId(nullptr, namespacesRecordId);
 }
 
 CollectionOptions NamespaceDetailsCollectionCatalogEntry::getCollectionOptions(
@@ -363,7 +363,7 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
     StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(
         txn, _namespacesRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);
     fassert(17486, result.getStatus());
-    _namespacesRecordId = result.getValue();
+    setNamespacesRecordId(txn, result.getValue());
 }
 
 void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) {
@@ -383,13 +383,20 @@ void NamespaceDetailsCollectionCatalogEntry::updateValidator(OperationContext* t
                                                 << validationAction)));
 }
 
-void NamespaceDetailsCollectionCatalogEntry::setNamespacesRecordId(RecordId newId) {
+void NamespaceDetailsCollectionCatalogEntry::setNamespacesRecordId(OperationContext* txn,
+                                                                   RecordId newId) {
     if (newId.isNull()) {
         invariant(ns().coll() == "system.namespaces" || ns().coll() == "system.indexes");
     } else {
-        // We don't need an OperationContext in MMAP, so 'nullptr' is OK.
-        auto namespaceEntry = _namespacesRecordStore->dataFor(nullptr, newId).releaseToBson();
+        // 'txn' is allowed to be null, but we don't need an OperationContext in MMAP, so that's OK.
+        auto namespaceEntry = _namespacesRecordStore->dataFor(txn, newId).releaseToBson();
         invariant(namespaceEntry["name"].String() == ns().ns());
+
+        // Register RecordId change for rollback if we're not initializing.
+        if (txn && !_namespacesRecordId.isNull()) {
+            auto oldNamespacesRecordId = _namespacesRecordId;
+            txn->recoveryUnit()->onRollback([=] { _namespacesRecordId = oldNamespacesRecordId; });
+        }
         _namespacesRecordId = newId;
     }
 }

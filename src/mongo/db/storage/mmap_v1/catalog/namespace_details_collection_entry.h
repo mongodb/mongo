@@ -106,7 +106,10 @@ public:
         return _namespacesRecordId;
     }
 
-    void setNamespacesRecordId(RecordId newId);
+    /**
+     * 'txn' is only allowed to be null when called from the constructor.
+     */
+    void setNamespacesRecordId(OperationContext* txn, RecordId newId);
 
 private:
     NamespaceDetails* _details;
