@@ -574,7 +574,7 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
         // because they don't have indexes on them anyway.
         if (entry) {
             if (entry->catalogEntry->getNamespacesRecordId().isNull()) {
-                entry->catalogEntry->setNamespacesRecordId(rid);
+                entry->catalogEntry->setNamespacesRecordId(txn, rid);
             } else {
                 invariant(entry->catalogEntry->getNamespacesRecordId() == rid);
             }

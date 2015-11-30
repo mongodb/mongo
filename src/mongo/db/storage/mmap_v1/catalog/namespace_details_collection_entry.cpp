@@ -39,6 +39,7 @@
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 
@@ -58,7 +59,7 @@ NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry(
       _namespacesRecordStore(namespacesRecordStore),
       _indexRecordStore(indexRecordStore),
       _db(db) {
-    setNamespacesRecordId(namespacesRecordId);
+    setNamespacesRecordId(nullptr, namespacesRecordId);
 }
 
 CollectionOptions NamespaceDetailsCollectionCatalogEntry::getCollectionOptions(
@@ -363,7 +364,7 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
     StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(
         txn, _namespacesRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);
     fassert(17486, result.getStatus());
-    _namespacesRecordId = result.getValue();
+    setNamespacesRecordId(txn, result.getValue());
 }
 
 void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) {
@@ -372,13 +373,37 @@ void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, 
     _updateSystemNamespaces(txn, BSON("$set" << BSON("options.flags" << newValue)));
 }
 
-void NamespaceDetailsCollectionCatalogEntry::setNamespacesRecordId(RecordId newId) {
+namespace {
+class NamespacesRecordIdChange : public RecoveryUnit::Change {
+public:
+    NamespacesRecordIdChange(RecordId* namespacesRecordId, const RecordId& newId)
+        : _namespacesRecordId(namespacesRecordId), _oldId(*namespacesRecordId) {}
+
+    void commit() override {}
+    void rollback() override {
+        *_namespacesRecordId = _oldId;
+    }
+
+private:
+    RecordId* _namespacesRecordId;
+    const RecordId _oldId;
+};
+}
+
+void NamespaceDetailsCollectionCatalogEntry::setNamespacesRecordId(OperationContext* txn,
+                                                                   RecordId newId) {
     if (newId.isNull()) {
         invariant(ns().coll() == "system.namespaces" || ns().coll() == "system.indexes");
     } else {
-        // We don't need an OperationContext in MMAP, so 'nullptr' is OK.
-        auto namespaceEntry = _namespacesRecordStore->dataFor(nullptr, newId).releaseToBson();
+        // 'txn' is allowed to be null, but we don't need an OperationContext in MMAP, so that's OK.
+        auto namespaceEntry = _namespacesRecordStore->dataFor(txn, newId).releaseToBson();
         invariant(namespaceEntry["name"].String() == ns().ns());
+
+        // Register RecordId change for rollback if we're not initializing.
+        if (txn && !_namespacesRecordId.isNull()) {
+            txn->recoveryUnit()->registerChange(
+                new NamespacesRecordIdChange(&_namespacesRecordId, newId));
+        }
         _namespacesRecordId = newId;
     }
 }
