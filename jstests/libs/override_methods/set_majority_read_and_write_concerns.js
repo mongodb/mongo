@@ -30,11 +30,24 @@
 
         // These commands directly support a writeConcern argument.
         var commandsToForceWriteConcern = [
+            "createRole",
+            "createUser",
             "delete",
+            "dropAllRolesFromDatabase",
+            "dropAllUsersFromDatabase",
+            "dropRole",
+            "dropUser",
             "findAndModify",
             "findandmodify",
+            "grantPrivilegesToRole",
+            "grantRolesToRole",
+            "grantRolesToUser",
             "insert",
+            "revokeRolesFromRole",
+            "revokeRolesFromUser",
             "update",
+            "updateRole",
+            "updateUser",
         ];
 
         // These commands do writes but do not support a writeConcern argument. Emulate it with a
