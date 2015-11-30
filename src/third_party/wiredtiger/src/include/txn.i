@@ -187,6 +187,13 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	    session->dhandle == session->meta_dhandle)
 		return (true);
 
+	/*
+	 * If we don't have a transactional snapshot, only make stable updates
+	 * visible.
+	 */
+	if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+		return (__wt_txn_visible_all(session, id));
+
 	/* Transactions see their own changes. */
 	if (id == txn->id)
 		return (true);

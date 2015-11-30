@@ -943,11 +943,11 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * reading thread will restart.  Include the ref we are splitting in
 	 * the count to be deleted.
 	 */
-	for (i = 0, deleted_entries = 1; i < parent_entries; ++i) {
+	for (deleted_entries = 1, i = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
 		if (next_ref->state == WT_REF_DELETED &&
-		    __wt_delete_page_skip(session, next_ref) &&
+		    __wt_delete_page_skip(session, next_ref, true) &&
 		    __wt_atomic_casv32(
 		    &next_ref->state, WT_REF_DELETED, WT_REF_SPLIT))
 			deleted_entries++;
@@ -958,6 +958,16 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * pages, less any WT_REFs we're removing.
 	 */
 	result_entries = (parent_entries + new_entries) - deleted_entries;
+
+	/*
+	 * If the entire (sub)tree is empty, give up: we can't leave an empty
+	 * internal page.  Mark it to be evicted soon and clean up any
+	 * references that have changed state.
+	 */
+	if (result_entries == 0) {
+		__wt_page_evict_soon(parent);
+		goto err;
+	}
 
 	/*
 	 * Allocate and initialize a new page index array for the parent, then
@@ -1003,6 +1013,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			*alloc_refp++ = next_ref;
 	}
 
+	/* Check that we filled in all the entries. */
+	WT_ASSERT(session, alloc_refp - alloc_index->index == result_entries);
+
 	/*
 	 * Update the parent page's index: this update makes the split visible
 	 * to threads descending the tree.
@@ -1038,9 +1051,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%s split into parent %" PRIu32 " -> %" PRIu32
-	    " (%" PRIu32 ")",
-	    __wt_page_type_string(ref->page->type), parent_entries,
-	    result_entries, result_entries - parent_entries));
+	    " (%" PRIu32 ")", ref->page == NULL ?
+	    "reverse" : __wt_page_type_string(ref->page->type),
+	    parent_entries, result_entries, result_entries - parent_entries));
 
 	/*
 	 * The new page index is in place, free the WT_REF we were splitting
@@ -1132,14 +1145,21 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	    __split_should_deepen(session, parent_ref))
 		ret = __split_deepen(session, parent);
 
-err:	if (!complete)
+err:	if (!complete) {
 		for (i = 0; i < parent_entries; ++i) {
 			next_ref = pindex->index[i];
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
 		}
 
-	__wt_free_ref_index(session, NULL, alloc_index, false);
+		/* If we gave up on a reverse split, unlock the child. */
+		if (ref_new == NULL) {
+			WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+			ref->state = WT_REF_DELETED;
+		}
+
+		__wt_free_ref_index(session, NULL, alloc_index, false);
+	}
 
 	/*
 	 * A note on error handling: if we completed the split, return success,
@@ -1435,6 +1455,24 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	WT_RET(__split_parent_lock(session, ref, &parent, &hazard));
 	ret = __split_insert(session, ref);
+	WT_TRET(__split_parent_unlock(session, parent, hazard));
+	return (ret);
+}
+
+/*
+ * __wt_split_reverse --
+ *	We have a locked ref that is empty and we want to rewrite the index in
+ *	its parent.
+ */
+int
+__wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_DECL_RET;
+	WT_PAGE *parent;
+	bool hazard;
+
+	WT_RET(__split_parent_lock(session, ref, &parent, &hazard));
+	ret = __split_parent(session, ref, NULL, 0, 0, 0);
 	WT_TRET(__split_parent_unlock(session, parent, hazard));
 	return (ret);
 }
