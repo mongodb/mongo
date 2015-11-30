@@ -230,6 +230,7 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
         }
 
         _runtime = JS_NewRuntime(kMaxBytesBeforeGC);
+        uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSRuntime", _runtime);
 
         // We turn on a variety of optimizations if the jit is enabled
         if (engine->isJITEnabled()) {
@@ -258,8 +259,6 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
             JS_SetNativeStackQuota(_runtime, available.get() - (64 * 1024));
         }
     }
-
-    uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSRuntime", _runtime);
 
     _context = JS_NewContext(_runtime, kStackChunkSize);
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSContext", _context);
