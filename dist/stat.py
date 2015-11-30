@@ -196,9 +196,11 @@ __wt_stat_''' + name + '''_aggregate(
             break;
     for l in sorted(list):
         if 'max_aggregate' in l.flags:
-            o = '\tif ((v = WT_STAT_READ(from, ' + l.name + ')) >\n' +\
-                '\t    to->' + l.name + ')\n' +\
-                '\t\tto->' + l.name + ' = v;\n'
+            o = '\tif ((v = WT_STAT_READ(from, ' + l.name + ')) > ' +\
+                'to->' + l.name + ')\n'
+            if len(o) > 72:             # Account for the leading tab.
+                o = o.replace(' > ', ' >\n\t    ')
+            o +='\t\tto->' + l.name + ' = v;\n'
         else:
             o = '\tto->' + l.name + ' += WT_STAT_READ(from, ' + l.name + ');\n'
             if len(o) > 72:             # Account for the leading tab.
