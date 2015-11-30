@@ -39,14 +39,9 @@ class test_bug010(wttest.WiredTigerTestCase):
     uri = 'table:' + name
     num_tables = 1000
 
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        # Disable checkpoint sync, to make checkpoints faster and
-        # increase the likelyhood of triggering the symptom
-        conn_params = ',create,checkpoint_sync=false'
-        conn = wiredtiger.wiredtiger_open(dir, conn_params)
-        return conn
+    # Disable checkpoint sync, to make checkpoints faster and
+    # increase the likelyhood of triggering the symptom
+    conn_config = 'checkpoint_sync=false'
 
     def test_checkpoint_dirty(self):
         # Create a lot of tables

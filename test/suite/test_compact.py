@@ -54,14 +54,9 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         ('utility', dict(utility=1,reopen=0)),
     ]
     scenarios = number_scenarios(multiply_scenarios('.', types, compact))
-
-    # Override WiredTigerTestCase, we want a large cache so that eviction
-    # doesn't happen (which could skew our compaction results).
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,cache_size=250MB,statistics=(all),' +
-            'error_prefix="%s: "' % self.shortid())
-        return conn
+    # We want a large cache so that eviction doesn't happen
+    # (which could skew our compaction results).
+    conn_config = 'cache_size=250MB,statistics=(all)'
 
     # Test compaction.
     def test_compact(self):

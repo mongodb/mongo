@@ -57,15 +57,10 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = check_scenarios([
         ('table', dict(uri='table:test',dsize=100,nops=2000,nthreads=1,time=30)),
     ])
-
     # Create a large cache, otherwise this test runs quite slowly.
-    def setUpConnectionOpen(self, dir):
-        wtopen_args = \
-            'create,cache_size=1G,log=(archive=false,enabled,file_max=%s)' % \
+    conn_config = lambda self, dir: \
+            'cache_size=1G,log=(archive=false,enabled,file_max=%s)' % \
             self.logmax
-        conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
-        self.pr(`conn`)
-        return conn
 
     def populate(self, uri, dsize, rows):
         self.pr('populate: ' + uri + ' with ' + str(rows) + ' rows')

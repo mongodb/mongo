@@ -72,7 +72,7 @@ class test_shared_cache01(wttest.WiredTigerTestCase):
         for name in connections:
             shutil.rmtree(name, True)
             os.mkdir(name)
-            next_conn =  wiredtiger.wiredtiger_open(
+            next_conn =  self.wiredtiger_open(
                 name,
                 'create,error_prefix="' + self.shortid() + ': "' +
                 pool_opts + extra_opts)

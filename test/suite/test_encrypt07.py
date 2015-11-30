@@ -50,7 +50,7 @@ class test_encrypt07(test_salvage.test_salvage):
         encarg = 'encryption=(name={0}{1}),'.format(
             self.sys_encrypt, self.sys_encrypt_args)
         extarg = self.extensionArg([('encryptors', self.sys_encrypt)])
-        conn = wiredtiger.wiredtiger_open(dir,
+        conn = self.wiredtiger_open(dir,
                'create,error_prefix="{0}: ",{1}{2}'.format(
                 self.shortid(), encarg, extarg))
         self.pr(`conn`)

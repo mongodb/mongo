@@ -46,13 +46,6 @@ class test_txn03(wttest.WiredTigerTestCase):
         ('var', dict(create_params = "key_format=S,value_format=S")),
     ])
 
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir, 'create,' +
-                ('error_prefix="%s: ",' % self.shortid()))
-        self.pr(`conn`)
-        return conn
-
     def test_ops(self):
         self.session.create(self.uri1, self.create_params)
         self.session.create(self.uri2, self.create_params)

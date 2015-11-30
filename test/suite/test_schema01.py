@@ -56,11 +56,6 @@ class test_schema01(wttest.WiredTigerTestCase):
         wttest.WiredTigerTestCase.__init__(self, *args, **kwargs)
         self.reconcile = False
 
-    def reopen(self):
-        self.conn.close()
-        self.conn = wiredtiger.wiredtiger_open('.', None)
-        self.session = self.conn.open_session()
-
     def create_table(self):
         self.pr('create table')
         self.session.create(self.tablename, 'key_format=5s,value_format=HQ,' +
@@ -89,7 +84,7 @@ class test_schema01(wttest.WiredTigerTestCase):
                 c.close()
 
             if reopen:
-                self.reopen()
+                self.reopen_conn()
 
             c = self.cursor()
             expectpos = 0

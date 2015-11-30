@@ -51,11 +51,7 @@ class test_stat01(wttest.WiredTigerTestCase):
     ]
     scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt))
 
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,statistics=(all),' + 'error_prefix="%s: "' % self.shortid())
-        return conn
+    conn_config = 'statistics=(all)'
 
     def statstr_to_int(self, str):
         """

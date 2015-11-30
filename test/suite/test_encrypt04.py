@@ -107,7 +107,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr('encarg = ' + encarg + ' extarg = ' + extarg)
         completed = False
         try:
-            conn = wiredtiger.wiredtiger_open(dir,
+            conn = self.wiredtiger_open(dir,
                 'create,error_prefix="{0}: ",{1}{2}'.format(
                  self.shortid(), encarg, extarg))
         except (BaseException) as err:

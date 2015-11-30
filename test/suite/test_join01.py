@@ -40,12 +40,8 @@ class test_join01(wttest.WiredTigerTestCase):
         ('table', dict(ref='table')),
         ('index', dict(ref='index'))
     ]
-
-    # Override WiredTigerTestCase, we have statistics tests.
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,statistics=(all),' + 'error_prefix="%s: "' % self.shortid())
-        return conn
+    # We need statistics for these tests.
+    conn_config = 'statistics=(all)'
 
     def gen_key(self, i):
         return [ i + 1 ]

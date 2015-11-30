@@ -32,7 +32,7 @@
 
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open, stat
+from wiredtiger import stat
 from wtscenario import multiply_scenarios, number_scenarios
 import wttest
 
@@ -41,24 +41,9 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_txn08'
     uri = 'table:' + tablename
 
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        # Cycle through the different transaction_sync values in a
-        # deterministic manner.
-        self.txn_sync = '(method=dsync,enabled)'
-        conn_params = \
-                'log=(archive=false,enabled,file_max=%s)' % self.logmax + \
-                ',create,error_prefix="%s: ",' % self.shortid() + \
-                'transaction_sync="%s",' % self.txn_sync
-        # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
-        try:
-            conn = wiredtiger_open(dir, conn_params)
-        except wiredtiger.WiredTigerError as e:
-            print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
-        self.pr(`conn`)
-        self.session2 = conn.open_session()
-        return conn
+    conn_config = lambda self, dir: \
+                'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+                'transaction_sync="(method=dsync,enabled)"'
 
     def test_printlog_unicode(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)

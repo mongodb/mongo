@@ -49,14 +49,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     ]
 
     scenarios = number_scenarios(uri)
-
-    # Override WiredTigerTestCase to enable statistics
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,' +
-            'statistics=(fast),' +
-            'error_prefix="%s: "' % self.shortid())
-        return conn
+    conn_config = 'statistics=(fast)'
 
     def openAndWalkStatCursor(self):
         c = self.session.open_cursor(

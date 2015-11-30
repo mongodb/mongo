@@ -40,15 +40,8 @@ class test_bug011(wttest.WiredTigerTestCase):
     ntables = 50
     nrows = 10000
     nops = 10000
-
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        conn_params = 'create,cache_size=10MB,' \
-                      'hazard_max=' + str(self.ntables / 2)
-        conn = wiredtiger.wiredtiger_open(dir, conn_params)
-        self.pr(`conn`)
-        return conn
+    conn_config = lambda self, dir: \
+                  'cache_size=10MB,hazard_max=' + str(self.ntables / 2)
 
     def test_eviction(self):
         cursors = []

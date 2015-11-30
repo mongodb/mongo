@@ -41,7 +41,7 @@ class test_config01(test_base03.test_base03):
         wtopen_args = 'create'
         if hasattr(self, 'cache_size'):
             wtopen_args += ',cache_size=' + str(self.cache_size)
-        conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
+        conn = self.wiredtiger_open(dir, wtopen_args)
         self.pr(`conn`)
         return conn
 

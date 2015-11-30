@@ -32,7 +32,7 @@
 
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open, stat
+from wiredtiger import stat
 from wtscenario import multiply_scenarios, number_scenarios
 import wttest
 
@@ -90,7 +90,7 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
                 'transaction_sync="%s",' % self.txn_sync
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
         try:
-            conn = wiredtiger_open(dir, conn_params)
+            conn = self.wiredtiger_open(dir, conn_params)
         except wiredtiger.WiredTigerError as e:
             print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
         self.pr(`conn`)
@@ -142,7 +142,7 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
         backup_conn_params = 'log=(enabled,file_max=%s,' % self.logmax + \
                 'compressor=%s)' % self.compress + \
                 self.extensionArg(self.compress)
-        backup_conn = wiredtiger_open(self.backup_dir, backup_conn_params)
+        backup_conn = self.wiredtiger_open(self.backup_dir, backup_conn_params)
         try:
             self.check(backup_conn.open_session(), None, committed)
         finally:

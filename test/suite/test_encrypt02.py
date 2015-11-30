@@ -81,7 +81,7 @@ class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
         extarg = self.extensionArg([('encryptors', self.encrypt)])
         connarg = 'create,error_prefix="{0}: ",{1},{2}'.format(
             self.shortid(), encarg, extarg)
-        conn = wiredtiger.wiredtiger_open(dir, connarg)
+        conn = self.wiredtiger_open(dir, connarg)
         self.pr(`conn`)
         return conn
 

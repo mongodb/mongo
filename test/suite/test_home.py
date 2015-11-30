@@ -70,8 +70,9 @@ class test_base_config(wttest.WiredTigerTestCase):
 
         # Open up another database, configure without base configuration.
         os.mkdir("A")
-        conn = wiredtiger.wiredtiger_open("A", "create,config_base=false")
+        conn = self.wiredtiger_open("A", "create,config_base=false")
         self.assertFalse(os.path.exists("A/WiredTiger.basecfg"))
+        conn.close()
 
 
 if __name__ == '__main__':

@@ -32,7 +32,7 @@
 
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open, stat, WiredTigerError
+from wiredtiger import stat, WiredTigerError
 from wtscenario import multiply_scenarios, number_scenarios, check_scenarios
 import wttest
 
@@ -54,6 +54,11 @@ class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
         ('none', dict(compress='none')),
     ])
     scenarios = number_scenarios(multiply_scenarios('.', reopens, compress))
+    conn_config = lambda self, dir: \
+                'log=(archive=false,enabled,file_max=%s,' % self.logmax + \
+                'compressor=%s),' % self.compress + \
+                'transaction_sync="(method=dsync,enabled)",' + \
+                self.extensionArg(self.compress)
 
     # Return the wiredtiger_open extension argument for a shared library.
     def extensionArg(self, name):
@@ -67,25 +72,6 @@ class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
         if not os.path.exists(extfile):
             self.skipTest('compression extension "' + extfile + '" not built')
         return ',extensions=["' + extfile + '"]'
-
-    # Overrides WiredTigerTestCase - add logging
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        self.txn_sync = '(method=dsync,enabled)'
-        conn_params = \
-                'log=(archive=false,enabled,file_max=%s,' % self.logmax + \
-                'compressor=%s)' % self.compress + \
-                ',create,error_prefix="%s: ",' % self.shortid() + \
-                'transaction_sync="%s",' % self.txn_sync + \
-                self.extensionArg(self.compress)
-        # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
-        try:
-            conn = wiredtiger_open(dir, conn_params)
-        except WiredTigerError as e:
-            print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
-        self.pr(`conn`)
-        self.session2 = conn.open_session()
-        return conn
 
     def test_log_cursor(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)

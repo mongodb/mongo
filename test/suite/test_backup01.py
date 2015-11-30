@@ -98,7 +98,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Check that a URI doesn't exist, both the meta-data and the file names.
     def confirmPathDoesNotExist(self, uri):
-        conn = wiredtiger.wiredtiger_open(self.dir)
+        conn = self.wiredtiger_open(self.dir)
         session = conn.open_session()
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: session.open_cursor(uri, None, None))

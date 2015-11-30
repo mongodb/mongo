@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from wiredtiger import wiredtiger_open, WiredTigerError
+from wiredtiger import WiredTigerError
 import sys, threading, wiredtiger, wttest
 
 class Callback(wiredtiger.AsyncCallback):
@@ -47,19 +47,9 @@ class test_async03(wttest.WiredTigerTestCase):
     """
     table_name1 = 'test_async03'
 
-    # Overrides WiredTigerTestCase so that we can configure
-    # async operations.
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        # Note: this usage is intentionally wrong,
-        # it is missing async=(enabled=true,...
-        conn_params = \
-                'create,error_prefix="%s: ",' % self.shortid() + \
-                'async=(ops_max=50,threads=3)'  # missing enabled=true !
-        sys.stdout.flush()
-        conn = wiredtiger_open(dir, conn_params)
-        self.pr(`conn`)
-        return conn
+    # Note: this usage is intentionally wrong, it is missing
+    #   async=(enabled=true,...
+    conn_config = 'async=(ops_max=50,threads=3)'
 
     def test_ops(self):
         tablearg = 'table:' + self.table_name1

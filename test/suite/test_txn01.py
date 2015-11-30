@@ -42,13 +42,6 @@ class test_txn01(wttest.WiredTigerTestCase):
         ('row-t', dict(uri='table:text_txn01',key_format='S',value_format='S')),
     ])
 
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir, 'create,' +
-                ('error_prefix="%s: ",' % self.shortid()))
-        self.pr(`conn`)
-        return conn
-
     # Return the number of records visible to the cursor.
     def cursor_count(self, cursor):
         count = 0
