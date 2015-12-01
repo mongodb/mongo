@@ -1467,8 +1467,6 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
-	WT_RET(ret);
-
 	return (ret);
 }
 
