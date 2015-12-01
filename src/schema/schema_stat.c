@@ -24,7 +24,7 @@ __wt_curstat_colgroup_init(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "statistics:%s", colgroup->source));
-	ret = __wt_curstat_init(session, buf->data, cfg, cst);
+	ret = __wt_curstat_init(session, buf->data, NULL, cfg, cst);
 
 err:	__wt_scr_free(session, &buf);
 	return (ret);
@@ -46,7 +46,7 @@ __wt_curstat_index_init(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "statistics:%s", idx->source));
-	ret = __wt_curstat_init(session, buf->data, cfg, cst);
+	ret = __wt_curstat_init(session, buf->data, NULL, cfg, cst);
 
 err:	__wt_scr_free(session, &buf);
 	return (ret);
@@ -159,7 +159,7 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_buf_fmt(
 		    session, buf, "statistics:%s", table->cgroups[i]->name));
 		WT_ERR(__wt_curstat_open(
-		    session, buf->data, cfg, &stat_cursor));
+		    session, buf->data, NULL, cfg, &stat_cursor));
 		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
 		if (i == 0)
 			*stats = *new;
@@ -174,7 +174,7 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_buf_fmt(
 		    session, buf, "statistics:%s", table->indices[i]->name));
 		WT_ERR(__wt_curstat_open(
-		    session, buf->data, cfg, &stat_cursor));
+		    session, buf->data, NULL, cfg, &stat_cursor));
 		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
 		__wt_stat_dsrc_aggregate_single(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));

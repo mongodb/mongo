@@ -72,6 +72,7 @@ src/cursor/cur_ds.c
 src/cursor/cur_dump.c
 src/cursor/cur_file.c
 src/cursor/cur_index.c
+src/cursor/cur_join.c
 src/cursor/cur_json.c
 src/cursor/cur_log.c
 src/cursor/cur_metadata.c

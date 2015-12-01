@@ -111,7 +111,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * other schema level operations will return EBUSY, even though
 		 * we're dropping the schema lock here.
 		 */
-		if (i % 1000 == 0) {
+		if (i % WT_THOUSAND == 0) {
 			WT_WITHOUT_LOCKS(session, ret =
 			    __wt_lsm_manager_clear_tree(session, lsm_tree));
 			WT_RET(ret);
@@ -752,7 +752,7 @@ __wt_lsm_tree_throttle(
 		WT_ASSERT(session,
 		    WT_TIMECMP(last_chunk->create_ts, ondisk->create_ts) >= 0);
 		timediff =
-		    WT_TIMEDIFF(last_chunk->create_ts, ondisk->create_ts);
+		    WT_TIMEDIFF_NS(last_chunk->create_ts, ondisk->create_ts);
 		lsm_tree->ckpt_throttle =
 		    (in_memory - 2) * timediff / (20 * record_count);
 
@@ -788,8 +788,8 @@ __wt_lsm_tree_throttle(
 	}
 
 	/* Put an upper bound of 1s on both throttle calculations. */
-	lsm_tree->ckpt_throttle = WT_MIN(1000000, lsm_tree->ckpt_throttle);
-	lsm_tree->merge_throttle = WT_MIN(1000000, lsm_tree->merge_throttle);
+	lsm_tree->ckpt_throttle = WT_MIN(WT_MILLION, lsm_tree->ckpt_throttle);
+	lsm_tree->merge_throttle = WT_MIN(WT_MILLION, lsm_tree->merge_throttle);
 
 	/*
 	 * Update our estimate of how long each in-memory chunk stays active.
@@ -803,15 +803,16 @@ __wt_lsm_tree_throttle(
 		WT_ASSERT(session, prev_chunk->generation == 0);
 		WT_ASSERT(session, WT_TIMECMP(
 		    last_chunk->create_ts, prev_chunk->create_ts) >= 0);
-		timediff =
-		    WT_TIMEDIFF(last_chunk->create_ts, prev_chunk->create_ts);
+		timediff = WT_TIMEDIFF_NS(
+		    last_chunk->create_ts, prev_chunk->create_ts);
 		WT_ASSERT(session,
 		    WT_TIMECMP(prev_chunk->create_ts, ondisk->create_ts) >= 0);
-		oldtime = WT_TIMEDIFF(prev_chunk->create_ts, ondisk->create_ts);
+		oldtime = WT_TIMEDIFF_NS(
+		    prev_chunk->create_ts, ondisk->create_ts);
 		if (timediff < 10 * oldtime)
 			lsm_tree->chunk_fill_ms =
 			    (3 * lsm_tree->chunk_fill_ms +
-			    timediff / 1000000) / 4;
+			    timediff / WT_MILLION) / 4;
 	}
 }
 
@@ -875,7 +876,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 */
 	if (last_chunk != NULL && last_chunk->switch_txn == WT_TXN_NONE &&
 	    !F_ISSET(last_chunk, WT_LSM_CHUNK_ONDISK))
-		last_chunk->switch_txn = __wt_txn_new_id(session);
+		last_chunk->switch_txn = __wt_txn_id_alloc(session, false);
 
 	/*
 	 * If a maximum number of chunks are configured, drop the any chunks
@@ -1286,7 +1287,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
 	if (lsm_tree->nchunks > 0 &&
 	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) != NULL) {
 		if (chunk->switch_txn == WT_TXN_NONE)
-			chunk->switch_txn = __wt_txn_new_id(session);
+			chunk->switch_txn = __wt_txn_id_alloc(session, false);
 		/*
 		 * If we have a chunk, we want to look for it to be on-disk.
 		 * So we need to add a reference to keep it available.

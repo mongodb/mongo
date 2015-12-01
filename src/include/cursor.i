@@ -41,11 +41,7 @@ __cursor_pos_clear(WT_CURSOR_BTREE *cbt)
 	cbt->cip_saved = NULL;
 	cbt->rip_saved = NULL;
 
-	/*
-	 * Don't clear the active flag, it's owned by the cursor enter/leave
-	 * functions.
-	 */
-	F_CLR(cbt, ~WT_CBT_ACTIVE);
+	F_CLR(cbt, WT_CBT_POSITION_MASK);
 }
 
 /*
@@ -93,7 +89,8 @@ __curfile_enter(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	WT_RET(__cursor_enter(session));
+	if (!F_ISSET(cbt, WT_CBT_NO_TXN))
+		WT_RET(__cursor_enter(session));
 	F_SET(cbt, WT_CBT_ACTIVE);
 	return (0);
 }
@@ -112,7 +109,8 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 
 	/* If the cursor was active, deactivate it. */
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
-		__cursor_leave(session);
+		if (!F_ISSET(cbt, WT_CBT_NO_TXN))
+			__cursor_leave(session);
 		F_CLR(cbt, WT_CBT_ACTIVE);
 	}
 
@@ -139,8 +137,72 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 }
 
 /*
+ * __wt_curindex_get_valuev --
+ *	Internal implementation of WT_CURSOR->get_value for index cursors
+ */
+static inline int
+__wt_curindex_get_valuev(WT_CURSOR *cursor, va_list ap)
+{
+	WT_CURSOR_INDEX *cindex;
+	WT_DECL_RET;
+	WT_ITEM *item;
+	WT_SESSION_IMPL *session;
+
+	cindex = (WT_CURSOR_INDEX *)cursor;
+	session = (WT_SESSION_IMPL *)cursor->session;
+	WT_CURSOR_NEEDVALUE(cursor);
+
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
+		ret = __wt_schema_project_merge(session,
+		    cindex->cg_cursors, cindex->value_plan,
+		    cursor->value_format, &cursor->value);
+		if (ret == 0) {
+			item = va_arg(ap, WT_ITEM *);
+			item->data = cursor->value.data;
+			item->size = cursor->value.size;
+		}
+	} else
+		ret = __wt_schema_project_out(session,
+		    cindex->cg_cursors, cindex->value_plan, ap);
+err:	return (ret);
+}
+
+/*
+ * __wt_curtable_get_valuev --
+ *	Internal implementation of WT_CURSOR->get_value for table cursors.
+ */
+static inline int
+__wt_curtable_get_valuev(WT_CURSOR *cursor, va_list ap)
+{
+	WT_CURSOR *primary;
+	WT_CURSOR_TABLE *ctable;
+	WT_DECL_RET;
+	WT_ITEM *item;
+	WT_SESSION_IMPL *session;
+
+	ctable = (WT_CURSOR_TABLE *)cursor;
+	session = (WT_SESSION_IMPL *)cursor->session;
+	primary = *ctable->cg_cursors;
+	WT_CURSOR_NEEDVALUE(primary);
+
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
+		ret = __wt_schema_project_merge(session,
+		    ctable->cg_cursors, ctable->plan,
+		    cursor->value_format, &cursor->value);
+		if (ret == 0) {
+			item = va_arg(ap, WT_ITEM *);
+			item->data = cursor->value.data;
+			item->size = cursor->value.size;
+		}
+	} else
+		ret = __wt_schema_project_out(session,
+		    ctable->cg_cursors, ctable->plan, ap);
+err:	return (ret);
+}
+
+/*
  * __wt_cursor_dhandle_incr_use --
- *	Increment the in-use counter in cursor's data source.
+ *	Increment the in-use counter in the cursor's data source.
  */
 static inline void
 __wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
@@ -157,7 +219,7 @@ __wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
 
 /*
  * __wt_cursor_dhandle_decr_use --
- *	Decrement the in-use counter in cursor's data source.
+ *	Decrement the in-use counter in the cursor's data source.
  */
 static inline void
 __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
@@ -198,7 +260,13 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
 		WT_RET(__curfile_enter(cbt));
-	__wt_txn_cursor_op(session);
+
+	/*
+	 * If this is an ordinary transactional cursor, make sure we are set up
+	 * to read.
+	 */
+	if (!F_ISSET(cbt, WT_CBT_NO_TXN))
+		__wt_txn_cursor_op(session);
 	return (0);
 }
 

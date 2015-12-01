@@ -77,12 +77,12 @@ __curstat_lsm_init(
 		 */
 		WT_ERR(__wt_buf_fmt(
 		    session, uribuf, "statistics:%s", chunk->uri));
-		ret = __wt_curstat_open(session, uribuf->data,
+		ret = __wt_curstat_open(session, uribuf->data, NULL,
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
 		    &stat_cursor);
 		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			ret = __wt_curstat_open(
-			    session, uribuf->data, cfg, &stat_cursor);
+			    session, uribuf->data, NULL, cfg, &stat_cursor);
 		WT_ERR(ret);
 
 		/*
@@ -107,7 +107,7 @@ __curstat_lsm_init(
 		WT_ERR(__wt_buf_fmt(
 		    session, uribuf, "statistics:%s", chunk->bloom_uri));
 		WT_ERR(__wt_curstat_open(
-		    session, uribuf->data, cfg, &stat_cursor));
+		    session, uribuf->data, NULL, cfg, &stat_cursor));
 
 		/*
 		 * The underlying statistics have now been initialized; fill in

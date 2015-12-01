@@ -198,19 +198,8 @@ struct __wt_ovfl_txnc {
  *	When a page is modified, there's additional information to maintain.
  */
 struct __wt_page_modify {
-	/*
-	 * Track the highest transaction ID at which the page was written to
-	 * disk.  This can be used to avoid trying to write the page multiple
-	 * times if a snapshot is keeping old versions pinned (e.g., in a
-	 * checkpoint).
-	 */
-	uint64_t disk_snap_min;
-
 	/* The first unwritten transaction ID (approximate). */
 	uint64_t first_dirty_txn;
-
-	/* In-memory split transaction ID. */
-	uint64_t inmem_split_txn;
 
 	/* Avoid checking for obsolete updates during checkpoints. */
 	uint64_t obsolete_check_txn;
@@ -221,10 +210,8 @@ struct __wt_page_modify {
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
 
-#ifdef HAVE_DIAGNOSTIC
 	/* Check that transaction time moves forward. */
 	uint64_t last_oldest_id;
-#endif
 
 	/* Dirty bytes added to the cache. */
 	size_t bytes_dirty;
@@ -313,17 +300,8 @@ struct __wt_page_modify {
 		 * so they can be discarded when no longer needed.
 		 */
 		WT_PAGE *root_split;	/* Linked list of root split pages */
-
-		/*
-		 * When we deepen the tree, newly created internal pages cannot
-		 * be evicted until all threads have exited the original page
-		 * index structure.  We set a transaction value during the split
-		 * that's checked during eviction.
-		 */
-		uint64_t split_txn;	/* Split eviction transaction value */
 	} intl;
 #define	mod_root_split		u2.intl.root_split
-#define	mod_split_txn		u2.intl.split_txn
 	struct {
 		/*
 		 * Appended items to column-stores: there is only a single one
@@ -437,24 +415,10 @@ struct __wt_page {
 				uint32_t deleted_entries;
 				WT_REF	**index;
 			} * volatile __index;	/* Collated children */
-
-			/*
-			 * When splitting to deepen the tree, track the number
-			 * of entries in the newly created parent, and how many
-			 * subsequent splits follow the initial set of entries.
-			 * If future splits into the page are generally after
-			 * the initial set of items, perform future deepening
-			 * splits in this page to optimize for an append-style
-			 * workload.
-			 */
-			uint32_t deepen_split_append;
-			uint32_t deepen_split_last;
 		} intl;
 #undef	pg_intl_recno
 #define	pg_intl_recno			u.intl.recno
 #define	pg_intl_parent_ref		u.intl.parent_ref
-#define	pg_intl_deepen_split_append	u.intl.deepen_split_append
-#define	pg_intl_deepen_split_last	u.intl.deepen_split_last
 
 	/*
 	 * Macros to copy/set the index because the name is obscured to ensure
@@ -581,7 +545,8 @@ struct __wt_page {
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 #define	WT_PAGE_OVERFLOW_KEYS	0x10	/* Page has overflow keys */
 #define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
-#define	WT_PAGE_UPDATE_IGNORE	0x40	/* Ignore updates on page discard */
+#define	WT_PAGE_SPLIT_BLOCK	0x40	/* Split blocking eviction and splits */
+#define	WT_PAGE_UPDATE_IGNORE	0x80	/* Ignore updates on page discard */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	uint8_t unused[2];		/* Unused padding */

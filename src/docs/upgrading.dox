@@ -1,6 +1,6 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_262 Upgrading to Version 2.6.2
+@section version_270 Upgrading to Version 2.7.0
 
 <dl>
 <dt>Change to config_base=false</dt>
@@ -11,6 +11,13 @@ was relying on this behavior, a connection will be opened with different
 settings after upgrading, which could lead to errors or unexpected behavior.
 </dd>
 
+<dt>Statistic change</dt>
+<dd>
+The statistic "pages split during eviction" was replaced. It has been
+replaced by a pair of statistics "internal pages split during eviction" and
+"leaf pages split during eviction".
+</dd>
+
 <dt>Change to WT_CURSOR::insert</dt>
 <dd>
 The WT_CURSOR::insert method in this release has slightly different semantics
@@ -19,7 +26,7 @@ WT_CURSOR::insert continued to reference application-memory specified to
 either WT_CURSOR::set_key or WT_CURSOR::set_value after a successful return,
 which could potentially lead to a core dump if the application freed that
 memory before a subsequent call to a WT_CURSOR:: method without an intermediate
-WT_CURSOR::set_key or WT_CURSOR::set_value call. In the 2.6.2 release,
+WT_CURSOR::set_key or WT_CURSOR::set_value call. In the 2.7.0 release,
 WT_CURSOR::insert behaves like the other cursor methods and does not reference
 application memory after a successful return. Applications depending on the
 previous semantic will require modifications to set the cursor's key and/or
