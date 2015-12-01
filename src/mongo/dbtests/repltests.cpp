@@ -72,8 +72,8 @@ protected:
 public:
     Base() : _client(&_txn) {
         ReplSettings replSettings;
-        replSettings.oplogSize = 10 * 1024 * 1024;
-        replSettings.master = true;
+        replSettings.setOplogSizeBytes(10 * 1024 * 1024);
+        replSettings.setMaster(true);
         setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
 
         setOplogCollectionName();
@@ -95,7 +95,7 @@ public:
             deleteAll(ns());
             deleteAll(cllNS());
             ReplSettings replSettings;
-            replSettings.oplogSize = 10 * 1024 * 1024;
+            replSettings.setOplogSizeBytes(10 * 1024 * 1024);
             setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
         } catch (...) {
             FAIL("Exception while cleaning up test");

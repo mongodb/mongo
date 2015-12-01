@@ -351,7 +351,8 @@ public:
             configObj = cmdObj["replSetInitiate"].Obj();
         }
 
-        std::string replSetString = ReplicationCoordinator::get(txn)->getSettings().replSet;
+        std::string replSetString =
+            ReplicationCoordinator::get(txn)->getSettings().getReplSetString();
         if (replSetString.empty()) {
             return appendCommandStatus(
                 result,

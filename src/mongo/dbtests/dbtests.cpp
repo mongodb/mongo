@@ -114,7 +114,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     mongo::dbtests::initWireSpec();
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     repl::ReplSettings replSettings;
-    replSettings.oplogSize = 10 * 1024 * 1024;
+    replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
     getGlobalAuthorizationManager()->setAuthEnabled(false);
     StartupTest::runTests();

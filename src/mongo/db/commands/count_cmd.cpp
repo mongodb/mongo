@@ -60,7 +60,7 @@ public:
     CmdCount() : Command("count") {}
     virtual bool slaveOk() const {
         // ok on --slave setups
-        return repl::getGlobalReplicationCoordinator()->getSettings().slave == repl::SimpleSlave;
+        return repl::getGlobalReplicationCoordinator()->getSettings().isSlave();
     }
     virtual bool slaveOverrideOk() const {
         return true;

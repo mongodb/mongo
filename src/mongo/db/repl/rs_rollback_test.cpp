@@ -63,8 +63,8 @@ const OplogInterfaceMock::Operations kEmptyMockOperations;
 
 ReplSettings createReplSettings() {
     ReplSettings settings;
-    settings.oplogSize = 5 * 1024 * 1024;
-    settings.replSet = "mySet/node1:12345";
+    settings.setOplogSizeBytes(5 * 1024 * 1024);
+    settings.setReplSetString("mySet/node1:12345");
     return settings;
 }
 

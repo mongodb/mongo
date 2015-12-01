@@ -93,7 +93,7 @@ void SyncTailTest::setUp() {
         serviceContext->initializeGlobalStorageEngine();
     }
     ReplSettings replSettings;
-    replSettings.oplogSize = 5 * 1024 * 1024;
+    replSettings.setOplogSizeBytes(5 * 1024 * 1024);
 
     setGlobalReplicationCoordinator(new ReplicationCoordinatorMock(replSettings));
 

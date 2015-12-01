@@ -682,7 +682,7 @@ TEST_F(ReplCoordTest, NodeReturnsImmediatelyWhenAwaitReplicationIsRanAgainstASta
 
 TEST_F(ReplCoordTest, NodeReturnsImmediatelyWhenAwaitReplicationIsRanAgainstAMasterSlaveNode) {
     ReplSettings settings;
-    settings.master = true;
+    settings.setMaster(true);
     init(settings);
     OperationContextNoop txn;
     OpTimeWithTermZero time(100, 1);
@@ -1729,7 +1729,7 @@ TEST_F(ReplCoordTest,
        NodeReturnsModeMasterSlaveInResponseToGetReplicationModeWhenRunningWithTheMasterFlag) {
     // modeMasterSlave if master set
     ReplSettings settings;
-    settings.master = true;
+    settings.setMaster(true);
     init(settings);
     ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, getReplCoord()->getReplicationMode());
 }
@@ -1738,7 +1738,7 @@ TEST_F(ReplCoordTest,
        NodeReturnsModeMasterSlaveInResponseToGetReplicationModeWhenRunningWithTheSlaveFlag) {
     // modeMasterSlave if the slave flag was set
     ReplSettings settings;
-    settings.slave = SimpleSlave;
+    settings.setSlave(true);
     init(settings);
     ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, getReplCoord()->getReplicationMode());
 }
@@ -1747,7 +1747,7 @@ TEST_F(ReplCoordTest,
        NodeReturnsModeReplSetInResponseToGetReplicationModeWhenRunningWithTheReplSetFlag) {
     // modeReplSet if the set name was supplied.
     ReplSettings settings;
-    settings.replSet = "mySet/node1:12345";
+    settings.setReplSetString("mySet/node1:12345");
     init(settings);
     ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
@@ -2054,7 +2054,7 @@ TEST_F(ReplCoordTest,
 
 TEST_F(ReplCoordTest, NodeDoesNotIncludeItselfWhenRunningGetHostsWrittenToInMasterSlave) {
     ReplSettings settings;
-    settings.master = true;
+    settings.setMaster(true);
     init(settings);
     HostAndPort clientHost("node2:12345");
     OperationContextNoop txn;
@@ -2757,7 +2757,7 @@ TEST_F(ReplCoordTest,
 
 TEST_F(ReplCoordTest, NodeReturnsNotAReplicaSetWhenWaitUntilOpTimeIsRunAgainstAStandaloneNode) {
     auto settings = ReplSettings();
-    settings.majorityReadConcernEnabled = true;
+    settings.setMajorityReadConcernEnabled(true);
     init(settings);
 
     OperationContextNoop txn;

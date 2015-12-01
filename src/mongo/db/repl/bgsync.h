@@ -78,7 +78,12 @@ public:
 class BackgroundSync : public BackgroundSyncInterface {
 public:
     // Allow index prefetching to be turned on/off
-    enum IndexPrefetchConfig { PREFETCH_NONE = 0, PREFETCH_ID_ONLY = 1, PREFETCH_ALL = 2 };
+    enum IndexPrefetchConfig {
+        UNINITIALIZED = 0,
+        PREFETCH_NONE = 1,
+        PREFETCH_ID_ONLY = 2,
+        PREFETCH_ALL = 3
+    };
 
     static BackgroundSync* get();
 

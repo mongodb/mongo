@@ -505,12 +505,12 @@ void createOplog(OperationContext* txn, const std::string& oplogCollectionName, 
     Collection* collection = ctx.db()->getCollection(oplogCollectionName);
 
     if (collection) {
-        if (replSettings.oplogSize != 0) {
+        if (replSettings.getOplogSizeBytes() != 0) {
             const CollectionOptions oplogOpts =
                 collection->getCatalogEntry()->getCollectionOptions(txn);
 
             int o = (int)(oplogOpts.cappedSize / (1024 * 1024));
-            int n = (int)(replSettings.oplogSize / (1024 * 1024));
+            int n = (int)(replSettings.getOplogSizeBytes() / (1024 * 1024));
             if (n != o) {
                 stringstream ss;
                 ss << "cmdline oplogsize (" << n << ") different than existing (" << o
@@ -527,8 +527,8 @@ void createOplog(OperationContext* txn, const std::string& oplogCollectionName, 
 
     /* create an oplog collection, if it doesn't yet exist. */
     long long sz = 0;
-    if (replSettings.oplogSize != 0) {
-        sz = replSettings.oplogSize;
+    if (replSettings.getOplogSizeBytes() != 0) {
+        sz = replSettings.getOplogSizeBytes();
     } else {
         /* not specified. pick a default size */
         sz = 50LL * 1024LL * 1024LL;
