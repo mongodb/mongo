@@ -328,7 +328,7 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
     // details.
     const bool shouldClearNonLocalTmpCollections =
         !(checkIfReplMissingFromCommandLine(txn) || replSettings.usingReplSets() ||
-          replSettings.slave == repl::SimpleSlave);
+          replSettings.isSlave());
 
     for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
         const string dbName = *i;
@@ -430,10 +430,10 @@ static void _initAndListen(int listenPort) {
         LogstreamBuilder l = log(LogComponent::kControl);
         l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
           << " dbpath=" << storageGlobalParams.dbpath;
-        if (replSettings.master)
-            l << " master=" << replSettings.master;
-        if (replSettings.slave)
-            l << " slave=" << (int)replSettings.slave;
+        if (replSettings.isMaster())
+            l << " master=" << replSettings.isMaster();
+        if (replSettings.isSlave())
+            l << " slave=" << (int)replSettings.isSlave();
 
         const bool is32bit = sizeof(int*) == 4;
         l << (is32bit ? " 32" : " 64") << "-bit host=" << getHostNameCached() << endl;
@@ -510,7 +510,7 @@ static void _initAndListen(int listenPort) {
             // enable majority read concern. We do not error if the they are implicitly enabled for
             // CSRS because a required step in the upgrade procedure can involve an mmapv1 node in
             // the CSRS in the REMOVED state. This is handled by the TopologyCoordinator.
-            invariant(replSettings.majorityReadConcernEnabled);
+            invariant(replSettings.isMajorityReadConcernEnabled());
             severe() << "Majority read concern requires a storage engine that supports"
                      << " snapshots, such as wiredTiger. " << storageGlobalParams.engine
                      << " does not support snapshots.";

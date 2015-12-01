@@ -1108,45 +1108,45 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
 
     repl::ReplSettings replSettings;
     if (params.count("master")) {
-        replSettings.master = params["master"].as<bool>();
+        replSettings.setMaster(params["master"].as<bool>());
     }
     if (params.count("slave") && params["slave"].as<bool>() == true) {
-        replSettings.slave = repl::SimpleSlave;
+        replSettings.setSlave(true);
     }
     if (params.count("slavedelay")) {
-        replSettings.slavedelay = params["slavedelay"].as<int>();
+        replSettings.setSlaveDelaySecs(params["slavedelay"].as<int>());
     }
     if (params.count("fastsync")) {
-        if (replSettings.slave != repl::SimpleSlave) {
+        if (!replSettings.isSlave()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "--fastsync must only be used with --slave");
         }
-        replSettings.fastsync = params["fastsync"].as<bool>();
+        replSettings.setFastSyncEnabled(params["fastsync"].as<bool>());
     }
     if (params.count("autoresync")) {
-        replSettings.autoresync = params["autoresync"].as<bool>();
+        replSettings.setAutoResyncEnabled(params["autoresync"].as<bool>());
     }
     if (params.count("source")) {
         /* specifies what the source in local.sources should be */
-        replSettings.source = params["source"].as<string>().c_str();
+        replSettings.setSource(params["source"].as<string>().c_str());
     }
     if (params.count("pretouch")) {
-        replSettings.pretouch = params["pretouch"].as<int>();
+        replSettings.setPretouch(params["pretouch"].as<int>());
     }
     if (params.count("replication.replSetName")) {
-        replSettings.replSet = params["replication.replSetName"].as<string>().c_str();
+        replSettings.setReplSetString(params["replication.replSetName"].as<string>().c_str());
     }
     if (params.count("replication.replSet")) {
         /* seed list of hosts for the repl set */
-        replSettings.replSet = params["replication.replSet"].as<string>().c_str();
+        replSettings.setReplSetString(params["replication.replSet"].as<string>().c_str());
     }
     if (params.count("replication.secondaryIndexPrefetch")) {
-        replSettings.rsIndexPrefetch =
-            params["replication.secondaryIndexPrefetch"].as<std::string>();
+        replSettings.setPrefetchIndexMode(
+            params["replication.secondaryIndexPrefetch"].as<std::string>());
     }
 
     if (params.count("replication.enableMajorityReadConcern")) {
-        replSettings.majorityReadConcernEnabled = true;
+        replSettings.setMajorityReadConcernEnabled(true);
     }
 
     if (params.count("storage.indexBuildRetry")) {
@@ -1154,7 +1154,7 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     }
 
     if (params.count("only")) {
-        replSettings.only = params["only"].as<string>().c_str();
+        replSettings.setOnly(params["only"].as<string>().c_str());
     }
     if (params.count("storage.mmapv1.nsSize")) {
         int x = params["storage.mmapv1.nsSize"].as<int>();
@@ -1178,8 +1178,8 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
                << "MB is too big for 32 bit version. Use 64 bit build instead.";
             return Status(ErrorCodes::BadValue, sb.str());
         }
-        replSettings.oplogSize = x * 1024 * 1024;
-        invariant(replSettings.oplogSize > 0);
+        replSettings.setOplogSizeBytes(x * 1024 * 1024);
+        invariant(replSettings.getOplogSizeBytes() > 0);
     }
     if (params.count("cacheSize")) {
         long x = params["cacheSize"].as<long>();
@@ -1210,7 +1210,7 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     if (params.count("sharding.clusterRole") &&
         params["sharding.clusterRole"].as<std::string>() == "configsvr") {
         serverGlobalParams.configsvr = true;
-        serverGlobalParams.configsvrMode = replSettings.replSet.empty()
+        serverGlobalParams.configsvrMode = replSettings.getReplSetString().empty()
             ? CatalogManager::ConfigServerMode::SCCC
             : CatalogManager::ConfigServerMode::CSRS;
         mmapv1GlobalOptions.smallfiles = true;  // config server implies small files
@@ -1225,9 +1225,10 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
             storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
         }
         if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::SCCC) {
-            replSettings.master = true;  // To force SCCC config servers to have an oplog for backup
+            // Set to true to force SCCC config servers to have an oplog for backup.
+            replSettings.setMaster(true);
             if (!params.count("replication.oplogSizeMB"))
-                replSettings.oplogSize = 5 * 1024 * 1024;
+                replSettings.setOplogSizeBytes(5 * 1024 * 1024);
         }
     }
 
@@ -1246,7 +1247,7 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     }
 
     if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::CSRS) {
-        replSettings.majorityReadConcernEnabled = true;
+        replSettings.setMajorityReadConcernEnabled(true);
     }
 
     if (params.count("sharding.archiveMovedChunks")) {
@@ -1279,8 +1280,8 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         storageGlobalParams.repairpath = storageGlobalParams.dbpath;
     }
 
-    if (replSettings.pretouch)
-        log() << "--pretouch " << replSettings.pretouch;
+    if (replSettings.getPretouch())
+        log() << "--pretouch " << replSettings.getPretouch();
 
     // Check if we are 32 bit and have not explicitly specified any journaling options
     if (sizeof(void*) == 4 && !params.count("storage.journal.enabled")) {

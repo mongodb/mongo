@@ -104,7 +104,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     _producerThread.reset(new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync)));
     _syncSourceFeedbackThread.reset(
         new stdx::thread(stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback)));
-    if (settings.majorityReadConcernEnabled || enableReplSnapshotThread) {
+    if (settings.isMajorityReadConcernEnabled() || enableReplSnapshotThread) {
         _snapshotThread = SnapshotThread::start(getGlobalServiceContext());
     }
     _startedThreads = true;

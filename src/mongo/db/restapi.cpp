@@ -289,14 +289,14 @@ public:
         if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
             repl::ReplicationCoordinator::modeReplSet) {
             ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>"
-               << replSettings.replSet;
+               << replSettings.getReplSetString();
         }
         // TODO(dannenberg) replAllDead is bad and should be removed when masterslave is removed
         if (repl::replAllDead)
             ss << "\n<b>replication replAllDead=" << repl::replAllDead << "</b>\n";
         else {
-            ss << "\nmaster: " << replSettings.master << '\n';
-            ss << "slave:  " << replSettings.slave << '\n';
+            ss << "\nmaster: " << replSettings.isMaster() << '\n';
+            ss << "slave:  " << replSettings.isSlave() << '\n';
             ss << '\n';
         }
 

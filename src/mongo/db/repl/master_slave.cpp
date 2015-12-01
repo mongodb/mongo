@@ -263,7 +263,7 @@ void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
     v.clear();
 
     const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
-    if (!replSettings.source.empty()) {
+    if (!replSettings.getSource().empty()) {
         // --source <host> specified.
         // check that no items are in sources other than that
         // add if missing
@@ -275,8 +275,8 @@ void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
             n++;
             ReplSource tmp(txn, obj);
-            if (tmp.hostName != replSettings.source) {
-                log() << "--source " << replSettings.source << " != " << tmp.hostName
+            if (tmp.hostName != replSettings.getSource()) {
+                log() << "--source " << replSettings.getSource() << " != " << tmp.hostName
                       << " from local.sources collection" << endl;
                 log() << "for instructions on changing this slave's source, see:" << endl;
                 log() << "http://dochub.mongodb.org/core/masterslave" << endl;
@@ -284,8 +284,8 @@ void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
                 sleepsecs(30);
                 dbexit(EXIT_REPLICATION_ERROR);
             }
-            if (tmp.only != replSettings.only) {
-                log() << "--only " << replSettings.only << " != " << tmp.only
+            if (tmp.only != replSettings.getOnly()) {
+                log() << "--only " << replSettings.getOnly() << " != " << tmp.only
                       << " from local.sources collection" << endl;
                 log() << "terminating after 30 seconds" << endl;
                 sleepsecs(30);
@@ -297,13 +297,13 @@ void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
         if (n == 0) {
             // source missing.  add.
             ReplSource s(txn);
-            s.hostName = replSettings.source;
-            s.only = replSettings.only;
+            s.hostName = replSettings.getSource();
+            s.only = replSettings.getOnly();
             s.save(txn);
         }
     } else {
         try {
-            massert(10384, "--only requires use of --source", replSettings.only.empty());
+            massert(10384, "--only requires use of --source", replSettings.getOnly().empty());
         } catch (...) {
             dbexit(EXIT_BADOPTIONS);
         }
@@ -696,8 +696,9 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
     CurOp individualOp(txn);
     txn->setReplicatedWrites(false);
     const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
-    if (replSettings.pretouch && !alreadyLocked /*doesn't make sense if in write lock already*/) {
-        if (replSettings.pretouch > 1) {
+    if (replSettings.getPretouch() &&
+        !alreadyLocked /*doesn't make sense if in write lock already*/) {
+        if (replSettings.getPretouch() > 1) {
             /* note: this is bad - should be put in ReplSource.  but this is first test... */
             static int countdown;
             verify(countdown >= 0);
@@ -706,12 +707,12 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
             } else {
                 const int m = 4;
                 if (tp.get() == 0) {
-                    int nthr = min(8, replSettings.pretouch);
+                    int nthr = min(8, replSettings.getPretouch());
                     nthr = max(nthr, 1);
                     tp.reset(new OldThreadPool(nthr));
                 }
                 vector<BSONObj> v;
-                oplogReader.peek(v, replSettings.pretouch);
+                oplogReader.peek(v, replSettings.getPretouch());
                 unsigned a = 0;
                 while (1) {
                     if (a >= v.size())
@@ -823,11 +824,11 @@ public:
         }
 
         const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
-        if (replSettings.slavedelay != 0 && potentialNewValue > 1) {
+        if (replSettings.getSlaveDelaySecs() != Seconds(0) && potentialNewValue > 1) {
             return Status(ErrorCodes::BadValue, "can't use a batch size > 1 with slavedelay");
         }
 
-        if (!replSettings.slave) {
+        if (!replSettings.isSlave()) {
             return Status(ErrorCodes::BadValue,
                           "can't set replApplyBatchSize on a non-slave machine");
         }
@@ -1049,11 +1050,13 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
                         false);
                 }
                 const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
-                if (replSettings.slavedelay &&
-                    (unsigned(time(0)) < nextOpTime.getSecs() + replSettings.slavedelay)) {
+                if (replSettings.getSlaveDelaySecs() != Seconds(0) &&
+                    (Seconds(time(0)) <
+                     Seconds(nextOpTime.getSecs()) + replSettings.getSlaveDelaySecs())) {
                     verify(justOne);
                     oplogReader.putBack(op);
-                    _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
+                    _sleepAdviceTime = nextOpTime.getSecs() +
+                        durationCount<Seconds>(replSettings.getSlaveDelaySecs()) + 1;
                     ScopedTransaction transaction(txn, MODE_X);
                     Lock::GlobalWrite lk(txn->lockState());
                     if (n > 0) {
@@ -1204,7 +1207,7 @@ static void replMain(OperationContext* txn) {
             Lock::GlobalWrite lk(txn->lockState());
             if (replAllDead) {
                 // throttledForceResyncDead can throw
-                if (!getGlobalReplicationCoordinator()->getSettings().autoresync ||
+                if (!getGlobalReplicationCoordinator()->getSettings().isAutoResyncEnabled() ||
                     !ReplSource::throttledForceResyncDead(txn, "auto")) {
                     log() << "all sources dead: " << replAllDead << ", sleeping for 5 seconds"
                           << endl;
@@ -1318,7 +1321,7 @@ static void replSlaveThread() {
 
 void startMasterSlave(OperationContext* txn) {
     const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
-    if (!replSettings.slave && !replSettings.master)
+    if (!replSettings.isSlave() && !replSettings.isMaster())
         return;
 
     AuthorizationSession::get(txn->getClient())->grantInternalAuthorization();
@@ -1327,21 +1330,20 @@ void startMasterSlave(OperationContext* txn) {
         ReplSource temp(txn);  // Ensures local.me is populated
     }
 
-    if (replSettings.slave) {
-        verify(replSettings.slave == SimpleSlave);
+    if (replSettings.isSlave()) {
         LOG(1) << "slave=true" << endl;
         stdx::thread repl_thread(replSlaveThread);
         repl_thread.detach();
     }
 
-    if (replSettings.master) {
+    if (replSettings.isMaster()) {
         LOG(1) << "master=true" << endl;
         createOplog(txn);
         stdx::thread t(replMasterThread);
         t.detach();
     }
 
-    if (replSettings.fastsync) {
+    if (replSettings.isFastSyncEnabled()) {
         while (!_replMainStarted)  // don't allow writes until we've set up from log
             sleepmillis(50);
     }

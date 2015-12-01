@@ -67,22 +67,10 @@ void runSyncThread() {
     AuthorizationSession::get(cc())->grantInternalAuthorization();
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
-    // Set initial indexPrefetch setting
-    const std::string& prefetch = replCoord->getSettings().rsIndexPrefetch;
-    if (!prefetch.empty()) {
-        BackgroundSync::IndexPrefetchConfig prefetchConfig = BackgroundSync::PREFETCH_ALL;
-        if (prefetch == "none")
-            prefetchConfig = BackgroundSync::PREFETCH_NONE;
-        else if (prefetch == "_id_only")
-            prefetchConfig = BackgroundSync::PREFETCH_ID_ONLY;
-        else if (prefetch == "all")
-            prefetchConfig = BackgroundSync::PREFETCH_ALL;
-        else {
-            warning() << "unrecognized indexPrefetch setting " << prefetch << ", defaulting "
-                      << "to \"all\"";
-        }
-        BackgroundSync::get()->setIndexPrefetchConfig(prefetchConfig);
-    }
+    // Overwrite prefetch index mode in BackgroundSync if ReplSettings has a mode set.
+    ReplSettings replSettings = replCoord->getSettings();
+    if (replSettings.isPrefetchIndexModeSet())
+        BackgroundSync::get()->setIndexPrefetchConfig(replSettings.getPrefetchIndexMode());
 
     while (!inShutdown()) {
         // After a reconfig, we may not be in the replica set anymore, so

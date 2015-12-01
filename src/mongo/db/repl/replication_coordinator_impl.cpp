@@ -150,7 +150,7 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
     if (settings.usingReplSets()) {
         return ReplicationCoordinator::modeReplSet;
     }
-    if (settings.master || settings.slave) {
+    if (settings.isMaster() || settings.isSlave()) {
         return ReplicationCoordinator::modeMasterSlave;
     }
     return ReplicationCoordinator::modeNone;
@@ -200,7 +200,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _rsConfigState(kConfigPreStart),
       _selfIndex(-1),
       _sleptLastElection(false),
-      _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.slave)),
+      _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.isSlave())),
       _canServeNonLocalReads(0U),
       _dr(createDataReplicatorOptions(this), &_replExecutor) {
     if (!isReplEnabled()) {
@@ -437,7 +437,7 @@ void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
 
     if (!_settings.usingReplSets()) {
         // Must be Master/Slave
-        invariant(_settings.master || _settings.slave);
+        invariant(_settings.isMaster() || _settings.isSlave());
         _externalState->startMasterSlave(txn);
         return;
     }
@@ -900,7 +900,7 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
     const bool isMajorityReadConcern =
         settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
 
-    if (isMajorityReadConcern && !getSettings().majorityReadConcernEnabled) {
+    if (isMajorityReadConcern && !getSettings().isMajorityReadConcernEnabled()) {
         // This is an opt-in feature. Fail if the user didn't opt-in.
         return ReadConcernResponse(
             Status(ErrorCodes::ReadConcernMajorityNotEnabled,
@@ -1484,7 +1484,7 @@ bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
         return false;
     }
 
-    if (!_settings.slave)
+    if (!_settings.isSlave())
         return true;
 
 
@@ -1493,7 +1493,7 @@ bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
         return false;
     }
 
-    if (_settings.master) {
+    if (_settings.isMaster()) {
         // if running with --master --slave, allow.
         return true;
     }
@@ -1515,7 +1515,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(StringData dbName) {
     if (dbName == "local") {
         return true;
     }
-    return !replAllDead && _settings.master;
+    return !replAllDead && _settings.isMaster();
 }
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(const NamespaceString& ns) {
@@ -1539,7 +1539,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
     if (canAcceptWritesFor(ns)) {
         return Status::OK();
     }
-    if (_settings.slave || _settings.master) {
+    if (_settings.isSlave() || _settings.isMaster()) {
         return Status::OK();
     }
     if (slaveOk) {

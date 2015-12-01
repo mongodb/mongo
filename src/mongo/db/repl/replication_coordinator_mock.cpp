@@ -61,14 +61,14 @@ const ReplSettings& ReplicationCoordinatorMock::getSettings() const {
 }
 
 bool ReplicationCoordinatorMock::isReplEnabled() const {
-    return _settings.usingReplSets() || _settings.master || _settings.slave;
+    return _settings.usingReplSets() || _settings.isMaster() || _settings.isSlave();
 }
 
 ReplicationCoordinator::Mode ReplicationCoordinatorMock::getReplicationMode() const {
     if (_settings.usingReplSets()) {
         return modeReplSet;
     }
-    if (_settings.master || _settings.slave) {
+    if (_settings.isMaster() || _settings.isSlave()) {
         return modeMasterSlave;
     }
     return modeNone;

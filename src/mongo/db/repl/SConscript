@@ -31,12 +31,16 @@ env.Library(
     ],
 )
 
-env.Library('repl_settings',
-            'repl_settings_init.cpp',
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/db/server_parameters'
-            ])
+env.Library(
+    target='repl_settings',
+    source=[
+        'repl_settings.cpp',
+        'repl_settings_init.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_parameters'
+    ])
 
 env.Library('rslog',
             'rslog.cpp',
@@ -302,6 +306,7 @@ env.Library('repl_coordinator_impl',
                      'data_replicator',
                      'repl_coordinator_global',
                      'repl_coordinator_interface',
+                     'repl_settings',
                      'replica_set_messages',
                      'replication_executor',
                      'reporter',
@@ -420,6 +425,7 @@ env.Library('replmocks',
                 '$BUILD_DIR/mongo/db/concurrency/lock_manager',
                 '$BUILD_DIR/mongo/executor/network_interface_mock',
                 'repl_coordinator_interface',
+                'repl_settings',
                 'replica_set_messages',
                 'replication_executor',
                 'storage_interface',
