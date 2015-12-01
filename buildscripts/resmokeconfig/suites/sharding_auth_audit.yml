@@ -20,6 +20,9 @@ selector:
     - jstests/sharding/copydb_from_mongos.js  # SERVER-13080
     - jstests/sharding/parallel.js
     - jstests/sharding/sync_cluster_config/sync[36].js
+    # Skip the testcases that do not have auth bypass when running ops in parallel.
+    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js         # SERVER-21713
+    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js  # SERVER-21713
 
 executor:
   js_test:
