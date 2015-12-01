@@ -340,8 +340,18 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 			return (ret);
 		}
 		addr->size = (uint8_t)unpack.size;
-		addr->type =
-		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
+		switch (unpack.raw) {
+		case WT_CELL_ADDR_INT:
+			addr->type = WT_ADDR_INT;
+			break;
+		case WT_CELL_ADDR_LEAF:
+			addr->type = WT_ADDR_LEAF;
+			break;
+		case WT_CELL_ADDR_LEAF_NO:
+			addr->type = WT_ADDR_LEAF_NO;
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
 		ref->addr = addr;
 	}
 
@@ -399,16 +409,7 @@ __split_ref_move_final(
 	WT_DECL_RET;
 	WT_PAGE *child;
 	WT_REF *ref, *child_ref;
-	uint64_t txn_new_id;
 	uint32_t i;
-
-	/*
-	 * When creating new internal pages as part of a split, we set a field
-	 * in those pages modify structure to prevent them from being evicted
-	 * until all threads are known to have exited the index of the page that
-	 * previously "owned" the WT_REF. Set that field to a safe value.
-	 */
-	txn_new_id = __wt_txn_id_alloc(session, false);
 
 	/*
 	 * The WT_REF structures moved to newly allocated child pages reference
@@ -461,8 +462,6 @@ __split_ref_move_final(
 			if (child_ref->home != child) {
 				child_ref->home = child;
 				child_ref->pindex_hint = 0;
-
-				child->modify->mod_split_txn = txn_new_id;
 			}
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);
@@ -896,6 +895,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		 */
 		WT_ASSERT(session, next_ref->page_del == NULL);
 
+		__wt_ref_free_addr(session, next_ref);
 		WT_TRET(__split_safe_free(
 		    session, split_gen, exclusive, next_ref, sizeof(WT_REF)));
 		parent_decr += sizeof(WT_REF);
@@ -1183,8 +1183,8 @@ err:	/*
  *	Lock an internal page.
  */
 static int
-__split_internal_lock(
-    WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE **parentp, bool *hazardp)
+__split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
+    WT_PAGE **parentp, bool *hazardp)
 {
 	WT_DECL_RET;
 	WT_PAGE *parent;
@@ -1202,7 +1202,7 @@ __split_internal_lock(
 	 * loop until the exclusive lock is resolved). If we want to split
 	 * the parent, give up to avoid that deadlock.
 	 */
-	if (S2BT(session)->checkpointing != WT_CKPT_OFF)
+	if (!trylock && S2BT(session)->checkpointing != WT_CKPT_OFF)
 		return (EBUSY);
 
 	/*
@@ -1227,7 +1227,10 @@ __split_internal_lock(
 		if (F_ISSET_ATOMIC(parent, WT_PAGE_SPLIT_BLOCK))
 			return (EBUSY);
 
-		WT_RET(__wt_fair_lock(session, &parent->page_lock));
+		if (trylock)
+			WT_RET(__wt_fair_trylock(session, &parent->page_lock));
+		else
+			WT_RET(__wt_fair_lock(session, &parent->page_lock));
 		if (parent == ref->home)
 			break;
 		WT_RET(__wt_fair_unlock(session, &parent->page_lock));
@@ -1371,7 +1374,7 @@ __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 		 * locks, lock-coupling up the tree.
 		 */
 		WT_ERR(__split_internal_lock(
-		    session, ref, &parent, &parent_hazard));
+		    session, ref, true, &parent, &parent_hazard));
 		ret = __split_internal(session, parent, page);
 		WT_TRET(__split_internal_unlock(session, page, page_hazard));
 
@@ -1635,7 +1638,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 *
 	 * Note this page has already been through an in-memory split.
 	 */
-	WT_ASSERT(session, __wt_page_can_split(session, page));
+	WT_ASSERT(session, __wt_leaf_page_can_split(session, page));
 	WT_ASSERT(session, __wt_page_is_modified(page));
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
@@ -1667,6 +1670,12 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	child->pindex_hint = ref->pindex_hint;
 	child->state = WT_REF_MEM;
 	child->addr = ref->addr;
+
+	/*
+	 * The address has moved to the replacement WT_REF.  Make sure it isn't
+	 * freed when the original ref is discarded.
+	 */
+	ref->addr = NULL;
 
 	/*
 	 * Copy the first key from the original page into first ref in the new
@@ -1818,13 +1827,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 #endif
 
 	/*
-	 * Save the transaction ID when the split happened.  Application
-	 * threads will not try to forcibly evict the page again until
-	 * all concurrent transactions commit.
-	 */
-	page->modify->inmem_split_txn = __wt_txn_id_alloc(session, false);
-
-	/*
 	 * Update the page accounting.
 	 *
 	 * XXX
@@ -1864,6 +1866,11 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	return (0);
 
 err:	if (split_ref[0] != NULL) {
+		/*
+		 * The address was moved to the replacement WT_REF, restore it.
+		 */
+		ref->addr = split_ref[0]->addr;
+
 		__wt_free(session, split_ref[0]->key.ikey);
 		__wt_free(session, split_ref[0]);
 	}
@@ -1891,7 +1898,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_SPLIT, "%p: split-insert", ref->page));
 
-	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
+	WT_RET(__split_internal_lock(session, ref, true, &parent, &hazard));
 	if ((ret = __split_insert(session, ref)) != 0) {
 		WT_TRET(__split_internal_unlock(session, parent, hazard));
 		return (ret);
@@ -1983,7 +1990,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_SPLIT, "%p: split-multi", ref->page));
 
-	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
+	WT_RET(__split_internal_lock(session, ref, false, &parent, &hazard));
 	if ((ret = __split_multi(session, ref, closing)) != 0 || closing) {
 		WT_TRET(__split_internal_unlock(session, parent, hazard));
 		return (ret);
@@ -2012,7 +2019,7 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_SPLIT, "%p: reverse-split", ref->page));
 
-	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
+	WT_RET(__split_internal_lock(session, ref, false, &parent, &hazard));
 	ret = __split_parent(session, ref, NULL, 0, 0, false, true);
 	WT_TRET(__split_internal_unlock(session, parent, hazard));
 	return (ret);

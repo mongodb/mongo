@@ -351,6 +351,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
+	uint64_t oldest_id;
 
 	page = ref->page;
 	mod = page->modify;
@@ -361,21 +362,14 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	/* We shouldn't get called with a clean page, that's an error. */
 	WT_ASSERT(session, __wt_page_is_modified(page));
 
-#ifdef HAVE_DIAGNOSTIC
-	{
 	/*
 	 * Check that transaction time always moves forward for a given page.
 	 * If this check fails, reconciliation can free something that a future
 	 * reconciliation will need.
 	 */
-	uint64_t oldest_id = __wt_txn_oldest_id(session);
+	oldest_id = __wt_txn_oldest_id(session);
 	WT_ASSERT(session, WT_TXNID_LE(mod->last_oldest_id, oldest_id));
 	mod->last_oldest_id = oldest_id;
-	}
-#endif
-
-	/* Record the most recent transaction ID we will *not* write. */
-	mod->disk_snap_min = session->txn.snap_min;
 
 	/* Initialize the reconciliation structure for each new run. */
 	WT_RET(__rec_write_init(
@@ -1401,12 +1395,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	    __wt_txn_visible_all(session, page_del->txnid))) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		WT_RET(__rec_block_free(session, addr, addr_size));
-
-		if (__wt_off_page(ref->home, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
-		ref->addr = NULL;
+		__wt_ref_free_addr(session, ref);
 	}
 
 	/*
@@ -5440,12 +5429,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			WT_RET(__wt_ref_info(
 			    session, ref, &addr, &addr_size, NULL));
 			WT_RET(__rec_block_free(session, addr, addr_size));
-			if (__wt_off_page(ref->home, ref->addr)) {
-				__wt_free(
-				    session, ((WT_ADDR *)ref->addr)->addr);
-				__wt_free(session, ref->addr);
-			}
-			ref->addr = NULL;
+			__wt_ref_free_addr(session, ref);
 		}
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */

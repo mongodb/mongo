@@ -198,19 +198,8 @@ struct __wt_ovfl_txnc {
  *	When a page is modified, there's additional information to maintain.
  */
 struct __wt_page_modify {
-	/*
-	 * Track the highest transaction ID at which the page was written to
-	 * disk.  This can be used to avoid trying to write the page multiple
-	 * times if a snapshot is keeping old versions pinned (e.g., in a
-	 * checkpoint).
-	 */
-	uint64_t disk_snap_min;
-
 	/* The first unwritten transaction ID (approximate). */
 	uint64_t first_dirty_txn;
-
-	/* In-memory split transaction ID. */
-	uint64_t inmem_split_txn;
 
 	/* Avoid checking for obsolete updates during checkpoints. */
 	uint64_t obsolete_check_txn;
@@ -221,10 +210,8 @@ struct __wt_page_modify {
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
 
-#ifdef HAVE_DIAGNOSTIC
 	/* Check that transaction time moves forward. */
 	uint64_t last_oldest_id;
-#endif
 
 	/* Dirty bytes added to the cache. */
 	size_t bytes_dirty;
@@ -313,17 +300,8 @@ struct __wt_page_modify {
 		 * so they can be discarded when no longer needed.
 		 */
 		WT_PAGE *root_split;	/* Linked list of root split pages */
-
-		/*
-		 * When we deepen the tree, newly created internal pages cannot
-		 * be evicted until all threads have exited the original page
-		 * index structure.  We set a transaction value during the split
-		 * that's checked during eviction.
-		 */
-		uint64_t split_txn;	/* Split eviction transaction value */
 	} intl;
 #define	mod_root_split		u2.intl.root_split
-#define	mod_split_txn		u2.intl.split_txn
 	struct {
 		/*
 		 * Appended items to column-stores: there is only a single one

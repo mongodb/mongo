@@ -379,7 +379,7 @@ __curfile_close(WT_CURSOR *cursor)
 	 * updated correctly.
 	 */
 	if (session->dhandle != NULL) {
-		/* Increment the data-source's in-use counter. */
+		/* Decrement the data-source's in-use counter. */
 		__wt_cursor_dhandle_decr_use(session);
 		WT_TRET(__wt_session_release_btree(session));
 	}
@@ -438,6 +438,9 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
 	cbt->btree = btree;
+
+	if (session->dhandle->checkpoint != NULL)
+		F_SET(cbt, WT_CBT_NO_TXN);
 
 	if (bulk) {
 		F_SET(cursor, WT_CURSTD_BULK);

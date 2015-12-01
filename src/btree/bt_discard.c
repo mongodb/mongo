@@ -50,8 +50,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	page = *pagep;
 	*pagep = NULL;
 
-	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD) &&
-	    __wt_page_is_modified(page))
+	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 		__wt_page_modify_clear(session, page);
 
 	/*
@@ -270,11 +269,7 @@ __wt_free_ref(
 	 * Free any address allocation; if there's no linked WT_REF page, it
 	 * must be allocated.
 	 */
-	if (ref->addr != NULL &&
-	    (ref->home == NULL || __wt_off_page(ref->home, ref->addr))) {
-		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-		__wt_free(session, ref->addr);
-	}
+	__wt_ref_free_addr(session, ref);
 
 	/* Free any page-deleted information. */
 	if (ref->page_del != NULL) {
