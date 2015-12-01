@@ -1672,6 +1672,12 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	child->addr = ref->addr;
 
 	/*
+	 * The address has moved to the replacement WT_REF.  Make sure it isn't
+	 * freed when the original ref is discarded.
+	 */
+	ref->addr = NULL;
+
+	/*
 	 * Copy the first key from the original page into first ref in the new
 	 * parent.  Pages created in memory always have a "smallest" insert
 	 * list, so look there first.  If we don't find one, get the first key
@@ -1860,6 +1866,11 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	return (0);
 
 err:	if (split_ref[0] != NULL) {
+		/*
+		 * The address was moved to the replacement WT_REF, restore it.
+		 */
+		ref->addr = split_ref[0]->addr;
+
 		__wt_free(session, split_ref[0]->key.ikey);
 		__wt_free(session, split_ref[0]);
 	}
