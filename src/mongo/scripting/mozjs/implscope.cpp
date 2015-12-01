@@ -260,6 +260,9 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
             // large pages, like 4MB?
             JS_SetNativeStackQuota(_runtime, available.get() - (64 * 1024));
         }
+
+        // The memory limit is in megabytes
+        JS_SetGCParametersBasedOnAvailableMemory(_runtime, kMallocMemoryLimit / (1024 * 1024));
     }
 
     _context = JS_NewContext(_runtime, kStackChunkSize);
