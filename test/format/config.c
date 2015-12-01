@@ -394,7 +394,7 @@ config_lrt(void)
 	 * stores.
 	 */
 	if (g.type == FIX) {
-		if (config_is_perm("long_running_txn"))
+		if (g.c_long_running_txn && config_is_perm("long_running_txn"))
 			die(EINVAL,
 			    "long_running_txn not supported with fixed-length "
 			    "column store");

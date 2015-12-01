@@ -241,19 +241,14 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_ADDR *addr;
 	WT_DECL_RET;
-	WT_PAGE *parent;
 	WT_PAGE_MODIFY *mod;
 
-	parent = ref->home;
 	mod = ref->page->modify;
 
 	switch (mod->rec_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		/* Discard the parent's address. */
-		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
+		__wt_ref_free_addr(session, ref);
 
 		/*
 		 * Update the parent to reference a deleted page.  The fact that
@@ -308,10 +303,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 			return (EBUSY);
 
 		/* Discard the parent's address. */
-		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
+		__wt_ref_free_addr(session, ref);
 
 		/*
 		 * Update the parent to reference the replacement page.
