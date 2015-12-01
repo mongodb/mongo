@@ -51,8 +51,7 @@ class OperationContext;
  * A blocking stage that returns the set of WSMs with RecordIDs of all of the documents that contain
  * the positive terms in the search query, as well as their scores.
  *
- * The WorkingSetMembers returned are in the LOC_AND_IDX state. If a filter is passed in, some
- * WorkingSetMembers may be returned in the LOC_AND_OBJ state.
+ * The WorkingSetMembers returned are fetched and in the LOC_AND_OBJ state.
  */
 class TextOrStage final : public PlanStage {
 public:

@@ -351,18 +351,21 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
     invariant(wsm->getState() == WorkingSetMember::LOC_AND_IDX);
     invariant(1 == wsm->keyData.size());
     const IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
-
     TextRecordData* textRecordData = &_scores[wsm->loc];
-    double* documentAggregateScore = &textRecordData->score;
+
+    if (textRecordData->score < 0) {
+        // We have already rejected this document for not matching the filter.
+        invariant(WorkingSet::INVALID_ID == textRecordData->wsid);
+        _ws->free(wsid);
+        return NEED_TIME;
+    }
 
     if (WorkingSet::INVALID_ID == textRecordData->wsid) {
-        // We haven't seen this RecordId before. Keep the working set member around (it may be
-        // force-fetched on saveState()).
-        textRecordData->wsid = wsid;
-
+        // We haven't seen this RecordId before.
+        invariant(textRecordData->score == 0);
+        bool shouldKeep = true;
         if (_filter) {
             // We have not seen this document before and need to apply a filter.
-            bool shouldKeep;
             bool wasDeleted = false;
             try {
                 TextMatchableDocument tdoc(getOpCtx(),
@@ -386,18 +389,35 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
                 wasDeleted = true;
             }
 
-            if (!shouldKeep) {
-                if (wasDeleted || wsm->hasObj()) {
-                    // We had to fetch but we're not going to return it.
-                    ++_specificStats.fetches;
-                }
-                _ws->free(textRecordData->wsid);
-                textRecordData->wsid = WorkingSet::INVALID_ID;
-                *documentAggregateScore = -1;
-                return NEED_TIME;
+            if (wasDeleted || wsm->hasObj()) {
+                ++_specificStats.fetches;
             }
         }
 
+        if (shouldKeep && !wsm->hasObj()) {
+            // Our parent expects LOC_AND_OBJ members, so we fetch the document here if we haven't
+            // already.
+            try {
+                shouldKeep = WorkingSetCommon::fetch(getOpCtx(), _ws, wsid, _recordCursor);
+                ++_specificStats.fetches;
+            } catch (const WriteConflictException& wce) {
+                wsm->makeObjOwnedIfNeeded();
+                _idRetrying = wsid;
+                *out = WorkingSet::INVALID_ID;
+                return NEED_YIELD;
+            }
+        }
+
+        if (!shouldKeep) {
+            _ws->free(wsid);
+            textRecordData->score = -1;
+            return NEED_TIME;
+        }
+
+        textRecordData->wsid = wsid;
+
+        // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+        wsm->makeObjOwnedIfNeeded();
     } else {
         // We already have a working set member for this RecordId. Free the new WSM and retrieve the
         // old one. Note that since we don't keep all index keys, we could get a score that doesn't
@@ -406,11 +426,6 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
         invariant(wsid != textRecordData->wsid);
         _ws->free(wsid);
         wsm = _ws->get(textRecordData->wsid);
-    }
-
-    if (*documentAggregateScore < 0) {
-        // We have already rejected this document for not matching the filter.
-        return NEED_TIME;
     }
 
     // Locate score within possibly compound key: {prefix,term,score,suffix}.
@@ -425,7 +440,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
     double documentTermScore = scoreElement.number();
 
     // Aggregate relevance score, term keys.
-    *documentAggregateScore += documentTermScore;
+    textRecordData->score += documentTermScore;
     return NEED_TIME;
 }
 
