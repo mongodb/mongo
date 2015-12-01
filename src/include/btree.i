@@ -445,6 +445,22 @@ __wt_off_page(WT_PAGE *page, const void *p)
 }
 
 /*
+ * __wt_ref_free_addr --
+ *	Free the address in a reference, if necessary.
+ */
+static inline void
+__wt_ref_free_addr(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	if (ref->addr != NULL) {
+		if (ref->home == NULL || __wt_off_page(ref->home, ref->addr)) {
+			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+			__wt_free(session, ref->addr);
+		} else
+			ref->addr = NULL;
+	}
+}
+
+/*
  * __wt_ref_key --
  *	Return a reference to a row-store internal page key as cheaply as
  * possible.
