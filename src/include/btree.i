@@ -1046,6 +1046,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
+	bool modified;
 
 	if (inmem_splitp != NULL)
 		*inmem_splitp = false;
@@ -1070,14 +1071,15 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 		return (true);
 	}
 
+	modified = __wt_page_is_modified(page);
+
 	/*
 	 * If the file is being checkpointed, we can't evict dirty pages:
 	 * if we write a page and free the previous version of the page, that
 	 * previous version might be referenced by an internal page already
 	 * been written in the checkpoint, leaving the checkpoint inconsistent.
 	 */
-	if (btree->checkpointing != WT_CKPT_OFF &&
-	    __wt_page_is_modified(page)) {
+	if (btree->checkpointing != WT_CKPT_OFF && modified) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (false);
@@ -1102,6 +1104,19 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 */
 	if (WT_PAGE_IS_INTERNAL(page) &&
 	    F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
+		return (false);
+
+	/*
+	 * If the oldest transaction hasn't changed since the last time
+	 * this page was written, it's unlikely we can make progress.
+	 * Similarly, if the most recent update on the page is not yet
+	 * globally visible, eviction will fail.  These heuristics
+	 * attempt to avoid repeated attempts to evict the same page.
+	 */
+	if (modified &&
+	    !F_ISSET(S2C(session)->cache, WT_CACHE_STUCK) &&
+	    (mod->last_oldest_id == __wt_txn_oldest_id(session) ||
+	    !__wt_txn_visible_all(session, mod->update_txn)))
 		return (false);
 
 	return (true);

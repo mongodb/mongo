@@ -1294,19 +1294,6 @@ fast:		/* If the page can't be evicted, give up. */
 				continue;
 		}
 
-		/*
-		 * If the oldest transaction hasn't changed since the last time
-		 * this page was written, it's unlikely we can make progress.
-		 * Similarly, if the most recent update on the page is not yet
-		 * globally visible, eviction will fail.  These heuristics
-		 * attempt to avoid repeated attempts to evict the same page.
-		 */
-		if (modified && !would_split &&
-		    !F_ISSET(cache, WT_CACHE_STUCK) &&
-		    (mod->last_oldest_id == __wt_txn_oldest_id(session) ||
-		    !__wt_txn_visible_all(session, mod->update_txn)))
-			continue;
-
 		WT_ASSERT(session, evict->ref == NULL);
 		__evict_init_candidate(session, evict, ref);
 		++evict;
