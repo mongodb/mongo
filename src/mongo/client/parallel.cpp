@@ -1527,6 +1527,11 @@ namespace mongo {
             if ( comp < 0 )
                 continue;
 
+            uassert(28841,
+                    str::stream() << "server " << _cursors[i].raw()->originalHost()
+                                  << " returned an error: " << me,
+                    !_cursors[i].raw()->hasResultFlag(ResultFlag_ErrSet));
+
             best = me;
             bestFrom = i;
         }
