@@ -241,10 +241,8 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_ADDR *addr;
 	WT_DECL_RET;
-	WT_PAGE *parent;
 	WT_PAGE_MODIFY *mod;
 
-	parent = ref->home;
 	mod = ref->page->modify;
 
 	switch (mod->rec_result) {

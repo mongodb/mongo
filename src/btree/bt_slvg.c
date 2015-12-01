@@ -1291,7 +1291,6 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 	 * free the underlying blocks.
 	 */
 	__wt_ref_free_addr(session, ref);
-	ref->addr = NULL;
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__slvg_modify_init(session, page));
@@ -2013,7 +2012,6 @@ __slvg_row_build_leaf(
 	 * free the underlying blocks.
 	 */
 	__wt_ref_free_addr(session, ref);
-	ref->addr = NULL;
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__slvg_modify_init(session, page));
