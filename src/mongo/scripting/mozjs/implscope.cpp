@@ -182,16 +182,18 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
         JS_MaybeGC(cx);
     }
 
-    bool kill = scope->isKillPending();
-
-    if (kill) {
-        scope->_engine->getDeadlineMonitor().stopDeadline(scope);
-        scope->unregisterOperation();
-
+    if (scope->_hasOutOfMemoryException) {
+        scope->_status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
+    } else if (scope->isKillPending()) {
         scope->_status = Status(ErrorCodes::JSInterpreterFailure, "Interrupted by the host");
     }
 
-    return !kill;
+    if (!scope->_status.isOK()) {
+        scope->_engine->getDeadlineMonitor().stopDeadline(scope);
+        scope->unregisterOperation();
+    }
+
+    return scope->_status.isOK();
 }
 
 void MozJSImplScope::_gcCallback(JSRuntime* rt, JSGCStatus status, void* data) {
@@ -292,6 +294,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _status(Status::OK()),
       _quickExit(false),
       _generation(0),
+      _hasOutOfMemoryException(false),
       _binDataProto(_context),
       _bsonProto(_context),
       _countDownLatchProto(_context),
@@ -360,7 +363,7 @@ MozJSImplScope::~MozJSImplScope() {
 }
 
 bool MozJSImplScope::hasOutOfMemoryException() {
-    return false;
+    return _hasOutOfMemoryException;
 }
 
 void MozJSImplScope::init(const BSONObj* data) {
@@ -829,7 +832,8 @@ bool MozJSImplScope::getQuickExit(int* exitCode) {
 }
 
 void MozJSImplScope::setOOM() {
-    _status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
+    _hasOutOfMemoryException = true;
+    JS_RequestInterruptCallback(_runtime);
 }
 
 void MozJSImplScope::setParentStack(std::string parentStack) {

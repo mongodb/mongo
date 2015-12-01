@@ -365,6 +365,7 @@ private:
     bool _quickExit;
     std::string _parentStack;
     std::size_t _generation;
+    bool _hasOutOfMemoryException;
 
     WrapType<BinDataInfo> _binDataProto;
     WrapType<BSONInfo> _bsonProto;

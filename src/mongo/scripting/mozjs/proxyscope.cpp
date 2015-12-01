@@ -106,13 +106,10 @@ std::string MozJSProxyScope::getError() {
     return out;
 }
 
-/**
- * This is an artifact of how out of memory errors were communicated in V8.  We
- * just throw out of memory errors from spidermonkey when we get them, rather
- * than setting a flag and having to pick them up here.
- */
 bool MozJSProxyScope::hasOutOfMemoryException() {
-    return false;
+    bool out;
+    run([&] { out = _implScope->hasOutOfMemoryException(); });
+    return out;
 }
 
 void MozJSProxyScope::gc() {
