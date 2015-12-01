@@ -1395,12 +1395,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	    __wt_txn_visible_all(session, page_del->txnid))) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		WT_RET(__rec_block_free(session, addr, addr_size));
-
-		if (__wt_off_page(ref->home, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
-		ref->addr = NULL;
+		__wt_ref_free_addr(session, ref);
 	}
 
 	/*
@@ -5434,12 +5429,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			WT_RET(__wt_ref_info(
 			    session, ref, &addr, &addr_size, NULL));
 			WT_RET(__rec_block_free(session, addr, addr_size));
-			if (__wt_off_page(ref->home, ref->addr)) {
-				__wt_free(
-				    session, ((WT_ADDR *)ref->addr)->addr);
-				__wt_free(session, ref->addr);
-			}
-			ref->addr = NULL;
+			__wt_ref_free_addr(session, ref);
 		}
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */

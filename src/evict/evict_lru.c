@@ -159,7 +159,8 @@ __evict_server(void *arg)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 #ifdef HAVE_DIAGNOSTIC
-	struct timespec now, stuck_ts = { 0, 0 };
+	struct timespec now, stuck_ts;
+	uint64_t pages_evicted = 0;
 #endif
 	u_int spins;
 
@@ -204,10 +205,11 @@ __evict_server(void *arg)
 			/* Next time we wake up, reverse the sweep direction. */
 			cache->flags ^= WT_CACHE_WALK_REVERSE;
 #ifdef HAVE_DIAGNOSTIC
-			stuck_ts.tv_sec = 0;
-		} else if (stuck_ts.tv_sec == 0)
+			pages_evicted = 0;
+		} else if (pages_evicted != cache->pages_evict) {
 			WT_ERR(__wt_epoch(session, &stuck_ts));
-		else {
+			pages_evicted = cache->pages_evict;
+		} else {
 			/* After being stuck for 5 minutes, give up. */
 			WT_ERR(__wt_epoch(session, &now));
 			if (WT_TIMEDIFF_SEC(now, stuck_ts) > 300) {
@@ -481,6 +483,13 @@ __evict_update_work(WT_SESSION_IMPL *session)
 		goto done;
 	}
 
+	/*
+	 * If the cache has been stuck and is now under control, clear the
+	 * stuck flag.
+	 */
+	if (bytes_inuse < bytes_max)
+		F_CLR(cache, WT_CACHE_STUCK);
+
 	dirty_inuse = __wt_cache_dirty_inuse(cache);
 	if (dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100) {
 		FLD_SET(cache->state, WT_EVICT_PASS_DIRTY);
@@ -498,6 +507,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
 		F_CLR(cache, WT_CACHE_WOULD_BLOCK);
 		goto done;
 	}
+
 	return (false);
 
 done:	if (F_ISSET(cache, WT_CACHE_STUCK))
@@ -1284,19 +1294,6 @@ fast:		/* If the page can't be evicted, give up. */
 				continue;
 		}
 
-		/*
-		 * If the oldest transaction hasn't changed since the last time
-		 * this page was written, it's unlikely we can make progress.
-		 * Similarly, if the most recent update on the page is not yet
-		 * globally visible, eviction will fail.  These heuristics
-		 * attempt to avoid repeated attempts to evict the same page.
-		 */
-		if (modified && !would_split &&
-		    !FLD_ISSET(cache->state, WT_CACHE_STUCK) &&
-		    (mod->last_oldest_id == __wt_txn_oldest_id(session) ||
-		    !__wt_txn_visible_all(session, mod->update_txn)))
-			continue;
-
 		WT_ASSERT(session, evict->ref == NULL);
 		__evict_init_candidate(session, evict, ref);
 		++evict;
@@ -1419,7 +1416,6 @@ static int
 __evict_page(WT_SESSION_IMPL *session, bool is_server)
 {
 	WT_BTREE *btree;
-	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *ref;
@@ -1457,12 +1453,6 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 	WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, false));
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
-
-	WT_RET(ret);
-
-	cache = S2C(session)->cache;
-	if (F_ISSET(cache, WT_CACHE_STUCK))
-		F_CLR(cache, WT_CACHE_STUCK);
 
 	return (ret);
 }
@@ -1607,8 +1597,8 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 
 		next_walk = NULL;
 		session->dhandle = dhandle;
-		while (__wt_tree_walk(session,
-		    &next_walk, NULL, WT_READ_CACHE | WT_READ_NO_WAIT) == 0 &&
+		while (__wt_tree_walk(session, &next_walk, NULL,
+		    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_WAIT) == 0 &&
 		    next_walk != NULL) {
 			page = next_walk->page;
 			size = page->memory_footprint;
