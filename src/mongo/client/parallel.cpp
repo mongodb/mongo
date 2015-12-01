@@ -1513,6 +1513,11 @@ BSONObj ParallelSortClusteredCursor::next() {
         // We know we have at least one result in this cursor
         BSONObj me = _cursors[i].get()->peekFirst();
 
+        uassert(28841,
+                str::stream() << "server " << _cursors[i].get()->originalHost()
+                              << " returned an error: " << me,
+                !_cursors[i].get()->hasResultFlag(ResultFlag_ErrSet));
+
         // If this is the first non-empty cursor, save the result as best
         if (bestFrom < 0) {
             best = me;
