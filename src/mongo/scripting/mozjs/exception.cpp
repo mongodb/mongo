@@ -36,6 +36,7 @@
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -88,6 +89,10 @@ Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, Stri
     JS::RootedValue vp(cx);
     if (!JS_GetPendingException(cx, &vp))
         return Status(altCode, altReason.rawData());
+
+    if (!vp.isObject()) {
+        return Status(altCode, ValueWriter(cx, vp).toString());
+    }
 
     JS::RootedObject obj(cx, vp.toObjectOrNull());
     JSErrorReport* report = JS_ErrorFromException(cx, obj);
