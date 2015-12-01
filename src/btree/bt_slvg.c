@@ -1290,8 +1290,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 	 * would have been lost.)  Clear the reference addr so eviction doesn't
 	 * free the underlying blocks.
 	 */
-	__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-	__wt_free(session, ref->addr);
+	__wt_ref_free_addr(session, ref);
 	ref->addr = NULL;
 
 	/* Write the new version of the leaf page to disk. */
@@ -2013,8 +2012,7 @@ __slvg_row_build_leaf(
 	 * would have been lost.)  Clear the reference addr so eviction doesn't
 	 * free the underlying blocks.
 	 */
-	__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-	__wt_free(session, ref->addr);
+	__wt_ref_free_addr(session, ref);
 	ref->addr = NULL;
 
 	/* Write the new version of the leaf page to disk. */
