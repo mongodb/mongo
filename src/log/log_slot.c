@@ -293,7 +293,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 		    &log->slot_pool[i].slot_buf, log->slot_buf_size));
 		F_SET(&log->slot_pool[i], WT_SLOT_INIT_FLAGS);
 	}
-	WT_STAT_FAST_CONN_INCRV(session,
+	WT_STAT_FAST_CONN_SET(session,
 	    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
 	/*
 	 * Set up the available slot from the pool the first time.
