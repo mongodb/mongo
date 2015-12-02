@@ -159,7 +159,10 @@
             }
         });
         var nodes = rst.startSet();
-        rst.initiate();
+
+        // Wait up to 5 minutes for the replica set to initiate. We allow extra time because
+        // allocating 1GB oplogs on test hosts can be slow with mmapv1.
+        rst.initiate(null, null, 5 * 60 * 1000);
         var primary = rst.getPrimary();
         var secondary = rst.getSecondary();
 
