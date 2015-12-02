@@ -76,6 +76,11 @@ void OpObserver::onInserts(OperationContext* txn,
 }
 
 void OpObserver::onUpdate(OperationContext* txn, oplogUpdateEntryArgs args) {
+    // Do not log a no-op operation; see SERVER-21738
+    if (args.update.isEmpty()) {
+        return;
+    }
+
     repl::logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria, args.fromMigrate);
 
     getGlobalAuthorizationManager()->logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria);
