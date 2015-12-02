@@ -1108,6 +1108,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		 */
 		WT_ASSERT(session, next_ref->page_del == NULL);
 
+		WT_TRET(__wt_ref_block_free(session, next_ref));
 		WT_TRET(__split_safe_free(
 		    session, split_gen, 0, next_ref, sizeof(WT_REF)));
 		parent_decr += sizeof(WT_REF);
@@ -1121,7 +1122,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * Add it to the session discard list, to be freed when it's safe.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_TRET(__wt_ref_block_free(session, next_ref));
 	WT_TRET(__split_safe_free(session, split_gen, closing, pindex, size));
 	parent_decr += size;
 
