@@ -422,9 +422,23 @@ var runner = (function() {
         jsTest.log('End of schedule');
     }
 
-    function cleanupWorkload(workload, context, cluster, errors, kind) {
+    function cleanupWorkload(workload, context, cluster, errors, kind, dbHashBlacklist) {
         // Returns true if the workload's teardown succeeds and false if the workload's
         // teardown fails.
+
+        try {
+            // Ensure that secondaries have caught up before workload teardown.
+            cluster.awaitReplication('before workload teardown');
+
+            // Check dbHash, for all DBs not in dbHashBlacklist, on all nodes
+            // before the workload's teardown method is called.
+            cluster.checkDbHashes(dbHashBlacklist, 'before workload teardown');
+        } catch (e) {
+            errors.push(new WorkloadFailure(e.toString(), e.stack,
+                                            kind + ' checking consistency on secondaries'));
+            return false;
+        }
+
         try {
             teardownWorkload(workload, context, cluster);
         } catch (e) {
@@ -434,8 +448,9 @@ var runner = (function() {
         return true;
     }
 
-    function runWorkloadGroup(threadMgr, workloads, context, cluster, clusterOptions, executionMode,
-                              executionOptions, errors, maxAllowedThreads){
+    function runWorkloadGroup(threadMgr, workloads, context, cluster, clusterOptions,
+                              executionMode, executionOptions, errors, maxAllowedThreads,
+                              dbHashBlacklist) {
         var cleanup = [];
         var teardownFailed = false;
         var startTime = Date.now(); // Initialize in case setupWorkload fails below.
@@ -479,7 +494,8 @@ var runner = (function() {
             // Call each foreground workload's teardown function. After all teardowns have completed
             // check if any of them failed.
             var cleanupResults = cleanup.map(workload =>
-                cleanupWorkload(workload, context, cluster, errors, 'Foreground'));
+                cleanupWorkload(workload, context, cluster, errors,
+                                'Foreground', dbHashBlacklist));
             teardownFailed = cleanupResults.some(success => (success === false));
 
             totalTime = Date.now() - startTime;
@@ -495,8 +511,12 @@ var runner = (function() {
         // Throw any existing errors so that the schedule aborts.
         throwError(errors);
 
-        // Ensure that secondaries have caught up for workload teardown (SERVER-18878).
-        cluster.awaitReplication();
+        // Ensure that secondaries have caught up after workload teardown.
+        cluster.awaitReplication('after workload-group teardown and data clean-up');
+
+        // Check dbHash, for all DBs not in dbHashBlacklist, on all nodes
+        // after the workload's teardown method is called.
+        cluster.checkDbHashes(dbHashBlacklist, 'after workload-group teardown and data clean-up');
     }
 
     function runWorkloads(workloads,
@@ -555,8 +575,13 @@ var runner = (function() {
 
         // List of DBs that will not be dropped.
         var dbBlacklist = ['admin', 'config', 'local', '$external'];
+
+        // List of DBs that dbHash is not run on.
+        var dbHashBlacklist = ['local'];
+
         if (cleanupOptions.dropDatabaseBlacklist) {
-            dbBlacklist = dbBlacklist.concat(cleanupOptions.dropDatabaseBlacklist);
+            dbBlacklist.push(...cleanupOptions.dropDatabaseBlacklist);
+            dbHashBlacklist.push(...cleanupOptions.dropDatabaseBlacklist);
         }
         if (!cleanupOptions.keepExistingDatabases) {
             dropAllDatabases(cluster.getDB('test'), dbBlacklist);
@@ -612,8 +637,9 @@ var runner = (function() {
                     });
 
                     // Run the next group of workloads in the schedule.
-                    runWorkloadGroup(threadMgr, workloads, groupContext, cluster, clusterOptions,
-                                     executionMode, executionOptions, errors, maxAllowedThreads);
+                    runWorkloadGroup(threadMgr, workloads, groupContext, cluster,
+                                     clusterOptions, executionMode, executionOptions,
+                                     errors, maxAllowedThreads, dbHashBlacklist);
                 });
             } finally {
                 // Set a flag so background threads know to terminate.
@@ -625,7 +651,8 @@ var runner = (function() {
             try {
                 // Call each background workload's teardown function.
                 bgCleanup.forEach(bgWorkload => cleanupWorkload(bgWorkload, bgContext, cluster,
-                                                                errors, 'Background'));
+                                                                errors, 'Background',
+                                                                dbHashBlacklist));
                 // TODO: Call cleanupWorkloadData() on background workloads here if no background
                 // workload teardown functions fail.
 

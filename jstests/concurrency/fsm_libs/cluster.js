@@ -109,6 +109,7 @@ var Cluster = function(options) {
     };
     var nextConn = 0;
     var primaries = [];
+    var replSets = [];
 
     // TODO: Define size of replica set from options
     var replSetNodes = 3;
@@ -172,6 +173,7 @@ var Cluster = function(options) {
                 while (rsTest) {
                     this._addReplicaSetConns(rsTest);
                     primaries.push(rsTest.getPrimary());
+                    replSets.push(rsTest);
                     ++i;
                     rsTest = st['rs' + i];
                 }
@@ -200,6 +202,7 @@ var Cluster = function(options) {
 
             conn = rst.getPrimary();
             primaries = [conn];
+            replSets = [rst];
 
             this.teardown = function teardown() {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
@@ -403,7 +406,11 @@ var Cluster = function(options) {
         st.stopBalancer();
     };
 
-    this.awaitReplication = function awaitReplication() {
+    this.isBalancerEnabled = function isBalancerEnabled() {
+        return this.isSharded() && options.enableBalancer;
+    };
+
+    this.awaitReplication = function awaitReplication(message) {
         if (this.isReplication()) {
             var wc = {
                 writeConcern: {
@@ -413,18 +420,77 @@ var Cluster = function(options) {
             };
             primaries.forEach(function(primary) {
                 var startTime = Date.now();
-                jsTest.log(primary.host + ': awaitReplication started');
+                jsTest.log(primary.host + ': awaitReplication started ' + message);
 
                 // Insert a document with a writeConcern for all nodes in the replica set to
                 // ensure that all previous workload operations have completed on secondaries
                 var result = primary.getDB('test').fsm_teardown.insert({ a: 1 }, wc);
                 assert.writeOK(result, 'teardown insert failed: ' + tojson(result));
-                assert(primary.getDB('test').fsm_teardown.drop(), 'teardown drop failed');
 
                 var totalTime = Date.now() - startTime;
-                jsTest.log(primary.host + ': awaitReplication completed in ' + totalTime + ' ms');
+                jsTest.log(primary.host + ': awaitReplication ' + message + ' completed in ' +
+                           totalTime + ' ms');
             });
         }
+    };
+
+    // Returns true if the specified DB contains a capped collection.
+    var containsCappedCollection = function containsCappedCollection(db) {
+        return db.getCollectionNames().some(coll => db[coll].isCapped());
+    };
+
+    // Checks dbHashes for databases that are not on the blacklist.
+    // All replica set nodes are checked.
+    this.checkDbHashes = function checkDbHashes(dbBlacklist, message) {
+        if (!this.isReplication() || this.isBalancerEnabled()) {
+            return;
+        }
+
+        var res = this.getDB('admin').runCommand('listDatabases');
+        assert.commandWorked(res);
+
+        res.databases.forEach(function(dbInfo) {
+            if (Array.contains(dbBlacklist, dbInfo.name)) {
+                return;
+            }
+            var hasCappedColl = containsCappedCollection(this.getDB(dbInfo.name));
+
+            replSets.forEach(function(replSet) {
+                var hashes = replSet.getHashes(dbInfo.name);
+                var masterHashes = hashes.master;
+                assert.commandWorked(masterHashes);
+                var dbHash = masterHashes.md5;
+
+                hashes.slaves.forEach(function(slaveHashes) {
+                    assert.commandWorked(slaveHashes);
+                    assert.eq(masterHashes.numCollections,
+                              slaveHashes.numCollections,
+                              message + ' dbHash number of collections in db ' +
+                                dbInfo.name + ' ' + tojson(hashes));
+
+                    if (!hasCappedColl) {
+                        // dbHash on a DB not containing a capped collection should match.
+                        assert.eq(dbHash,
+                                  slaveHashes.md5,
+                                  message + ' dbHash inconsistency for db ' +
+                                    dbInfo.name + ' ' + tojson(hashes));
+                    } else {
+                        // dbHash on a DB containing a capped collection will not return
+                        // consistent results between the replica set, so we only
+                        // check non-capped collections in the DB.
+                        var collNames = Object.keys(masterHashes.collections).filter(
+                                                    coll =>
+                                                    !this.getDB(dbInfo.name)[coll].isCapped());
+                        collNames.forEach(function(coll) {
+                            assert.eq(masterHashes.collections[coll],
+                                      slaveHashes.collections[coll],
+                                      message + ' dbHash inconsistency for collection ' + coll +
+                                        ' in db ' + dbInfo.name + ' ' + tojson(hashes));
+                        }, this);
+                    }
+                }, this);
+            }, this);
+        }, this);
     };
 };
 
