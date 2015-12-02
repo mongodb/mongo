@@ -1283,6 +1283,8 @@ tasks:
     vars:
       resmoke_args: --suites=slow2 --storageEngine=wiredTiger
       run_multiple_jobs: true
+      # Limited to 2 jobs because of memory constraints due to the WiredTiger cache size.
+      max_jobs: 2
 
 - <<: *task_template
   name: sharded_collections_jscore_passthrough
