@@ -895,7 +895,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		 */
 		WT_ASSERT(session, next_ref->page_del == NULL);
 
-		__wt_ref_free_addr(session, next_ref);
+		WT_TRET(__wt_ref_block_free(session, next_ref));
 		WT_TRET(__split_safe_free(
 		    session, split_gen, exclusive, next_ref, sizeof(WT_REF)));
 		parent_decr += sizeof(WT_REF);
