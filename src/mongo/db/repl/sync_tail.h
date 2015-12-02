@@ -129,7 +129,8 @@ private:
     // Doles out all the work to the writer pool threads and waits for them to complete
     void applyOps(const std::vector<std::vector<BSONObj>>& writerVectors);
 
-    void fillWriterVectors(const std::deque<BSONObj>& ops,
+    void fillWriterVectors(OperationContext* txn,
+                           const std::deque<BSONObj>& ops,
                            std::vector<std::vector<BSONObj>>* writerVectors);
     void handleSlaveDelay(const BSONObj& op);
 

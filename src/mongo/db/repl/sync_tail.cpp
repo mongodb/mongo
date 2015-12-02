@@ -39,10 +39,12 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/global_environment_experiment.h"
@@ -250,7 +252,7 @@ OpTime SyncTail::multiApply(OperationContext* txn, std::deque<BSONObj>& ops) {
     }
 
     std::vector<std::vector<BSONObj>> writerVectors(replWriterThreadCount);
-    fillWriterVectors(ops, &writerVectors);
+    fillWriterVectors(txn, ops, &writerVectors);
     LOG(2) << "replication batch size is " << ops.size() << endl;
     // We must grab this because we're going to grab write locks later.
     // We hold this mutex the entire time we're writing; it doesn't matter
@@ -279,8 +281,45 @@ OpTime SyncTail::multiApply(OperationContext* txn, std::deque<BSONObj>& ops) {
     return lastOpTime;
 }
 
-void SyncTail::fillWriterVectors(const std::deque<BSONObj>& ops,
+/**
+ * A caching functor that returns true if a namespace refers to a capped collection.
+ * Collections that don't exist are implicitly not capped.
+ */
+class CachingCappedChecker {
+public:
+    bool operator()(OperationContext* txn, StringData ns) {
+        auto it = _cache.find(ns);
+        if (it != _cache.end()) {
+            return it->second;
+        }
+
+        bool isCapped = isCappedImpl(txn, ns);
+        _cache[ns] = isCapped;
+        return isCapped;
+    }
+
+private:
+    bool isCappedImpl(OperationContext* txn, StringData ns) {
+        auto db = dbHolder().get(txn, ns);
+        if (!db)
+            return false;
+
+        auto collection = db->getCollection(ns);
+        return collection && collection->isCapped();
+    }
+
+    StringMap<bool> _cache;
+};
+
+void SyncTail::fillWriterVectors(OperationContext* txn,
+                                 const std::deque<BSONObj>& ops,
                                  std::vector<std::vector<BSONObj>>* writerVectors) {
+    const bool supportsDocLocking =
+        getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking();
+
+    Lock::GlobalRead globalReadLock(txn->lockState());
+    CachingCappedChecker isCapped;
+
     for (std::deque<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
         const BSONElement e = it->getField("ns");
         verify(e.type() == String);
@@ -291,8 +330,11 @@ void SyncTail::fillWriterVectors(const std::deque<BSONObj>& ops,
 
         const char* opType = it->getField("op").valuestrsafe();
 
-        if (getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking() &&
-            isCrudOpType(opType)) {
+        // For doc locking engines, include the _id of the document in the hash so we get
+        // parallelism even if all writes are to a single collection. We can't do this for capped
+        // collections because the order of inserts is a guaranteed property, unlike for normal
+        // collections.
+        if (supportsDocLocking && isCrudOpType(opType) && !isCapped(txn, ns)) {
             BSONElement id;
             switch (opType[0]) {
                 case 'u':
