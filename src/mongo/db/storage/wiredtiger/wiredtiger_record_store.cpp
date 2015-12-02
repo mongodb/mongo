@@ -289,6 +289,9 @@ void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* txn)
     long long numRecords = _rs->numRecords(txn);
     long long dataSize = _rs->dataSize(txn);
 
+    log() << "The size storer reports that the oplog contains " << numRecords
+          << " records totaling to " << dataSize << " bytes";
+
     // Only use sampling to estimate where to place the oplog stones if the number of samples drawn
     // is less than 5% of the collection.
     const uint64_t kMinSampleRatioForRandCursor = 20;
@@ -312,7 +315,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* txn)
 }
 
 void WiredTigerRecordStore::OplogStones::_calculateStonesByScanning(OperationContext* txn) {
-    log() << "Scanning the oplog to determine where to place markers for when to truncate";
+    log() << "Scanning the oplog to determine where to place markers for truncation";
 
     long long numRecords = 0;
     long long dataSize = 0;
@@ -339,7 +342,39 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesByScanning(OperationCon
 void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationContext* txn,
                                                                     int64_t estRecordsPerStone,
                                                                     int64_t estBytesPerStone) {
-    log() << "Sampling from the oplog to determine where to place markers for when to truncate";
+    Timestamp earliestOpTime;
+    Timestamp latestOpTime;
+
+    {
+        const bool forward = true;
+        auto cursor = _rs->getCursor(txn, forward);
+        auto record = cursor->next();
+        if (!record) {
+            // This shouldn't really happen unless the size storer values are far off from reality.
+            // The collection is probably empty, but fall back to scanning the oplog just in case.
+            log() << "Failed to determine the earliest optime, falling back to scanning the oplog";
+            _calculateStonesByScanning(txn);
+            return;
+        }
+        earliestOpTime = Timestamp(record->id.repr());
+    }
+
+    {
+        const bool forward = false;
+        auto cursor = _rs->getCursor(txn, forward);
+        auto record = cursor->next();
+        if (!record) {
+            // This shouldn't really happen unless the size storer values are far off from reality.
+            // The collection is probably empty, but fall back to scanning the oplog just in case.
+            log() << "Failed to determine the latest optime, falling back to scanning the oplog";
+            _calculateStonesByScanning(txn);
+            return;
+        }
+        latestOpTime = Timestamp(record->id.repr());
+    }
+
+    log() << "Sampling from the oplog between " << earliestOpTime.toStringPretty() << " and "
+          << latestOpTime.toStringPretty() << " to determine where to place markers for truncation";
 
     int64_t wholeStones = _rs->numRecords(txn) / estRecordsPerStone;
     int64_t numSamples = kRandomSamplesPerStone * _rs->numRecords(txn) / estRecordsPerStone;
@@ -358,7 +393,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
         auto record = cursor->next();
         if (!record) {
             // This shouldn't really happen unless the size storer values are far off from reality.
-            // The collection is probably empty, but fall back to the forward cursor just in case.
+            // The collection is probably empty, but fall back to scanning the oplog just in case.
             log() << "Failed to get enough random samples, falling back to scanning the oplog";
             _calculateStonesByScanning(txn);
             return;
@@ -373,7 +408,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
         int sampleIndex = kRandomSamplesPerStone * i - 1;
         RecordId lastRecord = oplogEstimates[sampleIndex];
 
-        LOG(1) << "Placing a marker at optime " << Timestamp(lastRecord.repr()).toStringPretty();
+        log() << "Placing a marker at optime " << Timestamp(lastRecord.repr()).toStringPretty();
         OplogStones::Stone stone = {estRecordsPerStone, estBytesPerStone, lastRecord};
         _stones.push_back(stone);
     }
