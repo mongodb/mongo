@@ -222,19 +222,14 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_ADDR *addr;
 	WT_DECL_RET;
-	WT_PAGE *parent;
 	WT_PAGE_MODIFY *mod;
 
-	parent = ref->home;
 	mod = ref->page->modify;
+
+	WT_ASSERT(session, ref->addr == NULL);
 
 	switch (mod->rec_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
-		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
-
 		/*
 		 * Update the parent to reference a deleted page.  The fact that
 		 * reconciliation left the page "empty" means there's no older
@@ -261,11 +256,6 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		WT_RET(__wt_split_multi(session, ref, closing));
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
-		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
-
 		/*
 		 * Update the parent to reference the replacement page.
 		 *

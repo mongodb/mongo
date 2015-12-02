@@ -244,7 +244,8 @@ ascend:	/*
 			 * If we see any child states other than deleted, the
 			 * page isn't empty.
 			 */
-			if (ref->state != WT_REF_DELETED)
+			if (ref->state != WT_REF_DELETED &&
+			    !LF_ISSET(WT_READ_TRUNCATE))
 				empty_internal = false;
 
 			if (LF_ISSET(WT_READ_CACHE)) {
@@ -270,6 +271,7 @@ ascend:	/*
 				WT_ERR(__wt_delete_page(session, ref, &skip));
 				if (skip)
 					break;
+				empty_internal = false;
 			} else if (LF_ISSET(WT_READ_COMPACT)) {
 				/*
 				 * Skip deleted pages, rewriting them doesn't
