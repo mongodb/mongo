@@ -248,7 +248,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	switch (mod->rec_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		/* Discard the parent's address. */
-		__wt_ref_free_addr(session, ref);
+		__wt_ref_addr_free(session, ref);
 
 		/*
 		 * Update the parent to reference a deleted page.  The fact that
@@ -303,7 +303,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 			return (EBUSY);
 
 		/* Discard the parent's address. */
-		__wt_ref_free_addr(session, ref);
+		__wt_ref_addr_free(session, ref);
 
 		/*
 		 * Update the parent to reference the replacement page.
