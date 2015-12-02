@@ -252,10 +252,7 @@ __wt_free_ref(
 	}
 
 	/* Free any address allocation. */
-	if (ref->addr != NULL && __wt_off_page(page, ref->addr)) {
-		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-		__wt_free(session, ref->addr);
-	}
+	__wt_ref_addr_free(session, ref);
 
 	/* Free any page-deleted information. */
 	if (ref->page_del != NULL) {
