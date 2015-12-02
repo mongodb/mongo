@@ -26,6 +26,13 @@ __wt_bm_preload(
 	WT_UNUSED(addr_size);
 	block = bm->block;
 
+	/*
+	 * Turn off pre-load when direct I/O is configured for the file,
+	 * the kernel cache isn't interesting.
+	 */
+	if (block->fh->direct_io)
+		return (0);
+
 	WT_STAT_FAST_CONN_INCR(session, block_preload);
 
 	/* Crack the cookie. */
