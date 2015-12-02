@@ -985,23 +985,6 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, bool destroy)
 }
 
 /*
- * __rec_block_free --
- *	Helper function to free a block.
- */
-static int
-__rec_block_free(
-    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
-{
-	WT_BM *bm;
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-	bm = btree->bm;
-
-	return (bm->free(bm, session, addr, addr_size));
-}
-
-/*
  * __rec_update_save --
  *	Save a WT_UPDATE list for later restoration.
  */
@@ -1343,8 +1326,6 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_REF *ref, WT_CHILD_STATE *statep)
 {
 	WT_PAGE_DELETED *page_del;
-	size_t addr_size;
-	const uint8_t *addr;
 
 	page_del = ref->page_del;
 
@@ -1392,11 +1373,8 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 */
 	if (ref->addr != NULL &&
 	    (page_del == NULL ||
-	    __wt_txn_visible_all(session, page_del->txnid))) {
-		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
-		WT_RET(__rec_block_free(session, addr, addr_size));
-		__wt_ref_free_addr(session, ref);
-	}
+	    __wt_txn_visible_all(session, page_del->txnid)))
+		WT_RET(__wt_ref_block_free(session, ref));
 
 	/*
 	 * If the original page is gone, we can skip the slot on the internal
@@ -5312,7 +5290,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			if (multi->addr.reuse)
 				multi->addr.addr = NULL;
 			else {
-				WT_RET(__rec_block_free(session,
+				WT_RET(__wt_btree_block_free(session,
 				    multi->addr.addr, multi->addr.size));
 				__wt_free(session, multi->addr.addr);
 			}
@@ -5395,8 +5373,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
-	size_t addr_size;
-	const uint8_t *addr;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -5421,16 +5397,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 */
 		if (__wt_ref_is_root(ref))
 			break;
-		if (ref->addr != NULL) {
-			/*
-			 * Free the page and clear the address (so we don't free
-			 * it twice).
-			 */
-			WT_RET(__wt_ref_info(
-			    session, ref, &addr, &addr_size, NULL));
-			WT_RET(__rec_block_free(session, addr, addr_size));
-			__wt_ref_free_addr(session, ref);
-		}
+		WT_RET(__wt_ref_block_free(session, ref));
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
@@ -5448,7 +5415,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * are checkpoints, and must be explicitly dropped.
 		 */
 		if (!__wt_ref_is_root(ref))
-			WT_RET(__rec_block_free(session,
+			WT_RET(__wt_btree_block_free(session,
 			    mod->mod_replace.addr, mod->mod_replace.size));
 
 		/* Discard the replacement page's address. */
@@ -5612,7 +5579,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			if (bnd->addr.reuse)
 				bnd->addr.addr = NULL;
 			else {
-				WT_TRET(__rec_block_free(session,
+				WT_TRET(__wt_btree_block_free(session,
 				    bnd->addr.addr, bnd->addr.size));
 				__wt_free(session, bnd->addr.addr);
 			}
