@@ -8,6 +8,7 @@ from __future__ import absolute_import
 import os
 import sys
 
+import bson
 import pymongo
 
 from . import fixtures
@@ -409,8 +410,10 @@ class CheckReplDBHash(CustomBehavior):
         collection on the secondary, if any.
         """
 
-        primary_coll = primary_db[coll_name]
-        secondary_coll = secondary_db[coll_name]
+        codec_options = bson.CodecOptions(document_class=bson.SON)
+
+        primary_coll = primary_db.get_collection(coll_name, codec_options=codec_options)
+        secondary_coll = secondary_db.get_collection(coll_name, codec_options=codec_options)
 
         primary_docs = CheckReplDBHash._extract_documents(primary_coll)
         secondary_docs = CheckReplDBHash._extract_documents(secondary_coll)
@@ -460,6 +463,8 @@ class CheckReplDBHash(CustomBehavior):
                 sb.append("Mismatching document:")
                 sb.append("    primary:   %s" % (primary_doc))
                 sb.append("    secondary: %s" % (secondary_doc))
+                p_idx += 1
+                s_idx += 1
 
             # One node was missing a document. Since the documents are sorted by _id, the doc with
             # the smaller _id was the one that was skipped.
