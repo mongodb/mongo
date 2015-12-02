@@ -122,7 +122,6 @@ Status renameCollection(OperationContext* txn,
         // If target exists and dropTarget is not true, return false.
         if (targetDB->getCollection(target)) {
             if (!dropTarget) {
-                printStackTrace();
                 return Status(ErrorCodes::NamespaceExists, "target namespace exists");
             }
 
