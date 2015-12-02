@@ -1326,8 +1326,6 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_REF *ref, WT_CHILD_STATE *statep)
 {
 	WT_PAGE_DELETED *page_del;
-	size_t addr_size;
-	const uint8_t *addr;
 
 	page_del = ref->page_del;
 
@@ -5374,8 +5372,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
-	size_t addr_size;
-	const uint8_t *addr;
 
 	btree = S2BT(session);
 	bm = btree->bm;
