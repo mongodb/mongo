@@ -184,6 +184,9 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 
 	p += snprintf(p, REMAIN(p, end), ",mmap=%d", g.c_mmap ? 1 : 0);
 
+	if (g.c_direct_io)
+		p += snprintf(p, REMAIN(p, end), ",direct_io=(data)");
+
 	if (g.c_data_extend)
 		p += snprintf(p, REMAIN(p, end), ",file_extend=(data=8MB)");
 
