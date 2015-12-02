@@ -1221,6 +1221,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * eviction, skip anything that isn't marked.
 		 */
 		if (LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) &&
+		    page->memory_footprint < btree->splitmempage &&
 		    page->read_gen != WT_READGEN_OLDEST)
 			continue;
 
