@@ -1371,8 +1371,9 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * read into this part of the name space again, the cache read function
 	 * instantiates an entirely new page.)
 	 */
-	if (page_del == NULL ||
-	    __wt_txn_visible_all(session, page_del->txnid))
+	if (ref->addr != NULL &&
+	    (page_del == NULL ||
+	    __wt_txn_visible_all(session, page_del->txnid)))
 		WT_RET(__wt_ref_block_free(session, ref));
 
 	/*
