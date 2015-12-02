@@ -161,6 +161,11 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	 */
 	if (trunc_cfg->expected_total >
 	    thread->workload->truncate_count + trunc_cfg->stone_gap) {
+		/*
+		 * Increase the multiplier until we create stones that are
+		 * almost large enough to truncate the whole expected table size
+		 * in one operation.
+		 */
 		trunc_cfg->catchup_multiplier =
 		    WT_MIN(trunc_cfg->catchup_multiplier + 1,
 		    trunc_cfg->needed_stones - 1);
