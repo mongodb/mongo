@@ -156,14 +156,14 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* txn,
         return status;
 
     mutablebson::Document resultDoc(*result, mutablebson::Document::kInPlaceDisabled);
-    _resolveUserRoles(&resultDoc, directRoles);
+    resolveUserRoles(&resultDoc, directRoles);
     *result = resultDoc.getObject();
 
     return Status::OK();
 }
 
-void AuthzManagerExternalStateLocal::_resolveUserRoles(mutablebson::Document* userDoc,
-                                                       const std::vector<RoleName>& directRoles) {
+void AuthzManagerExternalStateLocal::resolveUserRoles(mutablebson::Document* userDoc,
+                                                      const std::vector<RoleName>& directRoles) {
     unordered_set<RoleName> indirectRoles;
     PrivilegeVector allPrivileges;
     bool isRoleGraphInconsistent;
