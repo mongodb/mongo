@@ -51,6 +51,12 @@ class OpObserver {
 public:
     OpObserver() {}
     ~OpObserver() {}
+
+    struct DeleteState {
+        BSONObj idDoc;
+        bool isMigrating = false;
+    };
+
     void onCreateIndex(OperationContext* txn,
                        const std::string& ns,
                        BSONObj indexDoc,
@@ -61,9 +67,10 @@ public:
                    std::vector<BSONObj>::const_iterator end,
                    bool fromMigrate = false);
     void onUpdate(OperationContext* txn, oplogUpdateEntryArgs args);
+    DeleteState aboutToDelete(OperationContext* txn, const NamespaceString& ns, const BSONObj& doc);
     void onDelete(OperationContext* txn,
-                  const std::string& ns,
-                  const BSONObj& idDoc,
+                  const NamespaceString& ns,
+                  DeleteState deleteState,
                   bool fromMigrate = false);
     void onOpMessage(OperationContext* txn, const BSONObj& msgObj);
     void onCreateCollection(OperationContext* txn,

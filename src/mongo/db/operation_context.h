@@ -48,7 +48,7 @@ class WriteUnitOfWork;
 
 /**
  * This class encompasses the state required by an operation and lives from the time a network
- * peration is dispatched until its execution is finished. Note that each "getmore" on a cursor
+ * operation is dispatched until its execution is finished. Note that each "getmore" on a cursor
  * is a separate operation. On construction, an OperationContext associates itself with the
  * current client, and only on destruction it deassociates itself. At any time a client can be
  * associated with at most one OperationContext. Each OperationContext has a RecoveryUnit

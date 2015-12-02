@@ -441,4 +441,8 @@ void logOpForSharding(OperationContext* txn,
         shardingState->migrationSourceManager()->logOp(txn, opstr, ns, obj, patt, notInActiveChunk);
 }
 
+bool isInMigratingChunk(OperationContext* txn, const NamespaceString& ns, const BSONObj& doc) {
+    return ShardingState::get(txn)->migrationSourceManager()->isInMigratingChunk(ns, doc);
+}
+
 }  // namespace mongo

@@ -37,6 +37,7 @@ class BSONObj;
 class Client;
 class OperationContext;
 class ShardedConnectionInfo;
+class NamespaceString;
 
 // -----------------
 // --- core ---
@@ -69,4 +70,11 @@ void logOpForSharding(OperationContext* txn,
                       const BSONObj& obj,
                       BSONObj* patt,
                       bool forMigrateCleanup);
+
+/**
+ * Checks if 'doc' in 'ns' belongs to a currently migrating chunk.
+ *
+ * Note: Must be holding global IX lock when calling this method.
+ */
+bool isInMigratingChunk(OperationContext* txn, const NamespaceString& ns, const BSONObj& doc);
 }

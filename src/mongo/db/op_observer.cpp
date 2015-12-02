@@ -40,6 +40,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -91,16 +92,37 @@ void OpObserver::onUpdate(OperationContext* txn, oplogUpdateEntryArgs args) {
     }
 }
 
-void OpObserver::onDelete(OperationContext* txn,
-                          const std::string& ns,
-                          const BSONObj& idDoc,
-                          bool fromMigrate) {
-    repl::logOp(txn, "d", ns.c_str(), idDoc, nullptr, fromMigrate);
+OpObserver::DeleteState OpObserver::aboutToDelete(OperationContext* txn,
+                                                  const NamespaceString& ns,
+                                                  const BSONObj& doc) {
+    OpObserver::DeleteState deleteState;
+    BSONElement idElement = doc["_id"];
+    if (!idElement.eoo()) {
+        deleteState.idDoc = idElement.wrap();
+    }
+    deleteState.isMigrating = isInMigratingChunk(txn, ns, doc);
+    return deleteState;
+}
 
-    getGlobalAuthorizationManager()->logOp(txn, "d", ns.c_str(), idDoc, nullptr);
-    logOpForSharding(txn, "d", ns.c_str(), idDoc, nullptr, fromMigrate);
-    logOpForDbHash(txn, ns.c_str());
-    if (strstr(ns.c_str(), ".system.js")) {
+void OpObserver::onDelete(OperationContext* txn,
+                          const NamespaceString& ns,
+                          OpObserver::DeleteState deleteState,
+                          bool fromMigrate) {
+    if (deleteState.idDoc.isEmpty())
+        return;
+
+    repl::logOp(txn, "d", ns.ns().c_str(), deleteState.idDoc, nullptr, fromMigrate);
+
+    AuthorizationManager::get(txn->getServiceContext())
+        ->logOp(txn, "d", ns.ns().c_str(), deleteState.idDoc, nullptr);
+    logOpForSharding(txn,
+                     "d",
+                     ns.ns().c_str(),
+                     deleteState.idDoc,
+                     nullptr,
+                     fromMigrate || !deleteState.isMigrating);
+    logOpForDbHash(txn, ns.ns().c_str());
+    if (ns.coll() == "system.js") {
         Scope::storedFuncMod(txn);
     }
 }

@@ -161,6 +161,8 @@ bool opReplicatedEnough(OperationContext* txn,
     return majorityStatus.isOK() && userStatus.isOK();
 }
 
+MONGO_FP_DECLARE(failMigrationReceivedOutOfRangeDelete);
+
 }  // namespace
 
 // Enabling / disabling these fail points pauses / resumes MigrateStatus::_go(), the thread which
@@ -825,6 +827,9 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* txn,
             BSONObj fullObj;
             if (Helpers::findById(txn, ctx.db(), ns.c_str(), id, fullObj)) {
                 if (!isInRange(fullObj, min, max, shardKeyPattern)) {
+                    if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeDelete)) {
+                        invariant(0);
+                    }
                     continue;
                 }
             }
