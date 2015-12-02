@@ -234,6 +234,8 @@ void MigrationSourceManager::logOp(OperationContext* txn,
         // won't be transferred to the recipient shard. Also ignore ops from
         // _migrateClone and _transferMods since it is impossible to move a chunk
         // to self.
+        // Also ignore out of range deletes when migrating (notInActiveChunk is set in
+        // OpObserver::onDelete)
         return;
     }
 
@@ -283,9 +285,15 @@ void MigrationSourceManager::logOp(OperationContext* txn,
         }
     }
 
-    // Note: can't check if delete is in active chunk since the document is gone!
-
     txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, op));
+}
+
+bool MigrationSourceManager::isInMigratingChunk(const NamespaceString& ns, const BSONObj& doc) {
+    if (!_active)
+        return false;
+    if (ns != _nss)
+        return false;
+    return isInRange(doc, _min, _max, _shardKeyPattern);
 }
 
 bool MigrationSourceManager::transferMods(OperationContext* txn,

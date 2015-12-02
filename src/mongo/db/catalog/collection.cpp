@@ -488,11 +488,8 @@ void Collection::deleteDocument(OperationContext* txn,
 
     Snapshotted<BSONObj> doc = docFor(txn, loc);
 
-    BSONElement e = doc.value()["_id"];
-    BSONObj id;
-    if (e.type()) {
-        id = e.wrap();
-    }
+    auto opObserver = getGlobalServiceContext()->getOpObserver();
+    OpObserver::DeleteState deleteState = opObserver->aboutToDelete(txn, ns(), doc.value());
 
     /* check if any cursors point to us.  if so, advance them. */
     _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
@@ -501,9 +498,7 @@ void Collection::deleteDocument(OperationContext* txn,
 
     _recordStore->deleteRecord(txn, loc);
 
-    if (!id.isEmpty()) {
-        getGlobalServiceContext()->getOpObserver()->onDelete(txn, ns().ns(), id);
-    }
+    opObserver->onDelete(txn, ns(), std::move(deleteState));
 }
 
 Counter64 moveCounter;

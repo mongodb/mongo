@@ -201,7 +201,7 @@ function waitForMigrateStep( shardConnection, stepNumber ) {
         admin = shardConnection.getDB( 'admin' );
 
     assert( stepNumber >= 1);
-    assert( stepNumber <= 5 );
+    assert( stepNumber <= 5);
 
     var msg = (
         'Migrate thread on ' + shardConnection.shardName
@@ -215,7 +215,11 @@ function waitForMigrateStep( shardConnection, stepNumber ) {
         for ( var i = 0; i < in_progress.length; ++i ) {
             var op = in_progress[i];
             if ( op.desc && op.desc === 'migrateThread' ) {
-                return op.msg.startsWith( searchString );
+                if (op.hasOwnProperty('msg')) {
+                    return op.msg.startsWith( searchString );
+                } else {
+                    return false;
+                }
             }
         }
 

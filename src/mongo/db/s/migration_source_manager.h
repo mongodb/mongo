@@ -71,6 +71,8 @@ public:
                BSONObj* patt,
                bool notInActiveChunk);
 
+    bool isInMigratingChunk(const NamespaceString& ns, const BSONObj& doc);
+
     /**
      * Called from the source of a migration process, this method transfers the accummulated local
      * mods from source to destination.
