@@ -38,6 +38,10 @@
 #include "mongo/scripting/mozjs/proxyscope.h"
 #include "mongo/util/log.h"
 
+namespace js {
+void DisableExtraThreads();
+}
+
 namespace mongo {
 
 namespace {
@@ -64,6 +68,7 @@ namespace mozjs {
 
 MozJSScriptEngine::MozJSScriptEngine() {
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to JS_Init()", JS_Init());
+    js::DisableExtraThreads();
 }
 
 MozJSScriptEngine::~MozJSScriptEngine() {
