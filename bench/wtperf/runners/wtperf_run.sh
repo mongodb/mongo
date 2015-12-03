@@ -26,6 +26,7 @@ fi
 home=./WT_TEST
 outfile=./wtperf.out
 rm -f $outfile
+echo "Parsed $# args: test: $wttest runmax: $runmax arg: $wtarg" >> $outfile
 
 # Each of these has an entry for each op in ops below.
 avg=(0 0 0 0)
@@ -78,7 +79,6 @@ isstable()
 getmin=0
 getmax=1
 run=1
-echo "Running $wttest $wtarg" >> $outfile
 while test "$run" -le "$runmax"; do
 	rm -rf $home
 	mkdir $home
