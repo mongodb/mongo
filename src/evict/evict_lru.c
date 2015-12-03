@@ -39,6 +39,10 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 
 	page = entry->ref->page;
 
+	/* Any page set to the oldest generation should be discarded. */
+	if (page->read_gen == WT_READGEN_OLDEST)
+		return (WT_READGEN_OLDEST);
+
 	/*
 	 * Any leaf page from a dead tree is a great choice (not internal pages,
 	 * they may have children and are not yet evictable).
@@ -1261,6 +1265,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 * eviction, skip anything that isn't marked.
 		 */
 		if (FLD_ISSET(cache->state, WT_EVICT_PASS_WOULD_BLOCK) &&
+		    page->memory_footprint < btree->splitmempage &&
 		    page->read_gen != WT_READGEN_OLDEST)
 			continue;
 
