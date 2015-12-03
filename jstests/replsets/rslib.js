@@ -1,4 +1,11 @@
-var wait, occasionally, reconnect, getLatestOp, waitForAllMembers, reconfig, awaitOpTime;
+var wait;
+var occasionally;
+var reconnect;
+var getLatestOp;
+var waitForAllMembers;
+var reconfig;
+var awaitOpTime;
+var startSetIfSupportsReadMajority;
 var waitUntilAllNodesCaughtUp;
 
 (function () {
@@ -179,6 +186,27 @@ waitUntilAllNodesCaughtUp = function(rs) {
         return "Optimes of members 0 (" + tojson(ot) + ") and " + firstConflictingIndex + " (" +
             tojson(otherOt) + ") are different in " + tojson(rsStatus);
     });
+};
+
+/**
+ * Starts each node in the given replica set if the storage engine supports readConcern 'majority'.
+ * Returns true if the replica set was started successfully and false otherwise.
+ *
+ * @param replSetTest - The instance of {@link ReplSetTest} to start
+ * @param options - The options passed to {@link ReplSetTest.startSet}
+ */
+startSetIfSupportsReadMajority = function (replSetTest, options) {
+    try {
+        replSetTest.startSet(options);
+    } catch (e) {
+        var conn = MongoRunner.runMongod();
+        if (!conn.getDB("admin").serverStatus().storageEngine.supportsCommittedReads) {
+            MongoRunner.stopMongod(conn);
+            return false;
+        }
+        throw e;
+    }
+    return true;
 };
 
 }());

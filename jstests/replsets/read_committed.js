@@ -1,4 +1,13 @@
-// Test basic read committed functionality.
+/**
+ * Test basic read committed functionality, including:
+ *  - Writes with writeConcern 'majority' should be visible once the write completes.
+ *  - With the only data-bearing secondary down, committed reads should not include newly inserted
+ *    data.
+ *  - When data-bearing node comes back up and catches up, writes should be readable.
+ */
+
+load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
+
 (function() {
 "use strict";
 
@@ -7,20 +16,13 @@ var name = "read_committed";
 var replTest = new ReplSetTest({name: name,
                                 nodes: 3,
                                 nodeOptions: {enableMajorityReadConcern: ''}});
-var nodes = replTest.nodeList();
 
-try {
-    replTest.startSet();
-} catch (e) {
-    var conn = MongoRunner.runMongod();
-    if (!conn.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
-        jsTest.log("skipping test since storage engine doesn't support committed reads");
-        MongoRunner.stopMongod(conn);
-        return;
-    }
-    throw e;
+if (!startSetIfSupportsReadMajority(replTest)) {
+    jsTest.log("skipping test since storage engine doesn't support committed reads");
+    return;
 }
 
+var nodes = replTest.nodeList();
 replTest.initiate({"_id": name,
                    "members": [
                        { "_id": 0, "host": nodes[0] },

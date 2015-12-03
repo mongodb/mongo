@@ -1,5 +1,10 @@
-// Test read committed and writeConcern: "majority" work properly with all other nodes being
-// arbiters.
+/**
+ * Tests that writeConcern 'majority' writes succeed and are visible in a replica set that has one
+ * data-bearing node and two arbiters.
+ */
+
+load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
+
 (function() {
 "use strict";
 
@@ -8,20 +13,13 @@ var name = "read_majority_two_arbs";
 var replTest = new ReplSetTest({name: name,
                                 nodes: 3,
                                 nodeOptions: {enableMajorityReadConcern: ''}});
-var nodes = replTest.nodeList();
 
-try {
-    replTest.startSet();
-} catch (e) {
-    var conn = MongoRunner.runMongod();
-    if (!conn.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
-        jsTest.log("skipping test since storage engine doesn't support committed reads");
-        MongoRunner.stopMongod(conn);
-        return;
-    }
-    throw e;
+if (!startSetIfSupportsReadMajority(replTest)) {
+    jsTest.log("skipping test since storage engine doesn't support committed reads");
+    return;
 }
 
+var nodes = replTest.nodeList();
 replTest.initiate({"_id": name,
                    "members": [
                        {"_id": 0, "host": nodes[0]},

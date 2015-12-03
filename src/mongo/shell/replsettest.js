@@ -377,6 +377,11 @@ var ReplSetTest = function(opts) {
         return this.name + "/" + hosts.join(",");
     };
 
+    /**
+     * Starts each node in the replica set with the given options.
+     *
+     * @param options - The options passed to {@link MongoRunner.runMongod}
+     */
     this.startSet = function(options) {
         print("ReplSetTest starting set");
 
