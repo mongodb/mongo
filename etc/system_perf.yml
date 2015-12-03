@@ -35,7 +35,7 @@ functions:
       # checkout dsi code
       params:
         script: |
-          set -e 
+          set -e
           set -v
           git clone git@github.com:10gen/dsi.git
           cd dsi
@@ -219,21 +219,23 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../dsi/bin/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.0.6-Baseline --overrideFile ../dsi/bin/override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
+          python -u ../dsi/analysis/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.0.6-Baseline --overrideFile ../dsi/analysis/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
 
   "compare":
     - command: shell.exec
       params: 
-        script: | 
-          rm -rf ./*
+        script: |
+          set -o verbose
+          rm -rf ./src
           mkdir src
-    - command: s3.get
+    - command: shell.exec
+      # checkout dsi code
       params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: dsi/${revision}/compare.py
-        bucket: mciuploads
-        local_file: src/compare.py
+        script: |
+          set -e 
+          set -v
+          rm -rf ./dsi
+          git clone git@github.com:10gen/dsi.git
     - command: json.get
       params:
         task: ${compare_task}
@@ -253,7 +255,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u compare.py -b standalone.json -c oplog.json -t ${threshold}
+          python -u ../dsi/analysis/compare.py -b standalone.json -c oplog.json -t ${threshold}
 
 
 
@@ -293,16 +295,6 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb.tar.gz
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/buildscripts/compare.py
-        remote_file: dsi/${revision}/compare.py
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/octet-stream}
-        display_name: compare.py
 
 
 # The industry_benchmarks_WT task runs the "bring up cluster" task and is
