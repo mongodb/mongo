@@ -19,8 +19,8 @@
 
     assert.eq(50, replInfo.logSizeMB, replInfoString);
     assert.lt(0, replInfo.usedMB, replInfoString);
-    assert.lt(0, replInfo.timeDiff, replInfoString);
-    assert.eq(0, replInfo.timeDiffHours, replInfoString);
+    assert.lte(0, replInfo.timeDiff, replInfoString);
+    assert.lte(0, replInfo.timeDiffHours, replInfoString);
     // Just make sure the following fields exist since it would be hard to predict their values
     assert(replInfo.tFirst, replInfoString);
     assert(replInfo.tLast, replInfoString);
