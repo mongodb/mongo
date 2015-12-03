@@ -78,6 +78,7 @@ isstable()
 getmin=0
 getmax=1
 run=1
+echo "Running $wttest $wtarg" >> $outfile
 while test "$run" -le "$runmax"; do
 	rm -rf $home
 	mkdir $home
