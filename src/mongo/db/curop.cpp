@@ -231,6 +231,10 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
 CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {}
 
 CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
+    if (_stack->top()) {
+        // Child operation should inherit the previous operation's timeout.
+        setMaxTimeMicros(_stack->top()->getRemainingMaxTimeMicros());
+    }
     if (opCtx) {
         _stack->push(opCtx, this);
     } else {
