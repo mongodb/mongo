@@ -72,6 +72,8 @@ func TestBufferedBulkInserterInserts(t *testing.T) {
 			So(bufBulk, ShouldNotBeNil)
 
 			Convey("inserting 1,000,000 documents into the BufferedBulkInserter and flushing", func() {
+				session.SetSocketTimeout(0)
+
 				for i := 0; i < 1000000; i++ {
 					bufBulk.Insert(bson.M{"_id": i})
 				}
