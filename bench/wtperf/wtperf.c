@@ -1534,8 +1534,10 @@ execute_workload(CONFIG *cfg)
 		lprintf(cfg, 0, 1,
 		    "Starting workload #%d: %" PRId64 " threads, inserts=%"
 		    PRId64 ", reads=%" PRId64 ", updates=%" PRId64
-		    ", truncate=%" PRId64, i + 1, workp->threads, workp->insert,
-		    workp->read, workp->update, workp->truncate);
+		    ", truncate=%" PRId64 ", throttle=%" PRId64,
+		    i + 1, workp->threads, workp->insert,
+		    workp->read, workp->update, workp->truncate,
+		    workp->throttle);
 
 		/* Figure out the workload's schedule. */
 		if ((ret = run_mix_schedule(cfg, workp)) != 0)
