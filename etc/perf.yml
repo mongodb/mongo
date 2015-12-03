@@ -27,6 +27,13 @@ post:
     - command: shell.cleanup
 
 functions:
+  "download analysis scripts":
+    - command: shell.exec
+      params:
+        script: |
+          set -v
+          rm -rf ./dsi
+          git clone git@github.com:10gen/dsi.git
   "start server":
     - command: shell.exec
       params:
@@ -78,13 +85,6 @@ functions:
           ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
           echo "MONGOD STARTED."
   "compare":
-    - command: s3.get
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: perf/${version_id}/${revision}/compare.py-${version_id}
-        bucket: mciuploads
-        local_file: src/compare.py
     - command: json.get
       params:
         task: ${compare_task}
@@ -106,22 +106,8 @@ functions:
           set -o verbose
           virtualenv ./venv
           source ./venv/bin/activate
-          python compare.py -b stand.json -c node.json -t ${threshold}
+          python ../dsi/analysis/compare.py -b stand.json -c node.json -t ${threshold}
   "analyze":
-    - command: s3.get
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: perf/${version_id}/${revision}/perf_regression_check.py-${version_id}
-        bucket: mciuploads
-        local_file: src/perf_regression_check.py
-    - command: s3.get
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: perf/${version_id}/${revision}/override.json-${version_id}
-        bucket: mciuploads
-        local_file: src/override.json
     - command: shell.exec
       params:
         working_dir: src
@@ -150,7 +136,7 @@ functions:
           set -o errexit
           set -o verbose
           source ./venv/bin/activate
-          python perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.0.6-Baseline --overrideFile override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
+          python ../dsi/analysis/perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.0.6-Baseline --overrideFile ../dsi/analysis/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
     - command: shell.exec
       params:
@@ -218,16 +204,6 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/buildscripts/perf_regression_check.py
-        remote_file: perf/${version_id}/${revision}/perf_regression_check.py-${version_id}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/octet-stream}
-        display_name: perf_regression_check.py
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
         local_file: src/buildscripts/compare.py
         remote_file: perf/${version_id}/${revision}/compare.py-${version_id}
         bucket: mciuploads
@@ -257,6 +233,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: where
   depends_on:
@@ -270,6 +247,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: update
   depends_on:
@@ -283,12 +261,14 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: insert
   depends_on:
   - variant: linux-wt-standalone
     name: compile
   commands:
+    - func: "download analysis scripts"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -309,6 +289,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: misc
   depends_on:
@@ -322,6 +303,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: singleThreaded
   depends_on:
@@ -335,6 +317,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "none"
         threads : "1"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: singleThreaded-wt-repl-comp
   depends_on:
@@ -347,6 +330,7 @@ tasks:
       variant :  linux-wt-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "singleThreaded"
@@ -364,6 +348,7 @@ tasks:
       variant :  linux-wt-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "insert"
@@ -381,6 +366,7 @@ tasks:
       variant :  linux-wt-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "update"
@@ -398,6 +384,7 @@ tasks:
       variant :  linux-wt-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "misc"
@@ -415,6 +402,7 @@ tasks:
       variant :  linux-mmap-standalone
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "singleThreaded"
@@ -432,6 +420,7 @@ tasks:
       variant :  linux-mmap-standalone
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "query"
@@ -449,6 +438,7 @@ tasks:
       variant :  linux-mmap-standalone
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "where"
@@ -466,6 +456,7 @@ tasks:
       variant :  linux-mmap-standalone
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "geo"
@@ -483,6 +474,7 @@ tasks:
       variant :  linux-mmap-standalone
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "insert"
@@ -500,6 +492,7 @@ tasks:
       variant :  linux-mmap-standalone
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "update"
@@ -517,6 +510,7 @@ tasks:
       variant :  linux-mmap-standalone
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "misc"
@@ -534,6 +528,7 @@ tasks:
       variant :  linux-mmap-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "singleThreaded"
@@ -551,6 +546,7 @@ tasks:
       variant :  linux-mmap-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "insert"
@@ -568,6 +564,7 @@ tasks:
       variant :  linux-mmap-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "update"
@@ -585,6 +582,7 @@ tasks:
       variant :  linux-mmap-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "misc"
@@ -602,6 +600,7 @@ tasks:
       variant :  linux-mmap-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "singleThreaded"
@@ -619,6 +618,7 @@ tasks:
       variant :  linux-mmap-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "insert"
@@ -636,6 +636,7 @@ tasks:
       variant :  linux-mmap-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "update"
@@ -653,6 +654,7 @@ tasks:
       variant :  linux-mmap-repl
       status : "*"
   commands:
+    - func: "download analysis scripts"
     - func: "compare"
       vars:
         compare_task : "misc"
