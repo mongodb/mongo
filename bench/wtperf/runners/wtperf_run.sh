@@ -12,12 +12,16 @@
 # This script should be invoked with the pathname of the wtperf test
 # config to run and the number of runs.
 #
-if test "$#" -ne "2"; then
+if test "$#" -lt "2"; then
 	echo "Must specify wtperf test to run and number of runs"
 	exit 1
 fi
 wttest=$1
 runmax=$2
+wtarg=""
+if test "$#" -eq "3"; then
+	wtarg=$3
+fi
 
 home=./WT_TEST
 outfile=./wtperf.out
@@ -77,7 +81,7 @@ run=1
 while test "$run" -le "$runmax"; do
 	rm -rf $home
 	mkdir $home
-	LD_PRELOAD=/usr/lib64/libjemalloc.so.1 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest
+	LD_PRELOAD=/usr/lib64/libjemalloc.so.1 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest $wtarg
 	if test "$?" -ne "0"; then
 		exit 1
 	fi
