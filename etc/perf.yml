@@ -268,7 +268,6 @@ tasks:
   - variant: linux-wt-standalone
     name: compile
   commands:
-    - func: "download analysis scripts"
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -276,6 +275,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: geo
   depends_on:
