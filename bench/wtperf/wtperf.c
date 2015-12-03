@@ -2427,6 +2427,11 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 	if (usecs_to_complete < USEC_PER_SEC)
 		(void)usleep((useconds_t)(USEC_PER_SEC - usecs_to_complete));
 
+	/*
+	 * After sleeping, set the interval to the current time.
+	 */
+	if (__wt_epoch(NULL, &now) != 0)
+		return;
 	*ops = 0;
 	*interval = now;
 }
