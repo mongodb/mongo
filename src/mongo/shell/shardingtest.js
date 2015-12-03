@@ -21,6 +21,8 @@
  *         nodes {number}: number of replica members. Defaults to 3.
  *         protocolVersion {number}: protocol version of replset used by the
  *             replset initiation.
+ *         initiateTimeout {number}: timeout in milliseconds to specify
+ *              to ReplSetTest.prototype.initiate().
  *         For other options, @see ReplSetTest#start
  *       }
  * 
@@ -879,6 +881,8 @@ var ShardingTest = function(params) {
             delete rsDefaults.nodes;
             var protocolVersion = rsDefaults.protocolVersion;
             delete rsDefaults.protocolVersion;
+            var initiateTimeout = rsDefaults.initiateTimeout;
+            delete rsDefaults.initiateTimeout;
 
             print("Replica set test!")
 
@@ -896,7 +900,7 @@ var ShardingTest = function(params) {
                             nodes : rs.startSet(rsDefaults),
                             url : rs.getURL() };
 
-            rs.initiate();
+            rs.initiate(null, null, initiateTimeout);
             this["rs" + i] = rs
 
             this._rsObjects[i] = rs
@@ -1095,7 +1099,8 @@ var ShardingTest = function(params) {
         var config = this.configRS.getReplSetConfig();
         config.configsvr = true;
         config.settings = config.settings || {};
-        this.configRS.initiate(config);
+        var initiateTimeout = otherParams.rsOptions && otherParams.rsOptions.initiateTimeout;
+        this.configRS.initiate(config, null, initiateTimeout);
 
         this.configRS.getMaster(); // Wait for master to be elected before starting mongos
 
