@@ -100,6 +100,7 @@ struct __wt_cursor_btree {
 	WT_INSERT	*next_stack[WT_SKIP_MAXDEPTH];
 
 	uint32_t page_deleted_count;	/* Deleted items on the page */
+	uint32_t rand_leaf_skip;	/* Leaf pages to skip (next_random) */
 
 	uint64_t recno;			/* Record number */
 

@@ -997,6 +997,22 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_ref_is_leaf --
+ *	Check if a reference is for a leaf page.
+ */
+static inline bool
+__wt_ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	const uint8_t *addr;
+	size_t addr_size;
+	u_int type;
+
+	type = 0;
+	(void)(__wt_ref_info(session, ref, &addr, &addr_size, &type));
+	return (type == WT_CELL_ADDR_LEAF || type == WT_CELL_ADDR_LEAF_NO);
+}
+
+/*
  * __wt_ref_block_free --
  *	Free the on-disk block for a reference and clear the address.
  */

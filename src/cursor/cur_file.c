@@ -132,7 +132,9 @@ __curfile_next_random(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if ((ret = __wt_btcur_next_random(cbt)) == 0)
+	WT_WITH_PAGE_INDEX(session,
+	    ret = __wt_btcur_next_random(cbt));
+	if (ret == 0)
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END_RET(session, ret);
