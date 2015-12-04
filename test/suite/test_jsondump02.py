@@ -209,7 +209,7 @@ class test_jsondump02(wttest.WiredTigerTestCase):
         self.check_json(self.table_uri3, (
                 ('"key0" : 1', '"value0" : "\\u0001\\u0002\\u0003"'),
                 ('"key0" : 2',
-                 '"value0" : "\\u0077\\u0088\\u0099\\u0000\\u00FF\\u00FE"')))
+                 '"value0" : "\\u0077\\u0088\\u0099\\u0000\\u00ff\\u00fe"')))
         self.check_json(self.table_uri4, (
                 ('"ikey" : 1,\n"Skey" : "key1"',
                  '"S1" : "val1",\n"i2" : 1,\n"S3" : "val1",\n"i4" : 1'),

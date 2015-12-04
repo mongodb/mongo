@@ -34,6 +34,17 @@ __fill_hex(const uint8_t *src, size_t src_max,
 }
 
 /*
+ * __wt_fill_hex --
+ *	In-memory conversion of raw bytes to a hexadecimal representation.
+ */
+void
+__wt_fill_hex(const uint8_t *src, size_t src_max,
+    uint8_t *dest, size_t dest_max, size_t *lenp)
+{
+	return __fill_hex(src, src_max, dest, dest_max, lenp);
+}
+
+/*
  * __wt_raw_to_hex --
  *	Convert a chunk of data to a nul-terminated printable hex string.
  */
