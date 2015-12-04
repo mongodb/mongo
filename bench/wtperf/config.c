@@ -181,6 +181,16 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 	int ret;
 
 	group = scan = NULL;
+	if (cfg->workload != NULL) {
+		/*
+		 * This call overrides an earlier call.  Free and
+		 * reset everything.
+		 */
+		free(cfg->workload);
+		cfg->workload = NULL;
+		cfg->workload_cnt = 0;
+		cfg->workers_cnt = 0;
+	}
 	/* Allocate the workload array. */
 	if ((cfg->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD))) == NULL)
 		return (enomem(cfg));
