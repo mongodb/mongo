@@ -1100,7 +1100,8 @@ monitor(void *arg)
 	uint32_t latency_max, level;
 	u_int i;
 	int msg_err, ret;
-	char buf[64], *path, *str;
+	const char *str;
+	char buf[64], *path;
 
 	cfg = (CONFIG *)arg;
 	assert(cfg->sample_interval != 0);
