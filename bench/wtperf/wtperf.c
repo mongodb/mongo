@@ -1534,8 +1534,10 @@ execute_workload(CONFIG *cfg)
 		lprintf(cfg, 0, 1,
 		    "Starting workload #%d: %" PRId64 " threads, inserts=%"
 		    PRId64 ", reads=%" PRId64 ", updates=%" PRId64
-		    ", truncate=%" PRId64, i + 1, workp->threads, workp->insert,
-		    workp->read, workp->update, workp->truncate);
+		    ", truncate=%" PRId64 ", throttle=%" PRId64,
+		    i + 1, workp->threads, workp->insert,
+		    workp->read, workp->update, workp->truncate,
+		    workp->throttle);
 
 		/* Figure out the workload's schedule. */
 		if ((ret = run_mix_schedule(cfg, workp)) != 0)
@@ -2427,6 +2429,11 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 	if (usecs_to_complete < USEC_PER_SEC)
 		(void)usleep((useconds_t)(USEC_PER_SEC - usecs_to_complete));
 
+	/*
+	 * After sleeping, set the interval to the current time.
+	 */
+	if (__wt_epoch(NULL, &now) != 0)
+		return;
 	*ops = 0;
 	*interval = now;
 }

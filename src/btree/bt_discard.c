@@ -269,7 +269,7 @@ __wt_free_ref(
 	 * Free any address allocation; if there's no linked WT_REF page, it
 	 * must be allocated.
 	 */
-	__wt_ref_free_addr(session, ref);
+	__wt_ref_addr_free(session, ref);
 
 	/* Free any page-deleted information. */
 	if (ref->page_del != NULL) {
