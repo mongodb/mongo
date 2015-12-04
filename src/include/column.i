@@ -176,6 +176,16 @@ __col_insert_search(WT_INSERT_HEAD *inshead,
 			continue;
 		}
 
+		/*
+		 * When no exact match is found, the search returns the smallest
+		 * key larger than the searched-for key, or the largest key
+		 * smaller than the searched-for key, if there is no larger key.
+		 * Our callers depend on that: specifically, the fixed-length
+		 * column store cursor code interprets returning a key smaller
+		 * than the searched-for key to mean the searched-for key is
+		 * larger than any key on the page. Don't change that behavior,
+		 * things will break.
+		 */
 		ins_recno = WT_INSERT_RECNO(ret_ins);
 		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
 

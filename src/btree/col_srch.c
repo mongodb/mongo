@@ -129,7 +129,6 @@ leaf_only:
 	 */
 	if (recno == UINT64_MAX) {
 		cbt->compare = -1;
-		F_SET(cbt, WT_CBT_MAX_RECORD);		/* Past end-of-page. */
 		return (0);
 	}
 
@@ -216,8 +215,5 @@ past_end:
 		else
 			cbt->compare = -1;
 	}
-
-	if (cbt->compare == -1)
-		F_SET(cbt, WT_CBT_MAX_RECORD);		/* Past end-of-page. */
 	return (0);
 }

@@ -62,8 +62,18 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 static inline int
 __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 {
-	return (btree->type == BTREE_COL_FIX &&
-	    !F_ISSET(cbt, WT_CBT_MAX_RECORD));
+	/*
+	 * When there's no exact match, column-store search returns the key
+	 * nearest the searched-for key (continuing past keys smaller than the
+	 * searched-for key to return the next-largest key). Therefore, if the
+	 * returned comparison is -1, the searched-for key was larger than any
+	 * row on the page's standard information or column-store insert list.
+	 *
+	 * If the returned comparison is NOT -1, there was a row equal to or
+	 * larger than the searched-for key, and we implicitly create missing
+	 * rows.
+	 */
+	return (btree->type == BTREE_COL_FIX && cbt->compare != -1);
 }
 
 /*
