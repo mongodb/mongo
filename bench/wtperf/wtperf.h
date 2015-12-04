@@ -116,6 +116,7 @@ struct __truncate_struct {
 	uint64_t last_total_inserts;
 	uint64_t num_stones;
 	uint64_t last_key;
+	uint64_t catchup_multiplier;
 };
 
 /* Queue entry for use with the Truncate Logic */
