@@ -100,7 +100,6 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
 	bool empty_internal, isleaf, prev, skip;
@@ -401,10 +400,9 @@ ascend:	/*
 			 * A new page: configure for traversal of any internal
 			 * page's children, else return the leaf page.
 			 */
-descend:		couple = ref;
-			page = ref->page;
-			if (WT_PAGE_IS_INTERNAL(page)) {
-				WT_INTL_INDEX_GET(session, page, pindex);
+			if (WT_PAGE_IS_INTERNAL(ref->page)) {
+descend:			couple = ref;
+				WT_INTL_INDEX_GET(session, ref->page, pindex);
 				slot = prev ? pindex->entries - 1 : 0;
 				empty_internal = true;
 			} else {
@@ -416,6 +414,7 @@ descend:		couple = ref;
 				 */
 				if (LF_ISSET(WT_READ_SKIP_LEAF) &&
 				    *walkcntp > 0) {
+					couple = ref;
 					--*walkcntp;
 					break;
 				}
