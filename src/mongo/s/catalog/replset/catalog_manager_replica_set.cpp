@@ -463,14 +463,13 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
     LOG(1) << "dropCollection " << ns << " started";
 
     // Lock the collection globally so that split/migrate cannot run
-    stdx::chrono::seconds waitFor(2);
+    stdx::chrono::seconds waitFor(DistLockManager::kDefaultLockTimeout);
     MONGO_FAIL_POINT_BLOCK(setDropCollDistLockWait, customWait) {
         const BSONObj& data = customWait.getData();
         waitFor = stdx::chrono::seconds(data["waitForSecs"].numberInt());
     }
-    const stdx::chrono::milliseconds lockTryInterval(500);
-    auto scopedDistLock =
-        getDistLockManager()->lock(txn, ns.ns(), "drop", waitFor, lockTryInterval);
+
+    auto scopedDistLock = getDistLockManager()->lock(txn, ns.ns(), "drop", waitFor);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }

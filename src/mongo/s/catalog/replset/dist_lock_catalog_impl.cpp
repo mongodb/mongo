@@ -307,7 +307,7 @@ Status DistLockCatalogImpl::unlock(OperationContext* txn, const OID& lockSession
     request.setWriteConcern(_writeConcern);
 
     auto resultStatus = _client->runCommandOnConfigWithRetries(
-        txn, _locksNS.db().toString(), request.toBSON(), ShardRegistry::kNotMasterErrors);
+        txn, _locksNS.db().toString(), request.toBSON(), ShardRegistry::kAllRetriableErrors);
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();

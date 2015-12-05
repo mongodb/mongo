@@ -100,8 +100,7 @@ public:
         OperationContext* txn,
         StringData name,
         StringData whyMessage,
-        stdx::chrono::milliseconds waitFor = DistLockManager::kDefaultSingleLockAttemptTimeout,
-        stdx::chrono::milliseconds lockTryInterval = DistLockManager::kDefaultLockRetryInterval);
+        stdx::chrono::milliseconds waitFor = DistLockManager::kSingleLockAttemptTimeout);
 
     /**
      * Returns a pointer to the CatalogManager that should be used for general CatalogManager

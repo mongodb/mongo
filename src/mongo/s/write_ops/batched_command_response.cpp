@@ -340,14 +340,6 @@ void BatchedCommandResponse::setOk(int ok) {
     _isOkSet = true;
 }
 
-void BatchedCommandResponse::unsetOk() {
-    _isOkSet = false;
-}
-
-bool BatchedCommandResponse::isOkSet() const {
-    return _isOkSet;
-}
-
 int BatchedCommandResponse::getOk() const {
     dassert(_isOkSet);
     return _ok;
