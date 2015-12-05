@@ -65,6 +65,8 @@ namespace {
 
 AtomicUInt32 JOB_NUMBER;
 
+const stdx::chrono::milliseconds kNoDistLockTimeout(-1);
+
 /**
  * Generates a unique name for the temporary M/R output collection.
  */
@@ -455,11 +457,7 @@ public:
             {
                 // Take distributed lock to prevent split / migration.
                 auto scopedDistLock = grid.forwardingCatalogManager()->distLock(
-                    txn,
-                    finalColLong,
-                    "mr-post-process",
-                    stdx::chrono::milliseconds(-1),  // retry indefinitely
-                    stdx::chrono::milliseconds(100));
+                    txn, finalColLong, "mr-post-process", kNoDistLockTimeout);
 
                 if (!scopedDistLock.isOK()) {
                     return appendCommandStatus(result, scopedDistLock.getStatus());

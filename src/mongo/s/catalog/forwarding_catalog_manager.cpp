@@ -126,14 +126,12 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::d
     OperationContext* txn,
     StringData name,
     StringData whyMessage,
-    stdx::chrono::milliseconds waitFor,
-    stdx::chrono::milliseconds lockTryInterval) {
+    stdx::chrono::milliseconds waitFor) {
     for (int i = 0; i < 2; ++i) {
         try {
             _operationLock.lock_shared();
             auto guard = MakeGuard([this] { _operationLock.unlock_shared(); });
-            auto dlmLock = _actual->getDistLockManager()->lock(
-                txn, name, whyMessage, waitFor, lockTryInterval);
+            auto dlmLock = _actual->getDistLockManager()->lock(txn, name, whyMessage, waitFor);
             if (dlmLock.isOK()) {
                 guard.Dismiss();  // Don't unlock _operationLock; hold it until the returned
                                   // ScopedDistLock goes out of scope!

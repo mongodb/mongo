@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/dbclient_shard_resolver.h"
 
 #include <set>
