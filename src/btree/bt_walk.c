@@ -81,7 +81,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
-	bool empty_internal, prev, skip;
+	bool empty_internal, isleaf, prev, skip;
 	uint32_t slot;
 
 	btree = S2BT(session);
@@ -305,9 +305,11 @@ ascend:	/*
 			}
 
 			/* Optionally skip leaf pages. */
-			if (LF_ISSET(WT_READ_SKIP_LEAF) &&
-			    __wt_ref_is_leaf(session, ref))
-				break;
+			if (LF_ISSET(WT_READ_SKIP_LEAF)) {
+				WT_ERR(__wt_ref_is_leaf(session, ref, &isleaf));
+				if (isleaf)
+					break;
+			}
 
 			ret = __wt_page_swap(session, couple, ref, flags);
 

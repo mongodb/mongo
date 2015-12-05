@@ -828,6 +828,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	uint64_t leaf;
+	bool isleaf;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
@@ -853,35 +854,41 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 			/* Walk 1% of pages each time, adjust for tiny files. */
 			cbt->rand_leaf_skip /= 100;
 			++cbt->rand_leaf_skip;
+#if 0
 			printf("Skipping %u leaf pages each random op\n",
 			    cbt->rand_leaf_skip);
+#endif
 		}
 
 		/* Walk through the current parent. */
-		leaf = 0;
 		parent_ref = cbt->ref->home->pg_intl_parent_ref;
-		WT_RET(__wt_page_swap(session, cbt->ref, parent_ref, 0));
+		if (__wt_ref_is_root(parent_ref))
+			WT_ERR(__wt_page_release(session, cbt->ref, 0));
+		else
+			WT_ERR(
+			    __wt_page_swap(session, cbt->ref, parent_ref, 0));
 		cbt->ref = parent_ref;
 
-		while (leaf < cbt->rand_leaf_skip) {
+		for (leaf = 0; leaf < cbt->rand_leaf_skip;) {
 			parent = cbt->ref->page;
 			WT_INTL_FOREACH_BEGIN(session, parent, child) {
-				if (__wt_ref_is_leaf(session, child) &&
-				    ++leaf == cbt->rand_leaf_skip) {
-					WT_RET(__wt_page_swap(
+				WT_ERR(
+				    __wt_ref_is_leaf(session, child, &isleaf));
+				if (isleaf && ++leaf == cbt->rand_leaf_skip) {
+					WT_ERR(__wt_page_swap(
 					    session, cbt->ref, child, 0));
 					cbt->ref = child;
 					goto leaf;
 				}
 			} WT_INTL_FOREACH_END;
 			do {
-				WT_RET(__wt_tree_walk(session,
+				WT_ERR(__wt_tree_walk(session,
 				    &cbt->ref, NULL, WT_READ_SKIP_LEAF));
 			} while (cbt->ref == NULL);
 		}
 	}
 
-	WT_RET(__cursor_func_init(cbt, true));
+	WT_ERR(__cursor_func_init(cbt, true));
 	WT_ERR(__wt_row_random_descent(session, cbt));
 
 leaf:	WT_ERR(__wt_row_random_leaf(session, cbt));
@@ -893,6 +900,7 @@ leaf:	WT_ERR(__wt_row_random_leaf(session, cbt));
 		WT_ERR(ret);
 	}
 
+#if 0
 	if (cbt->ref != NULL) {
 		const uint8_t *addr;
 		size_t addr_size;
@@ -901,10 +909,14 @@ leaf:	WT_ERR(__wt_row_random_leaf(session, cbt));
 
 		WT_ERR(__wt_ref_info(
 		    session, cbt->ref, &addr, &addr_size, NULL));
-		WT_ERR(__wt_block_buffer_to_addr(
-		    btree->bm->block, addr, &off, &sz, &ckpt));
-		printf("%d\n", (int)((100 * off) / btree->bm->block->fh->size));
+		if (addr != NULL) {
+			WT_ERR(__wt_block_buffer_to_addr(
+			    btree->bm->block, addr, &off, &sz, &ckpt));
+			printf("%d\n",
+			    (int)((100 * off) / btree->bm->block->fh->size));
+		}
 	}
+#endif
 
 err:	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));
