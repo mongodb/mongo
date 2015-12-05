@@ -877,7 +877,9 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		 * Choose a leaf page from the tree.
 		 */
 		WT_ERR(__cursor_func_init(cbt, true));
-		WT_ERR(__wt_row_random_descent(session, cbt));
+		WT_WITH_PAGE_INDEX(
+		    session, ret = __wt_row_random_descent(session, cbt));
+		WT_ERR(ret);
 	} else {
 		/*
 		 * Read through the tree, skipping leaf pages. Be cautious about
