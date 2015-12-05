@@ -848,11 +848,13 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		 * !!! Ideally, this would be prime to avoid restart issues.
 		 */
 		if (cbt->rand_leaf_skip == 0) {
-			cbt->rand_leaf_skip = (uint32_t)(btree->bm->block->fh->size / btree->allocsize);
+			cbt->rand_leaf_skip = (uint32_t)
+			    (btree->bm->block->fh->size / btree->allocsize);
 			/* Walk 1% of pages each time, adjust for tiny files. */
 			cbt->rand_leaf_skip /= 100;
 			++cbt->rand_leaf_skip;
-			printf("Skipping %u leaf pages each random op\n", cbt->rand_leaf_skip);
+			printf("Skipping %u leaf pages each random op\n",
+			    cbt->rand_leaf_skip);
 		}
 
 		/* Walk through the current parent. */
@@ -864,14 +866,17 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		while (leaf < cbt->rand_leaf_skip) {
 			parent = cbt->ref->page;
 			WT_INTL_FOREACH_BEGIN(session, parent, child) {
-				if (__wt_ref_is_leaf(session, child) && ++leaf == cbt->rand_leaf_skip) {
-					WT_RET(__wt_page_swap(session, cbt->ref, child, 0));
+				if (__wt_ref_is_leaf(session, child) &&
+				    ++leaf == cbt->rand_leaf_skip) {
+					WT_RET(__wt_page_swap(
+					    session, cbt->ref, child, 0));
 					cbt->ref = child;
 					goto leaf;
 				}
 			} WT_INTL_FOREACH_END;
 			do {
-				WT_RET(__wt_tree_walk(session, &cbt->ref, NULL, WT_READ_SKIP_LEAF));
+				WT_RET(__wt_tree_walk(session,
+				    &cbt->ref, NULL, WT_READ_SKIP_LEAF));
 			} while (cbt->ref == NULL);
 		}
 	}
@@ -894,8 +899,10 @@ leaf:	WT_ERR(__wt_row_random_leaf(session, cbt));
 		wt_off_t off;
 		uint32_t sz, ckpt;
 
-		WT_ERR(__wt_ref_info(session, cbt->ref, &addr, &addr_size, NULL));
-		WT_ERR(__wt_block_buffer_to_addr(btree->bm->block, addr, &off, &sz, &ckpt));
+		WT_ERR(__wt_ref_info(
+		    session, cbt->ref, &addr, &addr_size, NULL));
+		WT_ERR(__wt_block_buffer_to_addr(
+		    btree->bm->block, addr, &off, &sz, &ckpt));
 		printf("%d\n", (int)((100 * off) / btree->bm->block->fh->size));
 	}
 
