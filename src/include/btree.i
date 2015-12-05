@@ -1452,31 +1452,3 @@ __wt_split_intl_race(
 	WT_INTL_INDEX_GET(session, parent, pindex);
 	return (pindex != saved_pindex);
 }
-
-/*
- * __wt_ref_is_leaf --
- *	Check if a reference is for a leaf page.
- */
-static inline int
-__wt_ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref, bool *isleafp)
-{
-	const uint8_t *addr;
-	size_t addr_size;
-	u_int type;
-
-	/*
-	 * If the page has a disk address, we can crack it to figure out if
-	 * this page is a leaf page or not. If there's no address, the page
-	 * isn't on disk, and must be in memory, but we have to acquire a
-	 * hazard pointer to look at that information.
-	 */
-	WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, &type));
-	if (addr != NULL) {
-		*isleafp =
-		    type == WT_CELL_ADDR_LEAF || type == WT_CELL_ADDR_LEAF_NO;
-		return (0);
-	}
-	WT_RET(__wt_page_in(session, ref, 0));
-	*isleafp = !WT_PAGE_IS_INTERNAL(ref->page);
-	return (__wt_page_release(session, ref, 0));
-}

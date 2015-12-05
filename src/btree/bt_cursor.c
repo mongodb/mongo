@@ -823,12 +823,9 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_PAGE *parent;
-	WT_REF *child, *parent_ref;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	uint64_t leaf;
-	bool isleaf;
+	uint64_t skip;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
@@ -882,39 +879,28 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		WT_ERR(__cursor_func_init(cbt, true));
 		WT_ERR(__wt_row_random_descent(session, cbt));
 	} else {
-		/* Continue from the current leaf page parent. */
-		parent_ref = cbt->ref->home->pg_intl_parent_ref;
-		if (__wt_ref_is_root(parent_ref))
-			WT_ERR(__wt_page_release(session, cbt->ref, 0));
-		else
-			WT_ERR(
-			    __wt_page_swap(session, cbt->ref, parent_ref, 0));
-		cbt->ref = parent_ref;
-
-		for (leaf = 0; leaf < cbt->rand_leaf_skip;) {
-			parent = cbt->ref->page;
-			WT_INTL_FOREACH_BEGIN(session, parent, child) {
-				WT_ERR(
-				    __wt_ref_is_leaf(session, child, &isleaf));
-				if (isleaf && ++leaf == cbt->rand_leaf_skip) {
-					WT_ERR(__wt_page_swap(
-					    session, cbt->ref, child, 0));
-					cbt->ref = child;
-					goto leaf;
-				}
-			} WT_INTL_FOREACH_END;
-			do {
-				WT_ERR(__wt_tree_walk(session,
-				    &cbt->ref, NULL, WT_READ_SKIP_LEAF));
-			} while (cbt->ref == NULL);
-		}
+		/*
+		 * Read through the tree, skipping leaf pages. Be cautious about
+		 * the skip count: if the last leaf page skipped was also the
+		 * last leaf page in the tree, it may be set to zero on return
+		 * with the end-of-walk condition.
+		 *
+		 * Pages read for data sampling aren't "useful"; don't update
+		 * the read generation of pages already in memory, and if a page
+		 * is read, set its generation to a low value so it is evicted
+		 * quickly.
+		 */
+		for (skip = cbt->rand_leaf_skip; cbt->ref == NULL || skip > 0;)
+			WT_ERR(__wt_tree_walk(session, &cbt->ref, &skip,
+			    WT_READ_NO_GEN | WT_READ_SKIP_INTL |
+			    WT_READ_SKIP_LEAF | WT_READ_WONT_NEED));
 	}
 
 	/*
 	 * Select a random entry from the leaf page. If it's not valid, move to
 	 * the next entry, if that doesn't work, move to the previous entry.
 	 */
-leaf:	WT_ERR(__wt_row_random_leaf(session, cbt));
+	WT_ERR(__wt_row_random_leaf(session, cbt));
 	if (__cursor_valid(cbt, &upd))
 		WT_ERR(__wt_kv_return(session, cbt, upd));
 	else {
