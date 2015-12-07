@@ -226,12 +226,12 @@ protected:
     intrusive_ptr<Testable> _associativeAndCommutative;
 };
 
-TEST_F(ExpressionNaryTest, AddConstantOperand) {
+TEST_F(ExpressionNaryTest, AddedConstantOperandIsSerialized) {
     _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(Value(9)));
     assertContents(_notAssociativeNorCommutative, BSON_ARRAY(9));
 }
 
-TEST_F(ExpressionNaryTest, AddFieldPathOperand) {
+TEST_F(ExpressionNaryTest, AddedFieldPathOperandIsSerialized) {
     _notAssociativeNorCommutative->addOperand(ExpressionFieldPath::create("ab.c"));
     assertContents(_notAssociativeNorCommutative, BSON_ARRAY("$ab.c"));
 }
@@ -279,7 +279,7 @@ TEST_F(ExpressionNaryTest, SerializationToBsonArr) {
 }
 
 // Verify that the internal operands are optimized
-TEST_F(ExpressionNaryTest, InternalOperandOptimization) {
+TEST_F(ExpressionNaryTest, InternalOperandOptimizationIsDone) {
     BSONArray spec = BSON_ARRAY(BSON("$and" << BSONArray()) << "$abc");
     addOperandArrayToExpr(_notAssociativeNorCommutative, spec);
     assertContents(_notAssociativeNorCommutative, spec);
