@@ -106,6 +106,19 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target="store_possible_cursor_test",
+    source=[
+        "store_possible_cursor_test.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        "$BUILD_DIR/mongo/s/mongoscore",
+        "$BUILD_DIR/mongo/util/clock_source_mock",
+        "store_possible_cursor",
+    ],
+)
+
 env.Library(
     target="cluster_cursor_manager",
     source=[

@@ -90,4 +90,7 @@
     assert.eq(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 10);
+
+    // Error on invalid collection name.
+    assert.commandFailedWithCode(db.runCommand({find: ""}), ErrorCodes.InvalidNamespace);
 })();
