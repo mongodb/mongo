@@ -46,7 +46,6 @@ static void config_opt_usage(void);
 #define	STRING_MATCH(str, bytes, len)					\
 	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
-
 /*
  * config_assign --
  *	Assign the src config to the dest, any storage allocated in dest is
@@ -211,7 +210,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		if ((ret = wiredtiger_config_parser_open(
 		    NULL, groupk.str, groupk.len, &scan)) != 0)
 			goto err;
-		
+
 		/* Move to the next workload slot. */
 		if (cfg->workload_cnt == WORKLOAD_MAX) {
 			fprintf(stderr,
@@ -318,7 +317,7 @@ err:	if (group != NULL)
 		(void)group->close(group);
 	if (scan != NULL)
 		(void)scan->close(scan);
-		
+
 	fprintf(stderr,
 	    "invalid thread configuration or scan error: %.*s\n",
 	    (int)len, config);
@@ -687,7 +686,7 @@ config_print(CONFIG *cfg)
 		for (i = 0, workp = cfg->workload;
 		    i < cfg->workload_cnt; ++i, ++workp)
 			printf("\t\t%" PRId64 " threads (inserts=%" PRId64
-			    ", reads=%" PRId64 ", updates=%" PRId64 
+			    ", reads=%" PRId64 ", updates=%" PRId64
 			    ", truncates=% " PRId64 ")\n",
 			    workp->threads,
 			    workp->insert, workp->read,
