@@ -38,6 +38,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -88,27 +89,37 @@ bool ActionSet::isSupersetOf(const ActionSet& other) const {
 Status ActionSet::parseActionSetFromString(const std::string& actionsString, ActionSet* result) {
     std::vector<std::string> actionsList;
     splitStringDelim(actionsString, &actionsList, ',');
-    return parseActionSetFromStringVector(actionsList, result);
+    std::vector<std::string> unrecognizedActions;
+    Status status = parseActionSetFromStringVector(actionsList, result, &unrecognizedActions);
+    invariantOK(status);
+    if (unrecognizedActions.empty()) {
+        return Status::OK();
+    }
+    std::string unrecognizedActionsString;
+    joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
+    return Status(
+        ErrorCodes::FailedToParse,
+        str::stream() << "Unrecognized action privilege strings: " << unrecognizedActionsString);
 }
 
 Status ActionSet::parseActionSetFromStringVector(const std::vector<std::string>& actionsVector,
-                                                 ActionSet* result) {
-    ActionSet actions;
+                                                 ActionSet* result,
+                                                 std::vector<std::string>* unrecognizedActions) {
+    result->removeAllActions();
     for (size_t i = 0; i < actionsVector.size(); i++) {
         ActionType action;
         Status status = ActionType::parseActionFromString(actionsVector[i], &action);
-        if (status != Status::OK()) {
-            ActionSet empty;
-            *result = empty;
-            return status;
+        if (status == ErrorCodes::FailedToParse) {
+            unrecognizedActions->push_back(actionsVector[i]);
+        } else {
+            invariantOK(status);
+            if (action == ActionType::anyAction) {
+                result->addAllActions();
+                return Status::OK();
+            }
+            result->addAction(action);
         }
-        if (action == ActionType::anyAction) {
-            actions.addAllActions();
-            break;
-        }
-        actions.addAction(action);
     }
-    *result = actions;
     return Status::OK();
 }
 
