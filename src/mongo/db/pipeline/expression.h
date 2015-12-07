@@ -503,7 +503,6 @@ class ExpressionAbs final : public ExpressionSingleNumericArg<ExpressionAbs> {
 class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
     Value evaluateInternal(Variables* vars) const final;
-
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -619,7 +618,6 @@ private:
 class ExpressionConcat final : public ExpressionVariadic<ExpressionConcat> {
 public:
     Value evaluateInternal(Variables* vars) const final;
-
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -631,7 +629,6 @@ public:
 class ExpressionConcatArrays final : public ExpressionVariadic<ExpressionConcatArrays> {
 public:
     Value evaluateInternal(Variables* vars) const final;
-
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -654,17 +651,13 @@ public:
 class ExpressionConstant final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-
     void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
-
     Value evaluateInternal(Variables* vars) const final;
-
     Value serialize(bool explain) const final;
 
     const char* getOpName() const;
 
     static boost::intrusive_ptr<ExpressionConstant> create(const Value& pValue);
-
     static boost::intrusive_ptr<Expression> parse(BSONElement bsonExpr,
                                                   const VariablesParseState& vps);
 
@@ -686,11 +679,8 @@ private:
 class ExpressionDateToString final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-
     Value serialize(bool explain) const final;
-
     Value evaluateInternal(Variables* vars) const final;
-
     void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
 
     static boost::intrusive_ptr<Expression> parse(BSONElement expr, const VariablesParseState& vps);
@@ -980,7 +970,6 @@ public:
 class ExpressionMultiply final : public ExpressionVariadic<ExpressionMultiply> {
 public:
     Value evaluateInternal(Variables* vars) const final;
-
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -1123,9 +1112,7 @@ private:
 class ExpressionOr final : public ExpressionVariadic<ExpressionOr> {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
-
     Value evaluateInternal(Variables* vars) const final;
-
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -1172,7 +1159,6 @@ public:
 class ExpressionSetIntersection final : public ExpressionVariadic<ExpressionSetIntersection> {
 public:
     Value evaluateInternal(Variables* vars) const final;
-
     const char* getOpName() const final;
 
     bool isAssociative() const final {
@@ -1200,9 +1186,7 @@ private:
 class ExpressionSetUnion final : public ExpressionVariadic<ExpressionSetUnion> {
 public:
     // intrusive_ptr<Expression> optimize() final;
-
     Value evaluateInternal(Variables* vars) const final;
-
     const char* getOpName() const final;
 
     bool isAssociative() const final {

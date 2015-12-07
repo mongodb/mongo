@@ -2370,23 +2370,14 @@ Value ExpressionPow::evaluateInternal(Variables* vars) const {
             long long max;
         };
 
-        // Array indices correspond to exponents 0 through 63. The values in each index are
-        // the
-        // min
-        // and max bases, respectively, that can be raised to that exponent without
-        // overflowing
-        // a
+        // Array indices correspond to exponents 0 through 63. The values in each index are the min
+        // and max bases, respectively, that can be raised to that exponent without overflowing a
         // 64-bit int. For max bases, this was computed by solving for b in
         // b = (2^63-1)^(1/exp) for exp = [0, 63] and truncating b. To calculate min bases,
-        // for
-        // even
-        // exps the equation  used was b = (2^63-1)^(1/exp), and for odd exps the equation
-        // used
-        // was
-        // b = (-2^63)^(1/exp). Since the magnitude of long min is greater than long max,
-        // the
-        // magnitude of some of the min bases raised to odd exps is greater than the
-        // corresponding
+        // b = (2^63-1)^(1/exp) for exp = [0, 63] and truncating b. To calculate min bases, for even
+        // exps the equation  used was b = (2^63-1)^(1/exp), and for odd exps the equation used was
+        // b = (-2^63)^(1/exp). Since the magnitude of long min is greater than long max, the
+        // magnitude of some of the min bases raised to odd exps is greater than the corresponding
         // max bases raised to the same exponents.
 
         static const MinMax kBaseLimits[] = {
@@ -2461,20 +2452,15 @@ Value ExpressionPow::evaluateInternal(Variables* vars) const {
     long long baseLong = baseVal.getLong();
     long long expLong = expVal.getLong();
 
-    // If the result cannot be represented as a long, return a double. Otherwise if either
-    // number
-    // is a long, return a long. If both numbers are ints, then return an int if the result
-    // fits
-    // or
+    // If the result cannot be represented as a long, return a double. Otherwise if either number
+    // is a long, return a long. If both numbers are ints, then return an int if the result fits or
     // a long if it is too big.
     if (!representableAsLong(baseLong, expLong)) {
         return Value(std::pow(baseLong, expLong));
     }
 
     long long result = 1;
-    // Use repeated multiplication, since pow() casts args to doubles which could result in
-    // loss
-    // of
+    // Use repeated multiplication, since pow() casts args to doubles which could result in loss of
     // precision if arguments are very large.
     for (int i = 0; i < expLong; i++) {
         result *= baseLong;
@@ -2534,8 +2520,7 @@ Value ExpressionSetDifference::evaluateInternal(Variables* vars) const {
     vector<Value> returnVec;
 
     for (vector<Value>::const_iterator it = lhsArray.begin(); it != lhsArray.end(); ++it) {
-        // rhsSet serves the dual role of filtering out elements that were originally
-        // present
+        // rhsSet serves the dual role of filtering out elements that were originally present
         // in RHS and of eleminating duplicates from LHS
         if (rhsSet.insert(*it).second) {
             returnVec.push_back(*it);
@@ -2665,12 +2650,9 @@ Value ExpressionSetIsSubset::evaluateInternal(Variables* vars) const {
 /**
  * This class handles the case where the RHS set is constant.
  *
- * Since it is constant we can construct the hashset once which makes the runtime
- *performance
- * effectively constant with respect to the size of RHS. Large, constant RHS is expected to
- *be a
- * major use case for $redact and this has been verified to improve performance
- *significantly.
+ * Since it is constant we can construct the hashset once which makes the runtime performance
+ * effectively constant with respect to the size of RHS. Large, constant RHS is expected to be a
+ * major use case for $redact and this has been verified to improve performance significantly.
  */
 class ExpressionSetIsSubset::Optimized : public ExpressionSetIsSubset {
 public:
@@ -2928,8 +2910,7 @@ Value ExpressionSubstr::evaluateInternal(Variables* vars) const {
                           << ":  Invalid range, starting index is a UTF-8 continuation byte.",
             (lower >= str.length() || !isContinuationByte(str[lower])));
 
-    // Check the byte after the last character we'd return. If it is a continuation byte,
-    // that
+    // Check the byte after the last character we'd return. If it is a continuation byte, that
     // means we're in the middle of a UTF-8 character.
     uassert(
         28657,
@@ -2938,8 +2919,7 @@ Value ExpressionSubstr::evaluateInternal(Variables* vars) const {
         (lower + length >= str.length() || !isContinuationByte(str[lower + length])));
 
     if (lower >= str.length()) {
-        // If lower > str.length() then string::substr() will throw out_of_range, so return
-        // an
+        // If lower > str.length() then string::substr() will throw out_of_range, so return an
         // empty string if lower is not a valid string index.
         return Value("");
     }
@@ -3051,8 +3031,7 @@ int ExpressionWeek::extract(const tm& tm) {
     int prevSundayDayOfYear = dayOfYear - dayOfWeek;    // may be negative
     int nextSundayDayOfYear = prevSundayDayOfYear + 7;  // must be positive
 
-    // Return the zero based index of the week of the next sunday, equal to the one based
-    // index
+    // Return the zero based index of the week of the next sunday, equal to the one based index
     // of the week of the previous sunday, which is to be returned.
     int nextSundayWeek = nextSundayDayOfYear / 7;
 
