@@ -45,6 +45,7 @@ selector:
     - jstests/sharding/startup_with_all_configs_down.js # SERVER-21215, fixed in v3.2.0-rc4
     - jstests/sharding/unowned_doc_filtering.js # SERVER-19608, fixed in v3.1.8
     - jstests/sharding/zero_shard_version.js # SERVER-20530, fixed in v3.1.9
+    - jstests/sharding/drop_sharded_db.js # SERVER-17723, fixed in v3.1.2
 
     # The following tests fail because of known bugs:
     - jstests/sharding/sync_cluster_config/sync6.js # SERVER-21660
