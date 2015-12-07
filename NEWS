@@ -665,292 +665,197 @@ index 791cb30..3a23071 100644
 +
 +join_stats = sorted(join_stats, key=attrgetter('name'))
 
+
+New features:
+
+959376c  WT-147: Create indexes on non-empty tables.
+4368d39  WT-1315: Cursor join implementation.
+ab5a8fb  WT-1728: Add a new WT_SESSION::reset API.
+
+Lookaside table:
+
+6a5a461  WT-1967: Allow eviction of updates required by old readers.
+87592ec  WT-2074: Fix a race between lookaside table reconciliation and checkpoints.
+0390b29  WT-2149: Fix the order of creation of the lookaside table.
+7518a69  WT-2190: Fix transaction visibility test that is applied to the lookaside table.
+2cf57a6  SERVER-21585: Don't use the lookaside file until the cache is stuck full.
+
+Issues fixed in MongoDB:
+
+d4fc69a  SERVER-17078: Add a "statistics=(size)" mode to statistics cursors.
+b83b901  SERVER-18356: Avoid reading baseconfig file when config_base is false.
+d57dc26  SERVER-18829: Have pages start in the middle of the LRU queue for eviction.
+b847ccc  SERVER-18838: During drops, don't remove files until the metadata is durable.
+8f7da9a  SERVER-18875: Clean up deleted pages.
+d04083d  SERVER-18899: Add unit test to simulate fsyncLock.
+3ec45a7  SERVER-19340: Avoid type aliasing in the random number generator.
+907c0ca  SERVER-19445: Have the oldest transaction update the oldest tracked ID.
+fb8739f  SERVER-19522: Try to evict internal pages with no useful child pages.
+4545a8b  SERVER-19573: Change row-store inserts to avoid page locking.
+b52d2d3  SERVER-19751: Retry pthread_create on EAGAIN or EINTR.
+46b4ad5  SERVER-19954: Don't scan tracked handles during checkpoints.
+65abd20  SERVER-19989: Add a write barrier before data handles are added to shared lists.
+3e46e79  SERVER-19990: Don't assert on eviction of live updates from dead trees.
+38dad39  SERVER-20008: Don't reset eviction walks when hitting a busy page.
+3b72361  SERVER-20159: Make all readers wait while the cache is full.
+8be547b  SERVER-20193: Fix obsolete transaction check.
+ad56c6a  SERVER-20303: Tune in-memory splits when inserting large objects.
+7505a02  SERVER-20385: Make WT_CURSOR::next(random) more random.
+35d46c3  SERVER-21027: Reverse split if there are many deleted pages.
+a6da10e  SERVER-21553: Enable fast-path truncate after splits.
+890ee34  SERVER-21619: Don't do internal page splits after a tree is marked DEAD.
+0e93d60  SERVER-21691: Avoid insert stalls.
+
 Other note worthy changes since the previous release:
 
-2df5658  WT-2257: Fixes when given multiple thread workload configs.
-c1013ce  WT-2256: Fix interval timer for wtperf throttling.
-fb7fc2f  WT-2245: Add a multiplier to the truncate stones to deal with very high throughput cases
-bff6525  SERVER-21553: Free blocks during reverse splits.
-c70b097  WT-2253: prioritize WT_READGEN_OLDEST pages for eviction.
-4fc3e39  WT-2253: Evict pages left behind by in-memory splits.
-e731ef8  WT-2251: Free addresses when we discard deleted page references.
-0e93d60  SERVER-21691: Avoid insert stalls
+944ccd1  WT-1350: Don't always evict pages when reconciling them.
+405f45e  WT-1481: Fix and clarify some sweep statistics.
+bc2aa57  WT-1744: Throttle worker threads based on eviction targets.
+55a989e  WT-1845: Allow read only transactions to commit after failure.
+df625dc  WT-1869: Avoid doing in memory splits while a tree is being checkpointed.
+263c5b7  WT-1930: Add configuration option to disable sweep of old handles.
+ddac54f  WT-1942: Add atomic implementations for PPC64 architecture.
+f196510  WT-1955: LSM merge aggressive.
+6310c3f  WT-1959: Change WT_SESSION::verify to not error on leaked blocks, by default.
+3866fa6  WT-1962: Make the hot_backup_lock a read/write lock.
+58f9e99  WT-1963: Modified Java's next/prev/search/search_near to work with backup cursors.
+4e0fe59  WT-1964: In Java fix session/cursor close in different thread than open.
+60e2150  WT-1966: Change how the shared cache assigns priority to participants.
+76d2e73  WT-1975: Wait for sync_lsn of earlier log files to complete for forced sync.
+e43b22a  WT-1977: Improve the performance of getting snapshots with many sessions.
+5eaf63e  WT-1978: Better checking and tests for index cursor comparison.
+e0d6229  WT-1980: Provide an API to query metadata meaningful to WT_SESSION::create.
+1602a4b  WT-1981: Fix a signed 32-bit integer unpacking bug.
+cd1704d  WT-1982: Track down cached overflow items that are being freed too early.
+57a9f38  WT-1985: Integer packing and other fixes for Python and Java.
+9897eb2  WT-1986: Fix a race renaming temporary log files.
+b10bff9  WT-1989: Improve scalability of log writes.
+f8dc12b  WT-1996: If there is an error applying updates during a page rewrite, don't free the first update.
+144a383  WT-1998: Fixes for indexes with some rarely used key/value formats.
+8af8b8a  WT-2002: If a file is corrupted, verify should not panic.
+e1d8bc7  WT-2007: Statically allocate log slot buffers to a maximum size.
+911158c  WT-2008: Fix a bug in recovery where a file create went missing.
+3e2e7e6  WT-2009: Apply tracked metadata operations post-commit.
+1255cb2  WT-2012: Fix a bug updating the oldest ID.
+ef9d56f  WT-2013: Add gcc asm definitions for ARM64.
+c8633e6  WT-2014: Checkpoint file fixes.
+9b09e69  WT-2015: Error path failure during block open.
+4938b8d  WT-2017: Once an eviction server thread is started keep it running.
+298f86c  WT-2019: Fix a logic bug tracking the maximum transaction ID in clean trees.
+7d6075c  WT-2020: Clarify checksum error failure messages.
+7b302d3  WT-2021: Fix a bug moving the oldest ID forward (introduced by WT-1967).
+9df72d7  WT-2022: When non-existent index cursor is opened, release the base table.
+81ffc2d  WT-2023: Improve locking primitives: simplify read-write lock operations.
+6b84722  WT-2029: Improve scalability of statistics.
+f97cfe9  WT-2031: Log slot revamp.
+bee11c3  WT-2032: WT_CURSOR::next configured with next_random=true on insert-only pages.
+cf53696  WT-2034: Make shared cache adjustments gradually.
+aee1c94  WT-2035: For index cursors, keep track of which column groups need to be positioned.
+36310d4  WT-2036: Make handle sweeps more robust.
+c948fbb  WT-2037: Only write a checkpoint to the log on close if it wasn't.
+e25e615  WT-2038: Avoid long scans holding the handle list lock.
+75a4655  WT-2039: Add error check and unit test for log records over 4Gb.
+5ab26af  WT-2042: Only try to evict tombstones that are visible to all readers.
+ce223ac  WT-2045: Don't let the eviction server do slow reconciliation, it can stall the entire eviction process.
+6665618  WT-2046: Add a counter for search restarts.
+98b4a28  WT-2047: The __wt_random code to handle an uninitialized random state is broken.
+258e2e1  WT-2050: Show size with memory allocation errors.
+2e1471c  WT-2053: Fix a bug in disk verify messages.
+e316e61  WT-2056: Reorder btree cursor close so stats are maintained correctly.
+70f9100  WT-2057: Strip the verbose configuration as part of writing the base configuration file.
+41b6fb8  WT-2058: Fix mutex and log-slot alignment.
+d72012b  WT-2059: Include non-aggregated stats in cursor results.
+3e0c7bf  WT-2062: Try harder to make progress on in-memory splits.
+66757f7  WT-2064: Don't spin indefinitely waiting for the handle list lock in eviction.
+292712e  WT-2065: Add a quota to shared cache configuration.
+8f42f02  WT-2066: Update the oldest transaction ID from eviction.
+e167592  WT-2068: Protect discarding handles with the handle list lock.
+fd72a09  WT-2075: Fix a hang in loggging with parallel workload.
+11c0fa0  WT-2078: Prevent segfault with NULL statistics cursor during OOM conditions.
+9734d85  WT-2081: Make verify progress reporting less verbose.
+6008b41  WT-2085: Run some of the log_server threads operations more frequently.
+39a69ec  WT-2086: Add a statistic to track when can_evict sees splittable pages.
+334e103  WT-2089: Relax restrictions on multiblock eviction and in-memory splits.
+f13b788  WT-2090: Avoid losing errors from the underlying Windows functions.
+83b8db7  WT-2092: Free log condition variables after all threads are joined.
+d9391c0  WT-2093: Use the C99 bool type to clarify when functions return true/false.
+f883d27  WT-2094: Eliminate direct write and record unbuffered log records that.
+9008260  WT-2097: Reintroduce immediate waits when forced eviction is necessary.
+ff1da28  WT-2100: Rename evict to evict_queue so it's easier to search for.
+41db2ee  WT-2101: Don't update the logging ckpt_lsn on clean shutdown.
+e1d6886  WT-2102: Fix a hang in log slot join when forcing log writes.
+4d0ebf4  WT-2104: New log_flush API to control the flushing or syncing of the log.
+0e96683  WT-2105: If a corrupted WT_CELL_VALUE_COPY cell has an offset larger than the current cell's offset in the page, we'll read memory outside of the page image.
+6a565bc  WT-2108: Rework in-memory page rewrite support (WT_PM_REC_REWRITE).
+dcb0ddb  WT-2114: Make application eviction fairer.
+10c2f15  WT-2115: Don't skip truncated pages that are part of a checkpoint.
+cd6ce97  WT-2116: Add diagnostic checks for stuck cache and dump the state.
+51cf672  WT-2119: Don't evict clean multiblock pages with overflow items during checkpoints.
+346ad40  WT-2126: Clean up if there is an error during splits.
+6831485  WT-2127: Deepen the tree more regularly to avoid wide internal pages.
+a0b5d2b  WT-2128: When decoding huffman encoding during salvage it's possible to have fewer bits than the symbol length during decoding, if the value has been corrupted.
+79f74e5  WT-2131: Switch to using a lock to control page splits to avoid starvation.
+02a3d9f  WT-2132: Make debug dump function more robust to errors.
+8c223e4  WT-2134: Flush all buffered log records in log_flush.
+d1b5e7f  WT-2135: Fix log_only setting for backup cursor. Fix initialization.
+aab8101  WT-2137: Check the sync_lsn is in the correct file before moving it forward.
+323af84  WT-2139: At read-uncommitted isolation, keep the same ID pinned while cursors are positioned.
+751c628  WT-2146: Do quick searches for short keys.
+62998ce  WT-2148: Change encoding functions to avoid -Wshift-negative-value.
+21b8330  WT-2151: Make zero fill of files configurable in case the OS can't be trusted.
+6c16fdd  WT-2153: Fix bug. Now we always need to start the log_server thread.
+6a5fca3  WT-2154: Make btree dump safer.
+0d74bc6  WT-2155: Remove last use of F_CAS_ATOMIC and the associated macro.
+cc42bda  WT-2156: Allow eviction workers to restart.
+bf1d359  WT-2157: If we give up trying to split a page, make sure it is written by the next checkpoint.
+ce9d265  WT-2159: Don't check the config twice in one path.
+544f27d  WT-2162: Add null pointer check, needed after an index is dropped.
+0d85ebe  WT-2164: Prevent another LSM chunk checkpoint while the first is still in progress.
+a81aae8  WT-2165: Remove FALLOC_FL_KEEP_SIZE flag from fallocate.
+2865a76  WT-2167: Switch recovery to using an internal session.
+5d4c952  WT-2170: Protect the turtle file with a lock.
+497b744  WT-2174: Avoid the table list lock when creating a size only statistics cursor.
+fdfa804  WT-2178: In-memory storage engine support.
+b9bd01f  WT-2179: Added decorator to mark txn13 as part of the --long test suite.
+be544dd  WT-2180: Remove cursor.{search,search-near,remove} key size validation.
+be412b5  WT-2182: When internal pages grow large enough, split them into their parents.
+c27e78e  WT-2184: Fix log scan bug when final record has many trailing zeros.
+9584be3  WT-2185: Don't do reverse splits when closing a file.
+f6b12d3  WT-2187: Add flag for flushing a slot.
+a4545bf  WT-2189: Make F_SET (and F_CLR) into a void expression.
+30ab327  WT-2191: In-memory disk image no longer the same as saved updates.
+4ba5698  WT-2192: Fix the logic around checking whether internal page is evictable.
+2f0b3e2  WT-2193: Handle read-committed metadata checkpoints during snapshot transactions.
+9b1febc  WT-2194: Java close callbacks should handle cursors that Java code did not open.
+438f455  WT-2195: Fix a hang after giving up on a reverse split.
+ff27fe9  WT-2196: Fix error handling in size only statistics.
+0a1ee34  WT-2199: Fix transaction sync inconsistency.
+368b307  WT-2200: Change WiredTiger caching strategy on Windows.
+2ff1fd6  WT-2203: Release an allocated page on error.
+3b3cf2a  WT-2204: Don't take a local copy of page->modify until we know the page is dirty.
+179d4d0  WT-2206: Change cache operations from flags to an enum.
+82514ca  WT-2207: Track whenever a session has a handle exclusive.
+78bd4ac  WT-2210: Raw compression fails if row-store recovery precedes column-store recovery.
+c360d53  WT-2212: Add a "use_environment" config to "wiredtiger_open".
+08c0fcd  WT-2217: Change WT_CURSOR::insert to clear "set" key/value on return.
+a72ddb7  WT-2218: Add truncate stats.
+ce8c091  WT-2219: Enhancements to in-memory testing.
+e2f1130  WT-2220: Split WT_TIMEDIFF macro into unit specific macros.
+59857f9  WT-2222: Add statistics for named snapshots.
+fb9cebe  WT-2224: Track which deleted refs are discarded by a split.
+cace179  WT-2228: Avoid unnecessary raw-compression calls.
+0a52a80  WT-2237: Have threads publish unique transaction IDs so that updates always become visible immediately on commit.
+6c7338f  WT-2241: Use a lock to protect transaction ID allocation.
+39dfd21  WT-2243: Don't keep transaction IDs pinned for reading from checkpoints.
+4c49948  WT-2244: Trigger in-memory splits sooner.
+fb7fc2f  WT-2245: Add a multiplier to the truncate stones to deal with very high throughput cases.
+9f2e4f3  WT-2248: WT_SESSION::close is updating WT_CONNECTION_IMPL.default_session.
 264ec21  WT-2249: Keep eviction stuck until cache usage is under 100%.
 dca1411  WT-2250: Minor fix.  Use SET instead of INCRV for stat.
-4c49948  WT-2244: Trigger in-memory splits sooner.
-9f2e4f3  WT-2248: WT_SESSION.close is updating WT_CONNECTION_IMPL.default_session
-a6da10e  SERVER-21553: Enable fast-path truncate after splits.
-39dfd21  WT-2243: Don't keep transaction IDs pinned for reading from checkpoints.
-4e1844c  WT-2230: multi-split error path
-cace179  WT-2228: avoid unnecessary raw-compression calls.
-890ee34  SERVER-21619: Don't do internal page splits after a tree is marked DEAD.
-6c7338f  WT-2241: Use a lock to protect transaction ID allocation.
-978c237  WT-2234: Coverity analysis warnings 
-e90b590  WT-2237: Avoid yields if we race allocating transaction IDs.
-0a52a80  WT-2237: Have threads publish unique transaction IDs so that updates always become visible immediately on commit
-2cf57a6  SERVER-21585: Don't use the lookaside file until the cache is stuck full.
-4ad8df7  SERVER-21585: Clean up LAS based on the current count of inserted records
-2d01a56  SERVER-21568: Fix a use after-free
-8b3bd66  WT-2227: Resolve lint errors in join implementation
-16c0a1a  WT-1315: Fix some leaks with join cursors.
-59857f9  WT-2222: Add statistics for named snapshots.
-4368d39  WT-1315: Cursor join implementation
-a72ddb7  WT-2218: Add truncate stats
-fb9cebe  WT-2224: Track which deleted refs are discarded by a split.
-e2f1130  WT-2220: Split WT_TIMEDIFF macro into unit specific macros.
-be412b5  WT-2182: when internal pages grow large enough, split them into their parents
-ce8c091  WT-2219: Enhancements to in-memory testing
-347d922  WT-2220: time_t cleanup.
-08c0fcd  WT-2217: change WT_CURSOR.insert to clear "set" key/value on return
-d1b5e7f  WT-2135: Fix log_only setting for backup cursor. Fix initialization.
-78bd4ac  WT-2210: raw compression fails if row-store recovery precedes column-store recovery
-c1b2634  WT-2182: fixes for splitting up the tree.
-0a1ee34  WT-2199: Fix transaction sync inconsistency.
-ee31bb2  WT-2182: Simplify the split deepen logic.
-c360d53  WT-2212: Add a "use_environment" config to "wiredtiger_open"
-82514ca  WT-2207: Track whenever a session has a handle exclusive.
-179d4d0  WT-2206: change cache operations from flags to an enum.
-3f132a4  WT-2182: detect internal page split races.
-368b307  WT-2200: Change WiredTiger caching strategy on Windows
-3b3cf2a  WT-2204: Don't take a local copy of page->modify until we know the page is dirty.
-5e23614  WT-2202: release of the "current" page is wrong.
-2ff1fd6  WT-2203: release an allocated page on error
-4aa5f2a  WT-2184: recovery test
-ff27fe9  WT-2196: Fix error handling in size only statistics.
-9b1febc  WT-2194: Java close callbacks should handle cursors that Java code did not open.
-a887cb2  WT-2196: Fix size-only statistics when there are LSM tables.
-2f0b3e2  WT-2193: Handle read-committed metadata checkpoints during snapshot transactions
-b1de96c  WT-2196: Fix size-only statistics when there are LSM tables.
-438f455  WT-2195: Fix a hang after giving up on a reverse split.
-4ba5698  WT-2192: Fix the logic around checking whether internal page is evictable.
-f6b12d3  WT-2187: Add flag for flushing a slot
-30ab327  WT-2191: in memory disk image no longer the same as saved updates
-ba931c1  SERVER-21027: Don't leave empty internal pages in the tree
-fdfa804  WT-2178: In-memory storage engine support
-04da9bb  WT-2127: Back out some of a change to split internal pages sooner.
-3868d0b  WT-2170: Application metadata cursors expect read-uncommitted semantics.
-c27e78e  WT-2184: Fix log scan bug when final record has many trailing zeros
-a4545bf  WT-2189: Make F_SET (and F_CLR) into a void expression.
-f4d20a3  SERVER-21027: Fix reverse splits to keep the original child ref locked
-9584be3  WT-2185: Don't do reverse splits when closing a file.
-91ee6a2  WT-2170: Move metadata read uncommitted to search
-35d46c3  SERVER-21027: Reverse split if there are many deleted pages
-6839f82  WT-2170: Add a macro perform an operation at an isolation level.
-0619d4a  WT-2146: fast q search.
-751c628  WT-2146: Do quick searches based on search key size
-cd6ce97  WT-2116: Add diagnostic checks for stuck cache and dump the state.
-a0fc9df  WT-2140: WT_SESSION.reset can release more memory
-e9cddf2  WT-2164: minor cleanups to __wt_lsm_checkpoint_chunk
-0d85ebe  WT-2164: Prevent another chunk checkpoint while the first is still in progress.
-3e5ed7e  WT-2164: Have LSM enable metadata tracking prior to checkpointing a chunk.
-be544dd  WT-2180: remove cursor.{search,search-near,remove} key size validation
-346ad40  WT-2126: clean up if there is an error during splits
-b9bd01f  WT-2179: Added decorator to mark txn13 as part of the --long test suite.
-497b744  WT-2174: Avoid the table list lock when creating a size only statistics cursor.
-0766b6d  WT-2126: __split_deepen() doesn't really need to panic
-5d4c952  WT-2170: Add turtle file lock.
-e167592  WT-2068: Protect discarding handles with the handle list lock.
-99024f6  WT-2068: complain if the live system is re-opened.
-8f0238e  WT-2068: Put live_open usage under HAVE_DIAGNOSTIC and an assert.
-a81aae8  WT-2165:  Remove FALLOC_FL_KEEP_SIZE flag.
-2865a76  WT-2167: Switch recovery to using an internal session.
-46b4ad5  SERVER-19954: Don't scan tracked handles during checkpoints.
-6a565bc  WT-2108: Rework in-memory page rewrite support (WT_PM_REC_REWRITE).
-6a5fca3  WT-2154: Make btree dump safer
-323af84  WT-2139: At read-uncommitted isolation, keep the same ID pinned while cursors are positioned
-544f27d  WT-2162:  Add null pointer check, needed after an index is dropped.
-b1fb715  WT-2149: Track if the lookaside table is open when starting eviction workers
-bf1d359  WT-2157: If we give up trying to split a page, make sure it is written by the next checkpoint
-0d74bc6  WT-2155: Remove last use of F_CAS_ATOMIC and the associated macro.
-ce9d265  WT-2159: don't check the config twice in one path.
-cc42bda  WT-2149: WT-2156: Allow eviction workers to restart.
-ecfbbb0  WT-2149: Deadlock opening lookaside table cursor
-0390b29  WT-2149: Fix the order of creation of the lookaside table
-21b8330  WT-2151: Add zero fill config
-ad56c6a  SERVER-20303: tuning in-memory splits for when inserting large objects
-f12d478  SERVER-20303: Require a minimum item count for in-memory splits.
-79f74e5  WT-2131: Switch to using a lock to control page splits.
-3df6a90  WT-2152: Add support for WTPERF operations recieving a rollback
-dcb0ddb  WT-2114: Make application eviction fairer
-6c16fdd  WT-2153: Fix bug. Now we always need to start the log_server thread.
-3f22640  WT-2131: Switch all WT_PAGE_RECONCILIATION locks to fair locks.
-ffcb888  SERVER-20543: Coverity/lint cleanups.
-62998ce  WT-2148: Change encoding functions to avoid -Wshift-negative-value
-aab8101  WT-2137: Check the sync_lsn is in the correct file before moving it forward.
-7a623ae  WT-2143: Revert part of the recent log cleanup changes.
-51cf672  WT-2119: don't evict clean multiblock pages with overflow items during checkpoints.
-d76280f  WT-2112: Boolean conversion pass over include.
-c8e1296  WT-2141: __meta_track_apply, __meta_track_unroll have unnecessarily complex error handling.
-6831485  WT-2127: Deepen the tree more regularly to avoid wide internal pages.
-5a354f7  WT-2119: don't evict clean multiblock pages with overflow items during checkpoints.
-87c52d4  WT-2126: page split locking
-8c223e4  WT-2134: Flush all buffered log records in log_flush
-02a3d9f  WT-2132: Make debug dump function more robust to errors.
-435026b  WT-2132: Be more defensive in code used to debug address structures.
-53638a1  WT-2112: Use bool in more places
-aa524da  WT-2088:  Clean up log verbose messages and comments.  Some code cleanup.
-f1837bf  WT-2122: Convert more expressions to use bool
-91deacb  WT-2122: more boolean conversion
-75a4655  WT-2039: Add error check and unit test for log records over 4Gb.
-10c2f15  WT-2115: Don't skip truncated pages that are part of a checkpoint
-959376c  WT-147: Dynamic Index creation.  Use bulk=unordered
-c2aa721  WT-2117: Set a minimum of 1MB cache per thread in test/format
-90d9d96  WT-2104: Write up commit and log_flush options.
-f4d3739  WT-2112: Coverity 73704, 73705, memory leak in salvage
-20d13e8  WT-2111: coverity complaint
-3b72361  SERVER-20159: Make all readers wait while the cache is full.
-4d0ebf4  WT-2104: New log_flush API to control the flushing or syncing of the log.
-5ab26af  WT-2042: Only try to evict tombstones that are visible to all readers.
-8be547b  SERVER-20193: Fix obsolete transaction check
-fd72a09  WT-2075: Add test for log hang with large parallel workload
-8a8867b  WT-2093: Fix bugs treating error returns as booleans
-7505a02  SERVER-20385: WT_CURSOR.next(random) more random
-41db2ee  WT-2101: Don't update the logging ckpt_lsn on clean shutdown.
-e1d6886  WT-2102: Combine the switch and force_write functions.
-ff1da28  WT-2100: Rename evict to evict_queue so it's easier to search for.
-4c66372  WT-147: Add undocumented bulk=unordered for LSM cursors.
-d9391c0  WT-2093: Use the C99 bool type to clarify when functions return true/false
-85187fc  WT-2075: When closing a slot, detect, return and handle different values.
-9008260  WT-2097: Reintroduce immediate waits when forced eviction is necessary.
-334e103  WT-2089: relax restrictions on multiblock eviction, in-memory splits
-f883d27  WT-2094: Eliminate direct write and record unbuffered log records that
-b044603  SERVER-20193: Performance regression fix
-39a69ec  WT-2086: Add a statistic to track when can_evict sees splittable pages.
-83b8db7  WT-2092: Free log condition variables after all threads are joined.
-87592ec  WT-2074: fix a race between lookaside table reconciliation and checkpoints.
-f13b788  WT-2090: Avoid losing errors from the underlying Windows functions.
-6008b41  WT-2085: Run some of the log_server threads operations more frequently
-69e81dc  WT-2034: Fine tune weighting of operations in shared cache balancing.
-e9a2a1c  WT-2069: Add truncate to wtperf_run.sh
-0b412d6  WT-2076: cleanup
-aee1c94  WT-2035: For index cursors, keep track of which column groups need to be positioned.
-9734d85  WT-2081: Make verify progress reporting less verbose.
-11c0fa0  WT-2078: prevent segfault with NULL statistics cursor during OOM conditions
-e316e61  WT-2056: Reorder btree cursor close so stats are maintained correctly.
-1e35c7d  WT-1967: fix an "uninitialized variable" warning.
-6a5a461  WT-1967: evict pages where updates are still required by older readers.
-f0ac3e1  WT-2034: Fix lint re casting in shared cache code.
-66757f7  WT-2064: Don't spin indefinitely waiting for the handle list lock in eviction
-9f8bdd7  WT-2067: Fix unused variable warnings
-cf53696  WT-2034: Make shared cache adjustments gradually
-8f42f02  WT-2066: Update the oldest transaction ID from eviction
-292712e  WT-2065: Add a quota to shared cache configuration.
-3e0c7bf  WT-2062: Try harder to make progress on in-memory splits
-1b372b9  WT-1967: Specify a key-format to simplify creating lookaside table records.
-f97cfe9  WT-2031: Log slot revamp
-a20d796  WT-2051: Encryption/metadata error cleanup.
-c592bff  WT-1967: Replace the WT_PAGE_SPLIT_LOCKED lock with WT_PAGE_RECONCILIATION.
-e40d30b  WT-2051:  Add test for decrypt returning an error
-d72012b  WT-2059: Include non-aggregated stats in cursor results.
-38dad39  SERVER-20008: Don't reset eviction walks when hitting a busy page.
-3e46e79  SERVER-19990: Don't assert on eviction of live updates from dead trees.
-2a89b8b  WT-2052: OS X clang compiler warnings.
-41b6fb8  WT-2058: Fix mutex and log-slot alignment.
-70f9100  WT-2057: Strip the verbose configuration as part of writing the base configuration file.
-258e2e1  WT-2050: Show size with memory allocation errors
-73162ee  WT-2055: Python, whitespace cleanup.
-2e1471c  WT-2053: Fix a bug in disk verify messages.
-b83b901  SERVER-18356: Avoid reading baseconfig file when config_base is false
-6665618  WT-2046: Add a counter for search restarts
-0d2f47c  WT-2049: don't start format's RNG at the same place every time.
-aec6668  WT-2048: Quiet a Coverity complaint.
-98b4a28  WT-2047: The __wt_random code to handle an uninitialized random state is broken.
-ada57c1  WT-2025: inline atomic functions.
-f752f07  WT-2029: minor cleanups.
-b1850e8  SERVER-19989: Add a write barrier before handles become public
-65abd20  SERVER-19989: Add a write barrier before data handles are added to shared lists
-6b84722  WT-2029: improve scalability of statistics
-9817f52  WT-2044: Fix Windows wtperf.exe build
-e14c60e  WT-2038: Discard checkpoint lock handles asap
-f12c694  WT-2038: Minor cleanups to tailq use, s_define searching.
-46c5333  WT-2038: Use TAILQ for all lists.
-405f45e  WT-1481: Fix and clarify some sweep statistics.
-c751977  WT-1967: Remove a redundant check preventing pages being considered for eviction
-413b696  WT-2038: Fix cases where the next tree for eviction could be discarded
-e25e615  WT-2038: Avoid long scans holding the handle list lock.
-c948fbb  WT-2037: Only write a checkpoint to the log on close if it wasn't
-36310d4  WT-2036: Make handle sweeps more robust
-5e75a5e  WT-2025: Pass simple arguments to compare-and-swap macros
-bee11c3  WT-2032: WT_CURSOR.next configured with next_random=true on insert-only pages
-7b302d3  WT-2021: Fix a bug moving the oldest ID forward (introduced by WT-1967).
-b52d2d3  SERVER-19751: Retry pthread_create on EAGAIN or EINTR.
-c5c9936  WT-2025: Assert that cursors are positioned for inserts
-4545a8b  WT-2025: SERVER-19573: Change row-store inserts to avoid page locking.
-5381877  WT-2023: Keep 16-bit values from overflowing into other fields.
-81ffc2d  WT-2023: Avoid bit shifts during read-write lock operations.
-55a989e  WT-1845: Allow read only transactions to commit after failure
-06bd0eb  WT-1967: Don't allow last_running to move past a running transaction.
-c5268ea  WT-1983: wtperf_truncate - fix issues with uint64 -> int64 conversion
-d7db0bb  WT-2028: minor __evict_walk_file cleanup
-7d03876  WT-2023: Mutex overflow simplify
-d7d2a98  WT-2023: Avoid the CAS instruction in the trylock functions.
-12f5617  WT-1983: Wtperf truncate
-fb8739f  SERVER-19522: Try to evict internal pages with no useful child pages.
-3ec45a7  SERVER-19340: Avoid type aliasing in the random number generator.
-ceab062  SERVER-19522, WT-2024: reconciliation locking
-9b09e69  WT-2015: error path failure during block open.
-9df72d7  WT-2022:  When non-existent index cursor is opened, release the base table.
-7d6075c  WT-2020: clarify checksum error failure messages.
-1255cb2  WT-2012: Fix a bug updating the oldest ID
-a083efd  WT-2018: Fix wtperf when running without populate phase
-4938b8d  WT-2017: Once an eviction server thread is started keep it running.
-298f86c  WT-2019: Fix a logic bug tracking the maximum transaction ID in clean trees
-c8633e6  WT-2014: Checkpoint file fixes
-344858c  WT-2016: wt_rwlock_t union packing
-ef9d56f  WT-2013: Add gcc asm definitions for ARM64
-24078c6  WT-1989: Use size_t for the log slot size in memory.
-f8dc12b  WT-1996: If there is an error applying updates during a page rewrite, don't free the first update
-53c7cac  WT-1969: WT_REF.pindex_hint cleanup
-b10bff9  WT-1989: Log scalability
-72530cc  WT-2102: Encryption mismatch checks
-3e2e7e6  WT-2009: Apply tracked metadata operations post-commit
-8af8b8a  WT-2002: If a file is corrupted, verify should not panic.
-907c0ca  SERVER-19445: Have the oldest transaction update the oldest tracked ID.
-911158c  WT-2008: Fix a bug in recovery where a file create went missing.
-cd9f255  WT-1967: Add support for a long-running, isolation=snapshot, reader thread
-e1d8bc7  WT-2007: Statically allocate log slot buffers to a maximum size.
-d714443  WT-1970: read -d command
-263c5b7  WT-1930: Add configuration option to disable sweep of old handles
-4b771f2  WT-2006: Copyright updates
-b094fbf  WT-1980: Bug fix: return ordinary metadata cursor values.
-57a9f38  WT-1985: Integer packing and other fixes for Java
-e0d6229  WT-1980: Provide an API to query metadata meaningful to WT_SESSION::create
-3866fa6  WT-1962: Make the hot_backup_lock a read/write lock.
-6351110  WT-1993: Coverity CID 1310061: Program hangs (LOCK)
-3b38f01  SERVER-18899: followup to abstract copying a WT home directory into a function.
-5ad2504  WT-1988: Added a doc subsection about the interation between cursors and eviction
-144a383  WT-1998, WT-2000: Fixes for indexes with some rarely used key/value formats
-030b916  WT-1982: Avoid unnecessary read barriers in transaction code
-fec82d6  WT-1985: More integer packing tests and fixes for python
-60e2150  WT-1966: Change how the shared cache assigns priority to participants.
-f54d82c  WT-1992: clean up metadata tracking error handling
-9897eb2  WT-1986: Fix a race renaming temporary log files.
-cd1704d  WT-1982: Track down cached overflow items that are being freed too early
-0925658  WT-1987: Add a TEST_WRAPPER variable for running all tests with valgrind or similar
-d04083d  SERVER-18899: Add unit test to simulate fsyncLock.
-7a7bde6  WT-1985: integer packing fixes for Python
-1602a4b  WT-1981: Fix a signed 32-bit integer unpacking bug
-4e0fe59  WT-1964: In Java fix session/cursor close in different thread than open
-f95e600  WT-1962: Fix usage of log->prep_missed.
-b847ccc  SERVER-18838: During drops, don't remove files until the metadata is durable
-8f7da9a  SERVER-18875: Clean up deleted pages
-76d2e73  WT-1975: Wait for sync_lsn of earlier log files to complete for forced sync.
-bc2aa57  WT-1744: Throttle worker threads based on eviction targets.
-5eaf63e  WT-1978: Better checking and tests for index cursor comparison
-e43b22a  WT-1977: Improve the performance of getting snapshots with many sessions
-ab5a8fb  WT-1728: Add a new WT_SESSION.reset API
-ddac54f  WT-1942: Add atomic implementations for PPC64 architecture.
-58f9e99  WT-1963: Modified Java's next/prev/search/search_near to work with backup cursors
-d57dc26  SERVER-18829: Have pages start in the middle of the LRU queue for eviction
-6310c3f  WT-1959: Change WT_SESSION.verify to not error on leaked blocks, by default.
-d4fc69a  SERVER-17078: Add a "statistics=(size)" mode to statistics cursors
-944ccd1  WT-1350: Don't always evict pages when reconciling them.
-f196510  WT-1955: Lsm merge aggressive
-df625dc  WT-1869: Avoid doing in memory splits while a tree is being checkpointed.
-ce223ac  WT-2045: Don't let the eviction server do slow reconciliation, it can stall the entire eviction process.
-0e96683  WT-2105: If a corrupted WT_CELL_VALUE_COPY cell has an offset larger than the current cell's offset in the page, we'll read memory outside of the page image.
-a0b5d2b  WT-2128: When decoding huffman encoding during salvage it's possible to have fewer bits than the symbol length during decoding, if the value has been corrupted.
-7518a69  WT-2190: Fix transaction visibility test that is applied to the lookaside table.
+e731ef8  WT-2251: Free addresses when we discard deleted page references.
+4fc3e39  WT-2253: Evict pages left behind by in-memory splits.
+2df5658  WT-2257: Fixes when given multiple thread workload configs.
+
 WiredTiger release 2.6.1, 2015-05-13
 ------------------------------------
 
@@ -1208,7 +1113,7 @@ API and behavior changes:
 * Update configuration string parsing to always be case sensitive. See
   upgrading documentation for more information.
 
-* Change the statistics cursor WT_CURSOR.reset method to re-load statistics
+* Change the statistics cursor WT_CURSOR::reset method to re-load statistics
   values. See upgrading documentation for more information.
   refs WT-1533
 
@@ -1418,7 +1323,7 @@ New features and API changes:
   See API documentation for more information.
   refs #1381
 
-* Add a new WT_SESSION.strerror method, a thread-safe alternative to
+* Add a new WT_SESSION::strerror method, a thread-safe alternative to
   ::wiredtiger_strerror.
   refs #1516
 
@@ -2224,7 +2129,7 @@ This is primarily a bugfix and performance tuning release. The main changes are:
 * The default behavior of the wt utility's load command has been changed to
   overwrite existing data.
 
-* Add a WT_SESSION.create prefix_compression_min configuration option with a
+* Add a WT_SESSION::create prefix_compression_min configuration option with a
   default value of 4. [#624] and [#624]
 
 * Fix "make install" of Python API. [#598]
