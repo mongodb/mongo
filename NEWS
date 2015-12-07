@@ -6,21 +6,19 @@ fixes.
 
 New features and API changes; refer to the API documentation for full details:
 
-959376c  WT-147: Create indexes on non-empty tables.
-08c0fcd  WT-2217:  The WT_CURSOR::insert method in this release has slightly different semantics with respect to referencing application memory. See the upgrading documentation for more information.
-4368d39  WT-1315:  Add an implementation of cursor joins via a new WT_SESSION::join API.
-4d0ebf4  WT-2104:  Add a method to flush log files via a new WT_SESSION::log_flush API. Made WT_SESSION::commit_transaction configuration options match log_flush options.
-d2111ff  WT-2104:  Change the default WT_SESSION::transaction_sync timeout to be 20 minutes rather than infinity.
-ab5a8fb  WT-1728:  Add a method to release resources held by a session handle via a new WT_SESSION::reset API.
-d4fc69a  SERVER-17078: Add a "statistics=(size)" mode to statistics cursors, which allows for retrieving file size only.
-6310c3f  WT-1959:  Change verify to understand the difference between warnings and errors. Add a new strict mode to verify that causes warnings to be reported as errors - enable strict mode to match earlier behaivor. See the upgrading documentation for more information.
-944ccd1  WT-1350:  Add a new configuration option to wiredtiger_open and WT_CONNECTION::reconfigure called eviction_dirty_trigger that causes eviction to start evicting dirty pages from cache once the given threshold has been reached.
-Allow a setting of 0 to wiredtiger_open and WT_CONNECTION::reconfigure called file_manager=(close_idle_time) configuration option to disable closing idle handles entirely.
-263c5b7  WT-1930:  Add a new configuration option to wiredtiger_open and WT_CONNECTION::reconfigure called file_manager=(close_scan_interval) which configures the interval between scans looking for idle handles. Default is 10 seconds.
-292712e  WT-2065: Add a new configuration option to wiredtiger_open and WT_CONNECTION::reconfigure, which is shared_cache=(quota). The effect being to limit the amount of shared cache a single participant can be assigned.
-21b8330  WT-2151: Enhance logging configuration to allow reconfiguration and add a new log=(zero_fill=) configuration option that causes WiredTiger to zero fill log files on creation.
-368b307  WT-2200:  Add a new configuration option to wiredtiger_open that causes WiredTiger to specify the FILE_FLAG_WRITE_THROUGH on Windows when writing files. New option is write_through.
-b83b901  SERVER-18356:  A change to the handling of config_base option to the wiredtiger_open API. See upgrading documentation for more information.
+* 959376c  WT-147: Create indexes on non-empty tables.
+* 4368d39  WT-1315: Add an implementation of cursor joins via a new WT_SESSION::join API.
+* 944ccd1  WT-1350: Add a new configuration option to ::wiredtiger_open and WT_CONNECTION::reconfigure called "eviction_dirty_trigger" that causes eviction to start evicting dirty pages from cache once the given threshold has been reached.
+* ab5a8fb  WT-1728: Add a WT_SESSION::reset method to release resources held by a session.
+* 263c5b7  WT-1930: Allow setting "file_manager=(close_idle_time=0)" to ::wiredtiger_open and WT_CONNECTION::reconfigure to disable closing idle handles.
+* 6310c3f  WT-1959: Change verify to distinguish between warnings and errors. Add a new strict mode to verify that causes warnings to be reported as errors. Enable strict mode to match earlier behaivor. See the upgrading documentation for more information.
+* 292712e  WT-2065: Add a new configuration option to ::wiredtiger_open and WT_CONNECTION::reconfigure called "shared_cache=(quota)" that limits the amount of shared cache a single participant can be assigned.
+* 4d0ebf4  WT-2104: Add a method to flush log files via a new WT_SESSION::log_flush API. Made WT_SESSION::commit_transaction configuration options match WT_SESSION::log_flush. Change the default WT_SESSION::transaction_sync timeout to 20 minutes rather than infinity.
+* 21b8330  WT-2151: Enhance logging configuration to allow reconfiguration and add a new "log=(zero_fill)" configuration option that causes WiredTiger to zero-fill log files on creation.
+* 368b307  WT-2200: Add a new configuration option to ::wiredtiger_open called "write_through" that causes WiredTiger to specify the FILE_FLAG_WRITE_THROUGH on Windows when writing files (default false, including when "direct_io" is configured).
+* 08c0fcd  WT-2217: After a successful call to WT_CURSOR::insert, the key and value will be cleared from the cursor. See the upgrading documentation for more information.
+* d4fc69a  SERVER-17078: Add a "statistics=(size)" mode to statistics cursors, which allows for retrieving file size only.
+* b83b901  SERVER-18356: Changed the handling of the "config_base" option to ::wiredtiger_open. See upgrading documentation for more information.
 
 
 The following statistics were removed:
@@ -188,7 +186,7 @@ ff27fe9  WT-2196: Fix error handling in size only statistics.
 179d4d0  WT-2206: Change cache operations from flags to an enum.
 82514ca  WT-2207: Track whenever a session has a handle exclusive.
 78bd4ac  WT-2210: Raw compression fails if row-store recovery precedes column-store recovery.
-c360d53  WT-2212: Add a "use_environment" config to "wiredtiger_open".
+c360d53  WT-2212: Add a "use_environment" config to ::wiredtiger_open.
 a72ddb7  WT-2218: Add truncate stats.
 ce8c091  WT-2219: Enhancements to in-memory testing.
 e2f1130  WT-2220: Split WT_TIMEDIFF macro into unit specific macros.
