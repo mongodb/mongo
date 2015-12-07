@@ -217,7 +217,6 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 		goto err;
 	}
 
-
 	*truncatedp = 1;
 	trunc_cfg->expected_total -= truncate_item->diff;
 
