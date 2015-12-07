@@ -38,6 +38,23 @@ __wt_page_is_modified(WT_PAGE *page)
 }
 
 /*
+ * __wt_btree_block_free --
+ *	Helper function to free a block from the current tree.
+ */
+static inline int
+__wt_btree_block_free(
+    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+{
+	WT_BM *bm;
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+	bm = btree->bm;
+
+	return (bm->free(bm, session, addr, addr_size));
+}
+
+/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
@@ -463,6 +480,23 @@ __wt_off_page(WT_PAGE *page, const void *p)
 	return (page->dsk == NULL ||
 	    p < (void *)page->dsk ||
 	    p >= (void *)((uint8_t *)page->dsk + page->dsk->mem_size));
+}
+
+/*
+ * __wt_ref_addr_free --
+ *	Free the address in a reference, if necessary.
+ */
+static inline void
+__wt_ref_addr_free(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	if (ref->addr == NULL)
+		return;
+
+	if (ref->home == NULL || __wt_off_page(ref->home, ref->addr)) {
+		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+		__wt_free(session, ref->addr);
+	}
+	ref->addr = NULL;
 }
 
 /*
@@ -963,6 +997,27 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_ref_block_free --
+ *	Free the on-disk block for a reference and clear the address.
+ */
+static inline int
+__wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	const uint8_t *addr;
+	size_t addr_size;
+
+	if (ref->addr == NULL)
+		return (0);
+
+	WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
+	WT_RET(__wt_btree_block_free(session, addr, addr_size));
+
+	/* Clear the address (so we don't free it twice). */
+	__wt_ref_addr_free(session, ref);
+	return (0);
+}
+
+/*
  * __wt_leaf_page_can_split --
  *	Check whether a page can be split in memory.
  */
@@ -1046,6 +1101,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
+	bool modified;
 
 	if (inmem_splitp != NULL)
 		*inmem_splitp = false;
@@ -1070,14 +1126,15 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 		return (true);
 	}
 
+	modified = __wt_page_is_modified(page);
+
 	/*
 	 * If the file is being checkpointed, we can't evict dirty pages:
 	 * if we write a page and free the previous version of the page, that
 	 * previous version might be referenced by an internal page already
 	 * been written in the checkpoint, leaving the checkpoint inconsistent.
 	 */
-	if (btree->checkpointing != WT_CKPT_OFF &&
-	    __wt_page_is_modified(page)) {
+	if (btree->checkpointing != WT_CKPT_OFF && modified) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (false);
@@ -1102,6 +1159,19 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 */
 	if (WT_PAGE_IS_INTERNAL(page) &&
 	    F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
+		return (false);
+
+	/*
+	 * If the oldest transaction hasn't changed since the last time
+	 * this page was written, it's unlikely we can make progress.
+	 * Similarly, if the most recent update on the page is not yet
+	 * globally visible, eviction will fail.  These heuristics
+	 * attempt to avoid repeated attempts to evict the same page.
+	 */
+	if (modified &&
+	    !F_ISSET(S2C(session)->cache, WT_CACHE_STUCK) &&
+	    (mod->last_oldest_id == __wt_txn_oldest_id(session) ||
+	    !__wt_txn_visible_all(session, mod->update_txn)))
 		return (false);
 
 	return (true);
