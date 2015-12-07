@@ -23,13 +23,14 @@ New features and API changes; refer to the API documentation for full details:
 
 The following statistics were removed:
 
-* pages split during eviction.
-* connection dhandles swept. 
-* connection candidate referenced.
-* log buffer size increases.
-* slots selected for switching that were unavailable.
-* record size exceeded maximum.
-* failed to find a slot large enough for record.
+f1ed3b9  WT-1481: connection dhandles swept.
+f1ed3b9  WT-1481: connection candidate referenced.
+4ba4518  WT-1481: failed to find a slot large enough for record.
+28563af  WT-1989: log buffer size increases.
+f81c70d  WT-1989: slots selected for switching that were unavailable.
+df4f69c  WT-2094: log records written directly.
+df4f69c  WT-2094: record size exceeded maximum.
+d68e078  WT-2182: pages split during eviction.
 
 Lookaside table:
 
