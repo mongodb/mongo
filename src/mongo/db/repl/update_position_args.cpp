@@ -91,8 +91,19 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         if (!status.isOK())
             return status;
 
-        Timestamp ts;
-        status = bsonExtractTimestampField(entry, kOpTimeFieldName, &ts);
+        OpTime opTime;
+        if (entry[kOpTimeFieldName].isABSONObj()) {
+            // In protocol version 1, { ts: <timestamp>, t: term }
+            Status status = bsonExtractOpTimeField(entry, kOpTimeFieldName, &opTime);
+            if (!status.isOK())
+                return status;
+        } else {
+            Timestamp ts;
+            status = bsonExtractTimestampField(entry, kOpTimeFieldName, &ts);
+            if (!status.isOK())
+                return status;
+            opTime = OpTime(ts, OpTime::kUninitializedTerm);
+        }
         if (!status.isOK())
             return status;
 
@@ -113,8 +124,7 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         if (!status.isOK())
             return status;
 
-        // TODO(siyuan) parse and fill term whem adding it to update position command.
-        _updates.push_back(UpdateInfo(rid, OpTime(ts, 0), cfgver, memberID));
+        _updates.push_back(UpdateInfo(rid, opTime, cfgver, memberID));
     }
 
     return Status::OK();

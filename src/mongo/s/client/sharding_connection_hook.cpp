@@ -40,8 +40,11 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
+#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/client/scc_fast_query_handler.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/version_manager.h"
@@ -50,6 +53,63 @@
 namespace mongo {
 
 using std::string;
+
+namespace {
+
+// A hook that parses the reply metadata from every response to a command sent from a DBClient
+// created by mongos or a sharding aware mongod and being used for sharded operations.
+// Used by mongos to capture the GLE stats so that we can target the correct node when subsequent
+// getLastError calls are made, as well as by both mongod and mongos to update the stored config
+// server optime.
+Status _shardingReplyMetadataReader(const BSONObj& metadataObj, StringData hostString) {
+    saveGLEStats(metadataObj, hostString);
+
+    auto shard = grid.shardRegistry()->getShardNoReload(hostString.toString());
+    if (!shard) {
+        return Status::OK();
+    }
+    // If this host is a known shard of ours, look for a config server optime in the response
+    // metadata to use to update our notion of the current config server optime.
+    auto responseStatus = rpc::ConfigServerMetadata::readFromMetadata(metadataObj);
+    if (!responseStatus.isOK()) {
+        return responseStatus.getStatus();
+    }
+    auto opTime = responseStatus.getValue().getOpTime();
+    if (opTime.is_initialized()) {
+        grid.shardRegistry()->advanceConfigOpTime(opTime.get());
+    }
+    return Status::OK();
+}
+
+// A hook that will append impersonated users to the metadata of every runCommand run by a DBClient
+// created by mongos or a sharding aware mongod.  mongos uses this information to send information
+// to mongod so that the mongod can produce auditing records attributed to the proper authenticated
+// user(s).
+// Additionally, if the connection is sharding-aware, also appends the stored config server optime.
+Status _shardingRequestMetadataWriter(bool shardedConn,
+                                      BSONObjBuilder* metadataBob,
+                                      StringData hostStringData) {
+    audit::writeImpersonatedUsersToMetadata(metadataBob);
+    if (!shardedConn) {
+        return Status::OK();
+    }
+
+    // Add config server optime to metadata sent to shards.
+    std::string hostString = hostStringData.toString();
+    auto shard = grid.shardRegistry()->getShardNoReload(hostString);
+    if (!shard) {
+        return Status(ErrorCodes::ShardNotFound,
+                      str::stream() << "Shard not found for server: " << hostString);
+    }
+    if (shard->isConfig()) {
+        return Status::OK();
+    }
+    rpc::ConfigServerMetadata(grid.shardRegistry()->getConfigOpTime()).writeToMetadata(metadataBob);
+
+    return Status::OK();
+}
+
+}  // namespace
 
 ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections)
     : _shardedConnections(shardedConnections) {}
@@ -68,23 +128,13 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
     }
 
     if (_shardedConnections) {
-        // For every DBClient created by mongos, add a hook that will capture the response from
-        // commands we pass along from the client, so that we can target the correct node when
-        // subsequent getLastError calls are made by mongos.
-        conn->setReplyMetadataReader([](const BSONObj& metadataObj, StringData hostString)
-                                         -> Status {
-                                             saveGLEStats(metadataObj, hostString);
-                                             return Status::OK();
-                                         });
+        conn->setReplyMetadataReader(_shardingReplyMetadataReader);
     }
 
-    // For every DBClient created by mongos, add a hook that will append impersonated users
-    // to the end of every runCommand.  mongod uses this information to produce auditing
-    // records attributed to the proper authenticated user(s).
-    conn->setRequestMetadataWriter([](BSONObjBuilder* metadataBob) -> Status {
-        audit::writeImpersonatedUsersToMetadata(metadataBob);
-        return Status::OK();
-    });
+    conn->setRequestMetadataWriter(
+        [this](BSONObjBuilder* metadataBob, StringData hostStringData) -> Status {
+            return _shardingRequestMetadataWriter(_shardedConnections, metadataBob, hostStringData);
+        });
 
     // For every SCC created, add a hook that will allow fastest-config-first config reads if
     // the appropriate server options are set.
@@ -95,8 +145,9 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
         }
     } else if (conn->type() == ConnectionString::MASTER) {
         BSONObj isMasterResponse;
-        conn->runCommand("admin", BSON("ismaster" << 1), isMasterResponse);
-
+        if (!conn->runCommand("admin", BSON("ismaster" << 1), isMasterResponse)) {
+            uassertStatusOK(getStatusFromCommandResult(isMasterResponse));
+        }
 
         long long configServerModeNumber;
         Status status =
@@ -113,7 +164,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
                 configServerModeNumber == 0 || configServerModeNumber == 1);
 
         BSONElement setName = isMasterResponse["setName"];
-        status = grid.catalogManager()->scheduleReplaceCatalogManagerIfNeeded(
+        status = grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
             configServerModeNumber == 0 ? CatalogManager::ConfigServerMode::SCCC
                                         : CatalogManager::ConfigServerMode::CSRS,
             setName.type() == String ? setName.valueStringData() : StringData(),

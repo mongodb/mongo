@@ -54,10 +54,13 @@ public:
      * Constructs an OP_COMMANDREPLY in an existing buffer. Ownership of the buffer
      * will be transfered to the CommandReplyBuilder.
      */
-    CommandReplyBuilder(std::unique_ptr<Message> message);
+    CommandReplyBuilder(Message&& message);
+
+
+    CommandReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
+    BufBuilder& getInPlaceReplyBuilder(std::size_t) final;
 
     CommandReplyBuilder& setMetadata(const BSONObj& metadata) final;
-    CommandReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
 
     Status addOutputDocs(DocumentRange outputDocs) final;
     Status addOutputDoc(const BSONObj& outputDoc) final;
@@ -73,21 +76,13 @@ public:
      * The behavior of calling any methods on the object is subsequently
      * undefined.
      */
-    std::unique_ptr<Message> done() final;
-
-    std::size_t availableBytes() const final;
+    Message done() final;
 
 private:
-    /**
-     *  Checks if there is enough space in the buffer to store dataSize bytes
-     *  and computes error message if not.
-     */
-    Status _hasSpaceFor(std::size_t dataSize) const;
-
     // Default values are all empty.
     BufBuilder _builder{};
-    std::unique_ptr<Message> _message;
-    State _state{State::kMetadata};
+    Message _message;
+    State _state{State::kCommandReply};
 };
 
 }  // namespace rpc

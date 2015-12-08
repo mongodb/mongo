@@ -30,7 +30,6 @@
 
 #include <vector>
 
-#include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/text_or.h"
@@ -106,7 +105,7 @@ unique_ptr<PlanStageStats> TextStage::getStats() {
 
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_TEXT);
     ret->specific = make_unique<TextStats>(_specificStats);
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
     return ret;
 }
 
@@ -135,11 +134,8 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* txn,
         textScorer->addChild(make_unique<IndexScan>(txn, ixparams, ws, nullptr));
     }
 
-    auto fetcher = make_unique<FetchStage>(
-        txn, ws, textScorer.release(), nullptr, _params.index->getCollection());
-
     auto matcher =
-        make_unique<TextMatchStage>(txn, std::move(fetcher), _params.query, _params.spec, ws);
+        make_unique<TextMatchStage>(txn, std::move(textScorer), _params.query, _params.spec, ws);
 
     unique_ptr<PlanStage> treeRoot = std::move(matcher);
     return treeRoot;

@@ -86,7 +86,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
 
     std::list<std::shared_ptr<Future::CommandResult>> futures;
     for (const ShardId& shardId : shardIds) {
-        const auto shard = grid.shardRegistry()->getShard(shardId);
+        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
         if (!shard) {
             continue;
         }
@@ -122,8 +122,8 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
         if (result["errmsg"].type() || result["code"].numberInt() != 0) {
             result = specialErrorHandler(res->getServer(), dbName, cmdObj, result);
 
-            BSONElement errmsg = result["errmsg"];
-            if (errmsg.eoo() || errmsg.String().empty()) {
+            BSONElement errmsgObj = result["errmsg"];
+            if (errmsgObj.eoo() || errmsgObj.String().empty()) {
                 // it was fixed!
                 results.emplace_back(*shardIdsIt, result);
                 subobj.append(res->getServer(), result);

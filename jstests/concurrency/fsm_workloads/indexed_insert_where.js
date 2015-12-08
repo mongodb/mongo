@@ -3,7 +3,10 @@
 /**
  * indexed_insert_where.js
  *
- * Bulk inserts documents in batches of 100, and then queries for documents inserted by the thread
+ * Bulk inserts documents in batches of 100, and then queries for documents inserted by the thread.
+ * Note: This workload is extended by remove_where.js, touch_base.js, update_where.js,
+ * and upsert_where.js. data.insertedDocuments is used as a counter by all of those workloads
+ * for their own checks.
  */
 
 var $config = (function() {
@@ -31,7 +34,7 @@ var $config = (function() {
 
         query: function query(db, collName) {
             var count = db[collName].find({ $where: 'this.tid === ' + this.tid }).itcount();
-            assertWhenOwnColl.eq(count, this.insertedDocuments, 
+            assertWhenOwnColl.eq(count, this.insertedDocuments,
                                  '$where query should return the number of documents this ' +
                                  'thread inserted');
         }

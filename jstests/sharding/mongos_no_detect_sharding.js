@@ -1,6 +1,9 @@
 // Tests whether new sharding is detected on insert by mongos
+(function() {
 
-var st = new ShardingTest( name = "test", shards = 1, verbose = 2, mongos = 2 );
+var st = new ShardingTest({ name: "mongos_no_detect_sharding",
+                            shards: 1,
+                            mongos: 2 });
 
 var mongos = st.s
 var config = mongos.getDB("config")
@@ -40,4 +43,6 @@ config.printShardingStatus( true )
 assert.eq( coll.getShardVersion().ok, 1 )
 assert.eq( 101, coll.find().itcount() )
 
-st.stop()
+st.stop();
+
+})();

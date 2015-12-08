@@ -59,6 +59,24 @@ void* nspr::Thread::ThreadRoutine(void* arg) {
     return nullptr;
 }
 
+namespace mongo {
+namespace mozjs {
+
+void PR_BindThread(PRThread* thread) {
+    kCurrentThread = thread;
+}
+
+PRThread* PR_CreateFakeThread() {
+    return new PRThread(nullptr, nullptr, true);
+}
+
+void PR_DestroyFakeThread(PRThread* thread) {
+    delete thread;
+}
+}  // namespace mozjs
+}  // namespace mongo
+
+
 PRThread* PR_CreateThread(PRThreadType type,
                           void (*start)(void* arg),
                           void* arg,

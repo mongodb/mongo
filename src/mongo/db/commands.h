@@ -59,6 +59,10 @@ namespace mutablebson {
 class Document;
 }  // namespace mutablebson
 
+namespace rpc {
+class ServerSelectionMetadata;
+}  // namespace rpc
+
 /** mongodb "commands" (sent via db.$cmd.findOne(...))
     subclass to make a command.  define a singleton object for it.
     */
@@ -75,6 +79,10 @@ protected:
 public:
     typedef StringMap<Command*> CommandMap;
 
+    // NOTE: Do not remove this declaration, or relocate it in this class. We
+    // are using this method to control where the vtable is emitted.
+    virtual ~Command();
+
     // Return the namespace for the command. If the first field in 'cmdObj' is of type
     // mongo::String, then that field is interpreted as the collection name, and is
     // appended to 'dbname' after a '.' character. If the first field is not of type
@@ -86,6 +94,10 @@ public:
     // or a database resource pattern, depending on whether parseNs returns a fully qualifed
     // collection name or just a database name.
     ResourcePattern parseResourcePattern(const std::string& dbname, const BSONObj& cmdObj) const;
+
+    virtual std::size_t reserveBytesForReply() const {
+        return 0u;
+    }
 
     const std::string name;
 
@@ -171,11 +183,17 @@ public:
      *
      *   2) Calling Explain::explainStages(...) on the PlanExecutor. This is the function
      *   which knows how to convert an execution stage tree into explain output.
+     *
+     * TODO: Remove the 'serverSelectionMetadata' parameter in favor of reading the
+     * ServerSelectionMetadata off 'txn'. Once OP_COMMAND is implemented in mongos, this metadata
+     * will be parsed and attached as a decoration on the OperationContext, as is already done on
+     * the mongod side.
      */
     virtual Status explain(OperationContext* txn,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const {
         return Status(ErrorCodes::IllegalOperation, "Cannot explain cmd: " + name);
     }
@@ -231,12 +249,14 @@ public:
         return false;
     }
 
+    virtual LogicalOp getLogicalOp() const {
+        return LogicalOp::opCommand;
+    }
+
     /** @param webUI expose the command in the web ui as localhost:28017/<name>
         @param oldName an optional old, deprecated name for the command
     */
     Command(StringData _name, bool webUI = false, StringData oldName = StringData());
-
-    virtual ~Command() {}
 
 protected:
     /**
@@ -348,13 +368,38 @@ public:
      */
     static void appendCommandWCStatus(BSONObjBuilder& result, const Status& status);
 
-    // Set by command line.  Controls whether or not testing-only commands should be available.
-    static int testCommandsEnabled;
+    /**
+     * If true, then testing commands are available. Defaults to false.
+     *
+     * Testing commands should conditionally register themselves by consulting this flag:
+     *
+     *     MONGO_INITIALIZER(RegisterMyTestCommand)(InitializerContext* context) {
+     *         if (Command::testCommandsEnabled) {
+     *             // Leaked intentionally: a Command registers itself when constructed.
+     *             new MyTestCommand();
+     *         }
+     *         return Status::OK();
+     *     }
+     *
+     * To make testing commands available by default, change the value to true before running any
+     * mongo initializers:
+     *
+     *     int myMain(int argc, char** argv, char** envp) {
+     *         static StaticObserver StaticObserver;
+     *         Command::testCommandsEnabled = true;
+     *         ...
+     *         runGlobalInitializersOrDie(argc, argv, envp);
+     *         ...
+     *     }
+     */
+    static bool testCommandsEnabled;
 
     /**
      * Returns true if this a request for the 'help' information associated with the command.
      */
-    static bool isHelpRequest(const rpc::RequestInterface& request);
+    static bool isHelpRequest(const BSONElement& helpElem);
+
+    static const char kHelpFieldName[];
 
     /**
      * Generates a reply from the 'help' information associated with a command. The state of
@@ -376,7 +421,8 @@ public:
                                       rpc::ReplyBuilderInterface* replyBuilder,
                                       const DBException& exception,
                                       const rpc::RequestInterface& request,
-                                      Command* command);
+                                      Command* command,
+                                      const BSONObj& metadata);
 
     /**
      * Generates a command error response. This overload of generateErrorResponse is intended

@@ -35,7 +35,14 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 
+namespace boost {
+namespace filesystem {
+class path;
+}  // namespace filesystem
+}  // namespace boost
+
 namespace mongo {
+class DataProtector;
 class StringData;
 class ServiceContext;
 
@@ -49,15 +56,52 @@ public:
     virtual ~WiredTigerCustomizationHooks() = default;
 
     /**
-     *  Appends additional configuration sub object(s) to the BSONObjbuilder builder.
+     * Returns true if the customization hooks are enabled.
      */
-    virtual void appendUID(BSONObjBuilder* builder) = 0;
+    virtual bool enabled() const = 0;
+
+    /**
+     * Perform any encryption engine initialization/sanity checking that needs to happen after
+     * storage engine initialization but before the server starts accepting incoming connections.
+     *
+     * Returns true if the server needs to be rebooted because of configuration changes.
+     */
+    virtual bool restartRequired() = 0;
 
     /**
      *  Gets the WiredTiger encryption configuration string for the
      *  provided table name
      */
     virtual std::string getOpenConfig(StringData tableName) = 0;
+
+    /**
+     * Returns the maximum size addition when doing transforming temp data.
+     */
+    size_t additionalBytesForProtectedBuffer() {
+        return 33;
+    }
+
+    /**
+     * Get the data protector object
+     */
+    virtual std::unique_ptr<DataProtector> getDataProtector() = 0;
+
+    /**
+     * Get an implementation specific path suffix to tag files with
+     */
+    virtual boost::filesystem::path getProtectedPathSuffix() = 0;
+
+    /**
+     * Transform temp data to non-readable form before writing it to disk.
+     */
+    virtual Status protectTmpData(
+        const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) = 0;
+
+    /**
+     * Tranforms temp data back to readable form, after reading from disk.
+     */
+    virtual Status unprotectTmpData(
+        const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) = 0;
 };
 
 // Empty default implementation of the abstract class WiredTigerCustomizationHooks
@@ -65,8 +109,20 @@ class EmptyWiredTigerCustomizationHooks : public WiredTigerCustomizationHooks {
 public:
     ~EmptyWiredTigerCustomizationHooks() override;
 
-    void appendUID(BSONObjBuilder* builder) override;
+    bool enabled() const override;
+
+    bool restartRequired() override;
 
     std::string getOpenConfig(StringData tableName) override;
+
+    std::unique_ptr<DataProtector> getDataProtector() override;
+
+    boost::filesystem::path getProtectedPathSuffix() override;
+
+    Status protectTmpData(
+        const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) override;
+
+    Status unprotectTmpData(
+        const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) override;
 };
 }  // namespace mongo

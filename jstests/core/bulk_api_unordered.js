@@ -50,7 +50,8 @@ var executeTests = function() {
           assert.eq(4, result.nModified);
     }
     assert.eq(2, result.nRemoved);
-    assert(1, result.getWriteErrorCount());
+    assert.eq(false, result.hasWriteErrors());
+    assert.eq(0, result.getWriteErrorCount());
     var upserts = result.getUpsertedIds();
     assert.eq(2, upserts.length);
     assert.eq(3, upserts[0].index);
@@ -88,7 +89,7 @@ var executeTests = function() {
     // Basic properties check
     assert.eq(2, result.nInserted);
     assert.eq(true, result.hasWriteErrors());
-    assert(1, result.getWriteErrorCount());
+    assert.eq(1, result.getWriteErrorCount());
 
     // Get the first error
     var error = result.getWriteErrorAt(0);
@@ -123,7 +124,7 @@ var executeTests = function() {
     assert.eq(2, result.nInserted);
     assert.eq(1, result.nUpserted);
     assert.eq(true, result.hasWriteErrors());
-    assert(3, result.getWriteErrorCount());
+    assert.eq(3, result.getWriteErrorCount());
 
     // Individual error checking
     var error = result.getWriteErrorAt(0);

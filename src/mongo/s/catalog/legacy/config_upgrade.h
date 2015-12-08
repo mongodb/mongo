@@ -34,6 +34,7 @@ namespace mongo {
 
 class CatalogManager;
 class DistLockManager;
+class OperationContext;
 class Status;
 class VersionType;
 
@@ -49,6 +50,8 @@ Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo
  *
  * Returns Status::OK() on success, or an error status indicating the source of failure.
  */
-Status checkAndInitConfigVersion(CatalogManager* catalogManager, DistLockManager* distLockManager);
+Status checkAndInitConfigVersion(OperationContext* txn,
+                                 CatalogManager* catalogManager,
+                                 DistLockManager* distLockManager);
 
 }  // namespace mongo

@@ -1,16 +1,15 @@
-// Test changing the --sslMode and --clusterAuthMode 
-// parameters using setParameter
+// Test changing the --sslMode and --clusterAuthMode parameters using setParameter
 
 var SERVER_CERT = "jstests/libs/server.pem"
 var CA_CERT = "jstests/libs/ca.pem" 
-port = allocatePorts(1)[0];
 
 function testSSLTransition(oldMode, newMode, shouldSucceed) {
-    var conn = MongoRunner.runMongod({port: port,
-                           sslMode: oldMode,
-                           sslPEMKeyFile: SERVER_CERT,
-                           sslCAFile: CA_CERT});
-    
+    var conn = MongoRunner.runMongod({
+        sslMode: oldMode,
+        sslPEMKeyFile: SERVER_CERT,
+        sslCAFile: CA_CERT
+    });
+
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
     adminDB.auth("root", "pwd");
@@ -18,16 +17,17 @@ function testSSLTransition(oldMode, newMode, shouldSucceed) {
                                    "sslMode" : newMode });
 
     assert(res["ok"] == shouldSucceed, tojson(res));
-    MongoRunner.stopMongod(port);
+    MongoRunner.stopMongod(conn.port);
 }
 
 function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
-    var conn = MongoRunner.runMongod({port: port,
-                           sslMode: sslMode,
-                           sslPEMKeyFile: SERVER_CERT,
-                           sslCAFile: CA_CERT,
-                           clusterAuthMode: oldMode});
-    
+    var conn = MongoRunner.runMongod({
+        sslMode: sslMode,
+        sslPEMKeyFile: SERVER_CERT,
+        sslCAFile: CA_CERT,
+        clusterAuthMode: oldMode
+    });
+
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
     adminDB.auth("root", "pwd");
@@ -35,7 +35,7 @@ function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
                                    "clusterAuthMode" : newMode });
 
     assert(res["ok"] == shouldSucceed, tojson(res));
-    MongoRunner.stopMongod(port);
+    MongoRunner.stopMongod(conn.port);
 }
 
 testSSLTransition("allowSSL", "invalid", false);

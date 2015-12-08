@@ -4,11 +4,10 @@
 
 var options = { shardOptions : { verbose : 0 } };
 
-var st = new ShardingTest({ shards : 2, mongos : 2, other : options });
+var st = new ShardingTest({ shards: 2, other: options });
 st.stopBalancer();
 
 var mongos = st.s0;
-var staleMongos = st.s1;
 var admin = mongos.getDB( "admin" );
 var shards = mongos.getCollection( "config.shards" ).find().toArray();
 var coll = mongos.getCollection( "foo.bar" );

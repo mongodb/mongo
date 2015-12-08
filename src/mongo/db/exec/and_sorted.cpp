@@ -115,6 +115,9 @@ PlanStage::StageState AndSortedStage::getTargetLoc(WorkingSetID* out) {
         _targetId = id;
         _targetLoc = member->loc;
 
+        // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+        member->makeObjOwnedIfNeeded();
+
         // We have to AND with all other children.
         for (size_t i = 1; i < _children.size(); ++i) {
             _workingTowardRep.push(i);
@@ -210,6 +213,10 @@ PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
             _targetNode = workingChildNumber;
             _targetLoc = member->loc;
             _targetId = id;
+
+            // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+            member->makeObjOwnedIfNeeded();
+
             _workingTowardRep = std::queue<size_t>();
             for (size_t i = 0; i < _children.size(); ++i) {
                 if (workingChildNumber != i) {
@@ -283,7 +290,7 @@ unique_ptr<PlanStageStats> AndSortedStage::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_AND_SORTED);
     ret->specific = make_unique<AndSortedStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats().release());
+        ret->children.emplace_back(_children[i]->getStats());
     }
 
     return ret;

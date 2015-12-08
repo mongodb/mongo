@@ -3,6 +3,8 @@
 // NOTE: Basic write functionality is tested via the passthrough tests, this file should contain
 // *only* mongos-specific tests.
 //
+(function() {
+"use strict";
 
 // Only reason for using localhost name is to make the test consistent with naming host so it
 // will be easier to check for the host name inside error objects.
@@ -271,3 +273,5 @@ jsTest.log("DONE!");
 
 MongoRunner.stopMongos( staleMongos );
 st.stop();
+
+}());

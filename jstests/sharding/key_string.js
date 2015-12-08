@@ -1,9 +1,7 @@
-// key_string.js
+(function() {
 
-s = new ShardingTest( "keystring" , 2 );
-s.stopBalancer();
+var s = new ShardingTest({ name: "keystring", shards: 2 });
 
-db = s.getDB( "test" );
 s.adminCommand( { enablesharding : "test" } )
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { name : 1 } } );
@@ -12,6 +10,8 @@ primary = s.getServer( "test" ).getDB( "test" );
 seconday = s.getOther( primary ).getDB( "test" );
 
 assert.eq( 1 , s.config.chunks.count() , "sanity check A" );
+
+var db = s.getDB( "test" );
 
 db.foo.save( { name : "eliot" } )
 db.foo.save( { name : "sara" } )
@@ -48,4 +48,4 @@ assert.throws( function(){ s.adminCommand( { split : "test.foo" , middle : { nam
 
 s.stop();
 
-
+})();

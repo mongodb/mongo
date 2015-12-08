@@ -28,7 +28,7 @@ load("jstests/replsets/rslib.js");
     }
 
     var name = "rollback2js";
-    var replTest = new ReplSetTest({ name: name, nodes: 3 });
+    var replTest = new ReplSetTest({ name: name, nodes: 3, useBridge: true });
     var nodes = replTest.nodeList();
 
     var conns = replTest.startSet();
@@ -38,7 +38,6 @@ load("jstests/replsets/rslib.js");
                             { "_id": 1, "host": nodes[1] },
                             { "_id": 2, "host": nodes[2], arbiterOnly: true}
     ]});
-    replTest.bridge();
 
     // Make sure we have a master and that that master is node A
     replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
@@ -70,11 +69,23 @@ load("jstests/replsets/rslib.js");
     a.createCollection("kap2", { capped: true, size: 5501 });
     replTest.awaitReplication();
 
+    var timeout;
+    if (replTest.getConfigFromPrimary().protocolVersion == 1) {
+        timeout = 30 * 1000;
+    } else {
+        timeout = 60 * 1000;
+    }
     // isolate A and wait for B to become master
-    replTest.partition(0, 1);
-    replTest.partition(0, 2);
-    assert.soon(function () { try { return B.isMaster().ismaster; } catch(e) { return false; } });
-    
+    conns[0].disconnect(conns[1]);
+    conns[0].disconnect(conns[2]);
+    assert.soon(function () {
+        try {
+            return B.isMaster().ismaster;
+        } catch(e) {
+            return false;
+        }
+    }, "node B did not become master as expected", timeout);
+
     // do operations on B and B alone, these will be rolled back
     assert.writeOK(b.bar.insert({ q: 4 }));
     assert.writeOK(b.bar.update({ q: 3 }, { q: 3, rb: true }));
@@ -92,10 +103,10 @@ load("jstests/replsets/rslib.js");
 
     // isolate B, bring A back into contact with the arbiter, then wait for A to become master
     // insert new data into A so that B will need to rollback when it reconnects to A
-    replTest.partition(1, 2);
+    conns[1].disconnect(conns[2]);
     assert.soon(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
 
-    replTest.unPartition(0, 2);
+    conns[0].reconnect(conns[2]);
     assert.soon(function () { try { return A.isMaster().ismaster; } catch(e) { return false; } });
     assert(a.bar.count() >= 1, "count check");
     assert.writeOK(a.bar.insert({ txt: 'foo' }));
@@ -105,12 +116,13 @@ load("jstests/replsets/rslib.js");
     // A is 1 2 3 7 8
     // B is 1 2 3 4 5 6
     // put B back in contact with A and arbiter, as A is primary, B will rollback and then catch up
-    replTest.unPartition(1, 2);
-    replTest.unPartition(0, 1);
+    conns[1].reconnect(conns[2]);
+    conns[0].reconnect(conns[1]);
 
     awaitOpTime(b.getMongo(), getLatestOp(a_conn).ts);
 
     // await steady state and ensure the two nodes have the same contents
+    replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
     checkFinalResults(a);
     checkFinalResults(b);

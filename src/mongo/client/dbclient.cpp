@@ -43,6 +43,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
@@ -62,6 +63,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password_digest.h"
@@ -291,24 +293,25 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
             str::stream() << "Database name '" << database << "' is not valid.",
             NamespaceString::validDBName(database));
 
+    // call() oddly takes this by pointer, so we need to put it on the stack.
+    auto host = getServerAddress();
+
     BSONObjBuilder metadataBob;
     metadataBob.appendElements(metadata);
 
     if (_metadataWriter) {
-        uassertStatusOK(_metadataWriter(&metadataBob));
+        uassertStatusOK(_metadataWriter(&metadataBob, host));
     }
 
     auto requestBuilder = rpc::makeRequestBuilder(getClientRPCProtocols(), getServerRPCProtocols());
 
     requestBuilder->setDatabase(database);
     requestBuilder->setCommandName(command);
-    requestBuilder->setMetadata(metadataBob.done());
     requestBuilder->setCommandArgs(commandArgs);
+    requestBuilder->setMetadata(metadataBob.done());
     auto requestMsg = requestBuilder->done();
 
-    auto replyMsg = stdx::make_unique<Message>();
-    // call oddly takes this by pointer, so we need to put it on the stack.
-    auto host = getServerAddress();
+    Message replyMsg;
 
     // We always want to throw if there was a network error, we do it here
     // instead of passing 'true' for the 'assertOk' parameter so we can construct a
@@ -317,14 +320,14 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
             str::stream() << "network error while attempting to run "
                           << "command '" << command << "' "
                           << "on host '" << host << "' ",
-            call(*requestMsg, *replyMsg, false, &host));
+            call(requestMsg, replyMsg, false, &host));
 
-    auto commandReply = rpc::makeReply(replyMsg.get());
+    auto commandReply = rpc::makeReply(&replyMsg);
 
     uassert(ErrorCodes::RPCProtocolNegotiationFailed,
             str::stream() << "Mismatched RPC protocols - request was '"
-                          << opToString(requestMsg->operation()) << "' '"
-                          << " but reply was '" << opToString(replyMsg->operation()) << "' ",
+                          << networkOpToString(requestMsg.operation()) << "' '"
+                          << " but reply was '" << networkOpToString(replyMsg.operation()) << "' ",
             requestBuilder->getProtocol() == commandReply->getProtocol());
 
     if (ErrorCodes::SendStaleConfig ==
@@ -853,16 +856,28 @@ private:
 /**
 * Initializes the wire version of conn, and returns the isMaster reply.
 */
-StatusWith<executor::RemoteCommandResponse> initWireVersion(DBClientBase* conn) {
+StatusWith<executor::RemoteCommandResponse> initWireVersion(DBClientConnection* conn) {
     try {
         // We need to force the usage of OP_QUERY on this command, even if we have previously
         // detected support for OP_COMMAND on a connection. This is necessary to handle the case
         // where we reconnect to an older version of MongoDB running at the same host/port.
         ScopedForceOpQuery forceOpQuery{conn};
 
+        BSONObjBuilder bob;
+        bob.append("isMaster", 1);
+
+        if (Command::testCommandsEnabled) {
+            // Only include the host:port of this process in the isMaster command request if test
+            // commands are enabled. mongobridge uses this field to identify the process opening a
+            // connection to it.
+            StringBuilder sb;
+            sb << getHostName() << ':' << serverGlobalParams.port;
+            bob.append("hostInfo", sb.str());
+        }
+
         Date_t start{Date_t::now()};
-        auto result = conn->runCommandWithMetadata(
-            "admin", "isMaster", rpc::makeEmptyMetadata(), BSON("isMaster" << 1));
+        auto result =
+            conn->runCommandWithMetadata("admin", "isMaster", rpc::makeEmptyMetadata(), bob.done());
         Date_t finish{Date_t::now()};
 
         BSONObj isMasterObj = result->getCommandReply().getOwned();
@@ -910,6 +925,15 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress) {
     }
 
     _setServerRPCProtocols(swProtocolSet.getValue());
+
+    auto negotiatedProtocol =
+        rpc::negotiate(getServerRPCProtocols(),
+                       rpc::computeProtocolSet(WireSpec::instance().minWireVersionOutgoing,
+                                               WireSpec::instance().maxWireVersionOutgoing));
+
+    if (!negotiatedProtocol.isOK()) {
+        return negotiatedProtocol.getStatus();
+    }
 
     if (_hook) {
         auto validationStatus = _hook(swIsMasterReply.getValue());

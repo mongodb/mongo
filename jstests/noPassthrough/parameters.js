@@ -53,10 +53,10 @@ ensureSetParameterFailure(dbConn, "logLevel", "foo");
 ensureSetParameterFailure(dbConn, "logLevel", "1.5");
 ensureSetParameterFailure(dbConn, "logLevel", -1);
 ensureSetParameterFailure(dbConn, "journalCommitInterval", "foo");
-ensureSetParameterFailure(dbConn, "journalCommitInterval", "1.5");
-ensureSetParameterFailure(dbConn, "journalCommitInterval", 1.5);
+ensureSetParameterFailure(dbConn, "journalCommitInterval", "0.5");
+ensureSetParameterFailure(dbConn, "journalCommitInterval", 0.5);
 ensureSetParameterFailure(dbConn, "journalCommitInterval", 1000);
-ensureSetParameterFailure(dbConn, "journalCommitInterval", 1);
+ensureSetParameterFailure(dbConn, "journalCommitInterval", 0);
 ensureSetParameterFailure(dbConn, "replMonitorMaxFailedChecks", "foo");
 
 MongoRunner.stopMongod(dbConn.port);

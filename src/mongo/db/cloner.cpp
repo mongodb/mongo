@@ -59,7 +59,7 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -225,12 +225,12 @@ struct Cloner::Fun {
                 WriteUnitOfWork wunit(txn);
 
                 BSONObj doc = tmp;
-                StatusWith<RecordId> loc = collection->insertDocument(txn, doc, true);
-                if (!loc.isOK()) {
+                Status status = collection->insertDocument(txn, doc, true);
+                if (!status.isOK()) {
                     error() << "error: exception cloning object in " << from_collection << ' '
-                            << loc.getStatus() << " obj:" << doc;
+                            << status << " obj:" << doc;
                 }
-                uassertStatusOK(loc.getStatus());
+                uassertStatusOK(status);
                 wunit.commit();
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "cloner insert", to_collection.ns());

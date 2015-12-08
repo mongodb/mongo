@@ -40,7 +40,7 @@ createCollectionWithData = function (db, collectionName, dataGenerator) {
               JSON.stringify(nextIndex.options) + ");");
         var ensureIndexResult = collection.ensureIndex(nextIndex.spec, nextIndex.options);
         // XXX: Is this the real way to check for errors?
-        assert(ensureIndexResult === undefined, JSON.stringify(ensureIndexResult));
+        assert(ensureIndexResult === undefined, tojson(ensureIndexResult));
         numIndexes++;
     }
 

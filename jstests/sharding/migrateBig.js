@@ -1,6 +1,10 @@
+(function() {
 
-s = new ShardingTest( "migrateBig" , 2 , 0 , 1 , { chunksize : 1 } );
-s.config.settings.update( { _id: "balancer" }, { $set : { stopped : true, _waitForDelete : true } } , true );
+var s = new ShardingTest({ name: "migrateBig",
+                           shards: 2,
+                           other: { chunkSize: 1 } });
+
+s.config.settings.update( { _id: "balancer" }, { $set : { _waitForDelete : true } } , true);
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { x : 1 } } );
@@ -53,7 +57,6 @@ for ( i=0; i<20; i+= 2 ) {
 
 db.printShardingStatus()
 
-
 s.config.settings.update( { _id: "balancer" }, { $set : { stopped: false } } , true );
 
 assert.soon( function(){ var x = s.chunkDiff( "foo" , "test" ); print( "chunk diff: " + x ); return x < 2; } , "no balance happened" , 8 * 60 * 1000 , 2000 ) 
@@ -62,4 +65,6 @@ assert.soon( function(){ return !s.isAnyBalanceInFlight(); } );
 
 assert.eq( coll.count() , coll.find().itcount() );
 
-s.stop()
+s.stop();
+
+})();

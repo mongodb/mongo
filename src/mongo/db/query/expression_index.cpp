@@ -43,7 +43,6 @@
 namespace mongo {
 
 using std::set;
-using mongo::Interval;
 
 BSONObj ExpressionMapping::hash(const BSONElement& value) {
     BSONObjBuilder bob;

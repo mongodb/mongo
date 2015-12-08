@@ -35,7 +35,7 @@ baseEnv.InjectThirdPartyIncludePaths(libraries=['stemmer'])
 baseEnv.Library('base', [
         'fts_index_format.cpp',
         'fts_matcher.cpp',
-        'fts_query.cpp',
+        'fts_query_impl.cpp',
         'fts_query_parser.cpp',
         'fts_spec.cpp',
         'fts_spec_legacy.cpp',
@@ -54,8 +54,19 @@ baseEnv.Library('base', [
                     "$BUILD_DIR/mongo/db/common",
                     "$BUILD_DIR/mongo/db/fts/unicode/unicode",
                     "$BUILD_DIR/mongo/platform/platform",
-                    "$BUILD_DIR/third_party/shim_stemmer"
+                    "$BUILD_DIR/mongo/util/md5",
+                    "$BUILD_DIR/third_party/shim_stemmer",
                     ])
+
+env.Library(
+    target='fts_query_noop',
+    source=[
+        'fts_query_noop.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
 
 env.Library( 'server_common', [
              'fts_enabled.cpp'
@@ -92,8 +103,11 @@ env.CppUnitTest( "fts_language_test", "fts_language_test.cpp",
 env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
                  LIBDEPS=["base"] )
 
-env.CppUnitTest( "fts_query_test", "fts_query_test.cpp",
+env.CppUnitTest( "fts_query_impl_test", "fts_query_impl_test.cpp",
                  LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_query_noop_test", "fts_query_noop_test.cpp",
+                 LIBDEPS=["fts_query_noop"] )
 
 env.CppUnitTest( "fts_spec_test", "fts_spec_test.cpp",
                  LIBDEPS=["base"] )

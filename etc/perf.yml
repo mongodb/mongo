@@ -3,11 +3,37 @@ stepback: false
 
 pre:
     - command: shell.track
+    - command: shell.exec
+      params:
+        silent: true
+        script: |
+          ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
+          exit 0
 
 post:
+    - command: "json.send"
+      params:
+        name: "perf"
+        file: "src/perf.json"
+    - command: attach.results
+      params:
+        file_location: src/report.json
+    - command: shell.exec
+      params:
+        silent: true
+        script: |
+          ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
+          exit 0
     - command: shell.cleanup
 
 functions:
+  "download analysis scripts":
+    - command: shell.exec
+      params:
+        script: |
+          set -v
+          rm -rf ./dsi
+          git clone git@github.com:10gen/dsi.git
   "start server":
     - command: shell.exec
       params:
@@ -18,14 +44,14 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${build_variant}/${revision}/mongod-${build_id}
+        remote_file: perf/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         local_file: src/mongod
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${build_variant}/${revision}/mongo-${build_id}
+        remote_file: perf/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         local_file: src/mongo
     - command: shell.exec
@@ -48,18 +74,40 @@ functions:
           set -o verbose
           mkdir -p ./dbdata
           ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags}
+    - command : shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -e
+          set -o verbose
           sleep 5
           # if we started a replset, initiate it and wait for it to become primary
           ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
           echo "MONGOD STARTED."
-  "analyze":
-    - command: s3.get
+  "compare":
+    - command: json.get
       params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: perf/${build_variant}/${revision}/perf_regression_check.py-${build_id}
-        bucket: mciuploads
-        local_file: src/perf_regression_check.py
+        task: ${compare_task}
+        variant : ${variant1}
+        file: "src/stand.json"
+        name: "perf"
+    - command: json.get
+      params:
+        task: ${compare_task}
+        variant : ${variant2}
+        file: "src/node.json"
+        name: "perf"
+    - command: shell.exec
+      type : test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          virtualenv ./venv
+          source ./venv/bin/activate
+          python ../dsi/analysis/compare.py -b stand.json -c node.json -t ${threshold}
+  "analyze":
     - command: shell.exec
       params:
         working_dir: src
@@ -74,6 +122,12 @@ functions:
         task: ${task_name}
         file: "src/history.json"
         name: "perf"
+    - command: json.get_history
+      params:
+        tags: true
+        task: ${task_name}
+        file: "src/tags.json"
+        name: "perf"
     - command: shell.exec
       type : test
       params:
@@ -82,7 +136,7 @@ functions:
           set -o errexit
           set -o verbose
           source ./venv/bin/activate
-          python perf_regression_check.py -f history.json --rev ${revision}
+          python ../dsi/analysis/perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.0.6-Baseline --overrideFile ../dsi/analysis/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
     - command: shell.exec
       params:
@@ -97,7 +151,7 @@ functions:
       params:
         working_dir: src
         script: |
-          set -e 
+          set -e
           set -v
           source ./venv/bin/activate
           cd perf
@@ -131,7 +185,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongod
-        remote_file: perf/${build_variant}/${revision}/mongod-${build_id}
+        remote_file: perf/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -141,7 +195,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongo
-        remote_file: perf/${build_variant}/${revision}/mongo-${build_id}
+        remote_file: perf/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -150,16 +204,27 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/buildscripts/perf_regression_check.py
-        remote_file: perf/${build_variant}/${revision}/perf_regression_check.py-${build_id}
+        local_file: src/buildscripts/compare.py
+        remote_file: perf/${version_id}/${revision}/compare.py-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
-        display_name: perf_regression_check.py
+        display_name: compare.py
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/etc/override.json
+        remote_file: perf/${version_id}/${revision}/override.json-${version_id}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/octet-stream}
+        display_name: override.json
 
 - name: query
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -168,10 +233,12 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: where
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -180,10 +247,12 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: update
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -192,10 +261,12 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: insert
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -204,10 +275,12 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: geo
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -216,10 +289,12 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: misc
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -228,10 +303,12 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: singleThreaded
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -240,17 +317,360 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "none"
         threads : "1"
+    - func: "download analysis scripts"
     - func: "analyze"
+- name: singleThreaded-wt-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : singleThreaded
+      variant : linux-wt-standalone
+      status : "*"
+    - name : singleThreaded
+      variant :  linux-wt-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "singleThreaded"
+        variant1 : "linux-wt-standalone"
+        variant2 : "linux-wt-repl"
+        threshold : 75
+- name: insert-wt-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : insert
+      variant : linux-wt-standalone
+      status : "*"
+    - name : insert
+      variant :  linux-wt-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "insert"
+        variant1 : "linux-wt-standalone"
+        variant2 : "linux-wt-repl"
+        threshold : 75
+- name: update-wt-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : update
+      variant : linux-wt-standalone
+      status : "*"
+    - name : update
+      variant :  linux-wt-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "update"
+        variant1 : "linux-wt-standalone"
+        variant2 : "linux-wt-repl"
+        threshold : 75
+- name: misc-wt-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : misc
+      variant : linux-wt-standalone
+      status : "*"
+    - name : misc
+      variant :  linux-wt-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "misc"
+        variant1 : "linux-wt-standalone"
+        variant2 : "linux-wt-repl"
+        threshold : 75
+- name: singleThreaded-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : singleThreaded
+      variant : linux-wt-standalone
+      status : "*"
+    - name : singleThreaded
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "singleThreaded"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: query-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : query
+      variant : linux-wt-standalone
+      status : "*"
+    - name : query
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "query"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: where-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : where
+      variant : linux-wt-standalone
+      status : "*"
+    - name : where
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "where"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: geo-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : geo
+      variant : linux-wt-standalone
+      status : "*"
+    - name : geo
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "geo"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: insert-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : insert
+      variant : linux-wt-standalone
+      status : "*"
+    - name : insert
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "insert"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: update-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : update
+      variant : linux-wt-standalone
+      status : "*"
+    - name : update
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "update"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: misc-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : misc
+      variant : linux-wt-standalone
+      status : "*"
+    - name : misc
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "misc"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: singleThreaded-wt-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : singleThreaded
+      variant : linux-wt-repl
+      status : "*"
+    - name : singleThreaded
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "singleThreaded"
+        variant2 : "linux-wt-repl"
+        variant1 : "linux-mmap-repl"
+        threshold : 85
+- name: insert-wt-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : insert
+      variant : linux-wt-repl
+      status : "*"
+    - name : insert
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "insert"
+        variant2 : "linux-wt-repl"
+        variant1 : "linux-mmap-repl"
+        threshold : 85
+- name: update-wt-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : update
+      variant : linux-wt-repl
+      status : "*"
+    - name : update
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "update"
+        variant2 : "linux-wt-repl"
+        variant1 : "linux-mmap-repl"
+        threshold : 85
+- name: misc-wt-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+      status : "*"
+    - name : misc
+      variant : linux-wt-repl
+    - name : misc
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "misc"
+        variant2 : "linux-wt-repl"
+        variant1 : "linux-mmap-repl"
+        threshold : 85
+- name: singleThreaded-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : singleThreaded
+      variant : linux-mmap-standalone
+      status : "*"
+    - name : singleThreaded
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "singleThreaded"
+        variant1 : "linux-mmap-standalone"
+        variant2 : "linux-mmap-repl"
+        threshold : 75
+- name: insert-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : insert
+      variant : linux-mmap-standalone
+      status : "*"
+    - name : insert
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "insert"
+        variant1 : "linux-mmap-standalone"
+        variant2 : "linux-mmap-repl"
+        threshold : 75
+- name: update-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : update
+      variant : linux-mmap-standalone
+      status : "*"
+    - name : update
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "update"
+        variant1 : "linux-mmap-standalone"
+        variant2 : "linux-mmap-repl"
+        threshold : 75
+- name: misc-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : misc
+      variant : linux-mmap-standalone
+      status : "*"
+    - name : misc
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "download analysis scripts"
+    - func: "compare"
+      vars:
+        compare_task : "misc"
+        variant1 : "linux-mmap-standalone"
+        variant2 : "linux-mmap-repl"
+        threshold : 75
 
 buildvariants:
 - name: linux-wt-standalone
-  display_name: Linux WT Standalone
+  display_name: Standalone Linux WT
   batchtime: 90 # 1.5 hours
   expansions:
     compile_flags: &compile_flags -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16"
+    mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --wiredTigerCacheSizeGB 16"
 
   run_on:
   - "centos6-perf"
@@ -267,20 +687,17 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-mmap-standalone
-  display_name: Linux MMAPv1 Standalone
+  display_name: Standalone Linux MMAPv1
   batchtime: 90 # 1.5 hours
   expansions:
     compile_flags: *compile_flags
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false"
+    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false"
 
   run_on:
   - "centos6-perf"
   tasks:
-  - name: compile
-    distros:
-    - rhel55
   - name: query
   - name: where
   - name: update
@@ -290,41 +707,87 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-wt-repl
-  display_name: Linux WT 1-Node ReplSet
+  display_name: 1-Node ReplSet Linux WT
   batchtime: 360 # 6 hours
   expansions:
     compile_flags: *compile_flags 
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --oplogSize 100000"
+    mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false "
 
   run_on:
   - "centos6-perf"
   tasks:
-  - name: compile
-    distros:
-    - rhel55
   - name: update
   - name: insert
   - name: misc
   - name: singleThreaded
 
 - name: linux-mmap-repl
-  display_name: Linux MMapv1 1-Node ReplSet
+  display_name: 1-Node ReplSet Linux MMAPv1
   batchtime: 360 # 6 hours
   expansions:
     compile_flags: *compile_flags 
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000"
+    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false"
 
   run_on:
   - "centos6-perf"
   tasks:
-  - name: compile
-    distros:
-    - rhel55
   - name: update
   - name: insert
   - name: misc
   - name: singleThreaded
+
+- name: linux-wt-repl-compare
+  display_name: 1-Node ReplSet Linux WT Comparison Standalone
+  batchtime: 360 # 6 hours
+  run_on:
+  - "centos6-perf"
+#    - "ubuntu1404-docker"
+  tasks:
+  - name: singleThreaded-wt-repl-comp
+  - name: insert-wt-repl-comp
+  - name: update-wt-repl-comp
+  - name: misc-wt-repl-comp
+
+- name: linux-mmap-repl-compare
+  display_name: 1-Node ReplSet Linux MMAPv1 Comparison Standalone
+  batchtime: 360 # 6 hours
+  run_on:
+  - "centos6-perf"
+#    - "ubuntu1404-docker"
+  tasks:
+  - name: singleThreaded-mmap-repl-comp
+  - name: insert-mmap-repl-comp
+  - name: update-mmap-repl-comp
+  - name: misc-mmap-repl-comp
+
+- name: linux-wt-mmap-standalone-compare
+  display_name: Standalone Linux WT Comparison MMAPv1
+  batchtime: 90 # 1.5 hours
+  run_on:
+  - "centos6-perf"
+#    - "ubuntu1404-docker"
+  tasks:
+  - name: singleThreaded-wt-mmap-standalone-comp
+  - name: insert-wt-mmap-standalone-comp
+  - name: update-wt-mmap-standalone-comp
+  - name: misc-wt-mmap-standalone-comp
+  - name: query-wt-mmap-standalone-comp
+  - name: where-wt-mmap-standalone-comp
+  - name: geo-wt-mmap-standalone-comp
+
+- name: linux-wt-mmap-repl-compare
+  display_name: 1-Node ReplSet Linux WT Comparison MMAPv1
+  batchtime: 360 # 6 hours
+  run_on:
+  - "centos6-perf"
+#    - "ubuntu1404-docker"
+  tasks:
+  - name: singleThreaded-wt-mmap-repl-comp
+  - name: insert-wt-mmap-repl-comp
+  - name: update-wt-mmap-repl-comp
+  - name: misc-wt-mmap-repl-comp
+

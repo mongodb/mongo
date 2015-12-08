@@ -76,7 +76,9 @@ public:
     void blacklistSyncSource(const HostAndPort& host, Date_t until) override {
         _blacklistedSource = host;
     }
-    bool shouldChangeSyncSource(const HostAndPort& currentSource) override {
+    bool shouldChangeSyncSource(const HostAndPort& currentSource,
+                                const OpTime& sourcesOpTime,
+                                bool syncSourceHasSyncSource) override {
         return false;
     }
     HostAndPort _syncSource;
@@ -112,8 +114,11 @@ public:
     void blacklistSyncSource(const HostAndPort& host, Date_t until) override {
         _syncSourceSelector->blacklistSyncSource(host, until);
     }
-    bool shouldChangeSyncSource(const HostAndPort& currentSource) override {
-        return _syncSourceSelector->shouldChangeSyncSource(currentSource);
+    bool shouldChangeSyncSource(const HostAndPort& currentSource,
+                                const OpTime& sourcesOpTime,
+                                bool syncSourceHasSyncSource) override {
+        return _syncSourceSelector->shouldChangeSyncSource(
+            currentSource, sourcesOpTime, syncSourceHasSyncSource);
     }
 
     void scheduleNetworkResponse(const BSONObj& obj) {
@@ -506,7 +511,7 @@ TEST_F(InitialSyncTest, Failpoint) {
                                                          << "node3:12345")));
 
     Timestamp time1(100, 1);
-    OpTime opTime1(time1, OpTime::kDefaultTerm);
+    OpTime opTime1(time1, OpTime::kInitialTerm);
     _myLastOpTime = opTime1;
     _memberState = MemberState::RS_SECONDARY;
 
@@ -554,7 +559,9 @@ public:
         LockGuard lk(_mutex);
         _blacklistedSource = host;
     }
-    bool shouldChangeSyncSource(const HostAndPort& currentSource) override {
+    bool shouldChangeSyncSource(const HostAndPort& currentSource,
+                                const OpTime& sourcesOpTime,
+                                bool syncSourceHasSyncSource) override {
         return false;
     }
     mutable stdx::mutex _mutex;
@@ -680,7 +687,9 @@ public:
         return HostAndPort();
     }
     void blacklistSyncSource(const HostAndPort& host, Date_t until) override {}
-    bool shouldChangeSyncSource(const HostAndPort& currentSource) override {
+    bool shouldChangeSyncSource(const HostAndPort& currentSource,
+                                const OpTime& sourcesOpTime,
+                                bool syncSourceHasSyncSource) override {
         return false;
     }
     ReplicationExecutor* _exec;
@@ -855,7 +864,7 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
     };
 
     auto& dr = getDR();
-    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kDefaultTerm);
+    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kInitialTerm);
     _memberState = MemberState::RS_SECONDARY;
 
     auto net = getNet();
@@ -935,7 +944,7 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
         barrier.countDownAndWait();
     };
 
-    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kDefaultTerm);
+    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kInitialTerm);
     _memberState = MemberState::RS_SECONDARY;
 
     auto net = getNet();

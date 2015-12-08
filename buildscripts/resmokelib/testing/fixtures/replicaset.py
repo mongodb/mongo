@@ -60,10 +60,13 @@ class ReplicaSetFixture(interface.ReplFixture):
     def setup(self):
         self.replset_name = self.mongod_options.get("replSet", "rs")
 
-        for i in xrange(self.num_nodes):
-            node = self._new_mongod(i, self.replset_name)
+        if not self.nodes:
+            for i in xrange(self.num_nodes):
+                node = self._new_mongod(i, self.replset_name)
+                self.nodes.append(node)
+
+        for node in self.nodes:
             node.setup()
-            self.nodes.append(node)
 
         self.port = self.get_primary().port
 
@@ -102,7 +105,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             if is_master:
                 break
             self.logger.info("Waiting for primary on port %d to be elected.", self.port)
-            time.sleep(1)  # Wait a little bit before trying again.
+            time.sleep(0.1)  # Wait a little bit before trying again.
 
         # Wait for the secondaries to become available.
         for secondary in self.get_secondaries():
@@ -114,7 +117,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                     break
                 self.logger.info("Waiting for secondary on port %d to become available.",
                                  secondary.port)
-                time.sleep(1)  # Wait a little bit before trying again.
+                time.sleep(0.1)  # Wait a little bit before trying again.
 
     def teardown(self):
         running_at_start = self.is_running()

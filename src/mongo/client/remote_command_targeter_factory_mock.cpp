@@ -47,12 +47,17 @@ public:
         return _mock->connectionString();
     }
 
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override {
-        return _mock->findHost(readPref);
+    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
+                                     Milliseconds maxWait) override {
+        return _mock->findHost(readPref, maxWait);
     }
 
     void markHostNotMaster(const HostAndPort& host) override {
         _mock->markHostNotMaster(host);
+    }
+
+    void markHostUnreachable(const HostAndPort& host) override {
+        _mock->markHostUnreachable(host);
     }
 
 private:

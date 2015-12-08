@@ -30,8 +30,8 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/catalog_manager_common.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -52,9 +52,12 @@ public:
         return ConfigServerMode::CSRS;
     }
 
-    Status startup() override;
+    /**
+     * Safe to call multiple times as long as they
+     */
+    Status startup(OperationContext* txn, bool allowNetworking) override;
 
-    void shutDown(bool allowNetworking) override;
+    void shutDown(OperationContext* txn, bool allowNetworking) override;
 
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
@@ -66,92 +69,131 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
-    StatusWith<OpTimePair<DatabaseType>> getDatabase(const std::string& dbName) override;
+    StatusWith<OpTimePair<DatabaseType>> getDatabase(OperationContext* txn,
+                                                     const std::string& dbName) override;
 
-    StatusWith<OpTimePair<CollectionType>> getCollection(const std::string& collNs) override;
+    StatusWith<OpTimePair<CollectionType>> getCollection(OperationContext* txn,
+                                                         const std::string& collNs) override;
 
-    Status getCollections(const std::string* dbName,
+    Status getCollections(OperationContext* txn,
+                          const std::string* dbName,
                           std::vector<CollectionType>* collections,
                           repl::OpTime* optime) override;
 
     Status dropCollection(OperationContext* txn, const NamespaceString& ns) override;
 
-    Status getDatabasesForShard(const std::string& shardName,
+    Status getDatabasesForShard(OperationContext* txn,
+                                const std::string& shardName,
                                 std::vector<std::string>* dbs) override;
 
-    Status getChunks(const BSONObj& query,
+    Status getChunks(OperationContext* txn,
+                     const BSONObj& query,
                      const BSONObj& sort,
                      boost::optional<int> limit,
                      std::vector<ChunkType>* chunks,
                      repl::OpTime* opTime) override;
 
-    Status getTagsForCollection(const std::string& collectionNs,
+    Status getTagsForCollection(OperationContext* txn,
+                                const std::string& collectionNs,
                                 std::vector<TagsType>* tags) override;
 
-    StatusWith<std::string> getTagForChunk(const std::string& collectionNs,
+    StatusWith<std::string> getTagForChunk(OperationContext* txn,
+                                           const std::string& collectionNs,
                                            const ChunkType& chunk) override;
 
-    Status getAllShards(std::vector<ShardType>* shards) override;
+    StatusWith<OpTimePair<std::vector<ShardType>>> getAllShards(OperationContext* txn) override;
 
-    bool runUserManagementWriteCommand(const std::string& commandName,
+    bool runUserManagementWriteCommand(OperationContext* txn,
+                                       const std::string& commandName,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* result) override;
 
-    bool runReadCommand(const std::string& dbname,
-                        const BSONObj& cmdObj,
-                        BSONObjBuilder* result) override;
-
-    bool runUserManagementReadCommand(const std::string& dbname,
+    bool runUserManagementReadCommand(OperationContext* txn,
+                                      const std::string& dbname,
                                       const BSONObj& cmdObj,
                                       BSONObjBuilder* result) override;
 
-    Status applyChunkOpsDeprecated(const BSONArray& updateOps,
+    Status applyChunkOpsDeprecated(OperationContext* txn,
+                                   const BSONArray& updateOps,
                                    const BSONArray& preCondition) override;
 
-    void logAction(const ActionLogType& actionLog) override;
+    StatusWith<SettingsType> getGlobalSettings(OperationContext* txn,
+                                               const std::string& key) override;
 
-    void logChange(const std::string& clientAddress,
-                   const std::string& what,
-                   const std::string& ns,
-                   const BSONObj& detail) override;
-
-    StatusWith<SettingsType> getGlobalSettings(const std::string& key) override;
-
-    void writeConfigServerDirect(const BatchedCommandRequest& request,
+    void writeConfigServerDirect(OperationContext* txn,
+                                 const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
+
+    Status insertConfigDocument(OperationContext* txn,
+                                const std::string& ns,
+                                const BSONObj& doc) override;
+
+    StatusWith<bool> updateConfigDocument(OperationContext* txn,
+                                          const std::string& ns,
+                                          const BSONObj& query,
+                                          const BSONObj& update,
+                                          bool upsert) override;
+
+    Status removeConfigDocuments(OperationContext* txn,
+                                 const std::string& ns,
+                                 const BSONObj& query) override;
 
     DistLockManager* getDistLockManager() override;
 
-    Status checkAndUpgrade(bool checkOnly) override;
+    Status initConfigVersion(OperationContext* txn) override;
 
-private:
-    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) override;
-
-    StatusWith<std::string> _generateNewShardName() override;
-
-    bool _runReadCommand(const std::string& dbname,
-                         const BSONObj& cmdObj,
-                         const ReadPreferenceSetting& settings,
-                         BSONObjBuilder* result);
+    Status appendInfoForConfigServerDatabases(OperationContext* txn,
+                                              BSONArrayBuilder* builder) override;
 
     /**
-     * Helper method for running a count command against a given target server with appropriate
+     * Runs a read command against the config server with majority read concern.
+     */
+    bool runReadCommandForTest(OperationContext* txn,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               BSONObjBuilder* result);
+
+private:
+    Status _checkDbDoesNotExist(OperationContext* txn,
+                                const std::string& dbName,
+                                DatabaseType* db) override;
+
+    StatusWith<std::string> _generateNewShardName(OperationContext* txn) override;
+
+    Status _createCappedConfigCollection(OperationContext* txn,
+                                         StringData collName,
+                                         int cappedSize) override;
+
+    /**
+     * Helper method for running a read command against the config server. Automatically retries on
+     * NotMaster and network errors, so these will never be returned.
+     */
+    StatusWith<BSONObj> _runReadCommand(OperationContext* txn,
+                                        const std::string& dbname,
+                                        const BSONObj& cmdObj,
+                                        const ReadPreferenceSetting& readPref);
+
+    /**
+     * Executes the specified batch write command on the current config server's primary and retries
+     * on the specified set of errors using the default retry policy.
+     */
+    void _runBatchWriteCommand(OperationContext* txn,
+                               const BatchedCommandRequest& request,
+                               BatchedCommandResponse* response,
+                               const ShardRegistry::ErrorCodesSet& errorsToCheck);
+
+    /**
+     * Helper method for running a count command against the config server with appropriate
      * error handling.
      */
-    StatusWith<long long> _runCountCommandOnConfig(const HostAndPort& target,
+    StatusWith<long long> _runCountCommandOnConfig(OperationContext* txn,
                                                    const NamespaceString& ns,
                                                    BSONObj query);
 
-    StatusWith<BSONObj> _runCommandOnConfig(const HostAndPort& target,
-                                            const std::string& dbName,
-                                            BSONObj cmdObj);
-
-    StatusWith<BSONObj> _runCommandOnConfigWithNotMasterRetries(const std::string& dbName,
-                                                                BSONObj cmdObj);
-
     StatusWith<OpTimePair<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
-        const HostAndPort& host,
+        OperationContext* txn,
+        const ReadPreferenceSetting& readPref,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
@@ -165,23 +207,19 @@ private:
     /**
      * Returns the current cluster schema/protocol version.
      */
-    StatusWith<VersionType> _getConfigVersion();
+    StatusWith<VersionType> _getConfigVersion(OperationContext* txn);
 
     /**
-     * Returns the highest last known config server opTime.
+     * Queries the config servers for the database metadata for the given database, using the
+     * given read preference.  Returns NamespaceNotFound if no database metadata is found.
      */
-    repl::OpTime _getConfigOpTime();
-
-    /**
-     * Updates the last known config server opTime if the given opTime is newer.
-     */
-    void _updateLastSeenConfigOpTime(const repl::OpTime& optime);
+    StatusWith<OpTimePair<DatabaseType>> _fetchDatabaseMetadata(
+        OperationContext* txn, const std::string& dbName, const ReadPreferenceSetting& readPref);
 
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
-    // (F) Self synchronizing.
     // (M) Must hold _mutex for access.
     // (R) Read only, can only be written during initialization.
     //
@@ -190,12 +228,6 @@ private:
 
     // Distribted lock manager singleton.
     std::unique_ptr<DistLockManager> _distLockManager;  // (R)
-
-    // Whether the logAction call should attempt to create the actionlog collection
-    AtomicInt32 _actionLogCollectionCreated;  // (F)
-
-    // Whether the logChange call should attempt to create the changelog collection
-    AtomicInt32 _changeLogCollectionCreated;  // (F)
 
     // True if shutDown() has been called. False, otherwise.
     bool _inShutdown = false;  // (M)

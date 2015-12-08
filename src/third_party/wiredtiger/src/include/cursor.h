@@ -197,7 +197,14 @@ struct __wt_cursor_btree {
 #define	WT_CBT_ITERATE_NEXT	0x04	/* Next iteration configuration */
 #define	WT_CBT_ITERATE_PREV	0x08	/* Prev iteration configuration */
 #define	WT_CBT_MAX_RECORD	0x10	/* Col-store: past end-of-table */
-#define	WT_CBT_SEARCH_SMALLEST	0x20	/* Row-store: small-key insert list */
+#define	WT_CBT_NO_TXN   	0x20	/* Non-transactional cursor
+					   (e.g. on a checkpoint) */
+#define	WT_CBT_SEARCH_SMALLEST	0x40	/* Row-store: small-key insert list */
+
+#define	WT_CBT_POSITION_MASK		/* Flags associated with position */ \
+	(WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV | \
+	WT_CBT_MAX_RECORD | WT_CBT_SEARCH_SMALLEST)
+
 	uint8_t flags;
 };
 
@@ -228,7 +235,7 @@ struct __wt_cursor_bulk {
 	uint32_t nrecs;			/* Max records per chunk */
 
 	/* Special bitmap bulk load for fixed-length column stores. */
-	int	bitmap;
+	bool	bitmap;
 
 	void	*reconcile;		/* Reconciliation information */
 };
@@ -261,6 +268,67 @@ struct __wt_cursor_index {
 
 	WT_CURSOR *child;
 	WT_CURSOR **cg_cursors;
+	uint8_t	*cg_needvalue;
+};
+
+struct __wt_cursor_join_iter {
+	WT_SESSION_IMPL		*session;
+	WT_CURSOR_JOIN		*cjoin;
+	WT_CURSOR_JOIN_ENTRY	*entry;
+	WT_CURSOR		*cursor;
+	WT_ITEM			*curkey;
+	bool			 advance;
+};
+
+struct __wt_cursor_join_endpoint {
+	WT_ITEM			 key;
+	uint8_t			 recno_buf[10];	/* holds packed recno */
+	WT_CURSOR		*cursor;
+
+#define	WT_CURJOIN_END_LT	0x01		/* include values <  cursor */
+#define	WT_CURJOIN_END_EQ	0x02		/* include values == cursor */
+#define	WT_CURJOIN_END_GT	0x04		/* include values >  cursor */
+#define	WT_CURJOIN_END_GE	(WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ)
+#define	WT_CURJOIN_END_LE	(WT_CURJOIN_END_LT | WT_CURJOIN_END_EQ)
+#define	WT_CURJOIN_END_OWN_KEY	0x08		/* must free key's data */
+	uint8_t			 flags;		/* range for this endpoint */
+};
+
+struct __wt_cursor_join_entry {
+	WT_INDEX		*index;
+	WT_CURSOR		*main;		/* raw main table cursor */
+	WT_BLOOM		*bloom;		/* Bloom filter handle */
+	uint32_t		 bloom_bit_count; /* bits per item in bloom */
+	uint32_t		 bloom_hash_count; /* hash functions in bloom */
+	uint64_t		 count;		/* approx number of matches */
+
+#define	WT_CURJOIN_ENTRY_BLOOM		0x01	/* use a bloom filter */
+#define	WT_CURJOIN_ENTRY_DISJUNCTION	0x02	/* endpoints are or-ed */
+#define	WT_CURJOIN_ENTRY_OWN_BLOOM	0x04	/* this entry owns the bloom */
+	uint8_t			 flags;
+
+	WT_CURSOR_JOIN_ENDPOINT	*ends;		/* reference endpoints */
+	size_t			 ends_allocated;
+	u_int			 ends_next;
+
+	WT_JOIN_STATS		 stats;		/* Join statistics */
+};
+
+struct __wt_cursor_join {
+	WT_CURSOR iface;
+
+	WT_TABLE		*table;
+	const char		*projection;
+	WT_CURSOR_JOIN_ITER	*iter;
+	WT_CURSOR_JOIN_ENTRY	*entries;
+	size_t			 entries_allocated;
+	u_int			 entries_next;
+	uint8_t			 recno_buf[10];	/* holds packed recno */
+
+#define	WT_CURJOIN_ERROR		0x01	/* Error in initialization */
+#define	WT_CURJOIN_INITIALIZED		0x02	/* Successful initialization */
+#define	WT_CURJOIN_SKIP_FIRST_LEFT	0x04	/* First check not needed */
+	uint8_t			 flags;
 };
 
 struct __wt_cursor_json {
@@ -297,22 +365,35 @@ struct __wt_cursor_metadata {
 	uint32_t flags;
 };
 
+struct __wt_join_stats_group {
+	const char *desc_prefix;	/* Prefix appears before description */
+	WT_CURSOR_JOIN *join_cursor;
+	ssize_t join_cursor_entry;	/* Position in entries */
+	WT_JOIN_STATS join_stats;
+};
+
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
-	int	notinitialized;		/* Cursor not initialized */
-	int	notpositioned;		/* Cursor not positioned */
+	bool	notinitialized;		/* Cursor not initialized */
+	bool	notpositioned;		/* Cursor not positioned */
 
-	WT_STATS *stats;		/* Stats owned by the cursor */
-	int	  stats_base;		/* Base statistics value */
-	int	  stats_count;		/* Count of stats elements */
+	int64_t	     *stats;		/* Statistics */
+	int	      stats_base;	/* Base statistics value */
+	int	      stats_count;	/* Count of statistics values */
+	int	     (*stats_desc)(WT_CURSOR_STAT *, int, const char **);
+					/* Statistics descriptions */
+	int	     (*next_set)(WT_SESSION_IMPL *, WT_CURSOR_STAT *, bool,
+			 bool);		/* Advance to next set */
 
 	union {				/* Copies of the statistics */
 		WT_DSRC_STATS dsrc_stats;
 		WT_CONNECTION_STATS conn_stats;
+		WT_JOIN_STATS_GROUP join_stats_group;
 	} u;
 
 	const char **cfg;		/* Original cursor configuration */
+	char	*desc_buf;		/* Saved description string */
 
 	int	 key;			/* Current stats key */
 	uint64_t v;			/* Current stats value */
@@ -368,11 +449,11 @@ struct __wt_cursor_table {
  */
 #define	WT_CURSOR_CHECKKEY(cursor) do {					\
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))			\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));		\
+		WT_ERR(__wt_cursor_kv_not_set(cursor, true));		\
 } while (0)
 #define	WT_CURSOR_CHECKVALUE(cursor) do {				\
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
+		WT_ERR(__wt_cursor_kv_not_set(cursor, false));		\
 } while (0)
 #define	WT_CURSOR_NEEDKEY(cursor) do {					\
 	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {			\

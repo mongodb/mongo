@@ -271,7 +271,10 @@ file_config = format_meta + [
         leaf pages''',
         min=0),
     Config('split_deepen_min_child', '0', r'''
-        minimum entries in a page to consider deepening the tree''',
+        minimum entries in a page to consider deepening the tree. Pages
+        will be considered for splitting and deepening the search tree
+        as soon as there are more than the configured number of children
+        ''',
         type='int', undoc=True),
     Config('split_deepen_per_child', '0', r'''
         entries allocated per child when deepening the tree''',
@@ -408,6 +411,41 @@ connection_runtime_config = [
             interval in seconds at which to check for files that are
             inactive and close them''', min=1, max=100000),
         ]),
+    Config('log', '', r'''
+        enable logging. Enabling logging uses three sessions from the
+        configured session_max''',
+        type='category', subconfig=[
+        Config('archive', 'true', r'''
+            automatically archive unneeded log files''',
+            type='boolean'),
+        Config('compressor', 'none', r'''
+            configure a compressor for log records.  Permitted values are
+            \c "none" or custom compression engine name created with
+            WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
+            for \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression,
+            these names are also available. See @ref compression for more
+            information'''),
+        Config('enabled', 'false', r'''
+            enable logging subsystem''',
+            type='boolean'),
+        Config('file_max', '100MB', r'''
+            the maximum size of log files''',
+            min='100KB', max='2GB'),
+        Config('path', '', r'''
+            the path to a directory into which the log files are written.
+            If the value is not an absolute path name, the files are created
+            relative to the database home'''),
+        Config('prealloc', 'true', r'''
+            pre-allocate log files.''',
+            type='boolean'),
+        Config('recover', 'on', r'''
+            run recovery or error if recovery needs to run after an
+            unclean shutdown.''',
+            choices=['error','on']),
+        Config('zero_fill', 'false', r'''
+            manually write zeroes into log files''',
+            type='boolean'),
+        ]),
     Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management. The LSM
         manager is started automatically the first time an LSM tree is opened.
@@ -449,13 +487,17 @@ connection_runtime_config = [
         Config('chunk', '10MB', r'''
             the granularity that a shared cache is redistributed''',
             min='1MB', max='10TB'),
+        Config('name', 'none', r'''
+            the name of a cache that is shared between databases or
+            \c "none" when no shared cache is configured'''),
+        Config('quota', '0', r'''
+            maximum size of cache this database can be allocated from the
+            shared cache. Defaults to the entire shared cache size''',
+            type='int'),
         Config('reserve', '0', r'''
             amount of cache this database is guaranteed to have
             available from the shared cache. This setting is per
             database. Defaults to the chunk size''', type='int'),
-        Config('name', 'none', r'''
-            the name of a cache that is shared between databases or
-            \c "none" when no shared cache is configured'''),
         Config('size', '500MB', r'''
             maximum memory to allocate for the shared cache. Setting
             this will update the value if one is already set''',
@@ -540,7 +582,7 @@ session_config = [
         choices=['read-uncommitted', 'read-committed', 'snapshot']),
 ]
 
-common_wiredtiger_open = [
+wiredtiger_open_common = connection_runtime_config + [
     Config('buffer_alignment', '-1', r'''
         in-memory alignment (in bytes) for buffers used for I/O.  The
         default value of -1 indicates a platform-specific alignment value
@@ -552,15 +594,16 @@ common_wiredtiger_open = [
         checkpoints''',
         type='boolean'),
     Config('direct_io', '', r'''
-        Use \c O_DIRECT to access files.  Options are given as a list,
-        such as <code>"direct_io=[data]"</code>.  Configuring
-        \c direct_io requires care, see @ref
-        tuning_system_buffer_cache_direct_io for important warnings.
-        Including \c "data" will cause WiredTiger data files to use
-        \c O_DIRECT, including \c "log" will cause WiredTiger log files
-        to use \c O_DIRECT, and including \c "checkpoint" will cause
-        WiredTiger data files opened at a checkpoint (i.e: read only) to
-        use \c O_DIRECT''',
+        Use \c O_DIRECT on POSIX systems, and \c FILE_FLAG_NO_BUFFERING on
+        Windows to access files.  Options are given as a list, such as
+        <code>"direct_io=[data]"</code>.  Configuring \c direct_io requires
+        care, see @ref tuning_system_buffer_cache_direct_io for important
+        warnings.  Including \c "data" will cause WiredTiger data files to use
+        direct I/O, including \c "log" will cause WiredTiger log files to use
+        direct I/O, and including \c "checkpoint" will cause WiredTiger data
+        files opened at a checkpoint (i.e: read only) to use direct I/O.
+        \c direct_io should be combined with \c write_through to get the
+        equivalent of \c O_DIRECT on Windows.''',
         type='list', choices=['checkpoint', 'data', 'log']),
     Config('encryption', '', r'''
         configure an encryptor for system wide metadata and logs.
@@ -604,38 +647,6 @@ common_wiredtiger_open = [
         maximum number of simultaneous hazard pointers per session
         handle''',
         min='15'),
-    Config('log', '', r'''
-        enable logging. Enabling logging uses three sessions from the
-        configured session_max''',
-        type='category', subconfig=[
-        Config('archive', 'true', r'''
-            automatically archive unneeded log files''',
-            type='boolean'),
-        Config('compressor', 'none', r'''
-            configure a compressor for log records.  Permitted values are
-            \c "none" or custom compression engine name created with
-            WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-            for \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression,
-            these names are also available. See @ref compression for more
-            information'''),
-        Config('enabled', 'false', r'''
-            enable logging subsystem''',
-            type='boolean'),
-        Config('file_max', '100MB', r'''
-            the maximum size of log files''',
-            min='100KB', max='2GB'),
-        Config('path', '', r'''
-            the path to a directory into which the log files are written.
-            If the value is not an absolute path name, the files are created
-            relative to the database home'''),
-        Config('prealloc', 'true', r'''
-            pre-allocate log files.''',
-            type='boolean'),
-        Config('recover', 'on', r'''
-            run recovery or error if recovery needs to run after an
-            unclean shutdown.''',
-            choices=['error','on']),
-        ]),
     Config('mmap', 'true', r'''
         Use memory mapping to access files when possible''',
         type='boolean'),
@@ -664,6 +675,46 @@ common_wiredtiger_open = [
             @ref tune_durability for more information''',
             choices=['dsync', 'fsync', 'none']),
         ]),
+    Config('write_through', '', r'''
+        Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files.  Ignored
+        on non-Windows systems.  Options are given as a list, such as
+        <code>"write_through=[data]"</code>.  Configuring \c write_through
+        requires care, see @ref tuning_system_buffer_cache_direct_io for
+        important warnings.  Including \c "data" will cause WiredTiger data
+        files to write through cache, including \c "log" will cause WiredTiger
+        log files to write through cache. \c write_through should be combined
+        with \c direct_io to get the equivalent of POSIX \c O_DIRECT on
+        Windows.''',
+        type='list', choices=['data', 'log']),
+]
+
+wiredtiger_open = wiredtiger_open_common + [
+   Config('config_base', 'true', r'''
+        write the base configuration file if creating the database.  If
+        \c false in the config passed directly to ::wiredtiger_open, will
+        ignore any existing base configuration file in addition to not creating
+        one.  See @ref config_base for more information''',
+        type='boolean'),
+    Config('create', 'false', r'''
+        create the database if it does not exist''',
+        type='boolean'),
+    Config('exclusive', 'false', r'''
+        fail if the database already exists, generally used with the
+        \c create option''',
+        type='boolean'),
+    Config('in_memory', 'false', r'''
+        keep data in-memory only, minimize disk I/O''',
+        type='boolean', undoc=True),
+    Config('use_environment', 'true', r'''
+        use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
+        variables if the process is not running with special privileges.
+        See @ref home for more information''',
+        type='boolean'),
+    Config('use_environment_priv', 'false', r'''
+        use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
+        variables even if the process is running with special privileges.
+        See @ref home for more information''',
+        type='boolean'),
 ]
 
 cursor_runtime_config = [
@@ -719,6 +770,44 @@ methods = {
     Config('remove_files', 'true', r'''
         should the underlying files be removed?''',
         type='boolean'),
+]),
+
+'WT_SESSION.join' : Method([
+    Config('compare', '"eq"', r'''
+        modifies the set of items to be returned so that the index key
+        satisfies the given comparison relative to the key set in this
+        cursor''',
+        choices=['eq', 'ge', 'gt', 'le', 'lt']),
+    Config('count', '', r'''
+        set an approximate count of the elements that would be included in
+        the join.  This is used in sizing the bloom filter, and also influences
+        evaluation order for cursors in the join. When the count is equal
+        for multiple bloom filters in a composition of joins, the bloom
+        filter may be shared''',
+        type='int'),
+    Config('bloom_bit_count', '16', r'''
+        the number of bits used per item for the bloom filter''',
+        min='2', max='1000'),
+    Config('bloom_hash_count', '8', r'''
+        the number of hash values per item for the bloom filter''',
+        min='2', max='100'),
+    Config('strategy', '', r'''
+        when set to bloom, a bloom filter is created and populated for
+        this index. This has an up front cost but may reduce the number
+        of accesses to the main table when iterating the joined cursor.
+        The bloom setting requires that count be set''',
+        choices=['bloom', 'default']),
+]),
+
+'WT_SESSION.log_flush' : Method([
+    Config('sync', 'on', r'''
+        forcibly flush the log and wait for it to achieve the synchronization
+        level specified.  The \c background setting initiates a background
+        synchronization intended to be used with a later call to
+        WT_SESSION::transaction_sync.  The \c off setting forces any
+        buffered log records to be written to the file system.  The
+        \c on setting forces log records to be written to the storage device''',
+        choices=['background', 'off', 'on']),
 ]),
 
 'WT_SESSION.log_printf' : Method([]),
@@ -807,10 +896,10 @@ methods = {
 ]),
 'WT_SESSION.strerror' : Method([]),
 'WT_SESSION.transaction_sync' : Method([
-    Config('timeout_ms', '', r'''
+    Config('timeout_ms', '1200000', r'''
         maximum amount of time to wait for background sync to complete in
         milliseconds.  A value of zero disables the timeout and returns
-        immediately.  The default waits forever.''',
+        immediately.''',
         type='int'),
 ]),
 
@@ -867,7 +956,12 @@ methods = {
 'WT_SESSION.commit_transaction' : Method([
     Config('sync', '', r'''
         override whether to sync log records when the transaction commits,
-        inherited from ::wiredtiger_open \c transaction_sync''',
+        inherited from ::wiredtiger_open \c transaction_sync.
+        The \c background setting initiates a background
+        synchronization intended to be used with a later call to
+        WT_SESSION::transaction_sync.  The \c off setting does not
+        wait for record to be written or synchronized.  The
+        \c on setting forces log records to be written to the storage device''',
         choices=['background', 'off', 'on']),
 ]),
 'WT_SESSION.rollback_transaction' : Method([]),
@@ -977,55 +1071,13 @@ methods = {
 # creation-specific configuration strings).
 # wiredtiger_open_all:
 #    All of the above configuration values combined
-'wiredtiger_open' : Method(
-    connection_runtime_config +
-    common_wiredtiger_open + [
-    Config('config_base', 'true', r'''
-        write the base configuration file if creating the database,
-        see @ref config_base for more information''',
-        type='boolean'),
-    Config('create', 'false', r'''
-        create the database if it does not exist''',
-        type='boolean'),
-    Config('exclusive', 'false', r'''
-        fail if the database already exists, generally used with the
-        \c create option''',
-        type='boolean'),
-    Config('use_environment_priv', 'false', r'''
-        use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
-        variables regardless of whether or not the process is running
-        with special privileges.  See @ref home for more information''',
-        type='boolean'),
-]),
-'wiredtiger_open_basecfg' : Method(
-    connection_runtime_config +
-    common_wiredtiger_open + [
+'wiredtiger_open' : Method(wiredtiger_open),
+'wiredtiger_open_basecfg' : Method(wiredtiger_open_common + [
     Config('version', '(major=0,minor=0)', r'''
         the file version'''),
 ]),
-'wiredtiger_open_usercfg' : Method(
-    connection_runtime_config +
-    common_wiredtiger_open
-),
-'wiredtiger_open_all' : Method(
-    connection_runtime_config +
-    common_wiredtiger_open + [
-    Config('config_base', 'true', r'''
-        write the base configuration file if creating the database,
-        see @ref config_base for more information''',
-        type='boolean'),
-    Config('create', 'false', r'''
-        create the database if it does not exist''',
-        type='boolean'),
-    Config('exclusive', 'false', r'''
-        fail if the database already exists, generally used with the
-        \c create option''',
-        type='boolean'),
-    Config('use_environment_priv', 'false', r'''
-        use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
-        variables regardless of whether or not the process is running
-        with special privileges.  See @ref home for more information''',
-        type='boolean'),
+'wiredtiger_open_usercfg' : Method(wiredtiger_open_common),
+'wiredtiger_open_all' : Method(wiredtiger_open + [
     Config('version', '(major=0,minor=0)', r'''
         the file version'''),
 ]),

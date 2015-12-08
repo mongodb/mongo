@@ -52,14 +52,23 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
       _storeLocalLastVoteDocumentStatus(Status::OK()),
       _storeLocalConfigDocumentShouldHang(false),
       _storeLocalLastVoteDocumentShouldHang(false),
-      _connectionsClosed(false) {}
+      _isApplierSignaledToCancelFetcher(false),
+      _connectionsClosed(false),
+      _threadsStarted(false) {}
 
 ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
-void ReplicationCoordinatorExternalStateMock::startThreads(executor::TaskExecutor* taskExecutor) {}
+void ReplicationCoordinatorExternalStateMock::startThreads(const ReplSettings& settings) {
+    _threadsStarted = true;
+}
+
 void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
-void ReplicationCoordinatorExternalStateMock::initiateOplog(OperationContext* txn,
-                                                            bool updateReplOpTime) {}
+Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(OperationContext* txn,
+                                                                         const BSONObj& config,
+                                                                         bool updateReplOpTime) {
+    return storeLocalConfigDocument(txn, config);
+}
+
 void ReplicationCoordinatorExternalStateMock::shutdown() {}
 void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
@@ -137,6 +146,8 @@ void ReplicationCoordinatorExternalStateMock::setLocalLastVoteDocument(
 
 void ReplicationCoordinatorExternalStateMock::setGlobalTimestamp(const Timestamp& newTime) {}
 
+void ReplicationCoordinatorExternalStateMock::cleanUpLastApplyBatch(OperationContext* txn) {}
+
 StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::loadLastOpTime(OperationContext* txn) {
     return _lastOpTime;
 }
@@ -155,6 +166,14 @@ void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentToHang(
     if (!hang) {
         _shouldHangConfigCondVar.notify_all();
     }
+}
+
+bool ReplicationCoordinatorExternalStateMock::isApplierSignaledToCancelFetcher() const {
+    return _isApplierSignaledToCancelFetcher;
+}
+
+bool ReplicationCoordinatorExternalStateMock::threadsStarted() const {
+    return _threadsStarted;
 }
 
 void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentStatus(Status status) {
@@ -177,7 +196,13 @@ void ReplicationCoordinatorExternalStateMock::killAllUserOperations(OperationCon
 
 void ReplicationCoordinatorExternalStateMock::clearShardingState() {}
 
+void ReplicationCoordinatorExternalStateMock::recoverShardingState(OperationContext* txn) {}
+
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
+
+void ReplicationCoordinatorExternalStateMock::signalApplierToCancelFetcher() {
+    _isApplierSignaledToCancelFetcher = true;
+}
 
 OperationContext* ReplicationCoordinatorExternalStateMock::createOperationContext(
     const std::string& threadName) {
@@ -194,6 +219,17 @@ void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(SnapshotNa
 void ReplicationCoordinatorExternalStateMock::forceSnapshotCreation() {}
 
 bool ReplicationCoordinatorExternalStateMock::snapshotsEnabled() const {
+    return true;
+}
+
+void ReplicationCoordinatorExternalStateMock::notifyOplogMetadataWaiters() {}
+
+double ReplicationCoordinatorExternalStateMock::getElectionTimeoutOffsetLimitFraction() const {
+    return 0.15;
+}
+
+bool ReplicationCoordinatorExternalStateMock::isReadCommittedSupportedByStorageEngine(
+    OperationContext* txn) const {
     return true;
 }
 

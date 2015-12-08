@@ -153,6 +153,12 @@ public:
         StatusWith<boost::optional<BSONObj>> next();
 
         /**
+         * Returns whether or not the underlying cursor is tailing a capped collection.  Cannot be
+         * called after returnCursor() is called.  A cursor must be owned.
+         */
+        bool isTailable() const;
+
+        /**
          * Transfers ownership of the underlying cursor back to the manager.  A cursor must be
          * owned, and a cursor will no longer be owned after this method completes.
          *
@@ -165,6 +171,32 @@ public:
          * Returns the cursor id for the underlying cursor, or zero if no cursor is owned.
          */
         CursorId getCursorId() const;
+
+        /**
+         * Returns the number of result documents returned so far by this cursor via the next()
+         * method.
+         */
+        long long getNumReturnedSoFar() const;
+
+        /**
+         * Stashes 'obj' to be returned later by this cursor. A cursor must be owned.
+         */
+        void queueResult(const BSONObj& obj);
+
+        /**
+         * Returns whether or not all the remote cursors underlying this cursor have been
+         * exhausted. Cannot be called after returnCursor() is called. A cursor must be owned.
+         */
+        bool remotesExhausted();
+
+        /**
+         * Sets the maxTimeMS value that the cursor should forward with any internally issued
+         * getMore requests. A cursor must be owned.
+         *
+         * Returns a non-OK status if this cursor type does not support maxTimeMS on getMore (i.e.
+         * if the cursor is not tailable + awaitData).
+         */
+        Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
 
     private:
         // ClusterCursorManager is a friend so that its methods can call the PinnedCursor
@@ -207,9 +239,7 @@ public:
     ~ClusterCursorManager();
 
     /**
-     * Registers the given cursor with this manager, and returns a PinnedCursor owning the
-     * (now-pinned) cursor.  The PinnedCursor must later be returned with
-     * PinnedCursor::returnCursor().
+     * Registers the given cursor with this manager, and returns the registered cursor's id.
      *
      * 'cursor' must be non-null.  'cursorType' should reflect whether or not the cursor is
      * operating on a sharded namespace (this will be used for reporting purposes).
@@ -218,10 +248,10 @@ public:
      *
      * Does not block.
      */
-    PinnedCursor registerCursor(std::unique_ptr<ClusterClientCursor> cursor,
-                                const NamespaceString& nss,
-                                CursorType cursorType,
-                                CursorLifetime cursorLifetime);
+    CursorId registerCursor(std::unique_ptr<ClusterClientCursor> cursor,
+                            const NamespaceString& nss,
+                            CursorType cursorType,
+                            CursorLifetime cursorLifetime);
 
     /**
      * Moves the given cursor to the 'pinned' state, and transfers ownership of the cursor to the
@@ -304,9 +334,14 @@ private:
 
     /**
      * Transfers ownership of the given pinned cursor back to the manager, and moves the cursor to
-     * the 'idle' state.  If 'cursorState' is 'Exhausted' and the cursor is not marked as 'kill
-     * pending', destroys the cursor (if the cursor is marked as 'kill pending', destruction of the
-     * cursor is delayed until it reaped).  Thread-safe.
+     * the 'idle' state.
+     *
+     * If 'cursorState' is 'Exhausted', the cursor will be destroyed.  However, destruction will be
+     * delayed until reapZombieCursors() is called under the following circumstances:
+     *   - The cursor is already marked as 'kill pending'.
+     *   - The cursor is managing open remote cursors which still need to be cleaned up.
+     *
+     * Thread-safe.
      *
      * Intentionally private.  Clients should use public methods on PinnedCursor to check a cursor
      * back in.
@@ -457,14 +492,15 @@ private:
         CursorEntryMap entryMap;
     };
 
-    // Synchronizes access to all private state.
+    // Clock source.  Used when the 'last active' time for a cursor needs to be set/updated.  May be
+    // concurrently accessed by multiple threads.
+    ClockSource* _clockSource;
+
+    // Synchronizes access to all private state variables below.
     mutable stdx::mutex _mutex;
 
     // Randomness source.  Used for cursor id generation.
     PseudoRandom _pseudoRandom;
-
-    // Clock source.  Used when the 'last active' time for a cursor needs to be set/updated.
-    ClockSource* _clockSource;
 
     // Map from cursor id prefix to associated namespace.  Exists only to provide namespace lookup
     // for (deprecated) getNamespaceForCursorId() method.

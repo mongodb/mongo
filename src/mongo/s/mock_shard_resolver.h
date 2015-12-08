@@ -41,7 +41,9 @@ class MockShardResolver : public ShardResolver {
 public:
     virtual ~MockShardResolver() {}
 
-    Status chooseWriteHost(const std::string& shardName, ConnectionString* shardHost) const {
+    Status chooseWriteHost(OperationContext* txn,
+                           const std::string& shardName,
+                           ConnectionString* shardHost) const {
         *shardHost =
             unittest::assertGet(ConnectionString::parse(std::string("$") + shardName + ":12345"));
         return Status::OK();

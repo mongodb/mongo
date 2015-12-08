@@ -77,6 +77,7 @@ public:
     NetworkInterfaceImpl(std::unique_ptr<NetworkConnectionHook> hook);
     ~NetworkInterfaceImpl();
     std::string getDiagnosticString() override;
+    void appendConnectionStats(BSONObjBuilder* b) override;
     void startup() override;
     void shutdown() override;
     void waitForWork() override;
@@ -88,7 +89,12 @@ public:
                       const RemoteCommandRequest& request,
                       const RemoteCommandCompletionFn& onFinish) override;
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) override;
+    /**
+     * Not implemented.
+     */
+    void cancelAllCommands() override {}
     void setAlarm(Date_t when, const stdx::function<void()>& action) override;
+    bool onNetworkThread() override;
 
 private:
     /**

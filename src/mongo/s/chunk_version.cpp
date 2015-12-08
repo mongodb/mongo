@@ -96,57 +96,19 @@ StatusWith<ChunkVersion> ChunkVersion::parseFromBSONForSetShardVersion(const BSO
     return chunkVersion;
 }
 
-
-ChunkVersionAndOpTime::ChunkVersionAndOpTime(ChunkVersion chunkVersion)
-    : _verAndOpT(chunkVersion) {}
-
-ChunkVersionAndOpTime::ChunkVersionAndOpTime(ChunkVersion chunkVersion, repl::OpTime ts)
-    : _verAndOpT(chunkVersion, ts) {}
-
-StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForCommands(
-    const BSONObj& obj) {
-    const auto chunkVersionStatus = ChunkVersion::parseFromBSONForCommands(obj);
-    if (!chunkVersionStatus.isOK())
-        return chunkVersionStatus.getStatus();
-
-    const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
-
-    const auto opTimeStatus = repl::OpTime::parseFromBSON(obj);
-    if (opTimeStatus.isOK()) {
-        return ChunkVersionAndOpTime(chunkVersion, opTimeStatus.getValue());
-    } else if (opTimeStatus == ErrorCodes::NoSuchKey) {
-        return ChunkVersionAndOpTime(chunkVersion);
-    }
-
-    return opTimeStatus.getStatus();
+void ChunkVersion::appendForSetShardVersion(BSONObjBuilder* builder) const {
+    addToBSON(*builder, kVersion);
 }
 
-StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForSetShardVersion(
-    const BSONObj& obj) {
-    const auto chunkVersionStatus = ChunkVersion::parseFromBSONForSetShardVersion(obj);
-    if (!chunkVersionStatus.isOK())
-        return chunkVersionStatus.getStatus();
-
-    const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
-
-    const auto opTimeStatus = repl::OpTime::parseFromBSON(obj);
-    if (opTimeStatus.isOK()) {
-        return ChunkVersionAndOpTime(chunkVersion, opTimeStatus.getValue());
-    } else if (opTimeStatus == ErrorCodes::NoSuchKey) {
-        return ChunkVersionAndOpTime(chunkVersion);
-    }
-
-    return opTimeStatus.getStatus();
+void ChunkVersion::appendForCommands(BSONObjBuilder* builder) const {
+    builder->appendArray(kShardVersion, toBSON());
 }
 
-void ChunkVersionAndOpTime::appendForSetShardVersion(BSONObjBuilder* builder) const {
-    _verAndOpT.value.addToBSON(*builder, kVersion);
-    _verAndOpT.opTime.append(builder);
-}
-
-void ChunkVersionAndOpTime::appendForCommands(BSONObjBuilder* builder) const {
-    builder->appendArray(kShardVersion, _verAndOpT.value.toBSON());
-    _verAndOpT.opTime.append(builder);
+BSONObj ChunkVersion::toBSON() const {
+    BSONArrayBuilder b;
+    b.appendTimestamp(_combined);
+    b.append(_epoch);
+    return b.arr();
 }
 
 }  // namespace mongo

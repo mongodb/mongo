@@ -32,7 +32,7 @@ load("jstests/replsets/rslib.js");
         assert.eq(8, x[4].q);
     };
 
-    var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3, oplogSize: 1 });
+    var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3, oplogSize: 1, useBridge: true });
     var nodes = replTest.nodeList();
 
     var conns = replTest.startSet();
@@ -42,7 +42,6 @@ load("jstests/replsets/rslib.js");
                              { "_id": 1, "host": nodes[1] },
                              { "_id": 2, "host": nodes[2], arbiterOnly: true}]
     });
-    replTest.bridge();
 
     // Make sure we have a master
     replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
@@ -96,19 +95,20 @@ load("jstests/replsets/rslib.js");
     assert.eq(a.bar.count(), 3, "a.count");
     assert.eq(b.bar.count(), 3, "b.count");
 
-    replTest.partition(0, 1);
-    replTest.partition(0, 2);
+    conns[0].disconnect(conns[1]);
+    conns[0].disconnect(conns[2]);
     assert.soon(function () { try { return B.isMaster().ismaster; } catch(e) { return false; } });
 
-    b.bar.insert({ q: 4 });
-    b.bar.insert({ q: 5 });
-    b.bar.insert({ q: 6 });
-    assert(b.bar.count() == 6, "u.count");
+    // These 97 documents will be rolled back eventually.
+    for (var i = 4; i <= 100; i++) {
+        b.bar.insert({ q: i });
+    }
+    assert.eq(100, b.bar.count(), "u.count");
 
     // a should not have the new data as it was partitioned.
-    replTest.partition(1, 2);
+    conns[1].disconnect(conns[2]);
     jsTest.log("*************** wait for server to reconnect ****************");
-    replTest.unPartition(0, 2);
+    conns[0].reconnect(conns[2]);
 
     jsTest.log("*************** B ****************");
     assert.soon(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
@@ -120,16 +120,25 @@ load("jstests/replsets/rslib.js");
     assert.writeOK(a.bar.insert({ q: 8 }));
 
     // A is 1 2 3 7 8
-    // B is 1 2 3 4 5 6
+    // B is 1 2 3 4 5 6 ... 100
 
+    var connectionsCreatedOnPrimaryBeforeRollback = a.serverStatus().connections.totalCreated;
     // bring B back online
-    replTest.unPartition(0, 1);
-    replTest.unPartition(1, 2);
+    conns[0].reconnect(conns[1]);
+    conns[1].reconnect(conns[2]);
 
     awaitOpTime(b.getMongo(), getLatestOp(a_conn).ts);
+    replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
     checkFinalResults(a);
     checkFinalResults(b);
+
+    var connectionsCreatedOnPrimaryAfterRollback = a.serverStatus().connections.totalCreated;
+    var connectionsCreatedOnPrimaryDuringRollback =
+        connectionsCreatedOnPrimaryAfterRollback - connectionsCreatedOnPrimaryBeforeRollback;
+    jsTest.log('connections created during rollback = ' + connectionsCreatedOnPrimaryDuringRollback);
+    assert.lt(connectionsCreatedOnPrimaryDuringRollback, 50,
+              'excessive number of connections made by secondary to primary during rollback');
 
     replTest.stopSet(15);
 }());

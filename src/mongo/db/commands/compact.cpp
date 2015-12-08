@@ -161,11 +161,6 @@ public:
         OldClientContext ctx(txn, nss.ns());
         BackgroundOperation::assertNoBgOpInProgForNs(nss.ns());
 
-        if (collection->isCapped()) {
-            errmsg = "cannot compact a capped collection";
-            return false;
-        }
-
         log() << "compact " << nss.ns() << " begin, options: " << compactOptions.toString();
 
         StatusWith<CompactStats> status = collection->compact(txn, &compactOptions);

@@ -37,13 +37,10 @@
 namespace mongo {
 
 RouterStageMerge::RouterStageMerge(executor::TaskExecutor* executor,
-                                   ClusterClientCursorParams params)
+                                   ClusterClientCursorParams&& params)
     : _executor(executor), _arm(executor, std::move(params)) {}
 
 StatusWith<boost::optional<BSONObj>> RouterStageMerge::next() {
-    // On error, kill the underlying async results merger.
-    auto killer = MakeGuard(&RouterStageMerge::kill, this);
-
     while (!_arm.ready()) {
         auto nextEventStatus = _arm.nextEvent();
         if (!nextEventStatus.isOK()) {
@@ -55,16 +52,20 @@ StatusWith<boost::optional<BSONObj>> RouterStageMerge::next() {
         _executor->waitForEvent(event);
     }
 
-    auto statusWithNext = _arm.nextReady();
-    if (statusWithNext.isOK()) {
-        killer.Dismiss();
-    }
-    return statusWithNext;
+    return _arm.nextReady();
 }
 
 void RouterStageMerge::kill() {
     auto killEvent = _arm.kill();
     _executor->waitForEvent(killEvent);
+}
+
+bool RouterStageMerge::remotesExhausted() {
+    return _arm.remotesExhausted();
+}
+
+Status RouterStageMerge::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    return _arm.setAwaitDataTimeout(awaitDataTimeout);
 }
 
 }  // namespace mongo

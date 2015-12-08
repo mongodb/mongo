@@ -35,6 +35,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -52,7 +53,9 @@ struct GetMoreRequest {
     GetMoreRequest(NamespaceString namespaceString,
                    CursorId id,
                    boost::optional<long long> sizeOfBatch,
-                   boost::optional<long long> term);
+                   boost::optional<Milliseconds> awaitDataTimeout,
+                   boost::optional<long long> term,
+                   boost::optional<repl::OpTime> lastKnownCommittedOpTime);
 
     /**
      * Construct a GetMoreRequest from the command specification and db name.
@@ -75,8 +78,14 @@ struct GetMoreRequest {
     // as fit within the byte limit.
     const boost::optional<long long> batchSize;
 
+    // The number of milliseconds for which a getMore on a tailable, awaitData query should block.
+    const boost::optional<Milliseconds> awaitDataTimeout;
+
     // Only internal queries from replication will typically have a term.
     const boost::optional<long long> term;
+
+    // Only internal queries from replication will have a last known committed optime.
+    const boost::optional<repl::OpTime> lastKnownCommittedOpTime;
 
 private:
     /**

@@ -50,9 +50,7 @@ const char kLinearizableReadConcernStr[] = "linearizable";
 }  // unnamed namespace
 
 const string ReadConcernArgs::kReadConcernFieldName("readConcern");
-const string ReadConcernArgs::kOpTimeFieldName("afterOpTime");
-const string ReadConcernArgs::kOpTimestampFieldName("ts");
-const string ReadConcernArgs::kOpTermFieldName("term");
+const string ReadConcernArgs::kAfterOpTimeFieldName("afterOpTime");
 const string ReadConcernArgs::kLevelFieldName("level");
 
 ReadConcernArgs::ReadConcernArgs() = default;
@@ -69,50 +67,61 @@ OpTime ReadConcernArgs::getOpTime() const {
     return _opTime.value_or(OpTime());
 }
 
-Status ReadConcernArgs::initialize(const BSONObj& cmdObj) {
-    auto readConcernElem = cmdObj[ReadConcernArgs::kReadConcernFieldName];
+Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
+    invariant(!_opTime && !_level);  // only legal to call on uninitialized object.
 
     if (readConcernElem.eoo()) {
         return Status::OK();
     }
 
-    if (!readConcernElem.isABSONObj()) {
+    dassert(readConcernElem.fieldNameStringData() == kReadConcernFieldName);
+
+    if (readConcernElem.type() != Object) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << kReadConcernFieldName << " field should be an object");
     }
 
     BSONObj readConcernObj = readConcernElem.Obj();
+    for (auto&& field : readConcernObj) {
+        auto fieldName = field.fieldNameStringData();
+        if (fieldName == kAfterOpTimeFieldName) {
+            OpTime opTime;
+            // TODO pass field in rather than scanning again.
+            auto opTimeStatus =
+                bsonExtractOpTimeField(readConcernObj, kAfterOpTimeFieldName, &opTime);
+            if (!opTimeStatus.isOK()) {
+                return opTimeStatus;
+            }
+            _opTime = opTime;
+        } else if (fieldName == kLevelFieldName) {
+            std::string levelString;
+            // TODO pass field in rather than scanning again.
+            auto readCommittedStatus =
+                bsonExtractStringField(readConcernObj, kLevelFieldName, &levelString);
+            if (!readCommittedStatus.isOK()) {
+                return readCommittedStatus;
+            }
 
-    if (readConcernObj.hasField(kOpTimeFieldName)) {
-        OpTime opTime;
-        auto opTimeStatus = bsonExtractOpTimeField(readConcernObj, kOpTimeFieldName, &opTime);
-        if (!opTimeStatus.isOK()) {
-            return opTimeStatus;
-        }
-        _opTime = opTime;
-    }
-
-    std::string levelString;
-    auto readCommittedStatus =
-        bsonExtractStringField(readConcernObj, kLevelFieldName, &levelString);
-    if (readCommittedStatus.isOK()) {
-        if (levelString == kLocalReadConcernStr) {
-            _level = ReadConcernLevel::kLocalReadConcern;
-        } else if (levelString == kMajorityReadConcernStr) {
-            _level = ReadConcernLevel::kMajorityReadConcern;
+            if (levelString == kLocalReadConcernStr) {
+                _level = ReadConcernLevel::kLocalReadConcern;
+            } else if (levelString == kMajorityReadConcernStr) {
+                _level = ReadConcernLevel::kMajorityReadConcern;
+            } else {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << kReadConcernFieldName << '.' << kLevelFieldName
+                                            << " must be either 'local' or 'majority'");
+            }
         } else {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << kReadConcernFieldName << '.' << kLevelFieldName
-                                        << " must be either \"local\" or \"majority\"");
+            return Status(ErrorCodes::InvalidOptions,
+                          str::stream() << "Unrecognized option in " << kReadConcernFieldName
+                                        << ": " << fieldName);
         }
-    } else if (readCommittedStatus != ErrorCodes::NoSuchKey) {
-        return readCommittedStatus;
     }
 
     return Status::OK();
 }
 
-void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) {
+void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
     BSONObjBuilder rcBuilder(builder->subobjStart(kReadConcernFieldName));
 
     if (_level) {
@@ -138,10 +147,7 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) {
     }
 
     if (_opTime) {
-        BSONObjBuilder afterBuilder(rcBuilder.subobjStart(kOpTimeFieldName));
-        afterBuilder.append(kOpTimestampFieldName, _opTime->getTimestamp());
-        afterBuilder.append(kOpTermFieldName, _opTime->getTerm());
-        afterBuilder.done();
+        _opTime->append(&rcBuilder, kAfterOpTimeFieldName);
     }
 
     rcBuilder.done();

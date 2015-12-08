@@ -33,8 +33,10 @@
 
 #include "mongo/db/repl/rs_rollback.h"
 
+#include <algorithm>
 #include <memory>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection.h"
@@ -107,6 +109,7 @@ using std::unique_ptr;
 using std::endl;
 using std::list;
 using std::map;
+using std::multimap;
 using std::set;
 using std::string;
 using std::pair;
@@ -148,6 +151,10 @@ struct FixUpInfo {
 
     // collections to drop
     set<string> toDrop;
+
+    // Indexes to drop.
+    // Key is collection namespace. Value is name of index to drop.
+    multimap<string, string> indexesToDrop;
 
     set<string> collectionsToResyncData;
     set<string> collectionsToResyncMetadata;
@@ -242,6 +249,7 @@ Status refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
                 severe() << "cannot rollback a collMod command: " << obj;
                 throw RSFatalException();
             }
+            return Status::OK();
         } else {
             severe() << "can't rollback this command yet: " << obj.toString();
             log() << "cmdname=" << cmdname;
@@ -249,11 +257,49 @@ Status refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
         }
     }
 
+    NamespaceString nss(doc.ns);
+    if (nss.isSystemDotIndexes()) {
+        if (*op != 'i') {
+            severe() << "Unexpected operation type '" << *op << "' on system.indexes operation, "
+                     << "document: " << doc.ownedObj;
+            throw RSFatalException();
+        }
+        string objNs;
+        auto status = bsonExtractStringField(obj, "ns", &objNs);
+        if (!status.isOK()) {
+            severe() << "Missing collection namespace in system.indexes operation, document: "
+                     << doc.ownedObj;
+            throw RSFatalException();
+        }
+        NamespaceString objNss(objNs);
+        if (!objNss.isValid()) {
+            severe() << "Invalid collection namespace in system.indexes operation, document: "
+                     << doc.ownedObj;
+            throw RSFatalException();
+        }
+        string indexName;
+        status = bsonExtractStringField(obj, "name", &indexName);
+        if (!status.isOK()) {
+            severe() << "Missing index name in system.indexes operation, document: "
+                     << doc.ownedObj;
+            throw RSFatalException();
+        }
+        using ValueType = multimap<string, string>::value_type;
+        ValueType pairToInsert = std::make_pair(objNs, indexName);
+        auto lowerBound = fixUpInfo.indexesToDrop.lower_bound(objNs);
+        auto upperBound = fixUpInfo.indexesToDrop.upper_bound(objNs);
+        auto matcher = [pairToInsert](const ValueType& pair) { return pair == pairToInsert; };
+        if (!std::count_if(lowerBound, upperBound, matcher)) {
+            fixUpInfo.indexesToDrop.insert(pairToInsert);
+        }
+        return Status::OK();
+    }
+
     doc._id = obj["_id"];
     if (doc._id.eoo()) {
-        warning() << "ignoring op on rollback no _id TODO : " << doc.ns << ' '
-                  << doc.ownedObj.toString();
-        return Status::OK();
+        severe() << "cannot rollback op with no _id. ns: " << doc.ns
+                 << ", document: " << doc.ownedObj;
+        throw RSFatalException();
     }
 
     fixUpInfo.toRefetch.insert(doc);
@@ -269,7 +315,8 @@ void syncFixUp(OperationContext* txn,
 
     unsigned long long totalSize = 0;
 
-    list<pair<DocID, BSONObj>> goodVersions;
+    // namespace -> doc id -> doc
+    map<string, map<DocID, BSONObj>> goodVersions;
 
     BSONObj newMinValid;
 
@@ -291,7 +338,7 @@ void syncFixUp(OperationContext* txn,
                 uassert(13410, "replSet too much data to roll back", totalSize < 300 * 1024 * 1024);
 
                 // note good might be eoo, indicating we should delete it
-                goodVersions.push_back(pair<DocID, BSONObj>(doc, good));
+                goodVersions[doc.ns][doc] = good;
             }
         }
         newMinValid = rollbackSource.getLastOperation();
@@ -323,9 +370,9 @@ void syncFixUp(OperationContext* txn,
 
     // we have items we are writing that aren't from a point-in-time.  thus best not to come
     // online until we get to that point in freshness.
-    OpTime minValid = fassertStatusOK(28774, OpTime::parseFromBSON(newMinValid));
+    OpTime minValid = fassertStatusOK(28774, OpTime::parseFromOplogEntry(newMinValid));
     log() << "minvalid=" << minValid;
-    setMinValid(txn, minValid);
+    setMinValid(txn, {OpTime{}, minValid});
 
     // any full collection resyncs required?
     if (!fixUpInfo.collectionsToResyncData.empty() ||
@@ -333,6 +380,7 @@ void syncFixUp(OperationContext* txn,
         for (const string& ns : fixUpInfo.collectionsToResyncData) {
             log() << "rollback 4.1.1 coll resync " << ns;
 
+            fixUpInfo.indexesToDrop.erase(ns);
             fixUpInfo.collectionsToResyncMetadata.erase(ns);
 
             const NamespaceString nss(ns);
@@ -426,9 +474,10 @@ void syncFixUp(OperationContext* txn,
             if (newMinValid.isEmpty()) {
                 err = "can't get minvalid from sync source";
             } else {
-                OpTime minValid = fassertStatusOK(28775, OpTime::parseFromBSON(newMinValid));
+                OpTime minValid = fassertStatusOK(28775, OpTime::parseFromOplogEntry(newMinValid));
                 log() << "minvalid=" << minValid;
-                setMinValid(txn, minValid);
+                const OpTime start{fixUpInfo.commonPoint, OpTime::kUninitializedTerm};
+                setMinValid(txn, {start, minValid});
             }
         } catch (const DBException& e) {
             err = "can't get/set minvalid: ";
@@ -448,13 +497,13 @@ void syncFixUp(OperationContext* txn,
         log() << "rollback 4.3";
     }
 
-    map<string, shared_ptr<Helpers::RemoveSaver>> removeSavers;
-
     log() << "rollback 4.6";
     // drop collections to drop before doing individual fixups - that might make things faster
     // below actually if there were subsequent inserts to rollback
     for (set<string>::iterator it = fixUpInfo.toDrop.begin(); it != fixUpInfo.toDrop.end(); it++) {
         log() << "rollback drop: " << *it;
+
+        fixUpInfo.indexesToDrop.erase(*it);
 
         ScopedTransaction transaction(txn, MODE_IX);
         const NamespaceString nss(*it);
@@ -463,9 +512,7 @@ void syncFixUp(OperationContext* txn,
         if (db) {
             WriteUnitOfWork wunit(txn);
 
-            shared_ptr<Helpers::RemoveSaver>& removeSaver = removeSavers[*it];
-            if (!removeSaver)
-                removeSaver.reset(new Helpers::RemoveSaver("rollback", "", *it));
+            Helpers::RemoveSaver removeSaver("rollback", "", *it);
 
             // perform a collection scan and write all documents in the collection to disk
             std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
@@ -473,7 +520,12 @@ void syncFixUp(OperationContext* txn,
             BSONObj curObj;
             PlanExecutor::ExecState execState;
             while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
-                removeSaver->goingToDelete(curObj);
+                auto status = removeSaver.goingToDelete(curObj);
+                if (!status.isOK()) {
+                    severe() << "rolling back createCollection on " << *it
+                             << " failed to write document to remove saver file: " << status;
+                    throw RSFatalException();
+                }
             }
             if (execState != PlanExecutor::IS_EOF) {
                 if (execState == PlanExecutor::FAILURE &&
@@ -494,149 +546,199 @@ void syncFixUp(OperationContext* txn,
         }
     }
 
+    // Drop indexes.
+    for (auto it = fixUpInfo.indexesToDrop.begin(); it != fixUpInfo.indexesToDrop.end(); it++) {
+        const NamespaceString nss(it->first);
+        const string& indexName = it->second;
+        log() << "rollback drop index: collection: " << nss.toString() << ". index: " << indexName;
+
+        ScopedTransaction transaction(txn, MODE_IX);
+        Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_X);
+        auto db = dbHolder().get(txn, nss.db());
+        if (!db) {
+            continue;
+        }
+        auto collection = db->getCollection(nss.toString());
+        if (!collection) {
+            continue;
+        }
+        auto indexCatalog = collection->getIndexCatalog();
+        if (!indexCatalog) {
+            continue;
+        }
+        bool includeUnfinishedIndexes = false;
+        auto indexDescriptor =
+            indexCatalog->findIndexByName(txn, indexName, includeUnfinishedIndexes);
+        if (!indexDescriptor) {
+            warning() << "rollback failed to drop index " << indexName << " in " << nss.toString()
+                      << ": index not found";
+            continue;
+        }
+        WriteUnitOfWork wunit(txn);
+        auto status = indexCatalog->dropIndex(txn, indexDescriptor);
+        if (!status.isOK()) {
+            severe() << "rollback failed to drop index " << indexName << " in " << nss.toString()
+                     << ": " << status;
+            throw RSFatalException();
+        }
+        wunit.commit();
+    }
+
     log() << "rollback 4.7";
     unsigned deletes = 0, updates = 0;
     time_t lastProgressUpdate = time(0);
     time_t progressUpdateGap = 10;
-    for (list<pair<DocID, BSONObj>>::iterator it = goodVersions.begin(); it != goodVersions.end();
-         it++) {
-        time_t now = time(0);
-        if (now - lastProgressUpdate > progressUpdateGap) {
-            log() << deletes << " delete and " << updates << " update operations processed out of "
-                  << goodVersions.size() << " total operations";
-            lastProgressUpdate = now;
+    for (const auto& nsAndGoodVersionsByDocID : goodVersions) {
+        // Keep an archive of items rolled back if the collection has not been dropped
+        // while rolling back createCollection operations.
+        const auto& ns = nsAndGoodVersionsByDocID.first;
+        unique_ptr<Helpers::RemoveSaver> removeSaver;
+        if (!fixUpInfo.toDrop.count(ns)) {
+            removeSaver.reset(new Helpers::RemoveSaver("rollback", "", ns));
         }
-        const DocID& doc = it->first;
-        BSONObj pattern = doc._id.wrap();  // { _id : ... }
-        try {
-            verify(doc.ns && *doc.ns);
-            if (fixUpInfo.collectionsToResyncData.count(doc.ns)) {
-                // we just synced this entire collection
-                continue;
+
+        const auto& goodVersionsByDocID = nsAndGoodVersionsByDocID.second;
+        for (const auto& idAndDoc : goodVersionsByDocID) {
+            time_t now = time(0);
+            if (now - lastProgressUpdate > progressUpdateGap) {
+                log() << deletes << " delete and " << updates
+                      << " update operations processed out of " << goodVersions.size()
+                      << " total operations";
+                lastProgressUpdate = now;
             }
-
-            // keep an archive of items rolled back
-            shared_ptr<Helpers::RemoveSaver>& removeSaver = removeSavers[doc.ns];
-            if (!removeSaver)
-                removeSaver.reset(new Helpers::RemoveSaver("rollback", "", doc.ns));
-
-            // todo: lots of overhead in context, this can be faster
-            const NamespaceString docNss(doc.ns);
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock docDbLock(txn->lockState(), docNss.db(), MODE_X);
-            OldClientContext ctx(txn, doc.ns);
-
-            // Add the doc to our rollback file
-            BSONObj obj;
-            Collection* collection = ctx.db()->getCollection(doc.ns);
-
-            // Do not log an error when undoing an insert on a no longer existent collection.
-            // It is likely that the collection was dropped as part of rolling back a
-            // createCollection command and regardless, the document no longer exists.
-            if (collection) {
-                bool found = Helpers::findOne(txn, collection, pattern, obj, false);
-                if (found) {
-                    removeSaver->goingToDelete(obj);
-                } else {
-                    error() << "rollback cannot find object: " << pattern << " in namespace "
-                            << doc.ns;
+            const DocID& doc = idAndDoc.first;
+            BSONObj pattern = doc._id.wrap();  // { _id : ... }
+            try {
+                verify(doc.ns && *doc.ns);
+                if (fixUpInfo.collectionsToResyncData.count(doc.ns)) {
+                    // We just synced this entire collection.
+                    continue;
                 }
-            }
 
-            if (it->second.isEmpty()) {
-                // wasn't on the primary; delete.
-                // TODO 1.6 : can't delete from a capped collection.  need to handle that here.
-                deletes++;
+                // TODO: Lots of overhead in context. This can be faster.
+                const NamespaceString docNss(doc.ns);
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock docDbLock(txn->lockState(), docNss.db(), MODE_X);
+                OldClientContext ctx(txn, doc.ns);
 
-                if (collection) {
-                    if (collection->isCapped()) {
-                        // can't delete from a capped collection - so we truncate instead. if
-                        // this item must go, so must all successors!!!
-                        try {
-                            // TODO: IIRC cappedTruncateAfter does not handle completely empty.
-                            // this will crazy slow if no _id index.
-                            long long start = Listener::getElapsedTimeMillis();
-                            RecordId loc = Helpers::findOne(txn, collection, pattern, false);
-                            if (Listener::getElapsedTimeMillis() - start > 200)
-                                warning() << "roll back slow no _id index for " << doc.ns
-                                          << " perhaps?";
-                            // would be faster but requires index:
-                            // RecordId loc = Helpers::findById(nsd, pattern);
-                            if (!loc.isNull()) {
-                                try {
-                                    collection->temp_cappedTruncateAfter(txn, loc, true);
-                                } catch (const DBException& e) {
-                                    if (e.getCode() == 13415) {
-                                        // hack: need to just make cappedTruncate do this...
-                                        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                                            WriteUnitOfWork wunit(txn);
-                                            uassertStatusOK(collection->truncate(txn));
-                                            wunit.commit();
-                                        }
-                                        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                                            txn, "truncate", collection->ns().ns());
-                                    } else {
-                                        throw e;
-                                    }
-                                }
-                            }
-                        } catch (const DBException& e) {
-                            error() << "rolling back capped collection rec " << doc.ns << ' '
-                                    << e.toString();
+                Collection* collection = ctx.db()->getCollection(doc.ns);
+
+                // Add the doc to our rollback file if the collection was not dropped while
+                // rolling back createCollection operations.
+                // Do not log an error when undoing an insert on a no longer existent collection.
+                // It is likely that the collection was dropped as part of rolling back a
+                // createCollection command and regardless, the document no longer exists.
+                if (collection && removeSaver) {
+                    BSONObj obj;
+                    bool found = Helpers::findOne(txn, collection, pattern, obj, false);
+                    if (found) {
+                        auto status = removeSaver->goingToDelete(obj);
+                        if (!status.isOK()) {
+                            severe() << "rollback cannot write document in namespace " << doc.ns
+                                     << " to archive file: " << status;
+                            throw RSFatalException();
                         }
                     } else {
-                        deleteObjects(txn,
-                                      ctx.db(),
-                                      doc.ns,
-                                      pattern,
-                                      PlanExecutor::YIELD_MANUAL,
-                                      true,   // justone
-                                      true);  // god
-                    }
-                    // did we just empty the collection?  if so let's check if it even
-                    // exists on the source.
-                    if (collection->numRecords(txn) == 0) {
-                        try {
-                            NamespaceString nss(doc.ns);
-                            auto infoResult = rollbackSource.getCollectionInfo(nss);
-                            if (!infoResult.isOK()) {
-                                // we should drop
-                                WriteUnitOfWork wunit(txn);
-                                ctx.db()->dropCollection(txn, doc.ns);
-                                wunit.commit();
-                            }
-                        } catch (const DBException&) {
-                            // this isn't *that* big a deal, but is bad.
-                            warning() << "rollback error querying for existence of " << doc.ns
-                                      << " at the primary, ignoring";
-                        }
+                        error() << "rollback cannot find object: " << pattern << " in namespace "
+                                << doc.ns;
                     }
                 }
-            } else {
-                // TODO faster...
-                OpDebug debug;
-                updates++;
 
-                const NamespaceString requestNs(doc.ns);
-                UpdateRequest request(requestNs);
+                if (idAndDoc.second.isEmpty()) {
+                    // wasn't on the primary; delete.
+                    // TODO 1.6 : can't delete from a capped collection.  need to handle that here.
+                    deletes++;
 
-                request.setQuery(pattern);
-                request.setUpdates(it->second);
-                request.setGod();
-                request.setUpsert();
-                UpdateLifecycleImpl updateLifecycle(true, requestNs);
-                request.setLifecycle(&updateLifecycle);
+                    if (collection) {
+                        if (collection->isCapped()) {
+                            // can't delete from a capped collection - so we truncate instead. if
+                            // this item must go, so must all successors!!!
+                            try {
+                                // TODO: IIRC cappedTruncateAfter does not handle completely empty.
+                                // this will crazy slow if no _id index.
+                                long long start = Listener::getElapsedTimeMillis();
+                                RecordId loc = Helpers::findOne(txn, collection, pattern, false);
+                                if (Listener::getElapsedTimeMillis() - start > 200)
+                                    warning() << "roll back slow no _id index for " << doc.ns
+                                              << " perhaps?";
+                                // would be faster but requires index:
+                                // RecordId loc = Helpers::findById(nsd, pattern);
+                                if (!loc.isNull()) {
+                                    try {
+                                        collection->temp_cappedTruncateAfter(txn, loc, true);
+                                    } catch (const DBException& e) {
+                                        if (e.getCode() == 13415) {
+                                            // hack: need to just make cappedTruncate do this...
+                                            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                                                WriteUnitOfWork wunit(txn);
+                                                uassertStatusOK(collection->truncate(txn));
+                                                wunit.commit();
+                                            }
+                                            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+                                                txn, "truncate", collection->ns().ns());
+                                        } else {
+                                            throw e;
+                                        }
+                                    }
+                                }
+                            } catch (const DBException& e) {
+                                error() << "rolling back capped collection rec " << doc.ns << ' '
+                                        << e.toString();
+                            }
+                        } else {
+                            deleteObjects(txn,
+                                          collection,
+                                          doc.ns,
+                                          pattern,
+                                          PlanExecutor::YIELD_MANUAL,
+                                          true,   // justone
+                                          true);  // god
+                        }
+                        // did we just empty the collection?  if so let's check if it even
+                        // exists on the source.
+                        if (collection->numRecords(txn) == 0) {
+                            try {
+                                NamespaceString nss(doc.ns);
+                                auto infoResult = rollbackSource.getCollectionInfo(nss);
+                                if (!infoResult.isOK()) {
+                                    // we should drop
+                                    WriteUnitOfWork wunit(txn);
+                                    ctx.db()->dropCollection(txn, doc.ns);
+                                    wunit.commit();
+                                }
+                            } catch (const DBException& ex) {
+                                // Failed to run listCollections command on sync source.
+                                // This isn't *that* big a deal, but is bad.
+                                warning() << "rollback error querying for existence of " << doc.ns
+                                          << " at the primary, ignoring: " << ex;
+                            }
+                        }
+                    }
+                } else {
+                    // TODO faster...
+                    OpDebug debug;
+                    updates++;
 
-                update(txn, ctx.db(), request, &debug);
+                    const NamespaceString requestNs(doc.ns);
+                    UpdateRequest request(requestNs);
+
+                    request.setQuery(pattern);
+                    request.setUpdates(idAndDoc.second);
+                    request.setGod();
+                    request.setUpsert();
+                    UpdateLifecycleImpl updateLifecycle(true, requestNs);
+                    request.setLifecycle(&updateLifecycle);
+
+                    update(txn, ctx.db(), request, &debug);
+                }
+            } catch (const DBException& e) {
+                log() << "exception in rollback ns:" << doc.ns << ' ' << pattern.toString() << ' '
+                      << e.toString() << " ndeletes:" << deletes;
+                warn = true;
             }
-        } catch (const DBException& e) {
-            log() << "exception in rollback ns:" << doc.ns << ' ' << pattern.toString() << ' '
-                  << e.toString() << " ndeletes:" << deletes;
-            warn = true;
         }
     }
 
-    removeSavers.clear();  // this effectively closes all of them
     log() << "rollback 5 d:" << deletes << " u:" << updates;
     log() << "rollback 6";
 
@@ -711,13 +813,14 @@ Status _syncRollback(OperationContext* txn,
             auto res = syncRollBackLocalOperations(
                 localOplog, rollbackSource.getOplog(), processOperationForFixUp);
             if (!res.isOK()) {
-                switch (res.getStatus().code()) {
+                const auto status = res.getStatus();
+                switch (status.code()) {
                     case ErrorCodes::OplogStartMissing:
                     case ErrorCodes::UnrecoverableRollbackError:
                         sleepSecondsFn(Seconds(1));
-                        return res.getStatus();
+                        return status;
                     default:
-                        throw RSFatalException(res.getStatus().toString());
+                        throw RSFatalException(status.toString());
                 }
             } else {
                 how.commonPoint = res.getValue().first;
@@ -728,7 +831,7 @@ Status _syncRollback(OperationContext* txn,
             return Status(ErrorCodes::UnrecoverableRollbackError,
                           str::stream()
                               << "need to rollback, but unable to determine common point between"
-                                 "local and remote oplog: " << e.what(),
+                                 " local and remote oplog: " << e.what(),
                           18752);
         } catch (const DBException& e) {
             warning() << "rollback 2 exception " << e.toString() << "; sleeping 1 min";
@@ -754,7 +857,7 @@ Status _syncRollback(OperationContext* txn,
         if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
             warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
                       << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                      << "but found self in " << replCoord->getMemberState();
+                      << " but found self in " << replCoord->getMemberState();
         }
 
         throw;
@@ -766,7 +869,7 @@ Status _syncRollback(OperationContext* txn,
     if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
         warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
                   << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                  << "but found self in " << replCoord->getMemberState();
+                  << " but found self in " << replCoord->getMemberState();
     }
 
     return Status::OK();
@@ -786,13 +889,13 @@ Status syncRollback(OperationContext* txn,
     // check that we are at minvalid, otherwise we cannot rollback as we may be in an
     // inconsistent state
     {
-        OpTime minvalid = getMinValid(txn);
-        if (minvalid > lastOpTimeApplied) {
+        BatchBoundaries boundaries = getMinValid(txn);
+        if (!boundaries.start.isNull() || boundaries.end > lastOpTimeApplied) {
             severe() << "need to rollback, but in inconsistent state" << endl;
             return Status(ErrorCodes::UnrecoverableRollbackError,
                           str::stream() << "need to rollback, but in inconsistent state. "
-                                        << "minvalid: " << minvalid.toString()
-                                        << " our last optime: " << lastOpTimeApplied.toString(),
+                                        << "minvalid: " << boundaries.end.toString()
+                                        << " > our last optime: " << lastOpTimeApplied.toString(),
                           18750);
         }
     }

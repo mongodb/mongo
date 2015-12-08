@@ -196,6 +196,27 @@ std::string generateClientProof(const unsigned char saltedPassword[hashSize],
     return base64::encode(reinterpret_cast<char*>(clientProof), hashSize);
 }
 
+/**
+ * Compare two arrays of bytes for equality in constant time.
+ *
+ * This means that the function runs for the same amount of time even if they differ. Unlike memcmp,
+ * this function does not exit on the first difference.
+ *
+ * Returns true if the two arrays are equal.
+ *
+ * TODO: evaluate if LTO inlines or changes the code flow of this function.
+ */
+NOINLINE_DECL
+bool memequal(volatile const unsigned char* s1, volatile const unsigned char* s2, size_t length) {
+    unsigned char ret = 0;
+
+    for (size_t i = 0; i < length; ++i) {
+        ret |= s1[i] ^ s2[i];
+    }
+
+    return ret == 0;
+}
+
 bool verifyServerSignature(const unsigned char saltedPassword[hashSize],
                            const std::string& authMessage,
                            const std::string& receivedServerSignature) {
@@ -222,7 +243,14 @@ bool verifyServerSignature(const unsigned char saltedPassword[hashSize],
 
     std::string encodedServerSignature =
         base64::encode(reinterpret_cast<char*>(serverSignature), sizeof(serverSignature));
-    return (receivedServerSignature == encodedServerSignature);
+
+    if (encodedServerSignature.size() != receivedServerSignature.size()) {
+        return false;
+    }
+
+    return memequal(reinterpret_cast<const unsigned char*>(encodedServerSignature.c_str()),
+                    reinterpret_cast<const unsigned char*>(receivedServerSignature.c_str()),
+                    encodedServerSignature.size());
 }
 
 }  // namespace scram

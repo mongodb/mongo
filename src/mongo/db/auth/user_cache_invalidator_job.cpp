@@ -52,19 +52,19 @@ namespace mongo {
 namespace {
 
 // How often to check with the config servers whether authorization information has changed.
-int userCacheInvalidationIntervalSecs = 30;  // 30 second default
+std::atomic<int> userCacheInvalidationIntervalSecs(30);  // NOLINT 30 second default
 stdx::mutex invalidationIntervalMutex;
 stdx::condition_variable invalidationIntervalChangedCondition;
 Date_t lastInvalidationTime;
 
-class ExportedInvalidationIntervalParameter : public ExportedServerParameter<int> {
+class ExportedInvalidationIntervalParameter
+    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedInvalidationIntervalParameter()
-        : ExportedServerParameter<int>(ServerParameterSet::getGlobal(),
-                                       "userCacheInvalidationIntervalSecs",
-                                       &userCacheInvalidationIntervalSecs,
-                                       true,
-                                       true) {}
+        : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "userCacheInvalidationIntervalSecs",
+              &userCacheInvalidationIntervalSecs) {}
 
     virtual Status validate(const int& potentialNewValue) {
         if (potentialNewValue < 1 || potentialNewValue > 86400) {
@@ -77,11 +77,12 @@ public:
 
     // Without this the compiler complains that defining set(const int&)
     // hides set(const BSONElement&)
-    using ExportedServerParameter<int>::set;
+    using ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>::set;
 
     virtual Status set(const int& newValue) {
         stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
-        Status status = ExportedServerParameter<int>::set(newValue);
+        Status status =
+            ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>::set(newValue);
         invalidationIntervalChangedCondition.notify_all();
         return status;
     }
@@ -92,7 +93,7 @@ StatusWith<OID> getCurrentCacheGeneration(OperationContext* txn) {
     try {
         BSONObjBuilder result;
         const bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
-            "admin", BSON("_getUserCacheGeneration" << 1), &result);
+            txn, "admin", BSON("_getUserCacheGeneration" << 1), &result);
         if (!ok) {
             return Command::getStatusFromCommandResult(result.obj());
         }

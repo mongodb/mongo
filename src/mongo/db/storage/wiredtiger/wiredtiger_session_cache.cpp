@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/memory.h"
@@ -151,12 +152,57 @@ void WiredTigerSessionCache::shuttingDown() {
     _snapshotManager.shutdown();
 }
 
+void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
+    const int shuttingDown = _shuttingDown.fetchAndAdd(1);
+    ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
+
+    uassert(ErrorCodes::ShutdownInProgress,
+            "Cannot wait for durability because a shutdown is in progress",
+            !(shuttingDown & kShuttingDownMask));
+
+    // When forcing a checkpoint with journaling enabled, don't synchronize with other
+    // waiters, as a log flush is much cheaper than a full checkpoint.
+    if (forceCheckpoint && _engine->isDurable()) {
+        WiredTigerSession* session = getSession();
+        ON_BLOCK_EXIT([this, session] { releaseSession(session); });
+        WT_SESSION* s = session->getSession();
+        invariantWTOK(s->checkpoint(s, NULL));
+        LOG(4) << "created checkpoint (forced)";
+        return;
+    }
+
+    uint32_t start = _lastSyncTime.load();
+    // Do the remainder in a critical section that ensures only a single thread at a time
+    // will attempt to synchronize.
+    stdx::unique_lock<stdx::mutex> lk(_lastSyncMutex);
+    uint32_t current = _lastSyncTime.loadRelaxed();  // synchronized with writes through mutex
+    if (current != start) {
+        // Someone else synced already since we read lastSyncTime, so we're done!
+        return;
+    }
+    _lastSyncTime.store(current + 1);
+
+    // Nobody has synched yet, so we have to sync ourselves.
+    WiredTigerSession* session = getSession();
+    ON_BLOCK_EXIT([this, session] { releaseSession(session); });
+    WT_SESSION* s = session->getSession();
+
+    // Use the journal when available, or a checkpoint otherwise.
+    if (_engine->isDurable()) {
+        invariantWTOK(s->log_flush(s, "sync=on"));
+        LOG(4) << "flushed journal";
+    } else {
+        invariantWTOK(s->checkpoint(s, NULL));
+        LOG(4) << "created checkpoint";
+    }
+}
+
 void WiredTigerSessionCache::closeAll() {
     // Increment the epoch as we are now closing all sessions with this epoch
     SessionCache swap;
 
     {
-        stdx::lock_guard<SpinLock> lock(_cacheLock);
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
         _epoch.fetchAndAdd(1);
         _sessions.swap(swap);
     }
@@ -166,13 +212,17 @@ void WiredTigerSessionCache::closeAll() {
     }
 }
 
+bool WiredTigerSessionCache::isEphemeral() {
+    return _engine && _engine->isEphemeral();
+}
+
 WiredTigerSession* WiredTigerSessionCache::getSession() {
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
     invariant(!(_shuttingDown.loadRelaxed() & kShuttingDownMask));
 
     {
-        stdx::lock_guard<SpinLock> lock(_cacheLock);
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
         if (!_sessions.empty()) {
             // Get the most recently used session so that if we discard sessions, we're
             // discarding older ones
@@ -214,7 +264,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     uint64_t currentEpoch = _epoch.load();
 
     if (session->_getEpoch() == currentEpoch) {  // check outside of lock to reduce contention
-        stdx::lock_guard<SpinLock> lock(_cacheLock);
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
         if (session->_getEpoch() == _epoch.load()) {  // recheck inside the lock for correctness
             returnedToCache = true;
             _sessions.push_back(session);

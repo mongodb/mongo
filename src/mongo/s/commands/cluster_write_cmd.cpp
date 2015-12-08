@@ -97,6 +97,7 @@ public:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const {
         BatchedCommandRequest request(_writeType);
 
@@ -111,7 +112,9 @@ public:
         }
 
         BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+        int options = 0;
+        ClusterExplain::wrapAsExplain(
+            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
@@ -126,7 +129,7 @@ public:
         }
 
         return ClusterExplain::buildExplainResult(
-            shardResults, ClusterExplain::kWriteOnShards, timer.millis(), out);
+            txn, shardResults, ClusterExplain::kWriteOnShards, timer.millis(), out);
     }
 
     virtual bool run(OperationContext* txn,
@@ -265,7 +268,7 @@ private:
             const ShardEndpoint* endpoint = *it;
 
             ConnectionString host;
-            Status status = resolver.chooseWriteHost(endpoint->shardName, &host);
+            Status status = resolver.chooseWriteHost(txn, endpoint->shardName, &host);
             if (!status.isOK())
                 return status;
 
@@ -291,7 +294,7 @@ private:
             Strategy::CommandResult result;
             result.target = host;
             {
-                const auto shard = grid.shardRegistry()->getShard(host.toString());
+                const auto shard = grid.shardRegistry()->getShard(txn, host.toString());
                 result.shardTargetId = shard->getId();
             }
             result.result = response.toBSON();

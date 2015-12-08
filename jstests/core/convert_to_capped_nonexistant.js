@@ -8,7 +8,7 @@ testDb.dropDatabase();
 var result = testDb.runCommand({convertToCapped: 'foo', size: 1024});
 assert.eq(result.ok, 0, "converting a nonexistent to capped worked and should not have");
 assert.eq(result.code,
-          60,
+          26,
           "converting a nonexistent database to capped failed, but code has changed");
 assert.eq(result.errmsg,
           "database convert_to_capped_nonexistent not found",

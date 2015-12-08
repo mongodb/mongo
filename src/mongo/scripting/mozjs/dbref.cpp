@@ -31,6 +31,7 @@
 #include "mongo/scripting/mozjs/dbref.h"
 
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 
 namespace mongo {
@@ -48,17 +49,17 @@ void DBRefInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "DBRef 1st parameter must be a string");
 
     JS::RootedObject thisv(cx);
-    scope->getDbRefProto().newObject(&thisv);
+    scope->getProto<DBRefInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    o.setValue("$ref", args.get(0));
-    o.setValue("$id", args.get(1));
+    o.setValue(InternedString::dollar_ref, args.get(0));
+    o.setValue(InternedString::dollar_id, args.get(1));
 
     if (args.length() == 3) {
         if (!args.get(2).isString())
             uasserted(ErrorCodes::BadValue, "DBRef 3rd parameter must be a string");
 
-        o.setValue("$db", args.get(2));
+        o.setValue(InternedString::dollar_db, args.get(2));
     }
 
     args.rval().setObjectOrNull(thisv);

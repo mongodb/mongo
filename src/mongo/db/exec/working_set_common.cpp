@@ -74,10 +74,6 @@ void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
         WorkingSetMember* member = workingSet->get(id);
         if (member->getState() == WorkingSetMember::LOC_AND_IDX) {
             member->isSuspicious = true;
-        } else if (member->getState() == WorkingSetMember::LOC_AND_OBJ) {
-            // Need to make sure that the data is owned, as underlying storage can change during a
-            // yield.
-            member->makeObjOwned();
         }
     }
 }
@@ -86,7 +82,7 @@ void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
 bool WorkingSetCommon::fetch(OperationContext* txn,
                              WorkingSet* workingSet,
                              WorkingSetID id,
-                             unowned_ptr<RecordCursor> cursor) {
+                             unowned_ptr<SeekableRecordCursor> cursor) {
     WorkingSetMember* member = workingSet->get(id);
 
     // The RecordFetcher should already have been transferred out of the WSM and used.

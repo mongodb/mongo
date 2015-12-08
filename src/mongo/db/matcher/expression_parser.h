@@ -35,44 +35,28 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
 
 class OperationContext;
 
-typedef StatusWith<std::unique_ptr<MatchExpression>> StatusWithMatchExpression;
-
 class MatchExpressionParser {
 public:
-    /**
-     * In general, expression parsing and matching should not require context, but the $where
-     * clause is an exception in that it needs to read the sys.js collection.
-     *
-     * The default behaviour is to return an error status that $where context is not present.
-     *
-     * Do not use this class to pass-in generic context as it should only be used for $where.
-     */
-    class WhereCallback {
-    public:
-        virtual StatusWithMatchExpression parseWhere(const BSONElement& where) const;
-
-        virtual ~WhereCallback() {}
-    };
-
     /**
      * caller has to maintain ownership obj
      * the tree has views (BSONElement) into obj
      */
-    static StatusWithMatchExpression parse(const BSONObj& obj,
-                                           const WhereCallback& whereCallback = WhereCallback()) {
+    static StatusWithMatchExpression parse(
+        const BSONObj& obj, const ExtensionsCallback& extensionsCallback = ExtensionsCallback()) {
         // The 0 initializes the match expression tree depth.
-        return MatchExpressionParser(&whereCallback)._parse(obj, 0);
+        return MatchExpressionParser(&extensionsCallback)._parse(obj, 0);
     }
 
 private:
-    explicit MatchExpressionParser(const WhereCallback* whereCallback)
-        : _whereCallback(whereCallback) {}
+    explicit MatchExpressionParser(const ExtensionsCallback* extensionsCallback)
+        : _extensionsCallback(extensionsCallback) {}
 
     /**
      * 5 = false
@@ -162,47 +146,12 @@ private:
     // The maximum allowed depth of a query tree. Just to guard against stack overflow.
     static const int kMaximumTreeDepth;
 
-    // Performs parsing for the $where clause. We do not own this pointer - it has to live
+    // Performs parsing for the match extensions. We do not own this pointer - it has to live
     // as long as the parser is active.
-    const WhereCallback* _whereCallback;
+    const ExtensionsCallback* _extensionsCallback;
 };
-
-/**
- * This implementation is used for the server-side code.
- */
-class WhereCallbackReal : public MatchExpressionParser::WhereCallback {
-public:
-    /**
-     * The OperationContext passed here is not owned, but just referenced. It gets assigned to
-     * any $where parsers, which this callback generates. Therefore, the op context must only
-     * be destroyed after these parsers and their clones (shallowClone) have been destroyed.
-     */
-    WhereCallbackReal(OperationContext* txn, StringData dbName);
-
-    virtual StatusWithMatchExpression parseWhere(const BSONElement& where) const;
-
-private:
-    // Not owned here
-    OperationContext* const _txn;
-    const StringData _dbName;
-};
-
-/**
- * This is just a pass-through implementation, used by sharding only.
- */
-class WhereCallbackNoop : public MatchExpressionParser::WhereCallback {
-public:
-    WhereCallbackNoop();
-
-    virtual StatusWithMatchExpression parseWhere(const BSONElement& where) const;
-};
-
 
 typedef stdx::function<StatusWithMatchExpression(
     const char* name, int type, const BSONObj& section)> MatchExpressionParserGeoCallback;
 extern MatchExpressionParserGeoCallback expressionParserGeoCallback;
-
-typedef stdx::function<StatusWithMatchExpression(const BSONObj& queryObj)>
-    MatchExpressionParserTextCallback;
-extern MatchExpressionParserTextCallback expressionParserTextCallback;
 }

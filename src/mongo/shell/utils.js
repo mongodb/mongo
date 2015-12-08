@@ -135,6 +135,23 @@ shellPrint = function( x ){
     }
 }
 
+print.captureAllOutput = function (fn, args) {
+    var res = {};
+    res.output = [];
+    var __orig_print = print;
+    print = function () {
+        Array.prototype.push.apply(res.output, Array.prototype.slice.call(arguments).join(" ").split("\n"));
+    };
+    try {
+        res.result = fn.apply(undefined, args);
+    }
+    finally {
+        // Stop capturing print() output
+        print = __orig_print;
+    }
+    return res;
+};
+
 if ( typeof TestData == "undefined" ){
     TestData = undefined
 }
@@ -175,8 +192,15 @@ jsTestOptions = function(){
                               adminUser : TestData.adminUser || "admin",
                               adminPassword : TestData.adminPassword || "password",
                               useLegacyConfigServers: TestData.useLegacyConfigServers || false,
+                              useLegacyReplicationProtocol:
+                                    TestData.useLegacyReplicationProtocol || false,
                               enableEncryption: TestData.enableEncryption,
                               encryptionKeyFile: TestData.encryptionKeyFile,
+                              auditDestination: TestData.auditDestination,
+                              minPort: TestData.minPort,
+                              maxPort: TestData.maxPort,
+                              // Note: does not support the array version
+                              mongosBinVersion: TestData.mongosBinVersion || "",
                             }
                         );
     }
@@ -262,6 +286,21 @@ jsTest.isMongos = function(conn) {
 
 defaultPrompt = function() {
     var status = db.getMongo().authStatus;
+    var prefix = db.getMongo().promptPrefix;
+
+    if (typeof prefix == 'undefined') {
+        prefix = "";
+        var buildInfo = db.runCommand({buildInfo: 1});
+        try {
+            if (buildInfo.modules.indexOf("enterprise") > -1) {
+                prefix = "MongoDB Enterprise "
+            }
+        } catch (e) {
+            // Don't do anything here. Just throw the error away.
+        }
+        db.getMongo().promptPrefix = prefix;
+    }
+
     try {
         // try to use repl set prompt -- no status or auth detected yet
         if (!status || !status.authRequired) {
@@ -269,7 +308,7 @@ defaultPrompt = function() {
                 var prompt = replSetMemberStatePrompt();
                 // set our status that it was good
                 db.getMongo().authStatus = {replSetGetStatus:true, isMaster: true};
-                return prompt;
+                return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
                 //print(e);
@@ -285,7 +324,7 @@ defaultPrompt = function() {
                 // set our status that it was good
                 status.replSetGetStatus = true;
                 db.getMongo().authStatus = status;
-                return prompt;
+                return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
                 //print(e);
@@ -300,7 +339,7 @@ defaultPrompt = function() {
                 var prompt = isMasterStatePrompt();
                 status.isMaster = true;
                 db.getMongo().authStatus = status;
-                return prompt;
+                return prefix + prompt;
             } catch (e) {
                 status.authRequired = true;
                 status.isMaster = false;
@@ -313,7 +352,7 @@ defaultPrompt = function() {
     }
 
     db.getMongo().authStatus = status;
-    return "> ";
+    return prefix + "> ";
 }
 
 replSetMemberStatePrompt = function() {
@@ -383,7 +422,7 @@ if (typeof(_writeMode) == 'undefined') {
 
 if (typeof(_readMode) == 'undefined') {
     // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
-    _readMode = function() { return "compatibility"; };
+    _readMode = function() { return "legacy"; };
 };
 
 shellPrintHelper = function (x) {
@@ -775,7 +814,7 @@ Math.sigFig = function( x , N ){
 Random = function() {}
 
 // set random seed
-Random.srand = function( s ) { _srand( s ); }
+Random.srand = function( s ) { return _srand( s ); }
 
 // random number 0 <= r < 1
 Random.rand = function() { return _rand(); }
@@ -784,9 +823,8 @@ Random.rand = function() { return _rand(); }
 Random.randInt = function( n ) { return Math.floor( Random.rand() * n ); }
 
 Random.setRandomSeed = function( s ) {
-    s = s || new Date().getTime();
-    print( "setting random seed: " + s );
-    Random.srand( s );
+    var seed = Random.srand( s );
+    print("setting random seed: " + seed);
 }
 
 // generate a random value from the exponential distribution with the specified mean

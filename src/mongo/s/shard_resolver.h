@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+class OperationContext;
+
 /**
  * Given a shard name, the ShardResolver resolves a particular host on that shard to contact.
  *
@@ -51,7 +53,8 @@ public:
      *
      * Returns !OK with message if the shard host could not be found for other reasons.
      */
-    virtual Status chooseWriteHost(const std::string& shardName,
+    virtual Status chooseWriteHost(OperationContext* txn,
+                                   const std::string& shardName,
                                    ConnectionString* shardHost) const = 0;
 };
 

@@ -44,23 +44,25 @@ struct MongoBase : public BaseInfo {
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(auth);
-        MONGO_DEFINE_JS_FUNCTION(copyDatabaseWithSCRAM);
-        MONGO_DEFINE_JS_FUNCTION(cursorFromId);
-        MONGO_DEFINE_JS_FUNCTION(cursorHandleFromId);
-        MONGO_DEFINE_JS_FUNCTION(find);
-        MONGO_DEFINE_JS_FUNCTION(getClientRPCProtocols);
-        MONGO_DEFINE_JS_FUNCTION(getServerRPCProtocols);
-        MONGO_DEFINE_JS_FUNCTION(insert);
-        MONGO_DEFINE_JS_FUNCTION(logout);
-        MONGO_DEFINE_JS_FUNCTION(remove);
-        MONGO_DEFINE_JS_FUNCTION(runCommand);
-        MONGO_DEFINE_JS_FUNCTION(runCommandWithMetadata);
-        MONGO_DEFINE_JS_FUNCTION(setClientRPCProtocols);
-        MONGO_DEFINE_JS_FUNCTION(update);
+        MONGO_DECLARE_JS_FUNCTION(auth);
+        MONGO_DECLARE_JS_FUNCTION(copyDatabaseWithSCRAM);
+        MONGO_DECLARE_JS_FUNCTION(cursorFromId);
+        MONGO_DECLARE_JS_FUNCTION(cursorHandleFromId);
+        MONGO_DECLARE_JS_FUNCTION(find);
+        MONGO_DECLARE_JS_FUNCTION(getClientRPCProtocols);
+        MONGO_DECLARE_JS_FUNCTION(getServerRPCProtocols);
+        MONGO_DECLARE_JS_FUNCTION(insert);
+        MONGO_DECLARE_JS_FUNCTION(logout);
+        MONGO_DECLARE_JS_FUNCTION(remove);
+        MONGO_DECLARE_JS_FUNCTION(runCommand);
+        MONGO_DECLARE_JS_FUNCTION(runCommandWithMetadata);
+        MONGO_DECLARE_JS_FUNCTION(setClientRPCProtocols);
+        MONGO_DECLARE_JS_FUNCTION(update);
+        MONGO_DECLARE_JS_FUNCTION(getMinWireVersion);
+        MONGO_DECLARE_JS_FUNCTION(getMaxWireVersion);
     };
 
-    static const JSFunctionSpec methods[15];
+    static const JSFunctionSpec methods[17];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
@@ -80,11 +82,12 @@ struct MongoExternalInfo : public MongoBase {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(load);
-        MONGO_DEFINE_JS_FUNCTION(quit);
+        MONGO_DECLARE_JS_FUNCTION(_forgetReplSet);
+        MONGO_DECLARE_JS_FUNCTION(load);
+        MONGO_DECLARE_JS_FUNCTION(quit);
     };
 
-    static const JSFunctionSpec freeFunctions[3];
+    static const JSFunctionSpec freeFunctions[4];
 };
 
 }  // namespace mozjs

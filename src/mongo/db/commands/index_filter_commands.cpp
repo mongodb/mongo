@@ -43,6 +43,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 
 
 namespace {
@@ -297,7 +298,7 @@ Status ClearFilters::clear(OperationContext* txn,
     querySettings->clearAllowedIndices();
 
     const NamespaceString nss(ns);
-    const WhereCallbackReal whereCallback(txn, nss.db());
+    const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
     // Remove corresponding entries from plan cache.
     // Admin hints affect the planning process directly. If there were
@@ -315,7 +316,7 @@ Status ClearFilters::clear(OperationContext* txn,
 
         // Create canonical query.
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            nss, entry->query, entry->sort, entry->projection, whereCallback);
+            nss, entry->query, entry->sort, entry->projection, extensionsCallback);
         invariant(statusWithCQ.isOK());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

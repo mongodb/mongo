@@ -10,12 +10,9 @@ load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongo
  */
 var $config = (function() {
 
-    // Define here so that both data.nDocs and data.genUpdateDoc can reference it
-    var nDocs = 200;
-
     var data = {
         // Number of docs to insert at the beginning.
-        nDocs: nDocs,
+        nDocs: 200,
         // Batch size of queries to introduce more saving and restoring of states.
         batchSize: 3,
         // The words that can be found in the collection.
@@ -46,7 +43,7 @@ var $config = (function() {
          * the update state should use for the update query.
          */
         genUpdateDoc: function genUpdateDoc() {
-            var newVal = Random.randInt(nDocs);
+            var newVal = Random.randInt(this.nDocs);
             return { $set: { a: newVal } };
         }
     };

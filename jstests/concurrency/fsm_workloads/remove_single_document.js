@@ -33,12 +33,9 @@ var $config = (function() {
         remove: { remove: 1 }
     };
 
-    var threadCount = 10;
-    var iterations = 20;
-
     function setup(db, collName, cluster) {
         // insert enough documents so that each thread can remove exactly one per iteration
-        var num = threadCount * iterations;
+        var num = this.threadCount * this.iterations;
         for (var i = 0; i < num; ++i) {
             db[collName].insert({ i: i, rand: Random.rand() });
         }
@@ -46,8 +43,8 @@ var $config = (function() {
     }
 
     return {
-        threadCount: threadCount,
-        iterations: iterations,
+        threadCount: 10,
+        iterations: 20,
         states: states,
         transitions: transitions,
         setup: setup,

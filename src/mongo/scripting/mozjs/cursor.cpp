@@ -32,17 +32,20 @@
 
 #include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec CursorInfo::methods[5] = {
-    MONGO_ATTACH_JS_FUNCTION(hasNext),
-    MONGO_ATTACH_JS_FUNCTION(next),
-    MONGO_ATTACH_JS_FUNCTION(objsLeftInBatch),
-    MONGO_ATTACH_JS_FUNCTION(readOnly),
+const JSFunctionSpec CursorInfo::methods[6] = {
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, CursorInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(hasNext, CursorInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(next, CursorInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(objsLeftInBatch, CursorInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(readOnly, CursorInfo),
     JS_FS_END,
 };
 
@@ -68,13 +71,7 @@ void CursorInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     }
 }
 
-void CursorInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    scope->getCursorProto().newObject(args.rval());
-}
-
-void CursorInfo::Functions::next(JSContext* cx, JS::CallArgs args) {
+void CursorInfo::Functions::next::call(JSContext* cx, JS::CallArgs args) {
     auto cursor = getCursor(args);
 
     if (!cursor) {
@@ -85,12 +82,14 @@ void CursorInfo::Functions::next(JSContext* cx, JS::CallArgs args) {
     ObjectWrapper o(cx, args.thisv());
 
     BSONObj bson = cursor->next();
-    bool ro = o.hasField("_ro") ? o.getBoolean("_ro") : false;
+    bool ro = o.hasField(InternedString::_ro) ? o.getBoolean(InternedString::_ro) : false;
 
-    ValueReader(cx, args.rval()).fromBSON(bson, ro);
+    // getOwned because cursor->next() gives us unowned bson from an internal
+    // buffer and we need to make a copy
+    ValueReader(cx, args.rval()).fromBSON(bson.getOwned(), nullptr, ro);
 }
 
-void CursorInfo::Functions::hasNext(JSContext* cx, JS::CallArgs args) {
+void CursorInfo::Functions::hasNext::call(JSContext* cx, JS::CallArgs args) {
     auto cursor = getCursor(args);
 
     if (!cursor) {
@@ -101,7 +100,7 @@ void CursorInfo::Functions::hasNext(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(cursor->more());
 }
 
-void CursorInfo::Functions::objsLeftInBatch(JSContext* cx, JS::CallArgs args) {
+void CursorInfo::Functions::objsLeftInBatch::call(JSContext* cx, JS::CallArgs args) {
     auto cursor = getCursor(args);
 
     if (!cursor) {
@@ -112,10 +111,19 @@ void CursorInfo::Functions::objsLeftInBatch(JSContext* cx, JS::CallArgs args) {
     args.rval().setInt32(cursor->objsLeftInBatch());
 }
 
-void CursorInfo::Functions::readOnly(JSContext* cx, JS::CallArgs args) {
-    ObjectWrapper(cx, args.thisv()).setBoolean("_ro", true);
+void CursorInfo::Functions::readOnly::call(JSContext* cx, JS::CallArgs args) {
+    ObjectWrapper(cx, args.thisv()).setBoolean(InternedString::_ro, true);
 
     args.rval().set(args.thisv());
+}
+
+void CursorInfo::Functions::close::call(JSContext* cx, JS::CallArgs args) {
+    auto cursor = getCursor(args);
+
+    if (cursor)
+        cursor->kill();
+
+    args.rval().setUndefined();
 }
 
 }  // namespace mozjs

@@ -9,8 +9,8 @@ var st = new ShardingTest({shards : 2, mongos : 2, other : options});
 // Stop balancer initially
 st.stopBalancer();
 
-var staleMongos = st.s0;
-var mongos = st.s1;
+var mongos = st.s0;
+var staleMongos = st.s1;
 var coll = mongos.getCollection("foo.bar");
 
 // Shard collection through first mongos
@@ -24,11 +24,13 @@ for ( var i = 0; i < numSplits; i++) {
     assert(mongos.adminCommand({split : coll + "", middle : {_id : i}}).ok);
 }
 
-// stop st.s1
-st.stopMongos(1);
+// Stop the first mongos who setup the cluster.
+st.stopMongos(0);
 
 // Start balancer, which lets the stale mongos balance
-st.startBalancer();
+assert.writeOK(staleMongos.getDB("config").settings.update({_id: "balancer"},
+                                                           {$set: {stopped: false}},
+                                                           true));
 
 // Make sure we eventually start moving chunks
 assert.soon(function() {

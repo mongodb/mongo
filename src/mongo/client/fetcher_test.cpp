@@ -57,6 +57,8 @@ public:
     void scheduleNetworkResponse(const BSONObj& obj, Milliseconds millis);
     void scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason);
     void scheduleNetworkResponseFor(const BSONObj& filter, const BSONObj& obj);
+    void scheduleNetworkResponseFor(NetworkInterfaceMock::NetworkOperationIterator noi,
+                                    const BSONObj& obj);
 
     // Calls scheduleNetworkResponse + finishProcessingNetworkResponse
     void processNetworkResponse(const BSONObj& obj);
@@ -142,6 +144,15 @@ void FetcherTest::scheduleNetworkResponseFor(const BSONObj& filter, const BSONOb
     auto req = net->getNextReadyRequest();
     ASSERT_EQ(req->getRequest().cmdObj[0], filter[0]);
     net->scheduleResponse(req, net->now(), responseStatus);
+}
+
+void FetcherTest::scheduleNetworkResponseFor(NetworkInterfaceMock::NetworkOperationIterator noi,
+                                             const BSONObj& obj) {
+    NetworkInterfaceMock* net = getNet();
+    Milliseconds millis(0);
+    executor::RemoteCommandResponse response(obj, BSONObj(), millis);
+    TaskExecutor::ResponseStatus responseStatus(response);
+    net->scheduleResponse(noi, net->now(), responseStatus);
 }
 
 void FetcherTest::scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason) {
@@ -595,6 +606,49 @@ TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
     ASSERT_NOT_OK(status);
 }
 
+
+TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKillsCursor) {
+    callbackHook = [](const StatusWith<Fetcher::QueryResponse>& fetchResult,
+                      Fetcher::NextAction* nextAction,
+                      BSONObjBuilder* getMoreBob) {};
+
+    ASSERT_OK(fetcher->schedule());
+    const BSONObj doc = BSON("_id" << 1);
+    scheduleNetworkResponse(
+        BSON("cursor" << BSON("id" << 1LL << "ns"
+                                   << "db.coll"
+                                   << "firstBatch" << BSON_ARRAY(doc)) << "ok" << 1));
+    getNet()->runReadyNetworkOperations();
+    ASSERT_OK(status);
+    ASSERT_EQUALS(1LL, cursorId);
+    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS(1U, documents.size());
+    ASSERT_EQUALS(doc, documents.front());
+    ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
+    ASSERT_FALSE(fetcher->isActive());
+
+    ASSERT_TRUE(getNet()->hasReadyRequests());
+    auto noi = getNet()->getNextReadyRequest();
+    auto&& request = noi->getRequest();
+    ASSERT_EQUALS(nss.db(), request.dbname);
+    auto&& cmdObj = request.cmdObj;
+    auto firstElement = cmdObj.firstElement();
+    ASSERT_EQUALS("killCursors", firstElement.fieldNameStringData());
+    ASSERT_EQUALS(nss.coll(), firstElement.String());
+    ASSERT_EQUALS(mongo::BSONType::Array, cmdObj["cursors"].type());
+    auto cursors = cmdObj["cursors"].Array();
+    ASSERT_EQUALS(1U, cursors.size());
+    ASSERT_EQUALS(cursorId, cursors.front().numberLong());
+
+    // killCursors command request will be canceled by executor on shutdown.
+    startCapturingLogMessages();
+    tearDown();
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(
+                      "killCursors command task failed: CallbackCanceled Callback canceled"));
+}
+
 void setNextActionToNoAction(const StatusWith<Fetcher::QueryResponse>& fetchResult,
                              Fetcher::NextAction* nextAction,
                              BSONObjBuilder* getMoreBob) {
@@ -629,8 +683,6 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
     callbackHook = setNextActionToNoAction;
 
     getNet()->runReadyNetworkOperations();
-
-    scheduleNetworkResponseFor(BSON("killCursors" << nss.coll()), BSON("ok" << false));
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
     ASSERT_EQUALS("db.coll", nss.ns());
@@ -638,6 +690,26 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
     ASSERT_EQUALS(doc2, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kNoAction == nextAction);
     ASSERT_FALSE(fetcher->isActive());
+
+    ASSERT_TRUE(getNet()->hasReadyRequests());
+    auto noi = getNet()->getNextReadyRequest();
+    auto&& request = noi->getRequest();
+    ASSERT_EQUALS(nss.db(), request.dbname);
+    auto&& cmdObj = request.cmdObj;
+    auto firstElement = cmdObj.firstElement();
+    ASSERT_EQUALS("killCursors", firstElement.fieldNameStringData());
+    ASSERT_EQUALS(nss.coll(), firstElement.String());
+    ASSERT_EQUALS(mongo::BSONType::Array, cmdObj["cursors"].type());
+    auto cursors = cmdObj["cursors"].Array();
+    ASSERT_EQUALS(1U, cursors.size());
+    ASSERT_EQUALS(cursorId, cursors.front().numberLong());
+
+    // Failed killCursors command response should be logged.
+    scheduleNetworkResponseFor(noi, BSON("ok" << false));
+    startCapturingLogMessages();
+    getNet()->runReadyNetworkOperations();
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesContaining("killCursors command failed: UnknownError"));
 }
 
 /**
@@ -701,7 +773,15 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
                               &getExecutor(),
                               &isShutdownCalled);
 
+    startCapturingLogMessages();
     getNet()->runReadyNetworkOperations();
+    stopCapturingLogMessages();
+    // Fetcher should attempt (unsuccessfully) to schedule a killCursors command.
+    ASSERT_EQUALS(
+        1,
+        countLogLinesContaining(
+            "failed to schedule killCursors command: ShutdownInProgress Shutdown in progress"));
+
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(fetcher->isActive());
 }

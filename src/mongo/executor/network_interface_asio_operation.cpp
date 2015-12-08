@@ -26,14 +26,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/network_interface_asio.h"
+
+#include "mongo/base/status_with.h"
+#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/connection_pool_asio.h"
+#include "mongo/executor/downconvert_find_and_getmore_commands.h"
+#include "mongo/executor/network_interface_asio.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/request_builder_interface.h"
+#include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace executor {
@@ -42,39 +52,86 @@ using asio::ip::tcp;
 
 namespace {
 
-std::unique_ptr<Message> messageFromRequest(const RemoteCommandRequest& request,
-                                            rpc::Protocol protocol) {
+// Metadata listener can be nullptr.
+StatusWith<Message> messageFromRequest(const RemoteCommandRequest& request,
+                                       rpc::Protocol protocol,
+                                       rpc::EgressMetadataHook* metadataHook) {
     BSONObj query = request.cmdObj;
     auto requestBuilder = rpc::makeRequestBuilder(protocol);
 
-    // TODO: handle metadata writers
+    BSONObj maybeAugmented;
+    // Handle outgoing request metadata.
+    if (metadataHook) {
+        BSONObjBuilder augmentedBob;
+        augmentedBob.appendElements(request.metadata);
+
+        auto writeStatus = callNoexcept(*metadataHook,
+                                        &rpc::EgressMetadataHook::writeRequestMetadata,
+                                        request.target,
+                                        &augmentedBob);
+        if (!writeStatus.isOK()) {
+            return writeStatus;
+        }
+
+        maybeAugmented = augmentedBob.obj();
+    } else {
+        maybeAugmented = request.metadata;
+    }
+
     auto toSend = rpc::makeRequestBuilder(protocol)
                       ->setDatabase(request.dbname)
                       .setCommandName(request.cmdObj.firstElementFieldName())
-                      .setMetadata(request.metadata)
                       .setCommandArgs(request.cmdObj)
+                      .setMetadata(maybeAugmented)
                       .done();
-
-    toSend->header().setId(nextMessageId());
-    return toSend;
+    return std::move(toSend);
 }
 
 }  // namespace
 
-NetworkInterfaceASIO::AsyncOp::AsyncOp(const TaskExecutor::CallbackHandle& cbHandle,
+NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
+                                       const TaskExecutor::CallbackHandle& cbHandle,
                                        const RemoteCommandRequest& request,
                                        const RemoteCommandCompletionFn& onFinish,
                                        Date_t now)
-    : _cbHandle(cbHandle), _request(request), _onFinish(onFinish), _start(now), _canceled(0) {}
+    : _owner(owner),
+      _cbHandle(cbHandle),
+      _request(request),
+      _onFinish(onFinish),
+      _start(now),
+      _resolver(owner->_io_service),
+      _canceled(0),
+      _timedOut(0),
+      _access(std::make_shared<AsyncOp::AccessControl>()),
+      _inSetup(true),
+      _strand(owner->_io_service) {}
 
 void NetworkInterfaceASIO::AsyncOp::cancel() {
-    // An operation may be in mid-flight when it is canceled, so we
-    // do not disconnect immediately upon cancellation.
-    _canceled.store(1);
+    LOG(2) << "Canceling operation; original request was: " << request().toString();
+    stdx::lock_guard<stdx::mutex> lk(_access->mutex);
+    auto access = _access;
+    auto generation = access->id;
+
+    // An operation may be in mid-flight when it is canceled, so we cancel any
+    // in-progress async ops but do not complete the operation now.
+
+    _strand.post([this, access, generation] {
+        stdx::lock_guard<stdx::mutex> lk(access->mutex);
+        if (generation == access->id) {
+            _canceled = true;
+            if (_connection) {
+                _connection->cancel();
+            }
+        }
+    });
 }
 
 bool NetworkInterfaceASIO::AsyncOp::canceled() const {
-    return (_canceled.load() == 1);
+    return _canceled;
+}
+
+bool NetworkInterfaceASIO::AsyncOp::timedOut() const {
+    return _timedOut;
 }
 
 const TaskExecutor::CallbackHandle& NetworkInterfaceASIO::AsyncOp::cbHandle() const {
@@ -91,26 +148,58 @@ void NetworkInterfaceASIO::AsyncOp::setConnection(AsyncConnection&& conn) {
     _connection = std::move(conn);
 }
 
-NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::beginCommand(
-    Message&& newCommand, Date_t now) {
+Status NetworkInterfaceASIO::AsyncOp::beginCommand(Message&& newCommand,
+                                                   AsyncCommand::CommandType type,
+                                                   const HostAndPort& target) {
     // NOTE: We operate based on the assumption that AsyncOp's
     // AsyncConnection does not change over its lifetime.
     invariant(_connection.is_initialized());
 
     // Construct a new AsyncCommand object for each command.
-    _command.emplace(_connection.get_ptr(), std::move(newCommand), now);
-    return _command.get();
+    _command.emplace(_connection.get_ptr(), type, std::move(newCommand), _owner->now(), target);
+    return Status::OK();
 }
 
-NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::beginCommand(
-    const RemoteCommandRequest& request, rpc::Protocol protocol, Date_t now) {
-    auto newCommand = messageFromRequest(request, protocol);
-    return beginCommand(std::move(*newCommand), now);
+Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& request,
+                                                   rpc::EgressMetadataHook* metadataHook) {
+    // Check if we need to downconvert find or getMore commands.
+    StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
+    const auto isFindCmd = commandName == LiteParsedQuery::kFindCommandName;
+    const auto isGetMoreCmd = commandName == GetMoreRequest::kGetMoreCommandName;
+    const auto isFindOrGetMoreCmd = isFindCmd || isGetMoreCmd;
+
+    // If we aren't sending a find or getMore, or the server supports OP_COMMAND we don't have
+    // to worry about downconversion.
+    if (!isFindOrGetMoreCmd || connection().serverProtocols() == rpc::supports::kAll) {
+        auto newCommand = messageFromRequest(request, operationProtocol(), metadataHook);
+        if (!newCommand.isOK()) {
+            return newCommand.getStatus();
+        }
+        return beginCommand(
+            std::move(newCommand.getValue()), AsyncCommand::CommandType::kRPC, request.target);
+    } else if (isFindCmd) {
+        auto downconvertedFind = downconvertFindCommandRequest(request);
+        if (!downconvertedFind.isOK()) {
+            return downconvertedFind.getStatus();
+        }
+        return beginCommand(std::move(downconvertedFind.getValue()),
+                            AsyncCommand::CommandType::kDownConvertedFind,
+                            request.target);
+    } else {
+        invariant(isGetMoreCmd);
+        auto downconvertedGetMore = downconvertGetMoreCommandRequest(request);
+        if (!downconvertedGetMore.isOK()) {
+            return downconvertedGetMore.getStatus();
+        }
+        return beginCommand(std::move(downconvertedGetMore.getValue()),
+                            AsyncCommand::CommandType::kDownConvertedGetMore,
+                            request.target);
+    }
 }
 
-NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::command() {
+NetworkInterfaceASIO::AsyncCommand* NetworkInterfaceASIO::AsyncOp::command() {
     invariant(_command.is_initialized());
-    return _command.get();
+    return _command.get_ptr();
 }
 
 void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& status) {
@@ -133,6 +222,26 @@ rpc::Protocol NetworkInterfaceASIO::AsyncOp::operationProtocol() const {
 void NetworkInterfaceASIO::AsyncOp::setOperationProtocol(rpc::Protocol proto) {
     invariant(!_operationProtocol.is_initialized());
     _operationProtocol = proto;
+}
+
+void NetworkInterfaceASIO::AsyncOp::reset() {
+    // We don't reset owner as it never changes
+    _cbHandle = {};
+    _request = {};
+    _onFinish = {};
+    _connectionPoolHandle = {};
+    // We don't reset _connection as we want to reuse it.
+    // Ditto for _operationProtocol.
+    _start = {};
+    _timeoutAlarm.reset();
+    _canceled = false;
+    _timedOut = false;
+    _command = boost::none;
+    // _inSetup should always be false at this point.
+}
+
+void NetworkInterfaceASIO::AsyncOp::setOnFinish(RemoteCommandCompletionFn&& onFinish) {
+    _onFinish = std::move(onFinish);
 }
 
 }  // namespace executor

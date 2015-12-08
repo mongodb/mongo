@@ -43,7 +43,6 @@ const BSONField<std::string> BatchedDeleteRequest::collName("delete");
 const BSONField<std::vector<BatchedDeleteDocument*>> BatchedDeleteRequest::deletes("deletes");
 const BSONField<BSONObj> BatchedDeleteRequest::writeConcern("writeConcern");
 const BSONField<bool> BatchedDeleteRequest::ordered("ordered", true);
-const BSONField<BSONObj> BatchedDeleteRequest::metadata("metadata");
 
 BatchedDeleteRequest::BatchedDeleteRequest() {
     clear();
@@ -96,9 +95,6 @@ BSONObj BatchedDeleteRequest::toBSON() const {
     if (_isOrderedSet)
         builder.append(ordered(), _ordered);
 
-    if (_metadata)
-        builder.append(metadata(), _metadata->toBSON());
-
     return builder.obj();
 }
 
@@ -132,18 +128,6 @@ bool BatchedDeleteRequest::parseBSON(StringData dbName, const BSONObj& source, s
         return false;
     _isOrderedSet = fieldState == FieldParser::FIELD_SET;
 
-    BSONObj metadataObj;
-    fieldState = FieldParser::extract(source, metadata, &metadataObj, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-
-    if (!metadataObj.isEmpty()) {
-        _metadata.reset(new BatchedRequestMetadata());
-        if (!_metadata->parseBSON(metadataObj, errMsg)) {
-            return false;
-        }
-    }
-
     return true;
 }
 
@@ -158,8 +142,6 @@ void BatchedDeleteRequest::clear() {
 
     _ordered = false;
     _isOrderedSet = false;
-
-    _metadata.reset();
 }
 
 void BatchedDeleteRequest::cloneTo(BatchedDeleteRequest* other) const {
@@ -182,11 +164,6 @@ void BatchedDeleteRequest::cloneTo(BatchedDeleteRequest* other) const {
 
     other->_ordered = _ordered;
     other->_isOrderedSet = _isOrderedSet;
-
-    if (_metadata) {
-        other->_metadata.reset(new BatchedRequestMetadata());
-        _metadata->cloneTo(other->_metadata.get());
-    }
 }
 
 std::string BatchedDeleteRequest::toString() const {
@@ -284,18 +261,6 @@ bool BatchedDeleteRequest::getOrdered() const {
     } else {
         return ordered.getDefault();
     }
-}
-
-void BatchedDeleteRequest::setMetadata(BatchedRequestMetadata* metadata) {
-    _metadata.reset(metadata);
-}
-
-bool BatchedDeleteRequest::isMetadataSet() const {
-    return _metadata.get();
-}
-
-BatchedRequestMetadata* BatchedDeleteRequest::getMetadata() const {
-    return _metadata.get();
 }
 
 }  // namespace mongo

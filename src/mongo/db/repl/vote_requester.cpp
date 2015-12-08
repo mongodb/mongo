@@ -45,20 +45,22 @@ namespace repl {
 using executor::RemoteCommandRequest;
 
 VoteRequester::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
-                                    long long candidateId,
+                                    long long candidateIndex,
                                     long long term,
                                     bool dryRun,
                                     OpTime lastOplogEntry)
     : _rsConfig(rsConfig),
-      _candidateId(candidateId),
+      _candidateIndex(candidateIndex),
       _term(term),
       _dryRun(dryRun),
       _lastOplogEntry(lastOplogEntry) {
     // populate targets with all voting members that aren't this node
+    long long index = 0;
     for (auto member = _rsConfig.membersBegin(); member != _rsConfig.membersEnd(); member++) {
-        if (member->isVoter() && member->getId() != candidateId) {
+        if (member->isVoter() && index != candidateIndex) {
             _targets.push_back(member->getHostAndPort());
         }
+        index++;
     }
 }
 
@@ -70,12 +72,12 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     requestVotesCmdBuilder.append("setName", _rsConfig.getReplSetName());
     requestVotesCmdBuilder.append("dryRun", _dryRun);
     requestVotesCmdBuilder.append("term", _term);
-    requestVotesCmdBuilder.append("candidateId", _candidateId);
+    requestVotesCmdBuilder.append("candidateIndex", _candidateIndex);
     requestVotesCmdBuilder.append("configVersion", _rsConfig.getConfigVersion());
 
     BSONObjBuilder lastCommittedOp(requestVotesCmdBuilder.subobjStart("lastCommittedOp"));
     lastCommittedOp.append("ts", _lastOplogEntry.getTimestamp());
-    lastCommittedOp.append("term", _lastOplogEntry.getTerm());
+    lastCommittedOp.append("t", _lastOplogEntry.getTerm());
     lastCommittedOp.done();
 
     const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();
@@ -83,10 +85,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     std::vector<RemoteCommandRequest> requests;
     for (const auto& target : _targets) {
         requests.push_back(RemoteCommandRequest(
-            target,
-            "admin",
-            requestVotesCmd,
-            Milliseconds(30 * 1000)));  // trying to match current Socket timeout
+            target, "admin", requestVotesCmd, _rsConfig.getElectionTimeoutPeriod()));
     }
 
     return requests;
@@ -99,13 +98,22 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
         log() << "VoteRequester: Got failed response from " << request.target << ": "
               << response.getStatus();
     } else {
+        _responders.insert(request.target);
         ReplSetRequestVotesResponse voteResponse;
-        voteResponse.initialize(response.getValue().data);
+        const auto status = voteResponse.initialize(response.getValue().data);
+        if (!status.isOK()) {
+            log() << "VoteRequester: Got error processing response with status: " << status
+                  << ", resp:" << response.getValue().data;
+        }
+
         if (voteResponse.getVoteGranted()) {
+            LOG(3) << "VoteRequester: Got yes vote from " << request.target
+                   << ", resp:" << response.getValue().data;
             _votes++;
         } else {
             log() << "VoteRequester: Got no vote from " << request.target
-                  << " because: " << voteResponse.getReason();
+                  << " because: " << voteResponse.getReason()
+                  << ", resp:" << response.getValue().data;
         }
 
         if (voteResponse.getTerm() > _term) {
@@ -119,14 +127,18 @@ bool VoteRequester::Algorithm::hasReceivedSufficientResponses() const {
         _responsesProcessed == static_cast<int>(_targets.size());
 }
 
-VoteRequester::VoteRequestResult VoteRequester::Algorithm::getResult() const {
+VoteRequester::Result VoteRequester::Algorithm::getResult() const {
     if (_staleTerm) {
-        return StaleTerm;
+        return Result::kStaleTerm;
     } else if (_votes >= _rsConfig.getMajorityVoteCount()) {
-        return SuccessfullyElected;
+        return Result::kSuccessfullyElected;
     } else {
-        return InsufficientVotes;
+        return Result::kInsufficientVotes;
     }
+}
+
+unordered_set<HostAndPort> VoteRequester::Algorithm::getResponders() const {
+    return _responders;
 }
 
 VoteRequester::VoteRequester() : _isCanceled(false) {}
@@ -135,12 +147,12 @@ VoteRequester::~VoteRequester() {}
 StatusWith<ReplicationExecutor::EventHandle> VoteRequester::start(
     ReplicationExecutor* executor,
     const ReplicaSetConfig& rsConfig,
-    long long candidateId,
+    long long candidateIndex,
     long long term,
     bool dryRun,
     OpTime lastOplogEntry,
     const stdx::function<void()>& onCompletion) {
-    _algorithm.reset(new Algorithm(rsConfig, candidateId, term, dryRun, lastOplogEntry));
+    _algorithm.reset(new Algorithm(rsConfig, candidateIndex, term, dryRun, lastOplogEntry));
     _runner.reset(new ScatterGatherRunner(_algorithm.get()));
     return _runner->start(executor, onCompletion);
 }
@@ -150,8 +162,12 @@ void VoteRequester::cancel(ReplicationExecutor* executor) {
     _runner->cancel(executor);
 }
 
-VoteRequester::VoteRequestResult VoteRequester::getResult() const {
+VoteRequester::Result VoteRequester::getResult() const {
     return _algorithm->getResult();
+}
+
+unordered_set<HostAndPort> VoteRequester::getResponders() const {
+    return _algorithm->getResponders();
 }
 
 }  // namespace repl

@@ -105,8 +105,7 @@ LBlock::init(TempAllocator& alloc)
 
         int numPhis = (phi->type() == MIRType_Value) ? BOX_PIECES : 1;
         for (int i = 0; i < numPhis; i++) {
-            void* array = alloc.allocateArray<sizeof(LAllocation)>(numPreds);
-            LAllocation* inputs = static_cast<LAllocation*>(array);
+            LAllocation* inputs = alloc.allocateArray<LAllocation>(numPreds);
             if (!inputs)
                 return false;
 

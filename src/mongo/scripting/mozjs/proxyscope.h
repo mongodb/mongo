@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "vm/PosixNSPR.h"
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/stdx/condition_variable.h"
@@ -125,6 +127,8 @@ public:
 
     void gc() override;
 
+    void advanceGeneration() override;
+
     double getNumber(const char* field) override;
     int getNumberInt(const char* field) override;
     long long getNumberLongLong(const char* field) override;
@@ -136,7 +140,7 @@ public:
     void setNumber(const char* field, double val) override;
     void setString(const char* field, StringData val) override;
     void setBoolean(const char* field, bool val) override;
-    void setElement(const char* field, const BSONElement& e) override;
+    void setElement(const char* field, const BSONElement& e, const BSONObj& parent) override;
     void setObject(const char* field, const BSONObj& obj, bool readOnly) override;
     void setFunction(const char* field, const char* code) override;
 
@@ -172,9 +176,13 @@ public:
     void kill();
 
 private:
-    void runOnImplThread(std::function<void()> f);
+    template <typename Closure>
+    void run(Closure&& closure);
+
+    void runOnImplThread(stdx::function<void()> f);
+
     void shutdownThread();
-    void implThread();
+    static void implThread(void* proxy);
 
     MozJSScriptEngine* const _engine;
     MozJSImplScope* _implScope;
@@ -189,7 +197,7 @@ private:
     Status _status;
 
     stdx::condition_variable _condvar;
-    stdx::thread _thread;
+    PRThread* _thread;
 };
 
 }  // namespace mozjs

@@ -152,6 +152,10 @@ private:
             errmsg = str::stream() << "\"ns\" field is not a string: " << e.fieldName();
             return false;
         }
+        if (nsElement.String().find('\0') != std::string::npos) {
+            errmsg = str::stream() << "namespaces cannot have embedded null characters";
+            return false;
+        }
         if (*opType != 'n' && nsElement.String().empty()) {
             errmsg = str::stream()
                 << "\"ns\" field value cannot be empty when op type is not 'n': " << e.fieldName();

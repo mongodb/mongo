@@ -80,7 +80,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/d_state.h"
@@ -99,6 +99,8 @@ namespace mongo {
 using std::endl;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
+using std::vector;
 
 namespace repl {
 std::string rsOplogName = "local.oplog.rs";
@@ -122,11 +124,14 @@ stdx::condition_variable newTimestampNotifier;
 static std::string _oplogCollectionName;
 
 // so we can fail the same way
-void checkOplogInsert(StatusWith<RecordId> result) {
-    massert(17322,
-            str::stream() << "write to oplog failed: " << result.getStatus().toString(),
-            result.isOK());
+void checkOplogInsert(Status result) {
+    massert(17322, str::stream() << "write to oplog failed: " << result.toString(), result.isOK());
 }
+
+struct OplogSlot {
+    OpTime opTime;
+    int64_t hash;
+};
 
 /**
  * Allocates an optime for a new entry in the oplog, and updates the replication coordinator to
@@ -138,16 +143,15 @@ void checkOplogInsert(StatusWith<RecordId> result) {
  * function registers the new optime with the storage system and the replication coordinator,
  * and provides no facility to revert those registrations on rollback.
  */
-std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
-                                           Collection* oplog,
-                                           const char* ns,
-                                           ReplicationCoordinator* replCoord,
-                                           const char* opstr,
-                                           ReplicationCoordinator::Mode replicationMode) {
-    synchronizeOnCappedInFlightResource(txn->lockState());
+OplogSlot getNextOpTime(OperationContext* txn,
+                        Collection* oplog,
+                        ReplicationCoordinator* replCoord,
+                        ReplicationCoordinator::Mode replicationMode) {
+    synchronizeOnCappedInFlightResource(txn->lockState(), oplog->ns());
 
-    long long hashNew = 0;
-    long long term = OpTime::kProtocolVersionV0Term;
+    OplogSlot slot;
+    slot.hash = 0;
+    long long term = OpTime::kUninitializedTerm;
 
     // Fetch term out of the newOpMutex.
     if (replicationMode == ReplicationCoordinator::modeReplSet &&
@@ -164,11 +168,11 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
 
     // Set hash if we're in replset mode, otherwise it remains 0 in master/slave.
     if (replicationMode == ReplicationCoordinator::modeReplSet) {
-        hashNew = hashGenerator.nextInt64();
+        slot.hash = hashGenerator.nextInt64();
     }
 
-    OpTime opTime(ts, term);
-    return std::pair<OpTime, long long>(opTime, hashNew);
+    slot.opTime = OpTime(ts, term);
+    return slot;
 }
 
 /**
@@ -180,8 +184,6 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
 class OplogDocWriter : public DocWriter {
 public:
     OplogDocWriter(const BSONObj& frame, const BSONObj& oField) : _frame(frame), _oField(oField) {}
-
-    ~OplogDocWriter() {}
 
     void writeDocument(char* start) const {
         char* buf = start;
@@ -237,6 +239,117 @@ void setOplogCollectionName() {
     }
 }
 
+namespace {
+
+Collection* getLocalOplogCollection(OperationContext* txn, const std::string& oplogCollectionName) {
+    if (_localOplogCollection)
+        return _localOplogCollection;
+    Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
+    Lock::CollectionLock lk2(txn->lockState(), oplogCollectionName, MODE_IX);
+
+    OldClientContext ctx(txn, oplogCollectionName);
+    _localDB = ctx.db();
+    invariant(_localDB);
+    _localOplogCollection = _localDB->getCollection(oplogCollectionName);
+    massert(13347,
+            "the oplog collection " + oplogCollectionName +
+                " missing. did you drop it? if so, restart the server",
+            _localOplogCollection);
+    return _localOplogCollection;
+}
+
+bool oplogDisabled(OperationContext* txn,
+                   ReplicationCoordinator::Mode replicationMode,
+                   const NamespaceString& nss) {
+    if (replicationMode == ReplicationCoordinator::modeNone)
+        return true;
+
+    if (nss.db() == "local")
+        return true;
+
+    if (nss.isSystemDotProfile())
+        return true;
+
+    if (!txn->writesAreReplicated())
+        return true;
+
+    fassert(28626, txn->recoveryUnit());
+
+    return false;
+}
+
+unique_ptr<OplogDocWriter> _logOpWriter(OperationContext* txn,
+                                        const char* opstr,
+                                        const NamespaceString& nss,
+                                        const BSONObj& obj,
+                                        BSONObj* o2,
+                                        bool fromMigrate,
+                                        OpTime optime,
+                                        long long hashNew) {
+    BSONObjBuilder b(256);
+
+    b.append("ts", optime.getTimestamp());
+    if (optime.getTerm() != -1)
+        b.append("t", optime.getTerm());
+    b.append("h", hashNew);
+    b.append("v", OPLOG_VERSION);
+    b.append("op", opstr);
+    b.append("ns", nss.ns());
+    if (fromMigrate)
+        b.appendBool("fromMigrate", true);
+    if (o2)
+        b.append("o2", *o2);
+
+    return stdx::make_unique<OplogDocWriter>(OplogDocWriter(b.obj(), obj));
+}
+}  // end anon namespace
+
+// Truncates the oplog to and including the "truncateTimestamp" entry.
+void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
+    const NamespaceString oplogNss(rsOplogName);
+    ScopedTransaction transaction(txn, MODE_IX);
+    AutoGetDb autoDb(txn, oplogNss.db(), MODE_IX);
+    Lock::CollectionLock oplogCollectionLoc(txn->lockState(), oplogNss.ns(), MODE_X);
+    Collection* oplogCollection = autoDb.getDb()->getCollection(oplogNss);
+    if (!oplogCollection) {
+        fassertFailedWithStatusNoTrace(
+            28820,
+            Status(ErrorCodes::NamespaceNotFound, str::stream() << "Can't find " << rsOplogName));
+    }
+
+    // Scan through oplog in reverse, from latest entry to first, to find the truncateTimestamp.
+    bool foundSomethingToTruncate = false;
+    RecordId lastRecordId;
+    BSONObj lastOplogEntry;
+    auto oplogRs = oplogCollection->getRecordStore();
+    auto oplogReverseCursor = oplogRs->getCursor(txn, false);
+    bool first = true;
+    while (auto next = oplogReverseCursor->next()) {
+        lastOplogEntry = next->data.releaseToBson();
+        lastRecordId = next->id;
+
+        const auto tsElem = lastOplogEntry["ts"];
+
+        if (first) {
+            if (tsElem.eoo())
+                LOG(2) << "Oplog tail entry: " << lastOplogEntry;
+            else
+                LOG(2) << "Oplog tail entry ts field: " << tsElem;
+            first = false;
+        }
+
+        if (tsElem.timestamp() < truncateTimestamp) {
+            break;
+        }
+
+        foundSomethingToTruncate = true;
+    }
+
+    if (foundSomethingToTruncate) {
+        oplogCollection->temp_cappedTruncateAfter(txn, lastRecordId, false);
+    }
+}
+
 /* we write to local.oplog.rs:
      { ts : ..., h: ..., v: ..., op: ..., etc }
    ts: an OpTime timestamp
@@ -253,8 +366,35 @@ void setOplogCollectionName() {
    bb param:
      if not null, specifies a boolean to pass along to the other side as b: param.
      used for "justOne" or "upsert" flags on 'd', 'u'
-
 */
+void _logOpsInner(OperationContext* txn,
+                  const char* opstr,
+                  const NamespaceString& nss,
+                  const vector<unique_ptr<OplogDocWriter>>& writers,
+                  bool fromMigrate,
+                  Collection* oplogCollection,
+                  ReplicationCoordinator::Mode replicationMode,
+                  bool updateReplOpTime,
+                  OpTime finalOpTime) {
+    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+
+    if (nss.size() && replicationMode == ReplicationCoordinator::modeReplSet &&
+        !replCoord->canAcceptWritesFor(nss)) {
+        severe() << "logOp() but can't accept write to collection " << nss.ns();
+        fassertFailed(17405);
+    }
+
+    // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
+    // instead we do a single copy to the destination in the record store.
+    for (auto it = writers.begin(); it != writers.end(); it++)
+        checkOplogInsert(oplogCollection->insertDocument(txn, it->get(), false));
+
+    // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
+    if (updateReplOpTime)
+        txn->recoveryUnit()->registerChange(new UpdateReplOpTimeChange(finalOpTime, replCoord));
+
+    ReplClientInfo::forClient(txn->getClient()).setLastOp(finalOpTime);
+}
 
 void _logOp(OperationContext* txn,
             const char* opstr,
@@ -262,104 +402,64 @@ void _logOp(OperationContext* txn,
             const BSONObj& obj,
             BSONObj* o2,
             bool fromMigrate,
-            const std::string& oplogCollectionName,
-            ReplicationCoordinator::Mode replicationMode,
-            bool updateReplOpTime) {
+            const std::string& oplogName,
+            ReplicationCoordinator::Mode replMode,
+            bool updateOpTime) {
     NamespaceString nss(ns);
-    if (nss.db() == "local") {
+    if (oplogDisabled(txn, replMode, nss))
         return;
-    }
-
-    if (nss.isSystemDotProfile()) {
-        return;
-    }
-
-    if (replicationMode == ReplicationCoordinator::modeNone) {
-        return;
-    }
-
-    if (!txn->writesAreReplicated()) {
-        return;
-    }
-
-    fassert(28626, txn->recoveryUnit());
-
-    Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
 
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-
-    if (ns[0] && replicationMode == ReplicationCoordinator::modeReplSet &&
-        !replCoord->canAcceptWritesFor(nss)) {
-        severe() << "logOp() but can't accept write to collection " << ns;
-        fassertFailed(17405);
-    }
-    Lock::CollectionLock lk2(txn->lockState(), oplogCollectionName, MODE_IX);
-
-
-    if (_localOplogCollection == nullptr) {
-        OldClientContext ctx(txn, oplogCollectionName);
-        _localDB = ctx.db();
-        invariant(_localDB);
-        _localOplogCollection = _localDB->getCollection(oplogCollectionName);
-        massert(13347,
-                "the oplog collection " + oplogCollectionName +
-                    " missing. did you drop it? if so, restart the server",
-                _localOplogCollection);
-    }
-
-    std::pair<OpTime, long long> slot =
-        getNextOpTime(txn, _localOplogCollection, ns, replCoord, opstr, replicationMode);
-
-    /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
-       instead we do a single copy to the destination position in the memory mapped file.
-    */
-
-    BSONObjBuilder b(256);
-
-    slot.first.append(&b);
-    b.append("h", slot.second);
-    b.append("v", OPLOG_VERSION);
-    b.append("op", opstr);
-    b.append("ns", ns);
-    if (fromMigrate) {
-        b.appendBool("fromMigrate", true);
-    }
-
-    if (o2) {
-        b.append("o2", *o2);
-    }
-    BSONObj partial = b.done();
-
-    OplogDocWriter writer(partial, obj);
-    // This transaction might roll back.
-    checkOplogInsert(_localOplogCollection->insertDocument(txn, &writer, false));
-
-    // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
-    if (updateReplOpTime) {
-        txn->recoveryUnit()->registerChange(new UpdateReplOpTimeChange(slot.first, replCoord));
-    }
-
-    ReplClientInfo::forClient(txn->getClient()).setLastOp(slot.first);
+    vector<unique_ptr<OplogDocWriter>> writers;
+    Collection* oplog = getLocalOplogCollection(txn, oplogName);
+    Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
+    Lock::CollectionLock lock(txn->lockState(), oplogName, MODE_IX);
+    auto slot = getNextOpTime(txn, oplog, replCoord, replMode);
+    auto writer = _logOpWriter(txn, opstr, nss, obj, o2, fromMigrate, slot.opTime, slot.hash);
+    writers.emplace_back(std::move(writer));
+    _logOpsInner(txn, opstr, nss, writers, fromMigrate, oplog, replMode, updateOpTime, slot.opTime);
 }
 
-void _logOp(OperationContext* txn,
+void logOps(OperationContext* txn,
             const char* opstr,
-            const char* ns,
-            const BSONObj& obj,
-            BSONObj* o2,
+            const NamespaceString& nss,
+            std::vector<BSONObj>::const_iterator begin,
+            std::vector<BSONObj>::const_iterator end,
             bool fromMigrate) {
-    _logOp(txn,
-           opstr,
-           ns,
-           obj,
-           o2,
-           fromMigrate,
-           _oplogCollectionName,
-           ReplicationCoordinator::get(txn)->getReplicationMode(),
-           true);
+    ReplicationCoordinator::Mode replMode = ReplicationCoordinator::get(txn)->getReplicationMode();
+
+    invariant(begin != end);
+    if (oplogDisabled(txn, replMode, nss))
+        return;
+
+    vector<unique_ptr<OplogDocWriter>> writers;
+    writers.reserve(end - begin);
+    OpTime finalOpTime;
+    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+    Collection* oplog = getLocalOplogCollection(txn, _oplogCollectionName);
+    Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
+    Lock::CollectionLock lock(txn->lockState(), _oplogCollectionName, MODE_IX);
+    for (auto it = begin; it != end; it++) {
+        auto slot = getNextOpTime(txn, oplog, replCoord, replMode);
+        finalOpTime = slot.opTime;
+        auto writer = _logOpWriter(txn, opstr, nss, *it, NULL, fromMigrate, slot.opTime, slot.hash);
+        writers.emplace_back(std::move(writer));
+    }
+    _logOpsInner(txn, opstr, nss, writers, fromMigrate, oplog, replMode, true, finalOpTime);
 }
 
-OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
+
+void logOp(OperationContext* txn,
+           const char* opstr,
+           const char* ns,
+           const BSONObj& obj,
+           BSONObj* o2,
+           bool fromMigrate) {
+    ReplicationCoordinator::Mode replMode = ReplicationCoordinator::get(txn)->getReplicationMode();
+    _logOp(txn, opstr, ns, obj, o2, fromMigrate, _oplogCollectionName, replMode, true);
+}
+
+OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops) {
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
     OpTime lastOptime;
@@ -383,21 +483,10 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
         OldClientContext ctx(txn, rsOplogName, _localDB);
         WriteUnitOfWork wunit(txn);
 
-        for (std::deque<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
-            const BSONObj& op = *it;
-            const OpTime optime = fassertStatusOK(28779, OpTime::parseFromBSON(op));
-
-            checkOplogInsert(_localOplogCollection->insertDocument(txn, op, false));
-
-            // lastOptime and optime are successive in the log, so it's safe to compare them.
-            if (!(lastOptime < optime)) {
-                severe() << "replication oplog stream went back in time. "
-                            "previous timestamp: " << lastOptime << " newest timestamp: " << optime
-                         << ". Op being applied: " << op;
-                fassertFailedNoTrace(18905);
-            }
-            lastOptime = optime;
-        }
+        checkOplogInsert(
+            _localOplogCollection->insertDocuments(txn, ops.begin(), ops.end(), false));
+        lastOptime =
+            fassertStatusOK(ErrorCodes::InvalidBSON, OpTime::parseFromOplogEntry(ops.back()));
         wunit.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeOps", _localOplogCollection->ns().ns());
@@ -531,7 +620,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
     {"dropDatabase",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd)
           -> Status { return dropDatabase(txn, NamespaceString(ns).db().toString()); },
-      {ErrorCodes::DatabaseNotFound}}},
+      {ErrorCodes::NamespaceNotFound}}},
     {"drop",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
          BSONObjBuilder resultWeDontCareAbout;
@@ -613,7 +702,7 @@ Status applyOperation_inlock(OperationContext* txn,
     if (fieldO.isABSONObj())
         o = fieldO.embeddedObject();
 
-    const char* ns = fieldNs.valuestrsafe();
+    const StringData ns = fieldNs.valueStringData();
 
     BSONObj o2;
     if (fieldO2.isABSONObj())
@@ -642,8 +731,7 @@ Status applyOperation_inlock(OperationContext* txn,
     if (*opType == 'i') {
         opCounters->gotInsert();
 
-        const char* p = strchr(ns, '.');
-        if (p && nsToCollectionSubstring(p) == "system.indexes") {
+        if (nsToCollectionSubstring(ns) == "system.indexes") {
             if (o["background"].trueValue()) {
                 IndexBuilder* builder = new IndexBuilder(o);
                 // This spawns a new thread and returns immediately.
@@ -677,13 +765,13 @@ Status applyOperation_inlock(OperationContext* txn,
         // 2. If okay, commit
         // 3. If not, do update (and commit)
         // 4. If both !Ok, return status
-        StatusWith<RecordId> status{ErrorCodes::NotYetInitialized, ""};
+        Status status{ErrorCodes::NotYetInitialized, ""};
         {
             WriteUnitOfWork wuow(txn);
             try {
                 status = collection->insertDocument(txn, o, true);
             } catch (DBException dbe) {
-                status = StatusWith<RecordId>(dbe.toStatus());
+                status = dbe.toStatus();
             }
             if (status.isOK()) {
                 wuow.commit();
@@ -691,8 +779,8 @@ Status applyOperation_inlock(OperationContext* txn,
         }
         // Now see if we need to do an update, based on duplicate _id index key
         if (!status.isOK()) {
-            if (status.getStatus().code() != ErrorCodes::DuplicateKey) {
-                return status.getStatus();
+            if (status.code() != ErrorCodes::DuplicateKey) {
+                return status;
             }
 
             // Do update on DuplicateKey errors.
@@ -786,7 +874,7 @@ Status applyOperation_inlock(OperationContext* txn,
                 o.hasField("_id"));
 
         if (opType[1] == 0) {
-            deleteObjects(txn, db, ns, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
+            deleteObjects(txn, collection, ns, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
         } else
             verify(opType[1] == 'b');  // "db" advertisement
     } else if (*opType == 'n') {
@@ -799,7 +887,8 @@ Status applyOperation_inlock(OperationContext* txn,
     // AuthorizationManager's logOp method registers a RecoveryUnit::Change
     // and to do so we need to have begun a UnitOfWork
     WriteUnitOfWork wuow(txn);
-    getGlobalAuthorizationManager()->logOp(txn, opType, ns, o, fieldO2.isABSONObj() ? &o2 : NULL);
+    getGlobalAuthorizationManager()->logOp(
+        txn, opType, ns.toString().c_str(), o, fieldO2.isABSONObj() ? &o2 : NULL);
     wuow.commit();
 
     return Status::OK();
@@ -908,7 +997,7 @@ void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS) {
 
     if (!lastOp.isEmpty()) {
         LOG(1) << "replSet setting last Timestamp";
-        const OpTime opTime = fassertStatusOK(28696, OpTime::parseFromBSON(lastOp));
+        const OpTime opTime = fassertStatusOK(28696, OpTime::parseFromOplogEntry(lastOp));
         setNewTimestamp(opTime.getTimestamp());
     }
 }
@@ -920,11 +1009,44 @@ void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
     _localOplogCollection = nullptr;
 }
 
+void signalOplogWaiters() {
+    if (_localOplogCollection) {
+        _localOplogCollection->notifyCappedWaitersIfNeeded();
+    }
+}
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replSnapshotThreadThrottleMicros, int, 1000);
 
 SnapshotThread::SnapshotThread(SnapshotManager* manager)
     : _manager(manager), _thread([this] { run(); }) {}
+
+bool SnapshotThread::shouldSleepMore(int numSleepsDone, size_t numUncommittedSnapshots) {
+    const double kThrottleRatio = 1 / 20.0;
+    const size_t kUncommittedSnapshotLimit = 1000;
+    const size_t kUncommittedSnapshotRestartPoint = kUncommittedSnapshotLimit / 2;
+
+    if (_inShutdown.load())
+        return false;  // Exit the thread quickly without sleeping.
+
+    if (numSleepsDone == 0)
+        return true;  // Always sleep at least once.
+
+    {
+        // Enforce a limit on the number of snapshots.
+        if (numUncommittedSnapshots >= kUncommittedSnapshotLimit)
+            _hitSnapshotLimit = true;  // Don't create new snapshots.
+
+        if (numUncommittedSnapshots < kUncommittedSnapshotRestartPoint)
+            _hitSnapshotLimit = false;  // Begin creating new snapshots again.
+
+        if (_hitSnapshotLimit)
+            return true;
+    }
+
+    // Spread out snapshots in time by sleeping as we collect more uncommitted snapshots.
+    const double numSleepsNeeded = numUncommittedSnapshots * kThrottleRatio;
+    return numSleepsNeeded > numSleepsDone;
+}
 
 void SnapshotThread::run() {
     Client::initThread("SnapshotThread");
@@ -934,22 +1056,24 @@ void SnapshotThread::run() {
 
     Timestamp lastTimestamp = {};
     while (true) {
-        {
-            // This block logically belongs at the end of the loop, but having it at the top
-            // simplifies handling of the "continue" cases. It is harmless to do these before the
-            // first run of the loop.
+        // This block logically belongs at the end of the loop, but having it at the top
+        // simplifies handling of the "continue" cases. It is harmless to do these before the
+        // first run of the loop.
+        for (int numSleepsDone = 0;
+             shouldSleepMore(numSleepsDone, replCoord->getNumUncommittedSnapshots());
+             numSleepsDone++) {
+            sleepmicros(replSnapshotThreadThrottleMicros);
             _manager->cleanupUnneededSnapshots();
-            sleepmicros(replSnapshotThreadThrottleMicros);  // Throttle by sleeping.
         }
 
         {
             stdx::unique_lock<stdx::mutex> lock(newOpMutex);
             while (true) {
-                if (_inShutdown)
+                if (_inShutdown.load())
                     return;
 
-                if (_forcedSnapshotPending || lastTimestamp != getLastSetTimestamp()) {
-                    _forcedSnapshotPending = false;
+                if (_forcedSnapshotPending.load() || lastTimestamp != getLastSetTimestamp()) {
+                    _forcedSnapshotPending.store(false);
                     lastTimestamp = getLastSetTimestamp();
                     break;
                 }
@@ -960,8 +1084,7 @@ void SnapshotThread::run() {
 
         while (MONGO_FAIL_POINT(disableSnapshotting)) {
             sleepsecs(1);
-            stdx::unique_lock<stdx::mutex> lock(newOpMutex);
-            if (_inShutdown) {
+            if (_inShutdown.load()) {
                 return;
             }
         }
@@ -983,8 +1106,10 @@ void SnapshotThread::run() {
             SnapshotName name(0);  // assigned real value in block.
             {
                 // Make sure there are no in-flight capped inserts while we create our snapshot.
-                Lock::ResourceLock cappedInsertLock(
-                    txn->lockState(), resourceCappedInFlight, MODE_X);
+                Lock::ResourceLock cappedInsertLockForOtherDb(
+                    txn->lockState(), resourceCappedInFlightForOtherDb, MODE_X);
+                Lock::ResourceLock cappedInsertLockForLocalDb(
+                    txn->lockState(), resourceCappedInFlightForLocalDb, MODE_X);
 
                 // Reserve the name immediately before we take our snapshot. This ensures that all
                 // names that compare lower must be from points in time visible to this named
@@ -1006,7 +1131,7 @@ void SnapshotThread::run() {
                     continue;  // oplog is completely empty.
 
                 const auto op = record->data.releaseToBson();
-                opTimeOfSnapshot = fassertStatusOK(28780, OpTime::parseFromBSON(op));
+                opTimeOfSnapshot = fassertStatusOK(28780, OpTime::parseFromOplogEntry(op));
                 invariant(!opTimeOfSnapshot.isNull());
             }
 
@@ -1023,8 +1148,8 @@ void SnapshotThread::shutdown() {
     invariant(_thread.joinable());
     {
         stdx::lock_guard<stdx::mutex> lock(newOpMutex);
-        invariant(!_inShutdown);
-        _inShutdown = true;
+        invariant(!_inShutdown.load());
+        _inShutdown.store(true);
         newTimestampNotifier.notify_all();
     }
     _thread.join();
@@ -1032,7 +1157,7 @@ void SnapshotThread::shutdown() {
 
 void SnapshotThread::forceSnapshot() {
     stdx::lock_guard<stdx::mutex> lock(newOpMutex);
-    _forcedSnapshotPending = true;
+    _forcedSnapshotPending.store(true);
     newTimestampNotifier.notify_all();
 }
 

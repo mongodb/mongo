@@ -33,7 +33,7 @@
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -43,7 +43,7 @@ namespace mongo {
 using std::unique_ptr;
 using std::vector;
 
-using fts::FTSQuery;
+using fts::FTSQueryImpl;
 using fts::FTSSpec;
 
 class OperationContext;
@@ -61,7 +61,7 @@ struct TextStageParams {
     BSONObj indexPrefix;
 
     // The text query.
-    FTSQuery query;
+    FTSQueryImpl query;
 };
 
 /**

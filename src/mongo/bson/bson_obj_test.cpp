@@ -41,6 +41,12 @@ TEST(BSONObjToString, EmptyArray) {
     ASSERT_EQUALS(text, o1_str);
 }
 
+TEST(BSONObjCompare, Timestamp) {
+    ASSERT_LT(BSON("" << Timestamp(0, 3)), BSON("" << Timestamp(~0U, 2)));
+    ASSERT_GT(BSON("" << Timestamp(2, 3)), BSON("" << Timestamp(2, 2)));
+    ASSERT_EQ(BSON("" << Timestamp(3ULL)), BSON("" << Timestamp(0, 3)));
+}
+
 TEST(BSONObjCompare, NumberDouble) {
     ASSERT_LT(BSON("" << 0.0), BSON("" << 1.0));
     ASSERT_LT(BSON("" << -1.0), BSON("" << 0.0));
@@ -537,5 +543,32 @@ TEST(Looping, Cpp11Auto) {
 
     ASSERT_EQUALS(count, 1 + 2 + 3);
 }
+
+TEST(BSONObj, getFields) {
+    auto e = BSON("a" << 1 << "b" << 2 << "c" << 3 << "d" << 4 << "e" << 5 << "f" << 6);
+    std::array<StringData, 3> fieldNames{"c", "d", "f"};
+    std::array<BSONElement, 3> fields;
+    e.getFields(fieldNames, &fields);
+    ASSERT_EQUALS(fields[0].type(), BSONType::NumberInt);
+    ASSERT_EQUALS(fields[0].numberInt(), 3);
+    ASSERT_EQUALS(fields[1].type(), BSONType::NumberInt);
+    ASSERT_EQUALS(fields[1].numberInt(), 4);
+    ASSERT_EQUALS(fields[2].type(), BSONType::NumberInt);
+    ASSERT_EQUALS(fields[2].numberInt(), 6);
+}
+
+TEST(BSONObj, getFieldsWithDuplicates) {
+    auto e = BSON("a" << 2 << "b"
+                      << "3"
+                      << "a" << 9 << "b" << 10);
+    std::array<StringData, 2> fieldNames{"a", "b"};
+    std::array<BSONElement, 2> fields;
+    e.getFields(fieldNames, &fields);
+    ASSERT_EQUALS(fields[0].type(), BSONType::NumberInt);
+    ASSERT_EQUALS(fields[0].numberInt(), 2);
+    ASSERT_EQUALS(fields[1].type(), BSONType::String);
+    ASSERT_EQUALS(fields[1].str(), "3");
+}
+
 
 }  // unnamed namespace

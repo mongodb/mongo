@@ -13,12 +13,12 @@
  *	Discard pages for a specific file.
  */
 int
-__wt_evict_file(WT_SESSION_IMPL *session, int syncop)
+__wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
-	int evict_reset;
+	bool evict_reset;
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction
@@ -27,7 +27,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
 
 	/* Make sure the oldest transaction ID is up-to-date. */
-	__wt_txn_update_oldest(session, 1);
+	__wt_txn_update_oldest(session, true);
 
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
@@ -76,29 +76,16 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			/*
 			 * Evict the page.
 			 */
-			WT_ERR(__wt_evict(session, ref, 1));
+			WT_ERR(__wt_evict(session, ref, true));
 			break;
 		case WT_SYNC_DISCARD:
-			WT_ASSERT(session,
-			    __wt_page_can_evict(session, page, 0, NULL));
-			__wt_evict_page_clean_update(session, ref, 1);
-			break;
-		case WT_SYNC_DISCARD_FORCE:
 			/*
-			 * Forced discard of the page, whether clean or dirty.
-			 * If we see a dirty page in a forced discard, clean
-			 * the page, both to keep statistics correct, and to
-			 * let the page-discard function assert no dirty page
-			 * is ever discarded.
+			 * Discard the page regardless of whether it is dirty.
 			 */
-			if (__wt_page_is_modified(page)) {
-				page->modify->write_gen = 0;
-				__wt_cache_dirty_decr(session, page);
-			}
-
-			F_SET(session, WT_SESSION_DISCARD_FORCE);
-			__wt_evict_page_clean_update(session, ref, 1);
-			F_CLR(session, WT_SESSION_DISCARD_FORCE);
+			WT_ASSERT(session,
+			    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
+			    __wt_page_can_evict(session, ref, NULL));
+			__wt_evict_page_clean_update(session, ref, true);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}

@@ -6,7 +6,7 @@ env.Library(
         'devnull_kv_engine.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/in_memory/in_memory_record_store',
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
         '$BUILD_DIR/mongo/db/storage/kv/kv_storage_engine',
     ],
 )

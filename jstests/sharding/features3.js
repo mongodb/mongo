@@ -6,15 +6,11 @@
 //   - Verifies a $where query can be killed on multiple DBs
 //   - Tests fsync and fsync+lock permissions on sharded db
 
-var s = new ShardingTest({shards: 2,
-                          mongos: 1,
-                          verbose:1});
+var s = new ShardingTest({shards: 2, mongos: 1 });
+
 var db = s.getDB("test");   // db variable name is required due to startParallelShell()
 var numDocs = 10000;
 db.foo.drop();
-
-// stop the balancer
-s.stopBalancer()
 
 // shard test.foo and add a split point
 s.adminCommand({enablesharding: "test"});
@@ -27,7 +23,7 @@ s.adminCommand({moveChunk: "test.foo", find: {_id: 3},
                 to: s.getNonPrimaries("test")[0], _waitForDelete: true});
 
 // restart balancer
-s.setBalancer(true)
+s.startBalancer();
 
 // insert 10k small documents into the sharded collection
 var bulk = db.foo.initializeUnorderedBulkOp();
@@ -78,7 +74,7 @@ function getMine(printInprog) {
     // Find all the where queries
     var mine = [];
     for (var x=0; x<inprog.length; x++) {
-        if (inprog[x].query && inprog[x].query.$where) {
+        if (inprog[x].query && inprog[x].query.filter && inprog[x].query.filter.$where) {
             mine.push(inprog[x]);
         }
     }
@@ -150,4 +146,4 @@ if ( x.all.shard0000 > 0 ) {
 x = db._adminCommand({"fsync" :1, lock:true});
 assert(!x.ok, "lock should fail: " + tojson(x));
 
-s.stop()
+s.stop();

@@ -79,8 +79,11 @@ public:
     void closeAll(unsigned skip_mask) {
         stdx::lock_guard<stdx::mutex> bl(m);
         for (std::set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++) {
-            if ((*i)->tag & skip_mask)
+            if ((*i)->tag & skip_mask) {
+                LOG(3) << "Skip closing connection # " << (*i)->connectionId();
                 continue;
+            }
+            LOG(3) << "Closing connection # " << (*i)->connectionId();
             (*i)->shutdown();
         }
     }
@@ -102,16 +105,15 @@ void MessagingPort::closeAllSockets(unsigned mask) {
     ports.closeAll(mask);
 }
 
-MessagingPort::MessagingPort(int fd, const SockAddr& remote) : psock(new Socket(fd, remote)) {
-    ports.insert(this);
-}
+MessagingPort::MessagingPort(int fd, const SockAddr& remote)
+    : MessagingPort(std::make_shared<Socket>(fd, remote)) {}
 
 MessagingPort::MessagingPort(double timeout, logger::LogSeverity ll)
-    : psock(new Socket(timeout, ll)) {
-    ports.insert(this);
-}
+    : MessagingPort(std::make_shared<Socket>(timeout, ll)) {}
 
-MessagingPort::MessagingPort(std::shared_ptr<Socket> sock) : psock(sock) {
+MessagingPort::MessagingPort(std::shared_ptr<Socket> sock) : psock(std::move(sock)) {
+    SockAddr sa = psock->remoteAddr();
+    _remoteParsed = HostAndPort(sa.getAddr(), sa.getPort());
     ports.insert(this);
 }
 
@@ -237,7 +239,7 @@ bool MessagingPort::recv(const Message& toSend, Message& response) {
                 << "  toSend op: " << (unsigned)toSend.operation() << '\n'
                 << "  response msgid:" << (unsigned)response.header().getId() << '\n'
                 << "  response len:  " << (unsigned)response.header().getLen() << '\n'
-                << "  response op:  " << response.operation() << '\n'
+                << "  response op:  " << static_cast<int>(response.operation()) << '\n'
                 << "  remote: " << psock->remoteString();
         verify(false);
         response.reset();
@@ -254,10 +256,6 @@ void MessagingPort::say(Message& toSend, int responseTo) {
 }
 
 HostAndPort MessagingPort::remote() const {
-    if (!_remoteParsed.hasPort()) {
-        SockAddr sa = psock->remoteAddr();
-        _remoteParsed = HostAndPort(sa.getAddr(), sa.getPort());
-    }
     return _remoteParsed;
 }
 

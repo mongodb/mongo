@@ -220,12 +220,12 @@ public:
             }
 
             try {
-                if (myLock->lock_try("Testing distributed lock with skew.", &lockObj)) {
+                if (myLock->lock_try(OID::gen(), "Testing distributed lock with skew.", &lockObj)) {
                     log() << "**** Locked for thread " << threadId << " with ts " << lockObj["ts"]
                           << endl;
 
                     if (count.loadRelaxed() % 3 == 1 &&
-                        myLock->lock_try("Testing lock non-re-entry.")) {
+                        myLock->lock_try(OID::gen(), "Testing lock non-re-entry.")) {
                         errors = true;
                         log() << "**** !Invalid lock re-entry" << endl;
                         break;

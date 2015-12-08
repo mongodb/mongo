@@ -10,6 +10,7 @@ env.Library(
     ],
     LIBDEPS = [
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 
@@ -49,6 +50,7 @@ env.Library(
         "geo_near.cpp",
         "group.cpp",
         "idhack.cpp",
+        "index_iterator.cpp",
         "index_scan.cpp",
         "keep_mutations.cpp",
         "limit.cpp",
@@ -79,8 +81,13 @@ env.Library(
         "scoped_timer",
         "working_set",
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/ops/update_driver",
         '$BUILD_DIR/third_party/s2/s2',
     ],
+    LIBDEPS_TAGS=[
+        # A great number of undefined symbols in this library
+        'incomplete',
+    ]
 )
 
 env.CppUnitTest(
@@ -91,7 +98,6 @@ env.CppUnitTest(
     LIBDEPS = [
         "exec",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
@@ -106,7 +112,6 @@ env.CppUnitTest(
     LIBDEPS = [
         "exec",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
@@ -121,7 +126,6 @@ env.CppUnitTest(
     LIBDEPS = [
         "exec",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
     NO_CRUTCH = True,

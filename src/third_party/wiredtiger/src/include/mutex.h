@@ -52,6 +52,24 @@ struct __wt_rwlock {
 };
 
 /*
+ * A light weight lock that can be used to replace spinlocks if fairness is
+ * necessary. Implements a ticket-based back off spin lock.
+ * The fields are available as a union to allow for atomically setting
+ * the state of the entire lock.
+ */
+struct __wt_fair_lock {
+	union {
+		uint32_t lock;
+		struct {
+			uint16_t owner;		/* Ticket for current owner */
+			uint16_t waiter;	/* Last allocated ticket */
+		} s;
+	} u;
+#define	fair_lock_owner u.s.owner
+#define	fair_lock_waiter u.s.waiter
+};
+
+/*
  * Spin locks:
  *
  * WiredTiger uses spinlocks for fast mutual exclusion (where operations done
@@ -65,20 +83,21 @@ struct __wt_rwlock {
 
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
-typedef volatile int WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT)
-    WT_SPINLOCK;
+struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_spinlock {
+	volatile int lock;
+};
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE ||\
 	SPINLOCK_TYPE == SPINLOCK_MSVC
 
-typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
+struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_spinlock {
 	wt_mutex_t lock;
 
 	const char *name;		/* Statistics: mutex name */
 
 	int8_t initialized;		/* Lock initialized, for cleanup */
-} WT_SPINLOCK;
+};
 
 #else
 

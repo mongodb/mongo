@@ -393,11 +393,9 @@ TEST_F(QueryPlannerTest, And2DSphereSameFieldNonNearMultikey) {
         "  {a: {$geoIntersects: {$geometry: "
         "{type: 'Point', coordinates: [4.0, 1.0]}}}}]}"));
 
-    assertNumSolutions(2U);
+    assertNumSolutions(3U);
     assertSolutionExists("{cscan: {dir: 1}}");
-    // Bounds of the two 2dsphere geo predicates are combined into
-    // a single index scan.
-    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}", 2U);
 }
 
 TEST_F(QueryPlannerTest, And2DSphereWithNearSameField) {

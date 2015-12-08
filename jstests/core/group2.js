@@ -23,16 +23,19 @@ assert.eq(1, result[0].count, "F");
 assert.eq(1, result[1].count, "G");
 assert.eq(1, result[2].count, "H");
 
+var keyFn = function(x) {
+    return { a: 'a' in x ? x.a : null };
+};
 
 delete cmd.key
-cmd["$keyf"] = function(x){ return { a : x.a }; };
+cmd["$keyf"] = keyFn;
 result2 = t.group( cmd );
 
 assert.eq( result , result2, "check result2" );
 
 
 delete cmd.$keyf
-cmd["keyf"] = function(x){ return { a : x.a }; };
+cmd["keyf"] = keyFn;
 result3 = t.group( cmd );
 
 assert.eq( result , result3, "check result3" );

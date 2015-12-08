@@ -7,8 +7,6 @@ var baseName = "auth_server-6591";
 var dbpath = MongoRunner.dataPath + baseName;
 var username = "foo";
 var password = "bar";
-var port = allocatePorts(1)[0];
-var host = "localhost:" + port;
 
 load("jstests/libs/host_ipaddr.js");
 
@@ -101,18 +99,18 @@ var authenticate = function(mongo) {
     mongo.getDB("admin").auth(username, password);
 };
 
-var shutdown = function(mongo) {
+var shutdown = function(conn) {
     print("============ shutting down.");
-    MongoRunner.stopMongod(port, /*signal*/false, { auth: { user: username, pwd: password}});
+    MongoRunner.stopMongod(conn.port, /*signal*/false, { auth: { user: username, pwd: password}});
 };
 
 var runTest = function(useHostName) {
     print("==========================");
     print("starting mongod: useHostName=" + useHostName);
     print("==========================");
-    MongoRunner.runMongod({auth: "", port: port, dbpath: dbpath, useHostName: useHostName});
+    var conn = MongoRunner.runMongod({auth: "", dbpath: dbpath, useHostName: useHostName});
 
-    var mongo = new Mongo(host);
+    var mongo = new Mongo("localhost:" + conn.port);
 
     assertCannotRunCommands(mongo);
 
@@ -125,7 +123,7 @@ var runTest = function(useHostName) {
     assertCanRunCommands(mongo);
 
     print("============ reconnecting with new client.");
-    mongo = new Mongo(host);
+    mongo = new Mongo("localhost:" + conn.port);
 
     assertCannotRunCommands(mongo);
 
@@ -133,26 +131,26 @@ var runTest = function(useHostName) {
 
     assertCanRunCommands(mongo);
 
-    shutdown(mongo);
+    shutdown(conn);
 };
 
-var runNonlocalTest = function(hostPort) {
+var runNonlocalTest = function(host) {
     print("==========================");
-    print("starting mongod: non-local host access "+hostPort);
+    print("starting mongod: non-local host access " + host);
     print("==========================");
-    MongoRunner.runMongod({auth: "", port: port, dbpath: dbpath});
+    var conn = MongoRunner.runMongod({auth: "", dbpath: dbpath});
 
-    var mongo = new Mongo(hostPort);
+    var mongo = new Mongo(host + ":" + conn.port);
 
     assertCannotRunCommands(mongo);
     assert.throws(function() { mongo.getDB("admin").createUser
         ({ user:username, pwd: password, roles: jsTest.adminUserRoles }); });
     assert.throws(function() { mongo.getDB("$external").createUser
         ({ user:username, pwd: password, roles: jsTest.adminUserRoles }); });
-    shutdown(mongo);
+    shutdown(conn);
 };
 
 runTest(false);
 runTest(true);
 
-runNonlocalTest(get_ipaddr()+":"+port);
+runNonlocalTest(get_ipaddr());

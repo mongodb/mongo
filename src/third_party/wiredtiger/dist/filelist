@@ -45,6 +45,7 @@ src/btree/col_srch.c
 src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
+src/cache/cache_las.c
 src/config/config.c
 src/config/config_api.c
 src/config/config_check.c
@@ -71,6 +72,7 @@ src/cursor/cur_ds.c
 src/cursor/cur_dump.c
 src/cursor/cur_file.c
 src/cursor/cur_index.c
+src/cursor/cur_join.c
 src/cursor/cur_json.c
 src/cursor/cur_log.c
 src/cursor/cur_metadata.c

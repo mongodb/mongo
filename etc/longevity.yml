@@ -5,20 +5,19 @@ pre:
     - command: shell.track
 
 post:
+    - command: attach.results
+      params:
+        file_location: src/report.json
     - command: shell.cleanup
     - command: shell.exec
-      # destroy the cluster after the test is done
       params:
         working_dir: dsi
         script: |
           set -e 
           set -o verbose
           cd ./clusters/${cluster}
-          # destroy the cluster post test
-          yes yes | ./terraform destroy
           # clean all file to be safe
           rm -rf *
-          echo "Cluster DESTROYED."
 
 functions:
   "prepare environment":
@@ -74,7 +73,7 @@ functions:
           set -o verbose
           cd ./clusters/${cluster}
           # configure mongodb cluster with wiredTiger
-          ../../bin/config-${setup}.sh mongodb ${storageEngine} ${numShard}
+          USE_CSRS=${use_csrs} ../../bin/config-${setup}.sh mongodb ${storageEngine} ${numShard}
           echo "${cluster} MongoDB Cluster STARTED."
           
   "run test":
@@ -115,6 +114,7 @@ functions:
           set -o verbose
           cd ./clusters/${cluster}
           # destroy the EC2 cluster
+          yes yes | ./terraform destroy
           yes yes | ./terraform destroy
           # clean all file to be safe
           rm -rf *
@@ -158,6 +158,29 @@ functions:
             content_type: ${content_type|application/x-gzip}
             display_name: ${test}-longevity-testlog
 
+  "analyze":
+    - command: json.get_history
+      params:
+        task: ${task_name}
+        file: "src/history.json"
+        name: "perf"
+    - command: json.get_history
+      params:
+        tags: true
+        task: ${task_name}
+        file: "src/tags.json"
+        name: "perf"
+    - command: shell.exec
+      # post_run_check.py and longevity_override.json for DSI tests is part of dsi repo in dsi/bin
+      type : test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          python -u ../dsi/analysis/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.0.6-Baseline --overrideFile ../dsi/analysis/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
+
+
 tasks:
 - name: compile
   commands:
@@ -198,10 +221,13 @@ tasks:
 - name: shard_cluster_test
   depends_on:
     - name: compile
+  exec_timeout_secs: 216000 
   commands:
     - func: "prepare environment"
     - func: "bring up 3 shard cluster"
     - func: "configure mongodb cluster"
+      vars:
+        use_csrs: "false"
     - func: "run test"
       vars:
         test: "ycsb"
@@ -209,6 +235,47 @@ tasks:
     - func: "upload log file"
       vars:
         test: "ycsb"
+    - func: "analyze"
+    - func: "destroy cluster"
+
+- name: shard_cluster_CSRS_test
+  depends_on:
+    - name: compile
+  exec_timeout_secs: 28800
+  commands:
+    - func: "prepare environment"
+    - func: "bring up 3 shard cluster"
+    - func: "configure mongodb cluster"
+      vars:
+        use_csrs: "true"
+    - func: "run test"
+      vars:
+        test: "ycsb-CSRS-wiredTiger"
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "ycsb"
+    - func: "analyze"
+    - func: "destroy cluster"
+
+- name: shard_cluster_MMAPv1_test
+  depends_on:
+    - name: compile
+  exec_timeout_secs: 28800
+  commands:
+    - func: "prepare environment"
+    - func: "bring up 3 shard cluster"
+    - func: "configure mongodb cluster"
+      vars:
+        use_csrs: "false"
+    - func: "run test"
+      vars:
+        test: "ycsb-mmap"
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "ycsb"
+    - func: "analyze"
     - func: "destroy cluster"
 
 buildvariants:
@@ -230,3 +297,39 @@ buildvariants:
       - rhel55
     - name: shard_cluster_test
 
+- name: linux-wt-shard-csrs
+  display_name: Linux WT Shard CSRS
+  batchtime: 10080 # 1 week
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    setup: shard
+    cluster: longevity
+    numShard: 3
+    storageEngine: wiredTiger
+
+  run_on:
+    - "linux-64-amzn-perf-longevity"
+  tasks:
+    - name: compile
+      distros:
+      - rhel55
+    - name: shard_cluster_CSRS_test
+    
+
+- name: linux-mmapv1-shard
+  display_name: Linux MMAPv1 Shard
+  batchtime: 10080 # 1 week
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    setup: shard
+    cluster: longevity
+    numShard: 3
+    storageEngine: mmapv1 
+
+  run_on:
+    - "linux-64-amzn-perf-longevity"
+  tasks:
+    - name: compile
+      distros:
+      - rhel55
+    - name: shard_cluster_MMAPv1_test

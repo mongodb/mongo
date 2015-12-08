@@ -1,6 +1,6 @@
-// version2.js
+(function() {
 
-s = new ShardingTest( "version2" , 1 , 2 )
+var s = new ShardingTest({ name: "version2", shards: 1 });
 
 s.adminCommand( { enablesharding : "alleyinsider" } );
 s.adminCommand( { shardcollection : "alleyinsider.foo" , key : { num : 1 } } );
@@ -14,13 +14,16 @@ assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s
 assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.i, 0 );
 
 var fooEpoch = s.getDB('config').chunks.findOne({ ns: 'alleyinsider.foo' }).lastmodEpoch;
-assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
-                       configdb: s._configDB,
-                       authoritative: true,
-                       version: new Timestamp(1, 0),
-                       versionEpoch: fooEpoch,
-                       shard: "shard0000",
-                       shardHost: "localhost:30000" }).ok == 1 );
+assert.commandWorked(
+    a.runCommand({
+        setShardVersion: "alleyinsider.foo",
+        configdb: s._configDB,
+        authoritative: true,
+        version: new Timestamp(1, 0),
+        versionEpoch: fooEpoch,
+        shard: "shard0000",
+        shardHost: s.s.host,
+    }));
 
 printjson( s.config.chunks.findOne() );
 
@@ -43,6 +46,7 @@ assert.commandWorked( a2.runCommand({ setShardVersion: "alleyinsider.bar",
                                       configdb: s._configDB,
                                       version: new Timestamp(1, 0),
                                       versionEpoch: barEpoch,
+                                      shard: 'shard0000',
                                       authoritative: true }),
                       "setShardVersion bar temp" );
 
@@ -60,5 +64,6 @@ assert.throws( simpleFindOne , [] , "should complain about not in sharded mode 1
 
 // simpleFindOne(); // newer version is ok
 
-
 s.stop();
+
+})();

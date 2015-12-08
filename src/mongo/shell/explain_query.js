@@ -5,10 +5,6 @@
 
 var DBExplainQuery = (function() {
 
-    // We expect to get back a "command not found" error in a sharded configuration if any
-    // of the shards have not been upgraded and don't implement the explain command.
-    var CMD_NOT_FOUND_CODE = 59;
-
     //
     // Private methods.
     //
@@ -154,7 +150,8 @@ var DBExplainQuery = (function() {
                     innerCmd = this._query._convertToCountCmd(this._applySkipLimit);
                 }
                 else {
-                    innerCmd = this._query._convertToCommand();
+                    var canAttachReadPref = false;
+                    innerCmd = this._query._convertToCommand(canAttachReadPref);
                 }
 
                 var explainCmd = {explain: innerCmd};
@@ -167,9 +164,10 @@ var DBExplainQuery = (function() {
                     explainCmd = explainDb._attachReadPreferenceToCommand(explainCmd, prefObj);
                 }
 
-                var explainResult = explainDb.runCommand(explainCmd, null, this._query._options);
+                var explainResult =
+                    explainDb.runReadCommand(explainCmd, null, this._query._options);
 
-                if (!explainResult.ok && explainResult.code === CMD_NOT_FOUND_CODE) {
+                if (!explainResult.ok && explainResult.code === ErrorCodes.CommandNotFound) {
                     // One of the shards doesn't have the explain command available. Retry using
                     // the legacy $explain format, which should be supported by all shards.
                     return explainWithLegacyQueryOption(this);

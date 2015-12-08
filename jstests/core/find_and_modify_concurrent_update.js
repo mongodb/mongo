@@ -23,6 +23,7 @@
             update: {$inc: {a: 1}}
         });
 
+        join();
         var docs = t.find().toArray();
         assert.eq(docs.length, 1);
 
@@ -31,8 +32,6 @@
         // fail to find a match. The assertion is that 'a' got incremented once (not zero times
         // and not twice).
         assert.eq(docs[0].a, 2);
-
-        join();
     }
 
 })();

@@ -274,19 +274,17 @@ public:
 
         rpc::CommandRequestBuilder requestBuilder{};
 
-        requestBuilder.setDatabase("admin")
-            .setCommandName(cmd)
-            .setMetadata(rpc::makeEmptyMetadata())
-            .setCommandArgs(cmdObj);
+        requestBuilder.setDatabase("admin").setCommandName(cmd).setCommandArgs(cmdObj).setMetadata(
+            rpc::makeEmptyMetadata());
 
         auto cmdRequestMsg = requestBuilder.done();
-        rpc::CommandRequest cmdRequest{cmdRequestMsg.get()};
+        rpc::CommandRequest cmdRequest{&cmdRequestMsg};
         rpc::CommandReplyBuilder cmdReplyBuilder{};
 
         Command::execCommand(txn, c, cmdRequest, &cmdReplyBuilder);
 
         auto cmdReplyMsg = cmdReplyBuilder.done();
-        rpc::CommandReply cmdReply{cmdReplyMsg.get()};
+        rpc::CommandReply cmdReply{&cmdReplyMsg};
 
         responseCode = 200;
 

@@ -1,0 +1,21 @@
+selector:
+  js_test:
+    roots:
+    - jstests/replsets/*.js
+    exclude_files:
+    - jstests/replsets/config_server_checks.js
+    - jstests/replsets/last_op_visible.js
+    - jstests/replsets/oplog_truncated_on_recovery.js
+    - jstests/replsets/read_committed*.js
+    - jstests/replsets/read_majority_two_arbs.js
+    # The combination of new bridges and PV0 can lead to an improper spanning tree in sync2.js.
+    - jstests/replsets/sync2.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            useLegacyReplicationProtocol: true
+        nodb: ''

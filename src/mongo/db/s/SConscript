@@ -23,28 +23,42 @@ env.Library(
     target='sharding',
     source=[
         'migration_destination_manager.cpp',
+        'migration_impl.cpp',
         'migration_source_manager.cpp',
         'sharded_connection_info.cpp',
         'sharding_state.cpp',
+        'sharding_state_recovery.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/s/sharding_initialization',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on symbols defined in files in serverOnlyFiles, and has
+        # many other missing dependencies.
+        'incomplete',
+    ],
 )
 
 env.Library(
     target='commands',
     source=[
         'merge_chunks_command.cpp',
+        'move_chunk_command.cpp',
         'set_shard_version_command.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/s/serveronly',
         'metadata',
         'sharding',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on getDeleter, defined in s/serveronly, which would be circular.
+        'incomplete',
+    ],
 )
 
 env.CppUnitTest(
@@ -57,7 +71,6 @@ env.CppUnitTest(
         'metadata',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy',
         '$BUILD_DIR/mongo/s/coreshard',

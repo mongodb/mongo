@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/ops/delete_request.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -69,7 +70,7 @@ Status ParsedDelete::parseRequest() {
 Status ParsedDelete::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
-    const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
+    const ExtensionsCallbackReal extensionsCallback(_txn, &_request->getNamespaceString());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
@@ -93,7 +94,7 @@ Status ParsedDelete::parseQueryToCQ() {
                                                      emptyObj,  // max
                                                      false,     // snapshot
                                                      _request->isExplain(),
-                                                     whereCallback);
+                                                     extensionsCallback);
 
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());

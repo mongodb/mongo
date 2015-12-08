@@ -159,11 +159,15 @@ void SyncSourceFeedback::run() {
     Client::initThread("SyncSourceFeedback");
 
     while (true) {  // breaks once _shutdownSignaled is true
+        auto txn = cc().makeOperationContext();
         {
             stdx::unique_lock<stdx::mutex> lock(_mtx);
             while (!_positionChanged && !_shutdownSignaled) {
                 if (_cond.wait_for(lock, _keepAliveInterval) == stdx::cv_status::timeout) {
-                    break;
+                    MemberState state = ReplicationCoordinator::get(txn.get())->getMemberState();
+                    if (!(state.primary() || state.startup())) {
+                        break;
+                    }
                 }
             }
 
@@ -174,7 +178,6 @@ void SyncSourceFeedback::run() {
             _positionChanged = false;
         }
 
-        auto txn = cc().makeOperationContext();
         MemberState state = ReplicationCoordinator::get(txn.get())->getMemberState();
         if (state.primary() || state.startup()) {
             _resetConnection();
@@ -187,24 +190,14 @@ void SyncSourceFeedback::run() {
         }
         if (!hasConnection()) {
             // fix connection if need be
-            if (target.empty()) {
-                sleepmillis(500);
-                stdx::unique_lock<stdx::mutex> lock(_mtx);
-                _positionChanged = true;
-                continue;
-            }
-            if (!_connect(txn.get(), target)) {
-                sleepmillis(500);
-                stdx::unique_lock<stdx::mutex> lock(_mtx);
-                _positionChanged = true;
+            if (target.empty() || !_connect(txn.get(), target)) {
+                // Loop back around again; the keepalive functionality will cause us to retry
                 continue;
             }
         }
         Status status = updateUpstream(txn.get());
         if (!status.isOK()) {
-            sleepmillis(500);
-            stdx::unique_lock<stdx::mutex> lock(_mtx);
-            _positionChanged = true;
+            log() << "updateUpstream failed: " << status << ", will retry";
         }
     }
 }

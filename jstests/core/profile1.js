@@ -54,13 +54,13 @@
         var msg = "";
         profileItems.forEach(function(d) {
             msg += "profile doc: " + d.ns + " " + d.op + " " +
-                tojson(d.query ? d.query : d.command);
+                tojson(d.query ? d.query : d.command) + '\n';
         });
         msg += tojson(db.system.profile.stats());
 
         // If these nunmbers don't match, it is possible the collection has rolled over
         // (set to 32MB above in the hope this doesn't happen)
-        assert.eq(3, profileItems.length, "E2 -- " + msg);
+        assert.eq(2, profileItems.length, "E2 -- " + msg);
 
         // Make sure we can't drop if profiling is still on
         assert.throws(function(z){

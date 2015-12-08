@@ -8,6 +8,10 @@
  * - fsyncUnlock (or start) Secondary
  * - Start mongod as hidden secondary
  * - Wait until new hidden node becomes secondary
+ *
+ * Some methods for backup used in this test checkpoint the files in the dbpath. This technique will
+ * not work for ephemeral storage engines, as they do not store any data in the dbpath.
+ * @tags: [requires_persistence]
  */
 
 (function() {
@@ -84,6 +88,7 @@
             "    'reindex_background.js'," +
             "    'yield_sort.js'," +
             "].map(function(file) { return dir + '/' + file; });" +
+            "Random.setRandomSeed();" +
             // run indefinitely
             "while (true) {" +
             "   try {" +
@@ -154,7 +159,10 @@
             }
         });
         var nodes = rst.startSet();
-        rst.initiate();
+
+        // Wait up to 5 minutes for the replica set to initiate. We allow extra time because
+        // allocating 1GB oplogs on test hosts can be slow with mmapv1.
+        rst.initiate(null, null, 5 * 60 * 1000);
         var primary = rst.getPrimary();
         var secondary = rst.getSecondary();
 
@@ -169,8 +177,16 @@
         // Let clients run for specified time before backing up secondary
         sleep(clientTime);
 
-        // Perform fsync to create checkpoint
-        assert.commandWorked(primary.adminCommand({fsync : 1}), testName + ' failed to fsync');
+        // Perform fsync to create checkpoint. We doublecheck if the storage engine
+        // supports fsync here.
+        var ret = primary.adminCommand({fsync : 1});
+
+        if (!ret.ok) {
+            assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
+            jsTestLog("Skipping test of " + options.backup
+                + " for " + storageEngine + ' as it does not support fsync');
+            return;
+        }
 
         // Configure new hidden secondary
         var dbpathSecondary = secondary.dbpath;
@@ -191,9 +207,15 @@
 
         // Perform the data backup to new secondary
         if (options.backup == 'fsyncLock') {
-            // Lock the DB for write, get dbhash & copy DB files for hidden secondary
-            assert.commandWorked(secondary.getDB("admin").fsyncLock(), testName +
-                                 ' failed to fsyncLock');
+            // Test that the secondary supports fsyncLock
+            var ret = secondary.getDB("admin").fsyncLock();
+            if (!ret.ok) {
+                assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
+                jsTestLog("Skipping test of " + options.backup
+                    + " for " + storageEngine + ' as it does not support fsync');
+                return;
+            }
+
             dbHash = secondary.getDB(crudDb).runCommand({dbhash: 1}).md5;
             copyDbpath(dbpathSecondary, hiddenDbpath);
             removeFile(hiddenDbpath + '/mongod.lock');
@@ -249,8 +271,8 @@
         // Note the dbhash can only run when the DB is inactive to get a result
         // that can be compared, which is only in the fsyncLock/fsynUnlock case
         if (dbHash !== undefined) {
-            assert(dbHash, rst.nodes[numNodes].getDB(crudDb).runCommand({dbhash: 1}).md5,
-                   testName + ' dbHash');
+            assert.eq(dbHash, rst.nodes[numNodes].getDB(crudDb).runCommand({dbhash: 1}).md5,
+                      testName + ' dbHash');
         }
 
         // Add new hidden secondary to replica set
@@ -266,14 +288,19 @@
         assert.commandWorked(primary.adminCommand({replSetReconfig : rsConfig}), testName +
                              ' failed to reconfigure replSet ' + tojson(rsConfig));
 
-        // Wait up to 60 seconds until the new hidden node is in state secondary
-        rst.waitForState(rst.nodes[numNodes], rst.SECONDARY, 60 * 1000);
+        // Wait up to 60 seconds until the new hidden node is in state RECOVERING.
+        rst.waitForState(rst.nodes[numNodes], [rst.RECOVERING, rst.SECONDARY], 60 * 1000);
 
-        // Stop CRUD client, FSM client & replica set mongods
+        // Stop CRUD client and FSM client.
         assert(checkProgram(crudPid), testName + ' CRUD client was not running at end of test');
         assert(checkProgram(fsmPid), testName + ' FSM client was not running at end of test');
         stopMongoProgramByPid(crudPid);
         stopMongoProgramByPid(fsmPid);
+
+        // Wait up to 60 seconds until the new hidden node is in state SECONDARY.
+        rst.waitForState(rst.nodes[numNodes], rst.SECONDARY, 60 * 1000);
+
+        // Stop set.
         rst.stopSet();
 
         // Cleanup the files from the test
@@ -283,22 +310,19 @@
     }
 
     // Main
+
+    // Add storage engines which are to be skipped entirely to this array
+    var noBackupTests = [ 'inMemoryExperiment' ];
+
+    // Grab the storage engine, default is wiredTiger
     var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
+    if (noBackupTests.indexOf(storageEngine) != -1) {
+        jsTestLog("Skipping test for " + storageEngine);
+        return;
+    }
+
     if (storageEngine === "wiredTiger") {
-        // fsyncLock does not work for wiredTiger (SERVER-18899)
-        // runTest({
-        //     name: storageEngine + ' fsyncLock/fsyncUnlock',
-        //     storageEngine: storageEngine,
-        //     backup: 'fsyncLock',
-        //     clientTime: 30000
-        // });
-        runTest({
-            name: storageEngine + ' stop/start',
-            storageEngine: storageEngine,
-            backup: 'stopStart',
-            clientTime: 30000
-        });
         // if rsync is not available on the host, then this test is skipped
         if (!runProgram('bash', '-c', 'which rsync')) {
             runTest({
@@ -310,19 +334,21 @@
         } else {
             jsTestLog("Skipping test for " + storageEngine + ' rolling');
         }
-    } else if (storageEngine === 'inMemoryExperiment') {
-        jsTestLog("Skipping test for " + storageEngine);
-    } else {
-        runTest({
-            name: storageEngine + ' fsyncLock/fsyncUnlock',
-            storageEngine: storageEngine,
-            backup: 'fsyncLock'
-        });
-        runTest({
-            name: storageEngine + ' stop/start',
-            storageEngine: storageEngine,
-            backup: 'stopStart'
-        });
     }
+
+    // Run the fsyncLock test. Will return before testing for any engine that doesn't 
+    // support fsyncLock
+    runTest({
+        name: storageEngine + ' fsyncLock/fsyncUnlock',
+        storageEngine: storageEngine,
+        backup: 'fsyncLock'
+    });
+
+    runTest({
+        name: storageEngine + ' stop/start',
+        storageEngine: storageEngine,
+        backup: 'stopStart',
+        clientTime: 30000
+    });
 
 }());

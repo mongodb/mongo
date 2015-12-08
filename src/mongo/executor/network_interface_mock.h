@@ -75,6 +75,7 @@ public:
 
     NetworkInterfaceMock();
     virtual ~NetworkInterfaceMock();
+    virtual void appendConnectionStats(BSONObjBuilder* b);
     virtual std::string getDiagnosticString();
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -95,7 +96,13 @@ public:
                               const RemoteCommandRequest& request,
                               const RemoteCommandCompletionFn& onFinish);
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
+    /**
+     * Not implemented.
+     */
+    void cancelAllCommands() override {}
     virtual void setAlarm(Date_t when, const stdx::function<void()>& action);
+
+    virtual bool onNetworkThread();
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -139,6 +146,12 @@ public:
     NetworkOperationIterator getNextReadyRequest();
 
     /**
+     * Gets the first unscheduled request. There must be at least one unscheduled request in the
+     * queue.
+     */
+    NetworkOperationIterator getFrontOfUnscheduledQueue();
+
+    /**
      * Schedules "response" in response to "noi" at virtual time "when".
      */
     void scheduleResponse(NetworkOperationIterator noi,
@@ -160,10 +173,11 @@ public:
 
     /**
      * Runs the simulator forward until now() == until or hasReadyRequests() is true.
+     * Returns now().
      *
      * Will not return until the executor thread is blocked in waitForWorkUntil or waitForWork.
      */
-    void runUntil(Date_t until);
+    Date_t runUntil(Date_t until);
 
     /**
      * Processes all ready, scheduled network operations.

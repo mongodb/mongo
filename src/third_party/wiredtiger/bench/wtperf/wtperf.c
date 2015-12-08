@@ -100,7 +100,7 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 static inline uint64_t
 get_next_incr(CONFIG *cfg)
 {
-	return (WT_ATOMIC_ADD8(cfg->insert_key, 1));
+	return (__wt_atomic_add64(&cfg->insert_key, 1));
 }
 
 static void
@@ -151,7 +151,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	switch (type) {
 	case WT_AOP_COMPACT:
 		tables = (uint32_t *)op->app_private;
-		WT_ATOMIC_ADD4(*tables, (uint32_t)-1);
+		(void)__wt_atomic_add32(tables, (uint32_t)-1);
 		break;
 	case WT_AOP_INSERT:
 		trk = &thread->insert;
@@ -186,7 +186,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		return (0);
 	if (ret == 0 || (ret == WT_NOTFOUND && type != WT_AOP_INSERT)) {
 		if (!cfg->in_warmup)
-			(void)WT_ATOMIC_ADD8(trk->ops, 1);
+			(void)__wt_atomic_add64(&trk->ops, 1);
 		return (0);
 	}
 err:
@@ -600,7 +600,34 @@ worker(void *arg)
 			if (ret == WT_NOTFOUND)
 				break;
 
-op_err:			lprintf(cfg, ret, 0,
+op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
+				/*
+				 * If we are running with explicit transactions
+				 * configured and we hit a WT_ROLLBACK, then we
+				 * should rollback the current transaction and
+				 * attempt to continue.
+				 * This does break the guarantee of insertion
+				 * order in cases of ordered inserts, as we
+				 * aren't retrying here.
+				 */
+				lprintf(cfg, ret, 1,
+				    "%s for: %s, range: %"PRIu64, op_name(op),
+				    key_buf, wtperf_value_range(cfg));
+				if ((ret = session->rollback_transaction(
+				    session, NULL)) != 0) {
+					lprintf(cfg, ret, 0,
+					     "Failed rollback_transaction");
+					goto err;
+				}
+				if ((ret = session->begin_transaction(
+				    session, NULL)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "Worker begin transaction failed");
+					goto err;
+				}
+				break;
+			}
+			lprintf(cfg, ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
 			    op_name(op), key_buf, wtperf_value_range(cfg));
 			goto err;
@@ -626,7 +653,7 @@ op_err:			lprintf(cfg, ret, 0,
 					goto err;
 				}
 				++trk->latency_ops;
-				usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+				usecs = WT_TIMEDIFF_US(stop, start);
 				track_operation(trk, usecs);
 			}
 			/* Increment operation count */
@@ -644,7 +671,7 @@ op_err:			lprintf(cfg, ret, 0,
 			if ((ret = session->begin_transaction(
 			    session, NULL)) != 0) {
 				lprintf(cfg, ret, 0,
-				    "Worker transaction commit failed");
+				    "Worker begin transaction failed");
 				goto err;
 			}
 		}
@@ -909,7 +936,7 @@ populate_thread(void *arg)
 				goto err;
 			}
 			++trk->latency_ops;
-			usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+			usecs = WT_TIMEDIFF_US(stop, start);
 			track_operation(trk, usecs);
 		}
 		++thread->insert.ops;	/* Same as trk->ops */
@@ -1041,7 +1068,7 @@ populate_async(void *arg)
 			goto err;
 		}
 		++trk->latency_ops;
-		usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+		usecs = WT_TIMEDIFF_US(stop, start);
 		track_operation(trk, usecs);
 	}
 	if ((ret = session->close(session, NULL)) != 0) {
@@ -1171,8 +1198,12 @@ monitor(void *arg)
 		if (latency_max != 0 &&
 		    (read_max > latency_max || insert_max > latency_max ||
 		     update_max > latency_max))
-			lprintf(cfg, WT_PANIC, 0,
-			    "max latency exceeded: threshold %" PRIu32
+			/*
+			 * Make this a non-fatal error and print WARNING in
+			 * the output so Jenkins can flag it as unstable.
+			 */
+			lprintf(cfg, 0, 0,
+			    "WARNING: max latency exceeded: threshold %" PRIu32
 			    " read max %" PRIu32 " insert max %" PRIu32
 			    " update max %" PRIu32, latency_max,
 			    read_max, insert_max, update_max);
@@ -1355,7 +1386,7 @@ execute_populate(CONFIG *cfg)
 	}
 
 	lprintf(cfg, 0, 1, "Finished load of %" PRIu32 " items", cfg->icount);
-	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
+	msecs = WT_TIMEDIFF_MS(stop, start);
 
 	/*
 	 * This is needed as the divisions will fail if the insert takes no time
@@ -1413,7 +1444,7 @@ execute_populate(CONFIG *cfg)
 		}
 		lprintf(cfg, 0, 1,
 		    "Compact completed in %" PRIu64 " seconds",
-		    (uint64_t)(ns_to_sec(WT_TIMEDIFF(stop, start))));
+		    (uint64_t)(WT_TIMEDIFF_SEC(stop, start)));
 		assert(tables == 0);
 	}
 	return (0);
@@ -1424,6 +1455,8 @@ close_reopen(CONFIG *cfg)
 {
 	int ret;
 
+	if (!cfg->reopen_connection)
+		return (0);
 	/*
 	 * Reopen the connection.  We do this so that the workload phase always
 	 * starts with the on-disk files, and so that read-only workloads can
@@ -2390,7 +2423,7 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 	 * If we did enough operations in less than a second, sleep for
 	 * the rest of the second.
 	 */
-	usecs_to_complete = ns_to_us(WT_TIMEDIFF(now, *interval));
+	usecs_to_complete = WT_TIMEDIFF_US(now, *interval);
 	if (usecs_to_complete < USEC_PER_SEC)
 		(void)usleep((useconds_t)(USEC_PER_SEC - usecs_to_complete));
 
@@ -2424,7 +2457,7 @@ drop_all_tables(CONFIG *cfg)
 		}
 	}
 	(void)__wt_epoch(NULL, &stop);
-	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
+	msecs = WT_TIMEDIFF_MS(stop, start);
 	lprintf(cfg, 0, 1,
 	    "Executed %" PRIu32 " drop operations average time %" PRIu64 "ms",
 	    cfg->table_count, msecs / cfg->table_count);

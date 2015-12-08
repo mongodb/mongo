@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include <string>
 #include <vector>
 
@@ -35,15 +37,19 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -76,6 +82,10 @@ public:
         return true;
     }
 
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -106,12 +116,17 @@ public:
 
         // Extract the query field. If the query field is nonexistent, an empty query is used.
         BSONObj query;
-        BSONElement queryElt;
-        auto statusQuery = bsonExtractTypedField(cmdObj, kQueryField, BSONType::Object, &queryElt);
-        if (statusQuery.isOK()) {
-            query = queryElt.embeddedObject();
-        } else if (statusQuery != ErrorCodes::NoSuchKey) {
-            return {statusQuery};
+        if (BSONElement queryElt = cmdObj[kQueryField]) {
+            if (queryElt.type() == BSONType::Object) {
+                query = queryElt.embeddedObject();
+            } else if (queryElt.type() != BSONType::jstNULL) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "\"" << kQueryField
+                                            << "\" had the wrong type. Expected "
+                                            << typeName(BSONType::Object) << " or "
+                                            << typeName(BSONType::jstNULL) << ", found "
+                                            << typeName(queryElt.type()));
+            }
         }
 
         auto executor = getExecutorDistinct(
@@ -127,6 +142,7 @@ public:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         const string ns = parseNs(dbname, cmdObj);
         AutoGetCollectionForRead ctx(txn, ns);
@@ -198,9 +214,24 @@ public:
             }
         }
 
+        // Return an error if execution fails for any reason.
+        if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+            const std::unique_ptr<PlanStageStats> stats(executor.getValue()->getStats());
+            log() << "Plan executor error during distinct command: "
+                  << PlanExecutor::statestr(state) << ", stats: " << Explain::statsToBSON(*stats);
+
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::OperationFailed,
+                                              str::stream()
+                                                  << "Executor error during distinct command: "
+                                                  << WorkingSetCommon::toStatusString(obj)));
+        }
+
+
         // Get summary information about the plan.
         PlanSummaryStats stats;
         Explain::getSummaryStats(*executor.getValue(), &stats);
+        collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
 
         verify(start == bb.buf());
 

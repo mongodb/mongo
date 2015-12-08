@@ -53,6 +53,13 @@ jsTest.log( "Running movePrimary for foo through mongosA ..." )
 // MongosA should already know about all the collection states
 printjson( adminA.runCommand({ movePrimary : "foo", to : fooOtherShard._id }) );
 
+if (st.configRS) {
+    // If we are in CSRS mode need to make sure that mongosB will actually get the most recent
+    // config data.
+    st.configRS.awaitLastOpCommitted();
+}
+
+
 // All collections still correctly sharded / unsharded
 assert.neq( null, mongosA.getCollection("foo.coll0").findOne() );
 assert.neq( null, mongosA.getCollection("foo.coll1").findOne() );
@@ -81,7 +88,12 @@ printjson( adminB.runCommand({ movePrimary : "bar", to : barOtherShard._id }) );
 // We need to flush the cluster config on mongosA, so it can discover that database 'bar' got
 // moved. Otherwise since the collections are not sharded, we have no way of discovering this.
 // See SERVER-8059.
-adminA.runCommand({ flushRouterConfig : 1 });
+if (st.configRS) {
+    // If we are in CSRS mode need to make sure that after we flushRouterConfig we'll actually get
+    // the most recent config data.
+    st.configRS.awaitLastOpCommitted();
+}
+assert.commandWorked(adminA.runCommand({ flushRouterConfig : 1 }));
 
 // All collections still correctly sharded / unsharded
 assert.neq( null, mongosA.getCollection("bar.coll0").findOne() );

@@ -124,7 +124,7 @@ restart:
  *	Return the previous fixed-length entry on the append list.
  */
 static inline int
-__cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_ITEM *val;
 	WT_PAGE *page;
@@ -209,7 +209,7 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
  *	Move to the previous, fixed-length column-store item.
  */
 static inline int
-__cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_fix_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_BTREE *btree;
 	WT_ITEM *val;
@@ -258,7 +258,7 @@ new_page:
  *	Return the previous variable-length entry on the append list.
  */
 static inline int
-__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
@@ -281,7 +281,8 @@ new_page:	if (cbt->ins == NULL)
 		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL)
 			continue;
 		if (WT_UPDATE_DELETED_ISSET(upd)) {
-			++cbt->page_deleted_count;
+			if (__wt_txn_visible_all(session, upd->txnid))
+				++cbt->page_deleted_count;
 			continue;
 		}
 		val->data = WT_UPDATE_DATA(upd);
@@ -296,7 +297,7 @@ new_page:	if (cbt->ins == NULL)
  *	Move to the previous, variable-length column-store item.
  */
 static inline int
-__cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_var_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
@@ -343,7 +344,8 @@ new_page:	if (cbt->recno < page->pg_var_recno)
 		    NULL : __wt_txn_read(session, cbt->ins->upd);
 		if (upd != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				++cbt->page_deleted_count;
+				if (__wt_txn_visible_all(session, upd->txnid))
+					++cbt->page_deleted_count;
 				continue;
 			}
 
@@ -414,7 +416,7 @@ new_page:	if (cbt->recno < page->pg_var_recno)
  *	Move to the previous row-store item.
  */
 static inline int
-__cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_row_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_INSERT *ins;
 	WT_ITEM *key, *val;
@@ -471,7 +473,8 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
 				continue;
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				++cbt->page_deleted_count;
+				if (__wt_txn_visible_all(session, upd->txnid))
+					++cbt->page_deleted_count;
 				continue;
 			}
 			key->data = WT_INSERT_KEY(ins);
@@ -505,7 +508,8 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		rip = &page->pg_row_d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)) {
-			++cbt->page_deleted_count;
+			if (__wt_txn_visible_all(session, upd->txnid))
+				++cbt->page_deleted_count;
 			continue;
 		}
 
@@ -519,13 +523,13 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
  *	Move to the previous record in the tree.
  */
 int
-__wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
+__wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	uint32_t flags;
-	int newpage;
+	bool newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
@@ -536,21 +540,21 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	if (truncating)
 		LF_SET(WT_READ_TRUNCATE);
 
-	WT_RET(__cursor_func_init(cbt, 0));
+	WT_RET(__cursor_func_init(cbt, false));
 
 	/*
 	 * If we aren't already iterating in the right direction, there's
 	 * some setup to do.
 	 */
 	if (!F_ISSET(cbt, WT_CBT_ITERATE_PREV))
-		__wt_btcur_iterate_setup(cbt, 0);
+		__wt_btcur_iterate_setup(cbt);
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
 	 * found.  Then, move to the previous page, until we reach the start
 	 * of the file.
 	 */
-	for (newpage = 0;; newpage = 1) {
+	for (newpage = false;; newpage = true) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
 		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
 
@@ -578,7 +582,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 			F_CLR(cbt, WT_CBT_ITERATE_APPEND);
 			if (ret != WT_NOTFOUND)
 				break;
-			newpage = 1;
+			newpage = true;
 		}
 		if (page != NULL) {
 			switch (page->type) {

@@ -1,5 +1,3 @@
-// sorted_data_interface_test_cursor.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -28,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
 #include <memory>
@@ -51,7 +51,7 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmpty) {
         const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
 
-        ASSERT(!cursor->seek(minKey, true));
+        ASSERT(!cursor->seek(kMinBSONKey, true));
 
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->next());
@@ -73,7 +73,7 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmptyReversed) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
 
-        ASSERT(!cursor->seek(maxKey, true));
+        ASSERT(!cursor->seek(kMaxBSONKey, true));
 
         // Cursor at EOF should remain at EOF when advanced
         ASSERT(!cursor->next());
@@ -112,7 +112,7 @@ TEST(SortedDataInterface, ExhaustCursor) {
         const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         for (int i = 0; i < nToInsert; i++) {
-            auto entry = i == 0 ? cursor->seek(minKey, true) : cursor->next();
+            auto entry = i == 0 ? cursor->seek(kMinBSONKey, true) : cursor->next();
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
         }
         ASSERT(!cursor->next());
@@ -155,7 +155,7 @@ TEST(SortedDataInterface, ExhaustCursorReversed) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         for (int i = nToInsert - 1; i >= 0; i--) {
-            auto entry = (i == nToInsert - 1) ? cursor->seek(maxKey, true) : cursor->next();
+            auto entry = (i == nToInsert - 1) ? cursor->seek(kMaxBSONKey, true) : cursor->next();
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
         }
         ASSERT(!cursor->next());

@@ -32,6 +32,7 @@
 #include "mongo/client/fetcher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -42,12 +43,6 @@ namespace mongo {
 
 class DBClientBase;
 class OperationContext;
-
-namespace executor {
-
-class TaskExecutor;
-
-}  // namespace executor
 
 namespace repl {
 
@@ -92,17 +87,13 @@ public:
 
 
     void shutdown();
-    void notify(OperationContext* txn);
 
     bool isPaused() const;
-
-    // Blocks until _pause becomes true from a call to stop() or shutdown()
-    void waitUntilPaused();
 
     virtual ~BackgroundSync() {}
 
     // starts the producer thread
-    void producerThread(executor::TaskExecutor* taskExecutor);
+    void producerThread();
     // starts the sync target notifying thread
     void notifierThread();
 
@@ -120,6 +111,11 @@ public:
 
     // Clears any fetched and buffered oplog entries.
     void clearBuffer();
+
+    /**
+     * Cancel existing find/getMore commands on the sync source's oplog collection.
+     */
+    void cancelFetcher();
 
     bool getInitialSyncRequestedFlag();
     void setInitialSyncRequestedFlag(bool value);
@@ -144,7 +140,10 @@ private:
     // Production thread
     BlockingQueue<BSONObj> _buffer;
 
-    // _mutex protects all of the class variables except _syncSourceReader and _buffer
+    // Task executor used to run find/getMore commands on sync source.
+    executor::ThreadPoolTaskExecutor _threadPoolTaskExecutor;
+
+    // _mutex protects all of the class variables except _buffer
     mutable stdx::mutex _mutex;
 
     OpTime _lastOpTimeFetched;
@@ -155,9 +154,6 @@ private:
 
     // if produce thread should be running
     bool _pause;
-    stdx::condition_variable _pausedCondition;
-    bool _appliedBuffer;
-    stdx::condition_variable _appliedBufferCondition;
 
     HostAndPort _syncSourceHost;
 
@@ -166,8 +162,8 @@ private:
     BackgroundSync operator=(const BackgroundSync& s);
 
     // Production thread
-    void _producerThread(executor::TaskExecutor* taskExecutor);
-    void _produce(OperationContext* txn, executor::TaskExecutor* taskExecutor);
+    void _producerThread();
+    void _produce(OperationContext* txn);
 
     /**
      * Processes query responses from fetcher.
@@ -177,6 +173,7 @@ private:
                           const HostAndPort& source,
                           OpTime lastOpTimeFetched,
                           long long lastFetchedHash,
+                          Milliseconds fetcherMaxTimeMS,
                           Status* remoteOplogStartStatus);
 
     /**
@@ -187,8 +184,19 @@ private:
                    const HostAndPort& source,
                    stdx::function<DBClientBase*()> getConnection);
 
-    // Evaluate if the current sync target is still good
-    bool _shouldChangeSyncSource(const HostAndPort& syncSource);
+    /**
+     * Evaluate if the current sync source is still good.
+     * "syncSource" is the name of the current sync source, which will be used to look up the
+     * member's heartbeat data.
+     * "syncSourceLastOpTime" is the last OpTime the sync source has. This is passed in because the
+     * data stored from heartbeats could be too stale and would cause unnecessary sync source
+     * changes.
+     * "syncSourceHasSyncSource" indicates whether our sync source is currently syncing from another
+     * member.
+     */
+    bool _shouldChangeSyncSource(const HostAndPort& syncSource,
+                                 const OpTime& syncSourceLastOpTime,
+                                 bool syncSourceHasSyncSource);
 
     // restart syncing
     void start(OperationContext* txn);

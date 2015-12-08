@@ -60,6 +60,7 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
@@ -584,7 +585,7 @@ static void edit(const string& whatToEdit) {
 }
 
 int _main(int argc, char* argv[], char** envp) {
-    setupSignalHandlers(true);
+    setupSignalHandlers();
     setupSignals();
 
     mongo::shell_utils::RecordMyLocation(argv[0]);
@@ -681,6 +682,10 @@ int _main(int argc, char* argv[], char** envp) {
     mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
     mongo::ScriptEngine::setup();
     mongo::globalScriptEngine->setScopeInitCallback(mongo::shell_utils::initScope);
+    mongo::globalScriptEngine->enableJIT(!shellGlobalParams.nojit);
+
+    auto poolGuard = MakeGuard([] { ScriptEngine::dropScopeCache(); });
+
     unique_ptr<mongo::Scope> scope(mongo::globalScriptEngine->newScope());
     shellMainScope = scope.get();
 
@@ -706,8 +711,9 @@ int _main(int argc, char* argv[], char** envp) {
 
     if (!shellGlobalParams.script.empty()) {
         mongo::shell_utils::MongoProgramScope s;
-        if (!scope->exec(shellGlobalParams.script, "(shell eval)", true, true, false))
+        if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false))
             return -4;
+        scope->exec("shellPrintHelper( __lastres__ );", "(shell2 eval)", true, true, false);
     }
 
     for (size_t i = 0; i < shellGlobalParams.files.size(); ++i) {
@@ -725,6 +731,7 @@ int _main(int argc, char* argv[], char** envp) {
     if (shellGlobalParams.files.size() == 0 && shellGlobalParams.script.empty())
         shellGlobalParams.runShell = true;
 
+    bool lastLineSuccessful = true;
     if (shellGlobalParams.runShell) {
         mongo::shell_utils::MongoProgramScope s;
         // If they specify norc, assume it's not their first time
@@ -847,39 +854,46 @@ int _main(int argc, char* argv[], char** envp) {
             bool wascmd = false;
             {
                 string cmd = linePtr;
-                if (cmd.find(" ") > 0)
-                    cmd = cmd.substr(0, cmd.find(" "));
+                string::size_type firstSpace;
+                if ((firstSpace = cmd.find(" ")) != string::npos)
+                    cmd = cmd.substr(0, firstSpace);
 
                 if (cmd.find("\"") == string::npos) {
                     try {
-                        scope->exec((string) "__iscmd__ = shellHelper[\"" + cmd + "\"];",
-                                    "(shellhelp1)",
-                                    false,
-                                    true,
-                                    true);
-                        if (scope->getBoolean("__iscmd__")) {
-                            scope->exec((string) "shellHelper( \"" + cmd + "\" , \"" +
-                                            code.substr(cmd.size()) + "\");",
-                                        "(shellhelp2)",
+                        lastLineSuccessful =
+                            scope->exec((string) "__iscmd__ = shellHelper[\"" + cmd + "\"];",
+                                        "(shellhelp1)",
                                         false,
                                         true,
-                                        false);
+                                        true);
+                        if (scope->getBoolean("__iscmd__")) {
+                            lastLineSuccessful =
+                                scope->exec((string) "shellHelper( \"" + cmd + "\" , \"" +
+                                                code.substr(cmd.size()) + "\");",
+                                            "(shellhelp2)",
+                                            false,
+                                            true,
+                                            false);
                             wascmd = true;
                         }
                     } catch (std::exception& e) {
                         cout << "error2:" << e.what() << endl;
                         wascmd = true;
+                        lastLineSuccessful = false;
                     }
                 }
             }
 
             if (!wascmd) {
                 try {
-                    if (scope->exec(code.c_str(), "(shell)", false, true, false))
+                    lastLineSuccessful = scope->exec(code.c_str(), "(shell)", false, true, false);
+                    if (lastLineSuccessful) {
                         scope->exec(
                             "shellPrintHelper( __lastres__ );", "(shell2)", true, true, false);
+                    }
                 } catch (std::exception& e) {
                     cout << "error:" << e.what() << endl;
+                    lastLineSuccessful = false;
                 }
             }
 
@@ -894,7 +908,7 @@ int _main(int argc, char* argv[], char** envp) {
         stdx::lock_guard<stdx::mutex> lk(mongo::shell_utils::mongoProgramOutputMutex);
         mongo::dbexitCalled = true;
     }
-    return 0;
+    return (lastLineSuccessful ? 0 : 1);
 }
 
 #ifdef _WIN32

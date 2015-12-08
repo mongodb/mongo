@@ -30,50 +30,27 @@
 
 #pragma once
 
-#include "mongo/db/fts/fts_query.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/fts/fts_query_impl.h"
+#include "mongo/db/matcher/expression_text_base.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
-class TextMatchExpression : public LeafMatchExpression {
+class NamespaceString;
+class OperationContext;
+
+class TextMatchExpression : public TextMatchExpressionBase {
 public:
-    TextMatchExpression() : LeafMatchExpression(TEXT) {}
-    virtual ~TextMatchExpression() {}
+    Status init(OperationContext* txn, const NamespaceString& nss, TextParams params);
 
-    Status init(const std::string& query,
-                const std::string& language,
-                bool caseSensitive,
-                bool diacriticSensitive);
-
-    virtual bool matchesSingleElement(const BSONElement& e) const;
-
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
-
-    virtual void toBSON(BSONObjBuilder* out) const;
-
-    virtual bool equivalent(const MatchExpression* other) const;
-
-    virtual std::unique_ptr<MatchExpression> shallowClone() const;
-
-    const std::string& getQuery() const {
-        return _query;
+    const fts::FTSQuery& getFTSQuery() const final {
+        return _ftsQuery;
     }
-    const std::string& getLanguage() const {
-        return _language;
-    }
-    bool getCaseSensitive() const {
-        return _caseSensitive;
-    }
-    bool getDiacriticSensitive() const {
-        return _diacriticSensitive;
-    }
+
+    std::unique_ptr<MatchExpression> shallowClone() const final;
 
 private:
-    std::string _query;
-    std::string _language;
-    bool _caseSensitive;
-    bool _diacriticSensitive;
+    fts::FTSQueryImpl _ftsQuery;
 };
 
 }  // namespace mongo

@@ -48,14 +48,14 @@ struct JSThreadInfo : public BaseInfo {
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(init);
-        MONGO_DEFINE_JS_FUNCTION(start);
-        MONGO_DEFINE_JS_FUNCTION(join);
-        MONGO_DEFINE_JS_FUNCTION(hasFailed);
-        MONGO_DEFINE_JS_FUNCTION(returnData);
+        MONGO_DECLARE_JS_FUNCTION(init);
+        MONGO_DECLARE_JS_FUNCTION(start);
+        MONGO_DECLARE_JS_FUNCTION(join);
+        MONGO_DECLARE_JS_FUNCTION(hasFailed);
+        MONGO_DECLARE_JS_FUNCTION(returnData);
 
-        MONGO_DEFINE_JS_FUNCTION(_threadInject);
-        MONGO_DEFINE_JS_FUNCTION(_scopedThreadInject);
+        MONGO_DECLARE_JS_FUNCTION(_threadInject);
+        MONGO_DECLARE_JS_FUNCTION(_scopedThreadInject);
     };
 
     /**

@@ -15,13 +15,13 @@ var awaitShell = startParallelShell( "db = db.getSiblingDB( '" + baseName + "');
                                      " }", testServer.port );
 
 for( i = 0; i < 30; ++i ) {
-    var bulk = t.initializeUnorderedBulkOp();
+    var bulk = t.initializeOrderedBulkOp();
     for( j = 0; j < 5000; ++j ) {
         bulk.insert({ _id: j } );
     }
 
     for( j = 0; j < 5000; ++j ) {
-        bulk.find({ _id: j }).remove();
+        bulk.find({ _id: j, $isolated: 1 }).remove();
     }
 
     assert.writeOK(bulk.execute());

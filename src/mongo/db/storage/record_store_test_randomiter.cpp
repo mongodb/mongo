@@ -119,8 +119,8 @@ TEST(RecordStoreTestHarness, GetRandomIteratorNonEmpty) {
         ASSERT(cursor->next());
 
         // We should have at least visited a quarter of the items if we're any random at all
-        // This should be enabled once the fix for WT-2032 is integrated:
-        // ASSERT_LT(remain.size(), nToInsert * 3 / 4);
+        // The expected fraction of visited records is 62.3%.
+        ASSERT_LT(remain.size(), nToInsert * 3 / 4);
     }
 }
 
@@ -163,11 +163,11 @@ TEST(RecordStoreTestHarness, GetRandomIteratorSingleton) {
         // We should be pointing at the only record in the store.
 
         // Check deattaching / reattaching
-        cursor->savePositioned();
+        cursor->save();
         cursor->detachFromOperationContext();
         opCtx = harnessHelper->newOperationContext();
         cursor->reattachToOperationContext(opCtx.get());
-        cursor->restore();
+        ASSERT_TRUE(cursor->restore());
 
         auto record = cursor->next();
         ASSERT_EQUALS(record->id, idToRetrieve);

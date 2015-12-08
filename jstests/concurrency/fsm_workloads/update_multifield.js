@@ -67,6 +67,10 @@ var $config = (function() {
         assertAlways.commandWorked(db[collName].ensureIndex({ z: 1 }));
         assertAlways.commandWorked(db[collName].ensureIndex({ x: 1, y: 1, z: 1 }));
 
+        // numDocs should be much less than threadCount, to make more threads use the same docs.
+        this.numDocs = Math.floor(this.threadCount / 3);
+        assertAlways.gt(this.numDocs, 0, 'numDocs should be a positive number');
+
         for (var i = 0; i < this.numDocs; ++i) {
             var res = db[collName].insert({ _id: i });
             assertWhenOwnColl.writeOK(res);
@@ -74,9 +78,8 @@ var $config = (function() {
         }
     }
 
-    var threadCount = 10;
     return {
-        threadCount: threadCount,
+        threadCount: 10,
         iterations: 10,
         startState: 'update',
         states: states,
@@ -105,8 +108,6 @@ var $config = (function() {
             },
             multi: false,
             isolated: false,
-            // numDocs should be much less than threadCount, to make more threads use the same docs
-            numDocs: Math.floor(threadCount / 3)
         },
         setup: setup
     };

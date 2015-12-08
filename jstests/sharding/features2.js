@@ -1,10 +1,6 @@
-// features2.js
+(function() {
 
-s = new ShardingTest( "features2" , 2 , 1 , 1 );
-
-// The counts and the tests for "on-num-shards" only works for previous assumptions in balancer 
-// behavior and assumes migrations do not occur during count() commands.
-s.stopBalancer()
+var s = new ShardingTest({ name: "features2", shards: 2, mongos: 1 });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -27,7 +23,7 @@ assert( a.foo.distinct("x").length == 0 || b.foo.distinct("x").length == 0 , "di
 
 assert.eq( 1 , s.onNumShards( "foo" ) , "A1" );
 
-s.shardGo( "foo" , { x : 1 } , { x : 2 } , { x : 3 }, null, true /* waitForDelete */ );
+s.shardColl( "foo" , { x : 1 } , { x : 2 } , { x : 3 }, null, true /* waitForDelete */ );
 
 assert.eq( 2 , s.onNumShards( "foo" ) , "A2" );
 
@@ -135,7 +131,7 @@ doMR = function( n ){
 doMR( "before" );
 
 assert.eq( 1 , s.onNumShards( "mr" ) , "E1" );
-s.shardGo( "mr" , { x : 1 } , { x : 2 } , { x : 3 }, null, true /* waitForDelete */ );
+s.shardColl( "mr" , { x : 1 } , { x : 2 } , { x : 3 }, null, true /* waitForDelete */ );
 assert.eq( 2 , s.onNumShards( "mr" ) , "E1" );
 
 doMR( "after" );
@@ -202,3 +198,5 @@ delete im2.localTime;
 assert.eq( isMaster, im2 );
 
 s.stop();
+
+})();

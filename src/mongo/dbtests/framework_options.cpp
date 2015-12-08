@@ -37,7 +37,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"

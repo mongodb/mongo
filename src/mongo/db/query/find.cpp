@@ -44,6 +44,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
@@ -53,7 +54,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
@@ -137,6 +138,7 @@ void beginQueryOp(OperationContext* txn,
 }
 
 void endQueryOp(OperationContext* txn,
+                Collection* collection,
                 const PlanExecutor& exec,
                 int dbProfilingLevel,
                 long long numResults,
@@ -151,10 +153,14 @@ void endQueryOp(OperationContext* txn,
     // Fill out curop based on explain summary statistics.
     PlanSummaryStats summaryStats;
     Explain::getSummaryStats(exec, &summaryStats);
-    curop->debug().scanAndOrder = summaryStats.hasSortStage;
-    curop->debug().nscanned = summaryStats.totalKeysExamined;
-    curop->debug().nscannedObjects = summaryStats.totalDocsExamined;
+    curop->debug().hasSortStage = summaryStats.hasSortStage;
+    curop->debug().keysExamined = summaryStats.totalKeysExamined;
+    curop->debug().docsExamined = summaryStats.totalDocsExamined;
     curop->debug().idhack = summaryStats.isIdhack;
+
+    if (collection) {
+        collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+    }
 
     const logger::LogComponent queryLogComponent = logger::LogComponent::kQuery;
     const logger::LogSeverity logLevelOne = logger::LogSeverity::Debug(1);
@@ -163,7 +169,8 @@ void endQueryOp(OperationContext* txn,
     if (dbProfilingLevel > 0 || curop->elapsedMillis() > serverGlobalParams.slowMS ||
         logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
         // Generate plan summary string.
-        curop->debug().planSummary = Explain::getPlanSummary(&exec);
+        stdx::lock_guard<Client>(*txn->getClient());
+        curop->setPlanSummary_inlock(Explain::getPlanSummary(&exec));
     }
 
     // Set debug information for consumption by the profiler only.
@@ -175,9 +182,9 @@ void endQueryOp(OperationContext* txn,
         curop->debug().execStats.set(statsBob.obj());
 
         // Replace exec stats with plan summary if stats cannot fit into CachedBSONObj.
-        if (curop->debug().execStats.tooBig() && !curop->debug().planSummary.empty()) {
+        if (curop->debug().execStats.tooBig() && !curop->getPlanSummary().empty()) {
             BSONObjBuilder bob;
-            bob.append("summary", curop->debug().planSummary.toString());
+            bob.append("summary", curop->getPlanSummary());
             curop->debug().execStats.set(bob.done());
         }
     }
@@ -361,10 +368,24 @@ QueryResult::View getMore(OperationContext* txn,
         // What number result are we starting at?  Used to fill out the reply.
         startingResult = cc->pos();
 
+        uint64_t notifierVersion = 0;
+        std::shared_ptr<CappedInsertNotifier> notifier;
+        if (isCursorAwaitData(cc)) {
+            invariant(ctx->getCollection()->isCapped());
+            // Retrieve the notifier which we will wait on until new data arrives. We make sure
+            // to do this in the lock because once we drop the lock it is possible for the
+            // collection to become invalid. The notifier itself will outlive the collection if
+            // the collection is dropped, as we keep a shared_ptr to it.
+            notifier = ctx->getCollection()->getCappedInsertNotifier();
+
+            // Must get the version before we call generateBatch in case a write comes in after
+            // that call and before we call wait on the notifier.
+            notifierVersion = notifier->getVersion();
+        }
+
         PlanExecutor* exec = cc->getExecutor();
         exec->reattachToOperationContext(txn);
         exec->restoreState();
-
         PlanExecutor::ExecState state;
 
         generateBatch(ntoreturn, cc, &bb, &numResults, &slaveReadTill, &state);
@@ -372,21 +393,18 @@ QueryResult::View getMore(OperationContext* txn,
         // If this is an await data cursor, and we hit EOF without generating any results, then
         // we block waiting for new data to arrive.
         if (isCursorAwaitData(cc) && state == PlanExecutor::IS_EOF && numResults == 0) {
-            // Retrieve the notifier which we will wait on until new data arrives. We make sure
-            // to do this in the lock because once we drop the lock it is possible for the
-            // collection to become invalid. The notifier itself will outlive the collection if
-            // the collection is dropped, as we keep a shared_ptr to it.
-            auto notifier = ctx->getCollection()->getCappedInsertNotifier();
-
             // Save the PlanExecutor and drop our locks.
             exec->saveState();
             ctx.reset();
 
             // Block waiting for data for up to 1 second.
             Seconds timeout(1);
-            uint64_t lastInsertCount = notifier->getCount();
-            notifier->waitForInsert(lastInsertCount, timeout);
+            notifier->wait(notifierVersion, timeout);
             notifier.reset();
+
+            // Set expected latency to match wait time. This makes sure the logs aren't spammed
+            // by awaitData queries that exceed slowms due to blocking on the CappedInsertNotifier.
+            curop.setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
 
             // Reacquiring locks.
             ctx = make_unique<AutoGetCollectionForRead>(txn, nss);
@@ -475,7 +493,7 @@ std::string runQuery(OperationContext* txn,
 
     // Parse the qm into a CanonicalQuery.
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(q, WhereCallbackReal(txn, nss.db()));
+    auto statusWithCQ = CanonicalQuery::canonicalize(q, ExtensionsCallbackReal(txn, &nss));
     if (!statusWithCQ.isOK()) {
         uasserted(
             17287,
@@ -530,9 +548,10 @@ std::string runQuery(OperationContext* txn,
         return "";
     }
 
+    ShardingState* const shardingState = ShardingState::get(txn);
+
     // We freak out later if this changes before we're done with the query.
-    const ChunkVersion shardingVersionAtStart =
-        ShardingState::get(getGlobalServiceContext())->getVersion(nss.ns());
+    const ChunkVersion shardingVersionAtStart = shardingState->getVersion(nss.ns());
 
     // Handle query option $maxTimeMS (not used with commands).
     curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
@@ -548,7 +567,7 @@ std::string runQuery(OperationContext* txn,
     // bb is used to hold query results
     // this buffer should contain either requested documents per query or
     // explain information, but not both
-    BufBuilder bb(32768);
+    BufBuilder bb(FindCommon::kInitReplyBufferSize);
     bb.skip(sizeof(QueryResult::Value));
 
     // How many results have we obtained from the executor?
@@ -562,7 +581,10 @@ std::string runQuery(OperationContext* txn,
     // uint64_t numMisplacedDocs = 0;
 
     // Get summary info about which plan the executor is using.
-    curop.debug().planSummary = Explain::getPlanSummary(exec.get());
+    {
+        stdx::lock_guard<Client> lk(*txn->getClient());
+        curop.setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+    }
 
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
         // Add result to output buffer.
@@ -606,16 +628,13 @@ std::string runQuery(OperationContext* txn,
     // TODO: Currently, chunk ranges are kept around until all ClientCursors created while the
     // chunk belonged on this node are gone. Separating chunk lifetime management from
     // ClientCursor should allow this check to go away.
-    if (!ShardingState::get(getGlobalServiceContext())
-             ->getVersion(nss.ns())
-             .isWriteCompatibleWith(shardingVersionAtStart)) {
+    if (!shardingState->getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
         // if the version changed during the query we might be missing some data and its safe to
         // send this as mongos can resend at this point
-        throw SendStaleConfigException(
-            nss.ns(),
-            "version changed during initial query",
-            shardingVersionAtStart,
-            ShardingState::get(getGlobalServiceContext())->getVersion(nss.ns()));
+        throw SendStaleConfigException(nss.ns(),
+                                       "version changed during initial query",
+                                       shardingVersionAtStart,
+                                       shardingState->getVersion(nss.ns()));
     }
 
     // Fill out curop based on query results. If we have a cursorid, we will fill out curop with
@@ -657,10 +676,10 @@ std::string runQuery(OperationContext* txn,
         // use by future getmore ops).
         cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
 
-        endQueryOp(txn, *cc->getExecutor(), dbProfilingLevel, numResults, ccId);
+        endQueryOp(txn, collection, *cc->getExecutor(), dbProfilingLevel, numResults, ccId);
     } else {
         LOG(5) << "Not caching executor but returning " << numResults << " results.\n";
-        endQueryOp(txn, *exec, dbProfilingLevel, numResults, ccId);
+        endQueryOp(txn, collection, *exec, dbProfilingLevel, numResults, ccId);
     }
 
     // Add the results from the query into the output buffer.

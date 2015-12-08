@@ -26,7 +26,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/index/expression_params",
         "$BUILD_DIR/mongo/db/matcher/expression_algo",
         "$BUILD_DIR/mongo/db/matcher/expressions",
-        "$BUILD_DIR/mongo/db/matcher/expressions_text",
         "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/server_parameters",
         "command_request_response",
@@ -51,8 +50,15 @@ env.Library(
         "internal_plans",
         "query_planner",
         "query_planner_test_lib",
-        "$BUILD_DIR/mongo/db/exec/exec"
+        "$BUILD_DIR/mongo/db/curop",
+        "$BUILD_DIR/mongo/db/exec/exec",
+        "$BUILD_DIR/mongo/db/s/sharding",
     ],
+    LIBDEPS_TAGS=[
+        # Depends on files from serverOnlyFiles, and has many other
+        # missing dependencies.
+        'incomplete',
+    ]
 )
 
 # Shared mongod/mongos query code.
@@ -76,7 +82,6 @@ env.CppUnitTest(
     LIBDEPS=[
         "query",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
@@ -106,18 +111,20 @@ env.Library(
     target='command_request_response',
     source=[
         'count_request.cpp',
-        'cursor_responses.cpp',
+        'cursor_response.cpp',
         'find_and_modify_request.cpp',
         'getmore_request.cpp',
-        'getmore_response.cpp',
         'killcursors_request.cpp',
         'killcursors_response.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/rpc/command_status',
+        'lite_parsed_query',
     ]
 )
 
@@ -125,9 +132,9 @@ env.CppUnitTest(
     target='command_request_response_test',
     source=[
         'count_request_test.cpp',
+        'cursor_response_test.cpp',
         'find_and_modify_request_test.cpp',
         'getmore_request_test.cpp',
-        'getmore_response_test.cpp',
         'killcursors_request_test.cpp',
         'killcursors_response_test.cpp',
     ],
@@ -145,6 +152,10 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/exec',
         '$BUILD_DIR/mongo/db/exec/working_set',
+    ],
+    LIBDEPS_TAGS=[
+        # Circular with the 'query' library in this directory
+        'incomplete',
     ],
 )
 
@@ -187,7 +198,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "query_planner",
-        "$BUILD_DIR/mongo/db/matcher/expressions_text",
     ],
 )
 
@@ -340,7 +350,6 @@ env.CppUnitTest(
         "query",
         "query_planner_test_fixture",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/ntservice_mock",
     ],

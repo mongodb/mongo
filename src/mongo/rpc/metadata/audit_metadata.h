@@ -57,6 +57,12 @@ public:
 
     static StatusWith<AuditMetadata> readFromMetadata(const BSONObj& metadataObj);
 
+    /**
+     * Parses AuditMetadata from a pre-extracted BSONElement. When reading a metadata object, this
+     * form is more efficient as it permits parsing the metadata in one pass.
+     */
+    static StatusWith<AuditMetadata> readFromMetadata(const BSONElement& metadataElem);
+
     Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
     static Status downconvert(const BSONObj& command,
@@ -74,6 +80,10 @@ public:
     const boost::optional<UsersAndRoles>& getImpersonatedUsersAndRoles() const;
 
     AuditMetadata(boost::optional<UsersAndRoles> impersonatedUsersAndRoles);
+
+    static StringData fieldName() {
+        return "$audit";
+    }
 
 private:
     boost::optional<UsersAndRoles> _impersonatedUsersAndRoles;

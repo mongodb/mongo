@@ -75,7 +75,7 @@ copyFile("jstests/libs/dur_checksum_bad_first.journal", path + "/journal/j._0");
 copyFile("jstests/libs/dur_checksum_good.journal", path + "/journal/j._1");
 
 exitCode = runMongoProgram("mongod",
-                           "--port", 30001,
+                           "--port", allocatePort(),
                            "--dbpath", path,
                            "--journal",
                            "--smallfiles",

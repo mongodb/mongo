@@ -112,6 +112,7 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitLambdaForSingleton(LLambdaForSingleton* lir);
     void visitPointer(LPointer* lir);
     void visitNurseryObject(LNurseryObject* lir);
+    void visitKeepAliveObject(LKeepAliveObject* lir);
     void visitSlots(LSlots* lir);
     void visitLoadSlotT(LLoadSlotT* lir);
     void visitLoadSlotV(LLoadSlotV* lir);

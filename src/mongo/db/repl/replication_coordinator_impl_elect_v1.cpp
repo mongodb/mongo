@@ -37,6 +37,7 @@
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/repl/election_winner_declarer.h"
 #include "mongo/db/repl/vote_requester.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -107,19 +108,17 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
             fassertFailed(28641);
     }
 
-    const StatusWith<ReplicationExecutor::EventHandle> finishEvh = _replExecutor.makeEvent();
-    if (finishEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+    auto finishedEvent = _makeEvent();
+    if (!finishedEvent) {
         return;
     }
-    fassert(28642, finishEvh.getStatus());
-    _electionFinishedEvent = finishEvh.getValue();
+    _electionFinishedEvent = finishedEvent;
 
-    const StatusWith<ReplicationExecutor::EventHandle> dryRunFinishEvh = _replExecutor.makeEvent();
-    if (dryRunFinishEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+    auto dryRunFinishedEvent = _makeEvent();
+    if (!dryRunFinishedEvent) {
         return;
     }
-    fassert(28767, dryRunFinishEvh.getStatus());
-    _electionDryRunFinishedEvent = dryRunFinishEvh.getValue();
+    _electionDryRunFinishedEvent = dryRunFinishedEvent;
 
     LoseElectionDryRunGuardV1 lossGuard(this);
 
@@ -145,7 +144,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
     StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
         &_replExecutor,
         _rsConfig,
-        _rsConfig.getMemberAt(_selfIndex).getId(),
+        _selfIndex,
         _topCoord->getTerm(),
         true,  // dry run
         getMyLastOptime(),
@@ -167,28 +166,31 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
         return;
     }
 
-    const VoteRequester::VoteRequestResult endResult = _voteRequester->getResult();
+    const VoteRequester::Result endResult = _voteRequester->getResult();
 
-    if (endResult == VoteRequester::InsufficientVotes) {
+    if (endResult == VoteRequester::Result::kInsufficientVotes) {
         log() << "not running for primary, we received insufficient votes";
         return;
-    } else if (endResult == VoteRequester::StaleTerm) {
+    } else if (endResult == VoteRequester::Result::kStaleTerm) {
         log() << "not running for primary, we have been superceded already";
         return;
-    } else if (endResult != VoteRequester::SuccessfullyElected) {
+    } else if (endResult != VoteRequester::Result::kSuccessfullyElected) {
         log() << "not running for primary, we received an unexpected problem";
         return;
     }
 
     log() << "dry election run succeeded, running for election";
-    _updateTerm_incallback(originalTerm + 1, nullptr);
+    // Stepdown is impossible from this term update.
+    TopologyCoordinator::UpdateTermResult updateTermResult;
+    _updateTerm_incallback(originalTerm + 1, &updateTermResult);
+    invariant(updateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm);
     // Secure our vote for ourself first
     _topCoord->voteForMyselfV1();
 
     // Store the vote in persistent storage.
     LastVote lastVote;
     lastVote.setTerm(originalTerm + 1);
-    lastVote.setCandidateId(getMyId());
+    lastVote.setCandidateIndex(_selfIndex);
 
     auto cbStatus = _replExecutor.scheduleDBWork(
         [this, lastVote](const ReplicationExecutor::CallbackArgs& cbData) {
@@ -220,6 +222,7 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
 
     auto cbStatus = _replExecutor.scheduleWork(
         [this, lastVote](const ReplicationExecutor::CallbackArgs& cbData) {
+            _replExecutor.signalEvent(_electionDryRunFinishedEvent);
             _startVoteRequester(lastVote.getTerm());
         });
     if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -227,7 +230,6 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
     }
     fassert(28768, cbStatus.getStatus());
 
-    _replExecutor.signalEvent(_electionDryRunFinishedEvent);
     lossGuard.dismiss();
 }
 
@@ -240,7 +242,7 @@ void ReplicationCoordinatorImpl::_startVoteRequester(long long newTerm) {
     StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
         &_replExecutor,
         _rsConfig,
-        _rsConfig.getMemberAt(_selfIndex).getId(),
+        _selfIndex,
         _topCoord->getTerm(),
         false,
         getMyLastOptime(),
@@ -263,20 +265,34 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
         return;
     }
 
-    const VoteRequester::VoteRequestResult endResult = _voteRequester->getResult();
+    const VoteRequester::Result endResult = _voteRequester->getResult();
 
-    if (endResult == VoteRequester::InsufficientVotes) {
-        log() << "not becoming primary, we received insufficient votes";
-        return;
-    } else if (endResult == VoteRequester::StaleTerm) {
-        log() << "not becoming primary, we have been superceded already";
-        return;
-    } else if (endResult != VoteRequester::SuccessfullyElected) {
-        log() << "not becoming primary, we received an unexpected problem";
-        return;
+    switch (endResult) {
+        case VoteRequester::Result::kInsufficientVotes:
+            log() << "not becoming primary, we received insufficient votes";
+            return;
+        case VoteRequester::Result::kStaleTerm:
+            log() << "not becoming primary, we have been superceded already";
+            return;
+        case VoteRequester::Result::kSuccessfullyElected:
+            log() << "election succeeded, assuming primary role in term " << _topCoord->getTerm();
+            break;
     }
 
-    log() << "election succeeded, assuming primary role in term " << _topCoord->getTerm();
+    {
+        // Mark all nodes that responded to our vote request as up to avoid immediately
+        // relinquishing primary.
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        Date_t now = _replExecutor.now();
+        const unordered_set<HostAndPort> liveNodes = _voteRequester->getResponders();
+        for (auto& nodeInfo : _slaveInfo) {
+            if (liveNodes.count(nodeInfo.hostAndPort)) {
+                nodeInfo.down = false;
+                nodeInfo.lastUpdate = now;
+            }
+        }
+    }
+
     // Prevent last committed optime from updating until we finish draining.
     _setFirstOpTimeOfMyTerm(
         OpTime(Timestamp(std::numeric_limits<int>::max(), 0), std::numeric_limits<int>::max()));
@@ -285,27 +301,6 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
     _voteRequester.reset(nullptr);
     _replExecutor.signalEvent(_electionFinishedEvent);
     lossGuard.dismiss();
-}
-
-void ReplicationCoordinatorImpl::_onElectionWinnerDeclarerComplete() {
-    LoseElectionGuardV1 lossGuard(this);
-
-    invariant(_voteRequester);
-    invariant(_electionWinnerDeclarer);
-
-    const Status endResult = _electionWinnerDeclarer->getStatus();
-
-    if (!endResult.isOK()) {
-        log() << "stepping down from primary, because: " << endResult;
-        _topCoord->prepareForStepDown();
-        _replExecutor.scheduleWorkWithGlobalExclusiveLock(
-            stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1));
-    }
-
-    lossGuard.dismiss();
-    _voteRequester.reset(nullptr);
-    _electionWinnerDeclarer.reset(nullptr);
-    _replExecutor.signalEvent(_electionFinishedEvent);
 }
 
 }  // namespace repl

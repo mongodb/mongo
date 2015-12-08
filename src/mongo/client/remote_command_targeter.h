@@ -29,10 +29,12 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class ConnectionString;
+class OperationContext;
 struct ReadPreferenceSetting;
 struct HostAndPort;
 template <typename T>
@@ -56,15 +58,19 @@ public:
     virtual ConnectionString connectionString() = 0;
 
     /**
-     * Obtains a host, which matches the read preferences specified by readPref.
+     * Obtains a host, which matches the read preferences specified by readPref, blocking for the
+     * specified maxWait milliseconds, if a match cannot be found immediately.
      *
-     * Returns OK and a host and port to use for the specified read preference or any
-     * ErrorCode. Known error codes are:
-     *      NotMaster if readPref is PrimaryOnly and there is no primary in the set
-     *      FailedToSatisfyReadPreference if it cannot find a node to match the read preference
-     *          and the readPref is anything other than PrimaryOnly
+     * Specifying a maxWait of zero means non-blocking. I.e., the call will just check the in-memory
+     * cached view of the replica set's host state and won't wait for it to be refreshed if it is
+     * found to be stale.
+     *
+     * Returns OK and a host and port to use for the specified read preference or an ErrorCode.
+     * Known error codes are:
+     *   All error codes which can be returned by ReplicaSetMonitor::getHostOrRefresh.
      */
-    virtual StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) = 0;
+    virtual StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
+                                             Milliseconds maxWait = Milliseconds(0)) = 0;
 
     /**
      * Reports to the targeter that a NotMaster response was received when communicating with
@@ -72,6 +78,21 @@ public:
      * subsequent request for the primary.
      */
     virtual void markHostNotMaster(const HostAndPort& host) = 0;
+
+    /**
+     * Similar to markHostNotMaster(). Reports to the targeter that a HostUnreachable response was
+     * received when communicating with "host". The targeter should update its bookkeeping to avoid
+     * giving out the same host on a subsequent request.
+     */
+    virtual void markHostUnreachable(const HostAndPort& host) = 0;
+
+    /**
+     * Based on the remaining time of the operation and the default max wait time for findHost,
+     * selects an appropriate value to pass to the maxWait argument of the findHost method, so it
+     * has high likelyhood in returning on time and also leaving time for the rest of the call to
+     * complete.
+     */
+    static Milliseconds selectFindHostMaxWaitTime(OperationContext* txn);
 
 protected:
     RemoteCommandTargeter() = default;

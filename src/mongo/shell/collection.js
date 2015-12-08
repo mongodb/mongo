@@ -54,7 +54,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".find(...).limit(n)");
     print("\tdb." + shortName + ".find(...).skip(n)");
     print("\tdb." + shortName + ".find(...).sort(...)");
-    print("\tdb." + shortName + ".findOne([query])");
+    print("\tdb." + shortName + ".findOne([query], [fields], [options], [readConcern])");
     print("\tdb." + shortName + ".findOneAndDelete( filter, <optional params> ) - delete first matching document, optional parameters are: projection, sort, maxTimeMS");
     print("\tdb." + shortName + ".findOneAndReplace( filter, replacement, <optional params> ) - replace first matching document, optional parameters are: projection, sort, maxTimeMS, upsert, returnNewDocument");
     print("\tdb." + shortName + ".findOneAndUpdate( filter, update, <optional params> ) - update first matching document, optional parameters are: projection, sort, maxTimeMS, upsert, returnNewDocument");
@@ -204,9 +204,13 @@ DBCollection.prototype.find = function( query , fields , limit , skip, batchSize
     return cursor;
 }
 
-DBCollection.prototype.findOne = function( query , fields, options ){
+DBCollection.prototype.findOne = function( query , fields, options, readConcern ){
     var cursor = this.find(query, fields, -1 /* limit */, 0 /* skip*/,
         0 /* batchSize */, options);
+
+    if ( readConcern ) {
+        cursor = cursor.readConcern(readConcern);
+    }
 
     if ( ! cursor.hasNext() )
         return null;
@@ -1486,7 +1490,7 @@ DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
               " for recent migrations." )
        sleep( 30000 )
 
-       for( shard in allSplitPoints ){
+       for( var shard in allSplitPoints ){
            for( var i = 0; i < allSplitPoints[ shard ].length; i++ ){
                var splitKey = allSplitPoints[ shard ][i]
                print( "Splitting at " + tojson( splitKey ) )
@@ -1574,53 +1578,35 @@ DBCollection.prototype.unsetWriteConcern = function() {
 * @param {number} [options.skip=null] The number of documents to skip for the count.
 * @param {string|object} [options.hint=null] An index name hint or specification for the query.
 * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+* @param {string} [options.readConcern=null] The level of readConcern passed to the count command
 * @return {number}
 */
 DBCollection.prototype.count = function(query, options) {
     var opts = Object.extend({}, options || {});
 
-    // Set parameters
-    var skip = (typeof opts.skip == 'number') ? opts.skip : null;
-    var limit = (typeof opts.limit == 'number') ? opts.limit : null;
-    var maxTimeMS = (typeof opts.maxTimeMS == 'number') ? opts.maxTimeMS : null;
-    var hint = opts.hint;
+    var query = this.find(query);
+    if (typeof opts.skip == 'number') {
+        query.skip(opts.skip);
+    }
 
-    // Execute using command if we have passed in skip/limit or hint
-    if (skip != null || limit != null || hint != null || maxTimeMS != null) {
-        // Final query
-        var cmd = {
-            'count': this.getName(),
-            'query': query
-        };
+    if (typeof opts.limit == 'number') {
+        query.limit(opts.limit);
+    }
 
-        // Add limit and skip if defined
-        if (typeof skip == 'number') {
-            cmd.skip = skip;
-        }
+    if (typeof opts.maxTimeMS == 'number') {
+        query.maxTimeMS(opts.maxTimeMS);
+    }
 
-        if (typeof limit == 'number') {
-            cmd.limit = limit;
-        }
+    if (opts.hint) {
+        query.hint(opts.hint);
+    }
 
-        if (hint) {
-            opts.hint = hint;
-        }
-
-        if (opts.maxTimeMS) {
-            cmd.maxTimeMS = opts.maxTimeMS;
-        }
-
-        // Run the command and return the result
-        var response = this.runReadCommand(cmd);
-        if (response.ok == 0) {
-            throw new Error("count failed: " + tojson(response));
-        }
-
-        return response.n;
+    if (typeof opts.readConcern == 'string') {
+        query.readConcern(opts.readConcern);
     }
 
     // Return the result of the find
-    return this.find(query).count();
+    return query.count(true);
 }
 
 /**

@@ -17,7 +17,7 @@ __rename_file(
     WT_SESSION_IMPL *session, const char *uri, const char *newuri)
 {
 	WT_DECL_RET;
-	int exist;
+	bool exist;
 	const char *filename, *newfile;
 	char *newvalue, *oldvalue;
 
@@ -31,7 +31,7 @@ __rename_file(
 
 	/* Close any btree handles in the file. */
 	WT_WITH_HANDLE_LIST_LOCK(session,
-	    ret = __wt_conn_dhandle_close_all(session, uri, 0));
+	    ret = __wt_conn_dhandle_close_all(session, uri, false));
 	WT_ERR(ret);
 
 	/*
@@ -87,9 +87,9 @@ __rename_tree(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(nv);
 	WT_DECL_ITEM(os);
 	WT_DECL_RET;
+	bool is_colgroup;
 	const char *newname, *olduri, *suffix;
 	char *value;
-	int is_colgroup;
 
 	olduri = table->name;
 	value = NULL;
@@ -210,7 +210,7 @@ __rename_table(WT_SESSION_IMPL *session,
 	(void)WT_PREFIX_SKIP(oldname, "table:");
 
 	WT_RET(__wt_schema_get_table(
-	    session, oldname, strlen(oldname), 0, &table));
+	    session, oldname, strlen(oldname), false, &table));
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)
@@ -276,7 +276,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	/* Bump the schema generation so that stale data is ignored. */
 	++S2C(session)->schema_gen;
 
-	WT_TRET(__wt_meta_track_off(session, 1, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

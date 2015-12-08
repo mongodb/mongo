@@ -35,6 +35,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/modifier_object_replace.h"
 #include "mongo/db/ops/modifier_table.h"
@@ -169,11 +170,11 @@ inline Status UpdateDriver::addAndParse(const modifiertable::ModifierType type,
 Status UpdateDriver::populateDocumentWithQueryFields(const BSONObj& query,
                                                      const vector<FieldRef*>* immutablePaths,
                                                      mutablebson::Document& doc) const {
-    // We canonicalize the query to collapse $and/$or, and the first arg (ns) is not needed
-    // Also, because this is for the upsert case, where we insert a new document if one was
-    // not found, the $where clause does not make sense, hence empty WhereCallback.
+    // We canonicalize the query to collapse $and/$or, and the first arg (ns) is not needed.  Also,
+    // because this is for the upsert case, where we insert a new document if one was not found, the
+    // $where/$text clauses do not make sense, hence empty ExtensionsCallback.
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(NamespaceString(""), query, WhereCallbackNoop());
+        CanonicalQuery::canonicalize(NamespaceString(""), query, ExtensionsCallbackNoop());
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

@@ -216,6 +216,9 @@ env.Library(
         'concurrency/spin_lock',
         'foundation',
     ],
+    LIBDEPS_TAGS=[
+        'incomplete'
+    ],
 )
 
 env.CppUnitTest(
@@ -238,11 +241,14 @@ if get_option('allocator') == 'tcmalloc':
         # Add in the include path for our vendored tcmalloc.
         tcmspEnv.InjectThirdPartyIncludePaths('gperftools')
 
+        # Include valgrind since tcmalloc disables itself while running under valgrind
+        tcmspEnv.InjectThirdPartyIncludePaths('valgrind')
+
         # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
         # level configure check, though its effects should still be scoped just to these files.
         tcmspEnv.Append(
             CPPDEFINES=[
-                'MONGO_HAVE_GPERFTOOLS_SHRINK_CACHE_SIZE'
+                'MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE'
             ]
         )
 
@@ -253,7 +259,10 @@ if get_option('allocator') == 'tcmalloc':
             'tcmalloc_set_parameter.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/coredb',
+            # TODO: This is needless, the definition of
+            # ServerStatusSection should live in its own library, as
+            # it doesn't require all of the other commands.
+            '$BUILD_DIR/mongo/db/commands/core',
             '$BUILD_DIR/mongo/db/server_parameters',
             '$BUILD_DIR/mongo/util/net/network',
         ],
@@ -368,6 +377,10 @@ env.Library(
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/db/server_options_core",
     ],
+    LIBDEPS_TAGS=[
+        # Depends on logProcessDetailsForLogRotate and exitCleanly
+        'incomplete',
+    ]
 )
 
 env.CppUnitTest(
@@ -420,4 +433,14 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
+)
+
+env.CppUnitTest(
+    target='itoa_test',
+    source=[
+        'itoa_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
 )

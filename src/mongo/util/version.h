@@ -45,22 +45,19 @@ std::string mongodVersion();
 // mongo git version
 const char* gitVersion();
 const char* distName();
-void printGitVersion();
 std::vector<std::string> compiledModules();
-void printCompiledModules();
 
 // Checks whether another version is the same major version as us
 bool isSameMajorVersion(const char* version);
 
 // Get/print the version of OpenSSL that's used at runtime
 const std::string openSSLVersion(const std::string& prefix = "", const std::string& suffix = "");
-void printOpenSSLVersion();
 
 // Append build info data to a BSONObjBuilder
 void appendBuildInfo(BSONObjBuilder& result);
 
 void printTargetMinOS();
-void printAllocator();
+void printBuildInfo();
 void show_warnings();
 
 extern const int kMongoVersionMajor;

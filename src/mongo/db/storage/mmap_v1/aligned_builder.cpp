@@ -111,7 +111,7 @@ void NOINLINE_DECL AlignedBuilder::growReallocate(unsigned oldLen) {
     }
 
     // Use smaller maximum for debug builds, as we should never be close the the maximum
-    dassert(_len <= 256 * MB);
+    dassert(_len <= 512 * MB);
 
     // Compute newSize by doubling the existing maximum size until the maximum is reached
     invariant(oldSize > 0);

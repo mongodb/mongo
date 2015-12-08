@@ -60,10 +60,11 @@ class MIRGenerator
     }
 
     template <typename T>
-    T * allocate(size_t count = 1) {
-        if (count & mozilla::tl::MulOverflowMask<sizeof(T)>::value)
+    T* allocate(size_t count = 1) {
+        size_t bytes;
+        if (MOZ_UNLIKELY(!CalculateAllocSize<T>(count, &bytes)))
             return nullptr;
-        return reinterpret_cast<T*>(alloc().allocate(sizeof(T) * count));
+        return static_cast<T*>(alloc().allocate(bytes));
     }
 
     // Set an error state and prints a message. Returns false so errors can be

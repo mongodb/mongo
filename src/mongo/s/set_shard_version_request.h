@@ -49,10 +49,27 @@ public:
     /**
      * Constructs a new set shard version request, which is of the "init" type, meaning it has no
      * namespace or version information associated with it and the init flag is set.
+     * The constructed request will not contain the "noConnectionVersioning" field, which means that
+     * the entire connection will be marked as "versioned" on the mongod side. DO NOT USE when
+     * sending through the TaskExecutor, which pools connections without consideration for which
+     * are marked as sharded.
      */
     static SetShardVersionRequest makeForInit(const ConnectionString& configServer,
                                               const std::string& shardName,
                                               const ConnectionString& shardConnectionString);
+
+    /**
+     * Constructs a new set shard version request, which is of the "init" type, meaning it has no
+     * namespace or version information associated with it and the init flag is set. In
+     * addition, the request will contain the "noConnectionVersioning" field, which means that the
+     * connection WILL NOT be marked as "versioned". DO NOT USE except on connections only used
+     * with operations that do per-operation versioning, and do not depend on the connection being
+     * marked as sharded.
+     */
+    static SetShardVersionRequest makeForInitNoPersist(
+        const ConnectionString& configServer,
+        const std::string& shardName,
+        const ConnectionString& shardConnectionString);
 
     /**
      * Constructs a new set shard version request, which is of the "versioning" type, meaning it has
@@ -60,29 +77,30 @@ public:
      *
      * The constructed request will not contain the "noConnectionVersioning" field, which means that
      * the entire connection will be marked as "versioned" on the mongod side. DO NOT USE when
-     * sending through the TaskExecutor, only for ShardConnection.
+     * sending through the TaskExecutor, which pools connections without consideration for which
+     * are marked as sharded.
      */
     static SetShardVersionRequest makeForVersioning(const ConnectionString& configServer,
                                                     const std::string& shardName,
                                                     const ConnectionString& shard,
                                                     const NamespaceString& nss,
-                                                    const ChunkVersionAndOpTime& nssVersion,
+                                                    const ChunkVersion& nssVersion,
                                                     bool isAuthoritative);
 
     /**
      * Constructs a new set shard version request, which is of the "versioning" type, meaning it has
      * both initialization data and namespace and version information associated with it. In
      * addition, the request will contain the "noConnectionVersioning" field, which means that the
-     * connection WILL NOT be marked as "versioned". DO NOT USE unless the command will be sent
-     * through the TaskExecutor.
+     * connection WILL NOT be marked as "versioned". DO NOT USE except on connections only used
+     * with operations that do per-operation versioning, and do not depend on the connection being
+     * marked as sharded.
      */
-    static SetShardVersionRequest makeForVersioningNoPersist(
-        const ConnectionString& configServer,
-        const std::string& shardName,
-        const ConnectionString& shard,
-        const NamespaceString& nss,
-        const ChunkVersionAndOpTime& nssVersion,
-        bool isAuthoritative);
+    static SetShardVersionRequest makeForVersioningNoPersist(const ConnectionString& configServer,
+                                                             const std::string& shardName,
+                                                             const ConnectionString& shard,
+                                                             const NamespaceString& nss,
+                                                             const ChunkVersion& nssVersion,
+                                                             bool isAuthoritative);
 
     /**
      * Parses an SSV request from a set shard version command.
@@ -153,7 +171,7 @@ private:
                            std::string shardName,
                            ConnectionString shardConnectionString,
                            NamespaceString nss,
-                           ChunkVersionAndOpTime version,
+                           ChunkVersion version,
                            bool isAuthoritative);
 
     SetShardVersionRequest();
@@ -169,7 +187,7 @@ private:
 
     // These values are only set if _init is false
     boost::optional<NamespaceString> _nss;
-    boost::optional<ChunkVersionAndOpTime> _version;
+    boost::optional<ChunkVersion> _version;
 };
 
 }  // namespace mongo

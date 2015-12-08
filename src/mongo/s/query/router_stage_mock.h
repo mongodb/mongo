@@ -36,7 +36,8 @@
 namespace mongo {
 
 /**
- * Passes through the first n results and then returns boost::none.
+ * Initialized by adding results to its results queue, it then passes through the results in its
+ * queue until the queue is empty.
  */
 class RouterStageMock final : public RouterExecStage {
 public:
@@ -45,6 +46,10 @@ public:
     StatusWith<boost::optional<BSONObj>> next() final;
 
     void kill() final;
+
+    bool remotesExhausted() final;
+
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
     /**
      * Queues a BSONObj to be returned.
@@ -56,8 +61,26 @@ public:
      */
     void queueError(Status status);
 
+    /**
+     * Queues an explicit boost::none response. The mock stage will also return boost::none
+     * automatically after emptying the queue of responses.
+     */
+    void queueEOF();
+
+    /**
+     * Explicitly marks the remote cursors as all exhausted.
+     */
+    void markRemotesExhausted();
+
+    /**
+     * Gets the timeout for awaitData, or an error if none was set.
+     */
+    StatusWith<Milliseconds> getAwaitDataTimeout();
+
 private:
-    std::queue<StatusWith<BSONObj>> _resultsQueue;
+    std::queue<StatusWith<boost::optional<BSONObj>>> _resultsQueue;
+    bool _remotesExhausted = false;
+    boost::optional<Milliseconds> _awaitDataTimeout;
 };
 
 }  // namespace mongo

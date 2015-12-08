@@ -241,9 +241,10 @@ public:
      * Returns true if the state was successfully restored and the execution tree can be
      * work()'d.
      *
-     * If allowed, will yield and retry if a WriteConflictException is encountered.
+     * Returns false if the PlanExecutor was killed while saved. A killed execution tree cannot be
+     * worked and should be deleted.
      *
-     * Returns false otherwise.  The execution tree cannot be worked and should be deleted.
+     * If allowed, will yield and retry if a WriteConflictException is encountered.
      */
     bool restoreState();
 

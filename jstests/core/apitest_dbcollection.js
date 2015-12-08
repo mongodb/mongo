@@ -1,5 +1,5 @@
 /**
- *   Tests for the db collection 
+ *   Tests for the db collection
  */
 
 
@@ -8,34 +8,34 @@
  *  test drop
  */
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).find().length() == 0,1);
+assert.eq(0, db.getCollection( "test_db" ).find().length(), "1");
 
 db.getCollection( "test_db" ).save({a:1});
-assert(db.getCollection( "test_db" ).find().length() == 1,2);
+assert.eq(1, db.getCollection( "test_db" ).find().length(), "2");
 
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).find().length() == 0,3);
+assert.eq(0, db.getCollection( "test_db" ).find().length(), "3");
 
 /*
  * test count
  */
- 
-assert(db.getCollection( "test_db" ).count() == 0,4);
+
+assert.eq(0, db.getCollection( "test_db" ).count(), "4");
 db.getCollection( "test_db" ).save({a:1});
-assert(db.getCollection( "test_db" ).count() == 1,5);
+assert.eq(1, db.getCollection( "test_db" ).count(), "5");
 for (i = 0; i < 100; i++) {
     db.getCollection( "test_db" ).save({a:1});
 }
-assert(db.getCollection( "test_db" ).count() == 101,6);
+assert.eq(101, db.getCollection( "test_db" ).count(), "6");
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).count() == 0,7);
- 
+assert.eq(0, db.getCollection( "test_db" ).count(), "7");
+
  /*
   * test validate
   */
 
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).count() == 0,8);
+assert.eq(0, db.getCollection( "test_db" ).count(), "8");
 
 for (i = 0; i < 100; i++) {
     db.getCollection( "test_db" ).save({a:1});
@@ -82,59 +82,59 @@ for (i = 0; i < 100; i++) {
 /*
  * test deleteIndex, deleteIndexes
  */
- 
+
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).count() == 0,12);
+assert.eq(0, db.getCollection( "test_db" ).count(), "12");
 db.getCollection( "test_db" ).dropIndexes();
-assert(db.getCollection( "test_db" ).getIndexes().length == 0,13);  
+assert.eq(0, db.getCollection( "test_db" ).getIndexes().length, "13");
 
 db.getCollection( "test_db" ).save({a:10});
-assert(db.getCollection( "test_db" ).getIndexes().length == 1,14);  
+assert.eq(1, db.getCollection( "test_db" ).getIndexes().length, "14");
 
 db.getCollection( "test_db" ).ensureIndex({a:1});
 db.getCollection( "test_db" ).save({a:10});
 
 print( tojson( db.getCollection( "test_db" ).getIndexes() ) );
-assert.eq(db.getCollection( "test_db" ).getIndexes().length , 2,15);  
+assert.eq(2, db.getCollection( "test_db" ).getIndexes().length, "15");
 
 db.getCollection( "test_db" ).dropIndex({a:1});
-assert(db.getCollection( "test_db" ).getIndexes().length == 1,16);  
+assert.eq(1, db.getCollection( "test_db" ).getIndexes().length, "16");
 
 db.getCollection( "test_db" ).save({a:10});
 db.getCollection( "test_db" ).ensureIndex({a:1});
 db.getCollection( "test_db" ).save({a:10});
 
-assert(db.getCollection( "test_db" ).getIndexes().length == 2,17);  
+assert.eq(2, db.getCollection( "test_db" ).getIndexes().length, "17");
 
 db.getCollection( "test_db" ).dropIndex("a_1");
-assert.eq( db.getCollection( "test_db" ).getIndexes().length , 1,18);  
+assert.eq(1, db.getCollection( "test_db" ).getIndexes().length, "18");
 
 db.getCollection( "test_db" ).save({a:10, b:11});
 db.getCollection( "test_db" ).ensureIndex({a:1});
 db.getCollection( "test_db" ).ensureIndex({b:1});
 db.getCollection( "test_db" ).save({a:10, b:12});
 
-assert(db.getCollection( "test_db" ).getIndexes().length == 3,19);  
+assert.eq(3, db.getCollection( "test_db" ).getIndexes().length, "19");
 
 db.getCollection( "test_db" ).dropIndex({b:1});
-assert(db.getCollection( "test_db" ).getIndexes().length == 2,20);  
+assert.eq(2, db.getCollection( "test_db" ).getIndexes().length, "20");
 db.getCollection( "test_db" ).dropIndex({a:1});
-assert(db.getCollection( "test_db" ).getIndexes().length == 1,21);  
+assert.eq(1, db.getCollection( "test_db" ).getIndexes().length, "21");
 
 db.getCollection( "test_db" ).save({a:10, b:11});
 db.getCollection( "test_db" ).ensureIndex({a:1});
 db.getCollection( "test_db" ).ensureIndex({b:1});
 db.getCollection( "test_db" ).save({a:10, b:12});
 
-assert(db.getCollection( "test_db" ).getIndexes().length == 3,22);  
+assert.eq(3, db.getCollection( "test_db" ).getIndexes().length, "22");
 
 db.getCollection( "test_db" ).dropIndexes();
-assert(db.getCollection( "test_db" ).getIndexes().length == 1,23);  
+assert.eq(1, db.getCollection( "test_db" ).getIndexes().length, "23");
 
 db.getCollection( "test_db" ).find();
 
 db.getCollection( "test_db" ).drop();
-assert(db.getCollection( "test_db" ).getIndexes().length == 0,24);  
+assert.eq(0, db.getCollection( "test_db" ).getIndexes().length, "24");
 
 /*
  * stats()

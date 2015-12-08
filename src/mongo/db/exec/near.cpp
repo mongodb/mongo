@@ -216,6 +216,8 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     // results.
     double memberDistance = distanceStatus.getValue();
 
+    // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+    nextMember->makeObjOwnedIfNeeded();
     _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
 
     // Store the member's RecordId, if available, for quick invalidation
@@ -311,7 +313,7 @@ unique_ptr<PlanStageStats> NearStage::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, _stageType);
     ret->specific.reset(_specificStats.clone());
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
-        ret->children.push_back(_childrenIntervals[i]->covering->getStats().release());
+        ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());
     }
     return ret;
 }

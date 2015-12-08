@@ -41,8 +41,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
-// error codes 8000-8009
-
 namespace mongo {
 
 using std::unique_ptr;
@@ -248,7 +246,7 @@ bool SyncClusterConnection::runCommand(const std::string& dbname,
         BSONObjBuilder metadataBob;
         metadataBob.appendElements(upconvertedMetadata);
 
-        uassertStatusOK(getRequestMetadataWriter()(&metadataBob));
+        uassertStatusOK(getRequestMetadataWriter()(&metadataBob, getServerAddress()));
 
         std::tie(interposedCmd, options) = uassertStatusOK(
             rpc::downconvertRequestMetadata(std::move(upconvertedCommand), metadataBob.done()));
@@ -285,7 +283,7 @@ BSONObj SyncClusterConnection::findOne(const string& ns,
         if (lockType > 0) {  // write $cmd
             string errmsg;
             if (!prepare(errmsg))
-                throw UserException(PrepareConfigsFailedCode,
+                throw UserException(ErrorCodes::PrepareConfigsFailed,
                                     (string) "SyncClusterConnection::findOne prepare failed: " +
                                         errmsg);
 
@@ -438,8 +436,9 @@ unique_ptr<DBClientCursor> SyncClusterConnection::_queryOnActive(const string& n
                   << " failed to: " << _conns[i]->toString() << " exception" << endl;
         }
     }
-    throw UserException(
-        8002, str::stream() << "all servers down/unreachable when querying: " << _address);
+    throw UserException(ErrorCodes::HostUnreachable,
+                        str::stream()
+                            << "all servers down/unreachable when querying: " << _address);
 }
 
 unique_ptr<DBClientCursor> SyncClusterConnection::getMore(const string& ns,
@@ -647,6 +646,22 @@ bool SyncClusterConnection::isStillConnected() {
             return false;
     }
     return true;
+}
+
+int SyncClusterConnection::getMinWireVersion() {
+    int minVersion = 0;
+    for (const auto& host : _conns) {
+        minVersion = std::max(minVersion, host->getMinWireVersion());
+    }
+    return minVersion;
+}
+
+int SyncClusterConnection::getMaxWireVersion() {
+    int maxVersion = std::numeric_limits<int>::max();
+    for (const auto& host : _conns) {
+        maxVersion = std::min(maxVersion, host->getMaxWireVersion());
+    }
+    return maxVersion;
 }
 
 void SyncClusterConnection::setAllSoTimeouts(double socketTimeout) {

@@ -36,6 +36,12 @@
 
 namespace mongo {
 
+class OperationContext;
+
+namespace rpc {
+class ServerSelectionMetadata;
+}  // namespace rpc
+
 /**
  * Namespace for the collection of static methods used by commands in the implementation of
  * explain on mongos.
@@ -45,13 +51,18 @@ public:
     /**
      * Given the BSON specification for a command, 'cmdObj', wraps the object in order to
      * produce the BSON for an explain of that command, at the given verbosity level
-     * 'verbosity'.
+     * 'verbosity' and according to the metadata in 'serverSelectionMetadata'.
      *
      * Adds the result to the BSONObj builder 'out'.
+     *
+     * Also uses 'serverSelectionMetdata' to set 'optionsOut' to the options bit vector that should
+     * be forwarded to the shards.
      */
     static void wrapAsExplain(const BSONObj& cmdObj,
                               ExplainCommon::Verbosity verbosity,
-                              BSONObjBuilder* out);
+                              const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                              BSONObjBuilder* out,
+                              int* optionsOut);
 
     /**
      * Determines the kind of "execution stage" that mongos would use in order to collect
@@ -67,7 +78,8 @@ public:
      *
      * On success, the output is added to the BSONObj builder 'out'.
      */
-    static Status buildExplainResult(const std::vector<Strategy::CommandResult>& shardResults,
+    static Status buildExplainResult(OperationContext* txn,
+                                     const std::vector<Strategy::CommandResult>& shardResults,
                                      const char* mongosStageName,
                                      long long millisElapsed,
                                      BSONObjBuilder* out);
@@ -95,7 +107,8 @@ private:
      * The planner info will display 'mongosStageName' as the name of the execution stage
      * performed by mongos after gathering results from the shards.
      */
-    static void buildPlannerInfo(const std::vector<Strategy::CommandResult>& shardResults,
+    static void buildPlannerInfo(OperationContext* txn,
+                                 const std::vector<Strategy::CommandResult>& shardResults,
                                  const char* mongosStageName,
                                  BSONObjBuilder* out);
 

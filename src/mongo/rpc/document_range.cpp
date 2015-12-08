@@ -83,7 +83,7 @@ DocumentRange::const_iterator& DocumentRange::const_iterator::operator++() {
     if (_cursor.length() == 0) {
         *this = const_iterator{};
     } else {
-        _obj = std::move(uassertStatusOK(_cursor.readAndAdvance<Validated<BSONObj>>()).val);
+        _obj = uassertStatusOK(_cursor.readAndAdvance<Validated<BSONObj>>()).val;
     }
     return *this;
 }

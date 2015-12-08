@@ -34,8 +34,8 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
  *	Return the size of a file in bytes, given a file name.
  */
 int
-__wt_filesize_name(
-    WT_SESSION_IMPL *session, const char *filename, wt_off_t *sizep)
+__wt_filesize_name(WT_SESSION_IMPL *session,
+    const char *filename, bool silent, wt_off_t *sizep)
 {
 	struct stat sb;
 	WT_DECL_RET;
@@ -52,5 +52,11 @@ __wt_filesize_name(
 		return (0);
 	}
 
-	WT_RET_MSG(session, ret, "%s: fstat", filename);
+	/*
+	 * Some callers of this function expect failure if the file doesn't
+	 * exist, and don't want an error message logged.
+	 */
+	if (!silent)
+		WT_RET_MSG(session, ret, "%s: fstat", filename);
+	return (ret);
 }

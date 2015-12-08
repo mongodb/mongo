@@ -41,9 +41,9 @@ namespace mozjs {
  */
 struct GlobalInfo : public BaseInfo {
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(gc);
-        MONGO_DEFINE_JS_FUNCTION(print);
-        MONGO_DEFINE_JS_FUNCTION(version);
+        MONGO_DECLARE_JS_FUNCTION(gc);
+        MONGO_DECLARE_JS_FUNCTION(print);
+        MONGO_DECLARE_JS_FUNCTION(version);
     };
 
     static const JSFunctionSpec freeFunctions[4];

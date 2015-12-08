@@ -37,7 +37,7 @@ function test(db, sharded, indexType) {
     assert.commandWorked(db.runCommand(geoCmd), tojson({sharded: sharded, indexType: indexType}));
 }
 
-var sharded = new ShardingTest({shards: 3, verbose: 0, mongos: 1});
+var sharded = new ShardingTest({ shards: 3, mongos: 1 });
 sharded.stopBalancer();
 sharded.adminCommand( { enablesharding : "test" } );
 var shardedDB = sharded.getDB('test');

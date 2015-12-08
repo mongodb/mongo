@@ -15,7 +15,6 @@ executor:
       class: MongoDFixture
       mongod_options:
         journal: ''
-        nopreallocj: ''
         set_parameters:
           enableTestCommands: 1
         smallfiles: ''

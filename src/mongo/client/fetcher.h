@@ -58,8 +58,6 @@ public:
      * If cursor ID is zero, there are no additional batches.
      */
     struct QueryResponse {
-        QueryResponse() = default;
-        QueryResponse(CursorId theCursorId, const NamespaceString& theNss, Documents theDocuments);
         CursorId cursorId = 0;
         NamespaceString nss;
         Documents documents;
@@ -67,7 +65,7 @@ public:
             BSONObj metadata;
         } otherFields;
         Milliseconds elapsedMillis = Milliseconds(0);
-        bool first;
+        bool first = false;
     };
 
     using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
@@ -121,6 +119,14 @@ public:
             const BSONObj& cmdObj,
             const CallbackFn& work,
             const BSONObj& metadata = rpc::makeEmptyMetadata());
+
+    Fetcher(executor::TaskExecutor* executor,
+            const HostAndPort& source,
+            const std::string& dbname,
+            const BSONObj& cmdObj,
+            const CallbackFn& work,
+            const BSONObj& metadata,
+            Milliseconds timeout);
 
     virtual ~Fetcher();
 
@@ -199,6 +205,9 @@ private:
 
     // Callback handle to the scheduled remote command.
     executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
+
+    // Socket timeout
+    Milliseconds _timeout;
 };
 
 }  // namespace mongo

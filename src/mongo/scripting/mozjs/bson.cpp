@@ -30,13 +30,16 @@
 
 #include "mongo/scripting/mozjs/bson.h"
 
+#include <boost/optional.hpp>
 #include <set>
 
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace mozjs {
@@ -56,31 +59,59 @@ namespace {
  * the appearance of mutable state on the read/write versions.
  */
 struct BSONHolder {
-    BSONHolder(const BSONObj& obj, bool ro)
-        : _obj(obj.getOwned()), _resolved(false), _readOnly(ro), _altered(false) {}
+    BSONHolder(const BSONObj& obj, const BSONObj* parent, std::size_t generation, bool ro)
+        : _obj(obj),
+          _generation(generation),
+          _isOwned(obj.isOwned() || (parent && parent->isOwned())),
+          _resolved(false),
+          _readOnly(ro),
+          _altered(false) {
+        if (parent) {
+            _parent.emplace(*parent);
+        }
+    }
+
+    const BSONObj& getOwner() const {
+        return _parent ? *(_parent) : _obj;
+    }
+
+    void uassertValid(JSContext* cx) const {
+        if (!_isOwned && getScope(cx)->getGeneration() != _generation)
+            uasserted(ErrorCodes::BadValue,
+                      "Attempt to access an invalidated BSON Object in JS scope");
+    }
 
     BSONObj _obj;
+    boost::optional<BSONObj> _parent;
+    std::size_t _generation;
+    bool _isOwned;
     bool _resolved;
     bool _readOnly;
     bool _altered;
-    std::set<std::string> _removed;
+    StringMap<bool> _removed;
 };
 
-BSONHolder* getHolder(JSObject* obj) {
-    return static_cast<BSONHolder*>(JS_GetPrivate(obj));
+BSONHolder* getValidHolder(JSContext* cx, JSObject* obj) {
+    auto holder = static_cast<BSONHolder*>(JS_GetPrivate(obj));
+
+    if (holder)
+        holder->uassertValid(cx);
+
+    return holder;
 }
 
 }  // namespace
 
-void BSONInfo::make(JSContext* cx, JS::MutableHandleObject obj, BSONObj bson, bool ro) {
+void BSONInfo::make(
+    JSContext* cx, JS::MutableHandleObject obj, BSONObj bson, const BSONObj* parent, bool ro) {
     auto scope = getScope(cx);
 
-    scope->getBsonProto().newInstance(obj);
-    JS_SetPrivate(obj, new BSONHolder(bson, ro));
+    scope->getProto<BSONInfo>().newObject(obj);
+    JS_SetPrivate(obj, new BSONHolder(bson, parent, scope->getGeneration(), ro));
 }
 
 void BSONInfo::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto holder = getHolder(obj);
+    auto holder = static_cast<BSONHolder*>(JS_GetPrivate(obj));
 
     if (!holder)
         return;
@@ -89,7 +120,7 @@ void BSONInfo::finalize(JSFreeOp* fop, JSObject* obj) {
 }
 
 void BSONInfo::enumerate(JSContext* cx, JS::HandleObject obj, JS::AutoIdVector& properties) {
-    auto holder = getHolder(obj);
+    auto holder = getValidHolder(cx, obj);
 
     if (!holder)
         return;
@@ -105,7 +136,7 @@ void BSONInfo::enumerate(JSContext* cx, JS::HandleObject obj, JS::AutoIdVector& 
 
         // TODO: when we get heterogenous set lookup, switch to StringData
         // rather than involving the temporary string
-        if (holder->_removed.count(e.fieldName()))
+        if (holder->_removed.find(e.fieldName()) != holder->_removed.end())
             continue;
 
         ValueReader(cx, &val).fromStringData(e.fieldNameStringData());
@@ -119,7 +150,7 @@ void BSONInfo::enumerate(JSContext* cx, JS::HandleObject obj, JS::AutoIdVector& 
 
 void BSONInfo::setProperty(
     JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool strict, JS::MutableHandleValue vp) {
-    auto holder = getHolder(obj);
+    auto holder = getValidHolder(cx, obj);
 
     if (holder) {
         if (holder->_readOnly) {
@@ -139,7 +170,7 @@ void BSONInfo::setProperty(
 }
 
 void BSONInfo::delProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* succeeded) {
-    auto holder = getHolder(obj);
+    auto holder = getValidHolder(cx, obj);
 
     if (holder) {
         if (holder->_readOnly) {
@@ -148,14 +179,15 @@ void BSONInfo::delProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
 
         holder->_altered = true;
 
-        holder->_removed.insert(IdWrapper(cx, id).toString());
+        JSStringWrapper jsstr;
+        holder->_removed[IdWrapper(cx, id).toStringData(&jsstr)] = true;
     }
 
     *succeeded = true;
 }
 
 void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp) {
-    auto holder = getHolder(obj);
+    auto holder = getValidHolder(cx, obj);
 
     *resolvedp = false;
 
@@ -164,21 +196,22 @@ void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, boo
     }
 
     IdWrapper idw(cx, id);
+    JSStringWrapper jsstr;
 
-    if (!holder->_readOnly && holder->_removed.count(idw.toString())) {
+    auto sname = idw.toStringData(&jsstr);
+
+    if (!holder->_readOnly && holder->_removed.find(sname.toString()) != holder->_removed.end()) {
         return;
     }
 
     ObjectWrapper o(cx, obj);
-
-    std::string sname = IdWrapper(cx, id).toString();
 
     if (holder->_obj.hasField(sname)) {
         auto elem = holder->_obj[sname];
 
         JS::RootedValue vp(cx);
 
-        ValueReader(cx, &vp).fromBSONElement(elem, holder->_readOnly);
+        ValueReader(cx, &vp).fromBSONElement(elem, holder->getOwner(), holder->_readOnly);
 
         o.defineProperty(id, vp, JSPROP_ENUMERATE);
 
@@ -193,22 +226,16 @@ void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, boo
     }
 }
 
-void BSONInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    scope->getBsonProto().newObject(args.rval());
-}
-
 std::tuple<BSONObj*, bool> BSONInfo::originalBSON(JSContext* cx, JS::HandleObject obj) {
     std::tuple<BSONObj*, bool> out(nullptr, false);
 
-    if (auto holder = getHolder(obj))
+    if (auto holder = getValidHolder(cx, obj))
         out = std::make_tuple(&holder->_obj, holder->_altered);
 
     return out;
 }
 
-void BSONInfo::Functions::bsonWoCompare(JSContext* cx, JS::CallArgs args) {
+void BSONInfo::Functions::bsonWoCompare::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 2)
         uasserted(ErrorCodes::BadValue, "bsonWoCompare needs 2 argument");
 
@@ -228,7 +255,7 @@ void BSONInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObj
     JS::RootedValue value(cx);
     value.setBoolean(true);
 
-    ObjectWrapper(cx, proto).defineProperty("_bson", value, 0);
+    ObjectWrapper(cx, proto).defineProperty(InternedString::_bson, value, 0);
 }
 
 }  // namespace mozjs

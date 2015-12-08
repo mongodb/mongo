@@ -45,17 +45,16 @@ public:
      * Depth is used when readers are invoked from ObjectWrappers to avoid
      * reading out overly nested objects
      */
-    ValueReader(JSContext* cx, JS::MutableHandleValue value, int depth = 0);
+    ValueReader(JSContext* cx, JS::MutableHandleValue value);
 
-    void fromBSONElement(const BSONElement& elem, bool readOnly);
-    void fromBSON(const BSONObj& obj, bool readOnly);
+    void fromBSONElement(const BSONElement& elem, const BSONObj& parent, bool readOnly);
+    void fromBSON(const BSONObj& obj, const BSONObj* parent, bool readOnly);
     void fromStringData(StringData sd);
     void fromDecimal128(Decimal128 decimal);
 
 private:
     JSContext* _context;
     JS::MutableHandleValue _value;
-    int _depth;
 };
 
 }  // namespace mozjs

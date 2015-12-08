@@ -34,15 +34,16 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec NumberIntInfo::methods[4] = {
-    MONGO_ATTACH_JS_FUNCTION(toNumber),
-    MONGO_ATTACH_JS_FUNCTION(toString),
-    MONGO_ATTACH_JS_FUNCTION(valueOf),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toNumber, NumberIntInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberIntInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(valueOf, NumberIntInfo),
     JS_FS_END,
 };
 
@@ -67,17 +68,17 @@ int NumberIntInfo::ToNumberInt(JSContext* cx, JS::HandleObject thisv) {
     return x ? *x : 0;
 }
 
-void NumberIntInfo::Functions::valueOf(JSContext* cx, JS::CallArgs args) {
+void NumberIntInfo::Functions::valueOf::call(JSContext* cx, JS::CallArgs args) {
     int out = NumberIntInfo::ToNumberInt(cx, args.thisv());
 
     args.rval().setInt32(out);
 }
 
-void NumberIntInfo::Functions::toNumber(JSContext* cx, JS::CallArgs args) {
-    valueOf(cx, args);
+void NumberIntInfo::Functions::toNumber::call(JSContext* cx, JS::CallArgs args) {
+    valueOf::call(cx, args);
 }
 
-void NumberIntInfo::Functions::toString(JSContext* cx, JS::CallArgs args) {
+void NumberIntInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     int val = NumberIntInfo::ToNumberInt(cx, args.thisv());
 
     str::stream ss;
@@ -91,7 +92,7 @@ void NumberIntInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     JS::RootedObject thisv(cx);
 
-    scope->getNumberIntProto().newObject(&thisv);
+    scope->getProto<NumberIntInfo>().newObject(&thisv);
 
     int32_t x = 0;
 

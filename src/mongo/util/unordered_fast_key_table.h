@@ -32,29 +32,40 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-template <typename K_L, typename K_S>
-struct UnorderedFastKeyTable_LS_C {
-    K_S operator()(const K_L& a) const {
-        return K_S(a);
-    }
-};
-
-template <typename K_L,                                         // key lookup
-          typename K_S,                                         // key storage
-          typename V,                                           // value
-          typename H,                                           // hash of K_L
-          typename E,                                           // equal of K_L
-          typename C,                                           // convertor from K_S -> K_L
-          typename C_LS = UnorderedFastKeyTable_LS_C<K_L, K_S>  // convertor from K_L -> K_S
-          >
+/**
+ * A hash map that allows a different type to be used stored (K_S) than is used for lookups (K_L).
+ *
+ * Takes a Traits class that must have the following:
+ *
+ * static uint32_t hash(K_L); // Computes a 32-bit hash of the key.
+ * static bool equals(K_L, K_L); // Returns true if the keys are equal.
+ * static K_S toStorage(K_L); // Converts from K_L to K_S.
+ * static K_L toLookup(K_S); // Converts from K_S to K_L.
+ * class HashedKey {
+ * public:
+ *     explicit HashedKey(K_L key); // Computes hash of key.
+ *     HashedKey(K_L key, uint32_t hash); // Populates with known hash.
+ *
+ *     const K_L& key() const;
+ *     uint32_t hash() const; // Should be free to call repeatedly.
+ * };
+ */
+template <typename K_L,  // key lookup
+          typename K_S,  // key storage
+          typename V,    // value
+          typename Traits>
 class UnorderedFastKeyTable {
 public:
-    typedef std::pair<K_S, V> value_type;
-    typedef K_L key_type;
-    typedef V mapped_type;
+    // Typedefs for compatibility with std::map.
+    using value_type = std::pair<K_S, V>;
+    using key_type = K_L;
+    using mapped_type = V;
+
+    using HashedKey = typename Traits::HashedKey;
 
 private:
     struct Entry {
@@ -62,55 +73,72 @@ private:
 
         bool used;
         bool everUsed;
-        size_t curHash;
+        uint32_t curHash;
         value_type data;
     };
 
     struct Area {
-        Area(unsigned capacity, double maxProbeRatio);
-        Area(const Area& other);
+        Area() = default;  // TODO constexpr
 
-        int find(const K_L& key,
-                 size_t hash,
-                 int* firstEmpty,
-                 const UnorderedFastKeyTable& sm) const;
+        Area(unsigned capacity, unsigned maxProbe)
+            : _hashMask(capacity - 1),
+              _maxProbe(maxProbe),
+              _entries(capacity ? new Entry[capacity] : nullptr) {
+            // Capacity must be a power of two or zero. See the comment on _hashMask for why.
+            dassert((capacity & (capacity - 1)) == 0);
+        }
 
-        bool transfer(Area* newArea, const UnorderedFastKeyTable& sm) const;
+        Area(const Area& other) : Area(other.capacity(), other._maxProbe) {
+            std::copy(other.begin(), other.end(), begin());
+        }
+
+        Area& operator=(const Area& other) {
+            Area(other).swap(this);
+            return *this;
+        }
+
+        int find(const HashedKey& key, int* firstEmpty) const;
+
+        bool transfer(Area* newArea) const;
 
         void swap(Area* other) {
             using std::swap;
-            swap(_capacity, other->_capacity);
+            swap(_hashMask, other->_hashMask);
             swap(_maxProbe, other->_maxProbe);
             swap(_entries, other->_entries);
         }
 
-        unsigned _capacity;
-        unsigned _maxProbe;
-        std::unique_ptr<Entry[]> _entries;
+        unsigned capacity() const {
+            return _hashMask + 1;
+        }
+
+        Entry* begin() {
+            return _entries.get();
+        }
+        Entry* end() {
+            return _entries.get() + capacity();
+        }
+
+        const Entry* begin() const {
+            return _entries.get();
+        }
+        const Entry* end() const {
+            return _entries.get() + capacity();
+        }
+
+        // Capacity is always a power of two. This means that the operation (hash % capacity) can be
+        // preformed by (hash & (capacity - 1)). Since we need the mask more than the capacity we
+        // store it directly and derive the capacity from it. The default capacity is 0 so the
+        // default hashMask is -1.
+        unsigned _hashMask = -1;
+        unsigned _maxProbe = 0;
+        std::unique_ptr<Entry[]> _entries = {};
     };
 
 public:
-    static const unsigned DEFAULT_STARTING_CAPACITY = 20;
-
-    /**
-     * @param startingCapacity how many buckets should exist on initial creation
-     *                         DEFAULT_STARTING_CAPACITY
-     * @param maxProbeRatio the percentage of buckets we're willing to probe
-     *                      no defined default as you can't have a static const double on windows
-     */
-    UnorderedFastKeyTable(unsigned startingCapacity = DEFAULT_STARTING_CAPACITY,
-                          double maxProbeRatio = 0.05);
-
-    UnorderedFastKeyTable(const UnorderedFastKeyTable& other);
+    UnorderedFastKeyTable() = default;  // TODO constexpr
 
     UnorderedFastKeyTable(std::initializer_list<std::pair<key_type, mapped_type>> entries);
-
-    UnorderedFastKeyTable& operator=(const UnorderedFastKeyTable& other) {
-        other.copyTo(this);
-        return *this;
-    }
-
-    void copyTo(UnorderedFastKeyTable* out) const;
 
     /**
      * @return number of elements in map
@@ -127,19 +155,30 @@ public:
      * @return storage space
      */
     size_t capacity() const {
-        return _area._capacity;
+        return _area.capacity();
     }
 
+    V& operator[](const HashedKey& key) {
+        return get(key);
+    }
     V& operator[](const K_L& key) {
         return get(key);
     }
 
-    V& get(const K_L& key);
+    V& get(const HashedKey& key);
+    V& get(const K_L& key) {
+        return get(HashedKey(key));
+    }
 
     /**
      * @return number of elements removed
      */
-    size_t erase(const K_L& key);
+    size_t erase(const HashedKey& key);
+    size_t erase(const K_L& key) {
+        if (empty())
+            return 0;  // Don't waste time hashing.
+        return erase(HashedKey(key));
+    }
 
     class const_iterator {
         friend class UnorderedFastKeyTable;
@@ -151,7 +190,7 @@ public:
         const_iterator(const Area* area) {
             _area = area;
             _position = 0;
-            _max = _area->_capacity - 1;
+            _max = _area->capacity() - 1;
             _skip();
         }
         const_iterator(const Area* area, int pos) {
@@ -172,10 +211,7 @@ public:
             if (_position < 0)
                 return *this;
             _position++;
-            if (_position > _max)
-                _position = -1;
-            else
-                _skip();
+            _skip();
             return *this;
         }
 
@@ -189,12 +225,12 @@ public:
     private:
         void _skip() {
             while (true) {
-                if (_area->_entries[_position].used)
-                    break;
-                if (_position >= _max) {
+                if (_position > _max) {
                     _position = -1;
                     break;
                 }
+                if (_area->_entries[_position].used)
+                    break;
                 ++_position;
             }
         }
@@ -209,32 +245,31 @@ public:
     /**
      * @return either a one-shot iterator with the key, or end()
      */
-    const_iterator find(const K_L& key) const;
+    const_iterator find(const K_L& key) const {
+        if (empty())
+            return end();  // Don't waste time hashing.
+        return find(HashedKey(key));
+    }
 
-    const_iterator begin() const;
+    const_iterator find(const HashedKey& key) const {
+        if (empty())
+            return end();
+        return const_iterator(&_area, _area.find(key, nullptr));
+    }
 
-    const_iterator end() const;
+    const_iterator begin() const {
+        return const_iterator(&_area);
+    }
+
+    const_iterator end() const {
+        return const_iterator();
+    }
 
 private:
-    /*
-     * @param firstEmpty, if we return -1, and firstEmpty != NULL,
-     *                    this will be set to the first empty bucket we found
-     * @retrun offset into _entries or -1 if not there
-     */
-    int _find(const K_L& key, int hash, int* firstEmpty) const;
-
     void _grow();
 
-    // ----
-
-    size_t _size;
-    double _maxProbeRatio;
+    size_t _size = 0;
     Area _area;
-
-    H _hash;
-    E _equals;
-    C _convertor;
-    C_LS _convertorOther;
 };
 }
 

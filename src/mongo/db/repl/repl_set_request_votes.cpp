@@ -28,10 +28,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_command.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/executor/network_interface.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
@@ -57,6 +61,21 @@ private:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
+
+        // We want to keep request vote connection open when relinquishing primary.
+        // Tag it here.
+        unsigned originalTag = 0;
+        AbstractMessagingPort* mp = txn->getClient()->port();
+        if (mp) {
+            originalTag = mp->tag;
+            mp->tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
+        }
+        // Untag the connection on exit.
+        ON_BLOCK_EXIT([mp, originalTag]() {
+            if (mp) {
+                mp->tag = originalTag;
+            }
+        });
 
         ReplSetRequestVotesResponse response;
         status = getGlobalReplicationCoordinator()->processReplSetRequestVotes(

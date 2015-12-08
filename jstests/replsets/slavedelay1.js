@@ -66,7 +66,7 @@ doTest = function( signal ) {
   master = master.getSisterDB(name);
 
   // wait for the node to catch up
-  replTest.awaitReplication();
+  replTest.awaitReplication(90*1000);
 
   assert.writeOK(master.foo.insert({ _id: 123, x: 'foo' }, { writeConcern: { w: 2 }}));
 

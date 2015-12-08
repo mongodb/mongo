@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/s/d_state.h"
 
 namespace mongo {
@@ -133,11 +133,6 @@ void DocumentSourceCursor::loadBatch() {
     massert(17286,
             str::stream() << "Unexpected return from PlanExecutor::getNext: " << state,
             state == PlanExecutor::IS_EOF || state == PlanExecutor::ADVANCED);
-}
-
-void DocumentSourceCursor::setSource(DocumentSource* pSource) {
-    /* this doesn't take a source */
-    verify(false);
 }
 
 long long DocumentSourceCursor::getLimit() const {

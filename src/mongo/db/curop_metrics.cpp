@@ -72,14 +72,14 @@ void recordCurOpMetrics(OperationContext* opCtx) {
         updatedCounter.increment(debug.nMatched);
     if (debug.ndeleted > 0)
         deletedCounter.increment(debug.ndeleted);
-    if (debug.nscanned > 0)
-        scannedCounter.increment(debug.nscanned);
-    if (debug.nscannedObjects > 0)
-        scannedObjectCounter.increment(debug.nscannedObjects);
+    if (debug.keysExamined > 0)
+        scannedCounter.increment(debug.keysExamined);
+    if (debug.docsExamined > 0)
+        scannedObjectCounter.increment(debug.docsExamined);
 
     if (debug.idhack)
         idhackCounter.increment();
-    if (debug.scanAndOrder)
+    if (debug.hasSortStage)
         scanAndOrderCounter.increment();
     if (debug.fastmod)
         fastmodCounter.increment();

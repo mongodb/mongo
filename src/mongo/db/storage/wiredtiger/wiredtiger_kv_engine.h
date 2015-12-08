@@ -49,10 +49,13 @@ class WiredTigerSizeStorer;
 
 class WiredTigerKVEngine final : public KVEngine {
 public:
-    WiredTigerKVEngine(const std::string& path,
-                       const std::string& extraOpenOptions = "",
-                       bool durable = true,
-                       bool repair = false);
+    WiredTigerKVEngine(const std::string& canonicalName,
+                       const std::string& path,
+                       const std::string& extraOpenOptions,
+                       size_t cacheSizeGB,
+                       bool durable,
+                       bool ephemeral,
+                       bool repair);
     virtual ~WiredTigerKVEngine();
 
     void setRecordStoreExtraOptions(const std::string& options);
@@ -64,6 +67,10 @@ public:
 
     virtual bool isDurable() const {
         return _durable;
+    }
+
+    virtual bool isEphemeral() {
+        return _ephemeral;
     }
 
     virtual RecoveryUnit* newRecoveryUnit();
@@ -95,6 +102,10 @@ public:
                               const RecordStore* originalRecordStore) const;
 
     virtual int flushAllFiles(bool sync);
+
+    virtual Status beginBackup(OperationContext* txn);
+
+    virtual void endBackup(OperationContext* txn);
 
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident);
 
@@ -132,6 +143,8 @@ public:
     static bool initRsOplogBackgroundThread(StringData ns);
 
 private:
+    class WiredTigerJournalFlusher;
+
     Status _salvageIfNeeded(const char* uri);
     void _checkIdentPath(StringData ident);
 
@@ -143,8 +156,12 @@ private:
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
+    std::string _canonicalName;
     std::string _path;
+
     bool _durable;
+    bool _ephemeral;
+    std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;
 
     std::string _rsOptions;
     std::string _indexOptions;
@@ -157,5 +174,7 @@ private:
     mutable ElapsedTracker _sizeStorerSyncTracker;
 
     mutable Date_t _previousCheckedDropsQueued;
+
+    std::unique_ptr<WiredTigerSession> _backupSession;
 };
 }

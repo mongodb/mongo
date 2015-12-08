@@ -24,9 +24,8 @@ typedef struct {
 
 	WT_LSN ckpt_lsn;		/* Start LSN for main recovery loop. */
 
-	int missing;			/* Were there missing files? */
-	int modified;			/* Did recovery make any changes? */
-	int metadata_only;		/*
+	bool missing;			/* Were there missing files? */
+	bool metadata_only;		/*
 					 * Set during the first recovery pass,
 					 * when only the metadata is recovered.
 					 */
@@ -38,12 +37,12 @@ typedef struct {
  */
 static int
 __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
-    WT_LSN *lsnp, u_int id, int duplicate, WT_CURSOR **cp)
+    WT_LSN *lsnp, u_int id, bool duplicate, WT_CURSOR **cp)
 {
 	WT_CURSOR *c;
+	bool metadata_op;
 	const char *cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "overwrite", NULL };
-	int metadata_op;
 
 	c = NULL;
 
@@ -55,7 +54,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	 * is more recent than the last checkpoint.  If there is no entry for a
 	 * file, assume it was dropped or missing after a hot backup.
 	 */
-	metadata_op = (id == WT_METAFILE_ID);
+	metadata_op = id == WT_METAFILE_ID;
 	if (r->metadata_only != metadata_op)
 		;
 	else if (id >= r->nfiles || r->files[id].uri == NULL) {
@@ -64,8 +63,8 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 			WT_RET(__wt_verbose(session, WT_VERB_RECOVERY,
 			    "No file found with ID %u (max %u)",
 			    id, r->nfiles));
-		r->missing = 1;
-	} else if (WT_LOG_CMP(lsnp, &r->files[id].ckpt_lsn) >= 0) {
+		r->missing = true;
+	} else if (__wt_log_cmp(lsnp, &r->files[id].ckpt_lsn) >= 0) {
 		/*
 		 * We're going to apply the operation.  Get the cursor, opening
 		 * one if none is cached.
@@ -90,7 +89,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
  */
 #define	GET_RECOVERY_CURSOR(session, r, lsnp, fileid, cp)		\
 	WT_ERR(__recovery_cursor(					\
-	    (session), (r), (lsnp), (fileid), 0, (cp)));		\
+	    (session), (r), (lsnp), (fileid), false, (cp)));		\
 	WT_ERR(__wt_verbose((session), WT_VERB_RECOVERY,		\
 	    "%s op %d to file %d at LSN %u/%" PRIuMAX,			\
 	    (cursor == NULL) ? "Skipping" : "Applying",			\
@@ -144,16 +143,16 @@ __txn_op_apply(
 		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 
 		/* Set up the cursors. */
-		if (start_recno == 0) {
+		if (start_recno == WT_RECNO_OOB) {
 			start = NULL;
 			stop = cursor;
-		} else if (stop_recno == 0) {
+		} else if (stop_recno == WT_RECNO_OOB) {
 			start = cursor;
 			stop = NULL;
 		} else {
 			start = cursor;
 			WT_ERR(__recovery_cursor(
-			    session, r, lsnp, fileid, 1, &stop));
+			    session, r, lsnp, fileid, true, &stop));
 		}
 
 		/* Set the keys. */
@@ -200,7 +199,7 @@ __txn_op_apply(
 		case WT_TXN_TRUNC_BOTH:
 			start = cursor;
 			WT_ERR(__recovery_cursor(
-			    session, r, lsnp, fileid, 1, &stop));
+			    session, r, lsnp, fileid, true, &stop));
 			break;
 		case WT_TXN_TRUNC_START:
 			start = cursor;
@@ -232,8 +231,6 @@ __txn_op_apply(
 	/* Reset the cursor so it doesn't block eviction. */
 	if (cursor != NULL)
 		WT_ERR(cursor->reset(cursor));
-
-	r->modified = 1;
 
 err:	if (ret != 0)
 		__wt_err(session, ret, "Operation failed during recovery");
@@ -415,16 +412,17 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	WT_RECOVERY r;
 	struct WT_RECOVERY_FILE *metafile;
 	char *config;
-	int needs_rec, was_backup;
+	bool eviction_started, needs_rec, was_backup;
 
 	conn = S2C(session);
 	WT_CLEAR(r);
 	WT_INIT_LSN(&r.ckpt_lsn);
-	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP) ? 1 : 0;
+	eviction_started = false;
+	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP);
 
 	/* We need a real session for recovery. */
-	WT_RET(__wt_open_session(conn, NULL, NULL, 1, &session));
-	F_SET(session, WT_SESSION_NO_LOGGING);
+	WT_RET(__wt_open_internal_session(conn, "txn-recover",
+	    false, WT_SESSION_NO_LOGGING, &session));
 	r.session = session;
 
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
@@ -451,7 +449,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * backup: we already have the correct metadata in that case.
 	 */
 	if (!was_backup) {
-		r.metadata_only = 1;
+		r.metadata_only = true;
 		if (WT_IS_INIT_LSN(&metafile->ckpt_lsn))
 			WT_ERR(__wt_log_scan(session,
 			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
@@ -485,7 +483,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * Now, recover all the files apart from the metadata.
 	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
 	 */
-	r.metadata_only = 0;
+	r.metadata_only = false;
 	WT_ERR(__wt_verbose(session, WT_VERB_RECOVERY,
 	    "Main recovery loop: starting at %u/%" PRIuMAX,
 	    r.ckpt_lsn.file, (uintmax_t)r.ckpt_lsn.offset));
@@ -497,6 +495,15 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 */
 	if (needs_rec && FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR))
 		WT_ERR(WT_RUN_RECOVERY);
+
+	/*
+	 * Recovery can touch more data than fits in cache, so it relies on
+	 * regular eviction to manage paging.  Start eviction threads for
+	 * recovery without LAS cursors.
+	 */
+	WT_ERR(__wt_evict_create(session));
+	eviction_started = true;
+
 	/*
 	 * Always run recovery even if it was a clean shutdown.
 	 * We can consider skipping it in the future.
@@ -525,6 +532,18 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 done:	FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
 err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
+
+	if (ret != 0)
+		__wt_err(session, ret, "Recovery failed");
+
+	/*
+	 * Destroy the eviction threads that were started in support of
+	 * recovery.  They will be restarted once the lookaside table is
+	 * created.
+	 */
+	if (eviction_started)
+		WT_TRET(__wt_evict_destroy(session));
+
 	WT_TRET(session->iface.close(&session->iface, NULL));
 
 	return (ret);

@@ -73,12 +73,12 @@ TEST(RequestBuilder, RoundTrip) {
 
     auto msg = r.setDatabase(databaseName)
                    .setCommandName(commandName)
-                   .setMetadata(metadata)
                    .setCommandArgs(commandArgs)
+                   .setMetadata(metadata)
                    .addInputDocs(inputDocRange)
                    .done();
 
-    rpc::CommandRequest parsed(msg.get());
+    rpc::CommandRequest parsed(&msg);
 
     ASSERT_EQUALS(parsed.getDatabase(), databaseName);
     ASSERT_EQUALS(parsed.getCommandName(), commandName);

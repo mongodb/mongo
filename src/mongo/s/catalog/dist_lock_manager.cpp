@@ -39,26 +39,29 @@ namespace mongo {
 const stdx::chrono::milliseconds DistLockManager::kDefaultSingleLockAttemptTimeout(0);
 const stdx::chrono::milliseconds DistLockManager::kDefaultLockRetryInterval(1000);
 
-DistLockManager::ScopedDistLock::ScopedDistLock(DistLockHandle lockHandle,
+DistLockManager::ScopedDistLock::ScopedDistLock(OperationContext* txn,
+                                                DistLockHandle lockHandle,
                                                 DistLockManager* lockManager)
-    : _lockID(std::move(lockHandle)), _lockManager(lockManager) {}
+    : _txn(txn), _lockID(std::move(lockHandle)), _lockManager(lockManager) {}
 
 DistLockManager::ScopedDistLock::~ScopedDistLock() {
     if (_lockManager) {
-        _lockManager->unlock(_lockID);
+        _lockManager->unlock(_txn, _lockID);
     }
 }
 
-DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other) : _lockManager(nullptr) {
+DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other)
+    : _txn(nullptr), _lockManager(nullptr) {
     *this = std::move(other);
 }
 
 DistLockManager::ScopedDistLock& DistLockManager::ScopedDistLock::operator=(
     ScopedDistLock&& other) {
     if (this != &other) {
-        if (_lockManager) {
-            _lockManager->unlock(_lockID);
-        }
+        invariant(_lockManager == nullptr);
+        invariant(_txn == nullptr);
+
+        _txn = other._txn;
         _lockID = std::move(other._lockID);
         _lockManager = other._lockManager;
         other._lockManager = nullptr;
@@ -72,6 +75,6 @@ Status DistLockManager::ScopedDistLock::checkStatus() {
         return Status(ErrorCodes::IllegalOperation, "no lock manager, lock was not acquired");
     }
 
-    return _lockManager->checkStatus(_lockID);
+    return _lockManager->checkStatus(_txn, _lockID);
 }
 }

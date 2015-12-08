@@ -34,7 +34,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
-        var newWord = $config.data.words[Random.randInt($config.data.words.length)];
+        var newWord = this.words[Random.randInt(this.words.length)];
         return { $set: { yield_text: newWord } };
     };
 

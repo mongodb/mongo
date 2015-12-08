@@ -4,7 +4,9 @@ function countTags( num, message ) {
     assert.eq( s.config.tags.count() , num , message );
 }
 
-s = new ShardingTest( "tag_range" , 2 , 0 , 1 , { nopreallocj : true } );
+var s = new ShardingTest({ name: "tag_range",
+                           shards: 2,
+                           mongos: 1 });
 
 // this set up is not required but prevents warnings in the remove
 db = s.getDB( "tag_range" );

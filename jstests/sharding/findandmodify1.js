@@ -1,4 +1,6 @@
-s = new ShardingTest( "find_and_modify_sharded" , 2 , 2);
+(function() {
+
+var s = new ShardingTest({ name: "find_and_modify_sharded", shards: 2 });
 
 s.adminCommand( { enablesharding : "test" } );
 db = s.getDB( "test" );
@@ -58,3 +60,5 @@ for (var i=0; i < numObjs; i++){
 }
 
 s.stop();
+
+})();

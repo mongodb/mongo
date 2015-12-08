@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
 
 #include "mongo/platform/basic.h"
 
@@ -36,13 +36,16 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/async_mock_stream_factory.h"
+#include "mongo/executor/async_timer_mock.h"
 #include "mongo/executor/network_interface_asio.h"
+#include "mongo/executor/network_interface_asio_test_utils.h"
 #include "mongo/executor/test_network_connection_hook.h"
+#include "mongo/rpc/factory.h"
 #include "mongo/rpc/legacy_reply_builder.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/message.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -51,13 +54,44 @@ namespace {
 
 HostAndPort testHost{"localhost", 20000};
 
+void initWireSpecMongoD() {
+    WireSpec& spec = WireSpec::instance();
+    // accept from any version
+    spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
+    spec.maxWireVersionIncoming = FIND_COMMAND;
+    // connect to any version
+    spec.minWireVersionOutgoing = RELEASE_2_4_AND_BEFORE;
+    spec.maxWireVersionOutgoing = FIND_COMMAND;
+}
+
+// Utility function to use with mock streams
+RemoteCommandResponse simulateIsMaster(RemoteCommandRequest request) {
+    ASSERT_EQ(std::string{request.cmdObj.firstElementFieldName()}, "isMaster");
+    ASSERT_EQ(request.dbname, "admin");
+
+    RemoteCommandResponse response;
+    response.data = BSON("minWireVersion" << mongo::WireSpec::instance().minWireVersionIncoming
+                                          << "maxWireVersion"
+                                          << mongo::WireSpec::instance().maxWireVersionIncoming);
+    return response;
+}
+
 class NetworkInterfaceASIOTest : public mongo::unittest::Test {
 public:
     void setUp() override {
+        initWireSpecMongoD();
+        NetworkInterfaceASIO::Options options;
+
+        // Use mock timer factory
+        auto timerFactory = stdx::make_unique<AsyncTimerFactoryMock>();
+        _timerFactory = timerFactory.get();
+        options.timerFactory = std::move(timerFactory);
+
         auto factory = stdx::make_unique<AsyncMockStreamFactory>();
         // keep unowned pointer, but pass ownership to NIA
         _streamFactory = factory.get();
-        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
+        options.streamFactory = std::move(factory);
+        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }
 
@@ -67,7 +101,27 @@ public:
         }
     }
 
-    NetworkInterface& net() {
+    Deferred<StatusWith<RemoteCommandResponse>> startCommand(
+        const TaskExecutor::CallbackHandle& cbHandle, const RemoteCommandRequest& request) {
+        Deferred<StatusWith<RemoteCommandResponse>> deferredResponse;
+        net().startCommand(cbHandle,
+                           request,
+                           [deferredResponse](StatusWith<RemoteCommandResponse> response) mutable {
+                               deferredResponse.emplace(std::move(response));
+                           });
+        return deferredResponse;
+    }
+
+    // Helper to run startCommand and wait for it
+    StatusWith<RemoteCommandResponse> startCommandSync(const RemoteCommandRequest& request) {
+        auto deferred = startCommand(makeCallbackHandle(), request);
+
+        // wait for the operation to complete
+        auto& result = deferred.get();
+        return result;
+    }
+
+    NetworkInterfaceASIO& net() {
         return *_net;
     }
 
@@ -75,37 +129,243 @@ public:
         return *_streamFactory;
     }
 
-    void simulateServerReply(AsyncMockStreamFactory::MockStream* stream,
-                             rpc::Protocol proto,
-                             const stdx::function<RemoteCommandResponse(RemoteCommandRequest)>) {}
+    AsyncTimerFactoryMock& timerFactory() {
+        return *_timerFactory;
+    }
 
 protected:
+    AsyncTimerFactoryMock* _timerFactory;
     AsyncMockStreamFactory* _streamFactory;
     std::unique_ptr<NetworkInterfaceASIO> _net;
 };
 
+TEST_F(NetworkInterfaceASIOTest, CancelMissingOperation) {
+    // This is just a sanity check, this action should have no effect.
+    net().cancelCommand(makeCallbackHandle());
+}
+
+TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
+    auto cbh = makeCallbackHandle();
+
+    // Kick off our operation
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        // Cancel operation while blocked in the write for determinism. By calling cancel here we
+        // ensure that it is not a no-op and that the asio::operation_aborted error will always
+        // be returned to the NIA.
+        WriteEvent write{stream};
+        net().cancelCommand(cbh);
+    }
+
+    // Wait for op to complete, assert that it was canceled.
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceASIOTest, ImmediateCancel) {
+    auto cbh = makeCallbackHandle();
+
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+
+    // Cancel immediately
+    net().cancelCommand(cbh);
+
+    // Allow stream to connect so operation can return
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceASIOTest, LateCancel) {
+    auto cbh = makeCallbackHandle();
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+
+    // Allow stream to connect so operation can return
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    // Simulate user command
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSONObj();
+                               response.metadata = BSONObj();
+                               return response;
+                           });
+
+    // Allow to complete, then cancel, nothing should happen.
+    deferred.get();
+    net().cancelCommand(cbh);
+}
+
+TEST_F(NetworkInterfaceASIOTest, CancelWithNetworkError) {
+    auto cbh = makeCallbackHandle();
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        WriteEvent{stream}.skip();
+        ReadEvent read{stream};
+
+        // Trigger both a cancellation and a network error
+        stream->setError(make_error_code(ErrorCodes::HostUnreachable));
+        net().cancelCommand(cbh);
+    }
+
+    // Wait for op to complete, assert that cancellation error had precedence.
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceASIOTest, CancelWithTimeout) {
+    auto cbh = makeCallbackHandle();
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        WriteEvent write{stream};
+
+        // Trigger both a cancellation and a timeout
+        net().cancelCommand(cbh);
+        timerFactory().fastForward(Milliseconds(500));
+    }
+
+    // Wait for op to complete, assert that cancellation error had precedence.
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
+    auto cbh = makeCallbackHandle();
+    auto deferred = startCommand(
+        cbh,
+        RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj(), Milliseconds(100)));
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        WriteEvent{stream}.skip();
+        ReadEvent read{stream};
+
+        // Trigger both a timeout and a network error
+        stream->setError(make_error_code(ErrorCodes::HostUnreachable));
+        timerFactory().fastForward(Milliseconds(500));
+    }
+
+    // Wait for op to complete, assert that timeout had precedence.
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::ExceededTimeLimit);
+}
+
+TEST_F(NetworkInterfaceASIOTest, CancelWithTimeoutAndNetworkError) {
+    auto cbh = makeCallbackHandle();
+    auto deferred = startCommand(
+        cbh,
+        RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj(), Milliseconds(100)));
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        WriteEvent{stream}.skip();
+        ReadEvent read{stream};
+
+        // Trigger a timeout, a cancellation, and a network error
+        stream->setError(make_error_code(ErrorCodes::HostUnreachable));
+        timerFactory().fastForward(Milliseconds(500));
+        net().cancelCommand(cbh);
+    }
+
+    // Wait for op to complete, assert that the cancellation had precedence.
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
+    // Kick off operation
+    auto cb = makeCallbackHandle();
+    Milliseconds timeout(1000);
+    auto deferred = startCommand(cb, {testHost, "testDB", BSON("a" << 1), BSONObj(), timeout});
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // Simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        // Wait for the operation to block on write so we know it's been added.
+        WriteEvent write{stream};
+
+        // Get the timer factory
+        auto& factory = timerFactory();
+
+        // Advance clock but not enough to force a timeout, assert still active
+        factory.fastForward(Milliseconds(500));
+        ASSERT(!deferred.hasCompleted());
+
+        // Advance clock and force timeout
+        factory.fastForward(Milliseconds(800));
+    }
+
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::ExceededTimeLimit);
+}
+
 TEST_F(NetworkInterfaceASIOTest, StartCommand) {
-    TaskExecutor::CallbackHandle cb{};
-
-    HostAndPort testHost{"localhost", 20000};
-
-    stdx::promise<RemoteCommandResponse> prom{};
-
-    bool callbackCalled = false;
-
-    net().startCommand(cb,
-                       RemoteCommandRequest(testHost, "testDB", BSON("foo" << 1), BSON("bar" << 1)),
-                       [&](StatusWith<RemoteCommandResponse> resp) {
-                           callbackCalled = true;
-
-                           try {
-                               prom.set_value(uassertStatusOK(resp));
-                           } catch (...) {
-                               prom.set_exception(std::current_exception());
-                           }
-                       });
-
-    auto fut = prom.get_future();
+    auto deferred =
+        startCommand(makeCallbackHandle(),
+                     RemoteCommandRequest(testHost, "testDB", BSON("foo" << 1), BSON("bar" << 1)));
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
 
@@ -113,17 +373,9 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     ConnectEvent{stream}.skip();
 
     // simulate isMaster reply.
-    stream->simulateServer(
-        rpc::Protocol::kOpQuery,
-        [](RemoteCommandRequest request) -> RemoteCommandResponse {
-            ASSERT_EQ(std::string{request.cmdObj.firstElementFieldName()}, "isMaster");
-            ASSERT_EQ(request.dbname, "admin");
-
-            RemoteCommandResponse response;
-            response.data = BSON("minWireVersion" << mongo::minWireVersion << "maxWireVersion"
-                                                  << mongo::maxWireVersion);
-            return response;
-        });
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
 
     auto expectedMetadata = BSON("meep"
                                  << "beep");
@@ -144,11 +396,125 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
                                return response;
                            });
 
-    auto res = fut.get();
+    auto& res = deferred.get();
 
-    ASSERT(callbackCalled);
-    ASSERT_EQ(res.data, expectedCommandReply);
-    ASSERT_EQ(res.metadata, expectedMetadata);
+    auto response = uassertStatusOK(res);
+    ASSERT_EQ(response.data, expectedCommandReply);
+    ASSERT_EQ(response.metadata, expectedMetadata);
+}
+
+class MalformedMessageTest : public NetworkInterfaceASIOTest {
+public:
+    using MessageHook = stdx::function<void(MsgData::View)>;
+
+    void runMessageTest(ErrorCodes::Error code, bool loadBody, MessageHook hook) {
+        // Kick off our operation
+        auto deferred =
+            startCommand(makeCallbackHandle(),
+                         RemoteCommandRequest(testHost, "testDB", BSON("ping" << 1), BSONObj()));
+
+        // Wait for it to block waiting for a write
+        auto stream = streamFactory().blockUntilStreamExists(testHost);
+        ConnectEvent{stream}.skip();
+        stream->simulateServer(rpc::Protocol::kOpQuery,
+                               [](RemoteCommandRequest request)
+                                   -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+        uint32_t messageId = 0;
+
+        {
+            // Get the appropriate message id
+            WriteEvent write{stream};
+            std::vector<uint8_t> messageData = stream->popWrite();
+            Message msg(messageData.data(), false);
+            messageId = msg.header().getId();
+        }
+
+        // Build a mock reply message
+        auto replyBuilder = rpc::makeReplyBuilder(rpc::Protocol::kOpCommandV1);
+        replyBuilder->setCommandReply(BSON("hello!" << 1));
+        replyBuilder->setMetadata(BSONObj());
+
+        auto message = replyBuilder->done();
+        message.header().setResponseTo(messageId);
+
+        auto actualSize = message.header().getLen();
+
+        // Allow caller to mess with the Message
+        hook(message.header());
+
+        {
+            // Load the header
+            ReadEvent read{stream};
+            auto headerBytes = reinterpret_cast<const uint8_t*>(message.header().view2ptr());
+            stream->pushRead({headerBytes, headerBytes + sizeof(MSGHEADER::Value)});
+        }
+
+        if (loadBody) {
+            // Load the body if we need to
+            ReadEvent read{stream};
+            auto dataBytes = reinterpret_cast<const uint8_t*>(message.buf());
+            auto body = dataBytes;
+            std::advance(body, sizeof(MSGHEADER::Value));
+            stream->pushRead({body, dataBytes + static_cast<std::size_t>(actualSize)});
+        }
+
+        auto& response = deferred.get();
+        ASSERT(response == code);
+    }
+};
+
+TEST_F(MalformedMessageTest, messageHeaderWrongResponseTo) {
+    runMessageTest(
+        ErrorCodes::ProtocolError,
+        false,
+        [](MsgData::View message) { message.setResponseTo(message.getResponseTo() + 1); });
+}
+
+TEST_F(MalformedMessageTest, messageHeaderlenZero) {
+    runMessageTest(
+        ErrorCodes::InvalidLength, false, [](MsgData::View message) { message.setLen(0); });
+}
+
+TEST_F(MalformedMessageTest, MessageHeaderLenTooSmall) {
+    runMessageTest(ErrorCodes::InvalidLength,
+                   false,
+                   [](MsgData::View message) { message.setLen(6); });  // min is 16
+}
+
+TEST_F(MalformedMessageTest, MessageHeaderLenTooLarge) {
+    runMessageTest(ErrorCodes::InvalidLength,
+                   false,
+                   [](MsgData::View message) { message.setLen(48000001); });  // max is 48000000
+}
+
+TEST_F(MalformedMessageTest, MessageHeaderLenNegative) {
+    runMessageTest(
+        ErrorCodes::InvalidLength, false, [](MsgData::View message) { message.setLen(-1); });
+}
+
+TEST_F(MalformedMessageTest, MessageLenSmallerThanActual) {
+    runMessageTest(ErrorCodes::InvalidBSON,
+                   true,
+                   [](MsgData::View message) { message.setLen(message.getLen() - 10); });
+}
+
+TEST_F(MalformedMessageTest, FailedToReadAllBytesForMessage) {
+    runMessageTest(ErrorCodes::InvalidLength,
+                   true,
+                   [](MsgData::View message) { message.setLen(message.getLen() + 100); });
+}
+
+TEST_F(MalformedMessageTest, UnsupportedOpcode) {
+    runMessageTest(ErrorCodes::UnsupportedFormat,
+                   true,
+                   [](MsgData::View message) { message.setOperation(2222); });
+}
+
+TEST_F(MalformedMessageTest, MismatchedOpcode) {
+    runMessageTest(ErrorCodes::UnsupportedFormat,
+                   true,
+                   [](MsgData::View message) { message.setOperation(2006); });
 }
 
 class NetworkInterfaceASIOConnectionHookTest : public NetworkInterfaceASIOTest {
@@ -159,7 +525,10 @@ public:
         auto factory = stdx::make_unique<AsyncMockStreamFactory>();
         // keep unowned pointer, but pass ownership to NIA
         _streamFactory = factory.get();
-        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(factory), std::move(hook));
+        NetworkInterfaceASIO::Options options{};
+        options.streamFactory = std::move(factory);
+        options.networkConnectionHook = std::move(hook);
+        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }
 };
@@ -189,38 +558,34 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
             return Status::OK();
         }));
 
-    stdx::promise<void> done;
-    bool statusCorrect = false;
-    auto doneFuture = done.get_future();
-
-    net().startCommand({},
-                       {testHost,
-                        "blah",
-                        BSON("foo"
-                             << "bar")},
-                       [&](StatusWith<RemoteCommandResponse> result) {
-                           statusCorrect = (result == validationFailedStatus);
-                           done.set_value();
-                       });
+    auto deferred = startCommand(makeCallbackHandle(),
+                                 {testHost,
+                                  "blah",
+                                  BSON("foo"
+                                       << "bar")});
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
 
     ConnectEvent{stream}.skip();
 
     // simulate isMaster reply.
-    stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               RemoteCommandResponse response;
-                               response.data = BSON("minWireVersion"
-                                                    << mongo::minWireVersion << "maxWireVersion"
-                                                    << mongo::maxWireVersion << "TESTKEY"
-                                                    << "TESTVALUE");
-                               return response;
-                           });
+    stream->simulateServer(
+        rpc::Protocol::kOpQuery,
+        [](RemoteCommandRequest request) -> RemoteCommandResponse {
+            RemoteCommandResponse response;
+            response.data =
+                BSON("minWireVersion"
+                     << mongo::WireSpec::instance().minWireVersionIncoming << "maxWireVersion"
+                     << mongo::WireSpec::instance().maxWireVersionIncoming << "TESTKEY"
+                     << "TESTVALUE");
+            return response;
+        });
 
     // we should stop here.
-    doneFuture.get();
-    ASSERT(statusCorrect);
+    auto& res = deferred.get();
+
+    // auto result = uassertStatusOK(res);
+    ASSERT(res == validationFailedStatus);
     ASSERT(validateCalled);
     ASSERT(hostCorrect);
     ASSERT(isMasterReplyCorrect);
@@ -247,36 +612,24 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
             return Status::OK();
         }));
 
-    stdx::promise<void> done;
-    bool statusCorrect = false;
-    auto doneFuture = done.get_future();
-
-    net().startCommand({},
-                       {testHost,
-                        "blah",
-                        BSON("foo"
-                             << "bar")},
-                       [&](StatusWith<RemoteCommandResponse> result) {
-                           statusCorrect = (result == makeRequestError);
-                           done.set_value();
-                       });
+    auto deferred = startCommand(makeCallbackHandle(),
+                                 {testHost,
+                                  "blah",
+                                  BSON("foo"
+                                       << "bar")});
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               RemoteCommandResponse response;
-                               response.data = BSON("minWireVersion" << mongo::minWireVersion
-                                                                     << "maxWireVersion"
-                                                                     << mongo::maxWireVersion);
-                               return response;
-                           });
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
 
     // We should stop here.
-    doneFuture.get();
-    ASSERT(statusCorrect);
+    auto& res = deferred.get();
+
+    ASSERT(res == makeRequestError);
     ASSERT(makeRequestCalled);
     ASSERT(!handleReplyCalled);
 }
@@ -297,10 +650,6 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
             return Status::OK();
         }));
 
-    stdx::promise<void> done;
-    auto doneFuture = done.get_future();
-    bool statusCorrect = false;
-
     auto commandRequest = BSON("foo"
                                << "bar");
 
@@ -311,29 +660,15 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     auto metadata = BSON("aaa"
                          << "bbb");
 
-    net().startCommand({},
-                       {testHost, "blah", commandRequest},
-                       [&](StatusWith<RemoteCommandResponse> result) {
-                           statusCorrect =
-                               (result.isOK() && (result.getValue().data == commandReply) &&
-                                (result.getValue().metadata == metadata));
-                           done.set_value();
-                       });
-
+    auto deferred = startCommand(makeCallbackHandle(), {testHost, "blah", commandRequest});
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               RemoteCommandResponse response;
-                               response.data = BSON("minWireVersion" << mongo::minWireVersion
-                                                                     << "maxWireVersion"
-                                                                     << mongo::maxWireVersion);
-                               return response;
-                           });
-
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
 
     // Simulate user command.
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
@@ -347,8 +682,11 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
                            });
 
     // We should get back the reply now.
-    doneFuture.get();
-    ASSERT(statusCorrect);
+    auto& result = deferred.get();
+
+    ASSERT(result.isOK());
+    ASSERT(result.getValue().data == commandReply);
+    ASSERT(result.getValue().metadata == metadata);
 }
 
 TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
@@ -384,30 +722,17 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
             return handleReplyError;
         }));
 
-    stdx::promise<void> done;
-    auto doneFuture = done.get_future();
-    bool statusCorrect = false;
     auto commandRequest = BSON("foo"
                                << "bar");
-    net().startCommand({},
-                       {testHost, "blah", commandRequest},
-                       [&](StatusWith<RemoteCommandResponse> result) {
-                           statusCorrect = (result == handleReplyError);
-                           done.set_value();
-                       });
+    auto deferred = startCommand(makeCallbackHandle(), {testHost, "blah", commandRequest});
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
 
     // simulate isMaster reply.
     stream->simulateServer(rpc::Protocol::kOpQuery,
-                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               RemoteCommandResponse response;
-                               response.data = BSON("minWireVersion" << mongo::minWireVersion
-                                                                     << "maxWireVersion"
-                                                                     << mongo::maxWireVersion);
-                               return response;
-                           });
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
 
     // Simulate hook reply
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
@@ -421,41 +746,106 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
                                return response;
                            });
 
-    doneFuture.get();
-    ASSERT(statusCorrect);
+    auto& result = deferred.get();
+
+    ASSERT(result == handleReplyError);
     ASSERT(makeRequestCalled);
     ASSERT(handleReplyCalled);
     ASSERT(handleReplyArgumentCorrect);
 }
 
 TEST_F(NetworkInterfaceASIOTest, setAlarm) {
-    stdx::promise<bool> nearFuture;
-    stdx::future<bool> executed = nearFuture.get_future();
-
     // set a first alarm, to execute after "expiration"
     Date_t expiration = net().now() + Milliseconds(100);
-    net().setAlarm(
-        expiration,
-        [this, expiration, &nearFuture]() { nearFuture.set_value(net().now() >= expiration); });
 
-    // wait enough time for first alarm to execute
-    auto status = executed.wait_for(Milliseconds(5000));
+    Deferred<Date_t> deferred;
+    net().setAlarm(expiration,
+                   [this, expiration, deferred]() mutable { deferred.emplace(net().now()); });
 
-    // assert that not only did it execute, but executed after "expiration"
-    ASSERT(status == stdx::future_status::ready);
-    ASSERT(executed.get());
+    // Get our timer factory
+    auto& factory = timerFactory();
 
-    // set an alarm for the future, kill interface, ensure it didn't execute
-    stdx::promise<bool> farFuture;
-    stdx::future<bool> executed2 = farFuture.get_future();
+    // force the alarm to fire
+    factory.fastForward(Milliseconds(5000));
+
+    // assert that it executed after "expiration"
+    auto& result = deferred.get();
+    ASSERT(result >= expiration);
 
     expiration = net().now() + Milliseconds(99999999);
-    net().setAlarm(expiration, [this, &farFuture]() { farFuture.set_value(true); });
+    Deferred<bool> deferred2;
+    net().setAlarm(expiration, [this, deferred2]() mutable { deferred2.emplace(true); });
 
     net().shutdown();
+    ASSERT(!deferred2.hasCompleted());
+}
 
-    status = executed2.wait_for(Milliseconds(0));
-    ASSERT(status == stdx::future_status::timeout);
+class NetworkInterfaceASIOMetadataTest : public NetworkInterfaceASIOTest {
+protected:
+    void setUp() override {}
+
+    void start(std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+        auto factory = stdx::make_unique<AsyncMockStreamFactory>();
+        _streamFactory = factory.get();
+        NetworkInterfaceASIO::Options options{};
+        options.streamFactory = std::move(factory);
+        options.metadataHook = std::move(metadataHook);
+        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
+        _net->startup();
+    }
+};
+
+class TestMetadataHook : public rpc::EgressMetadataHook {
+public:
+    TestMetadataHook(bool* wroteRequestMetadata, bool* gotReplyMetadata)
+        : _wroteRequestMetadata(wroteRequestMetadata), _gotReplyMetadata(gotReplyMetadata) {}
+
+    Status writeRequestMetadata(const HostAndPort& requestDestination,
+                                BSONObjBuilder* metadataBob) override {
+        metadataBob->append("foo", "bar");
+        *_wroteRequestMetadata = true;
+        return Status::OK();
+    }
+
+    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override {
+        *_gotReplyMetadata = (metadataObj["baz"].str() == "garply");
+        return Status::OK();
+    }
+
+private:
+    bool* _wroteRequestMetadata;
+    bool* _gotReplyMetadata;
+};
+
+TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
+    bool wroteRequestMetadata = false;
+    bool gotReplyMetadata = false;
+    start(stdx::make_unique<TestMetadataHook>(&wroteRequestMetadata, &gotReplyMetadata));
+
+    auto deferred = startCommand(makeCallbackHandle(), {testHost, "blah", BSON("ping" << 1)});
+
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    // Simulate hook reply
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               ASSERT(request.metadata["foo"].str() == "bar");
+                               RemoteCommandResponse response;
+                               response.data = BSON("ok" << 1);
+                               response.metadata = BSON("baz"
+                                                        << "garply");
+                               return response;
+                           });
+
+    deferred.get();
+    ASSERT(wroteRequestMetadata);
+    ASSERT(gotReplyMetadata);
 }
 
 }  // namespace

@@ -47,10 +47,21 @@ public:
 
     void kill() final;
 
+    bool isTailable() const final;
+
+    long long getNumReturnedSoFar() const final;
+
+    void queueResult(const BSONObj& obj) final;
+
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+
     /**
-     * Queues a BSONObj to be returned.
+     * Returns true unless marked as having non-exhausted remote cursors via
+     * markRemotesNotExhausted().
      */
-    void queueResult(BSONObj obj);
+    bool remotesExhausted() final;
+
+    void markRemotesNotExhausted();
 
     /**
      * Queues an error response.
@@ -62,6 +73,11 @@ private:
     bool _exhausted = false;
     std::queue<StatusWith<BSONObj>> _resultsQueue;
     stdx::function<void(void)> _killCallback;
+
+    // Number of returned documents.
+    long long _numReturnedSoFar = 0;
+
+    bool _remotesExhausted = true;
 };
 
 }  // namespace mongo

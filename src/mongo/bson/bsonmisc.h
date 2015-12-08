@@ -253,6 +253,11 @@ public:
         return *_builder;
     }
 
+    /**
+     * Restores this object to its empty state.
+     */
+    void reset();
+
 private:
     StringData _fieldName;
     BSONObjBuilder* _builder;

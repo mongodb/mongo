@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <jsapi.h>
 #include <memory>
 #include <string>
@@ -45,6 +46,17 @@ class JSStringWrapper {
 public:
     JSStringWrapper() = default;
     JSStringWrapper(JSContext* cx, JSString* str);
+    JSStringWrapper(std::int32_t val);
+
+#if defined(_MSC_VER) && _MSC_VER < 1900
+    JSStringWrapper(JSStringWrapper&&);
+
+    JSStringWrapper& operator=(JSStringWrapper&&);
+#else
+    JSStringWrapper(JSStringWrapper&&) = default;
+
+    JSStringWrapper& operator=(JSStringWrapper&&) = default;
+#endif
 
     StringData toStringData() const;
     std::string toString() const;
@@ -52,9 +64,10 @@ public:
     explicit operator bool() const;
 
 private:
-    JSContext* _context = nullptr;
     std::unique_ptr<char[]> _str;
     size_t _length = 0;
+    char _buf[64];
+    bool _isSet = false;
 };
 
 }  // namespace mozjs

@@ -84,6 +84,17 @@ private:
                      std::vector<WriteErrorDetail*>* errors);
 
     /**
+     * Inserts a subset of an insert batch.
+     * Returns a true to discontinue the insert, or false if not.
+     */
+    bool insertMany(WriteBatchExecutor::ExecInsertsState* state,
+                    size_t startIndex,
+                    size_t endIndex,
+                    CurOp* currentOp,
+                    std::vector<WriteErrorDetail*>* errors,
+                    bool ordered);
+
+    /**
      * Executes the inserts of an insert batch and returns the write errors.
      *
      * Internally uses the DBLock of the request namespace.
@@ -91,11 +102,6 @@ private:
      * times.
      */
     void execInserts(const BatchedCommandRequest& request, std::vector<WriteErrorDetail*>* errors);
-
-    /**
-     * Executes a single insert from a batch, described in the opaque "state" object.
-     */
-    void execOneInsert(ExecInsertsState* state, WriteErrorDetail** error);
 
     /**
      * Executes an update item (which may update many documents or upsert), and returns the
@@ -115,19 +121,12 @@ private:
     void execRemove(const BatchItemRef& removeItem, WriteErrorDetail** error);
 
     /**
-     * Helper for incrementing stats on the next CurOp.
-     *
-     * No lock requirements.
-     */
-    void incOpStats(const BatchItemRef& currWrite);
-
-    /**
      * Helper for incrementing stats after each individual write op.
      *
      * No lock requirements (though usually done inside write lock to make stats update look
      * atomic).
      */
-    void incWriteStats(const BatchItemRef& currWrite,
+    void incWriteStats(const BatchedCommandRequest::BatchType opType,
                        const WriteOpStats& stats,
                        const WriteErrorDetail* error,
                        CurOp* currentOp);

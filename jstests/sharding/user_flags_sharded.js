@@ -1,8 +1,8 @@
 // Test that when user flags are set on a collection,
 // then collection is sharded, flags get carried over.
+(function() {
 
 if (jsTest.options().storageEngine === "mmapv1") {
-
     // the dbname and collection we'll be working with
     var dbname = "testDB";
     var coll = "userFlagsColl";
@@ -39,7 +39,7 @@ if (jsTest.options().storageEngine === "mmapv1") {
     assert.eq( collstats.userFlags , 0 , "modified collection should have userFlags = 0 ");
 
     // start up a new sharded cluster, and add previous mongod
-    var s = new ShardingTest( "user_flags", 1 );
+    var s = new ShardingTest({ name: "user_flags", shards: 1 });
     assert( s.admin.runCommand( { addshard: newShardConn.host , name: "myShard" } ).ok,
             "did not accept new shard" );
 
@@ -60,5 +60,6 @@ if (jsTest.options().storageEngine === "mmapv1") {
 
     MongoRunner.stopMongod(newShardConn);
     s.stop();
-
 }
+
+})();

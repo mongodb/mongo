@@ -29,110 +29,29 @@
  */
 
 #include "mongo/platform/basic.h"
-#include "mongo/base/init.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
+
+#include "mongo/db/matcher/expression_where_noop.h"
+
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::string;
-using stdx::make_unique;
+WhereNoOpMatchExpression::WhereNoOpMatchExpression(WhereParams params)
+    : WhereMatchExpressionBase(std::move(params)) {}
 
-/**
- * Bogus no-op $where match expression to parse $where in mongos,
- * since mongos doesn't have script engine to compile JS functions.
- *
- * Linked into mongos, instead of the real WhereMatchExpression.
- */
-class WhereNoOpMatchExpression : public MatchExpression {
-public:
-    WhereNoOpMatchExpression() : MatchExpression(WHERE) {}
-    virtual ~WhereNoOpMatchExpression() {}
-
-    Status init(StringData theCode);
-
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const {
-        return false;
-    }
-
-    virtual bool matchesSingleElement(const BSONElement& e) const {
-        return false;
-    }
-
-    virtual unique_ptr<MatchExpression> shallowClone() const {
-        unique_ptr<WhereNoOpMatchExpression> e = make_unique<WhereNoOpMatchExpression>();
-        e->init(_code);
-        if (getTag()) {
-            e->setTag(getTag()->clone());
-        }
-        return std::move(e);
-    }
-
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
-
-    virtual void toBSON(BSONObjBuilder* out) const;
-
-    virtual bool equivalent(const MatchExpression* other) const;
-
-    virtual void resetTag() {
-        setTag(NULL);
-    }
-
-private:
-    string _code;
-};
-
-Status WhereNoOpMatchExpression::init(StringData theCode) {
-    if (theCode.size() == 0)
-        return Status(ErrorCodes::BadValue, "code for $where cannot be empty");
-
-    _code = theCode.toString();
-
-    return Status::OK();
+bool WhereNoOpMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
+    return false;
 }
 
-void WhereNoOpMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
-    debug << "$where (only in mongos)\n";
-
-    _debugAddSpace(debug, level + 1);
-    debug << "code: " << _code << "\n";
-}
-
-void WhereNoOpMatchExpression::toBSON(BSONObjBuilder* out) const {
-    out->append("$where", _code);
-}
-
-bool WhereNoOpMatchExpression::equivalent(const MatchExpression* other) const {
-    if (matchType() != other->matchType())
-        return false;
-    const WhereNoOpMatchExpression* noopOther = static_cast<const WhereNoOpMatchExpression*>(other);
-    return _code == noopOther->_code;
-}
-
-
-// -----------------
-
-WhereCallbackNoop::WhereCallbackNoop() {}
-
-StatusWithMatchExpression WhereCallbackNoop::parseWhere(const BSONElement& where) const {
-    unique_ptr<WhereNoOpMatchExpression> exp(new WhereNoOpMatchExpression());
-    if (where.type() == String || where.type() == Code) {
-        Status s = exp->init(where.valuestr());
-        if (!s.isOK())
-            return StatusWithMatchExpression(s);
-        return {std::move(exp)};
+std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const {
+    WhereParams params;
+    params.code = getCode();
+    params.scope = getScope();
+    std::unique_ptr<WhereNoOpMatchExpression> e =
+        stdx::make_unique<WhereNoOpMatchExpression>(std::move(params));
+    if (getTag()) {
+        e->setTag(getTag()->clone());
     }
-
-    if (where.type() == CodeWScope) {
-        Status s = exp->init(where.codeWScopeCode());
-        if (!s.isOK())
-            return StatusWithMatchExpression(s);
-        return {std::move(exp)};
-    }
-
-    return StatusWithMatchExpression(ErrorCodes::BadValue, "$where got bad type");
+    return std::move(e);
 }
 }

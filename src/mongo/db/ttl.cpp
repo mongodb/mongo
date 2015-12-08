@@ -319,9 +319,16 @@ private:
     }
 };
 
+namespace {
+// The global TTLMonitor object is intentionally leaked.  Even though it is only used in one
+// function, we declare it here to indicate to the leak sanitizer that the leak of this object
+// should not be reported.
+TTLMonitor* ttlMonitor = nullptr;
+}  // namespace
+
 void startTTLBackgroundJob() {
-    TTLMonitor* ttl = new TTLMonitor();
-    ttl->go();
+    ttlMonitor = new TTLMonitor();
+    ttlMonitor->go();
 }
 
 string TTLMonitor::secondsExpireField = "expireAfterSeconds";

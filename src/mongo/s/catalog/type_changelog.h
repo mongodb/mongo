@@ -37,15 +37,12 @@
 namespace mongo {
 
 /**
- * This class represents the layout and contents of documents contained in the
- * config.changelog collection. All manipulation of documents coming from that
- * collection should be done with this class.
+ * This class represents the layout and contents of documents contained in the config.changelog or
+ * config.actionlog collections. All manipulation of documents coming from that collection should be
+ * done with this class.
  */
 class ChangeLogType {
 public:
-    // Name of the changelog collection in the config server.
-    static const std::string ConfigNS;
-
     // Field names and types in the changelog collection type.
     static const BSONField<std::string> changeId;
     static const BSONField<std::string> server;
@@ -125,7 +122,7 @@ private:
     boost::optional<Date_t> _time;
     // (M)  description of the change
     boost::optional<std::string> _what;
-    // (M) database or collection this change applies to
+    // (O) database or collection this change applies to
     boost::optional<std::string> _ns;
     // (M)  A BSONObj containing extra information about some operations
     boost::optional<BSONObj> _details;

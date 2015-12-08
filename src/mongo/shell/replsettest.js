@@ -29,6 +29,11 @@
  * 
  *        Note: For both formats, a special boolean property 'arbiter' can be
  *          specified to denote a member is an arbiter.
+ *
+ *        Note: A special "bridgeOptions" property can be specified in both the object and array
+ *           formats to configure the options for the mongobridge corresponding to that node. These
+ *           options are merged with the opts.bridgeOptions options, where the node-specific options
+ *           take precedence.
  * 
  *     nodeOptions {Object}: Options to apply to all nodes in the replica set.
  *        Format for Object:
@@ -40,104 +45,138 @@
  *     useSeedList {boolean}: Use the connection string format of this set
  *        as the replica set name (overrides the name property). Default: false
  *     keyFile {string}
- *     shardSvr {boolean}: Default: false
- *     startPort {number}: port offset to be used for each replica. Default: 31000
+ *     shardSvr {boolean}: Whether this replica set serves as a shard in a cluster. Default: false.
+ *     protocolVersion {number}: protocol version of replset used by the replset initiation.
+ *
+ *     useBridge {boolean}: If true, then a mongobridge process is started for each node in the
+ *        replica set. Both the replica set configuration and the connections returned by startSet()
+ *        will be references to the proxied connections. Defaults to false.
+ *
+ *     bridgeOptions {Object}: Options to apply to all mongobridge processes. Defaults to {}.
+ *
+ *     settings {object}: Setting used in the replica set config document.
+ *        Example:
+ *              settings: { chainingAllowed: false, ... }
  *   }
  * 
  * Member variables:
  * numNodes {number} - number of nodes
  * nodes {Array.<Mongo>} - connection to replica set members
  */
-ReplSetTest = function( opts ){
+ReplSetTest = function(opts) {
     this.name  = opts.name || "testReplSet";
     this.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
     this.host  = this.useHostName ? (opts.host || getHostName()) : 'localhost';
     this.oplogSize = opts.oplogSize || 40;
     this.useSeedList = opts.useSeedList || false;
-    this.ports = [];
-    this.keyFile = opts.keyFile
+    this.keyFile = opts.keyFile;
     this.shardSvr = opts.shardSvr || false;
+    this.protocolVersion = opts.protocolVersion;
+    this.useBridge = opts.useBridge || false;
+    this.bridgeOptions = opts.bridgeOptions || {};
+    this.configSettings = opts.settings || false;
 
-    this.startPort = opts.startPort || 31000;
+    this.nodeOptions = {};
 
-    this.nodeOptions = {}    
-    if( isObject( opts.nodes ) ){
-        var len = 0
-        for( var i in opts.nodes ){
-            var options = this.nodeOptions[ "n" + len ] = Object.merge(opts.nodeOptions, 
+    var i;
+    if (isObject(opts.nodes )) {
+        var len = 0;
+
+        for(i in opts.nodes) {
+            var options = this.nodeOptions[ "n" + len ] = Object.merge(opts.nodeOptions,
                                                                        opts.nodes[i]);
-            if( i.startsWith( "a" ) ) options.arbiter = true;
-            len++
+            if( i.startsWith( "a" ) ) {
+                options.arbiter = true;
+            }
+            len++;
         }
-        this.numNodes = len
+
+        this.numNodes = len;
     }
-    else if( Array.isArray( opts.nodes ) ){
-        for( var i = 0; i < opts.nodes.length; i++ )
+    else if (Array.isArray(opts.nodes)) {
+        for(i = 0; i < opts.nodes.length; i++) {
             this.nodeOptions[ "n" + i ] = Object.merge(opts.nodeOptions, opts.nodes[i]);
-        this.numNodes = opts.nodes.length
+        }
+
+        this.numNodes = opts.nodes.length;
     }
     else {
-        for ( var i =0; i < opts.nodes; i++ )
+        for (i = 0; i < opts.nodes; i++) {
             this.nodeOptions[ "n" + i ] = opts.nodeOptions;
+        }
+
         this.numNodes = opts.nodes;
     }
-    
-    this.ports = allocatePorts( this.numNodes , this.startPort );
-    this.nodes = []
-    this.initLiveNodes()
-    
-    Object.extend( this, ReplSetTest.Health )
-    Object.extend( this, ReplSetTest.State )
-    
-}
+
+    this.ports = allocatePorts(this.numNodes);
+    this.nodes = [];
+
+    if (this.useBridge) {
+        this._unbridgedPorts = allocatePorts(this.numNodes);
+        this._unbridgedNodes = [];
+    }
+
+    this.initLiveNodes();
+
+    Object.extend( this, ReplSetTest.Health );
+    Object.extend( this, ReplSetTest.State );
+};
 
 // List of nodes as host:port strings.
 ReplSetTest.prototype.nodeList = function() {
     var list = [];
     for(var i=0; i<this.ports.length; i++) {
-      list.push( this.host + ":" + this.ports[i]);
+        list.push( this.host + ":" + this.ports[i]);
     }
 
     return list;
-}
+};
 
 // Here we store a reference to all reachable nodes.
 ReplSetTest.prototype.initLiveNodes = function() {
-    this.liveNodes = { master: null, slaves: [] }
-}
+    this.liveNodes = { master: null, slaves: [] };
+};
 
 ReplSetTest.prototype.getNodeId = function(node) {
     
-    if( node.toFixed ) return parseInt( node )
-    
-    for( var i = 0; i < this.nodes.length; i++ ){
-        if( this.nodes[i] == node ) return i
+    if( node.toFixed ) {
+        return parseInt( node );
     }
     
-    if( node instanceof ObjectId ){
-        for( var i = 0; i < this.nodes.length; i++ ){
-            if( this.nodes[i].runId == node ) return i
+    for( var i = 0; i < this.nodes.length; i++ ){
+        if( this.nodes[i] == node ) {
+            return i;
         }
     }
     
-    if( node.nodeId != null ) return parseInt( node.nodeId )
+    if( node instanceof ObjectId ) {
+        for(i = 0; i < this.nodes.length; i++){
+            if( this.nodes[i].runId == node ) {
+                return i;
+            }
+        }
+    }
     
-    return undefined
+    if( node.nodeId != null ) {
+        return parseInt( node.nodeId );
+    }
     
-}
+    return undefined;
+    
+};
 
 ReplSetTest.prototype.getPort = function( n ){
     
-    n = this.getNodeId( n )
+    n = this.getNodeId( n );
     
     print( "ReplSetTest n: " + n + " ports: " + tojson( this.ports ) + "\t" + this.ports[n] + " " + typeof(n) );
     return this.ports[ n ];
-}
+};
 
 ReplSetTest.prototype.getPath = function( n ){
     
     if( n.host )
-        n = this.getNodeId( n )
+        n = this.getNodeId( n );
 
     var p = MongoRunner.dataPath + this.name + "-"+n;
     if ( ! this._alldbpaths )
@@ -145,25 +184,29 @@ ReplSetTest.prototype.getPath = function( n ){
     else
         this._alldbpaths.push( p );
     return p;
-}
+};
 
 ReplSetTest.prototype.getReplSetConfig = function() {
     var cfg = {};
 
-    cfg['_id']  = this.name;
+    cfg._id = this.name;
+    if (this.protocolVersion !== undefined && this.protocolVersion !== null) {
+        cfg.protocolVersion = this.protocolVersion;
+    }
+
     cfg.members = [];
 
-    for (i=0; i<this.ports.length; i++) {
+    for (var i=0; i<this.ports.length; i++) {
         member = {};
-        member['_id']  = i;
+        member._id = i;
 
         var port = this.ports[i];
 
-        member['host'] = this.host + ":" + port;
+        member.host = this.host + ":" + port;
         var nodeOpts = this.nodeOptions[ "n" + i ];
         if (nodeOpts) {
             if (nodeOpts.arbiter) {
-                member['arbiterOnly'] = true;
+                member.arbiterOnly = true;
             }
             if (nodeOpts.rsConfig) {
                 Object.extend(member, nodeOpts.rsConfig);
@@ -172,13 +215,20 @@ ReplSetTest.prototype.getReplSetConfig = function() {
         cfg.members.push(member);
     }
 
+    if (jsTestOptions().useLegacyReplicationProtocol) {
+        cfg.protocolVersion = 0;
+    }
+
+    if (this.configSettings) {
+        cfg.settings = this.configSettings;
+    }
     return cfg;
-}
+};
 
 ReplSetTest.prototype.getURL = function(){
     var hosts = [];
     
-    for(i=0; i<this.ports.length; i++) {
+    for(var i=0; i<this.ports.length; i++) {
 
         var port;
         // Connect on the right port
@@ -189,88 +239,20 @@ ReplSetTest.prototype.getURL = function(){
     }
     
     return this.name + "/" + hosts.join(",");
-}
-
-ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
-
-    if ( ! extra )
-        extra = {};
-
-    if ( ! extra.oplogSize )
-        extra.oplogSize = this.oplogSize;
-
-    var a = []
-
-
-    if ( putBinaryFirst )
-        a.push( "mongod" );
-
-    if ( extra.noReplSet ) {
-        delete extra.noReplSet;
-    }
-    else {
-        a.push( "--replSet" );
-        
-        if( this.useSeedList ) {
-            a.push( this.getURL() );
-        }
-        else {
-            a.push( this.name );
-        }
-    }
-    
-    a.push( "--noprealloc", "--smallfiles" );
-
-    a.push( "--rest" );
-
-    a.push( "--port" );
-    a.push( this.getPort( n ) );
-
-    a.push( "--dbpath" );
-    a.push( this.getPath( ( n.host ? this.getNodeId( n ) : n ) ) );
-    
-    if( this.keyFile ){
-        a.push( "--keyFile" )
-        a.push( keyFile )
-    }        
-    
-    if( jsTestOptions().noJournal ) a.push( "--nojournal" )
-    if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
-    if( jsTestOptions().keyFile && !this.keyFile) {
-        a.push( "--keyFile" )
-        a.push( jsTestOptions().keyFile )
-    }
-    
-    for ( var k in extra ){
-        var v = extra[k];
-        if( k in MongoRunner.logicalOptions ) continue
-        a.push( "--" + k );
-        if ( v != null ){
-            if( v.replace ){
-                v = v.replace(/\$node/g, "" + ( n.host ? this.getNodeId( n ) : n ) )
-                v = v.replace(/\$set/g, this.name )
-                v = v.replace(/\$path/g, this.getPath( n ) )
-            }
-            a.push( v );
-        }
-    }
-
-    return a;
-}
+};
 
 ReplSetTest.prototype.startSet = function( options ) {
-    
     var nodes = [];
     print( "ReplSetTest Starting Set" );
 
-    for( n = 0 ; n < this.ports.length; n++ ) {
-        node = this.start(n, options)
+    for( var n = 0 ; n < this.ports.length; n++ ) {
+        node = this.start(n, options);
         nodes.push(node);
     }
 
     this.nodes = nodes;
     return this.nodes;
-}
+};
 
 ReplSetTest.prototype.callIsMaster = function() {
   
@@ -278,19 +260,17 @@ ReplSetTest.prototype.callIsMaster = function() {
   this.initLiveNodes();
     
   for(var i=0; i<this.nodes.length; i++) {
-
     try {
       var n = this.nodes[i].getDB('admin').runCommand({ismaster:1});
       
-      if(n['ismaster'] == true) {
-        master = this.nodes[i]
-        this.liveNodes.master = master
+      if(n.ismaster == true) {
+        master = this.nodes[i];
+        this.liveNodes.master = master;
       }
       else {
         this.nodes[i].setSlaveOk();
         this.liveNodes.slaves.push(this.nodes[i]);
       }
-
     }
     catch (err) {
       print("ReplSetTest Could not call ismaster on node " + i + ": " + tojson(err));
@@ -298,7 +278,7 @@ ReplSetTest.prototype.callIsMaster = function() {
   }
 
   return master || false;
-}
+};
 
 ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs, timeout ) {
     var hostCount = host.length;
@@ -311,26 +291,26 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs, timeout ) {
     
     timeout = timeout || 60 * 1000;
     
-    if( hostOk == undefined ) hostOk = { ok : true }
-    if( host.host ) host = host.host
-    if( rs && rs.getMaster ) rs = rs.name
+    if( hostOk == undefined ) hostOk = { ok : true };
+    if( host.host ) host = host.host;
+    if( rs && rs.getMaster ) rs = rs.name;
     
-    print( "Awaiting " + host + " to be " + tojson( hostOk ) + " for " + conn + " (rs: " + rs + ")" )
+    print( "Awaiting " + host + " to be " + tojson( hostOk ) + " for " + conn + " (rs: " + rs + ")" );
     
-    var tests = 0
+    var tests = 0;
     assert.soon( function() {
-        var rsClientHosts = conn.getDB( "admin" ).runCommand( "connPoolStats" )[ "replicaSets" ]
+        var rsClientHosts = conn.getDB( "admin" ).runCommand( "connPoolStats" ).replicaSets;
         if( tests++ % 10 == 0 ) 
-            printjson( rsClientHosts )
+            printjson( rsClientHosts );
         
-        for ( rsName in rsClientHosts ){
-            if( rs && rs != rsName ) continue
+        for ( var rsName in rsClientHosts ){
+            if( rs && rs != rsName ) continue;
             for ( var i = 0; i < rsClientHosts[rsName].hosts.length; i++ ){
                 var clientHost = rsClientHosts[rsName].hosts[ i ];
-                if( clientHost.addr != host ) continue
+                if( clientHost.addr != host ) continue;
                 
                 // Check that *all* host properties are set correctly
-                var propOk = true
+                var propOk = true;
                 for( var prop in hostOk ){
                     if ( isObject( hostOk[prop] )) {
                         if ( !friendlyEqual( hostOk[prop], clientHost[prop] )){
@@ -349,9 +329,9 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs, timeout ) {
             }
         }
         return false;
-    }, "timed out waiting for replica set client to recognize hosts", timeout )
+    }, "timed out waiting for replica set client to recognize hosts", timeout );
     
-}
+};
 
 ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
   this.getMaster(); // Wait for a primary to be selected.
@@ -365,8 +345,8 @@ ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
           var ready = true;
           for(var i=0; i<len; i++) {
               var isMaster = slaves[i].getDB("admin").runCommand({ismaster: 1});
-              var arbiter = isMaster['arbiterOnly'] == undefined ? false : isMaster['arbiterOnly'];
-              ready = ready && ( isMaster['secondary'] || arbiter );
+              var arbiter = isMaster.arbiterOnly == undefined ? false : isMaster.arbiterOnly;
+              ready = ready && ( isMaster.secondary || arbiter );
           }
           return ready;
       }, "Awaiting secondaries", tmo);
@@ -391,81 +371,84 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
     throw err;
   }
   return master;
-}
+};
 
-ReplSetTest.prototype.getPrimary = ReplSetTest.prototype.getMaster
+ReplSetTest.prototype.getPrimary = ReplSetTest.prototype.getMaster;
+
+ReplSetTest.prototype.awaitNoPrimary = function(msg, timeout) {
+    msg = msg || "Timed out waiting for there to be no primary in replset: " + this.name;
+    timeout = timeout || 30000;
+    var self = this;
+    assert.soon(function() {
+                    return self.callIsMaster() == false;
+                }, msg, timeout);
+
+};
 
 ReplSetTest.prototype.getSecondaries = function( timeout ){
-    var master = this.getMaster( timeout )
-    var secs = []
+    var master = this.getMaster( timeout );
+    var secs = [];
     for( var i = 0; i < this.nodes.length; i++ ){
         if( this.nodes[i] != master ){
-            secs.push( this.nodes[i] )
+            secs.push( this.nodes[i] );
         }
     }
-    return secs
-}
+    return secs;
+};
 
 ReplSetTest.prototype.getSecondary = function( timeout ){
     return this.getSecondaries( timeout )[0];
-}
+};
 
 ReplSetTest.prototype.status = function( timeout ){
-    var master = this.callIsMaster()
-    if( ! master ) master = this.liveNodes.slaves[0]
-    return master.getDB("admin").runCommand({replSetGetStatus: 1})
-}
+    var master = this.callIsMaster();
+    if( ! master ) master = this.liveNodes.slaves[0];
+    return master.getDB("admin").runCommand({replSetGetStatus: 1});
+};
 
 // Add a node to the test set
-ReplSetTest.prototype.add = function( config ) {
-  if(this.ports.length == 0) {
-    var nextPort = allocatePorts( 1, this.startPort )[0];
-  }
-  else {
-    var nextPort = this.ports[this.ports.length-1] + 1;
-  }
-  print("ReplSetTest Next port: " + nextPort);
-  this.ports.push(nextPort);
-  printjson(this.ports);
+ReplSetTest.prototype.add = function(config) {
+    var nextPort = allocatePort();
+    print("ReplSetTest Next port: " + nextPort);
 
-  var nextId = this.nodes.length;
-  printjson(this.nodes);
-  print("ReplSetTest nextId:" + nextId);
-  var newNode = this.start( nextId, config );
-  
-  return newNode;
-}
+    this.ports.push(nextPort);
+    printjson(this.ports);
+
+    if (this.useBridge) {
+        this._unbridgedPorts.push(allocatePort());
+    }
+
+    var nextId = this.nodes.length;
+    printjson(this.nodes);
+
+    print("ReplSetTest nextId: " + nextId);
+    return this.start(nextId, config);
+};
 
 ReplSetTest.prototype.remove = function( nodeId ) {
-    nodeId = this.getNodeId( nodeId )
+    nodeId = this.getNodeId( nodeId );
     this.nodes.splice( nodeId, 1 );
     this.ports.splice( nodeId, 1 );
-}
+
+    if (this.useBridge) {
+        this._unbridgedNodes.splice(nodeId, 1);
+        this._unbridgedPorts.splice(nodeId, 1);
+    }
+};
 
 ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var master  = this.nodes[0].getDB("admin");
     var config  = cfg || this.getReplSetConfig();
     var cmd     = {};
     var cmdKey  = initCmd || 'replSetInitiate';
-    var timeout = timeout || 60000;
-    var ex;
+    timeout = timeout || 60000;
+    if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
+        config.protocolVersion = 0;
+    }
     cmd[cmdKey] = config;
     printjson(cmd);
 
-    // TODO(schwerin): After removing the legacy implementation of replica sets, there should be no
-    // reason to try these commands more than once, so we should be able to get rid of assert.soon()
-    // here.
-    assert.soon(function () {
-        try {
-            assert.commandWorked(master.runCommand(cmd), tojson(cmd));
-            return true;
-        }
-        catch (ex) {
-            print("ReplSetTest caught exception " + tojson(ex) + " while running " + tojson(cmd) +
-                  " in assert.soon");
-            return false;
-        }
-    }, "Failed all attempts to run "  + tojson(cmd), timeout);
+    assert.commandWorked(master.runCommand(cmd), tojson(cmd));
     this.awaitSecondaryNodes(timeout);
 
     // Setup authentication if running test with authentication
@@ -473,24 +456,54 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
         master = this.getMaster();
         jsTest.authenticateNodes(this.nodes);
     }
-}
+};
 
-ReplSetTest.prototype.reInitiate = function(timeout) {
-    var master  = this.nodes[0];
-    var c = master.getDB("local")['system.replset'].findOne();
-    var config  = this.getReplSetConfig();
-    var timeout = timeout || 60000;
-    config.version = c.version + 1;
-    this.initiate( config , 'replSetReconfig', timeout );
-}
+/**
+ * Gets the current replica set config from the primary.
+ *
+ * throws if any error occurs on the command.
+ */
+ReplSetTest.prototype.getConfigFromPrimary = function() {
+    var primary = this.getPrimary(90 * 1000 /* 90 sec timeout */);
+    return assert.commandWorked(primary.getDB("admin").adminCommand("replSetGetConfig")).config;
+};
+
+// alias to match rs.conf* behavior in the shell.
+ReplSetTest.prototype.conf = ReplSetTest.prototype.getConfigFromPrimary;
+ReplSetTest.prototype.config = ReplSetTest.prototype.conf;
+
+ReplSetTest.prototype.reInitiate = function() {
+    "use strict";
+
+    var config = this.getReplSetConfig();
+    var newVersion = this.getConfigFromPrimary().version + 1;
+    config.version = newVersion;
+
+    if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
+        config.protocolVersion = 0;
+    }
+    try {
+        assert.commandWorked(this.getPrimary().adminCommand({replSetReconfig: config}));
+    }
+    catch (e) {
+        if (tojson(e).indexOf("error doing query: failed") < 0) {
+            throw e;
+        }
+    }
+};
+
+ReplSetTest.prototype.getLastOpTime = function(conn) {
+    var replStatus = conn.getDB("admin").runCommand("replSetGetStatus");
+    var myOpTime = replStatus.members.filter(m=>m.self)[0].optime;
+    return myOpTime.ts ? myOpTime.ts : myOpTime;
+};
 
 ReplSetTest.prototype.getLastOpTimeWritten = function() {
-    this.getMaster();
+    var master = this.getMaster();
     var self = this;
     assert.soon(function() {
         try {
-            var cursor = self.liveNodes.master.getDB("local")['oplog.rs'].find({});
-            self.latest = cursor.sort({'$natural': -1}).limit(1).next()['ts'];
+            self.latest = self.getLastOpTime(master);
         }
         catch(e) {
             print("ReplSetTest caught exception " + e);
@@ -501,98 +514,149 @@ ReplSetTest.prototype.getLastOpTimeWritten = function() {
     }, "awaiting oplog query", 30000);
 };
 
+/**
+ * Waits for the last oplog entry on the primary to be visible in the committed snapshop view
+ * of the oplog on *all* secondaries.
+ */
+ReplSetTest.prototype.awaitLastOpCommitted = function() {
+    var rst = this;
+    var master = rst.getMaster();
+    var lastOp = master.getDB('local').oplog.rs.find().sort({ $natural: -1 }).limit(1).next();
+
+    var opTime;
+    var filter;
+    if (this.getReplSetConfig().protocolVersion === 1) {
+        opTime = {ts: lastOp.ts, t: lastOp.t};
+        filter = opTime;
+    } else {
+        opTime = {ts: lastOp.ts, t: -1};
+        filter = {ts: lastOp.ts};
+    }
+    print("Waiting for op with OpTime " + tojson(opTime) + " to be committed on all secondaries");
+
+    var isLastOpCommitted = function() {
+        for (var i = 0; i < rst.nodes.length; i++) {
+            var node = rst.nodes[i];
+
+            // Continue if we're connected to an arbiter
+            var res = node.getDB("admin").runCommand({replSetGetStatus: 1});
+            assert.commandWorked(res);
+            if (res.myState == 7) {
+                continue;
+            }
+
+            res = node.getDB('local').runCommand({find: 'oplog.rs',
+                                                  filter: filter,
+                                                  readConcern: {level: "majority",
+                                                                afterOpTime: opTime},
+                                                  maxTimeMS: 1000});
+            if (!res.ok) {
+                printjson(res);
+                return false;
+            }
+            var cursor = new DBCommandCursor(node, res);
+            if (!cursor.hasNext()) {
+                return false;
+            }
+        }
+        return true;
+    };
+    assert.soon(isLastOpCommitted,
+                "Op failed to become committed on all secondaries: " + tojson(lastOp));
+};
+
 ReplSetTest.prototype.awaitReplication = function(timeout) {
     timeout = timeout || 30000;
 
     this.getLastOpTimeWritten();
 
-    var name = this.liveNodes.master.toString().substr(14); // strip "connection to "
-    print("ReplSetTest awaitReplication: starting: timestamp for primary, " +
-          name + ", is " + tojson(this.latest));
-
     // get the latest config version from master. if there is a problem, grab master and try again
     var configVersion;
+    var masterOpTime;
+    var masterName;
+    var master;
     try {
-        configVersion = this.liveNodes.master.getDB("local")['system.replset'].findOne().version;
+        master = this.getMaster();
+        configVersion = this.conf().version;
+        masterOpTime = this.getLastOpTime(master);
+        masterName = master.toString().substr(14); // strip "connection to "
     }
-    catch(e) {
-        this.getMaster();
-        configVersion = this.liveNodes.master.getDB("local")['system.replset'].findOne().version;
+    catch (e) {
+        master = this.getMaster();
+        configVersion = this.conf().version;
+        masterOpTime = this.getLastOpTime(master);
+        masterName = master.toString().substr(14); // strip "connection to "
     }
 
+    print("ReplSetTest awaitReplication: starting: timestamp for primary, " + masterName +
+            ", is " + tojson(this.latest) +
+            ", last oplog entry is " + tojsononeline(masterOpTime));
+
     var self = this;
-    assert.soon( function() {
+    assert.soon(function() {
          try {
              print("ReplSetTest awaitReplication: checking secondaries against timestamp " +
                    tojson(self.latest));
              var secondaryCount = 0;
              for (var i=0; i < self.liveNodes.slaves.length; i++) {
                  var slave = self.liveNodes.slaves[i];
+                 var slaveName = slave.toString().substr(14); // strip "connection to "
 
                  var slaveConfigVersion =
                         slave.getDB("local")['system.replset'].findOne().version;
 
                  if (configVersion != slaveConfigVersion) {
-                     print("ReplSetTest awaitReplication: secondary #" + secondaryCount
-                           + ", " + name + ", has config version #" + slaveConfigVersion
-                           + ", but expected config version #" + configVersion);
-                     master = self.getMaster();
-                     var masterVersion = master.getDB("local")['system.replset'].findOne().version;
-                     if (slaveConfigVersion > configVersion
-                         && slaveConfigVersion === masterVersion) {
-                         configVersion = slaveConfigVersion;
-                         print ("changing expected config version # since secondary # "
-                                + "was higher and the master # now matches it");
-                     }
-                     return false;
+                    print("ReplSetTest awaitReplication: secondary #" + secondaryCount +
+                           ", " + slaveName + ", has config version #" + slaveConfigVersion +
+                           ", but expected config version #" + configVersion);
+
+                    if (slaveConfigVersion > configVersion) {
+                        master = this.getMaster();
+                        configVersion = master.getDB("local")['system.replset'].findOne().version;
+                        masterOpTime = self.getLastOpTime(master);
+                        masterName = master.toString().substr(14); // strip "connection to "
+
+                        print("ReplSetTest awaitReplication: timestamp for primary, " +
+                                masterName + ", is " + tojson(this.latest) +
+                                ", last oplog entry is " + tojsononeline(masterOpTime));
+                    }
+
+                    return false;
                  }
 
                  // Continue if we're connected to an arbiter
                  if (res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
-                     if (res.myState == 7) {
+                     if (res.myState == self.ARBITER) {
                          continue;
                      }
                  }
 
                  ++secondaryCount;
-                 var name = slave.toString().substr(14); // strip "connection to "
                  print("ReplSetTest awaitReplication: checking secondary #" +
-                       secondaryCount + ": " + name);
+                       secondaryCount + ": " + slaveName);
+
                  slave.getDB("admin").getMongo().setSlaveOk();
-                 var log = slave.getDB("local")['oplog.rs'];
-                 if (log.find({}).sort({'$natural': -1}).limit(1).hasNext()) {
-                     var entry = log.find({}).sort({'$natural': -1}).limit(1).next();
-                     var ts = entry['ts'];
-                     if (self.latest.t < ts.t ||
-                            (self.latest.t == ts.t && self.latest.i < ts.i)) {
-                         self.latest = self.liveNodes.master.getDB("local")['oplog.rs'].
-                                            find({}).
-                                            sort({'$natural': -1}).
-                                            limit(1).
-                                            next()['ts'];
-                         print("ReplSetTest awaitReplication: timestamp for " + name +
-                               " is newer, resetting latest to " + tojson(self.latest));
-                         return false;
-                     }
-                     if (!friendlyEqual(self.latest, ts)) {
-                         print("ReplSetTest awaitReplication: timestamp for secondary #" +
-                               secondaryCount + ", " + name + ", is " + tojson(ts) +
-                               " but latest is " + tojson(self.latest));
-                         print("ReplSetTest awaitReplication: last oplog entry (of " +
-                               log.count() + ") for secondary #" + secondaryCount +
-                               ", " + name + ", is " + tojsononeline(entry));
-                         print("ReplSetTest awaitReplication: secondary #" +
-                               secondaryCount + ", " + name + ", is NOT synced");
-                         return false;
-                     }
-                     print("ReplSetTest awaitReplication: secondary #" +
-                           secondaryCount + ", " + name + ", is synced");
-                 }
-                 else {
-                     print("ReplSetTest awaitReplication: waiting for secondary #" +
-                           secondaryCount + ", " + name + ", to have an oplog built");
+
+                 var ts = self.getLastOpTime(slave);
+                 if (self.latest.t < ts.t ||
+                        (self.latest.t == ts.t && self.latest.i < ts.i)) {
+                     self.latest = self.getLastOpTime(master);
+                     print("ReplSetTest awaitReplication: timestamp for " + slaveName +
+                           " is newer, resetting latest to " + tojson(self.latest));
                      return false;
                  }
+
+                 if (!friendlyEqual(self.latest, ts)) {
+                     print("ReplSetTest awaitReplication: timestamp for secondary #" +
+                           secondaryCount + ", " + slaveName + ", is " + tojson(ts) +
+                           " but latest is " + tojson(self.latest));
+                     print("ReplSetTest awaitReplication: secondary #" +
+                           secondaryCount + ", " + slaveName + ", is NOT synced");
+                     return false;
+                 }
+
+                 print("ReplSetTest awaitReplication: secondary #" +
+                       secondaryCount + ", " + slaveName + ", is synced");
              }
 
              print("ReplSetTest awaitReplication: finished: all " + secondaryCount +
@@ -609,15 +673,15 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
              return false;
          }
      }, "awaiting replication", timeout);
-}
+};
 
 ReplSetTest.prototype.getHashes = function( db ){
     this.getMaster();
     var res = {};
-    res.master = this.liveNodes.master.getDB( db ).runCommand( "dbhash" )
-    res.slaves = this.liveNodes.slaves.map( function(z){ return z.getDB( db ).runCommand( "dbhash" ); } )
+    res.master = this.liveNodes.master.getDB( db ).runCommand( "dbhash" );
+    res.slaves = this.liveNodes.slaves.map( function(z){ return z.getDB( db ).runCommand( "dbhash" ); } );
     return res;
-}
+};
 
 /**
  * Starts up a server.  Options are saved by default for subsequent starts.
@@ -634,39 +698,35 @@ ReplSetTest.prototype.getHashes = function( db ){
  *   before the server starts.  Default: false.
  * 
  */
-ReplSetTest.prototype.start = function( n , options , restart , wait ){
-    
-    if( n.length ){
-        
-        var nodes = n
-        var started = []
+ReplSetTest.prototype.start = function( n , options , restart , wait ) {
+    if( n.length ) {
+        var nodes = n;
+        var started = [];
         
         for( var i = 0; i < nodes.length; i++ ){
             if( this.start( nodes[i], Object.merge({}, options), restart, wait ) ){
-                started.push( nodes[i] )
+                started.push( nodes[i] );
             }
         }
         
-        return started
-        
+        return started;
     }
+
+    // TODO: should we do something special if we don't currently know about this node?
+    n = this.getNodeId(n);
     
-    print( "ReplSetTest n is : " + n )
+    print( "ReplSetTest n is : " + n );
     
     defaults = { useHostName : this.useHostName,
                  oplogSize : this.oplogSize, 
                  keyFile : this.keyFile, 
-                 port : this.getPort( n ),
+                 port : this.useBridge ? this._unbridgedPorts[n] : this.ports[n],
                  noprealloc : "",
                  smallfiles : "",
-                 rest : "",
                  replSet : this.useSeedList ? this.getURL() : this.name,
-                 dbpath : "$set-$node" }
+                 dbpath : "$set-$node" };
     
-    defaults = Object.merge( defaults, ReplSetTest.nodeOptions || {} )
-
-    // TODO : should we do something special if we don't currently know about this node?
-    n = this.getNodeId( n )
+    defaults = Object.merge( defaults, ReplSetTest.nodeOptions || {} );
     
     //
     // Note : this replaces the binVersion of the shared startSet() options the first time 
@@ -675,49 +735,69 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
     //
     if( options && options.binVersion ){
         options.binVersion = 
-            MongoRunner.versionIterator( options.binVersion )
+            MongoRunner.versionIterator( options.binVersion );
     }
     
-    options = Object.merge( defaults, options )
-    options = Object.merge( options, this.nodeOptions[ "n" + n ] )
+    options = Object.merge( defaults, options );
+    options = Object.merge( options, this.nodeOptions[ "n" + n ] );
     delete options.rsConfig;
 
-    options.restart = options.restart || restart
+    options.restart = options.restart || restart;
 
-    var pathOpts = { node : n, set : this.name }
-    options.pathOpts = Object.merge( options.pathOpts || {}, pathOpts )
+    var pathOpts = { node : n, set : this.name };
+    options.pathOpts = Object.merge( options.pathOpts || {}, pathOpts );
     
     if( tojson(options) != tojson({}) )
-        printjson(options)
+        printjson(options);
 
     // make sure to call getPath, otherwise folders wont be cleaned
     this.getPath(n);
 
     print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
-    
-    var rval = this.nodes[n] = MongoRunner.runMongod( options )
-    
-    if( ! rval ) return rval
-    
-    // Add replica set specific attributes
-    this.nodes[n].nodeId = n
-            
-    printjson( this.nodes )
-        
-    wait = wait || false
-    if( ! wait.toFixed ){
-        if( wait ) wait = 0
-        else wait = -1
+
+    if (this.useBridge) {
+        var bridgeOptions = Object.merge(this.bridgeOptions, options.bridgeOptions || {});
+        bridgeOptions = Object.merge(bridgeOptions, {
+            hostName: this.host,
+            port: this.ports[n],
+            // The mongod processes identify themselves to mongobridge as host:port, where the host
+            // is the actual hostname of the machine and not localhost.
+            dest: getHostName() + ":" + this._unbridgedPorts[n],
+        });
+
+        this.nodes[n] = new MongoBridge(bridgeOptions);
+    }
+
+    var conn = MongoRunner.runMongod(options);
+    if (!conn) {
+        throw new Error("Failed to start node " + n);
+    }
+
+    if (this.useBridge) {
+        this.nodes[n].connectToBridge();
+        this._unbridgedNodes[n] = conn;
+    } else {
+        this.nodes[n] = conn;
     }
     
-    if( wait < 0 ) return rval
-    
-    // Wait for startup
-    this.waitForHealth( rval, this.UP, wait )
-    
-    return rval
-    
-}
+    // Add replica set specific attributes.
+    this.nodes[n].nodeId = n;
+            
+    printjson( this.nodes );
+        
+    wait = wait || false;
+    if( ! wait.toFixed ){
+        if( wait ) wait = 0;
+        else wait = -1;
+    }
+
+    if (wait >= 0) {
+        // Wait for node to start up.
+        this.waitForHealth(this.nodes[n], this.UP, wait);
+    }
+
+    return this.nodes[n];
+};
 
 
 /**
@@ -733,8 +813,8 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
 ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     // Can specify wait as third parameter, if using default signal
     if( signal == true || signal == false ){
-        wait = signal
-        signal = undefined
+        wait = signal;
+        signal = undefined;
     }
     
     this.stop(n, signal, options);
@@ -751,13 +831,13 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
         }
     }
     return started;
-}
+};
 
 ReplSetTest.prototype.stopMaster = function(signal, opts) {
     var master = this.getMaster();
     var master_id = this.getNodeId( master );
     return this.stop(master_id, signal, opts);
-}
+};
 
 /**
  * Stops a particular node or nodes, specified by conn or id
@@ -770,28 +850,33 @@ ReplSetTest.prototype.stop = function(n, signal, opts) {
         
     // Flatten array of nodes to stop
     if( n.length ){
-        nodes = n
+        nodes = n;
         
-        var stopped = []
+        var stopped = [];
         for( var i = 0; i < nodes.length; i++ ){
             if (this.stop(nodes[i], signal, opts))
-                stopped.push( nodes[i] )
+                stopped.push( nodes[i] );
         }
         
-        return stopped
+        return stopped;
     }
     
     // Can specify wait as second parameter, if using default signal
     if( signal == true || signal == false ){
-        signal = undefined
+        signal = undefined;
     }
     
-    var port = this.getPort( n );
+    n = this.getNodeId(n);
+    var port = this.useBridge ? this._unbridgedPorts[n] : this.ports[n];
     print('ReplSetTest stop *** Shutting down mongod in port ' + port + ' ***');
     var ret = MongoRunner.stopMongod( port , signal, opts );
 
     print('ReplSetTest stop *** Mongod in port ' + port +
           ' shutdown with code (' + ret + ') ***');
+
+    if (this.useBridge) {
+        this.nodes[n].stop();
+    }
 
     return ret;
 };
@@ -800,8 +885,7 @@ ReplSetTest.prototype.stop = function(n, signal, opts) {
  * Kill all members of this replica set.
  *
  * @param {number} signal The signal number to use for killing the members
- * @param {boolean} forRestart will not cleanup data directory or teardown
- *   bridges if set to true.
+ * @param {boolean} forRestart will not cleanup data directory
  * @param {Object} opts @see MongoRunner.stopMongod
  */
 ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
@@ -811,21 +895,13 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
     if ( forRestart ) { return; }
     if ( this._alldbpaths ){
         print("ReplSetTest stopSet deleting all dbpaths");
-        for( i=0; i<this._alldbpaths.length; i++ ){
+        for(i=0; i<this._alldbpaths.length; i++) {
             resetDbpath( this._alldbpaths[i] );
         }
     }
-    if (this.bridges) {
-        for (var i = 0; i < this.bridges.length; i++) {
-            for (var j = 0; j < this.bridges[i].length; j++) {
-                if (this.bridges[i][j] && this.bridges[i][j].port) {
-                    this.bridges[i][j].stop();
-                }
-            }
-        }   
-    }
-    
-    print('ReplSetTest stopSet *** Shut down repl set - test worked ****' )
+    _forgetReplSet(this.name);
+
+    print('ReplSetTest stopSet *** Shut down repl set - test worked ****' );
 };
 
 /**
@@ -859,7 +935,7 @@ ReplSetTest.prototype.ensureOplogsMatch = function() {
             this.query = function(ts) {
                 var coll = this.getOplogColl();
                 var query = {"ts": {"$gte": ts ? ts : new Timestamp()}};
-                this.cursor = coll.find(query).sort({$natural:1})
+                this.cursor = coll.find(query).sort({$natural:1});
                 this.cursor.addOption(DBQuery.Option.oplogReplay);
             };
             
@@ -869,7 +945,7 @@ ReplSetTest.prototype.ensureOplogsMatch = function() {
             
             this.getOplogColl = function () {
                 return this.mongo.getDB("local")["oplog.rs"];
-            }
+            };
             
             this.lastDoc = null;
             this.cursor = null;
@@ -883,49 +959,49 @@ ReplSetTest.prototype.ensureOplogsMatch = function() {
         var rsSize = nodes.length;
         for (var i = 0; i < rsSize; i++) {
             readers[i] = new OplogReader(nodes[i]);
-            var currTS = readers[i].getFirstDoc()["ts"];
+            var currTS = readers[i].getFirstDoc().ts;
             if (currTS.t > largestTS.t || (currTS.t == largestTS.t && currTS.i > largestTS.i) ) {
                 largestTS = currTS;
             }
         }
         
         // start all oplogReaders at the same place. 
-        for (var i = 0; i < rsSize; i++) {
+        for (i = 0; i < rsSize; i++) {
             readers[i].query(largestTS);
         }
 
         var firstReader = readers[0];
         while (firstReader.hasNext()) {
-            var ts = firstReader.next()["ts"];
-            for(var i = 1; i < rsSize; i++) { 
+            var ts = firstReader.next().ts;
+            for(i = 1; i < rsSize; i++) {
                 assert.eq(ts, 
-                          readers[i].next()["ts"], 
+                          readers[i].next().ts,
                           " non-matching ts for node: " + readers[i].mongo);
             }
         }
         
         // ensure no other node has more oplog
-        for (var i = 1; i < rsSize; i++) { 
+        for (i = 1; i < rsSize; i++) {
             assert.eq(false, 
                       readers[i].hasNext(),
                       "" + readers[i] + " shouldn't have more oplog.");
         }
     }
-}
+};
 /**
  * Waits until there is a master node
  */
 ReplSetTest.prototype.waitForMaster = function( timeout ){
     
-    var master = undefined
+    var master;
     
     var self = this;
     assert.soon(function() {
         return ( master = self.getMaster() );
     }, "waiting for master", timeout);
     
-    return master
-}
+    return master;
+};
 
 
 /**
@@ -937,8 +1013,8 @@ ReplSetTest.prototype.waitForMaster = function( timeout ){
  *     respond to the isMaster command.
  */
 ReplSetTest.prototype.waitForHealth = function( node, state, timeout ){
-    this.waitForIndicator( node, state, "health", timeout )    
-}
+    this.waitForIndicator( node, state, "health", timeout );
+};
 
 /**
  * Wait for a state indicator to go to a particular state or states.
@@ -948,8 +1024,8 @@ ReplSetTest.prototype.waitForHealth = function( node, state, timeout ){
  * 
  */
 ReplSetTest.prototype.waitForState = function( node, state, timeout ){
-    this.waitForIndicator( node, state, "state", timeout )
-}
+    this.waitForIndicator( node, state, "state", timeout );
+};
 
 /**
  * Wait for a rs indicator to go to a particular state or states.
@@ -963,12 +1039,12 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     
     if( node.length ){
         
-        var nodes = node        
+        var nodes = node;
         for( var i = 0; i < nodes.length; i++ ){
             if( states.length )
-                this.waitForIndicator( nodes[i], states[i], ind, timeout )
+                this.waitForIndicator( nodes[i], states[i], ind, timeout );
             else
-                this.waitForIndicator( nodes[i], states, ind, timeout )
+                this.waitForIndicator( nodes[i], states, ind, timeout );
         }
         
         return;
@@ -977,18 +1053,18 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     timeout = timeout || 30000;
     
     if( ! node.getDB ){
-        node = this.nodes[node]
+        node = this.nodes[node];
     }
     
-    if( ! states.length ) states = [ states ]
+    if( ! states.length ) states = [ states ];
     
-    print( "ReplSetTest waitForIndicator " + ind + " on " + node )
-    printjson( states )
-    print( "ReplSetTest waitForIndicator from node " + node )
+    print( "ReplSetTest waitForIndicator " + ind + " on " + node );
+    printjson( states );
+    print( "ReplSetTest waitForIndicator from node " + node );
     
-    var lastTime = null
-    var currTime = new Date().getTime()
-    var status = undefined;
+    var lastTime = null;
+    var currTime = new Date().getTime();
+    var status;
 
     var self = this;
     assert.soon(function() {
@@ -1012,7 +1088,7 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
             return false;
         }
 
-        var printStatus = false
+        var printStatus = false;
         if( lastTime == null || ( currTime = new Date().getTime() ) - (1000 * 5) > lastTime ) {
             if( lastTime == null ) {
                 print( "ReplSetTest waitForIndicator Initial status ( timeout : " +
@@ -1035,8 +1111,13 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
             if( status.members[i].name == node.host || status.members[i].name == node.name ) {
                 for( var j = 0; j < states.length; j++ ) {
                     if( printStatus ) {
-                        print( "Status " + " : " + status.members[i][ind] +
-                                "  target state : " + states[j] );
+                        print( "Status -- " + " current state: " + status.members[i][ind] +
+                                ",  target state : " + states[j] );
+                    }
+
+                    if (typeof(states[j]) != "number") {
+                        throw new Error("State was not an number -- type:" +
+                                        typeof(states[j]) + ", value:" + states[j]);
                     }
                     if( status.members[i][ind] == states[j] ) {
                         return true;
@@ -1049,8 +1130,8 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
 
     }, "waiting for state indicator " + ind + " for " + timeout + "ms", timeout);
 
-    print( "ReplSetTest waitForIndicator final status:" )
-    printjson( status )
+    print( "ReplSetTest waitForIndicator final status:" );
+    printjson( status );
 };
 
 ReplSetTest.Health = {};
@@ -1072,190 +1153,42 @@ ReplSetTest.State.REMOVED = 10;
 /** 
  * Overflows a replica set secondary or secondaries, specified by id or conn.
  */
-ReplSetTest.prototype.overflow = function( secondaries ){
-    
+ReplSetTest.prototype.overflow = function( secondaries ) {
     // Create a new collection to overflow, allow secondaries to replicate
-    var master = this.getMaster()
-    var overflowColl = master.getCollection( "_overflow.coll" )
-    overflowColl.insert({ replicated : "value" })
-    this.awaitReplication()
-    
+    var master = this.getMaster();
+    var overflowColl = master.getCollection( "_overflow.coll" );
+    overflowColl.insert({ replicated : "value" });
+    this.awaitReplication();
+
     this.stop(secondaries);
-        
+
     var count = master.getDB("local").oplog.rs.count();
     var prevCount = -1;
-    
-    // Keep inserting till we hit our capped coll limits
-    while (count != prevCount) {
-      
+
+    // Insert batches of documents until we exceed the capped size for the oplog and truncate it.
+
+    while (count > prevCount) {
       print("ReplSetTest overflow inserting 10000");
       var bulk = overflowColl.initializeUnorderedBulkOp();
       for (var i = 0; i < 10000; i++) {
-          bulk.insert({ overflow : "value" });
+        bulk.insert({ overflow : "Insert some large overflow value to eat oplog space faster." });
       }
-      bulk.execute();
+      assert.writeOK(bulk.execute());
+
       prevCount = count;
       this.awaitReplication();
       
       count = master.getDB("local").oplog.rs.count();
-      
+
       print( "ReplSetTest overflow count : " + count + " prev : " + prevCount );
-      
     }
-    
+
+    // Do one writeConcern:2 write in order to ensure that all of the oplog gets propagated to the
+    // secondary which is online
+    assert.writeOK(
+        overflowColl.insert({ overflow: "Last overflow value" }, { writeConcern: { w: 2 } }));
+
     // Restart all our secondaries and wait for recovery state
-    this.start( secondaries, { remember : true }, true, true )
-    this.waitForState( secondaries, this.RECOVERING, 5 * 60 * 1000 )
-    
-}
-
-
-
-
-/**
- * Bridging allows you to test network partitioning.  For example, you can set
- * up a replica set, run bridge(), then kill the connection between any two
- * nodes x and y with partition(x, y).
- *
- * Once you have called bridging, you cannot reconfigure the replica set.
- */
-ReplSetTest.prototype.bridge = function( opts ) {
-    if (this.bridges) {
-        print("ReplSetTest bridge bridges have already been created!");
-        return;
-    }
-    
-    var n = this.nodes.length;
-
-    // create bridges
-    this.bridges = [];
-    for (var i=0; i<n; i++) {
-        var nodeBridges = [];
-        for (var j=0; j<n; j++) {
-            if (i == j) {
-                continue;
-            }
-            nodeBridges[j] = new ReplSetBridge(this, i, j);
-        }
-        this.bridges.push(nodeBridges);
-    }
-    print("ReplSetTest bridge bridges: " + this.bridges);
-    
-    // restart everyone independently
-    this.stopSet(null, true, opts );
-    for (var i=0; i<n; i++) {
-        this.restart(i, {noReplSet : true});
-    }
-    
-    // create new configs
-    for (var i=0; i<n; i++) {
-        config = this.nodes[i].getDB("local").system.replset.findOne();
-        
-        if (!config) {
-            print("ReplSetTest bridge couldn't find config for "+this.nodes[i]);
-            assert(false);
-        }
-
-        var updateMod = {"$set" : {}};
-        for (var j = 0; j<config.members.length; j++) {
-            if (config.members[j].host == this.host+":"+this.ports[i]) {
-                continue;
-            }
-
-            updateMod['$set']["members."+j+".host"] = this.bridges[i][j].host;
-        }
-        print("ReplSetTest bridge for node " + i + ":");
-        printjson(updateMod);
-        this.nodes[i].getDB("local").system.replset.update({},updateMod);
-	var err = this.nodes[i].getDB("local").getLastErrorObj();
-        if (err.err) {
-           print("Error updating replset config: " + tojson(err));
-           throw err;
-        }
-    }
-
-    this.stopSet( null, true, opts );
-    
-    // start set
-    for (var i=0; i<n; i++) {
-        this.restart(i);
-    }
-    this.reconfig = function() {
-        throw notImplemented;
-    }
-
-    return this.getMaster();
-};
-
-/**
- * This kills the bridge between two nodes.  As parameters, specify the from and
- * to node numbers.
- *
- * For example, with a three-member replica set, we'd have nodes 0, 1, and 2,
- * with the following bridges: 0->1, 0->2, 1->0, 1->2, 2->0, 2->1.  We can kill
- * the connection between nodes 0 and 2 by calling replTest.partition(0,2) or
- * replTest.partition(2,0) (either way is identical). Then the replica set would
- * have the following bridges: 0->1, 1->0, 1->2, 2->1.
- *
- * The bidirectional parameter, which defaults to true, determines whether
- * replTest.partition(0,2) will stop the bridges for 0->2 and 2->0 (true), or
- * just 0->2 (false).
- */
-ReplSetTest.prototype.partition = function(from, to, bidirectional) {
-    bidirectional = typeof bidirectional !== 'undefined' ? bidirectional : true;
-
-    this.bridges[from][to].stop();
-
-    if (bidirectional) {
-        this.bridges[to][from].stop();
-    }
-};
-
-/**
- * This reverses a partition created by partition() above.
- */
-ReplSetTest.prototype.unPartition = function(from, to, bidirectional) {
-    bidirectional = typeof bidirectional !== 'undefined' ? bidirectional : true;
-
-    this.bridges[from][to].start();
-
-    if (bidirectional) {
-        this.bridges[to][from].start();
-    }
-};
-
-/**
- * Helpers for partitioning in only one direction so that the test files are more clear to readers.
- */
-ReplSetTest.prototype.partitionOneWay = function(from, to) {
-    this.partition(from, to, false);
-};
-
-ReplSetTest.prototype.unPartitionOneWay = function(from, to) {
-    this.unPartition(from, to, false);
-};
-
-/**
- * Helpers for adding/removing delays from a partition.
- */
-ReplSetTest.prototype.addPartitionDelay = function(from, to, delay, bidirectional) {
-    bidirectional = typeof bidirectional !== 'undefined' ? bidirectional : true;
-
-    this.bridges[from][to].setDelay(delay);
-
-    if (bidirectional) {
-        this.bridges[to][from].setDelay(delay);
-    }
-};
-
-ReplSetTest.prototype.removePartitionDelay = function(from, to, bidirectional) {
-    this.addPartitionDelay(from, to, 0, bidirectional);
-};
-
-ReplSetTest.prototype.addOneWayPartitionDelay = function(from, to, delay) {
-    this.addPartitionDelay(from, to, delay, false);
-};
-
-ReplSetTest.prototype.removeOneWayPartitionDelay = function(from, to) {
-    this.addPartitionDelay(from, to, 0, false);
+    this.start( secondaries, { remember : true }, true, true );
+    this.waitForState( secondaries, this.RECOVERING, 5 * 60 * 1000 );
 };

@@ -12,7 +12,7 @@ db[coll].insert({loc:[0,0]});
 // $geoNear is only allowed as the first stage in a pipeline, nowhere else.
 assertErrorCode(db[coll],
                 [{$match: {x:1}}, {$geoNear:{near: [1,1], spherical: true, distanceField: 'dis'}}],
-                16602);
+                28837);
 
 function checkOutput(cmdOut, aggOut, expectedNum) {
     assert.commandWorked(cmdOut, "geoNear command");
@@ -116,12 +116,27 @@ function test(db, sharded, indexType) {
     aggCmd.$geoNear.near = queryPoint;
     aggArr = [aggCmd, {$limit: 50}, {$limit:60}, {$limit:40}];
     checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggArr), 40);
+
+    // Test $geoNear with an initial batchSize of 0. Regression test for SERVER-20935.
+    queryPoint = pointMaker.mkPt(0.25);
+    geoCmd.spherical = true;
+    geoCmd.near = queryPoint;
+    geoCmd.limit = 70;
+    delete geoCmd.num;
+    aggCmd.$geoNear.spherical = true;
+    aggCmd.$geoNear.near = queryPoint;
+    aggCmd.$geoNear.limit = 70;
+    delete aggCmd.$geoNear.num;
+    var cmdRes = db[coll].runCommand("aggregate", {pipeline: [aggCmd], cursor: {batchSize: 0}});
+    assert.commandWorked(cmdRes);
+    var cmdCursor = new DBCommandCursor(db[coll].getMongo(), cmdRes, 0);
+    checkOutput(db.runCommand(geoCmd), cmdCursor, 70);
 }
 
 test(db, false, '2d');
 test(db, false, '2dsphere');
 
-var sharded = new ShardingTest({shards: 3, verbose: 0, mongos: 1});
+var sharded = new ShardingTest({shards: 3, mongos: 1});
 sharded.stopBalancer();
 sharded.adminCommand( { enablesharding : "test" } );
 sharded.ensurePrimaryShard('test', 'shard0001');

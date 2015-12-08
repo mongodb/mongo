@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/s/catalog/catalog_manager_common.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 
 namespace mongo {
@@ -36,7 +36,7 @@ namespace mongo {
 /**
  * A dummy implementation of CatalogManager for testing purposes.
  */
-class CatalogManagerMock : public CatalogManagerCommon {
+class CatalogManagerMock : public CatalogManager {
 public:
     CatalogManagerMock();
     ~CatalogManagerMock();
@@ -45,9 +45,11 @@ public:
         return ConfigServerMode::NONE;
     }
 
-    Status startup() override;
+    Status startup(OperationContext* txn, bool allowNetworking) override;
 
-    void shutDown(bool allowNetworking) override;
+    void shutDown(OperationContext* txn, bool allowNetworking) override;
+
+    Status enableSharding(OperationContext* txn, const std::string& dbName);
 
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
@@ -64,74 +66,104 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
-    Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
+    Status updateDatabase(OperationContext* txn,
+                          const std::string& dbName,
+                          const DatabaseType& db) override;
 
-    StatusWith<OpTimePair<DatabaseType>> getDatabase(const std::string& dbName) override;
+    StatusWith<OpTimePair<DatabaseType>> getDatabase(OperationContext* txn,
+                                                     const std::string& dbName) override;
 
-    Status updateCollection(const std::string& collNs, const CollectionType& coll) override;
+    Status updateCollection(OperationContext* txn,
+                            const std::string& collNs,
+                            const CollectionType& coll) override;
 
-    StatusWith<OpTimePair<CollectionType>> getCollection(const std::string& collNs) override;
+    StatusWith<OpTimePair<CollectionType>> getCollection(OperationContext* txn,
+                                                         const std::string& collNs) override;
 
-    Status getCollections(const std::string* dbName,
+    Status getCollections(OperationContext* txn,
+                          const std::string* dbName,
                           std::vector<CollectionType>* collections,
                           repl::OpTime* optime) override;
 
     Status dropCollection(OperationContext* txn, const NamespaceString& ns) override;
 
-    Status getDatabasesForShard(const std::string& shardName,
+    Status getDatabasesForShard(OperationContext* txn,
+                                const std::string& shardName,
                                 std::vector<std::string>* dbs) override;
 
-    Status getChunks(const BSONObj& filter,
+    Status getChunks(OperationContext* txn,
+                     const BSONObj& filter,
                      const BSONObj& sort,
                      boost::optional<int> limit,
                      std::vector<ChunkType>* chunks,
                      repl::OpTime* opTime) override;
 
-    Status getTagsForCollection(const std::string& collectionNs,
+    Status getTagsForCollection(OperationContext* txn,
+                                const std::string& collectionNs,
                                 std::vector<TagsType>* tags) override;
 
-    StatusWith<std::string> getTagForChunk(const std::string& collectionNs,
+    StatusWith<std::string> getTagForChunk(OperationContext* txn,
+                                           const std::string& collectionNs,
                                            const ChunkType& chunk) override;
 
-    Status getAllShards(std::vector<ShardType>* shards) override;
+    StatusWith<OpTimePair<std::vector<ShardType>>> getAllShards(OperationContext* txn) override;
 
-    bool runUserManagementWriteCommand(const std::string& commandName,
+    bool runUserManagementWriteCommand(OperationContext* txn,
+                                       const std::string& commandName,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* result) override;
 
-    virtual bool runReadCommand(const std::string& dbname,
-                                const BSONObj& cmdObj,
-                                BSONObjBuilder* result) override;
-
-    bool runUserManagementReadCommand(const std::string& dbname,
+    bool runUserManagementReadCommand(OperationContext* txn,
+                                      const std::string& dbname,
                                       const BSONObj& cmdObj,
                                       BSONObjBuilder* result) override;
 
-    Status applyChunkOpsDeprecated(const BSONArray& updateOps,
+    Status applyChunkOpsDeprecated(OperationContext* txn,
+                                   const BSONArray& updateOps,
                                    const BSONArray& preCondition) override;
 
-    void logAction(const ActionLogType& actionLog) override;
+    Status logAction(OperationContext* txn,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) override;
 
-    void logChange(const std::string& clientAddress,
-                   const std::string& what,
-                   const std::string& ns,
-                   const BSONObj& detail) override;
+    Status logChange(OperationContext* txn,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) override;
 
-    StatusWith<SettingsType> getGlobalSettings(const std::string& key) override;
+    StatusWith<SettingsType> getGlobalSettings(OperationContext* txn,
+                                               const std::string& key) override;
 
-    void writeConfigServerDirect(const BatchedCommandRequest& request,
+    void writeConfigServerDirect(OperationContext* txn,
+                                 const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
+
+    Status insertConfigDocument(OperationContext* txn,
+                                const std::string& ns,
+                                const BSONObj& doc) override;
+
+    StatusWith<bool> updateConfigDocument(OperationContext* txn,
+                                          const std::string& ns,
+                                          const BSONObj& query,
+                                          const BSONObj& update,
+                                          bool upsert) override;
+
+    Status removeConfigDocuments(OperationContext* txn,
+                                 const std::string& ns,
+                                 const BSONObj& query) override;
+
+    Status createDatabase(OperationContext* txn, const std::string& dbName);
 
     DistLockManager* getDistLockManager() override;
 
-    Status checkAndUpgrade(bool checkOnly) override;
+    Status initConfigVersion(OperationContext* txn) override;
+
+    Status appendInfoForConfigServerDatabases(OperationContext* txn,
+                                              BSONArrayBuilder* builder) override;
 
 private:
-    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) override;
-
-    StatusWith<std::string> _generateNewShardName() override;
-
     std::unique_ptr<DistLockManagerMock> _mockDistLockMgr;
 };
 

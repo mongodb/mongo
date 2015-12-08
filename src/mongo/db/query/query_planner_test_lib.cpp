@@ -297,28 +297,28 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         BSONElement searchElt = textObj["search"];
         if (!searchElt.eoo()) {
-            if (searchElt.String() != node->query) {
+            if (searchElt.String() != node->ftsQuery->getQuery()) {
                 return false;
             }
         }
 
         BSONElement languageElt = textObj["language"];
         if (!languageElt.eoo()) {
-            if (languageElt.String() != node->language) {
+            if (languageElt.String() != node->ftsQuery->getLanguage()) {
                 return false;
             }
         }
 
         BSONElement caseSensitiveElt = textObj["caseSensitive"];
         if (!caseSensitiveElt.eoo()) {
-            if (caseSensitiveElt.trueValue() != node->caseSensitive) {
+            if (caseSensitiveElt.trueValue() != node->ftsQuery->getCaseSensitive()) {
                 return false;
             }
         }
 
         BSONElement diacriticSensitiveElt = textObj["diacriticSensitive"];
         if (!diacriticSensitiveElt.eoo()) {
-            if (diacriticSensitiveElt.trueValue() != node->diacriticSensitive) {
+            if (diacriticSensitiveElt.trueValue() != node->ftsQuery->getDiacriticSensitive()) {
                 return false;
             }
         }

@@ -47,10 +47,10 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -98,11 +98,10 @@ static bool handleCursorCommand(OperationContext* txn,
             break;
         }
 
+        // If adding this object will cause us to exceed the BSON size limit, then we stash it for
+        // later.
         if (resultsArray.len() + next.objsize() > byteLimit) {
-            // Get the pipeline proxy stage wrapped by this PlanExecutor.
-            PipelineProxyStage* proxy = static_cast<PipelineProxyStage*>(exec->getRootStage());
-            // too big. next will be the first doc in the second batch
-            proxy->pushBack(next);
+            exec->enqueue(next);
             break;
         }
 

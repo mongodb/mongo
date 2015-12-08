@@ -22,8 +22,9 @@ __curstat_lsm_init(
 	WT_DSRC_STATS *new, *stats;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
+	int64_t bloom_count;
 	u_int i;
-	int locked;
+	bool locked;
 	char config[64];
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL, NULL };
@@ -31,9 +32,9 @@ __curstat_lsm_init(
 	   WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
 	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
-	locked = 0;
+	locked = false;
 	WT_WITH_HANDLE_LIST_LOCK(session,
-	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	    ret = __wt_lsm_tree_get(session, uri, false, &lsm_tree));
 	WT_RET(ret);
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 
@@ -49,25 +50,22 @@ __curstat_lsm_init(
 		cfg[1] = disk_cfg[1] = config;
 	}
 
-	/*
-	 * Set the cursor to reference the data source statistics; we don't
-	 * initialize it, instead we copy (rather than aggregate), the first
-	 * chunk's statistics, which has the same effect.
-	 */
-	stats = &cst->u.dsrc_stats;
-
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
 	WT_ERR(__wt_lsm_tree_readlock(session, lsm_tree));
-	locked = 1;
+	locked = true;
 
-	/* Initialize the statistics. */
-	__wt_stat_init_dsrc_stats(stats);
+	/*
+	 * Set the cursor to reference the data source statistics into which
+	 * we're going to aggregate statistics from the underlying objects.
+	 */
+	stats = &cst->u.dsrc_stats;
+	__wt_stat_dsrc_init_single(stats);
 
 	/*
 	 * For each chunk, aggregate its statistics, as well as any associated
 	 * bloom filter statistics, into the total statistics.
 	 */
-	for (i = 0; i < lsm_tree->nchunks; i++) {
+	for (bloom_count = 0, i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 
 		/*
@@ -79,12 +77,12 @@ __curstat_lsm_init(
 		 */
 		WT_ERR(__wt_buf_fmt(
 		    session, uribuf, "statistics:%s", chunk->uri));
-		ret = __wt_curstat_open(session, uribuf->data,
+		ret = __wt_curstat_open(session, uribuf->data, NULL,
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
 		    &stat_cursor);
 		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			ret = __wt_curstat_open(
-			    session, uribuf->data, cfg, &stat_cursor);
+			    session, uribuf->data, NULL, cfg, &stat_cursor);
 		WT_ERR(ret);
 
 		/*
@@ -93,23 +91,23 @@ __curstat_lsm_init(
 		 * top-level.
 		 */
 		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
-		WT_STAT_SET(new, lsm_generation_max, chunk->generation);
+		new->lsm_generation_max = chunk->generation;
 
 		/* Aggregate statistics from each new chunk. */
-		__wt_stat_aggregate_dsrc_stats(new, stats);
+		__wt_stat_dsrc_aggregate_single(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 
 		if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
 			continue;
 
 		/* Maintain a count of bloom filters. */
-		WT_STAT_INCR(&lsm_tree->stats, bloom_count);
+		++bloom_count;
 
 		/* Get the bloom filter's underlying object. */
 		WT_ERR(__wt_buf_fmt(
 		    session, uribuf, "statistics:%s", chunk->bloom_uri));
 		WT_ERR(__wt_curstat_open(
-		    session, uribuf->data, cfg, &stat_cursor));
+		    session, uribuf->data, NULL, cfg, &stat_cursor));
 
 		/*
 		 * The underlying statistics have now been initialized; fill in
@@ -117,24 +115,39 @@ __curstat_lsm_init(
 		 * into the top-level.
 		 */
 		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
-		WT_STAT_SET(new,
-		    bloom_size, (chunk->count * lsm_tree->bloom_bit_count) / 8);
-		WT_STAT_SET(new, bloom_page_evict,
-		    WT_STAT(new, cache_eviction_clean) +
-		    WT_STAT(new, cache_eviction_dirty));
-		WT_STAT_SET(new, bloom_page_read, WT_STAT(new, cache_read));
+		new->bloom_size =
+		    (int64_t)((chunk->count * lsm_tree->bloom_bit_count) / 8);
+		new->bloom_page_evict =
+		    new->cache_eviction_clean + new->cache_eviction_dirty;
+		new->bloom_page_read = new->cache_read;
 
-		__wt_stat_aggregate_dsrc_stats(new, stats);
+		__wt_stat_dsrc_aggregate_single(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
 	/* Set statistics that aren't aggregated directly into the cursor */
-	WT_STAT_SET(stats, lsm_chunk_count, lsm_tree->nchunks);
+	stats->bloom_count = bloom_count;
+	stats->lsm_chunk_count = lsm_tree->nchunks;
 
-	/* Aggregate, and optionally clear, LSM-level specific information. */
-	__wt_stat_aggregate_dsrc_stats(&lsm_tree->stats, stats);
+	/* Include, and optionally clear, LSM-level specific information. */
+	stats->bloom_miss = lsm_tree->bloom_miss;
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
-		__wt_stat_refresh_dsrc_stats(&lsm_tree->stats);
+		lsm_tree->bloom_miss = 0;
+	stats->bloom_hit = lsm_tree->bloom_hit;
+	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+		lsm_tree->bloom_hit = 0;
+	stats->bloom_false_positive = lsm_tree->bloom_false_positive;
+	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+		lsm_tree->bloom_false_positive = 0;
+	stats->lsm_lookup_no_bloom = lsm_tree->lsm_lookup_no_bloom;
+	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+		lsm_tree->lsm_lookup_no_bloom = 0;
+	stats->lsm_checkpoint_throttle = lsm_tree->lsm_checkpoint_throttle;
+	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+		lsm_tree->lsm_checkpoint_throttle = 0;
+	stats->lsm_merge_throttle = lsm_tree->lsm_merge_throttle;
+	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+		lsm_tree->lsm_merge_throttle = 0;
 
 	__wt_curstat_dsrc_final(cst);
 

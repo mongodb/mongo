@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -68,6 +69,7 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
                                                const intrusive_ptr<ExpressionContext>& pCtx) {
     intrusive_ptr<Pipeline> pPipeline(new Pipeline(pCtx));
     vector<BSONElement> pipeline;
+    repl::ReadConcernArgs readConcernArgs;
 
     /* gather the specification for the aggregation */
     for (BSONObj::iterator cmdIterator = cmdObj.begin(); cmdIterator.more();) {
@@ -80,7 +82,12 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
         }
 
         // maxTimeMS is also for the command processor.
-        if (pFieldName == LiteParsedQuery::cmdOptionMaxTimeMS) {
+        if (str::equals(pFieldName, LiteParsedQuery::cmdOptionMaxTimeMS)) {
+            continue;
+        }
+
+        if (pFieldName == repl::ReadConcernArgs::kReadConcernFieldName) {
+            uassertStatusOK(readConcernArgs.initialize(cmdElement));
             continue;
         }
 
@@ -150,11 +157,19 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
                 pipeElement.type() == Object);
 
         sources.push_back(DocumentSource::parse(pCtx, pipeElement.Obj()));
-
-        // TODO find a good general way to check stages that must be first syntactically
+        if (sources.back()->isValidInitialSource()) {
+            uassert(28837,
+                    str::stream() << sources.back()->getSourceName()
+                                  << " is only valid as the first stage in a pipeline.",
+                    iStep == 0);
+        }
 
         if (dynamic_cast<DocumentSourceOut*>(sources.back().get())) {
             uassert(16991, "$out can only be the final stage in the pipeline", iStep == nSteps - 1);
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "$out can only be used with the 'local' read concern level",
+                    readConcernArgs.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
         }
     }
 
@@ -315,8 +330,17 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
             inputNs.isValid());
 
     std::vector<Privilege> privileges;
-    Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                             Privilege(inputResource, ActionType::find));
+
+    if (cmdObj.getFieldDotted("pipeline.0.$indexStats")) {
+        Privilege::addPrivilegeToPrivilegeVector(
+            &privileges,
+            Privilege(ResourcePattern::forAnyNormalResource(), ActionType::indexStats));
+    } else {
+        // If no source requiring an alternative permission scheme is specified then default to
+        // requiring find() privileges on the given namespace.
+        Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                 Privilege(inputResource, ActionType::find));
+    }
 
     BSONObj pipeline = cmdObj.getObjectField("pipeline");
     BSONForEach(stageElem, pipeline) {
@@ -336,7 +360,7 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
             }
             Privilege::addPrivilegeToPrivilegeVector(
                 &privileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
-        } else if (stageName == "$lookUp" && stage.firstElementType() == Object) {
+        } else if (stageName == "$lookup" && stage.firstElementType() == Object) {
             NamespaceString fromNs(db, stage.firstElement()["from"].str());
             Privilege::addPrivilegeToPrivilegeVector(
                 &privileges,

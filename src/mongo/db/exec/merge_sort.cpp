@@ -87,10 +87,10 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
         StageState code = child->work(&id);
 
         if (PlanStage::ADVANCED == code) {
+            WorkingSetMember* member = _ws->get(id);
+
             // If we're deduping...
             if (_dedup) {
-                WorkingSetMember* member = _ws->get(id);
-
                 if (!member->hasLoc()) {
                     // Can't dedup data unless there's a RecordId.  We go ahead and use its
                     // result.
@@ -122,6 +122,8 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
             StageWithValue value;
             value.id = id;
             value.stage = child;
+            // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+            member->makeObjOwnedIfNeeded();
             _mergingData.push_front(value);
 
             // Insert the result (indirectly) into our priority queue.
@@ -252,7 +254,7 @@ unique_ptr<PlanStageStats> MergeSortStage::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SORT_MERGE);
     ret->specific = make_unique<MergeSortStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats().release());
+        ret->children.emplace_back(_children[i]->getStats());
     }
     return ret;
 }

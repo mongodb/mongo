@@ -92,13 +92,30 @@ public:
 
     static Status syncApply(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert);
 
-    /**
-     * Runs _applyOplogUntil(stopOpTime)
-     */
-    virtual void oplogApplication(OperationContext* txn, const OpTime& stopOpTime);
-
     void oplogApplication();
     bool peek(BSONObj* obj);
+
+    /**
+     * A parsed oplog entry.
+     *
+     * This only includes the fields used by the code using this object at the time this was
+     * written. As more code uses this, more fields should be added.
+     *
+     * All unowned members (such as StringDatas and BSONElements) point into the raw BSON.
+     * All StringData members are guaranteed to be NUL terminated.
+     */
+    struct OplogEntry {
+        explicit OplogEntry(const BSONObj& raw);
+
+        BSONObj raw;  // Owned.
+
+        StringData ns = "";
+        StringData opType = "";
+
+        BSONElement version;
+        BSONElement o;
+        BSONElement o2;
+    };
 
     class OpQueue {
     public:
@@ -106,32 +123,30 @@ public:
         size_t getSize() const {
             return _size;
         }
-        const std::deque<BSONObj>& getDeque() const {
+        const std::deque<OplogEntry>& getDeque() const {
             return _deque;
         }
-        void push_back(BSONObj& op) {
-            _deque.push_back(op);
-            _size += op.objsize();
+        void push_back(OplogEntry&& op) {
+            _size += op.raw.objsize();
+            _deque.push_back(std::move(op));
         }
         bool empty() const {
             return _deque.empty();
         }
 
-        BSONObj back() const {
+        const OplogEntry& back() const {
             invariant(!_deque.empty());
             return _deque.back();
         }
 
     private:
-        std::deque<BSONObj> _deque;
+        std::deque<OplogEntry> _deque;
         size_t _size;
     };
 
     // returns true if we should continue waiting for BSONObjs, false if we should
     // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
-    bool tryPopAndWaitForMore(OperationContext* txn,
-                              OpQueue* ops,
-                              ReplicationCoordinator* replCoord);
+    bool tryPopAndWaitForMore(OperationContext* txn, OpQueue* ops);
 
     /**
      * Fetch a single document referenced in the operation from the sync source.
@@ -158,31 +173,13 @@ protected:
     static const int replBatchLimitSeconds = 1;
     static const unsigned int replBatchLimitOperations = 5000;
 
-    // SyncTail base class always supports awaiting commit if any op has j:true flag
-    // that indicates awaiting commit before updating last OpTime.
-    virtual bool supportsWaitingUntilDurable() {
-        return true;
-    }
-
-    // Prefetch and write a deque of operations, using the supplied function.
-    // Initial Sync and Sync Tail each use a different function.
-    // Returns the last OpTime applied.
-    static OpTime multiApply(OperationContext* txn,
-                             const OpQueue& ops,
-                             OldThreadPool* prefetcherPool,
-                             OldThreadPool* writerPool,
-                             MultiSyncApplyFunc func,
-                             SyncTail* sync,
-                             bool supportsAwaitingCommit);
-
-    /**
-     * Applies oplog entries until reaching "endOpTime".
-     *
-     * NOTE:Will not transition or check states
-     */
-    void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
+    // Apply a batch of operations, using multiple threads.
+    // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
+    OpTime multiApply(OperationContext* txn, const OpQueue& ops);
 
 private:
+    class OpQueueBatcher;
+
     std::string _hostname;
 
     BackgroundSyncInterface* _networkQueue;

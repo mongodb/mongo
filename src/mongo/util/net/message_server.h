@@ -43,15 +43,21 @@ public:
     virtual ~MessageHandler() {}
 
     /**
-     * called once when a socket is connected
+     * Called once when a socket is connected.
      */
     virtual void connected(AbstractMessagingPort* p) = 0;
 
     /**
-     * called every time a message comes in
-     * handler is responsible for responding to client
+     * Called every time a message comes in. Handler is responsible for responding to client.
      */
     virtual void process(Message& m, AbstractMessagingPort* p) = 0;
+
+    /**
+     * Called once, either when the client disconnects or when the process is shutting down. After
+     * close() is called, this handler's AbstractMessagingPort pointer (passed in via the
+     * connected() method) is no longer valid.
+     */
+    virtual void close() = 0;
 };
 
 class MessageServer {
@@ -66,7 +72,7 @@ public:
     virtual ~MessageServer() {}
     virtual void run() = 0;
     virtual void setAsTimeTracker() = 0;
-    virtual void setupSockets() = 0;
+    virtual bool setupSockets() = 0;
 };
 
 // TODO use a factory here to decide between port and asio variations

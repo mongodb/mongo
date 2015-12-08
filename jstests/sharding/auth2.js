@@ -1,4 +1,4 @@
-var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize : 1, verbose : 2,
+var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunkSize: 1, verbose : 2,
                             other : { nopreallocj : 1, verbose : 2, useHostname : true,
                                       configOptions : { verbose : 2 }}});
 

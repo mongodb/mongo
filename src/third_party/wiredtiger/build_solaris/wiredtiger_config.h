@@ -118,6 +118,9 @@
 /* Enable verbose message configuration. */
 /* #undef HAVE_VERBOSE */
 
+/* Define to 1 if you have the <x86intrin.h> header file. */
+/* #undef HAVE_X86INTRIN_H */
+
 /* Spinlock type from mutex.h. */
 #define SPINLOCK_TYPE SPINLOCK_PTHREAD_MUTEX
 

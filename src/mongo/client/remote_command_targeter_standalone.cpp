@@ -43,11 +43,15 @@ ConnectionString RemoteCommandTargeterStandalone::connectionString() {
 }
 
 StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
-    const ReadPreferenceSetting& readPref) {
+    const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
     return _hostAndPort;
 }
 
 void RemoteCommandTargeterStandalone::markHostNotMaster(const HostAndPort& host) {
+    dassert(host == _hostAndPort);
+}
+
+void RemoteCommandTargeterStandalone::markHostUnreachable(const HostAndPort& host) {
     dassert(host == _hostAndPort);
 }
 

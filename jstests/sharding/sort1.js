@@ -1,6 +1,8 @@
+(function() {
 
-s = new ShardingTest( "sort1" , 2 , 0 , 2 )
-s.stopBalancer();
+var s = new ShardingTest({ name: "sort1",
+                           shards: 2,
+                           mongos: 2 });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -98,3 +100,5 @@ assert.eq( backward , getSorted( "sub.x" , 1 , { '_id' : 0, 'sub.num':1 } ) , "D
 assert.eq( forward , getSorted( "sub.x" , -1 , { '_id' : 0, 'sub.num':1 } ) , "D12" )
 
 s.stop();
+
+})();

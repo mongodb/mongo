@@ -1,6 +1,8 @@
 (function(){
 
-var s = new ShardingTest( "shard_with_special_db_names", 2, 0, 2 );
+var s = new ShardingTest({ name: "shard_with_special_db_names",
+                           shards: 2,
+                           mongos: 2 });
 var specialDB = "[a-z]+";
 var specialNS = specialDB + ".special";
 
@@ -26,4 +28,3 @@ assert.eq( cursor.count(), 1 );
 assert( cursor.next()["dropped"] );
 
 })();
-

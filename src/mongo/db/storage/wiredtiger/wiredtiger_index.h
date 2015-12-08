@@ -62,7 +62,8 @@ public:
      * Note that even if this function returns an OK status, WT_SESSION:create() may still
      * fail with the constructed configuration string.
      */
-    static StatusWith<std::string> generateCreateString(const std::string& sysIndexConfig,
+    static StatusWith<std::string> generateCreateString(const std::string& engineName,
+                                                        const std::string& sysIndexConfig,
                                                         const std::string& collIndexConfig,
                                                         const IndexDescriptor& desc);
 
@@ -80,12 +81,12 @@ public:
 
     virtual Status insert(OperationContext* txn,
                           const BSONObj& key,
-                          const RecordId& loc,
+                          const RecordId& id,
                           bool dupsAllowed);
 
     virtual void unindex(OperationContext* txn,
                          const BSONObj& key,
-                         const RecordId& loc,
+                         const RecordId& id,
                          bool dupsAllowed);
 
     virtual void fullValidate(OperationContext* txn,
@@ -95,13 +96,15 @@ public:
     virtual bool appendCustomStats(OperationContext* txn,
                                    BSONObjBuilder* output,
                                    double scale) const;
-    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
+    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& id);
 
     virtual bool isEmpty(OperationContext* txn);
 
+    virtual Status touch(OperationContext* txn) const;
+
     virtual long long getSpaceUsedBytes(OperationContext* txn) const;
 
-    bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& loc);
+    bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id);
 
     virtual Status initAsEmpty(OperationContext* txn);
 
@@ -123,12 +126,12 @@ public:
 protected:
     virtual Status _insert(WT_CURSOR* c,
                            const BSONObj& key,
-                           const RecordId& loc,
+                           const RecordId& id,
                            bool dupsAllowed) = 0;
 
     virtual void _unindex(WT_CURSOR* c,
                           const BSONObj& key,
-                          const RecordId& loc,
+                          const RecordId& id,
                           bool dupsAllowed) = 0;
 
     class BulkBuilder;
@@ -159,12 +162,9 @@ public:
         return true;
     }
 
-    Status _insert(WT_CURSOR* c,
-                   const BSONObj& key,
-                   const RecordId& loc,
-                   bool dupsAllowed) override;
+    Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
 
-    void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& loc, bool dupsAllowed) override;
+    void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
 };
 
 class WiredTigerIndexStandard : public WiredTigerIndex {
@@ -182,12 +182,9 @@ public:
         return false;
     }
 
-    Status _insert(WT_CURSOR* c,
-                   const BSONObj& key,
-                   const RecordId& loc,
-                   bool dupsAllowed) override;
+    Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
 
-    void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& loc, bool dupsAllowed) override;
+    void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
 };
 
 }  // namespace

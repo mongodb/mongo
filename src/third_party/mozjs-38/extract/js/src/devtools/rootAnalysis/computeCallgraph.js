@@ -288,8 +288,19 @@ for (var nameIndex = minStream; nameIndex <= maxStream; nameIndex++) {
     // identical, but that should be rare enough that we don't care.
     var markerPos = functionName.indexOf(internalMarker);
     if (markerPos > 0) {
-        var inChargeXTor = functionName.substr(0, markerPos) + functionName.substr(markerPos + internalMarker.length);
+        var inChargeXTor = functionName.replace(internalMarker, "");
         print("D " + memo(inChargeXTor) + " " + memo(functionName));
+
+        // Bug 1056410: Oh joy. GCC does something even funkier internally,
+        // where it generates calls to ~Foo() but a body for ~Foo(int32) even
+        // though it uses the same mangled name for both. So we need to add a
+        // synthetic edge from the former to the latter.
+        //
+        // inChargeXTor will have the (int32).
+        if (functionName.indexOf("::~") > 0) {
+            var calledDestructor = inChargeXTor.replace("(int32)", "()");
+            print("D " + memo(calledDestructor) + " " + memo(inChargeXTor));
+        }
     }
 
     xdb.free_string(name);

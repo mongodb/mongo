@@ -47,6 +47,7 @@ using std::vector;
 using std::set;
 using std::string;
 using std::unique_ptr;
+using unittest::assertGet;
 
 // TODO: Port these existing tests here: replmonitor_bad_seed.js, repl_monitor_refresh.js
 
@@ -265,8 +266,8 @@ TEST_F(TwoNodeWithTags, SecDownRetryNoTag) {
 
     replSet->restore(secHost);
 
-    HostAndPort node = monitor->getHostOrRefresh(
-        ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, TagSet()));
+    HostAndPort node = assertGet(monitor->getHostOrRefresh(
+        ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, TagSet()), Milliseconds(0)));
 
     ASSERT_FALSE(monitor->isPrimary(node));
     ASSERT_EQUALS(secHost, node.toString());
@@ -293,8 +294,8 @@ TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
 
     TagSet tags(BSON_ARRAY(BSON("dc"
                                 << "ny")));
-    HostAndPort node = monitor->getHostOrRefresh(
-        ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, tags));
+    HostAndPort node = assertGet(monitor->getHostOrRefresh(
+        ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, tags), Milliseconds(0)));
 
     ASSERT_FALSE(monitor->isPrimary(node));
     ASSERT_EQUALS(secHost, node.toString());

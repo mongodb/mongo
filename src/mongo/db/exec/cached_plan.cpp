@@ -96,6 +96,9 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
         if (PlanStage::ADVANCED == state) {
             // Save result for later.
+            WorkingSetMember* member = _ws->get(id);
+            // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+            member->makeObjOwnedIfNeeded();
             _results.push_back(id);
 
             if (_results.size() >= numResults) {
@@ -296,16 +299,10 @@ PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
 void CachedPlanStage::doInvalidate(OperationContext* txn,
                                    const RecordId& dl,
                                    InvalidationType type) {
-    for (std::list<WorkingSetID>::iterator it = _results.begin(); it != _results.end();) {
+    for (auto it = _results.begin(); it != _results.end(); ++it) {
         WorkingSetMember* member = _ws->get(*it);
         if (member->hasLoc() && member->loc == dl) {
-            std::list<WorkingSetID>::iterator next = it;
-            ++next;
             WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
-            _results.erase(it);
-            it = next;
-        } else {
-            ++it;
         }
     }
 }
@@ -316,7 +313,7 @@ std::unique_ptr<PlanStageStats> CachedPlanStage::getStats() {
     std::unique_ptr<PlanStageStats> ret =
         stdx::make_unique<PlanStageStats>(_commonStats, STAGE_CACHED_PLAN);
     ret->specific = stdx::make_unique<CachedPlanStats>(_specificStats);
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
 
     return ret;
 }
@@ -327,7 +324,7 @@ const SpecificStats* CachedPlanStage::getSpecificStats() const {
 
 void CachedPlanStage::updatePlanCache() {
     std::unique_ptr<PlanCacheEntryFeedback> feedback = stdx::make_unique<PlanCacheEntryFeedback>();
-    feedback->stats = std::move(getStats());
+    feedback->stats = getStats();
     feedback->score = PlanRanker::scoreTree(feedback->stats.get());
 
     PlanCache* cache = _collection->infoCache()->getPlanCache();

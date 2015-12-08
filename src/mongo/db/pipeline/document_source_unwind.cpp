@@ -43,8 +43,9 @@ using std::vector;
 /** Helper class to unwind array from a single document. */
 class DocumentSourceUnwind::Unwinder {
 public:
-    /** @param unwindPath is the field path to the array to unwind. */
-    Unwinder(const FieldPath& unwindPath);
+    Unwinder(const FieldPath& unwindPath,
+             bool preserveNullAndEmptyArrays,
+             const boost::optional<FieldPath>& indexPath);
     /** Reset the unwinder to unwind a new document. */
     void resetDocument(const Document& document);
 
@@ -57,67 +58,127 @@ public:
     boost::optional<Document> getNext();
 
 private:
+    // Tracks whether or not we can possibly return any more documents. Note we may return
+    // boost::none even if this is true.
+    bool _haveNext = false;
+
     // Path to the array to unwind.
     const FieldPath _unwindPath;
 
+    // Documents that have a nullish value, or an empty array for the field '_unwindPath', will pass
+    // through the $unwind stage unmodified if '_preserveNullAndEmptyArrays' is true.
+    const bool _preserveNullAndEmptyArrays;
+
+    // If set, the $unwind stage will include the array index in the specified path, overwriting any
+    // existing value, setting to null when the value was a non-array or empty array.
+    const boost::optional<FieldPath> _indexPath;
+
     Value _inputArray;
+
     MutableDocument _output;
 
     // Document indexes of the field path components.
     vector<Position> _unwindPathFieldIndexes;
+
     // Index into the _inputArray to return next.
     size_t _index;
 };
 
-DocumentSourceUnwind::Unwinder::Unwinder(const FieldPath& unwindPath) : _unwindPath(unwindPath) {}
+DocumentSourceUnwind::Unwinder::Unwinder(const FieldPath& unwindPath,
+                                         bool preserveNullAndEmptyArrays,
+                                         const boost::optional<FieldPath>& indexPath)
+    : _unwindPath(unwindPath),
+      _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
+      _indexPath(indexPath) {}
 
 void DocumentSourceUnwind::Unwinder::resetDocument(const Document& document) {
     // Reset document specific attributes.
-    _inputArray = Value();
     _output.reset(document);
     _unwindPathFieldIndexes.clear();
     _index = 0;
-
-    Value pathValue = document.getNestedField(_unwindPath, &_unwindPathFieldIndexes);
-    if (pathValue.nullish()) {
-        // The path does not exist or is null.
-        return;
-    }
-
-    _inputArray = pathValue;
+    _inputArray = document.getNestedField(_unwindPath, &_unwindPathFieldIndexes);
+    _haveNext = true;
 }
 
 boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
-    if (_inputArray.missing())
+    // WARNING: Any functional changes to this method must also be implemented in the unwinding
+    // implementation of the $lookup stage.
+    if (!_haveNext) {
         return boost::none;
+    }
 
-    // If needed, this will automatically clone all the documents along the
-    // field path so that the end values are not shared across documents
-    // that have come out of this pipeline operator.  This is a partial deep
-    // clone. Because the value at the end will be replaced, everything
-    // along the path leading to that will be replaced in order not to share
-    // that change with any other clones (or the original).
+    // Track which index this value came from. If 'includeArrayIndex' was specified, we will use
+    // this index in the output document, or null if the value didn't come from an array.
+    boost::optional<long long> indexForOutput;
 
     if (_inputArray.getType() == Array) {
-        if (_index == _inputArray.getArrayLength())
+        const size_t length = _inputArray.getArrayLength();
+        invariant(_index == 0 || _index < length);
+
+        if (length == 0) {
+            // Preserve documents with empty arrays if asked to, otherwise skip them.
+            _haveNext = false;
+            if (!_preserveNullAndEmptyArrays) {
+                return boost::none;
+            }
+            _output.removeNestedField(_unwindPathFieldIndexes);
+        } else {
+            // Set field to be the next element in the array. If needed, this will automatically
+            // clone all the documents along the field path so that the end values are not shared
+            // across documents that have come out of this pipeline operator. This is a partial deep
+            // clone. Because the value at the end will be replaced, everything along the path
+            // leading to that will be replaced in order not to share that change with any other
+            // clones (or the original).
+            _output.setNestedField(_unwindPathFieldIndexes, _inputArray[_index]);
+            indexForOutput = _index;
+            _index++;
+            _haveNext = _index < length;
+        }
+    } else if (_inputArray.nullish()) {
+        // Preserve a nullish value if asked to, otherwise skip it.
+        _haveNext = false;
+        if (!_preserveNullAndEmptyArrays) {
             return boost::none;
-        _output.setNestedField(_unwindPathFieldIndexes, _inputArray[_index]);
-    } else if (_index > 0) {
-        return boost::none;
+        }
     } else {
-        //_output.setNestedField(_unwindPathFieldIndexes, _inputArray);
+        // Any non-nullish, non-array type should pass through.
+        _haveNext = false;
     }
-    _index++;
-    return _output.peek();
+
+    if (_indexPath) {
+        _output.getNestedField(*_indexPath) =
+            indexForOutput ? Value(*indexForOutput) : Value(BSONNULL);
+    }
+
+    return _haveNext ? _output.peek() : _output.freeze();
 }
 
-DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx) {}
+DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext>& pExpCtx,
+                                           const FieldPath& fieldPath,
+                                           bool preserveNullAndEmptyArrays,
+                                           const boost::optional<FieldPath>& indexPath)
+    : DocumentSource(pExpCtx),
+      _unwindPath(fieldPath),
+      _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
+      _indexPath(indexPath),
+      _unwinder(new Unwinder(fieldPath, preserveNullAndEmptyArrays, indexPath)) {}
 
 REGISTER_DOCUMENT_SOURCE(unwind, DocumentSourceUnwind::createFromBson);
 
 const char* DocumentSourceUnwind::getSourceName() const {
     return "$unwind";
+}
+
+intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const string& unwindPath,
+    bool preserveNullAndEmptyArrays,
+    const boost::optional<string>& indexPath) {
+    return new DocumentSourceUnwind(expCtx,
+                                    FieldPath(unwindPath),
+                                    preserveNullAndEmptyArrays,
+                                    indexPath ? FieldPath(*indexPath)
+                                              : boost::optional<FieldPath>());
 }
 
 boost::optional<Document> DocumentSourceUnwind::getNext() {
@@ -140,35 +201,73 @@ boost::optional<Document> DocumentSourceUnwind::getNext() {
 }
 
 Value DocumentSourceUnwind::serialize(bool explain) const {
-    verify(_unwindPath);
-    return Value(DOC(getSourceName() << _unwindPath->getPath(true)));
+    return Value(DOC(getSourceName() << DOC(
+                         "path" << _unwindPath.getPath(true) << "preserveNullAndEmptyArrays"
+                                << (_preserveNullAndEmptyArrays ? Value(true) : Value())
+                                << "includeArrayIndex"
+                                << (_indexPath ? Value((*_indexPath).getPath(false)) : Value()))));
 }
 
 DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
-    deps->fields.insert(_unwindPath->getPath(false));
+    deps->fields.insert(_unwindPath.getPath(false));
     return SEE_NEXT;
-}
-
-void DocumentSourceUnwind::unwindPath(const FieldPath& fieldPath) {
-    // Can't set more than one unwind path.
-    uassert(15979, "$unwind can't unwind more than one path", !_unwindPath);
-    // Record the unwind path.
-    _unwindPath.reset(new FieldPath(fieldPath));
-    _unwinder.reset(new Unwinder(fieldPath));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    /*
-      The value of $unwind should just be a field path.
-     */
-    uassert(15981, "the $unwind field path must be specified as a string", elem.type() == String);
+    // $unwind accepts either the legacy "{$unwind: '$path'}" syntax, or a nested document with
+    // extra options.
+    string prefixedPathString;
+    bool preserveNullAndEmptyArrays = false;
+    boost::optional<string> indexPath;
+    if (elem.type() == Object) {
+        for (auto&& subElem : elem.Obj()) {
+            if (subElem.fieldNameStringData() == "path") {
+                uassert(28808,
+                        str::stream() << "expected a string as the path for $unwind stage, got "
+                                      << typeName(subElem.type()),
+                        subElem.type() == String);
+                prefixedPathString = subElem.str();
+            } else if (subElem.fieldNameStringData() == "preserveNullAndEmptyArrays") {
+                uassert(28809,
+                        str::stream() << "expected a boolean for the preserveNullAndEmptyArrays "
+                                         "option to $unwind stage, got "
+                                      << typeName(subElem.type()),
+                        subElem.type() == Bool);
+                preserveNullAndEmptyArrays = subElem.Bool();
+            } else if (subElem.fieldNameStringData() == "includeArrayIndex") {
+                uassert(28810,
+                        str::stream() << "expected a non-empty string for the includeArrayIndex "
+                                         " option to $unwind stage, got "
+                                      << typeName(subElem.type()),
+                        subElem.type() == String && !subElem.String().empty());
+                indexPath = subElem.String();
+                uassert(28822,
+                        str::stream() << "includeArrayIndex option to $unwind stage should not be "
+                                         "prefixed with a '$': " << (*indexPath),
+                        (*indexPath)[0] != '$');
+            } else {
+                uasserted(28811,
+                          str::stream() << "unrecognized option to $unwind stage: "
+                                        << subElem.fieldNameStringData());
+            }
+        }
+    } else if (elem.type() == String) {
+        prefixedPathString = elem.str();
+    } else {
+        uasserted(
+            15981,
+            str::stream()
+                << "expected either a string or an object as specification for $unwind stage, got "
+                << typeName(elem.type()));
+    }
+    uassert(28812, "no path specified to $unwind stage", !prefixedPathString.empty());
 
-    string prefixedPathString(elem.str());
+    uassert(28818,
+            str::stream() << "path option to $unwind stage should be prefixed with a '$': "
+                          << prefixedPathString,
+            prefixedPathString[0] == '$');
     string pathString(Expression::removeFieldPrefix(prefixedPathString));
-    intrusive_ptr<DocumentSourceUnwind> pUnwind(new DocumentSourceUnwind(pExpCtx));
-    pUnwind->unwindPath(FieldPath(pathString));
-
-    return pUnwind;
+    return DocumentSourceUnwind::create(pExpCtx, pathString, preserveNullAndEmptyArrays, indexPath);
 }
 }

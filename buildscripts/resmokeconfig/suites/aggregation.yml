@@ -3,17 +3,17 @@ selector:
     roots:
     - jstests/aggregation/*.js
     - jstests/aggregation/bugs/*.js
-    - src/mongo/db/modules/*/jstests/aggregation/*.js
 
 executor:
   js_test:
-    config: {}
+    config:
+      shell_options:
+        readMode: commands
     hooks:
     - class: CleanEveryN
       n: 20
     fixture:
       class: MongoDFixture
       mongod_options:
-        nopreallocj: ''
         set_parameters:
           enableTestCommands: 1

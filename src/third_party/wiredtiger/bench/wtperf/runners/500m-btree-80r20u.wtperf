@@ -1,0 +1,18 @@
+# wtperf options file: simulate riak and its test2 configuration
+# The configuration for the connection and table are from riak and the
+# specification of the data (count, size, threads) is from basho_bench.
+# This test assumes that its correlating populate already completed and exists.
+#
+#conn_config="cache_size=21G,checkpoint_sync=false,mmap=false,session_max=1024,statistics=(fast,clear),statistics_log=(wait=60)"
+conn_config="cache_size=21G,checkpoint_sync=false,mmap=false,session_max=1024,log=(enabled),statistics=(fast),statistics_log=(wait=30)"
+checkpoint_interval=60
+create=false
+compression="snappy"
+sess_config="isolation=snapshot
+key_sz=40
+value_sz=1000
+max_latency=2000
+report_interval=10
+run_time=7200
+sample_interval=10
+threads=((count=20,reads=4,updates=1))

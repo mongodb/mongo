@@ -71,7 +71,7 @@ public:
      *
      * Throws if there is currently no committed snapshot.
      */
-    SnapshotName beginTransactionOnCommittedSnapshot(WT_SESSION* session, bool sync) const;
+    SnapshotName beginTransactionOnCommittedSnapshot(WT_SESSION* session) const;
 
     /**
      * Returns lowest SnapshotName that could possibly be used by a future call to

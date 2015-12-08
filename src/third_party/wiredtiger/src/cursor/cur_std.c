@@ -63,7 +63,7 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
  *	Standard error message for key/values not set.
  */
 int
-__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
+__wt_cursor_kv_not_set(WT_CURSOR *cursor, bool key)
 {
 	WT_SESSION_IMPL *session;
 
@@ -113,9 +113,9 @@ int
 __wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
 {
 	WT_DECL_RET;
-	int raw_set;
+	bool raw_set;
 
-	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW);
 	if (!raw_set)
 		F_SET(cursor, WT_CURSTD_RAW);
 	ret = cursor->get_key(cursor, key);
@@ -132,9 +132,9 @@ __wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
 void
 __wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
 {
-	int raw_set;
+	bool raw_set;
 
-	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW);
 	if (!raw_set)
 		F_SET(cursor, WT_CURSTD_RAW);
 	cursor->set_key(cursor, key);
@@ -151,9 +151,9 @@ int
 __wt_cursor_get_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
 {
 	WT_DECL_RET;
-	int raw_set;
+	bool raw_set;
 
-	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW);
 	if (!raw_set)
 		F_SET(cursor, WT_CURSTD_RAW);
 	ret = cursor->get_value(cursor, value);
@@ -170,9 +170,9 @@ __wt_cursor_get_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
 void
 __wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
 {
-	int raw_set;
+	bool raw_set;
 
-	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW);
 	if (!raw_set)
 		F_SET(cursor, WT_CURSTD_RAW);
 	cursor->set_value(cursor, value);
@@ -195,7 +195,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT))
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));
+		WT_ERR(__wt_cursor_kv_not_set(cursor, true));
 
 	if (WT_CURSOR_RECNO(cursor)) {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
@@ -258,9 +258,9 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			    item->data, item->size, "q", &cursor->recno));
 		} else
 			cursor->recno = va_arg(ap, uint64_t);
-		if (cursor->recno == 0)
+		if (cursor->recno == WT_RECNO_OOB)
 			WT_ERR_MSG(session, EINVAL,
-			    "Record numbers must be greater than zero");
+			    "%d is an invalid record number", WT_RECNO_OOB);
 		buf->data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {
@@ -344,7 +344,7 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));
+		WT_ERR(__wt_cursor_kv_not_set(cursor, false));
 
 	/* Fast path some common cases. */
 	fmt = cursor->value_format;
@@ -463,15 +463,16 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
-	__wt_buf_free(session, &cursor->key);
-	__wt_buf_free(session, &cursor->value);
 
 	if (F_ISSET(cursor, WT_CURSTD_OPEN)) {
 		TAILQ_REMOVE(&session->cursors, cursor, q);
 
+		(void)__wt_atomic_sub32(&S2C(session)->open_cursor_count, 1);
 		WT_STAT_FAST_DATA_DECR(session, session_cursor_open);
-		WT_STAT_FAST_CONN_ATOMIC_DECR(session, session_cursor_open);
 	}
+
+	__wt_buf_free(session, &cursor->key);
+	__wt_buf_free(session, &cursor->value);
 
 	__wt_free(session, cursor->internal_uri);
 	__wt_free(session, cursor->uri);
@@ -683,8 +684,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
 
 	F_SET(cursor, WT_CURSTD_OPEN);
+	(void)__wt_atomic_add32(&S2C(session)->open_cursor_count, 1);
 	WT_STAT_FAST_DATA_INCR(session, session_cursor_open);
-	WT_STAT_FAST_CONN_ATOMIC_INCR(session, session_cursor_open);
 
 	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);

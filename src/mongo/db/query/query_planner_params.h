@@ -58,10 +58,9 @@ struct QueryPlannerParams {
         // shouldn't be on this shard" stage before projection.
         //
         // In order to set this, you must check
-        // ShardingState::get(getGlobalServiceContext())->needCollectionMetadata(current_namespace)
-        // in the same lock that you use
-        // to build the query executor. You must also wrap the PlanExecutor in a ClientCursor
-        // within the same lock. See the comment on ShardFilterStage for details.
+        // ShardingState::needCollectionMetadata(current_namespace) in the same lock that you use to
+        // build the query executor. You must also wrap the PlanExecutor in a ClientCursor within
+        // the same lock. See the comment on ShardFilterStage for details.
         INCLUDE_SHARD_FILTER = 1 << 2,
 
         // Set this if you don't want any plans with a blocking sort stage.  All sorts must be
@@ -92,6 +91,10 @@ struct QueryPlannerParams {
         // collection scan. The MMAPv1 storage engine sets this option since it cannot
         // guarantee that a collection scan won't miss documents or return duplicates.
         SNAPSHOT_USE_ID = 1 << 9,
+
+        // Set this if you don't want any plans with a non-covered projection stage. All projections
+        // must be provided/covered by an index.
+        NO_UNCOVERED_PROJECTIONS = 1 << 10,
     };
 
     // See Options enum above.

@@ -125,7 +125,7 @@ def __get_syslibdeps(node):
     """
     cached_var_name = syslibdeps_env_var + '_cached'
     if not hasattr(node.attributes, cached_var_name):
-        syslibdeps = []
+        syslibdeps = node.get_env().Flatten(node.get_env().get(syslibdeps_env_var, []))
         for lib in __get_libdeps(node):
             for syslib in node.get_env().Flatten(lib.get_env().get(syslibdeps_env_var, [])):
                 if syslib:
@@ -304,6 +304,12 @@ def shlibdeps_emitter(target, source, env):
 
     return target, source
 
+def expand_libdeps_tags(source, target, env, for_signature):
+    results = []
+    for expansion in env.get('LIBDEPS_TAG_EXPANSIONS', []):
+        results.append(expansion(source, target, env, for_signature))
+    return results
+
 def setup_environment(env, emitting_shared=False):
     """Set up the given build environment to do LIBDEPS tracking."""
 
@@ -311,6 +317,8 @@ def setup_environment(env, emitting_shared=False):
         env['_LIBDEPS']
     except KeyError:
         env['_LIBDEPS'] = '$_LIBDEPS_LIBS'
+
+    env['_LIBDEPS_TAGS'] = expand_libdeps_tags
 
     # TODO: remove this
     # this is a horrible horrible hack for 
@@ -335,7 +343,7 @@ def setup_environment(env, emitting_shared=False):
         env.Append(
             PROGEMITTER=libdeps_emitter,
             SHLIBEMITTER=libdeps_emitter)
-    env.Prepend(_LIBFLAGS=' $LINK_WHOLE_ARCHIVE_START $LINK_LIBGROUP_START $_LIBDEPS $LINK_LIBGROUP_END $LINK_WHOLE_ARCHIVE_END $_SYSLIBDEPS ')
+    env.Prepend(_LIBFLAGS=' $_LIBDEPS_TAGS $LINK_WHOLE_ARCHIVE_START $LINK_LIBGROUP_START $_LIBDEPS $LINK_LIBGROUP_END $LINK_WHOLE_ARCHIVE_END $_SYSLIBDEPS ')
     for builder_name in ('Program', 'SharedLibrary', 'LoadableModule'):
         try:
             update_scanner(env['BUILDERS'][builder_name])

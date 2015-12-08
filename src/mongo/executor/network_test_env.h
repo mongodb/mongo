@@ -73,25 +73,22 @@ public:
         FutureHandle(FutureHandle&& other)
             : _future(std::move(other._future)),
               _executor(other._executor),
-              _network(other._network) {
-            other._executor = nullptr;
-            other._network = nullptr;
-        }
+              _network(other._network) {}
+#else
+        FutureHandle(FutureHandle&& other) = default;
+#endif
 
         FutureHandle& operator=(FutureHandle&& other) {
+            // Assigning to initialized FutureHandle is banned because of the work required prior to
+            // waiting on the future.
+            invariant(!_future.valid());
+
             _future = std::move(other._future);
             _executor = other._executor;
             _network = other._network;
 
-            other._executor = nullptr;
-            other._network = nullptr;
-
             return *this;
         }
-#else
-        FutureHandle(FutureHandle&& other) = default;
-        FutureHandle& operator=(FutureHandle&& other) = default;
-#endif
 
         ~FutureHandle() {
             if (_future.valid()) {

@@ -15,7 +15,7 @@ static int __ckpt_server_start(WT_CONNECTION_IMPL *);
  *	Parse and setup the checkpoint server options.
  */
 static int
-__ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
+__ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
@@ -31,17 +31,28 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
 	 * Checkpoints based on log size also require logging be enabled.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.wait", &cval));
-	conn->ckpt_usecs = (uint64_t)cval.val * 1000000;
+	conn->ckpt_usecs = (uint64_t)cval.val * WT_MILLION;
+
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.log_size", &cval));
 	conn->ckpt_logsize = (wt_off_t)cval.val;
+
+	/* Checkpoints are incompatible with in-memory configuration */
+	if (conn->ckpt_usecs != 0 || conn->ckpt_logsize != 0) {
+		WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
+		if (cval.val != 0)
+			WT_RET_MSG(session, EINVAL,
+			    "In memory configuration incompatible with "
+			    "checkpoints");
+	}
+
 	__wt_log_written_reset(session);
 	if ((conn->ckpt_usecs == 0 && conn->ckpt_logsize == 0) ||
 	    (conn->ckpt_logsize && conn->ckpt_usecs == 0 &&
 	     !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))) {
-		*startp = 0;
+		*startp = false;
 		return (0);
 	}
-	*startp = 1;
+	*startp = true;
 
 	/*
 	 * The application can specify a checkpoint name, which we ignore if
@@ -123,32 +134,34 @@ static int
 __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
+	uint32_t session_flags;
 
 	/* Nothing to do if the server is already running. */
 	if (conn->ckpt_session != NULL)
 		return (0);
 
 	F_SET(conn, WT_CONN_SERVER_CHECKPOINT);
-	/* The checkpoint server gets its own session. */
-	WT_RET(__wt_open_internal_session(
-	    conn, "checkpoint-server", 1, 1, &conn->ckpt_session));
-	session = conn->ckpt_session;
 
 	/*
+	 * The checkpoint server gets its own session.
+	 *
 	 * Checkpoint does enough I/O it may be called upon to perform slow
 	 * operations for the block manager.
 	 */
-	F_SET(session, WT_SESSION_CAN_WAIT);
+	session_flags = WT_SESSION_CAN_WAIT;
+	WT_RET(__wt_open_internal_session(conn,
+	    "checkpoint-server", true, session_flags, &conn->ckpt_session));
+	session = conn->ckpt_session;
 
-	WT_RET(
-	    __wt_cond_alloc(session, "checkpoint server", 0, &conn->ckpt_cond));
+	WT_RET(__wt_cond_alloc(
+	    session, "checkpoint server", false, &conn->ckpt_cond));
 
 	/*
 	 * Start the thread.
 	 */
 	WT_RET(__wt_thread_create(
 	    session, &conn->ckpt_tid, __ckpt_server, session));
-	conn->ckpt_tid_set = 1;
+	conn->ckpt_tid_set = true;
 
 	return (0);
 }
@@ -161,10 +174,10 @@ int
 __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	int start;
+	bool start;
 
 	conn = S2C(session);
-	start = 0;
+	start = false;
 
 	/* If there is already a server running, shut it down. */
 	if (conn->ckpt_session != NULL)
@@ -194,7 +207,7 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 	if (conn->ckpt_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->ckpt_cond));
 		WT_TRET(__wt_thread_join(session, conn->ckpt_tid));
-		conn->ckpt_tid_set = 0;
+		conn->ckpt_tid_set = false;
 	}
 	WT_TRET(__wt_cond_destroy(session, &conn->ckpt_cond));
 
@@ -211,7 +224,7 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 	 * get confused.
 	 */
 	conn->ckpt_session = NULL;
-	conn->ckpt_tid_set = 0;
+	conn->ckpt_tid_set = false;
 	conn->ckpt_cond = NULL;
 	conn->ckpt_config = NULL;
 	conn->ckpt_usecs = 0;

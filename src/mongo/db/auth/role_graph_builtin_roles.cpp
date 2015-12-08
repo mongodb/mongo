@@ -160,7 +160,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
     // clusterMonitor role actions that target a database (or collection) resource
     clusterMonitorRoleDatabaseActions << ActionType::collStats  // dbAdmin gets this also
                                       << ActionType::dbStats    // dbAdmin gets this also
-                                      << ActionType::getShardVersion;
+                                      << ActionType::getShardVersion << ActionType::indexStats;
 
     // hostManager role actions that target the cluster resource
     hostManagerRoleClusterActions
@@ -289,6 +289,9 @@ void addUserAdminAnyDbPrivileges(PrivilegeVector* privileges) {
         privileges, Privilege(ResourcePattern::forAnyNormalResource(), userAdminRoleActions));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forClusterResource(), ActionType::listDatabases));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
+        Privilege(ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
         Privilege(ResourcePattern::forClusterResource(), ActionType::invalidateUserCache));
@@ -545,7 +548,7 @@ void addRootRolePrivileges(PrivilegeVector* privileges) {
     addUserAdminAnyDbPrivileges(privileges);
     addDbAdminAnyDbPrivileges(privileges);
     addReadWriteAnyDbPrivileges(privileges);
-
+    addRestorePrivileges(privileges);
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forAnyResource(), ActionType::validate));
 }

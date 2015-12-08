@@ -34,14 +34,23 @@
 namespace mongo {
 
 inline int StringData::compare(StringData other) const {
-    int res = memcmp(_data, other._data, std::min(_size, other._size));
-    if (res != 0) {
+    // It is illegal to pass nullptr to memcmp. It is an invariant of
+    // StringData that if _data is nullptr, _size is zero. If asked to
+    // compare zero bytes, memcmp returns zero (how could they
+    // differ?). So, if either StringData object has a nullptr _data
+    // object, then memcmp would return zero. Achieve this by assuming
+    // zero, and only calling memcmp if both pointers are valid.
+    int res = 0;
+    if (_data && other._data)
+        res = memcmp(_data, other._data, std::min(_size, other._size));
+
+    if (res != 0)
         return res > 0 ? 1 : -1;
-    } else if (_size == other._size) {
+
+    if (_size == other._size)
         return 0;
-    } else {
-        return _size > other._size ? 1 : -1;
-    }
+
+    return _size > other._size ? 1 : -1;
 }
 
 inline bool StringData::equalCaseInsensitive(StringData other) const {

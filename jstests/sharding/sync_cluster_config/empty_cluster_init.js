@@ -6,9 +6,9 @@
 
 jsTest.log("Start config servers...")
 
-var configSvrA = MongoRunner.runMongod({ verbose : 2 });
-var configSvrB = MongoRunner.runMongod({ verbose : 2 });
-var configSvrC = MongoRunner.runMongod({ verbose : 2 });
+var configSvrA = MongoRunner.runMongod({ configsvr: "", journal: "", verbose : 2 });
+var configSvrB = MongoRunner.runMongod({ configsvr: "", journal: "", verbose : 2 });
+var configSvrC = MongoRunner.runMongod({ configsvr: "", journal: "", verbose : 2 });
 
 var configConnStr = [configSvrA.host, configSvrB.host, configSvrC.host].join(",");
 
@@ -89,8 +89,8 @@ jsTest.log("Mongoses stopped...");
 
 printjson(version);
 
-assert.eq(version.minCompatibleVersion, 6);
-assert.eq(version.currentVersion, 7);
+assert.eq(version.minCompatibleVersion, 5);
+assert.eq(version.currentVersion, 6);
 assert(version.clusterId);
 assert.eq(version.excluding, undefined);
 

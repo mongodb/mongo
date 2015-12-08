@@ -34,6 +34,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/stringutils.h"
@@ -44,8 +45,9 @@ namespace {
 
 const char kCollectionField[] = "collection";
 const char kBatchSizeField[] = "batchSize";
-const char kMaxTimeMSField[] = "maxTimeMS";
+const char kAwaitDataTimeoutField[] = "maxTimeMS";
 const char kTermField[] = "term";
+const char kLastKnownCommittedOpTimeField[] = "lastKnownCommittedOpTime";
 
 }  // namespace
 
@@ -56,8 +58,15 @@ GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 GetMoreRequest::GetMoreRequest(NamespaceString namespaceString,
                                CursorId id,
                                boost::optional<long long> sizeOfBatch,
-                               boost::optional<long long> term)
-    : nss(std::move(namespaceString)), cursorid(id), batchSize(sizeOfBatch), term(term) {}
+                               boost::optional<Milliseconds> awaitDataTimeout,
+                               boost::optional<long long> term,
+                               boost::optional<repl::OpTime> lastKnownCommittedOpTime)
+    : nss(std::move(namespaceString)),
+      cursorid(id),
+      batchSize(sizeOfBatch),
+      awaitDataTimeout(awaitDataTimeout),
+      term(term),
+      lastKnownCommittedOpTime(lastKnownCommittedOpTime) {}
 
 Status GetMoreRequest::isValid() const {
     if (!nss.isValid()) {
@@ -97,7 +106,9 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
 
     // Optional fields.
     boost::optional<long long> batchSize;
+    boost::optional<Milliseconds> awaitDataTimeout;
     boost::optional<long long> term;
+    boost::optional<repl::OpTime> lastKnownCommittedOpTime;
 
     for (BSONElement el : cmdObj) {
         const char* fieldName = el.fieldName();
@@ -123,16 +134,28 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
             }
 
             batchSize = el.numberLong();
-        } else if (str::equals(fieldName, kMaxTimeMSField)) {
-            // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
-            // here.
-            continue;
+        } else if (str::equals(fieldName, kAwaitDataTimeoutField)) {
+            auto maxAwaitDataTime = LiteParsedQuery::parseMaxTimeMS(el);
+            if (!maxAwaitDataTime.isOK()) {
+                return maxAwaitDataTime.getStatus();
+            }
+
+            if (maxAwaitDataTime.getValue()) {
+                awaitDataTimeout = Milliseconds(maxAwaitDataTime.getValue());
+            }
         } else if (str::equals(fieldName, kTermField)) {
             if (el.type() != BSONType::NumberLong) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'term' must be of type NumberLong in: " << cmdObj};
             }
             term = el.Long();
+        } else if (str::equals(fieldName, kLastKnownCommittedOpTimeField)) {
+            repl::OpTime ot;
+            Status status = bsonExtractOpTimeField(el.wrap(), kLastKnownCommittedOpTimeField, &ot);
+            if (!status.isOK()) {
+                return status;
+            }
+            lastKnownCommittedOpTime = ot;
         } else if (!str::startsWith(fieldName, "$")) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "Failed to parse: " << cmdObj << ". "
@@ -150,7 +173,12 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                 str::stream() << "Field 'collection' missing in: " << cmdObj};
     }
 
-    GetMoreRequest request(NamespaceString(*fullns), *cursorid, batchSize, term);
+    GetMoreRequest request(NamespaceString(*fullns),
+                           *cursorid,
+                           batchSize,
+                           awaitDataTimeout,
+                           term,
+                           lastKnownCommittedOpTime);
     Status validStatus = request.isValid();
     if (!validStatus.isOK()) {
         return validStatus;
@@ -169,8 +197,16 @@ BSONObj GetMoreRequest::toBSON() const {
         builder.append(kBatchSizeField, *batchSize);
     }
 
+    if (awaitDataTimeout) {
+        builder.append(kAwaitDataTimeoutField, durationCount<Milliseconds>(*awaitDataTimeout));
+    }
+
     if (term) {
         builder.append(kTermField, *term);
+    }
+
+    if (lastKnownCommittedOpTime) {
+        lastKnownCommittedOpTime->append(&builder, kLastKnownCommittedOpTimeField);
     }
 
     return builder.obj();

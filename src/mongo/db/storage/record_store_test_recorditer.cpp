@@ -304,7 +304,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
         ASSERT(!cursor->next());
 
         // Add a record and ensure we're still EOF.
-        cursor->savePositioned();
+        cursor->save();
 
         StringBuilder sb;
         sb << "record " << nToInsert + 1;
@@ -324,8 +324,8 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
     }
 }
 
-// Test calling savePositioned and restore after each call to next
-TEST(RecordStoreTestHarness, RecordIteratorSavePositionedRestore) {
+// Test calling save and restore after each call to next
+TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
     unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
@@ -367,8 +367,8 @@ TEST(RecordStoreTestHarness, RecordIteratorSavePositionedRestore) {
 
         // Iterate, checking EOF along the way.
         for (int i = 0; i < nToInsert; i++) {
-            cursor->savePositioned();
-            cursor->savePositioned();  // It is legal to save twice in a row.
+            cursor->save();
+            cursor->save();  // It is legal to save twice in a row.
             cursor->restore();
 
             const auto record = cursor->next();
@@ -377,8 +377,8 @@ TEST(RecordStoreTestHarness, RecordIteratorSavePositionedRestore) {
             ASSERT_EQUALS(datas[i], record->data.data());
         }
 
-        cursor->savePositioned();
-        cursor->savePositioned();  // It is legal to save twice in a row.
+        cursor->save();
+        cursor->save();  // It is legal to save twice in a row.
         cursor->restore();
 
         ASSERT(!cursor->next());

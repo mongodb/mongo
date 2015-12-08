@@ -1,6 +1,10 @@
-// multcollections.js
+(function() {
 
-s = new ShardingTest( "multcollections" , 2 , 1 , 1 , { chunksize : 1, enableBalancer : true }  );
+var s = new ShardingTest({ name: "multcollections",
+                           shards: 2,
+                           mongos: 1,
+                           verbose: 1,
+                           other: { chunkSize: 1, enableBalancer : true } });
 
 s.adminCommand( { enablesharding : "test" } );
 db = s.getDB( "test" )
@@ -52,5 +56,6 @@ while ( 1 ){
         break
 }
 
-s.stop()
+s.stop();
 
+})();

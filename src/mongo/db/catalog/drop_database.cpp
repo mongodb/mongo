@@ -55,7 +55,7 @@ Status dropDatabase(OperationContext* txn, const std::string& dbName) {
         AutoGetDb autoDB(txn, dbName, MODE_X);
         Database* const db = autoDB.getDb();
         if (!db) {
-            return Status(ErrorCodes::DatabaseNotFound,
+            return Status(ErrorCodes::NamespaceNotFound,
                           str::stream() << "Could not drop database " << dbName
                                         << " because it does not exist");
         }

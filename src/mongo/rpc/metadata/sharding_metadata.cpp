@@ -34,6 +34,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -61,13 +62,26 @@ StatusWith<ShardingMetadata> ShardingMetadata::readFromMetadata(const BSONObj& m
                                     << smElem.embeddedObject().toString());
     }
 
-    BSONElement lastOpTimeElem;
-    auto lastOpTimeExtractStatus = bsonExtractTypedField(smElem.embeddedObject(),
-                                                         kGLEStatsLastOpTimeFieldName,
-                                                         mongo::bsonTimestamp,
-                                                         &lastOpTimeElem);
-    if (!lastOpTimeExtractStatus.isOK()) {
-        return lastOpTimeExtractStatus;
+    repl::OpTime opTime;
+    const BSONElement opTimeElement = smElem.embeddedObject()[kGLEStatsLastOpTimeFieldName];
+    if (opTimeElement.eoo()) {
+        return Status(ErrorCodes::NoSuchKey, "lastOpTime field missing");
+    } else if (opTimeElement.type() == bsonTimestamp) {
+        opTime = repl::OpTime(opTimeElement.timestamp(), repl::OpTime::kUninitializedTerm);
+    } else if (opTimeElement.type() == Date) {
+        opTime = repl::OpTime(Timestamp(opTimeElement.date()), repl::OpTime::kUninitializedTerm);
+    } else if (opTimeElement.type() == Object) {
+        Status status =
+            bsonExtractOpTimeField(smElem.embeddedObject(), kGLEStatsLastOpTimeFieldName, &opTime);
+        if (!status.isOK()) {
+            return status;
+        }
+    } else {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "Expected \"" << kGLEStatsLastOpTimeFieldName
+                                    << "\" field in response to replSetHeartbeat "
+                                       "command to have type Date or Timestamp, but found type "
+                                    << typeName(opTimeElement.type()));
     }
 
     BSONElement lastElectionIdElem;
@@ -77,12 +91,18 @@ StatusWith<ShardingMetadata> ShardingMetadata::readFromMetadata(const BSONObj& m
         return lastElectionIdExtractStatus;
     }
 
-    return ShardingMetadata(lastOpTimeElem.timestamp(), lastElectionIdElem.OID());
+    return ShardingMetadata(opTime, lastElectionIdElem.OID());
 }
 
-Status ShardingMetadata::writeToMetadata(BSONObjBuilder* metadataBob) const {
+Status ShardingMetadata::writeToMetadata(BSONObjBuilder* metadataBob,
+                                         rpc::Protocol protocol) const {
     BSONObjBuilder subobj(metadataBob->subobjStart(kGLEStatsFieldName));
-    subobj.append(kGLEStatsLastOpTimeFieldName, getLastOpTime());
+    if (getLastOpTime().getTerm() > repl::OpTime::kUninitializedTerm &&
+        protocol == Protocol::kOpCommandV1) {
+        getLastOpTime().append(&subobj, kGLEStatsLastOpTimeFieldName);
+    } else {
+        subobj.append(kGLEStatsLastOpTimeFieldName, getLastOpTime().getTimestamp());
+    }
     subobj.append(kGLEStatsElectionIdFieldName, getLastElectionId());
     return Status::OK();
 }
@@ -97,7 +117,7 @@ Status ShardingMetadata::downconvert(const BSONObj& commandReply,
         // We can reuse the same logic to write the sharding metadata out to the legacy
         // command as the element has the same format whether it is there or on the metadata
         // object.
-        swShardingMetadata.getValue().writeToMetadata(legacyCommandReplyBob);
+        swShardingMetadata.getValue().writeToMetadata(legacyCommandReplyBob, Protocol::kOpQuery);
     } else if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
         // It is valid to not have a $gleStats field.
     } else {
@@ -113,7 +133,7 @@ Status ShardingMetadata::upconvert(const BSONObj& legacyCommand,
     // as it has the same format whether it is there or on the metadata object.
     auto swShardingMetadata = readFromMetadata(legacyCommand);
     if (swShardingMetadata.isOK()) {
-        swShardingMetadata.getValue().writeToMetadata(metadataBob);
+        swShardingMetadata.getValue().writeToMetadata(metadataBob, Protocol::kOpCommandV1);
 
         // Write out the command excluding the $gleStats subobject.
         for (const auto& elem : legacyCommand) {
@@ -130,10 +150,10 @@ Status ShardingMetadata::upconvert(const BSONObj& legacyCommand,
     return Status::OK();
 }
 
-ShardingMetadata::ShardingMetadata(Timestamp lastOpTime, OID lastElectionId)
+ShardingMetadata::ShardingMetadata(repl::OpTime lastOpTime, OID lastElectionId)
     : _lastOpTime(std::move(lastOpTime)), _lastElectionId(std::move(lastElectionId)) {}
 
-const Timestamp& ShardingMetadata::getLastOpTime() const {
+const repl::OpTime& ShardingMetadata::getLastOpTime() const {
     return _lastOpTime;
 }
 

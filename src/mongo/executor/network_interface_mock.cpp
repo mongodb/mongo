@@ -63,6 +63,8 @@ std::string NetworkInterfaceMock::getDiagnosticString() {
     return "NetworkInterfaceMock diagnostics here";
 }
 
+void NetworkInterfaceMock::appendConnectionStats(BSONObjBuilder* b) {}
+
 Date_t NetworkInterfaceMock::now() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _now_inlock();
@@ -143,6 +145,10 @@ void NetworkInterfaceMock::setAlarm(const Date_t when, const stdx::function<void
         return;
     }
     _alarms.emplace(when, action);
+}
+
+bool NetworkInterfaceMock::onNetworkThread() {
+    return _currentlyRunning == kNetworkThread;
 }
 
 void NetworkInterfaceMock::startup() {
@@ -229,6 +235,13 @@ NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNextRead
     return _processing.begin();
 }
 
+NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getFrontOfUnscheduledQueue() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    invariant(_currentlyRunning == kNetworkThread);
+    invariant(_hasReadyRequests_inlock());
+    return _unscheduled.begin();
+}
+
 void NetworkInterfaceMock::scheduleResponse(NetworkOperationIterator noi,
                                             Date_t when,
                                             const TaskExecutor::ResponseStatus& response) {
@@ -263,7 +276,7 @@ void NetworkInterfaceMock::requeueAt(NetworkOperationIterator noi, Date_t dontAs
     _unscheduled.splice(insertBefore, _processing, noi);
 }
 
-void NetworkInterfaceMock::runUntil(Date_t until) {
+Date_t NetworkInterfaceMock::runUntil(Date_t until) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     invariant(until > _now_inlock());
@@ -287,6 +300,7 @@ void NetworkInterfaceMock::runUntil(Date_t until) {
         _waitingToRunMask |= kExecutorThread;
     }
     _runReadyNetworkOperations_inlock(&lk);
+    return _now_inlock();
 }
 
 void NetworkInterfaceMock::runReadyNetworkOperations() {

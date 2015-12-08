@@ -1,6 +1,8 @@
 // Verify that a user with read and write access to database "test" cannot access database "test2"
 // via a mapper, reducer or finalizer.
 
+(function() {
+
 //
 // User document declarations.  All users in this test are added to the admin database.
 //
@@ -28,8 +30,13 @@ function assertInsert(collection, obj) {
     assert.writeOK(collection.insert(obj));
 }
 
-var cluster = new ShardingTest("authwhere", 1, 0, 1,
-                               { extraOptions: { keyFile: "jstests/libs/key1" } });
+var cluster = new ShardingTest({ name: "authmr",
+                                 shards: 1,
+                                 mongos: 1,
+                                 other: {
+                                     extraOptions: { keyFile: "jstests/libs/key1" }
+                                 }
+                               });
 
 // Set up the test data.
 (function() {
@@ -109,3 +116,5 @@ assert.throws(function() {
         adminDB.logout();
     }
 }());
+
+})();

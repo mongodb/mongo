@@ -387,9 +387,8 @@ StatusWith<RecordId> RecordStoreV1Base::updateRecord(OperationContext* txn,
         return StatusWith<RecordId>(oldLocation);
     }
 
-    if (isCapped())
-        return StatusWith<RecordId>(
-            ErrorCodes::InternalError, "failing update: objects in a capped ns cannot grow", 10003);
+    // We enforce the restriction of unchanging capped doc sizes above the storage layer.
+    invariant(!isCapped());
 
     // we have to move
     if (dataSize + MmapV1RecordHeader::HeaderSize > MaxAllowedAllocation) {
@@ -417,11 +416,12 @@ bool RecordStoreV1Base::updateWithDamagesSupported() const {
     return true;
 }
 
-Status RecordStoreV1Base::updateWithDamages(OperationContext* txn,
-                                            const RecordId& loc,
-                                            const RecordData& oldRec,
-                                            const char* damageSource,
-                                            const mutablebson::DamageVector& damages) {
+StatusWith<RecordData> RecordStoreV1Base::updateWithDamages(
+    OperationContext* txn,
+    const RecordId& loc,
+    const RecordData& oldRec,
+    const char* damageSource,
+    const mutablebson::DamageVector& damages) {
     MmapV1RecordHeader* rec = recordFor(DiskLoc::fromRecordId(loc));
     char* root = rec->data();
 
@@ -434,7 +434,7 @@ Status RecordStoreV1Base::updateWithDamages(OperationContext* txn,
         std::memcpy(targetPtr, sourcePtr, where->size);
     }
 
-    return Status::OK();
+    return rec->toRecordData();
 }
 
 void RecordStoreV1Base::deleteRecord(OperationContext* txn, const RecordId& rid) {
@@ -910,10 +910,6 @@ boost::optional<Record> RecordStoreV1Base::IntraExtentIterator::next() {
     return {{out, _rs->dataFor(_txn, out)}};
 }
 
-boost::optional<Record> RecordStoreV1Base::IntraExtentIterator::seekExact(const RecordId& id) {
-    invariant(!"seekExact not supported");
-}
-
 void RecordStoreV1Base::IntraExtentIterator::advance() {
     if (_curr.isNull())
         return;
@@ -923,8 +919,13 @@ void RecordStoreV1Base::IntraExtentIterator::advance() {
     _curr = (nextOfs == DiskLoc::NullOfs ? DiskLoc() : DiskLoc(_curr.a(), nextOfs));
 }
 
-void RecordStoreV1Base::IntraExtentIterator::invalidate(const RecordId& rid) {
+void RecordStoreV1Base::IntraExtentIterator::invalidate(OperationContext* txn,
+                                                        const RecordId& rid) {
     if (rid == _curr.toRecordId()) {
+        const DiskLoc origLoc = _curr;
+
+        // Undo the advance on rollback, as the deletion that forced it "never happened".
+        txn->recoveryUnit()->onRollback([this, origLoc]() { this->_curr = origLoc; });
         advance();
     }
 }

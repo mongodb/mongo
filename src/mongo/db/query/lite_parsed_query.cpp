@@ -44,16 +44,18 @@ namespace mongo {
 using std::string;
 using std::unique_ptr;
 
-const char* LiteParsedQuery::kFindCommandReadPrefField("$readPreference");
+const std::string LiteParsedQuery::kUnwrappedReadPrefField("$queryOptions");
+const std::string LiteParsedQuery::kWrappedReadPrefField("$readPreference");
 
-const string LiteParsedQuery::cmdOptionMaxTimeMS("maxTimeMS");
-const string LiteParsedQuery::queryOptionMaxTimeMS("$maxTimeMS");
+const char LiteParsedQuery::cmdOptionMaxTimeMS[] = "maxTimeMS";
+const char LiteParsedQuery::queryOptionMaxTimeMS[] = "$maxTimeMS";
 
-const string LiteParsedQuery::metaTextScore("textScore");
 const string LiteParsedQuery::metaGeoNearDistance("geoNearDistance");
 const string LiteParsedQuery::metaGeoNearPoint("geoNearPoint");
-const string LiteParsedQuery::metaRecordId("recordId");
 const string LiteParsedQuery::metaIndexKey("indexKey");
+const string LiteParsedQuery::metaRecordId("recordId");
+const string LiteParsedQuery::metaSortKey("sortKey");
+const string LiteParsedQuery::metaTextScore("textScore");
 
 const long long LiteParsedQuery::kDefaultBatchSize = 101;
 
@@ -91,10 +93,9 @@ const char kTailableField[] = "tailable";
 const char kOplogReplayField[] = "oplogReplay";
 const char kNoCursorTimeoutField[] = "noCursorTimeout";
 const char kAwaitDataField[] = "awaitData";
-const char kPartialField[] = "partial";
+const char kPartialResultsField[] = "allowPartialResults";
 const char kTermField[] = "term";
 const char kOptionsField[] = "options";
-const char kShardVersionField[] = "shardVersion";
 
 }  // namespace
 
@@ -159,6 +160,14 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_hint = hintObj;
+        } else if (str::equals(fieldName, repl::ReadConcernArgs::kReadConcernFieldName.c_str())) {
+            // Read concern parsing is handled elsewhere, but we store a copy here.
+            Status status = checkFieldType(el, Object);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            pq->_readConcern = el.Obj().getOwned();
         } else if (str::equals(fieldName, kSkipField)) {
             if (!el.isNumber()) {
                 str::stream ss;
@@ -249,7 +258,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_maxScan = maxScan;
-        } else if (str::equals(fieldName, cmdOptionMaxTimeMS.c_str())) {
+        } else if (str::equals(fieldName, cmdOptionMaxTimeMS)) {
             StatusWith<int> maxTimeMS = parseMaxTimeMS(el);
             if (!maxTimeMS.isOK()) {
                 return maxTimeMS.getStatus();
@@ -291,8 +300,6 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_snapshot = el.boolean();
-        } else if (str::equals(fieldName, kFindCommandReadPrefField)) {
-            pq->_hasReadPref = true;
         } else if (str::equals(fieldName, kTailableField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
@@ -300,13 +307,6 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_tailable = el.boolean();
-        } else if (str::equals(fieldName, "slaveOk")) {
-            Status status = checkFieldType(el, Bool);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            pq->_slaveOk = el.boolean();
         } else if (str::equals(fieldName, kOplogReplayField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
@@ -328,13 +328,13 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_awaitData = el.boolean();
-        } else if (str::equals(fieldName, kPartialField)) {
+        } else if (str::equals(fieldName, kPartialResultsField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_partial = el.boolean();
+            pq->_allowPartialResults = el.boolean();
         } else if (str::equals(fieldName, kOptionsField)) {
             // 3.0.x versions of the shell may generate an explain of a find command with an
             // 'options' field. We accept this only if the 'options' field is empty so that
@@ -358,9 +358,6 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                               str::stream() << "Failed to parse options: " << optionsObj.toString()
                                             << ". You may need to update your shell or driver.");
             }
-        } else if (str::equals(fieldName, repl::ReadConcernArgs::kReadConcernFieldName.c_str())) {
-            // read concern parsing is handled elsewhere.
-            continue;
         } else if (str::equals(fieldName, kShardVersionField)) {
             // Shard version parsing is handled elsewhere.
         } else if (str::equals(fieldName, kTermField)) {
@@ -422,6 +419,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     const BSONObj& projection,
     const BSONObj& sort,
     const BSONObj& hint,
+    const BSONObj& readConcern,
     boost::optional<long long> skip,
     boost::optional<long long> limit,
     boost::optional<long long> batchSize,
@@ -442,7 +440,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     bool isOplogReplay,
     bool isNoCursorTimeout,
     bool isAwaitData,
-    bool isPartial) {
+    bool allowPartialResults) {
     unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
     // ntoreturn and batchSize or limit are mutually exclusive.
     if (batchSize || limit) {
@@ -453,6 +451,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     pq->_proj = projection;
     pq->_sort = sort;
     pq->_hint = hint;
+    pq->_readConcern = readConcern;
 
     pq->_skip = skip;
     pq->_limit = limit;
@@ -477,9 +476,9 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     pq->_oplogReplay = isOplogReplay;
     pq->_noCursorTimeout = isNoCursorTimeout;
     pq->_awaitData = isAwaitData;
-    pq->_partial = isPartial;
+    pq->_allowPartialResults = allowPartialResults;
 
-    return std::move(pq);
+    return pq;
 }
 
 BSONObj LiteParsedQuery::asFindCommand() const {
@@ -505,6 +504,10 @@ void LiteParsedQuery::asFindCommand(BSONObjBuilder* cmdBuilder) const {
 
     if (!_hint.isEmpty()) {
         cmdBuilder->append(kHintField, _hint);
+    }
+
+    if (!_readConcern.isEmpty()) {
+        cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
     }
 
     if (_skip) {
@@ -575,8 +578,8 @@ void LiteParsedQuery::asFindCommand(BSONObjBuilder* cmdBuilder) const {
         cmdBuilder->append(kAwaitDataField, true);
     }
 
-    if (_partial) {
-        cmdBuilder->append(kPartialField, true);
+    if (_allowPartialResults) {
+        cmdBuilder->append(kPartialResultsField, true);
     }
 
     if (_replicationTerm) {
@@ -650,21 +653,20 @@ Status LiteParsedQuery::validate() const {
                       "'limit' or 'batchSize' fields can not be set with 'ntoreturn' field.");
     }
 
+    // Tailable cursors cannot have any sort other than {$natural: 1}.
+    if (_tailable) {
+        const BSONObj expectedSort = BSON("$natural" << 1);
+        if (!_sort.isEmpty() && _sort != expectedSort) {
+            return Status(ErrorCodes::BadValue,
+                          "cannot use tailable option with a sort other than {$natural: 1}");
+        }
+    }
+
     return Status::OK();
 }
 
 // static
-StatusWith<int> LiteParsedQuery::parseMaxTimeMSCommand(const BSONObj& cmdObj) {
-    return parseMaxTimeMS(cmdObj[cmdOptionMaxTimeMS]);
-}
-
-// static
-StatusWith<int> LiteParsedQuery::parseMaxTimeMSQuery(const BSONObj& queryObj) {
-    return parseMaxTimeMS(queryObj[queryOptionMaxTimeMS]);
-}
-
-// static
-StatusWith<int> LiteParsedQuery::parseMaxTimeMS(const BSONElement& maxTimeMSElt) {
+StatusWith<int> LiteParsedQuery::parseMaxTimeMS(BSONElement maxTimeMSElt) {
     if (!maxTimeMSElt.eoo() && !maxTimeMSElt.isNumber()) {
         return StatusWith<int>(
             ErrorCodes::BadValue,
@@ -946,7 +948,7 @@ int LiteParsedQuery::getOptions() const {
     if (_exhaust) {
         options |= QueryOption_Exhaust;
     }
-    if (_partial) {
+    if (_allowPartialResults) {
         options |= QueryOption_PartialResults;
     }
     return options;
@@ -959,7 +961,7 @@ void LiteParsedQuery::initFromInt(int options) {
     _noCursorTimeout = (options & QueryOption_NoCursorTimeout) != 0;
     _awaitData = (options & QueryOption_AwaitData) != 0;
     _exhaust = (options & QueryOption_Exhaust) != 0;
-    _partial = (options & QueryOption_PartialResults) != 0;
+    _allowPartialResults = (options & QueryOption_PartialResults) != 0;
 }
 
 void LiteParsedQuery::addMetaProjection() {

@@ -69,10 +69,6 @@ void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
     initThread(desc, getGlobalServiceContext(), mp);
 }
 
-/**
- * This must be called whenever a new thread is started, so that active threads can be tracked
- * so each thread has a Client object in TLS.
- */
 void Client::initThread(const char* desc, ServiceContext* service, AbstractMessagingPort* mp) {
     invariant(currentClient.getMake()->get() == nullptr);
 
@@ -87,6 +83,12 @@ void Client::initThread(const char* desc, ServiceContext* service, AbstractMessa
 
     // Create the client obj, attach to thread
     *currentClient.get() = service->makeClient(fullDesc, mp);
+}
+
+void Client::destroy() {
+    invariant(currentClient.get());
+    invariant(currentClient.get()->get());
+    currentClient.reset(nullptr);
 }
 
 namespace {

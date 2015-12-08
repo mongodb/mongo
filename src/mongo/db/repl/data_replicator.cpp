@@ -45,6 +45,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -386,7 +387,10 @@ Status DatabasesCloner::start() {
 
     log() << "starting cloning of all databases";
     // Schedule listDatabase command which will kick off the database cloner per result db.
-    Request listDBsReq(_source, "admin", BSON("listDatabases" << true), BSON("$secondaryOk" << 1));
+    Request listDBsReq(_source,
+                       "admin",
+                       BSON("listDatabases" << true),
+                       rpc::ServerSelectionMetadata(true, boost::none).toBSON());
     CBHStatus s = _exec->scheduleRemoteCommand(
         listDBsReq,
         stdx::bind(&DatabasesCloner::_onListDatabaseFinish, this, stdx::placeholders::_1));
@@ -497,6 +501,11 @@ void DatabasesCloner::_doNextActions() {
 }
 
 void DatabasesCloner::_failed() {
+    if (!_active) {
+        return;
+    }
+    _active = false;
+
     // TODO: cancel outstanding work, like any cloners active
     invariant(_finishFn);
     _finishFn(_status);
@@ -1353,7 +1362,7 @@ void DataReplicator::_rollbackOperations(const CallbackArgs& cbData) {
     }
     invariant(cbData.txn);
 
-    OpTime lastOpTimeWritten(getLastTimestampApplied(), OpTime::kDefaultTerm);
+    OpTime lastOpTimeWritten(getLastTimestampApplied(), OpTime::kInitialTerm);
     HostAndPort syncSource = getSyncSource();
     auto rollbackStatus = _opts.rollbackFn(cbData.txn, lastOpTimeWritten, syncSource);
     if (!rollbackStatus.isOK()) {

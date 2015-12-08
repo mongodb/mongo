@@ -1,4 +1,9 @@
 // Test SERVER-623 - starting slave from a new snapshot
+//
+// This test requires persistence because it assumes copying the dbpath with copy the data between
+// nodes. There should not be any data in the dbpath for ephemeral storage engines, so this will not
+// work. It also requires the fsync command to enduce replication lag.
+// @tags: [requires_persistence, requires_fsync]
 
 ports = allocatePorts( 3 );
 

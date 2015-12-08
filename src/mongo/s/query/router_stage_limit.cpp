@@ -49,12 +49,22 @@ StatusWith<boost::optional<BSONObj>> RouterStageLimit::next() {
         return childResult;
     }
 
-    ++_returnedSoFar;
+    if (childResult.getValue()) {
+        ++_returnedSoFar;
+    }
     return childResult;
 }
 
 void RouterStageLimit::kill() {
     getChildStage()->kill();
+}
+
+bool RouterStageLimit::remotesExhausted() {
+    return getChildStage()->remotesExhausted();
+}
+
+Status RouterStageLimit::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
 }
 
 }  // namespace mongo

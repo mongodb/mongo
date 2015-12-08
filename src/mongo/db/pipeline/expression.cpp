@@ -1908,8 +1908,7 @@ Value ExpressionMeta::evaluateInternal(Variables* vars) const {
         case MetaType::TEXT_SCORE:
             return root.hasTextScore() ? Value(root.getTextScore()) : Value();
         case MetaType::RAND_VAL:
-            return root.hasRandMetaField() ? Value(static_cast<long long>(root.getRandMetaField()))
-                                           : Value();
+            return root.hasRandMetaField() ? Value(root.getRandMetaField()) : Value();
     }
     MONGO_UNREACHABLE;
 }

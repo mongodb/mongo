@@ -118,7 +118,9 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
 
         scope->setOOM();
 
-        return nullptr;
+        // We fall through here because we want to let spidermonkey continue
+        // with whatever it was doing.  Calling setOOM will fail the top level
+        // operation as soon as possible.
     }
 
 #ifdef MONGO_NO_MALLOC_USABLE_SIZE

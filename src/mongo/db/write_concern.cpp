@@ -32,6 +32,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/rpc/protocol.h"
 
 namespace mongo {
 
@@ -73,9 +75,13 @@ void addJournalSyncForWMajority(WriteConcernOptions* writeConcern) {
         writeConcern->syncMode = WriteConcernOptions::JOURNAL;
     }
 }
+
+const std::string kLocalDB = "local";
 }  // namespace
 
-StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj) {
+StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
+                                                    const BSONObj& cmdObj,
+                                                    const std::string& dbName) {
     // The default write concern if empty is w : 1
     // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
     WriteConcernOptions writeConcern =
@@ -107,7 +113,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj) {
         return wcStatus;
     }
 
-    wcStatus = validateWriteConcern(writeConcern);
+    wcStatus = validateWriteConcern(txn, writeConcern, dbName);
     if (!wcStatus.isOK()) {
         return wcStatus;
     }
@@ -117,8 +123,9 @@ StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj) {
 
     return writeConcern;
 }
-
-Status validateWriteConcern(const WriteConcernOptions& writeConcern) {
+Status validateWriteConcern(OperationContext* txn,
+                            const WriteConcernOptions& writeConcern,
+                            const std::string& dbName) {
     const bool isJournalEnabled = getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();
 
     if (writeConcern.syncMode == WriteConcernOptions::JOURNAL && !isJournalEnabled) {
@@ -127,16 +134,39 @@ Status validateWriteConcern(const WriteConcernOptions& writeConcern) {
     }
 
     const bool isConfigServer = serverGlobalParams.configsvr;
+    const bool isLocalDb(dbName == kLocalDB);
     const repl::ReplicationCoordinator::Mode replMode =
         repl::getGlobalReplicationCoordinator()->getReplicationMode();
 
-    if (isConfigServer && replMode != repl::ReplicationCoordinator::modeReplSet) {
-        // SCCC config servers can have a master-slave oplog, but we still don't allow w > 1.
-        if (writeConcern.wNumNodes > 1) {
-            return Status(ErrorCodes::BadValue,
-                          "cannot use 'w' > 1 on a sync cluster connection config server host");
+    if (isConfigServer) {
+        auto protocol = rpc::getOperationProtocol(txn);
+        // This here only for v3.0 backwards compatibility.
+        if (serverGlobalParams.configsvrMode != CatalogManager::ConfigServerMode::CSRS &&
+            replMode != repl::ReplicationCoordinator::modeReplSet &&
+            protocol == rpc::Protocol::kOpQuery && writeConcern.wNumNodes == 0 &&
+            writeConcern.wMode.empty()) {
+            return Status::OK();
+        }
+
+        if (!writeConcern.validForConfigServers()) {
+            return Status(
+                ErrorCodes::BadValue,
+                str::stream()
+                    << "w:1 and w:'majority' are the only valid write concerns when writing to "
+                       "config servers, got: " << writeConcern.toBSON().toString());
+        }
+        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::CSRS &&
+            replMode == repl::ReplicationCoordinator::modeReplSet && !isLocalDb &&
+            writeConcern.wMode.empty()) {
+            invariant(writeConcern.wNumNodes == 1);
+            return Status(
+                ErrorCodes::BadValue,
+                str::stream()
+                    << "w: 'majority' is the only valid write concern when writing to config "
+                       "server replica sets, got: " << writeConcern.toBSON().toString());
         }
     }
+
     if (replMode == repl::ReplicationCoordinator::modeNone) {
         if (writeConcern.wNumNodes > 1) {
             return Status(ErrorCodes::BadValue, "cannot use 'w' > 1 when a host is not replicated");
@@ -203,11 +233,17 @@ void WriteConcernResult::appendTo(const WriteConcernOptions& writeConcern,
 
 Status waitForWriteConcern(OperationContext* txn,
                            const OpTime& replOpTime,
+                           const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result) {
-    const WriteConcernOptions& writeConcern = txn->getWriteConcern();
+    // We assume all options have been validated earlier, if not, programming error.
+    // Passing localDB name is a hack to avoid more rigorous check that performed for non local DB.
+    dassert(validateWriteConcern(txn, writeConcern, kLocalDB).isOK());
 
-    // We assume all options have been validated earlier, if not, programming error
-    dassert(validateWriteConcern(writeConcern).isOK());
+    // We should never be waiting for write concern while holding any sort of lock, because this may
+    // lead to situations where the replication heartbeats are stalled.
+    //
+    // This check does not hold for writes done through dbeval because it runs with a global X lock.
+    dassert(!txn->lockState()->isLocked() || txn->getClient()->isInDirectClient());
 
     // Next handle blocking on disk
 

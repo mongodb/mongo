@@ -38,13 +38,12 @@ class OperationContext;
 class RecordData;
 
 /**
- * When a capped collection has to delete a document, it needs a way to tell the caller
- * what its deleting so it can unindex or do any other cleanup.
- * This is that way.
+ * When a capped collection is modified (delete/insert/etc) then certain notifications need to
+ * be made, which this (pure virtual) interface exposes.
  */
-class CappedDocumentDeleteCallback {
+class CappedCallback {
 public:
-    virtual ~CappedDocumentDeleteCallback() {}
+    virtual ~CappedCallback() {}
 
     /**
      * This will be called right before loc is deleted when wrapping.
@@ -54,5 +53,10 @@ public:
     virtual Status aboutToDeleteCapped(OperationContext* txn,
                                        const RecordId& loc,
                                        RecordData data) = 0;
+
+    /**
+     * Used to notify any waiters when new documents may be visible in the capped collection.
+     */
+    virtual void notifyCappedWaitersIfNeeded() = 0;
 };
 }

@@ -45,7 +45,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_conn_config_init(session));
 
 	/* Statistics. */
-	__wt_stat_init_connection_stats(&conn->stats);
+	__wt_stat_connection_init(conn);
 
 	/* Locks. */
 	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
@@ -55,11 +55,15 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
 	WT_RET(__wt_rwlock_alloc(session,
 	    &conn->hot_backup_lock, "hot backup"));
+	WT_RET(__wt_spin_init(session, &conn->las_lock, "lookaside table"));
 	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
 	WT_RET(__wt_spin_init(session, &conn->schema_lock, "schema"));
 	WT_RET(__wt_spin_init(session, &conn->table_lock, "table creation"));
-	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS(conn), &conn->page_lock));
-	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
+	WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
+
+	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS, &conn->page_lock));
+	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, conn->page_lock);
+	for (i = 0; i < WT_PAGE_LOCKS; ++i)
 		WT_RET(
 		    __wt_spin_init(session, &conn->page_lock[i], "btree page"));
 
@@ -71,7 +75,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(
 	    session, &conn->lsm_manager.switch_lock, "LSM switch queue lock"));
 	WT_RET(__wt_cond_alloc(
-	    session, "LSM worker cond", 0, &conn->lsm_manager.work_cond));
+	    session, "LSM worker cond", false, &conn->lsm_manager.work_cond));
 
 	/*
 	 * Generation numbers.
@@ -138,10 +142,12 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->encryptor_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
 	WT_TRET(__wt_rwlock_destroy(session, &conn->hot_backup_lock));
+	__wt_spin_destroy(session, &conn->las_lock);
 	__wt_spin_destroy(session, &conn->reconfig_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_spin_destroy(session, &conn->table_lock);
-	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
+	__wt_spin_destroy(session, &conn->turtle_lock);
+	for (i = 0; i < WT_PAGE_LOCKS; ++i)
 		__wt_spin_destroy(session, &conn->page_lock[i]);
 	__wt_free(session, conn->page_lock);
 

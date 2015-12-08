@@ -253,7 +253,7 @@ BSONObj Document::toBsonWithMetaData() const {
     if (hasTextScore())
         bb.append(metaFieldTextScore, getTextScore());
     if (hasRandMetaField())
-        bb.append(metaFieldRandVal, static_cast<long long>(getRandMetaField()));
+        bb.append(metaFieldRandVal, getRandMetaField());
     return bb.obj();
 }
 
@@ -269,7 +269,7 @@ Document Document::fromBsonWithMetaData(const BSONObj& bson) {
                 md.setTextScore(elem.Double());
                 continue;
             } else if (fieldName == metaFieldRandVal) {
-                md.setRandMetaField(static_cast<int64_t>(elem.numberLong()));
+                md.setRandMetaField(elem.Double());
                 continue;
             }
         }
@@ -438,7 +438,7 @@ void Document::serializeForSorter(BufBuilder& buf) const {
     }
     if (hasRandMetaField()) {
         buf.appendNum(char(DocumentStorage::MetaType::RAND_VAL + 1));
-        buf.appendNum(static_cast<long long>(getRandMetaField()));
+        buf.appendNum(getRandMetaField());
     }
     buf.appendNum(char(0));
 }
@@ -455,7 +455,7 @@ Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeS
         if (marker == char(DocumentStorage::MetaType::TEXT_SCORE) + 1) {
             doc.setTextScore(buf.read<double>());
         } else if (marker == char(DocumentStorage::MetaType::RAND_VAL) + 1) {
-            doc.setRandMetaField(buf.read<int64_t>());
+            doc.setRandMetaField(buf.read<double>());
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }

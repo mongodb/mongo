@@ -33,6 +33,13 @@
 #include "mongo/db/repl/initial_sync.h"
 
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/repl_client_info.h"
+
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 
@@ -41,7 +48,7 @@ namespace repl {
 
 unsigned replSetForceInitialSyncFailure = 0;
 
-InitialSync::InitialSync(BackgroundSyncInterface* q) : SyncTail(q, multiInitialSyncApply) {}
+InitialSync::InitialSync(BackgroundSyncInterface* q, MultiSyncApplyFunc func) : SyncTail(q, func) {}
 
 InitialSync::~InitialSync() {}
 
@@ -57,5 +64,69 @@ void InitialSync::oplogApplication(OperationContext* txn, const OpTime& endOpTim
     _applyOplogUntil(txn, endOpTime);
 }
 
+
+/* applies oplog from "now" until endOpTime using the applier threads for initial sync*/
+void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTime) {
+    unsigned long long bytesApplied = 0;
+    unsigned long long entriesApplied = 0;
+    while (true) {
+        OpQueue ops;
+
+        auto replCoord = repl::ReplicationCoordinator::get(txn);
+        while (!tryPopAndWaitForMore(txn, &ops)) {
+            // nothing came back last time, so go again
+            if (ops.empty())
+                continue;
+
+            // Check if we reached the end
+            const BSONObj currentOp = ops.back().raw;
+            const OpTime currentOpTime =
+                fassertStatusOK(28772, OpTime::parseFromOplogEntry(currentOp));
+
+            // When we reach the end return this batch
+            if (currentOpTime == endOpTime) {
+                break;
+            } else if (currentOpTime > endOpTime) {
+                severe() << "Applied past expected end " << endOpTime << " to " << currentOpTime
+                         << " without seeing it. Rollback?";
+                fassertFailedNoTrace(18693);
+            }
+
+            // apply replication batch limits
+            if (ops.getSize() > replBatchLimitBytes)
+                break;
+            if (ops.getDeque().size() > replBatchLimitOperations)
+                break;
+        };
+
+        if (ops.empty()) {
+            severe() << "got no ops for batch...";
+            fassertFailedNoTrace(18692);
+        }
+
+        const BSONObj lastOp = ops.back().raw.getOwned();
+
+        // Tally operation information
+        bytesApplied += ops.getSize();
+        entriesApplied += ops.getDeque().size();
+
+        const OpTime lastOpTime = multiApply(txn, ops);
+
+        replCoord->setMyLastOptime(lastOpTime);
+        setNewTimestamp(lastOpTime.getTimestamp());
+
+        if (inShutdown()) {
+            return;
+        }
+
+        // if the last op applied was our end, return
+        if (lastOpTime == endOpTime) {
+            LOG(1) << "SyncTail applied " << entriesApplied << " entries (" << bytesApplied
+                   << " bytes)"
+                   << " and finished at opTime " << endOpTime;
+            return;
+        }
+    }  // end of while (true)
+}
 }  // namespace repl
 }  // namespace mongo

@@ -31,6 +31,7 @@
 #include "mongo/scripting/mozjs/dbpointer.h"
 
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/util/mongoutils/str.h"
@@ -49,15 +50,15 @@ void DBPointerInfo::construct(JSContext* cx, JS::CallArgs args) {
     if (!args.get(0).isString())
         uasserted(ErrorCodes::BadValue, "DBPointer 1st parameter must be a string");
 
-    if (!scope->getOidProto().instanceOf(args.get(1)))
+    if (!scope->getProto<OIDInfo>().instanceOf(args.get(1)))
         uasserted(ErrorCodes::BadValue, "DBPointer 2nd parameter must be an ObjectId");
 
     JS::RootedObject thisv(cx);
-    scope->getDbPointerProto().newObject(&thisv);
+    scope->getProto<DBPointerInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    o.setValue("ns", args.get(0));
-    o.setValue("id", args.get(1));
+    o.setValue(InternedString::ns, args.get(0));
+    o.setValue(InternedString::id, args.get(1));
 
     args.rval().setObjectOrNull(thisv);
 }

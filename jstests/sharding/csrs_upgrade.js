@@ -53,6 +53,17 @@ var st;
         assert.commandWorked(runNextSplit(snode));
     };
 
+    var waitUntilMaster = function (dnode) {
+        var isMasterReply;
+        assert.soon(function () {
+            isMasterReply = dnode.adminCommand({ismaster: 1});
+            return isMasterReply.ismaster;
+        }, function () {
+            return "Expected " + dnode.name + " to respond ismaster:true, but got " +
+                tojson(isMasterReply);
+        });
+    };
+
     /**
      * Runs a config.version read, then splits the data collection and expects the read to succed
      * and the split to fail.
@@ -76,6 +87,33 @@ var st;
             useHostname: true
         }
     });
+
+    var waitUntilAllCaughtUp = function(csrs) {
+        var rsStatus;
+        var firstConflictingIndex;
+        var ot;
+        var otherOt;
+        assert.soon(function () {
+            rsStatus = csrs[0].adminCommand('replSetGetStatus');
+            if (rsStatus.ok != 1) {
+                return false;
+            }
+            assert.eq(csrs.length, rsStatus.members.length, tojson(rsStatus));
+            ot = rsStatus.members[0].optime;
+            for (var i = 1; i < rsStatus.members.length; ++i) {
+                otherOt = rsStatus.members[i].optime;
+                if (bsonWoCompare({ts: otherOt.ts}, {ts: ot.ts}) ||
+                    bsonWoCompare({t: otherOt.t},  {t: ot.t})) {
+                    firstConflictingIndex = i;
+                    return false;
+                }
+            }
+            return true;
+        }, function () {
+            return "Optimes of members 0 (" + tojson(ot) + ") and " + firstConflictingIndex + " (" +
+                tojson(otherOt) + ") are different in " + tojson(rsStatus);
+        });
+    };
 
     var shardConfigs = st.s0.getCollection("config.shards").find().toArray();
     assert.eq(2, shardConfigs.length);
@@ -114,10 +152,7 @@ var st;
         _id: csrsName,
         version: 1,
         configsvr: true,
-        members: [ { _id: 0, host: st.c0.name }],
-        settings: {
-            protocolVersion :1
-        }
+        members: [ { _id: 0, host: st.c0.name }]
     };
     assert.commandWorked(st.c0.adminCommand({replSetInitiate: csrsConfig}));
     var csrs = [];
@@ -127,6 +162,7 @@ var st;
     csrs0Opts.configsvrMode = "sccc";
     MongoRunner.stopMongod(st.c0);
     csrs.push(MongoRunner.runMongod(csrs0Opts));
+    waitUntilMaster(csrs[0]);
 
     assertCanSplit(st.s0, "using SCCC protocol when first config server is a 1-node replica set");
 
@@ -148,10 +184,7 @@ var st;
     assertCanSplit(st.s0, "using SCCC protocol when first config server is primary of " +
                   csrs.length + "-node replica set");
 
-    // This write is an easy way to wait for all members of the CSRS set to have
-    // replicated all of the documents.
-    assert.writeOK(csrs[0].getCollection('config.tmp').insert({},
-                                                              { writeConcern: { w:csrs.length }}));
+    waitUntilAllCaughtUp(csrs);
 
     jsTest.log("Shutting down second and third SCCC config server nodes");
     MongoRunner.stopMongod(st.c1);
@@ -168,11 +201,22 @@ var st;
 
     jsTest.log("Restarting " + csrs[0].name + " in csrs mode");
     delete csrs0Opts.configsvrMode;
+    try {
+        csrs[0].adminCommand({replSetStepDown: 60});
+    } catch (e) {} // Expected
     MongoRunner.stopMongod(csrs[0]);
     csrs[0] = MongoRunner.runMongod(csrs0Opts);
     var csrsStatus;
     assert.soon(function () {
         csrsStatus = csrs[0].adminCommand({replSetGetStatus: 1});
+        if (csrsStatus.members[0].stateStr == "STARTUP" ||
+            csrsStatus.members[0].stateStr == "STARTUP2" ||
+            csrsStatus.members[0].stateStr == "RECOVERING") {
+            // Make sure first node is fully online or else mongoses still in SCCC mode might not
+            // find any node online to talk to.
+            return false;
+        }
+
         var i;
         for (i = 0; i < csrsStatus.members.length; ++i) {
             if (TestData.storageEngine != "wiredTiger" && TestData.storageEngine != "") {
@@ -195,9 +239,11 @@ var st;
     var sconfig = Object.extend({}, st.s0.fullOptions, /* deep */ true);
     delete sconfig.port;
     sconfig.configdb = csrsName + "/" + csrs[0].name;
-    assertCanSplit(startMongos(sconfig), "when mongos started with --configdb=" + sconfig.configdb);
+    assertCanSplit(MongoRunner.runMongos(sconfig),
+                   "when mongos started with --configdb=" + sconfig.configdb);
     sconfig.configdb = st.s0.fullOptions.configdb;
-    assertCanSplit(startMongos(sconfig), "when mongos started with --configdb=" + sconfig.configdb);
+    assertCanSplit(MongoRunner.runMongos(sconfig),
+                   "when mongos started with --configdb=" + sconfig.configdb);
     assertCanSplit(st.s0, "on mongos that drove the upgrade");
     assertCanSplit(st.s1, "on mongos that was previously unaware of the upgrade");
 }());

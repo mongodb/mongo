@@ -1,6 +1,9 @@
 // Test that the clock skew of the distributed lock disallows getting locks for moving and splitting.
+(function() {
 
-s = new ShardingTest( "moveDistLock", 3, 0, undefined, { sync : true } );
+var s = new ShardingTest({ name: "moveDistLock",
+                           shards: 3,
+                           other: { sync : true } });
 
 // Enable sharding on DB and collection before skewing the clocks
 result = s.getDB("admin").runCommand( { enablesharding : "test1" } );
@@ -13,7 +16,7 @@ s._configServers[1].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew :
 
 // We need to start another mongos after skewing the clock, since the first mongos will have already
 // tested the config servers (via the balancer) before we manually skewed them
-otherMongos = startMongos( { port : 30020, v : 2, configdb : s._configDB } );
+var otherMongos = MongoRunner.runMongos({v: 2, configdb: s._configDB});
 
 // Initialize DB data
 initDB = function(name) {
@@ -22,7 +25,7 @@ initDB = function(name) {
 	c.save( { a : 1 } );
 	c.save( { a : 2 } );
 	c.save( { a : 3 } );
-	assert( 3, c.count() );
+	assert.eq( 3, c.count() );
 
 	return s.getServer( name );
 }
@@ -66,3 +69,5 @@ printjson(result);
 assert.eq( result.ok, 1, "Move command should have succeeded again!" )
 
 s.stop();
+
+})();

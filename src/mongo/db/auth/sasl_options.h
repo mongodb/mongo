@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -47,7 +48,8 @@ struct SASLGlobalParams {
     std::string hostName;
     std::string serviceName;
     std::string authdPath;
-    int scramIterationCount;
+    std::atomic<int> scramIterationCount;  // NOLINT
+    std::atomic<int> authFailedDelay;      // NOLINT
 
     SASLGlobalParams();
 };

@@ -1,11 +1,10 @@
 # -*- mode: python -*-
 
 Import([
+    'debugBuild',
     'env',
     'serverJs',
-    'usev8',
     'usemozjs',
-    'v8suffix',
 ])
 
 env.Library(
@@ -21,6 +20,11 @@ env.Library(
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/md5',
     ],
+    LIBDEPS_TAGS=[
+        # Depends on mongo::createDirectClient, which is not uniquely defined
+        'incomplete'
+    ],
+
 )
 
 env.Library(
@@ -54,26 +58,7 @@ env.Library(
     ],
 )
 
-if usev8:
-    scriptingEnv = env.Clone()
-    scriptingEnv.InjectThirdPartyIncludePaths(libraries=['v8'])
-    scriptingEnv.Library(
-        target='scripting',
-        source=[
-            'engine_v8' + v8suffix + '.cpp',
-            'v8' + v8suffix + '_db.cpp',
-            'v8' + v8suffix + '_utils.cpp',
-            'v8' + v8suffix + '_profiler.cpp',
-        ],
-        LIBDEPS=[
-            'bson_template_evaluator',
-            'scripting_common',
-            '$BUILD_DIR/third_party/shim_v8',
-            '$BUILD_DIR/mongo/shell/mongojs',
-            '$BUILD_DIR/mongo/db/service_context',
-        ],
-    )
-elif usemozjs:
+if usemozjs:
     scriptingEnv = env.Clone()
     scriptingEnv.InjectThirdPartyIncludePaths(libraries=['mozjs'])
 
@@ -101,12 +86,20 @@ elif usemozjs:
         'STATIC_JS_API=1',
     ])
 
+    if debugBuild:
+        scriptingEnv.Prepend(CPPDEFINES=[
+            'DEBUG',
+            'JS_DEBUG',
+        ])
+
     scriptingEnv.JSHeader(
         target='mozjs/mongohelpers_js.cpp',
         source=[
             'mozjs/mongohelpers.js'
         ]
     )
+
+    env.Alias('generated-sources', 'mozjs/mongohelpers_js.cpp')
 
     scriptingEnv.Library(
         target='scripting',
@@ -128,6 +121,7 @@ elif usemozjs:
             'mozjs/global.cpp',
             'mozjs/idwrapper.cpp',
             'mozjs/implscope.cpp',
+            'mozjs/internedstring.cpp',
             'mozjs/jscustomallocator.cpp',
             'mozjs/jsstringwrapper.cpp',
             'mozjs/jsthread.cpp',
@@ -156,6 +150,11 @@ elif usemozjs:
             '$BUILD_DIR/third_party/shim_mozjs',
             '$BUILD_DIR/mongo/shell/mongojs',
             '$BUILD_DIR/mongo/db/service_context',
+        ],
+        LIBDEPS_TAGS=[
+            # Depends on haveLocalShardingInfo and createDirectClient, which are not
+            # uniquely defined.
+            'incomplete',
         ],
     )
 else:

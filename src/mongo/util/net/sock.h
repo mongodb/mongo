@@ -69,6 +69,9 @@ const int SOCK_FAMILY_UNKNOWN_ERROR = 13078;
 
 void disableNagle(int sock);
 
+// Generate a string representation for getaddrinfo return codes
+std::string getAddrInfoStrError(int code);
+
 #if defined(_WIN32)
 
 typedef short sa_family_t;

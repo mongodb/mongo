@@ -1,12 +1,14 @@
-// Check index rebuild is disabled with --noIndexBuildRetry when MongoDB is killed
+// Check index rebuild is disabled with --noIndexBuildRetry when MongoDB is killed.
+//
+// This test requires persistence beacuase it assumes data/indices will survive a restart.
+// @tags: [requires_persistence]
 (function() {
     'use strict';
     var baseName = 'index_retry';
     var dbpath = MongoRunner.dataPath + baseName;
-    var ports = allocatePorts(1);
+
     var conn = MongoRunner.runMongod({
         dbpath: dbpath,
-        port: ports[0],
         journal: ''});
 
     var test = conn.getDB("test");
@@ -64,7 +66,7 @@
     function abortDuringIndexBuild(options) {
         var createIdx = startParallelShell(
             'db.' + name + '.createIndex({ a: 1 }, { background: true });',
-            ports[0]);
+            conn.port);
 
         // Wait for the index build to start.
         var times = 0;
@@ -75,7 +77,7 @@
         );
 
         print("killing the mongod");
-        MongoRunner.stopMongod(ports[0], /* signal */ 9);
+        MongoRunner.stopMongod(conn.port, /* signal */ 9);
 
         var exitCode = createIdx({checkExitSuccess: false});
         assert.neq(0, exitCode, "expected shell to exit abnormally due to mongod being terminated");
@@ -85,7 +87,6 @@
 
     conn = MongoRunner.runMongod({
         dbpath: dbpath,
-        port: ports[0],
         journal: '',
         noIndexBuildRetry: '',
         restart: true});
@@ -101,6 +102,6 @@
 
     print("Index rebuilding disabled successfully");
 
-    MongoRunner.stopMongod(ports[0]);
+    MongoRunner.stopMongod(conn.port);
     print("SUCCESS!");
 }());

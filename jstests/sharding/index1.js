@@ -1,10 +1,7 @@
-/**
- * @tags : [ hashed ] 
- */
+// SERVER-2326 - make sure that sharding only works with unique indices
+(function() {
 
-// from server 2326 - make sure that sharding only works with unique indices
-
-s = new ShardingTest( "shard_index", 2, 0, 1 )
+var s = new ShardingTest({ name: "shard_index", shards: 2, mongos: 1 });
 
 // Regenerate fully because of SERVER-2782
 for ( var i = 0; i < 22; i++ ) {
@@ -390,3 +387,5 @@ for ( var i = 0; i < 22; i++ ) {
 }
 
 s.stop();
+
+})();

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 
@@ -38,7 +39,7 @@ class OperationContext;
 /**
  * Invoked when database profile is enabled.
  */
-void profile(OperationContext* txn, int op);
+void profile(OperationContext* txn, NetworkOp op);
 
 /**
  * Pre-creates the profile collection for the specified database.

@@ -51,6 +51,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -178,6 +179,12 @@ public:
         const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(txn);
         result.append("numIndexesBefore", numIndexesBefore);
 
+        auto client = txn->getClient();
+        ScopeGuard lastOpSetterGuard =
+            MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                         &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                         txn);
+
         MultiIndexBlock indexer(txn, collection);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
@@ -188,8 +195,6 @@ public:
         if (specs.size() == 0) {
             result.append("numIndexesAfter", numIndexesBefore);
             result.append("note", "all indexes already exist");
-            // No-ops need to reset lastOp in the client, for write concern.
-            repl::ReplClientInfo::forClient(txn->getClient()).setLastOpToSystemLastOpTime(txn);
             return true;
         }
 
@@ -203,9 +208,15 @@ public:
                 status = checkUniqueIndexConstraints(txn, ns.ns(), spec["key"].Obj());
 
                 if (!status.isOK()) {
-                    appendCommandStatus(result, status);
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
+            }
+            if (spec["v"].isNumber() && spec["v"].numberInt() == 0) {
+                return appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::CannotCreateIndex,
+                           str::stream() << "illegal index specification: " << spec << ". "
+                                         << "The option v:0 cannot be passed explicitly"));
             }
         }
 
@@ -286,6 +297,8 @@ public:
 
         result.append("numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn));
 
+        lastOpSetterGuard.Dismiss();
+
         return true;
     }
 
@@ -295,10 +308,11 @@ private:
                                               const BSONObj& newIdxKey) {
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
 
-        if (ShardingState::get(getGlobalServiceContext())->enabled()) {
+        ShardingState* const shardingState = ShardingState::get(txn);
+
+        if (shardingState->enabled()) {
             std::shared_ptr<CollectionMetadata> metadata(
-                ShardingState::get(getGlobalServiceContext())
-                    ->getCollectionMetadata(ns.toString()));
+                shardingState->getCollectionMetadata(ns.toString()));
             if (metadata) {
                 ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
                 if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {

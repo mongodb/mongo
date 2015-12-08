@@ -37,7 +37,7 @@
 
 #include "mongo/util/mongoutils/str.h"
 
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
 

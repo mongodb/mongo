@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+class ExtensionsCallback;
+
 struct ProjectionStageParams {
     enum ProjectionImplementation {
         // The default case.  Will handle every projection.
@@ -49,8 +51,8 @@ struct ProjectionStageParams {
         SIMPLE_DOC
     };
 
-    ProjectionStageParams(const MatchExpressionParser::WhereCallback& wc)
-        : projImpl(NO_FAST_PATH), fullExpression(NULL), whereCallback(&wc) {}
+    ProjectionStageParams(const ExtensionsCallback& wc)
+        : projImpl(NO_FAST_PATH), fullExpression(NULL), extensionsCallback(&wc) {}
 
     ProjectionImplementation projImpl;
 
@@ -66,8 +68,8 @@ struct ProjectionStageParams {
     // from.  Otherwise, this field is ignored.
     BSONObj coveredKeyObj;
 
-    // Used for creating context for the $where clause processing. Not owned.
-    const MatchExpressionParser::WhereCallback* whereCallback;
+    // Used for creating context for the match extensions processing. Not owned.
+    const ExtensionsCallback* extensionsCallback;
 };
 
 /**
@@ -91,7 +93,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    typedef unordered_set<StringData, StringData::Hasher> FieldSet;
+    using FieldSet = StringMap<bool>;  // Value is unused.
 
     /**
      * Given the projection spec for a simple inclusion projection,
@@ -131,7 +133,7 @@ private:
 
     // Data used for both SIMPLE_DOC and COVERED_ONE_INDEX paths.
     // Has the field names present in the simple projection.
-    unordered_set<StringData, StringData::Hasher> _includedFields;
+    FieldSet _includedFields;
 
     //
     // Used for the COVERED_ONE_INDEX path.

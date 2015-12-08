@@ -49,7 +49,7 @@ void ProgressMeter::reset(unsigned long long total, int secondsBetween, int chec
     _hits = 0;
     _lastTime = (int)time(0);
 
-    _active = 1;
+    _active = true;
 }
 
 

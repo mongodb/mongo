@@ -13,15 +13,15 @@ function clearQueryPlanCache() {
 function assertAllFound( matches ) {
 //    printjson( matches );
     found = new Array( numDocs );
-    for( i = 0; i < numDocs; ++i ) {
+    for( var i = 0; i < numDocs; ++i ) {
         found[ i ] = false;
     }
-    for( i in matches ) {
+    for( var i in matches ) {
         m = matches[ i ];
         found[ m._id ] = true;
     }
-    for( i = 0; i < numDocs; ++i ) {
-        assert( found[ i ], i );
+    for( var i = 0; i < numDocs; ++i ) {
+        assert( found[ i ], i.toString() );
     }
 }
 
@@ -66,7 +66,7 @@ function checkCursorWithBatchSize( query, sort, batchSize, expectedLeftInBatch )
     if ( expectedLeftInBatch > 110 ) {
         cursor = makeCursor( query, {}, sort, batchSize, true );
         lastNonAIndexResult = -1;
-        for( i = 0; i < expectedLeftInBatch; ++i ) {
+        for( var i = 0; i < expectedLeftInBatch; ++i ) {
             next = cursor.next();
             // Identify the query plan used by checking the fields of a returnKey query.
             if ( !friendlyEqual( [ 'a', '_id' ], Object.keySet( next ) ) ) {
@@ -80,7 +80,7 @@ function checkCursorWithBatchSize( query, sort, batchSize, expectedLeftInBatch )
 
 function queryWithPlanTypes( withDups ) {
     t.drop();
-    for( i = 1; i < numDocs; ++i ) {
+    for( var i = 1; i < numDocs; ++i ) {
         t.save( { _id:i, a:i, b:0 } );
     }
     if ( withDups ) {

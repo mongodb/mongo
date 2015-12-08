@@ -62,6 +62,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
@@ -82,9 +83,7 @@ using std::vector;
 namespace {
 
 // Used to obtain mutex that guards modifications to persistent authorization data
-const auto getAuthzDataMutex = ServiceContext::declareDecoration<stdx::timed_mutex>();
-
-const Seconds authzDataMutexAcquisitionTimeout{5};
+const auto getAuthzDataMutex = ServiceContext::declareDecoration<stdx::mutex>();
 
 BSONArray roleSetToBSONArray(const unordered_set<RoleName>& roles) {
     BSONArrayBuilder rolesArrayBuilder;
@@ -534,14 +533,15 @@ Status removePrivilegeDocuments(OperationContext* txn,
  */
 Status writeAuthSchemaVersionIfNeeded(OperationContext* txn,
                                       AuthorizationManager* authzManager,
-                                      int foundSchemaVersion) {
+                                      int foundSchemaVersion,
+                                      const BSONObj& writeConcern) {
     Status status = updateOneAuthzDocument(
         txn,
         AuthorizationManager::versionCollectionNamespace,
         AuthorizationManager::versionDocumentQuery,
         BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName << foundSchemaVersion)),
-        true,                                        // upsert
-        BSONObj());                                  // write concern
+        true,  // upsert
+        writeConcern);
     if (status == ErrorCodes::NoMatchingDocument) {  // SERVER-11492
         status = Status::OK();
     }
@@ -554,7 +554,9 @@ Status writeAuthSchemaVersionIfNeeded(OperationContext* txn,
  * for the MongoDB 2.6 and 3.0 MongoDB-CR/SCRAM mixed auth mode.
  * Returns an error otherwise.
  */
-Status requireAuthSchemaVersion26Final(OperationContext* txn, AuthorizationManager* authzManager) {
+Status requireAuthSchemaVersion26Final(OperationContext* txn,
+                                       AuthorizationManager* authzManager,
+                                       const BSONObj& writeConcern) {
     int foundSchemaVersion;
     Status status = authzManager->getAuthorizationVersion(txn, &foundSchemaVersion);
     if (!status.isOK()) {
@@ -569,7 +571,7 @@ Status requireAuthSchemaVersion26Final(OperationContext* txn, AuthorizationManag
                           << AuthorizationManager::schemaVersion26Final << " but found "
                           << foundSchemaVersion);
     }
-    return writeAuthSchemaVersionIfNeeded(txn, authzManager, foundSchemaVersion);
+    return writeAuthSchemaVersionIfNeeded(txn, authzManager, foundSchemaVersion, writeConcern);
 }
 
 /**
@@ -661,11 +663,12 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
         if (args.userName.getDB() == "$external" && getSSLManager() &&
-            getSSLManager()->getSSLConfiguration().serverSubjectName == args.userName.getUser()) {
+            getSSLManager()->getSSLConfiguration().isClusterMember(args.userName.getUser())) {
             return appendCommandStatus(result,
                                        Status(ErrorCodes::BadValue,
-                                              "Cannot create an x.509 user with the same "
-                                              "subjectname as the server"));
+                                              "Cannot create an x.509 user with a subjectname "
+                                              "that would be recognized as an internal "
+                                              "cluster member."));
         }
 #endif
 
@@ -711,14 +714,9 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -825,15 +823,10 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -897,32 +890,25 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
-        }
-
-
         UserName userName;
         BSONObj writeConcern;
-        status = auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName, &writeConcern);
+        Status status =
+            auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        int nMatched;
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
+        }
 
         audit::logDropUser(ClientBasic::getCurrent(), userName);
 
+        int nMatched;
         status = removePrivilegeDocuments(txn,
                                           BSON(AuthorizationManager::USER_NAME_FIELD_NAME
                                                << userName.getUser()
@@ -976,31 +962,24 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
-        }
-
         BSONObj writeConcern;
-        status =
+        Status status =
             auth::parseAndValidateDropAllUsersFromDatabaseCommand(cmdObj, dbname, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
-        int numRemoved;
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
+        }
 
         audit::logDropAllUsersFromDatabase(ClientBasic::getCurrent(), dbname);
 
+        int numRemoved;
         status = removePrivilegeDocuments(txn,
                                           BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname),
                                           writeConcern,
@@ -1045,25 +1024,20 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        std::string userNameString;
+        std::vector<RoleName> roles;
+        BSONObj writeConcern;
+        Status status = auth::parseRolePossessionManipulationCommands(
+            cmdObj, "grantRolesToUser", dbname, &userNameString, &roles, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        std::string userNameString;
-        std::vector<RoleName> roles;
-        BSONObj writeConcern;
-        status = auth::parseRolePossessionManipulationCommands(
-            cmdObj, "grantRolesToUser", dbname, &userNameString, &roles, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1125,25 +1099,20 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        std::string userNameString;
+        std::vector<RoleName> roles;
+        BSONObj writeConcern;
+        Status status = auth::parseRolePossessionManipulationCommands(
+            cmdObj, "revokeRolesFromUser", dbname, &userNameString, &roles, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        std::string userNameString;
-        std::vector<RoleName> roles;
-        BSONObj writeConcern;
-        status = auth::parseRolePossessionManipulationCommands(
-            cmdObj, "revokeRolesFromUser", dbname, &userNameString, &roles, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1241,6 +1210,9 @@ public:
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }
+
+                userDetails = _redactPrivilegesForBackwardsCompabilityIfNeeded(txn, userDetails);
+
                 if (!args.showCredentials) {
                     // getUserDescription always includes credentials, need to strip it out
                     BSONObjBuilder userWithoutCredentials(usersArrayBuilder.subobjStart());
@@ -1286,6 +1258,48 @@ public:
         return true;
     }
 
+private:
+    /**
+     * Gets the Protocol from 'txn' of the operation being run to determine if it was from
+     * OP_COMMAND or OP_QUERY.  If OP_COMMAND, returns the input user document unmodified.
+     * If OP_QUERY, assumes that means it is a 3.0 mongos talking to us, and returns a modified
+     * version of the input user doc, with all privileges containing the 'bypassDocumentValidation'
+     * modified to remove that action.  This is because when a 3.0 mongos parses the privileges from
+     * a user document at authentication time, it skips any privileges containing any actions it
+     * doesn't know about, and 'bypassDocumentValidation' was added for 3.2 so a 3.0 mongos will not
+     * recognize it.
+     * NOTE: This means that if a user connects directly to mongod with a driver that doesn't use
+     * OP_COMMAND and runs usersInfo with 'showPrivileges':true, they won't see any privileges
+     * containing 'bypassDocumentValidation', even if the user in question actually does possess
+     * that action.
+     * See SERVER-21486 and SERVER-21659 for more details.
+     * TODO(SERVER-21561): Remove this after 3.2
+     */
+    BSONObj _redactPrivilegesForBackwardsCompabilityIfNeeded(OperationContext* txn,
+                                                             BSONObj userDoc) {
+        if (rpc::getOperationProtocol(txn) != rpc::Protocol::kOpQuery) {
+            return userDoc;
+        }
+
+        namespace mmb = mutablebson;
+        bool changed = false;
+        mmb::Document redacted(userDoc, mmb::Document::kInPlaceDisabled);
+        mmb::Element privilegesArray =
+            mmb::findFirstChildNamed(redacted.root(), "inheritedPrivileges");
+        for (auto privilegeElement = privilegesArray.leftChild(); privilegeElement.ok();
+             privilegeElement = privilegeElement.rightSibling()) {
+            auto actionsArray = mmb::findFirstChildNamed(privilegeElement, "actions");
+            for (auto actionElement = actionsArray.leftChild(); actionElement.ok();) {
+                auto nextActionElement = actionElement.rightSibling();
+                if (actionElement.getValueString() == "bypassDocumentValidation") {
+                    invariantOK(actionElement.remove());
+                    changed = true;
+                }
+                actionElement = nextActionElement;
+            }
+        }
+        return changed ? redacted.getObject().getOwned() : userDoc;
+    }
 } cmdUsersInfo;
 
 class CmdCreateRole : public Command {
@@ -1375,15 +1389,10 @@ public:
         roleObjBuilder.append("roles", rolesVectorToBSONArray(args.roles));
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1464,15 +1473,10 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1539,25 +1543,20 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        RoleName roleName;
+        PrivilegeVector privilegesToAdd;
+        BSONObj writeConcern;
+        Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
+            cmdObj, "grantPrivilegesToRole", dbname, &roleName, &privilegesToAdd, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        RoleName roleName;
-        PrivilegeVector privilegesToAdd;
-        BSONObj writeConcern;
-        status = auth::parseAndValidateRolePrivilegeManipulationCommands(
-            cmdObj, "grantPrivilegesToRole", dbname, &roleName, &privilegesToAdd, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1652,29 +1651,25 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        RoleName roleName;
+        PrivilegeVector privilegesToRemove;
+        BSONObj writeConcern;
+        Status status =
+            auth::parseAndValidateRolePrivilegeManipulationCommands(cmdObj,
+                                                                    "revokePrivilegesFromRole",
+                                                                    dbname,
+                                                                    &roleName,
+                                                                    &privilegesToRemove,
+                                                                    &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        RoleName roleName;
-        PrivilegeVector privilegesToRemove;
-        BSONObj writeConcern;
-        status = auth::parseAndValidateRolePrivilegeManipulationCommands(cmdObj,
-                                                                         "revokePrivilegesFromRole",
-                                                                         dbname,
-                                                                         &roleName,
-                                                                         &privilegesToRemove,
-                                                                         &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1791,15 +1786,10 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1872,25 +1862,20 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        std::string roleNameString;
+        std::vector<RoleName> rolesToRemove;
+        BSONObj writeConcern;
+        Status status = auth::parseRolePossessionManipulationCommands(
+            cmdObj, "revokeRolesFromRole", dbname, &roleNameString, &rolesToRemove, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        std::string roleNameString;
-        std::vector<RoleName> rolesToRemove;
-        BSONObj writeConcern;
-        status = auth::parseRolePossessionManipulationCommands(
-            cmdObj, "revokeRolesFromRole", dbname, &roleNameString, &rolesToRemove, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1969,23 +1954,18 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        RoleName roleName;
+        BSONObj writeConcern;
+        Status status = auth::parseDropRoleCommand(cmdObj, dbname, &roleName, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        RoleName roleName;
-        BSONObj writeConcern;
-        status = auth::parseDropRoleCommand(cmdObj, dbname, &roleName, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2136,15 +2116,10 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2766,15 +2741,10 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2800,4 +2770,226 @@ public:
 
 } cmdMergeAuthzCollections;
 
+/**
+ * Logs that the auth schema upgrade failed because of "status" and returns "status".
+ */
+Status logUpgradeFailed(const Status& status) {
+    log() << "Auth schema upgrade failed with " << status;
+    return status;
+}
+
+/**
+ * Updates a single user document from MONGODB-CR to SCRAM credentials.
+ *
+ * Throws a DBException on errors.
+ */
+void updateUserCredentials(OperationContext* txn,
+                           const StringData& sourceDB,
+                           const BSONObj& userDoc,
+                           const BSONObj& writeConcern) {
+    // Skip users in $external, SERVER-18475
+    if (userDoc["db"].String() == "$external") {
+        return;
+    }
+
+    BSONElement credentialsElement = userDoc["credentials"];
+    uassert(18806,
+            mongoutils::str::stream()
+                << "While preparing to upgrade user doc from "
+                   "2.6/3.0 user data schema to the 3.0+ SCRAM only schema, found a user doc "
+                   "with missing or incorrectly formatted credentials: " << userDoc.toString(),
+            credentialsElement.type() == Object);
+
+    BSONObj credentialsObj = credentialsElement.Obj();
+    BSONElement mongoCRElement = credentialsObj["MONGODB-CR"];
+    BSONElement scramElement = credentialsObj["SCRAM-SHA-1"];
+
+    // Ignore any user documents that already have SCRAM credentials. This should only
+    // occur if a previous authSchemaUpgrade was interrupted halfway.
+    if (!scramElement.eoo()) {
+        return;
+    }
+
+    uassert(18744,
+            mongoutils::str::stream()
+                << "While preparing to upgrade user doc from "
+                   "2.6/3.0 user data schema to the 3.0+ SCRAM only schema, found a user doc "
+                   "missing MONGODB-CR credentials :" << userDoc.toString(),
+            !mongoCRElement.eoo());
+
+    std::string hashedPassword = mongoCRElement.String();
+
+    BSONObj query = BSON("_id" << userDoc["_id"].String());
+    BSONObjBuilder updateBuilder;
+    {
+        BSONObjBuilder toSetBuilder(updateBuilder.subobjStart("$set"));
+        toSetBuilder << "credentials"
+                     << BSON("SCRAM-SHA-1" << scram::generateCredentials(
+                                 hashedPassword, saslGlobalParams.scramIterationCount));
+    }
+
+    uassertStatusOK(updateOneAuthzDocument(txn,
+                                           NamespaceString("admin", "system.users"),
+                                           query,
+                                           updateBuilder.obj(),
+                                           true,
+                                           writeConcern));
+}
+
+/** Loop through all the user documents in the admin.system.users collection.
+ *  For each user document:
+ *   1. Compute SCRAM credentials based on the MONGODB-CR hash
+ *   2. Remove the MONGODB-CR hash
+ *   3. Add SCRAM credentials to the user document credentials section
+ */
+Status updateCredentials(OperationContext* txn, const BSONObj& writeConcern) {
+    // Loop through and update the user documents in admin.system.users.
+    Status status = queryAuthzDocument(
+        txn,
+        NamespaceString("admin", "system.users"),
+        BSONObj(),
+        BSONObj(),
+        stdx::bind(updateUserCredentials, txn, "admin", stdx::placeholders::_1, writeConcern));
+    if (!status.isOK())
+        return logUpgradeFailed(status);
+
+    // Update the schema version document.
+    status =
+        updateOneAuthzDocument(txn,
+                               AuthorizationManager::versionCollectionNamespace,
+                               AuthorizationManager::versionDocumentQuery,
+                               BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName
+                                                   << AuthorizationManager::schemaVersion28SCRAM)),
+                               true,
+                               writeConcern);
+    if (!status.isOK())
+        return logUpgradeFailed(status);
+
+    return Status::OK();
+}
+
+/**
+ * Performs one step in the process of upgrading the stored authorization data to the
+ * newest schema.
+ *
+ * On success, returns Status::OK(), and *isDone will indicate whether there are more
+ * steps to perform.
+ *
+ * If the authorization data is already fully upgraded, returns Status::OK and sets *isDone
+ * to true, so this is safe to call on a fully upgraded system.
+ *
+ * On failure, returns a status other than Status::OK().  In this case, is is typically safe
+ * to try again.
+ */
+Status upgradeAuthSchemaStep(OperationContext* txn,
+                             AuthorizationManager* authzManager,
+                             const BSONObj& writeConcern,
+                             bool* isDone) {
+    int authzVersion;
+    Status status = authzManager->getAuthorizationVersion(txn, &authzVersion);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    switch (authzVersion) {
+        case AuthorizationManager::schemaVersion26Final:
+        case AuthorizationManager::schemaVersion28SCRAM: {
+            Status status = updateCredentials(txn, writeConcern);
+            if (status.isOK())
+                *isDone = true;
+            return status;
+        }
+        default:
+            return Status(ErrorCodes::AuthSchemaIncompatible,
+                          mongoutils::str::stream()
+                              << "Do not know how to upgrade auth schema from version "
+                              << authzVersion);
+    }
+}
+
+/**
+ * Performs up to maxSteps steps in the process of upgrading the stored authorization data
+ * to the newest schema.  Behaves as if by repeatedly calling upgradeSchemaStep up to
+ * maxSteps times until either it completes the upgrade or returns a non-OK status.
+ *
+ * Invalidates the user cache before the first step and after each attempted step.
+ *
+ * Returns Status::OK() to indicate that the upgrade process has completed successfully.
+ * Returns ErrorCodes::OperationIncomplete to indicate that progress was made, but that more
+ * steps must be taken to complete the process.  Other returns indicate a failure to make
+ * progress performing the upgrade, and the specific code and message in the returned status
+ * may provide additional information.
+ */
+Status upgradeAuthSchema(OperationContext* txn,
+                         AuthorizationManager* authzManager,
+                         int maxSteps,
+                         const BSONObj& writeConcern) {
+    if (maxSteps < 1) {
+        return Status(ErrorCodes::BadValue,
+                      "Minimum value for maxSteps parameter to upgradeAuthSchema is 1");
+    }
+    authzManager->invalidateUserCache();
+    for (int i = 0; i < maxSteps; ++i) {
+        bool isDone;
+        Status status = upgradeAuthSchemaStep(txn, authzManager, writeConcern, &isDone);
+        authzManager->invalidateUserCache();
+        if (!status.isOK() || isDone) {
+            return status;
+        }
+    }
+    return Status(ErrorCodes::OperationIncomplete,
+                  mongoutils::str::stream() << "Auth schema upgrade incomplete after " << maxSteps
+                                            << " successful steps.");
+}
+
+class CmdAuthSchemaUpgrade : public Command {
+public:
+    CmdAuthSchemaUpgrade() : Command("authSchemaUpgrade") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return true;
+    }
+
+    virtual void help(stringstream& ss) const {
+        ss << "Upgrades the auth data storage schema";
+    }
+
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        return auth::checkAuthForAuthSchemaUpgradeCommand(client);
+    }
+
+    virtual bool run(OperationContext* txn,
+                     const string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
+        auth::AuthSchemaUpgradeArgs parsedArgs;
+        Status status = auth::parseAuthSchemaUpgradeCommand(cmdObj, dbname, &parsedArgs);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
+        }
+
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        status = upgradeAuthSchema(txn, authzManager, parsedArgs.maxSteps, parsedArgs.writeConcern);
+        if (status.isOK())
+            result.append("done", true);
+        return appendCommandStatus(result, status);
+    }
+
+} cmdAuthSchemaUpgrade;
 }  // namespace mongo

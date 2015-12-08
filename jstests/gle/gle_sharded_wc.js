@@ -1,7 +1,7 @@
-//
 // Tests of sharded GLE enforcing write concern against operations in a cluster
 // Basic sharded GLE operation is tested elsewhere.
-//
+
+(function() {
 
 // Options for a cluster with two replica set shards, the first with two nodes the second with one
 // This lets us try a number of GLE scenarios
@@ -128,3 +128,5 @@ assert.eq(coll.count({ _id : 1 }), 1);
 jsTest.log( "DONE!" );
 
 st.stop();
+
+})();

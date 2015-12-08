@@ -54,13 +54,13 @@ TEST(BatchedCommandResponse, Basic) {
                                    << WCErrorDetail::errInfo(BSON("a" << 1))
                                    << WCErrorDetail::errMessage("norepl")));
 
-    BSONObj origResponseObj = BSON(
-        BatchedCommandResponse::ok(false)
-        << BatchedCommandResponse::errCode(-1)
-        << BatchedCommandResponse::errMessage("this batch didn't work")
-        << BatchedCommandResponse::n(0) << BatchedCommandResponse::lastOp(mongo::Timestamp(1ULL))
-        << BatchedCommandResponse::writeErrors() << writeErrorsArray
-        << BatchedCommandResponse::writeConcernError() << writeConcernError);
+    BSONObj origResponseObj =
+        BSON(BatchedCommandResponse::ok(false)
+             << BatchedCommandResponse::errCode(-1)
+             << BatchedCommandResponse::errMessage("this batch didn't work")
+             << BatchedCommandResponse::n(0) << "opTime" << mongo::Timestamp(1ULL)
+             << BatchedCommandResponse::writeErrors() << writeErrorsArray
+             << BatchedCommandResponse::writeConcernError() << writeConcernError);
 
     string errMsg;
     BatchedCommandResponse response;
@@ -68,7 +68,8 @@ TEST(BatchedCommandResponse, Basic) {
     ASSERT_TRUE(ok);
 
     BSONObj genResponseObj = response.toBSON();
-    ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj));
+    ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj)) << "parsed: " << genResponseObj
+                                                                << " original: " << origResponseObj;
 }
 
 }  // namespace

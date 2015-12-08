@@ -297,10 +297,10 @@ public:
     bool hasRandMetaField() const {
         return _metaFields.test(MetaType::RAND_VAL);
     }
-    int64_t getRandMetaField() const {
+    double getRandMetaField() const {
         return _randVal;
     }
-    void setRandMetaField(int64_t val) {
+    void setRandMetaField(double val) {
         _metaFields.set(MetaType::RAND_VAL);
         _randVal = val;
     }
@@ -385,7 +385,7 @@ private:
 
     std::bitset<MetaType::NUM_FIELDS> _metaFields;
     double _textScore;
-    int64_t _randVal;
+    double _randVal;
     // When adding a field, make sure to update clone() method
 };
 }

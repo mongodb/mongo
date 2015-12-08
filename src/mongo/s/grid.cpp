@@ -67,8 +67,8 @@ StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(OperationContext* t
         return status;
     }
 
-    if (status == ErrorCodes::DatabaseNotFound) {
-        auto statusCreateDb = catalogManager(txn)->createDatabase(dbName);
+    if (status == ErrorCodes::NamespaceNotFound) {
+        auto statusCreateDb = catalogManager(txn)->createDatabase(txn, dbName);
         if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
             return catalogCache()->getDatabase(txn, dbName);
         }
@@ -106,8 +106,13 @@ bool Grid::shouldBalance(const SettingsType& balancerSettings) const {
 
 bool Grid::getConfigShouldBalance(OperationContext* txn) const {
     auto balSettingsResult =
-        grid.catalogManager(txn)->getGlobalSettings(SettingsType::BalancerDocKey);
+        grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
     if (!balSettingsResult.isOK()) {
+        if (balSettingsResult == ErrorCodes::NoMatchingDocument) {
+            // Settings document for balancer does not exist, default to balancing allowed.
+            return true;
+        }
+
         warning() << balSettingsResult.getStatus();
         return false;
     }
@@ -131,12 +136,12 @@ void Grid::clearForUnitTests() {
     _cursorManager.reset();
 }
 
-ForwardingCatalogManager* Grid::catalogManager() {
+ForwardingCatalogManager* Grid::forwardingCatalogManager() {
     return _catalogManager.get();
 }
 
-ForwardingCatalogManager* Grid::catalogManager(OperationContext* txn) {
-    return _catalogManager.get();
+CatalogManager* Grid::catalogManager(OperationContext* txn) {
+    return _catalogManager->getCatalogManagerToUse(txn);
 }
 
 }  // namespace mongo

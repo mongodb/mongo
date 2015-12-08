@@ -327,6 +327,30 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "aggregate_indexStats",
+            command: {aggregate: "foo", pipeline: [{$indexStats: {}}]},
+            setup: function (db) {
+                db.createCollection("foo");
+            },
+            teardown: function (db) {
+                db.foo.drop();
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {
+                        clusterMonitor: 1,
+                        clusterAdmin: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        {resource: {anyResource: true}, actions: ["indexStats"]}
+                    ]
+                }
+            ]
+        },
+        {
             testname: "appendOplogNote",
             command: {appendOplogNote: 1, data: {a: 1}},
             skipSharded: true,
@@ -344,6 +368,25 @@ var authCommandsLib = {
                         { resource: {cluster: true}, actions: ["appendOplogNote"] }
                     ],
                     expectFail: true, // because no replication enabled
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
+            testname: "authSchemaUpgrade",
+            command: {authSchemaUpgrade: 1},
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {
+                        userAdminAnyDatabase: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["authSchemaUpgrade"] }
+                    ]
                 },
                 { runOnDb: firstDbName, roles: {} },
                 { runOnDb: secondDbName, roles: {} }
@@ -1116,6 +1159,21 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "findWithTerm",
+            command: {find: "foo", limit: -1, term: NumberLong(1)},
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {__system: 1},
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] },
+                        { resource: {cluster: true}, actions: ["internal"] }
+                    ],
+                    expectFail: true // because of invalid limit
+                },
+            ]
+        },
+        {
             testname: "findAndModify",
             command: {findAndModify: "x", query: {_id: "abc"}, update: {$inc: {n: 1}}},
             setup: function (db) {
@@ -1307,6 +1365,21 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "getMoreWithTerm",
+            command: {getMore: NumberLong("1"), collection: "foo", term: NumberLong(1)},
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {__system: 1},
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] },
+                        { resource: {cluster: true}, actions: ["internal"] }
+                    ],
+                    expectFail: true
+                }
+            ]
+        },
+        {
             testname: "getnonce",
             command: {getnonce: 1},
             testcases: [
@@ -1460,6 +1533,7 @@ var authCommandsLib = {
                         dbOwner: 1,
                         hostManager: 1,
                         clusterAdmin: 1,
+                        backup: 1,
                         root: 1,
                         __system: 1
                     },
@@ -1475,6 +1549,7 @@ var authCommandsLib = {
                         readWriteAnyDatabase: 1,
                         hostManager: 1,
                         clusterAdmin: 1,
+                        backup: 1,
                         root: 1,
                         __system: 1
                     },
@@ -1589,7 +1664,7 @@ var authCommandsLib = {
                         }
                     ]
                 },
-                // test legacy (pre 3.0) way of authorizing listCollections
+                // Test legacy (pre 3.0) way of authorizing listCollections.
                 {
                     runOnDb: firstDbName,
                     privileges: [
@@ -1628,6 +1703,16 @@ var authCommandsLib = {
                         {
                             resource: {db: firstDbName, collection: ""},
                             actions: ["listIndexes"]
+                        }
+                    ]
+                },
+                // Test legacy (pre 3.0) way of authorizing listIndexes.
+                {
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: "system.indexes"},
+                            actions: ["find"]
                         }
                     ]
                 }
@@ -1732,7 +1817,7 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "mergeChunks",
+            testname: "s_mergeChunks",
             command: {mergeChunks: "test.x", bounds: [{i : 0}, {i : 5}]},
             skipStandalone: true,
             testcases: [
@@ -1749,14 +1834,49 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "moveChunk",
+            testname: "d_mergeChunks",
+            command: {mergeChunks: "test.x", bounds: [{i : 0}, {i : 5}]},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: { __system: 1 },
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["internal"] }
+                    ],
+                    expectFail: true
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
+            testname: "s_moveChunk",
             command: {moveChunk: "test.x"},
+            skipStandalone: true,
             testcases: [
                 {
                     runOnDb: adminDbName,
                     roles: roles_clusterManager,
                     privileges: [
                         { resource: {db: "test", collection: "x"}, actions: ["moveChunk"] }
+                    ],
+                    expectFail: true
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
+            testname: "d_moveChunk",
+            command: {moveChunk: "test.x"},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: { __system: 1 },
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },
@@ -2470,9 +2590,9 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: adminDbName,
-                    roles: roles_clusterManager,
+                    roles: { __system: 1 },
                     privileges: [
-                        { resource: {db: "test", collection: "x"}, actions: ["splitChunk"] }
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },

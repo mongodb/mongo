@@ -50,7 +50,7 @@ __curbulk_insert_var(WT_CURSOR *cursor)
 	WT_CURSOR_BULK *cbulk;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int duplicate;
+	bool duplicate;
 
 	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
@@ -71,13 +71,13 @@ __curbulk_insert_var(WT_CURSOR *cursor)
 	 * Instead of a "first time" variable, I'm using the RLE count, because
 	 * it is only zero before the first row is inserted.
 	 */
-	duplicate = 0;
+	duplicate = false;
 	if (cbulk->rle != 0) {
 		if (cbulk->last.size == cursor->value.size &&
 		    memcmp(cbulk->last.data, cursor->value.data,
 		    cursor->value.size) == 0) {
 			++cbulk->rle;
-			duplicate = 1;
+			duplicate = true;
 		} else
 			WT_ERR(__wt_bulk_insert_var(session, cbulk));
 	}
@@ -225,7 +225,7 @@ err:	API_END_RET(session, ret);
  */
 int
 __wt_curbulk_init(WT_SESSION_IMPL *session,
-    WT_CURSOR_BULK *cbulk, int bitmap, int skip_sort_check)
+    WT_CURSOR_BULK *cbulk, bool bitmap, bool skip_sort_check)
 {
 	WT_CURSOR *c;
 	WT_CURSOR_BTREE *cbt;

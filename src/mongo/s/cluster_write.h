@@ -28,14 +28,13 @@
 
 #pragma once
 
-
 #include "mongo/s/write_ops/batch_write_exec.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 
 class ClusterWriterStats;
+class BatchedCommandRequest;
+class BatchedCommandResponse;
 class BatchWriteExecStats;
 class OperationContext;
 
@@ -73,13 +72,7 @@ private:
 
 /**
  * Used only for writes to the config server, config and admin databases.
- *
- * Note: response can be NULL if you don't care about the write statistics.
  */
-Status clusterCreateIndex(OperationContext* txn,
-                          const std::string& ns,
-                          BSONObj keys,
-                          bool unique,
-                          BatchedCommandResponse* response);
+Status clusterCreateIndex(OperationContext* txn, const std::string& ns, BSONObj keys, bool unique);
 
 }  // namespace mongo

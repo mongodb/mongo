@@ -13,10 +13,17 @@ var SEC_TAGS = [
 var NODES = SEC_TAGS.length + 1;
 
 var doTest = function(useDollarQuerySyntax) {
-    var st = new ShardingTest({ shards: { rs0: { nodes: NODES, oplogSize: 10, verbose: 2,
-                    useHostName: true }}});
+    var st = new ShardingTest({ shards: {
+                                    rs0: { nodes: NODES, oplogSize: 10, useHostName: true }
+                                }});
     var replTest = st.rs0;
     var primaryNode = replTest.getMaster();
+
+    // The $-prefixed query syntax is only legal for compatibility mode reads, not for the
+    // find/getMore commands.
+    if (useDollarQuerySyntax && st.s.getDB("test").getMongo().useReadCommands()) {
+        return;
+    }
 
     var setupConf = function(){
         var replConf = primaryNode.getDB( 'local' ).system.replset.findOne();
@@ -93,7 +100,6 @@ var doTest = function(useDollarQuerySyntax) {
         return false;
     });
 
-
     var getExplain = function(readPrefMode, readPrefTags) {
         if (useDollarQuerySyntax) {
             var readPrefObj = {
@@ -113,16 +119,8 @@ var doTest = function(useDollarQuerySyntax) {
     };
 
     var getExplainServer = function(explain) {
-        var serverInfo;
-
-        if (useDollarQuerySyntax) {
-            serverInfo = explain.serverInfo;
-        }
-        else {
-            assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
-            serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
-        }
-
+        assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
+        var serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
         return serverInfo.host + ":" + serverInfo.port.toString();
     };
 

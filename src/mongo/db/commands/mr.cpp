@@ -49,18 +49,22 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"
@@ -567,7 +571,7 @@ long long State::postProcessCollection(OperationContext* txn, CurOp* op, Progres
  *
  * TODO: make count work with versioning
  */
-unsigned long long _safeCount(Client* client,
+unsigned long long _safeCount(OperationContext* txn,
                               // Can't be const b/c count isn't
                               /* const */ DBDirectClient& db,
                               const string& ns,
@@ -575,7 +579,7 @@ unsigned long long _safeCount(Client* client,
                               int options = 0,
                               int limit = 0,
                               int skip = 0) {
-    ShardForceVersionOkModeBlock ignoreVersion(client);  // ignore versioning here
+    OperationShardVersion::IgnoreVersioningBlock ignoreVersion(txn, NamespaceString(ns));
     return db.count(ns, query, options, limit, skip);
 }
 
@@ -586,13 +590,11 @@ unsigned long long _safeCount(Client* client,
 long long State::postProcessCollectionNonAtomic(OperationContext* txn,
                                                 CurOp* op,
                                                 ProgressMeterHolder& pm) {
-    auto client = txn->getClient();
-
     if (_config.outputOptions.finalNamespace == _config.tempNamespace)
-        return _safeCount(client, _db, _config.outputOptions.finalNamespace);
+        return _safeCount(txn, _db, _config.outputOptions.finalNamespace);
 
     if (_config.outputOptions.outType == Config::REPLACE ||
-        _safeCount(client, _db, _config.outputOptions.finalNamespace) == 0) {
+        _safeCount(txn, _db, _config.outputOptions.finalNamespace) == 0) {
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lock(txn->lockState());  // TODO(erh): why global???
         // replace: just rename from temp to final collection name, dropping previous collection
@@ -611,7 +613,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
     } else if (_config.outputOptions.outType == Config::MERGE) {
         // merge: upsert new docs into old collection
         {
-            const auto count = _safeCount(client, _db, _config.tempNamespace, BSONObj());
+            const auto count = _safeCount(txn, _db, _config.tempNamespace, BSONObj());
             stdx::lock_guard<Client> lk(*txn->getClient());
             op->setMessage_inlock(
                 "m/r: merge post processing", "M/R Merge Post Processing Progress", count);
@@ -633,7 +635,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
         BSONList values;
 
         {
-            const auto count = _safeCount(client, _db, _config.tempNamespace, BSONObj());
+            const auto count = _safeCount(txn, _db, _config.tempNamespace, BSONObj());
             stdx::lock_guard<Client> lk(*txn->getClient());
             op->setMessage_inlock(
                 "m/r: reduce post processing", "M/R Reduce Post Processing Progress", count);
@@ -669,7 +671,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
         pm.finished();
     }
 
-    return _safeCount(txn->getClient(), _db, _config.outputOptions.finalNamespace);
+    return _safeCount(txn, _db, _config.outputOptions.finalNamespace);
 }
 
 /**
@@ -694,7 +696,7 @@ void State::insert(const string& ns, const BSONObj& o) {
         b.appendElements(o);
         BSONObj bo = b.obj();
 
-        uassertStatusOK(coll->insertDocument(_txn, bo, true).getStatus());
+        uassertStatusOK(coll->insertDocument(_txn, bo, true));
         wuow.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R insert", ns);
@@ -713,7 +715,7 @@ void State::_insertToInc(BSONObj& o) {
         bool shouldReplicateWrites = _txn->writesAreReplicated();
         _txn->setReplicatedWrites(false);
         ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, _txn, shouldReplicateWrites);
-        uassertStatusOK(coll->insertDocument(_txn, o, true, false).getStatus());
+        uassertStatusOK(coll->insertDocument(_txn, o, true, false));
         wuow.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R insertToInc", _config.incLong);
@@ -730,12 +732,8 @@ bool State::sourceExists() {
 }
 
 long long State::incomingDocuments() {
-    return _safeCount(_txn->getClient(),
-                      _db,
-                      _config.ns,
-                      _config.filter,
-                      QueryOption_SlaveOk,
-                      (unsigned)_config.limit);
+    return _safeCount(
+        _txn, _db, _config.ns, _config.filter, QueryOption_SlaveOk, (unsigned)_config.limit);
 }
 
 State::~State() {
@@ -766,8 +764,10 @@ void State::init() {
     // setup js
     const string userToken =
         AuthorizationSession::get(ClientBasic::getCurrent())->getAuthenticatedUserNamesToken();
-    _scope.reset(globalScriptEngine->getPooledScope(_txn, _config.dbname, "mapreduce" + userToken)
-                     .release());
+    _scope.reset(globalScriptEngine->newScopeForCurrentThread());
+    _scope->registerOperation(_txn);
+    _scope->setLocalDB(_config.dbname);
+    _scope->loadStored(_txn, true);
 
     if (!_config.scopeSetup.isEmpty())
         _scope->init(&_config.scopeSetup);
@@ -1018,10 +1018,10 @@ void State::finalReduce(CurOp* op, ProgressMeterHolder& pm) {
     }
 
     const NamespaceString nss(_config.incLong);
-    const WhereCallbackReal whereCallback(_txn, nss.db());
+    const ExtensionsCallbackReal extensionsCallback(_txn, &nss);
 
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(nss, BSONObj(), sortKey, BSONObj(), whereCallback);
+        CanonicalQuery::canonicalize(nss, BSONObj(), sortKey, BSONObj(), extensionsCallback);
     verify(statusWithCQ.isOK());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -1252,8 +1252,8 @@ public:
         return true;
     }
 
-    bool supportsReadConcern() const final {
-        return true;
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
     }
 
     virtual void help(stringstream& help) const {
@@ -1314,10 +1314,8 @@ public:
 
             // Get metadata before we check our version, to make sure it doesn't increment
             // in the meantime.  Need to do this in the same lock scope as the block.
-            if (ShardingState::get(getGlobalServiceContext())
-                    ->needCollectionMetadata(client, config.ns)) {
-                collMetadata =
-                    ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(config.ns);
+            if (ShardingState::get(txn)->needCollectionMetadata(txn, config.ns)) {
+                collMetadata = ShardingState::get(txn)->getCollectionMetadata(config.ns);
             }
         }
 
@@ -1379,10 +1377,10 @@ public:
                 unique_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_IS));
                 unique_ptr<AutoGetDb> scopedAutoDb(new AutoGetDb(txn, nss.db(), MODE_S));
 
-                const WhereCallbackReal whereCallback(txn, nss.db());
+                const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
                 auto statusWithCQ = CanonicalQuery::canonicalize(
-                    nss, config.filter, config.sort, BSONObj(), whereCallback);
+                    nss, config.filter, config.sort, BSONObj(), extensionsCallback);
                 if (!statusWithCQ.isOK()) {
                     uasserted(17238, "Can't canonicalize query " + config.filter.toString());
                     return 0;
@@ -1573,6 +1571,7 @@ public:
             maybeDisableValidation.emplace(txn);
 
         ShardedConnectionInfo::addHook();
+
         // legacy name
         string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
         verify(shardedOutputCollection.size() > 0);
@@ -1607,7 +1606,15 @@ public:
             BSONObjIterator i(shardCounts);
             while (i.more()) {
                 BSONElement e = i.next();
-                servers.insert(e.fieldName());
+                std::string server = e.fieldName();
+                servers.insert(server);
+
+                if (!grid.shardRegistry()->getShard(txn, server)) {
+                    return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::ShardNotFound,
+                               str::stream() << "Shard not found for server: " << server));
+                }
             }
         }
 
@@ -1640,7 +1647,7 @@ public:
 
             // Fetch result from other shards 1 chunk at a time. It would be better to do
             // just one big $or query, but then the sorting would not be efficient.
-            const string shardName = ShardingState::get(getGlobalServiceContext())->getShardName();
+            const string shardName = ShardingState::get(txn)->getShardName();
             const ChunkMap& chunkMap = cm->getChunkMap();
 
             for (ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it) {

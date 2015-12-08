@@ -530,13 +530,14 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
-                _collection->updateDocumentWithDamages(
+                StatusWith<RecordData> newRecStatus = _collection->updateDocumentWithDamages(
                     getOpCtx(),
                     loc,
                     Snapshotted<RecordData>(oldObj.snapshotId(), oldRec),
                     source,
                     _damages,
                     args);
+                newObj = uassertStatusOK(std::move(newRecStatus)).releaseToBson();
             }
 
             _specificStats.fastmod = true;
@@ -811,8 +812,18 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
         ScopeGuard memberFreer = MakeGuard(&WorkingSet::free, _ws, id);
 
         if (!member->hasLoc()) {
-            // We expect to be here because of an invalidation causing a force-fetch, and
-            // doc-locking storage engines do not issue invalidations.
+            // We expect to be here because of an invalidation causing a force-fetch.
+
+            // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so
+            // will not produce any more results even if there is another matching document.
+            // Throw a WCE here so that these operations get another chance to find a matching
+            // document. The findAndModify command should automatically retry if it gets a WCE. The
+            // findAndModify command should automatically retry if it gets a WCE.
+            // TODO: this is not necessary if there was no sort specified.
+            if (_params.request->shouldReturnAnyDocs()) {
+                throw WriteConflictException();
+            }
+
             ++_specificStats.nInvalidateSkips;
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
@@ -833,7 +844,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
         }
 
         try {
-            std::unique_ptr<RecordCursor> cursor;
+            std::unique_ptr<SeekableRecordCursor> cursor;
             if (getOpCtx()->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
                 cursor = _collection->getCursor(getOpCtx());
                 // our snapshot has changed, refetch
@@ -852,14 +863,18 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 }
             }
 
+            // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState()
+            // is allowed to free the memory.
+            member->makeObjOwnedIfNeeded();
+
             // Save state before making changes
             try {
-                child()->saveState();
                 if (supportsDocLocking()) {
-                    // Doc-locking engines require this after saveState() since they don't use
+                    // Doc-locking engines require this before saveState() since they don't use
                     // invalidations.
                     WorkingSetCommon::prepareForSnapshotChange(_ws);
                 }
+                child()->saveState();
             } catch (const WriteConflictException& wce) {
                 std::terminate();
             }
@@ -886,6 +901,14 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 member->transitionToOwnedObj();
             }
         } catch (const WriteConflictException& wce) {
+            // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so
+            // will not produce any more results even if there is another matching document.
+            // Re-throw the WCE here so that these operations get another chance to find a matching
+            // document. The findAndModify command should automatically retry if it gets a WCE.
+            // TODO: this is not necessary if there was no sort specified.
+            if (_params.request->shouldReturnAnyDocs()) {
+                throw;
+            }
             _idRetrying = id;
             memberFreer.Dismiss();  // Keep this member around so we can retry updating it.
             *out = WorkingSet::INVALID_ID;
@@ -995,7 +1018,7 @@ unique_ptr<PlanStageStats> UpdateStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_UPDATE);
     ret->specific = make_unique<UpdateStats>(_specificStats);
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
     return ret;
 }
 
@@ -1031,8 +1054,8 @@ UpdateResult UpdateStage::makeUpdateResult(const PlanExecutor& exec, OpDebug* op
     // Get summary information about the plan.
     PlanSummaryStats stats;
     Explain::getSummaryStats(exec, &stats);
-    opDebug->nscanned = stats.totalKeysExamined;
-    opDebug->nscannedObjects = stats.totalDocsExamined;
+    opDebug->keysExamined = stats.totalKeysExamined;
+    opDebug->docsExamined = stats.totalDocsExamined;
 
     return UpdateResult(updateStats->nMatched > 0 /* Did we update at least one obj? */,
                         !updateStats->isDocReplacement /* $mod or obj replacement */,

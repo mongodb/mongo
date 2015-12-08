@@ -26,9 +26,14 @@
  *    it in the license file.
  */
 
+#ifdef _WIN32
+#define NVALGRIND
+#endif
+
 #include "mongo/platform/basic.h"
 
 #include "gperftools/malloc_extension.h"
+#include <valgrind/valgrind.h>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
@@ -91,11 +96,13 @@ Status TcmallocNumericPropertyServerParameter::set(const BSONElement& newValueEl
                           << std::min<unsigned long long>(std::numeric_limits<size_t>::max(),
                                                           std::numeric_limits<long long>::max()));
     }
-    if (!MallocExtension::instance()->SetNumericProperty(_tcmallocPropertyName.c_str(),
-                                                         static_cast<size_t>(valueAsLongLong))) {
-        return Status(ErrorCodes::InternalError,
-                      str::stream() << "Failed to set internal tcmalloc property "
-                                    << _tcmallocPropertyName);
+    if (!RUNNING_ON_VALGRIND) {
+        if (!MallocExtension::instance()->SetNumericProperty(
+                _tcmallocPropertyName.c_str(), static_cast<size_t>(valueAsLongLong))) {
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Failed to set internal tcmalloc property "
+                                        << _tcmallocPropertyName);
+        }
     }
     return Status::OK();
 }

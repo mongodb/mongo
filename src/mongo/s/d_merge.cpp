@@ -70,7 +70,7 @@ bool mergeChunks(OperationContext* txn,
     // Get the distributed lock
     string whyMessage = stream() << "merging chunks in " << nss.ns() << " from " << minKey << " to "
                                  << maxKey;
-    auto scopedDistLock = grid.catalogManager(txn)->distLock(nss.ns(), whyMessage);
+    auto scopedDistLock = grid.forwardingCatalogManager()->distLock(txn, nss.ns(), whyMessage);
 
     if (!scopedDistLock.isOK()) {
         *errMsg = stream() << "could not acquire collection lock for " << nss.ns()
@@ -253,8 +253,7 @@ bool mergeChunks(OperationContext* txn,
 
     BSONObj mergeLogEntry = buildMergeLogEntry(chunksToMerge, shardVersion, mergeVersion);
 
-    grid.catalogManager(txn)
-        ->logChange(txn->getClient()->clientAddress(true), "merge", nss.ns(), mergeLogEntry);
+    grid.catalogManager(txn)->logChange(txn, "merge", nss.ns(), mergeLogEntry);
 
     return true;
 }
@@ -355,6 +354,6 @@ Status runApplyOpsCmd(OperationContext* txn,
     }
 
     BSONArray preCond = buildOpPrecond(firstChunk.getNS(), firstChunk.getShard(), currShardVersion);
-    return grid.catalogManager(txn)->applyChunkOpsDeprecated(updatesB.arr(), preCond);
+    return grid.catalogManager(txn)->applyChunkOpsDeprecated(txn, updatesB.arr(), preCond);
 }
 }

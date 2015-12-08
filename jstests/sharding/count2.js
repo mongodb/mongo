@@ -1,15 +1,16 @@
-// count2.js
+(function() {
 
-s1 = new ShardingTest( "count2" , 2 , 1 , 2 );
-s2 = s1._mongos[1];
-s1.stopBalancer();
+var s1 = new ShardingTest({ name: "count2",
+                            shards: 2,
+                            mongos: 2 });
+var s2 = s1._mongos[1];
 
 s1.adminCommand( { enablesharding: "test" } );
 s1.ensurePrimaryShard('test', 'shard0001');
 s1.adminCommand( { shardcollection: "test.foo" , key : { name : 1 } } );
 
-db1 = s1.getDB( "test" ).foo;
-db2 = s2.getDB( "test" ).foo;
+var db1 = s1.getDB( "test" ).foo;
+var db2 = s2.getDB( "test" ).foo;
 
 assert.eq( 1, s1.config.chunks.count(), "sanity check A");
 
@@ -48,3 +49,5 @@ assert.eq( 6, db2.find().limit( 0 ).count( true ));
 assert.eq( 6, db2.getDB().runCommand({ count: db2.getName(), limit: 0 }).n );
 
 s1.stop();
+
+})();

@@ -264,6 +264,11 @@ private:
 std::string terseCurrentTime(bool colonsOk = true);
 
 /**
+ * Produces a short UTC date + time approriate for file names with Z appended.
+ */
+std::string terseUTCCurrentTime();
+
+/**
  * Formats "date" according to the ISO 8601 extended form standard, including date,
  * and time with milliseconds decimal component, in the UTC timezone.
  *
@@ -319,7 +324,11 @@ bool toPointInTime(const std::string& str, boost::posix_time::ptime* timeOfDay);
 void sleepsecs(int s);
 void sleepmillis(long long ms);
 void sleepmicros(long long micros);
-void sleepFor(const Milliseconds& time);
+
+template <typename DurationType>
+void sleepFor(DurationType time) {
+    sleepmicros(durationCount<Microseconds>(time));
+}
 
 class Backoff {
 public:

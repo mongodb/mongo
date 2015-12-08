@@ -8,17 +8,25 @@
 "use strict";
 
 var name = 'lastOpVisible';
-var replTest = new ReplSetTest({name: name, nodes: 3});
+var replTest = new ReplSetTest({name: name,
+                                nodes: 3,
+                                nodeOptions: {enableMajorityReadConcern: ''}});
 
-replTest.startSet();
+try {
+    replTest.startSet();
+} catch (e) {
+    var conn = MongoRunner.runMongod();
+    if (!conn.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
+        print("Skipping read_majority.js since storageEngine doesn't support it.");
+        MongoRunner.stopMongod(conn);
+        return;
+    }
+    throw e;
+}
+
 replTest.initiate();
 
 var primary = replTest.getPrimary();
-
-if (!primary.getDB(name).serverStatus().storageEngine.supportsCommittedReads) {
-    print("Skipping read_majority.js since storageEngine doesn't support it.");
-    return;
-}
 
 // Do an insert without writeConcern.
 var res = primary.getDB(name).runCommandWithMetadata("insert",

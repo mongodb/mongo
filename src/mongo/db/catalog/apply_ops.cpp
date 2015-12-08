@@ -129,18 +129,27 @@ Status applyOps(OperationContext* txn,
 
         Status status(ErrorCodes::InternalError, "");
 
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            if (*opType == 'c') {
-                status = repl::applyCommand_inlock(txn, temp);
-                break;
-            } else {
-                OldClientContext ctx(txn, ns);
+        try {
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                if (*opType == 'c') {
+                    status = repl::applyCommand_inlock(txn, temp);
+                    break;
+                } else {
+                    OldClientContext ctx(txn, ns);
 
-                status = repl::applyOperation_inlock(txn, ctx.db(), temp, alwaysUpsert);
-                break;
+                    status = repl::applyOperation_inlock(txn, ctx.db(), temp, alwaysUpsert);
+                    break;
+                }
             }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "applyOps", ns);
+        } catch (const DBException& ex) {
+            ab.append(false);
+            result->append("applied", ++num);
+            result->append("code", ex.getCode());
+            result->append("errmsg", ex.what());
+            result->append("results", ab.arr());
+            return Status(ErrorCodes::UnknownError, "");
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "applyOps", ns);
 
         ab.append(status.isOK());
         if (!status.isOK()) {

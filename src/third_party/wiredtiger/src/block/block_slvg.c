@@ -66,26 +66,26 @@ int
 __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	/* Discard the checkpoint. */
-	return (__wt_block_checkpoint_unload(session, block, 0));
+	return (__wt_block_checkpoint_unload(session, block, false));
 }
 
 /*
  * __wt_block_offset_invalid --
  *	Return if the block offset is insane.
  */
-int
+bool
 __wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size)
 {
 	if (size == 0)				/* < minimum page size */
-		return (1);
+		return (true);
 	if (size % block->allocsize != 0)	/* not allocation-size units */
-		return (1);
+		return (true);
 	if (size > WT_BTREE_PAGE_SIZE_MAX)	/* > maximum page size */
-		return (1);
+		return (true);
 						/* past end-of-file */
 	if (offset + (wt_off_t)size > block->fh->size)
-		return (1);
-	return (0);
+		return (true);
+	return (false);
 }
 
 /*
@@ -94,7 +94,7 @@ __wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size)
  */
 int
 __wt_block_salvage_next(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t *addr, size_t *addr_sizep, int *eofp)
+    WT_BLOCK *block, uint8_t *addr, size_t *addr_sizep, bool *eofp)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_ITEM(tmp);
@@ -165,7 +165,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 int
 __wt_block_salvage_valid(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t *addr, size_t addr_size, int valid)
+    WT_BLOCK *block, uint8_t *addr, size_t addr_size, bool valid)
 {
 	wt_off_t offset;
 	uint32_t size, cksum;

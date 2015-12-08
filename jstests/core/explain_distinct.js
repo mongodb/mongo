@@ -43,9 +43,9 @@
     assert.commandFailed(runDistinctExplain(coll, 'b', {$not: 1})); // Bad query.
     assert.commandFailed(runDistinctExplain(coll, 'a', {$not: 1})); // Bad query.
     assert.commandFailed(runDistinctExplain(coll, '_id', {$not: 1})); // Bad query.
-    assert.commandFailed(runDistinctExplain(coll, '', null)); // Bad query.
 
     // Ensure that server accepts a distinct command with no 'query' field.
+    assert.commandWorked(runDistinctExplain(coll, '', null));
     assert.commandWorked(runDistinctExplain(coll, ''));
 
     assert.eq([1], coll.distinct('b'));

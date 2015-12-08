@@ -62,7 +62,7 @@ replTest.restart(1);
 
 
 print("check sync");
-replTest.awaitReplication();
+replTest.awaitReplication(60 * 1000);
 
 
 print("add data");

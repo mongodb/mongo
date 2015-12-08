@@ -41,8 +41,13 @@ namespace mongo {
 class BSONObj;
 
 class AScopedConnection;
+class ClusterCursorManager;
 class DBClientBase;
 class DBClientCursor;
+
+namespace executor {
+class TaskExecutor;
+}  // namespace executor
 
 /**
  * DEPRECATED - do not use in any new code. All new code must use the TaskExecutor interface
@@ -130,13 +135,5 @@ int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& 
  * Utility function to return an empty result set from a command.
  */
 bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns);
-
-/**
- * Utility function to parse a cursor command response and save the cursor in the CursorCache
- * "refs" container. Returns Status::OK() if the cursor was successfully saved or no cursor
- * was specified in the command response, and returns an error Status if a parsing error was
- * encountered.
- */
-Status storePossibleCursor(const std::string& server, const BSONObj& cmdResult);
 
 }  // namespace mongo

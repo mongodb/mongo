@@ -33,19 +33,23 @@ MONGO_RUNNER_SUBDIR = "mongorunner"
 
 # Names below correspond to how they are specified via the command line or in the options YAML file.
 DEFAULTS = {
+    "basePort": 20000,
     "buildloggerUrl": "https://logkeeper.mongodb.org",
     "continueOnFailure": False,
     "dbpathPrefix": None,
     "dbtest": None,
     "dryRun": None,
+    "excludeWithAllTags": None,
+    "excludeWithAnyTags": None,
+    "includeWithAllTags": None,
+    "includeWithAnyTags": None,
     "jobs": 1,
     "mongo": None,
     "mongod": None,
     "mongodSetParameters": None,
     "mongos": None,
     "mongosSetParameters": None,
-    "nojournal": None,
-    "nopreallocj": None,
+    "nojournal": False,
     "repeat": 1,
     "reportFile": None,
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
@@ -63,6 +67,10 @@ DEFAULTS = {
 # Variables that are set by the user at the command line or with --options.
 ##
 
+# The starting port number to use for mongod and mongos processes spawned by resmoke.py and the
+# mongo shell.
+BASE_PORT = None
+
 # The root url of the buildlogger server.
 BUILDLOGGER_URL = None
 
@@ -77,8 +85,22 @@ DBTEST_EXECUTABLE = None
 # actually running them).
 DRY_RUN = None
 
+# If set, then any jstests that have all of the specified tags will be excluded from the suite(s).
+EXCLUDE_WITH_ALL_TAGS = None
+
+# If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
+EXCLUDE_WITH_ANY_TAGS = None
+
 # If true, then a test failure or error will cause resmoke.py to exit and not run any more tests.
 FAIL_FAST = None
+
+# If set, then only jstests that have all of the specified tags will be run during the jstest
+# portion of the suite(s).
+INCLUDE_WITH_ALL_TAGS = None
+
+# If set, then only jstests that have at least one of the specified tags will be run during the
+# jstest portion of the suite(s).
+INCLUDE_WITH_ANY_TAGS = None
 
 # If set, then resmoke.py starts the specified number of Job instances to run tests.
 JOBS = None

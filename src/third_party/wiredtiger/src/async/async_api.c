@@ -52,8 +52,8 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	 * Insert it at the head expecting LRU usage.  We need a real session
 	 * for the cursor.
 	 */
-	WT_RET(
-	    __wt_open_internal_session(conn, "async-cursor", 1, 1, &session));
+	WT_RET(__wt_open_internal_session(
+	    conn, "async-cursor", true, 0, &session));
 	__wt_spin_lock(session, &async->ops_lock);
 	WT_ERR(__wt_calloc_one(session, &af));
 	WT_ERR(__wt_strdup(session, uri, &af->uri));
@@ -151,15 +151,16 @@ retry:
 	 * If we can set the state then the op entry is ours.
 	 * Start the next search at the next entry after this one.
 	 */
-	if (!WT_ATOMIC_CAS4(op->state, WT_ASYNCOP_FREE, WT_ASYNCOP_READY)) {
+	if (!__wt_atomic_cas32(&op->state, WT_ASYNCOP_FREE, WT_ASYNCOP_READY)) {
 		WT_STAT_FAST_CONN_INCR(session, async_alloc_race);
 		goto retry;
 	}
 	WT_STAT_FAST_CONN_INCRV(session, async_alloc_view, view);
 	WT_RET(__async_get_format(conn, uri, config, op));
-	op->unique_id = WT_ATOMIC_ADD8(async->op_id, 1);
+	op->unique_id = __wt_atomic_add64(&async->op_id, 1);
 	op->optype = WT_AOP_NONE;
-	(void)WT_ATOMIC_STORE4(async->ops_index, (i + 1) % conn->async_size);
+	(void)__wt_atomic_store32(
+	    &async->ops_index, (i + 1) % conn->async_size);
 	*opp = op;
 	return (0);
 }
@@ -170,7 +171,7 @@ retry:
  */
 static int
 __async_config(WT_SESSION_IMPL *session,
-    WT_CONNECTION_IMPL *conn, const char **cfg, int *runp)
+    WT_CONNECTION_IMPL *conn, const char **cfg, bool *runp)
 {
 	WT_CONFIG_ITEM cval;
 
@@ -206,15 +207,15 @@ __wt_async_stats_update(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
-	WT_CONNECTION_STATS *stats;
+	WT_CONNECTION_STATS **stats;
 
 	conn = S2C(session);
 	async = conn->async;
 	if (async == NULL)
 		return;
-	stats = &conn->stats;
-	WT_STAT_SET(stats, async_cur_queue, async->cur_queue);
-	WT_STAT_SET(stats, async_max_queue, async->max_queue);
+	stats = conn->stats;
+	WT_STAT_SET(session, stats, async_cur_queue, async->cur_queue);
+	WT_STAT_SET(session, stats, async_max_queue, async->max_queue);
 	F_SET(conn, WT_CONN_SERVER_ASYNC);
 }
 
@@ -228,7 +229,7 @@ __async_start(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
-	uint32_t i;
+	uint32_t i, session_flags;
 
 	conn = S2C(session);
 	conn->async_cfg = 1;
@@ -239,7 +240,8 @@ __async_start(WT_SESSION_IMPL *session)
 	async = conn->async;
 	TAILQ_INIT(&async->formatqh);
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));
-	WT_RET(__wt_cond_alloc(session, "async flush", 0, &async->flush_cond));
+	WT_RET(__wt_cond_alloc(
+	    session, "async flush", false, &async->flush_cond));
 	WT_RET(__wt_async_op_init(session));
 
 	/*
@@ -254,9 +256,9 @@ __async_start(WT_SESSION_IMPL *session)
 		 * workers and we may want to selectively stop some workers
 		 * while leaving the rest running.
 		 */
-		WT_RET(__wt_open_internal_session(
-		    conn, "async-worker", 1, 1, &async->worker_sessions[i]));
-		F_SET(async->worker_sessions[i], WT_SESSION_SERVER_ASYNC);
+		session_flags = WT_SESSION_SERVER_ASYNC;
+		WT_RET(__wt_open_internal_session(conn, "async-worker",
+		    true, session_flags, &async->worker_sessions[i]));
 	}
 	for (i = 0; i < conn->async_workers; i++) {
 		/*
@@ -277,12 +279,12 @@ int
 __wt_async_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	int run;
+	bool run;
 
 	conn = S2C(session);
 
 	/* Handle configuration. */
-	run = 0;
+	run = false;
 	WT_RET(__async_config(session, conn, cfg, &run));
 
 	/* If async is not configured, we're done. */
@@ -302,8 +304,8 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn, tmp_conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	int run;
-	uint32_t i;
+	bool run;
+	uint32_t i, session_flags;
 
 	conn = S2C(session);
 	async = conn->async;
@@ -369,10 +371,9 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 			/*
 			 * Each worker has its own session.
 			 */
-			WT_RET(__wt_open_internal_session(conn,
-			    "async-worker", 1, 1, &async->worker_sessions[i]));
-			F_SET(async->worker_sessions[i],
-			    WT_SESSION_SERVER_ASYNC);
+			session_flags = WT_SESSION_SERVER_ASYNC;
+			WT_RET(__wt_open_internal_session(conn, "async-worker",
+			    true, session_flags, &async->worker_sessions[i]));
 		}
 		for (i = conn->async_workers; i < tmp_conn.async_workers; i++) {
 			/*
@@ -514,7 +515,7 @@ retry:
 		 */
 		__wt_sleep(0, 100000);
 
-	if (!WT_ATOMIC_CAS4(async->flush_state, WT_ASYNC_FLUSH_NONE,
+	if (!__wt_atomic_cas32(&async->flush_state, WT_ASYNC_FLUSH_NONE,
 	    WT_ASYNC_FLUSH_IN_PROGRESS))
 		goto retry;
 	/*
@@ -524,7 +525,7 @@ retry:
 	 * things off the work queue with the lock.
 	 */
 	async->flush_count = 0;
-	(void)WT_ATOMIC_ADD8(async->flush_gen, 1);
+	(void)__wt_atomic_add64(&async->flush_gen, 1);
 	WT_ASSERT(session, async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;
 	WT_ERR(__wt_async_op_enqueue(session, &async->flush_op));

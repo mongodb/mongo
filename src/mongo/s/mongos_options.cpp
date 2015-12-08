@@ -83,7 +83,13 @@ Status addMongosOptions(moe::OptionSection* options) {
     moe::OptionSection sharding_options("Sharding options");
 
     sharding_options.addOptionChaining(
-        "sharding.configDB", "configdb", moe::String, "1 or 3 comma separated config servers");
+        "sharding.configDB",
+        "configdb",
+        moe::String,
+        "Connection string for communicating with config servers. Acceptable forms:\n"
+        "CSRS: <config replset name>/<host1:port>,<host2:port>,[...]\n"
+        "SCCC (deprecated): <host1:port>,<host2:port>,<host3:port>\n"
+        "Single-node (for testing only): <host1:port>");
 
     sharding_options.addOptionChaining(
         "replication.localPingThresholdMs",
@@ -92,10 +98,6 @@ Status addMongosOptions(moe::OptionSection* options) {
         "ping time (in ms) for a node to be considered local (default 15ms)");
 
     sharding_options.addOptionChaining("test", "test", moe::Switch, "just run unit tests")
-        .setSources(moe::SourceAllLegacy);
-
-    sharding_options.addOptionChaining(
-                         "upgrade", "upgrade", moe::Switch, "upgrade meta data version")
         .setSources(moe::SourceAllLegacy);
 
     sharding_options.addOptionChaining(
@@ -262,25 +264,33 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
                                         << configdbConnectionString.getStatus().toString());
         }
 
-        mongosGlobalParams.configdbs = configdbConnectionString.getValue();
+        std::vector<HostAndPort> seedServers;
+        for (const auto& host : configdbConnectionString.getValue().getServers()) {
+            seedServers.push_back(host);
+            if (!seedServers.back().hasPort()) {
+                seedServers.back() = HostAndPort{host.host(), ServerGlobalParams::ConfigServerPort};
+            }
+        }
+
+        mongosGlobalParams.configdbs =
+            ConnectionString{configdbConnectionString.getValue().type(),
+                             seedServers,
+                             configdbConnectionString.getValue().getSetName()};
     }
 
     std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
 
     if (mongosGlobalParams.configdbs.type() != ConnectionString::SYNC &&
-        mongosGlobalParams.configdbs.type() != ConnectionString::SET) {
-        return Status(
-            ErrorCodes::BadValue,
-            "Must have either 3 node legacy config servers, or a replica set config server");
+        mongosGlobalParams.configdbs.type() != ConnectionString::SET &&
+        mongosGlobalParams.configdbs.type() != ConnectionString::MASTER) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid config server value "
+                                    << mongosGlobalParams.configdbs.toString());
     }
 
     if (configServers.size() < 3) {
-        warning() << "running with less than 3 config servers should be done only for testing "
-                     "purposes and is not recommended for production";
-    }
-
-    if (params.count("upgrade")) {
-        mongosGlobalParams.upgrade = params["upgrade"].as<bool>();
+        warning() << "Running a sharded cluster with fewer than 3 config servers should only be "
+                     "done for testing purposes and is not recommended for production.";
     }
 
     return Status::OK();

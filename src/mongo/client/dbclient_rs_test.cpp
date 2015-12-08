@@ -49,7 +49,9 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+namespace mongo {
 namespace {
+
 using std::make_pair;
 using std::map;
 using std::pair;
@@ -57,34 +59,12 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-using mongo::AssertionException;
-using mongo::BSONArray;
-using mongo::BSONElement;
-using mongo::BSONField;
-using mongo::BSONObj;
-using mongo::BSONObjBuilder;
-using mongo::ConnectionString;
-using mongo::DBClientCursor;
-using mongo::DBClientReplicaSet;
-using mongo::HostAndPort;
-using mongo::HostField;
-using mongo::IdentityNS;
-using mongo::MockReplicaSet;
-using mongo::Query;
-using mongo::ReadPreference;
-using mongo::ReadPreferenceSetting;
-using mongo::ReplicaSetMonitor;
-using mongo::ScopedDbConnection;
-using mongo::StringData;
-using mongo::TagSet;
-using mongo::rpc::ServerSelectionMetadata;
-
 /**
  * Constructs a metadata object containing the passed server selection metadata.
  */
 BSONObj makeMetadata(ReadPreference rp, TagSet tagSet, bool secondaryOk) {
     BSONObjBuilder metadataBob;
-    ServerSelectionMetadata ssm(secondaryOk, ReadPreferenceSetting(rp, tagSet));
+    rpc::ServerSelectionMetadata ssm(secondaryOk, ReadPreferenceSetting(rp, tagSet));
     uassertStatusOK(ssm.writeToMetadata(&metadataBob));
     return metadataBob.obj();
 }
@@ -92,10 +72,14 @@ BSONObj makeMetadata(ReadPreference rp, TagSet tagSet, bool secondaryOk) {
 /**
  * Basic fixture with one primary and one secondary.
  */
-class BasicRS : public mongo::unittest::Test {
+class BasicRS : public unittest::Test {
 protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
+
+        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
+        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
+
         _replSet.reset(new MockReplicaSet("test", 2));
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
     }
@@ -215,10 +199,14 @@ TEST_F(BasicRS, CommandSecondaryPreferred) {
 /**
  * Setup for 2 member replica set will all of the nodes down.
  */
-class AllNodesDown : public mongo::unittest::Test {
+class AllNodesDown : public unittest::Test {
 protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
+
+        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
+        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
+
         _replSet.reset(new MockReplicaSet("test", 2));
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
@@ -324,10 +312,14 @@ TEST_F(AllNodesDown, CommandNearest) {
 /**
  * Setup for 2 member replica set with the primary down.
  */
-class PrimaryDown : public mongo::unittest::Test {
+class PrimaryDown : public unittest::Test {
 protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
+
+        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
+        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
+
         _replSet.reset(new MockReplicaSet("test", 2));
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
         _replSet->kill(_replSet->getPrimary());
@@ -429,10 +421,14 @@ TEST_F(PrimaryDown, Nearest) {
 /**
  * Setup for 2 member replica set with the secondary down.
  */
-class SecondaryDown : public mongo::unittest::Test {
+class SecondaryDown : public unittest::Test {
 protected:
     void setUp() {
         ReplicaSetMonitor::cleanup();
+
+        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
+        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
+
         _replSet.reset(new MockReplicaSet("test", 2));
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
@@ -539,7 +535,7 @@ TEST_F(SecondaryDown, CommandNearest) {
  * Warning: Tests running this fixture cannot be run in parallel with other tests
  * that uses ConnectionString::setConnectionHook
  */
-class TaggedFiveMemberRS : public mongo::unittest::Test {
+class TaggedFiveMemberRS : public unittest::Test {
 protected:
     void setUp() {
         // Tests for pinning behavior require this.
@@ -548,6 +544,9 @@ protected:
         // This shuts down the background RSMWatcher thread and prevents it from running. These
         // tests depend on controlling when the RSMs are updated.
         ReplicaSetMonitor::cleanup();
+
+        // Set the number of consecutive failed checks to 2 so the test doesn't run too long
+        ReplicaSetMonitor::maxConsecutiveFailedChecks = 2;
 
         _replSet.reset(new MockReplicaSet("test", 5));
         _originalConnectionHook = ConnectionString::getConnectionHook();
@@ -807,4 +806,6 @@ TEST_F(TaggedFiveMemberRS, SlaveConnReturnsSecConn) {
     dest = doc[HostField.name()].str();
     ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
 }
-}
+
+}  // namespace
+}  // namespace mongo

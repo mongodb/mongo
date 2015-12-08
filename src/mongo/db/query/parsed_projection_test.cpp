@@ -191,6 +191,86 @@ TEST(ParsedProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression
     ASSERT(!status.isOK());
 }
 
+TEST(ParsedProjectionTest, ParsedProjectionDefaults) {
+    auto parsedProjection = createParsedProjection("{}", "{}");
+
+    ASSERT_FALSE(parsedProjection->wantSortKey());
+    ASSERT_TRUE(parsedProjection->requiresDocument());
+    ASSERT_FALSE(parsedProjection->requiresMatchDetails());
+    ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
+    ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
+    ASSERT_FALSE(parsedProjection->wantIndexKey());
+}
+
+TEST(ParsedProjectionTest, SortKeyMetaProjection) {
+    auto parsedProjection = createParsedProjection("{}", "{foo: {$meta: 'sortKey'}}");
+
+    ASSERT_EQ(parsedProjection->getProjObj(), fromjson("{foo: {$meta: 'sortKey'}}"));
+    ASSERT_TRUE(parsedProjection->wantSortKey());
+    ASSERT_TRUE(parsedProjection->requiresDocument());
+
+    ASSERT_FALSE(parsedProjection->requiresMatchDetails());
+    ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
+    ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
+    ASSERT_FALSE(parsedProjection->wantIndexKey());
+}
+
+TEST(ParsedProjectionTest, SortKeyMetaProjectionCovered) {
+    auto parsedProjection = createParsedProjection("{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0}");
+
+    ASSERT_EQ(parsedProjection->getProjObj(), fromjson("{a: 1, foo: {$meta: 'sortKey'}, _id: 0}"));
+    ASSERT_TRUE(parsedProjection->wantSortKey());
+
+    ASSERT_FALSE(parsedProjection->requiresDocument());
+    ASSERT_FALSE(parsedProjection->requiresMatchDetails());
+    ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
+    ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
+    ASSERT_FALSE(parsedProjection->wantIndexKey());
+}
+
+TEST(ParsedProjectionTest, SortKeyMetaAndSlice) {
+    auto parsedProjection =
+        createParsedProjection("{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$slice: 1}}");
+
+    ASSERT_EQ(parsedProjection->getProjObj(),
+              fromjson("{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$slice: 1}}"));
+    ASSERT_TRUE(parsedProjection->wantSortKey());
+    ASSERT_TRUE(parsedProjection->requiresDocument());
+
+    ASSERT_FALSE(parsedProjection->requiresMatchDetails());
+    ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
+    ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
+    ASSERT_FALSE(parsedProjection->wantIndexKey());
+}
+
+TEST(ParsedProjectionTest, SortKeyMetaAndElemMatch) {
+    auto parsedProjection = createParsedProjection(
+        "{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$elemMatch: {a: 1}}}");
+
+    ASSERT_EQ(parsedProjection->getProjObj(),
+              fromjson("{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$elemMatch: {a: 1}}}"));
+    ASSERT_TRUE(parsedProjection->wantSortKey());
+    ASSERT_TRUE(parsedProjection->requiresDocument());
+
+    ASSERT_FALSE(parsedProjection->requiresMatchDetails());
+    ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
+    ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
+    ASSERT_FALSE(parsedProjection->wantIndexKey());
+}
+
+TEST(ParsedProjectionTest, SortKeyMetaAndExclusion) {
+    auto parsedProjection = createParsedProjection("{}", "{a: 0, foo: {$meta: 'sortKey'}, _id: 0}");
+
+    ASSERT_EQ(parsedProjection->getProjObj(), fromjson("{a: 0, foo: {$meta: 'sortKey'}, _id: 0}"));
+    ASSERT_TRUE(parsedProjection->wantSortKey());
+    ASSERT_TRUE(parsedProjection->requiresDocument());
+
+    ASSERT_FALSE(parsedProjection->requiresMatchDetails());
+    ASSERT_FALSE(parsedProjection->wantGeoNearDistance());
+    ASSERT_FALSE(parsedProjection->wantGeoNearPoint());
+    ASSERT_FALSE(parsedProjection->wantIndexKey());
+}
+
 //
 // DBRef projections
 //

@@ -31,6 +31,11 @@ if conf.CheckFunc("sync_file_range"):
                 "HAVE_SYNC_FILE_RANGE"
     ])
 
+if conf.CheckCHeader('x86intrin.h'):
+        env.Append(CPPDEFINES=[
+            "HAVE_X86INTRIN_H"
+    ])
+
 if env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_win"])
     env.Append(CFLAGS=[
@@ -39,6 +44,7 @@ if env.TargetOSIs('windows'):
     if get_option('allocator') == 'tcmalloc':
         env.InjectThirdPartyIncludePaths(libraries=['gperftools'])
         env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
+        env.Append(CPPDEFINES=['HAVE_POSIX_MEMALIGN'])
 elif env.TargetOSIs('osx'):
     env.Append(CPPPATH=["build_darwin"])
 elif env.TargetOSIs('solaris'):
@@ -105,6 +111,8 @@ env.Substfile(
         'src/include/wiredtiger.in',
     ],
     SUBST_DICT=replacements)
+
+env.Alias('generated-sources', "wiredtiger.h")
 
 #
 # WiredTiger library

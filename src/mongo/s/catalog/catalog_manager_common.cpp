@@ -43,8 +43,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
@@ -53,8 +55,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -65,6 +65,12 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
+
+const std::string kActionLogCollectionName("actionlog");
+const int kActionLogCollectionSizeMB = 2 * 1024 * 1024;
+
+const std::string kChangeLogCollectionName("changelog");
+const int kChangeLogCollectionSizeMB = 10 * 1024 * 1024;
 
 /**
  * Validates that the specified connection string can serve as a shard server. In particular,
@@ -83,7 +89,8 @@ namespace {
  * shard's name should be checked and if empty, one should be generated using some uniform
  * algorithm.
  */
-StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
+StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
+                                          ShardRegistry* shardRegistry,
                                           const ConnectionString& connectionString,
                                           const std::string* shardProposedName) {
     if (connectionString.type() == ConnectionString::SYNC) {
@@ -96,32 +103,26 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
         return {ErrorCodes::BadValue, "shard name cannot be empty"};
     }
 
-    auto shardConn = shardRegistry->createConnection(connectionString);
+    const std::shared_ptr<Shard> shardConn{shardRegistry->createConnection(connectionString)};
     invariant(shardConn);
 
-    auto shardHostStatus =
-        shardConn->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
-    if (!shardHostStatus.isOK()) {
-        return shardHostStatus.getStatus();
-    }
-
-    const HostAndPort& shardHost = shardHostStatus.getValue();
-
-    StatusWith<BSONObj> cmdStatus{ErrorCodes::InternalError, "uninitialized value"};
+    const ReadPreferenceSetting readPref{ReadPreference::PrimaryOnly};
 
     // Is it mongos?
-    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("isdbgrid" << 1));
+    auto cmdStatus = shardRegistry->runCommandForAddShard(
+        txn, shardConn, readPref, "admin", BSON("isdbgrid" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
 
     // (ok == 1) implies that it is a mongos
     if (getStatusFromCommandResult(cmdStatus.getValue()).isOK()) {
-        return {ErrorCodes::BadValue, "can't add a mongos process as a shard"};
+        return {ErrorCodes::OperationFailed, "can't add a mongos process as a shard"};
     }
 
     // Is it a replica set?
-    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("isMaster" << 1));
+    cmdStatus = shardRegistry->runCommandForAddShard(
+        txn, shardConn, readPref, "admin", BSON("isMaster" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -133,7 +134,7 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
 
     // Make sure the specified replica set name (if any) matches the actual shard's replica set
     if (providedSetName.empty() && !foundSetName.empty()) {
-        return {ErrorCodes::BadValue,
+        return {ErrorCodes::OperationFailed,
                 str::stream() << "host is part of set " << foundSetName << "; "
                               << "use replica set url format "
                               << "<setname>/<server1>,<server2>, ..."};
@@ -154,7 +155,8 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
     }
 
     // Is it a mongos config server?
-    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("replSetGetStatus" << 1));
+    cmdStatus = shardRegistry->runCommandForAddShard(
+        txn, shardConn, readPref, "admin", BSON("replSetGetStatus" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -174,12 +176,12 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
         }
 
         if (isConfigServer) {
-            return {ErrorCodes::BadValue,
+            return {ErrorCodes::OperationFailed,
                     str::stream() << "Cannot add " << connectionString.toString()
                                   << " as a shard since it is part of a config server replica set"};
         }
     } else if ((res["info"].type() == String) && (res["info"].String() == "configsvr")) {
-        return {ErrorCodes::BadValue,
+        return {ErrorCodes::OperationFailed,
                 "the specified mongod is a legacy-style config "
                 "server and cannot be used as a shard server"};
     }
@@ -215,8 +217,8 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
             if (hostSet.find(host) == hostSet.end()) {
                 return {ErrorCodes::OperationFailed,
                         str::stream() << "in seed list " << connectionString.toString() << ", host "
-                                      << host << " does not belong to replica set "
-                                      << foundSetName};
+                                      << host << " does not belong to replica set " << foundSetName
+                                      << "; found " << resIsMaster.toString()};
             }
         }
     }
@@ -251,19 +253,17 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
  * it returns excluding those named local and admin, since they serve administrative purpose.
  */
 StatusWith<std::vector<std::string>> getDBNamesListFromShard(
-    ShardRegistry* shardRegistry, const ConnectionString& connectionString) {
-    auto shardConn = shardRegistry->createConnection(connectionString);
+    OperationContext* txn, ShardRegistry* shardRegistry, const ConnectionString& connectionString) {
+    const std::shared_ptr<Shard> shardConn{
+        shardRegistry->createConnection(connectionString).release()};
     invariant(shardConn);
 
-    auto shardHostStatus =
-        shardConn->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
-    if (!shardHostStatus.isOK()) {
-        return shardHostStatus.getStatus();
-    }
-
-    const HostAndPort& shardHost = shardHostStatus.getValue();
-
-    auto cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("listDatabases" << 1));
+    auto cmdStatus =
+        shardRegistry->runCommandForAddShard(txn,
+                                             shardConn,
+                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                             "admin",
+                                             BSON("listDatabases" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -296,7 +296,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
                                                   const long long maxSize) {
     // Validate the specified connection string may serve as shard at all
     auto shardStatus =
-        validateHostAsShard(grid.shardRegistry(), shardConnectionString, shardProposedName);
+        validateHostAsShard(txn, grid.shardRegistry(), shardConnectionString, shardProposedName);
     if (!shardStatus.isOK()) {
         // TODO: This is a workaround for the case were we could have some bad shard being
         // requested to be added and we put that bad connection string on the global replica set
@@ -308,14 +308,14 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
 
     ShardType& shardType = shardStatus.getValue();
 
-    auto dbNamesStatus = getDBNamesListFromShard(grid.shardRegistry(), shardConnectionString);
+    auto dbNamesStatus = getDBNamesListFromShard(txn, grid.shardRegistry(), shardConnectionString);
     if (!dbNamesStatus.isOK()) {
         return dbNamesStatus.getStatus();
     }
 
     // Check that none of the existing shard candidate's dbs exist already
     for (const string& dbName : dbNamesStatus.getValue()) {
-        auto dbt = getDatabase(dbName);
+        auto dbt = getDatabase(txn, dbName);
         if (dbt.isOK()) {
             const auto& dbDoc = dbt.getValue().value;
             return Status(ErrorCodes::OperationFailed,
@@ -323,14 +323,14 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
                                         << "'" << shardConnectionString.toString() << "'"
                                         << " because a local database '" << dbName
                                         << "' exists in another " << dbDoc.getPrimary());
-        } else if (dbt != ErrorCodes::DatabaseNotFound) {
+        } else if (dbt != ErrorCodes::NamespaceNotFound) {
             return dbt.getStatus();
         }
     }
 
     // If a name for a shard wasn't provided, generate one
     if (shardType.getName().empty()) {
-        StatusWith<string> result = _generateNewShardName();
+        StatusWith<string> result = _generateNewShardName(txn);
         if (!result.isOK()) {
             return Status(ErrorCodes::OperationFailed, "error generating new shard name");
         }
@@ -344,14 +344,14 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
 
     log() << "going to add shard: " << shardType.toString();
 
-    Status result = insert(ShardType::ConfigNS, shardType.toBSON(), NULL);
+    Status result = insertConfigDocument(txn, ShardType::ConfigNS, shardType.toBSON());
     if (!result.isOK()) {
         log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
         return result;
     }
 
     // Make sure the new shard is visible
-    grid.shardRegistry()->reload();
+    grid.shardRegistry()->reload(txn);
 
     // Add all databases which were discovered on the new shard
     for (const string& dbName : dbNamesStatus.getValue()) {
@@ -360,7 +360,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
         dbt.setPrimary(shardType.getName());
         dbt.setSharded(false);
 
-        Status status = updateDatabase(dbName, dbt);
+        Status status = updateDatabase(txn, dbName, dbt);
         if (!status.isOK()) {
             log() << "adding shard " << shardConnectionString.toString()
                   << " even though could not add database " << dbName;
@@ -372,51 +372,44 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
     shardDetails.append("name", shardType.getName());
     shardDetails.append("host", shardConnectionString.toString());
 
-    logChange(txn->getClient()->clientAddress(true), "addShard", "", shardDetails.obj());
+    logChange(txn, "addShard", "", shardDetails.obj());
 
     return shardType.getName();
 }
 
-Status CatalogManagerCommon::updateCollection(const std::string& collNs,
+Status CatalogManagerCommon::updateCollection(OperationContext* txn,
+                                              const std::string& collNs,
                                               const CollectionType& coll) {
     fassert(28634, coll.validate());
 
-    BatchedCommandResponse response;
-    Status status = update(CollectionType::ConfigNS,
-                           BSON(CollectionType::fullNs(collNs)),
-                           coll.toBSON(),
-                           true,   // upsert
-                           false,  // multi
-                           &response);
+    auto status = updateConfigDocument(
+        txn, CollectionType::ConfigNS, BSON(CollectionType::fullNs(collNs)), coll.toBSON(), true);
     if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "collection metadata write failed: " << response.toBSON()
-                                    << "; status: " << status.toString());
+        return Status(status.getStatus().code(),
+                      str::stream() << "collection metadata write failed"
+                                    << causedBy(status.getStatus()));
     }
 
     return Status::OK();
 }
 
-Status CatalogManagerCommon::updateDatabase(const std::string& dbName, const DatabaseType& db) {
+Status CatalogManagerCommon::updateDatabase(OperationContext* txn,
+                                            const std::string& dbName,
+                                            const DatabaseType& db) {
     fassert(28616, db.validate());
 
-    BatchedCommandResponse response;
-    Status status = update(DatabaseType::ConfigNS,
-                           BSON(DatabaseType::name(dbName)),
-                           db.toBSON(),
-                           true,   // upsert
-                           false,  // multi
-                           &response);
+    auto status = updateConfigDocument(
+        txn, DatabaseType::ConfigNS, BSON(DatabaseType::name(dbName)), db.toBSON(), true);
     if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "database metadata write failed: " << response.toBSON()
-                                    << "; status: " << status.toString());
+        return Status(status.getStatus().code(),
+                      str::stream() << "database metadata write failed"
+                                    << causedBy(status.getStatus()));
     }
 
     return Status::OK();
 }
 
-Status CatalogManagerCommon::createDatabase(const std::string& dbName) {
+Status CatalogManagerCommon::createDatabase(OperationContext* txn, const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
     // The admin and config databases should never be explicitly created. They "just exist",
@@ -426,19 +419,19 @@ Status CatalogManagerCommon::createDatabase(const std::string& dbName) {
 
     // Lock the database globally to prevent conflicts with simultaneous database creation.
     auto scopedDistLock =
-        getDistLockManager()->lock(dbName, "createDatabase", Seconds{5}, Milliseconds{500});
+        getDistLockManager()->lock(txn, dbName, "createDatabase", Seconds{5}, Milliseconds{500});
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
 
     // check for case sensitivity violations
-    Status status = _checkDbDoesNotExist(dbName, nullptr);
+    Status status = _checkDbDoesNotExist(txn, dbName, nullptr);
     if (!status.isOK()) {
         return status;
     }
 
     // Database does not exist, pick a shard and create a new entry
-    auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
+    auto newShardIdStatus = selectShardForNewDatabase(txn, grid.shardRegistry());
     if (!newShardIdStatus.isOK()) {
         return newShardIdStatus.getStatus();
     }
@@ -452,9 +445,7 @@ Status CatalogManagerCommon::createDatabase(const std::string& dbName) {
     db.setPrimary(newShardId);
     db.setSharded(false);
 
-    BatchedCommandResponse response;
-    status = insert(DatabaseType::ConfigNS, db.toBSON(), &response);
-
+    status = insertConfigDocument(txn, DatabaseType::ConfigNS, db.toBSON());
     if (status.code() == ErrorCodes::DuplicateKey) {
         return Status(ErrorCodes::NamespaceExists, "database " + dbName + " already exists");
     }
@@ -462,13 +453,50 @@ Status CatalogManagerCommon::createDatabase(const std::string& dbName) {
     return status;
 }
 
+Status CatalogManagerCommon::logAction(OperationContext* txn,
+                                       const std::string& what,
+                                       const std::string& ns,
+                                       const BSONObj& detail) {
+    if (_actionLogCollectionCreated.load() == 0) {
+        Status result = _createCappedConfigCollection(
+            txn, kActionLogCollectionName, kActionLogCollectionSizeMB);
+        if (result.isOK() || result == ErrorCodes::NamespaceExists) {
+            _actionLogCollectionCreated.store(1);
+        } else {
+            log() << "couldn't create config.actionlog collection:" << causedBy(result);
+            return result;
+        }
+    }
+
+    return _log(txn, kActionLogCollectionName, what, ns, detail);
+}
+
+Status CatalogManagerCommon::logChange(OperationContext* txn,
+                                       const std::string& what,
+                                       const std::string& ns,
+                                       const BSONObj& detail) {
+    if (_changeLogCollectionCreated.load() == 0) {
+        Status result = _createCappedConfigCollection(
+            txn, kChangeLogCollectionName, kChangeLogCollectionSizeMB);
+        if (result.isOK() || result == ErrorCodes::NamespaceExists) {
+            _changeLogCollectionCreated.store(1);
+        } else {
+            log() << "couldn't create config.changelog collection:" << causedBy(result);
+            return result;
+        }
+    }
+
+    return _log(txn, kChangeLogCollectionName, what, ns, detail);
+}
+
 // static
-StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(ShardRegistry* shardRegistry) {
+StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(OperationContext* txn,
+                                                                    ShardRegistry* shardRegistry) {
     vector<ShardId> allShardIds;
 
     shardRegistry->getAllShardIds(&allShardIds);
     if (allShardIds.empty()) {
-        shardRegistry->reload();
+        shardRegistry->reload(txn);
         shardRegistry->getAllShardIds(&allShardIds);
 
         if (allShardIds.empty()) {
@@ -478,7 +506,8 @@ StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(ShardRegistr
 
     ShardId candidateShardId = allShardIds[0];
 
-    auto candidateSizeStatus = shardutil::retrieveTotalShardSize(candidateShardId, shardRegistry);
+    auto candidateSizeStatus =
+        shardutil::retrieveTotalShardSize(txn, candidateShardId, shardRegistry);
     if (!candidateSizeStatus.isOK()) {
         return candidateSizeStatus.getStatus();
     }
@@ -486,7 +515,7 @@ StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(ShardRegistr
     for (size_t i = 1; i < allShardIds.size(); i++) {
         const ShardId shardId = allShardIds[i];
 
-        const auto sizeStatus = shardutil::retrieveTotalShardSize(shardId, shardRegistry);
+        const auto sizeStatus = shardutil::retrieveTotalShardSize(txn, shardId, shardRegistry);
         if (!sizeStatus.isOK()) {
             return sizeStatus.getStatus();
         }
@@ -500,7 +529,7 @@ StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(ShardRegistr
     return candidateShardId;
 }
 
-Status CatalogManagerCommon::enableSharding(const std::string& dbName) {
+Status CatalogManagerCommon::enableSharding(OperationContext* txn, const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
     DatabaseType db;
@@ -508,16 +537,16 @@ Status CatalogManagerCommon::enableSharding(const std::string& dbName) {
     // Lock the database globally to prevent conflicts with simultaneous database
     // creation/modification.
     auto scopedDistLock =
-        getDistLockManager()->lock(dbName, "enableSharding", Seconds{5}, Milliseconds{500});
+        getDistLockManager()->lock(txn, dbName, "enableSharding", Seconds{5}, Milliseconds{500});
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
 
     // Check for case sensitivity violations
-    Status status = _checkDbDoesNotExist(dbName, &db);
+    Status status = _checkDbDoesNotExist(txn, dbName, &db);
     if (status.isOK()) {
         // Database does not exist, create a new entry
-        auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
+        auto newShardIdStatus = selectShardForNewDatabase(txn, grid.shardRegistry());
         if (!newShardIdStatus.isOK()) {
             return newShardIdStatus.getStatus();
         }
@@ -530,6 +559,11 @@ Status CatalogManagerCommon::enableSharding(const std::string& dbName) {
         db.setPrimary(newShardId);
         db.setSharded(true);
     } else if (status.code() == ErrorCodes::NamespaceExists) {
+        if (db.getSharded()) {
+            return Status(ErrorCodes::AlreadyInitialized,
+                          str::stream() << "sharding already enabled for database " << dbName);
+        }
+
         // Database exists, so just update it
         db.setSharded(true);
     } else {
@@ -538,7 +572,38 @@ Status CatalogManagerCommon::enableSharding(const std::string& dbName) {
 
     log() << "Enabling sharding for database [" << dbName << "] in config db";
 
-    return updateDatabase(dbName, db);
+    return updateDatabase(txn, dbName, db);
+}
+
+Status CatalogManagerCommon::_log(OperationContext* txn,
+                                  const StringData& logCollName,
+                                  const std::string& what,
+                                  const std::string& operationNS,
+                                  const BSONObj& detail) {
+    Date_t now = grid.shardRegistry()->getExecutor()->now();
+    const std::string hostName = grid.shardRegistry()->getNetwork()->getHostName();
+    const string changeId = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
+
+    ChangeLogType changeLog;
+    changeLog.setChangeId(changeId);
+    changeLog.setServer(hostName);
+    changeLog.setClientAddr(txn->getClient()->clientAddress(true));
+    changeLog.setTime(now);
+    changeLog.setNS(operationNS);
+    changeLog.setWhat(what);
+    changeLog.setDetails(detail);
+
+    BSONObj changeLogBSON = changeLog.toBSON();
+    log() << "about to log metadata event into " << logCollName << ": " << changeLogBSON;
+
+    const NamespaceString nss("config", logCollName);
+    Status result = insertConfigDocument(txn, nss.ns(), changeLogBSON);
+    if (!result.isOK()) {
+        warning() << "Error encountered while logging config change with ID [" << changeId
+                  << "] into collection " << logCollName << ": " << result;
+    }
+
+    return result;
 }
 
 }  // namespace mongo

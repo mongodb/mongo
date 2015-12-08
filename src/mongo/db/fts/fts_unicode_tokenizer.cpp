@@ -30,7 +30,7 @@
 
 #include "mongo/db/fts/fts_unicode_tokenizer.h"
 
-#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"

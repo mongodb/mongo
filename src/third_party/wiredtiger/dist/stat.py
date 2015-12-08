@@ -5,19 +5,18 @@ import re, string, sys, textwrap
 from dist import compare_srcfile
 
 # Read the source files.
-from stat_data import groups, dsrc_stats, connection_stats
+from stat_data import groups, dsrc_stats, connection_stats, join_stats
 
 def print_struct(title, name, base, stats):
     '''Print the structures for the stat.h file.'''
     f.write('/*\n')
     f.write(' * Statistics entries for ' + title + '.\n')
     f.write(' */\n')
-    f.write(
-        '#define\tWT_' + name.upper() + '_STATS_BASE\t' + str(base) + '\n')
+    f.write('#define\tWT_' + name.upper() + '_STATS_BASE\t' + str(base) + '\n')
     f.write('struct __wt_' + name + '_stats {\n')
 
     for l in stats:
-        f.write('\tWT_STATS ' + l.name + ';\n')
+        f.write('\tint64_t ' + l.name + ';\n')
     f.write('};\n\n')
 
 # Update the #defines in the stat.h file.
@@ -36,8 +35,16 @@ for line in open('../src/include/stat.h', 'r'):
         print_struct(
             'connections', 'connection', 1000, connection_stats)
         print_struct('data sources', 'dsrc', 2000, dsrc_stats)
+        print_struct('join cursors', 'join', 3000, join_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/include/stat.h')
+
+def print_defines_one(capname, base, stats):
+    for v, l in enumerate(stats, base):
+        f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
+        f.write('#define\tWT_STAT_' + capname + '_' + l.name.upper() + "\t" *
+            max(1, 6 - int((len('WT_STAT_' + capname + '_' + l.name)) / 8)) +
+            str(v) + '\n')
 
 def print_defines():
     '''Print the #defines for the wiredtiger.in file.'''
@@ -52,11 +59,7 @@ def print_defines():
  * @{
  */
 ''')
-    for v, l in enumerate(connection_stats, 1000):
-        f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
-        f.write('#define\tWT_STAT_CONN_' + l.name.upper() + "\t" *
-            max(1, 6 - int((len('WT_STAT_CONN_' + l.name)) / 8)) +
-            str(v) + '\n')
+    print_defines_one('CONN', 1000, connection_stats)
     f.write('''
 /*!
  * @}
@@ -65,11 +68,16 @@ def print_defines():
  * @{
  */
 ''')
-    for v, l in enumerate(dsrc_stats, 2000):
-        f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
-        f.write('#define\tWT_STAT_DSRC_' + l.name.upper() + "\t" *
-            max(1, 6 - int((len('WT_STAT_DSRC_' + l.name)) / 8)) +
-            str(v) + '\n')
+    print_defines_one('DSRC', 2000, dsrc_stats)
+    f.write('''
+/*!
+ * @}
+ * @name Statistics for join cursors
+ * @anchor statistics_join
+ * @{
+ */
+''')
+    print_defines_one('JOIN', 3000, join_stats)
     f.write('/*! @} */\n')
 
 # Update the #defines in the wiredtiger.in file.
@@ -90,67 +98,116 @@ for line in open('../src/include/wiredtiger.in', 'r'):
 f.close()
 compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
 
-def print_func(name, list):
-    '''Print the functions for the stat.c file.'''
+def print_func(name, handle, list):
+    '''Print the structures/functions for the stat.c file.'''
+    f.write('\n')
+    f.write('static const char * const __stats_' + name + '_desc[] = {\n')
+    for l in list:
+        f.write('\t"' + l.desc + '",\n')
+    f.write('};\n')
+
+    f.write('''
+int
+__wt_stat_''' + name + '''_desc(WT_CURSOR_STAT *cst, int slot, const char **p)
+{
+\tWT_UNUSED(cst);
+\t*p = __stats_''' + name + '''_desc[slot];
+\treturn (0);
+}
+''')
+
     f.write('''
 void
-__wt_stat_init_''' + name + '''_stats(WT_''' + name.upper() + '''_STATS *stats)
+__wt_stat_''' + name + '_init_single(WT_' + name.upper() + '''_STATS *stats)
 {
-\t/* Clear, so can also be called for reinitialization. */
 \tmemset(stats, 0, sizeof(*stats));
-
+}
 ''')
-    for l in sorted(list):
-        o = '\tstats->' + l.name + '.desc = "' + l.desc + '";\n'
-        if len(o) + 7  > 80:
-            o = o.replace('= ', '=\n\t    ')
-        f.write(o)
-    f.write('''}
+
+    if handle != None:
+        f.write('''
+void
+__wt_stat_''' + name + '_init(' + handle + ''' *handle)
+{
+\tint i;
+
+\tfor (i = 0; i < WT_COUNTER_SLOTS; ++i) {
+\t\thandle->stats[i] = &handle->stat_array[i];
+\t\t__wt_stat_''' + name + '''_init_single(handle->stats[i]);
+\t}
+}
 ''')
 
     f.write('''
 void
-__wt_stat_refresh_''' + name + '''_stats(void *stats_arg)
+__wt_stat_''' + name + '_clear_single(WT_' + name.upper() + '''_STATS *stats)
 {
-\tWT_''' + name.upper() + '''_STATS *stats;
-
-\tstats = (WT_''' + name.upper() + '''_STATS *)stats_arg;
 ''')
     for l in sorted(list):
         # no_clear: don't clear the value.
-        if not 'no_clear' in l.flags:
-            f.write('\tstats->' + l.name + '.v = 0;\n');
+        if 'no_clear' in l.flags:
+            f.write('\t\t/* not clearing ' + l.name + ' */\n')
+        else:
+            f.write('\tstats->' + l.name + ' = 0;\n')
     f.write('}\n')
-
-    # Aggregation is only interesting for data-source statistics.
-    # Complain if any aggregation flags are set.
-    if name == 'connection':
-        for l in sorted(list):
-            if 'no_aggregate' in l.flags or 'max_aggregate' in l.flags:
-                print >>sys.stdout,\
-                    "Aggregation configuration for " +\
-                    name + "." + l.name + " statistics not supported"
-        return;
 
     f.write('''
 void
-__wt_stat_aggregate_''' + name +
-'''_stats(const void *child, const void *parent)
+__wt_stat_''' + name + '_clear_all(WT_' + name.upper() + '''_STATS **stats)
 {
-\tWT_''' + name.upper() + '''_STATS *c, *p;
+\tu_int i;
 
-\tc = (WT_''' + name.upper() + '''_STATS *)child;
-\tp = (WT_''' + name.upper() + '''_STATS *)parent;
+\tfor (i = 0; i < WT_COUNTER_SLOTS; ++i)
+\t\t__wt_stat_''' + name + '''_clear_single(stats[i]);
+}
 ''')
+
+    # Single structure aggregation is currently only used by data sources.
+    if name == 'dsrc':
+        f.write('''
+void
+__wt_stat_''' + name + '''_aggregate_single(
+    WT_''' + name.upper() + '_STATS *from, WT_' + name.upper() + '''_STATS *to)
+{
+''')
+        for l in sorted(list):
+            if 'no_aggregate' in l.flags:
+                o = '\tto->' + l.name + ' = from->' + l.name + ';\n'
+            elif 'max_aggregate' in l.flags:
+                o = '\tif (from->' + l.name + ' > to->' + l.name + ')\n' +\
+                    '\t\tto->' + l.name + ' = from->' + l.name + ';\n'
+            else:
+                o = '\tto->' + l.name + ' += from->' + l.name + ';\n'
+                if len(o) > 72:         # Account for the leading tab.
+                    o = o.replace(' += ', ' +=\n\t    ')
+            f.write(o)
+        f.write('}\n')
+
+    f.write('''
+void
+__wt_stat_''' + name + '''_aggregate(
+    WT_''' + name.upper() + '_STATS **from, WT_' + name.upper() + '''_STATS *to)
+{
+''')
+    # Connection level aggregation does not currently have any computation
+    # of a maximum value; I'm leaving in support for it, but don't declare
+    # a temporary variable until it's needed.
+    for l in sorted(list):
+        if 'max_aggregate' in l.flags:
+            f.write('\tint64_t v;\n\n')
+            break;
     for l in sorted(list):
         if 'no_aggregate' in l.flags:
-            continue;
+            o = '\tto->' + l.name + ' = from[0]->' + l.name + ';\n'
         elif 'max_aggregate' in l.flags:
-            o = 'if (c->' + l.name + '.v > p->' + l.name +\
-            '.v)\n\t    p->' + l.name + '.v = c->' + l.name + '.v;'
+            o = '\tif ((v = WT_STAT_READ(from, ' + l.name + ')) >\n' +\
+                '\t    to->' + l.name + ')\n' +\
+                '\t\tto->' + l.name + ' = v;\n'
         else:
-            o = 'p->' + l.name + '.v += c->' + l.name + '.v;'
-        f.write('\t' + o + '\n')
+            o = '\tto->' + l.name + ' += WT_STAT_READ(from, ' + l.name + ');\n'
+            if len(o) > 72:             # Account for the leading tab.
+                o = o.replace(' += ', ' +=\n\t    ')
+        f.write(o)
     f.write('}\n')
 
 # Write the stat initialization and refresh routines to the stat.c file.
@@ -158,11 +215,11 @@ f = open(tmp_file, 'w')
 f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')
 
-print_func('dsrc', dsrc_stats)
-print_func('connection', connection_stats)
+print_func('dsrc', 'WT_DATA_HANDLE', dsrc_stats)
+print_func('connection', 'WT_CONNECTION_IMPL', connection_stats)
+print_func('join', None, join_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/support/stat.c')
-
 
 # Update the statlog file with the entries we can scale per second.
 scale_info = 'no_scale_per_second_list = [\n'
@@ -180,6 +237,7 @@ for l in sorted(dsrc_stats):
         scale_info += '    \'' + l.desc + '\',\n'
     if 'no_clear' in l.flags:
         clear_info += '    \'' + l.desc + '\',\n'
+# No join statistics can be captured in wtstats
 scale_info += ']\n'
 clear_info += ']\n'
 prefix_info = 'prefix_list = [\n'

@@ -61,6 +61,7 @@ struct ShellGlobalParams {
     bool runShell;
     bool nodb;
     bool norc;
+    bool nojit = false;
 
     std::string script;
 

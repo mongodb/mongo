@@ -25,6 +25,7 @@ env.CppUnitTest(
 env.Library(
     target='network',
     source=[
+        "hostname_canonicalization.cpp",
         "httpclient.cpp",
         "listen.cpp",
         "message.cpp",
@@ -43,6 +44,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'hostandport',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on inShutdown
+        'incomplete',
     ],
 )
 
@@ -68,6 +73,18 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target="hostname_canonicalization_worker",
+    source=[
+        "hostname_canonicalization_worker.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        'network',
+    ],
+)
+
+env.Library(
     target="message_server_port",
     source=[
         "message_server_port.cpp",
@@ -75,6 +92,10 @@ env.Library(
     LIBDEPS=[
         'network',
         '$BUILD_DIR/mongo/db/stats/counters',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on inShutdown and dbexit
+        'incomplete',
     ],
 )
 

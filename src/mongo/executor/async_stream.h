@@ -37,16 +37,24 @@ namespace executor {
 
 class AsyncStream final : public AsyncStreamInterface {
 public:
-    AsyncStream(asio::io_service* io_service);
+    AsyncStream(asio::io_service::strand* strand);
 
-    void connect(asio::ip::tcp::resolver::iterator iter, ConnectHandler&& connectHandler);
+    ~AsyncStream();
+
+    void connect(asio::ip::tcp::resolver::iterator iter, ConnectHandler&& connectHandler) override;
 
     void write(asio::const_buffer buffer, StreamHandler&& streamHandler) override;
 
     void read(asio::mutable_buffer buffer, StreamHandler&& streamHandler) override;
 
+    void cancel() override;
+
+    bool isOpen() override;
+
 private:
+    asio::io_service::strand* const _strand;
     asio::ip::tcp::socket _stream;
+    bool _connected = false;
 };
 
 }  // namespace executor

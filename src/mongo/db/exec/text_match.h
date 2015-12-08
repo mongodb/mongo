@@ -33,7 +33,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/fts/fts_matcher.h"
-#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 
 namespace mongo {
@@ -41,7 +41,7 @@ namespace mongo {
 using std::unique_ptr;
 
 using fts::FTSMatcher;
-using fts::FTSQuery;
+using fts::FTSQueryImpl;
 using fts::FTSSpec;
 
 
@@ -59,7 +59,7 @@ class TextMatchStage final : public PlanStage {
 public:
     TextMatchStage(OperationContext* opCtx,
                    unique_ptr<PlanStage> child,
-                   const FTSQuery& query,
+                   const FTSQueryImpl& query,
                    const FTSSpec& spec,
                    WorkingSet* ws);
     ~TextMatchStage();

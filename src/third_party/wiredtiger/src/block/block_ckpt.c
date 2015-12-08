@@ -12,7 +12,7 @@ static int __ckpt_process(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 static int __ckpt_string(
 	WT_SESSION_IMPL *, WT_BLOCK *, const uint8_t *, WT_ITEM *);
 static int __ckpt_update(
-	WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *, WT_BLOCK_CKPT *, int);
+	WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *, WT_BLOCK_CKPT *, bool);
 
 /*
  * __wt_block_ckpt_init --
@@ -27,12 +27,14 @@ __wt_block_ckpt_init(
 	ci->version = WT_BM_CHECKPOINT_VERSION;
 	ci->root_offset = WT_BLOCK_INVALID_OFFSET;
 
-	WT_RET(__wt_block_extlist_init(session, &ci->alloc, name, "alloc", 0));
-	WT_RET(__wt_block_extlist_init(session, &ci->avail, name, "avail", 1));
 	WT_RET(__wt_block_extlist_init(
-	    session, &ci->discard, name, "discard", 0));
+	    session, &ci->alloc, name, "alloc", false));
 	WT_RET(__wt_block_extlist_init(
-	    session, &ci->ckpt_avail, name, "ckpt_avail", 1));
+	    session, &ci->avail, name, "avail", true));
+	WT_RET(__wt_block_extlist_init(
+	    session, &ci->discard, name, "discard", false));
+	WT_RET(__wt_block_extlist_init(
+	    session, &ci->ckpt_avail, name, "ckpt_avail", true));
 
 	return (0);
 }
@@ -44,7 +46,7 @@ __wt_block_ckpt_init(
 int
 __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
     const uint8_t *addr, size_t addr_size,
-    uint8_t *root_addr, size_t *root_addr_sizep, int checkpoint)
+    uint8_t *root_addr, size_t *root_addr_sizep, bool checkpoint)
 {
 	WT_BLOCK_CKPT *ci, _ci;
 	WT_DECL_ITEM(tmp);
@@ -81,11 +83,16 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_ERR(__wt_block_ckpt_init(session, ci, "checkpoint"));
 	} else {
 		/*
-		 * We depend on the btree level for locking: things will go
-		 * bad fast should we open the live system in two handles, or
-		 * if we create, salvage, truncate or verify the live/running
-		 * file, for that matter.
+		 * We depend on the btree level for locking: things will go bad
+		 * fast if we open the live system in two handles, or salvage,
+		 * truncate or verify the live/running file.
 		 */
+#ifdef HAVE_DIAGNOSTIC
+		__wt_spin_lock(session, &block->live_lock);
+		WT_ASSERT(session, block->live_open == false);
+		block->live_open = true;
+		__wt_spin_unlock(session, &block->live_lock);
+#endif
 		ci = &block->live;
 		WT_ERR(__wt_block_ckpt_init(session, ci, "live"));
 	}
@@ -165,7 +172,7 @@ err:		/*
  */
 int
 __wt_block_checkpoint_unload(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, int checkpoint)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, bool checkpoint)
 {
 	WT_DECL_RET;
 
@@ -176,8 +183,8 @@ __wt_block_checkpoint_unload(
 	/*
 	 * If it's the live system, truncate to discard any extended blocks and
 	 * discard the active extent lists.  Hold the lock even though we're
-	 * unloading the live checkpoint, there could be readers active in
-	 * other checkpoints.
+	 * unloading the live checkpoint, there could be readers active in other
+	 * checkpoints.
 	 */
 	if (!checkpoint) {
 		/*
@@ -189,6 +196,9 @@ __wt_block_checkpoint_unload(
 
 		__wt_spin_lock(session, &block->live_lock);
 		__wt_block_ckpt_destroy(session, &block->live);
+#ifdef HAVE_DIAGNOSTIC
+		block->live_open = false;
+#endif
 		__wt_spin_unlock(session, &block->live_lock);
 	}
 
@@ -217,7 +227,7 @@ __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci)
  */
 int
 __wt_block_checkpoint(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase, int data_cksum)
+    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase, bool data_cksum)
 {
 	WT_BLOCK_CKPT *ci;
 	WT_DECL_RET;
@@ -225,7 +235,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	ci = &block->live;
 
 	/* Switch to first-fit allocation. */
-	__wt_block_configure_first_fit(block, 1);
+	__wt_block_configure_first_fit(block, true);
 
 	/*
 	 * Write the root page: it's possible for there to be a checkpoint of
@@ -242,7 +252,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	} else
 		WT_ERR(__wt_block_write_off(session, block, buf,
 		    &ci->root_offset, &ci->root_size, &ci->root_cksum,
-		    data_cksum, 0));
+		    data_cksum, false));
 
 	/*
 	 * Checkpoints are potentially reading/writing/merging lots of blocks,
@@ -257,7 +267,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	WT_TRET(__wt_block_ext_discard(session, 250));
 
 	/* Restore the original allocation plan. */
-err:	__wt_block_configure_first_fit(block, 0);
+err:	__wt_block_configure_first_fit(block, false);
 
 	return (ret);
 }
@@ -363,10 +373,10 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	uint64_t ckpt_size;
-	int deleting, locked;
+	bool deleting, locked;
 
 	ci = &block->live;
-	locked = 0;
+	locked = false;
 
 #ifdef HAVE_DIAGNOSTIC
 	WT_RET(__ckpt_verify(session, ckptbase));
@@ -427,7 +437,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	 */
 	__wt_block_extlist_free(session, &ci->ckpt_avail);
 	WT_RET(__wt_block_extlist_init(
-	    session, &ci->ckpt_avail, "live", "ckpt_avail", 1));
+	    session, &ci->ckpt_avail, "live", "ckpt_avail", true));
 	__wt_block_extlist_free(session, &ci->ckpt_alloc);
 	__wt_block_extlist_free(session, &ci->ckpt_discard);
 
@@ -436,12 +446,12 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	 * the subsequent checkpoint into which it gets rolled; read them from
 	 * disk before we lock things down.
 	 */
-	deleting = 0;
+	deleting = false;
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
 		if (F_ISSET(ckpt, WT_CKPT_FAKE) ||
 		    !F_ISSET(ckpt, WT_CKPT_DELETE))
 			continue;
-		deleting = 1;
+		deleting = true;
 
 		/*
 		 * Read the checkpoint and next checkpoint extent lists if we
@@ -473,7 +483,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	 * the final merge of ranges into the live tree.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	locked = 1;
+	locked = true;
 
 	/*
 	 * We've allocated our last page, update the checkpoint size.  We need
@@ -599,7 +609,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		if (F_ISSET(ckpt, WT_CKPT_UPDATE))
 			WT_ERR(__ckpt_update(
-			    session, block, ckpt, ckpt->bpriv, 0));
+			    session, block, ckpt, ckpt->bpriv, false));
 
 live_update:
 	/* Truncate the file if that's possible. */
@@ -620,7 +630,7 @@ live_update:
 			 */
 			ckpt->ckpt_size = ci->ckpt_size = ckpt_size;
 
-			WT_ERR(__ckpt_update(session, block, ckpt, ci, 1));
+			WT_ERR(__ckpt_update(session, block, ckpt, ci, true));
 		}
 
 	/*
@@ -631,10 +641,10 @@ live_update:
 	 */
 	ci->ckpt_alloc = ci->alloc;
 	WT_ERR(__wt_block_extlist_init(
-	    session, &ci->alloc, "live", "alloc", 0));
+	    session, &ci->alloc, "live", "alloc", false));
 	ci->ckpt_discard = ci->discard;
 	WT_ERR(__wt_block_extlist_init(
-	    session, &ci->discard, "live", "discard", 0));
+	    session, &ci->discard, "live", "discard", false));
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
@@ -647,15 +657,13 @@ live_update:
 			break;
 	if ((a = ckpt->bpriv) == NULL)
 		a = &block->live;
-	if (a->discard.entries != 0) {
-		__wt_errx(session,
+	if (a->discard.entries != 0)
+		WT_ERR_MSG(session, WT_ERROR,
 		    "first checkpoint incorrectly has blocks on the discard "
 		    "list");
-		WT_ERR(WT_ERROR);
-	}
 #endif
 
-	block->ckpt_inprogress = 1;
+	block->ckpt_inprogress = true;
 
 err:	if (locked)
 		__wt_spin_unlock(session, &block->live_lock);
@@ -675,7 +683,7 @@ err:	if (locked)
  */
 static int
 __ckpt_update(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_CKPT *ckpt, WT_BLOCK_CKPT *ci, int is_live)
+    WT_BLOCK *block, WT_CKPT *ckpt, WT_BLOCK_CKPT *ci, bool is_live)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
@@ -773,7 +781,7 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		WT_RET_MSG(session, WT_ERROR,
 		    "%s: checkpoint resolved, but no checkpoint in progress",
 		    block->name);
-	block->ckpt_inprogress = 0;
+	block->ckpt_inprogress = false;
 
 	__wt_spin_lock(session, &block->live_lock);
 	ret = __wt_block_extlist_merge(

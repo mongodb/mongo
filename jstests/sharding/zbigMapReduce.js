@@ -7,7 +7,7 @@ function setupTest() {
                             mongos : 1,
                             other: { rs: true,
                                      numReplicas: 2,
-                                     chunksize : 1,
+                                     chunkSize: 1,
                                      rsOptions: { oplogSize : 50 },
                                      enableBalancer : 1
                                  } } );

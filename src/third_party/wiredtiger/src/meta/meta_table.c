@@ -12,22 +12,22 @@
  * __metadata_turtle --
  *	Return if a key's value should be taken from the turtle file.
  */
-static int
+static bool
 __metadata_turtle(const char *key)
 {
 	switch (key[0]) {
 	case 'f':
 		if (strcmp(key, WT_METAFILE_URI) == 0)
-			return (1);
+			return (true);
 		break;
 	case 'W':
 		if (strcmp(key, "WiredTiger version") == 0)
-			return (1);
+			return (true);
 		if (strcmp(key, "WiredTiger version string") == 0)
-			return (1);
+			return (true);
 		break;
 	}
-	return (0);
+	return (false);
 }
 
 /*
@@ -37,6 +37,8 @@ __metadata_turtle(const char *key)
 int
 __wt_metadata_open(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
+
 	if (session->meta_dhandle != NULL)
 		return (0);
 
@@ -45,7 +47,24 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 	session->meta_dhandle = session->dhandle;
 	WT_ASSERT(session, session->meta_dhandle != NULL);
 
-	/* The meta_dhandle doesn't need to stay locked -- release it. */
+	/* 
+	 * Set special flags for the metadata file: eviction (the metadata file
+	 * is in-memory and never evicted), logging (the metadata file is always
+	 * logged if possible).
+	 *
+	 * Test flags before setting them so updates can't race in subsequent
+	 * opens (the first update is safe because it's single-threaded from
+	 * wiredtiger_open).
+	 */
+	btree = S2BT(session);
+	if (!F_ISSET(btree, WT_BTREE_IN_MEMORY))
+		F_SET(btree, WT_BTREE_IN_MEMORY);
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		F_SET(btree, WT_BTREE_NO_EVICTION);
+	if (F_ISSET(btree, WT_BTREE_NO_LOGGING))
+		F_CLR(btree, WT_BTREE_NO_LOGGING);
+
+	/* The metadata handle doesn't need to stay locked -- release it. */
 	return (__wt_session_release_btree(session));
 }
 
@@ -59,9 +78,9 @@ __wt_metadata_cursor(
 {
 	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
+	bool is_dead;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_open_cursor), config, NULL };
-	int is_dead;
 
 	saved_dhandle = session->dhandle;
 	WT_ERR(__wt_metadata_open(session));
@@ -77,7 +96,7 @@ __wt_metadata_cursor(
 	/* The metadata should never be closed. */
 	WT_ASSERT(session, !is_dead);
 
-	WT_ERR(__wt_curfile_create(session, NULL, cfg, 0, 0, cursorp));
+	WT_ERR(__wt_curfile_create(session, NULL, cfg, false, false, cursorp));
 	__wt_cursor_dhandle_incr_use(session);
 
 	/* Restore the caller's btree. */
@@ -132,8 +151,11 @@ __wt_metadata_update(
 	    key, value, WT_META_TRACKING(session) ? "true" : "false",
 	    __metadata_turtle(key) ? "" : "not "));
 
-	if (__metadata_turtle(key))
-		return (__wt_turtle_update(session, key, value));
+	if (__metadata_turtle(key)) {
+		WT_WITH_TURTLE_LOCK(session,
+		    ret = __wt_turtle_update(session, key, value));
+		return (ret);
+	}
 
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
@@ -200,9 +222,20 @@ __wt_metadata_search(
 	if (__metadata_turtle(key))
 		return (__wt_turtle_read(session, key, valuep));
 
+	/*
+	 * All metadata reads are at read-uncommitted isolation.  That's
+	 * because once a schema-level operation completes, subsequent
+	 * operations must see the current version of checkpoint metadata, or
+	 * they may try to read blocks that may have been freed from a file.
+	 * Metadata updates use non-transactional techniques (such as the
+	 * schema and metadata locks) to protect access to in-flight updates.
+	 */
 	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
-	WT_ERR(cursor->search(cursor));
+	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+	    ret = cursor->search(cursor));
+	WT_ERR(ret);
+
 	WT_ERR(cursor->get_value(cursor, &value));
 	WT_ERR(__wt_strdup(session, value, valuep));
 

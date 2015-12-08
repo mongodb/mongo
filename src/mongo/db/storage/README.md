@@ -107,8 +107,8 @@ details.
 
 * KVEngine
 * RecordStore
-* RecordCursor
 * RecoveryUnit
+* SeekableRecordCursor
 * SortedDataInterface
 * ServerStatusSection
 * ServerParameter
@@ -120,4 +120,3 @@ details.
 [replica set]: http://docs.mongodb.org/manual/replication/
 [Storage FAQ]: http://docs.mongodb.org/manual/faq/storage
 [two-phase locking]: http://en.wikipedia.org/wiki/Two-phase_locking
-

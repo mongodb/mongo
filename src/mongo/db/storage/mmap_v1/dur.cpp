@@ -90,7 +90,7 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -485,8 +485,8 @@ void Stats::S::_asObj(BSONObjBuilder* builder) const {
                    << (unsigned)(_commitsMicros / 1000) << "commitsInWriteLock"
                    << (unsigned)(_commitsInWriteLockMicros / 1000));
 
-    if (mmapv1GlobalOptions.journalCommitInterval != 0) {
-        b << "journalCommitIntervalMs" << mmapv1GlobalOptions.journalCommitInterval;
+    if (storageGlobalParams.journalCommitIntervalMs != 0) {
+        b << "journalCommitIntervalMs" << storageGlobalParams.journalCommitIntervalMs.load();
     }
 }
 
@@ -672,7 +672,7 @@ static void durThread() {
     uint64_t remapLastTimestamp(0);
 
     while (shutdownRequested.loadRelaxed() == 0) {
-        unsigned ms = mmapv1GlobalOptions.journalCommitInterval;
+        unsigned ms = storageGlobalParams.journalCommitIntervalMs;
         if (ms == 0) {
             ms = samePartition ? 100 : 30;
         }

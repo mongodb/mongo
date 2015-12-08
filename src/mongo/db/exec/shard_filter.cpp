@@ -136,7 +136,7 @@ unique_ptr<PlanStageStats> ShardFilterStage::getStats() {
     _commonStats.isEOF = isEOF();
     unique_ptr<PlanStageStats> ret =
         make_unique<PlanStageStats>(_commonStats, STAGE_SHARDING_FILTER);
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
     ret->specific = make_unique<ShardingFilterStats>(_specificStats);
     return ret;
 }

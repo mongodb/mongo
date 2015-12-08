@@ -24,7 +24,7 @@ var $config = (function() {
         }
 
         function init(db, collName) {
-            this.fromDBName = uniqueDBName(this.prefix, this.tid, 0);
+            this.fromDBName = db.getName() + uniqueDBName(this.prefix, this.tid, 0);
             this.num = 1;
             var fromDB = db.getSiblingDB(this.fromDBName);
 
@@ -38,7 +38,7 @@ var $config = (function() {
         }
 
         function rename(db, collName) {
-            var toDBName = uniqueDBName(this.prefix, this.tid, this.num++);
+            var toDBName = db.getName() + uniqueDBName(this.prefix, this.tid, this.num++);
             var renameCommand = {
                 renameCollection: this.fromDBName + '.' + collName,
                 to: toDBName + '.' + collName,
@@ -70,13 +70,18 @@ var $config = (function() {
     };
 
     function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
+        var pattern = new RegExp('^' + db.getName() + this.prefix + '\\d+_\\d+$');
         dropDatabases(db, pattern);
     }
 
     return {
         threadCount: 10,
-        iterations: 20,
+        // We only run a few iterations to reduce the amount of data cumulatively
+        // written to disk by mmapv1. For example, setting 10 threads and 5
+        // iterations causes this workload to write at least 32MB (.ns and .0 files)
+        // * 10 threads * 5 iterations worth of data to disk, which can be slow on
+        // test hosts.
+        iterations: 5,
         data: data,
         states: states,
         transitions: transitions,

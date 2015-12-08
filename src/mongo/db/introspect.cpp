@@ -80,7 +80,7 @@ void _appendUserInfo(const CurOp& c, BSONObjBuilder& builder, AuthorizationSessi
 }  // namespace
 
 
-void profile(OperationContext* txn, int op) {
+void profile(OperationContext* txn, NetworkOp op) {
     // Initialize with 1kb at start in order to avoid realloc later
     BufBuilder profileBufBuilder(1024);
 
@@ -148,8 +148,9 @@ void profile(OperationContext* txn, int op) {
             }
         }
     } catch (const AssertionException& assertionEx) {
-        warning() << "Caught Assertion while trying to profile " << opToString(op) << " against "
-                  << CurOp::get(txn)->getNS() << ": " << assertionEx.toString() << endl;
+        warning() << "Caught Assertion while trying to profile " << networkOpToString(op)
+                  << " against " << CurOp::get(txn)->getNS() << ": " << assertionEx.toString()
+                  << endl;
     }
 }
 

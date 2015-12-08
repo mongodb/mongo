@@ -43,6 +43,10 @@ public:
 
     void kill() final;
 
+    bool remotesExhausted() final;
+
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+
 private:
     long long _limit;
 

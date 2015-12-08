@@ -54,8 +54,10 @@ class Spec(object):
         self.gitspec = gitspec
         self.rel = rel
 
+    # Nightly version numbers can be in the form: 3.0.7-pre-, or 3.0.7-5-g3b67ac
+    #
     def is_nightly(self):
-        return bool(re.search("-$", self.version()))
+        return bool(re.search("-$", self.version())) or bool(re.search("\d-\d+-g[0-9a-f]+$", self.version()))
 
     def is_rc(self):
         return bool(re.search("-rc\d+$", self.version()))
@@ -236,7 +238,7 @@ class Distro(object):
         for SUSE)"""
 
         if re.search("(suse)", self.n):
-            return [ "suse11" ]
+            return [ "suse11", "suse12" ]
         if re.search("(redhat|fedora|centos)", self.n):
             return [ "rhel70", "rhel62", "rhel57" ]
         elif self.n == 'ubuntu':

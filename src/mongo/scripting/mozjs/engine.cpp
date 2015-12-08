@@ -33,11 +33,22 @@
 #include "mongo/scripting/mozjs/engine.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/proxyscope.h"
 #include "mongo/util/log.h"
 
+namespace js {
+void DisableExtraThreads();
+}
+
 namespace mongo {
+
+namespace {
+
+MONGO_EXPORT_SERVER_PARAMETER(disableJavaScriptJIT, bool, false);
+
+}  // namespace
 
 void ScriptEngine::setup() {
     if (!globalScriptEngine) {
@@ -57,6 +68,7 @@ namespace mozjs {
 
 MozJSScriptEngine::MozJSScriptEngine() {
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to JS_Init()", JS_Init());
+    js::DisableExtraThreads();
 }
 
 MozJSScriptEngine::~MozJSScriptEngine() {
@@ -65,6 +77,10 @@ MozJSScriptEngine::~MozJSScriptEngine() {
 
 mongo::Scope* MozJSScriptEngine::createScope() {
     return new MozJSProxyScope(this);
+}
+
+mongo::Scope* MozJSScriptEngine::createScopeForCurrentThread() {
+    return new MozJSImplScope(this);
 }
 
 void MozJSScriptEngine::interrupt(unsigned opId) {
@@ -100,6 +116,14 @@ void MozJSScriptEngine::interruptAll() {
     for (auto&& iScope : _opToScopeMap) {
         iScope.second->kill();
     }
+}
+
+void MozJSScriptEngine::enableJIT(bool value) {
+    disableJavaScriptJIT.store(!value);
+}
+
+bool MozJSScriptEngine::isJITEnabled() const {
+    return !disableJavaScriptJIT.load();
 }
 
 void MozJSScriptEngine::registerOperation(OperationContext* txn, MozJSImplScope* scope) {

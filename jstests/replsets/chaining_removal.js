@@ -18,18 +18,24 @@
                 {_id: 4, host: nodes[4].host, priority: 0},
             ],
             });
+    replTest.waitForState(nodes[0], replTest.PRIMARY, 60 * 1000);
     var primary = replTest.getPrimary();
-    // force node 4 to chain through node 1
     replTest.awaitReplication();
-    assert.commandWorked(nodes[4].getDB("admin").runCommand({"replSetSyncFrom": nodes[1].host}));
+
+    // Force node 1 to sync directly from node 0.
     assert.commandWorked(nodes[1].getDB("admin").runCommand({"replSetSyncFrom": nodes[0].host}));
     var res;
-    var res2;
+    assert.soon(function() {
+        res = nodes[1].getDB("admin").runCommand({"replSetGetStatus": 1});
+        return res.syncingTo === nodes[0].host;
+    }, function() { return "node 1 failed to start syncing from node 0: " + tojson(res); } );
+
+    // Force node 4 to sync through node 1.
+    assert.commandWorked(nodes[4].getDB("admin").runCommand({"replSetSyncFrom": nodes[1].host}));
     assert.soon(function() {
         res = nodes[4].getDB("admin").runCommand({"replSetGetStatus": 1});
-        res2 = nodes[1].getDB("admin").runCommand({"replSetGetStatus": 1});
-        return res.syncingTo === nodes[1].host && res2.syncingTo === nodes[0].host;
-    }, "node 4 failed to start chaining: "+ tojson(res));
+        return res.syncingTo === nodes[1].host;
+    }, function() { return "node 4 failed to start chaining through node 1: " + tojson(res); } );
 
     // write that should reach all nodes
     var timeout = 15 * 1000;

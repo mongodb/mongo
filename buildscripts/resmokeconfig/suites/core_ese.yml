@@ -20,6 +20,5 @@ executor:
       mongod_options:
         enableEncryption: ''
         encryptionKeyFile: *keyFile
-        nopreallocj: ''
         set_parameters:
           enableTestCommands: 1

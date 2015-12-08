@@ -31,6 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 
@@ -70,10 +71,13 @@ public:
 private:
     explicit SnapshotThread(SnapshotManager* manager);
     void run();
+    bool shouldSleepMore(int numSleepsDone, size_t numUncommittedSnapshots);
 
     SnapshotManager* const _manager;
-    bool _inShutdown = false;             // guarded by newOpMutex in oplog.cpp.
-    bool _forcedSnapshotPending = false;  // guarded by newOpMutex in oplog.cpp.
+    bool _hitSnapshotLimit = false;
+
+    AtomicWord<bool> _inShutdown{false};             // writes guarded by newOpMutex in oplog.cpp.
+    AtomicWord<bool> _forcedSnapshotPending{false};  // writes guarded by newOpMutex in oplog.cpp.
     stdx::thread _thread;
 };
 

@@ -130,7 +130,7 @@ namespace {
 CountDownLatchHolder globalCountDownLatchHolder;
 }  // namespace
 
-void CountDownLatchInfo::Functions::_new(JSContext* cx, JS::CallArgs args) {
+void CountDownLatchInfo::Functions::_new::call(JSContext* cx, JS::CallArgs args) {
     uassert(ErrorCodes::JSInterpreterFailure, "need exactly one argument", args.length() == 1);
     uassert(
         ErrorCodes::JSInterpreterFailure, "argument must be an integer", args.get(0).isNumber());
@@ -138,7 +138,7 @@ void CountDownLatchInfo::Functions::_new(JSContext* cx, JS::CallArgs args) {
     args.rval().setInt32(globalCountDownLatchHolder.make(args.get(0).toNumber()));
 }
 
-void CountDownLatchInfo::Functions::_await(JSContext* cx, JS::CallArgs args) {
+void CountDownLatchInfo::Functions::_await::call(JSContext* cx, JS::CallArgs args) {
     uassert(ErrorCodes::JSInterpreterFailure, "need exactly one argument", args.length() == 1);
     uassert(
         ErrorCodes::JSInterpreterFailure, "argument must be an integer", args.get(0).isNumber());
@@ -148,7 +148,7 @@ void CountDownLatchInfo::Functions::_await(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void CountDownLatchInfo::Functions::_countDown(JSContext* cx, JS::CallArgs args) {
+void CountDownLatchInfo::Functions::_countDown::call(JSContext* cx, JS::CallArgs args) {
     uassert(ErrorCodes::JSInterpreterFailure, "need exactly one argument", args.length() == 1);
     uassert(
         ErrorCodes::JSInterpreterFailure, "argument must be an integer", args.get(0).isNumber());
@@ -158,7 +158,7 @@ void CountDownLatchInfo::Functions::_countDown(JSContext* cx, JS::CallArgs args)
     args.rval().setUndefined();
 }
 
-void CountDownLatchInfo::Functions::_getCount(JSContext* cx, JS::CallArgs args) {
+void CountDownLatchInfo::Functions::_getCount::call(JSContext* cx, JS::CallArgs args) {
     uassert(ErrorCodes::JSInterpreterFailure, "need exactly one argument", args.length() == 1);
     uassert(
         ErrorCodes::JSInterpreterFailure, "argument must be an integer", args.get(0).isNumber());

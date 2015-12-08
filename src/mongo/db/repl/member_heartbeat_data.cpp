@@ -47,7 +47,7 @@ MemberHeartbeatData::MemberHeartbeatData() : _health(-1), _authIssue(false) {
 
 void MemberHeartbeatData::setUpValues(Date_t now,
                                       const HostAndPort& host,
-                                      ReplSetHeartbeatResponse hbResponse) {
+                                      ReplSetHeartbeatResponse&& hbResponse) {
     _health = 1;
     if (_upSince == Date_t()) {
         _upSince = now;
@@ -70,7 +70,7 @@ void MemberHeartbeatData::setUpValues(Date_t now,
               << hbResponse.getState().toString() << rsLog;
     }
 
-    _lastResponse = hbResponse;
+    _lastResponse = std::move(hbResponse);
 }
 
 void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeatMessage) {

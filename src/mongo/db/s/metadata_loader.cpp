@@ -66,11 +66,11 @@ public:
         return chunk.getShard() == _currShard;
     }
 
-    virtual pair<BSONObj, BSONObj> rangeFor(const ChunkType& chunk) const {
+    virtual pair<BSONObj, BSONObj> rangeFor(OperationContext* txn, const ChunkType& chunk) const {
         return make_pair(chunk.getMin(), chunk.getMax());
     }
 
-    virtual string shardFor(const string& name) const {
+    virtual string shardFor(OperationContext* txn, const string& name) const {
         return name;
     }
 
@@ -92,24 +92,26 @@ MetadataLoader::MetadataLoader() = default;
 
 MetadataLoader::~MetadataLoader() = default;
 
-Status MetadataLoader::makeCollectionMetadata(CatalogManager* catalogManager,
+Status MetadataLoader::makeCollectionMetadata(OperationContext* txn,
+                                              CatalogManager* catalogManager,
                                               const string& ns,
                                               const string& shard,
                                               const CollectionMetadata* oldMetadata,
                                               CollectionMetadata* metadata) const {
-    Status status = _initCollection(catalogManager, ns, shard, metadata);
+    Status status = _initCollection(txn, catalogManager, ns, shard, metadata);
     if (!status.isOK() || metadata->getKeyPattern().isEmpty()) {
         return status;
     }
 
-    return initChunks(catalogManager, ns, shard, oldMetadata, metadata);
+    return initChunks(txn, catalogManager, ns, shard, oldMetadata, metadata);
 }
 
-Status MetadataLoader::_initCollection(CatalogManager* catalogManager,
+Status MetadataLoader::_initCollection(OperationContext* txn,
+                                       CatalogManager* catalogManager,
                                        const string& ns,
                                        const string& shard,
                                        CollectionMetadata* metadata) const {
-    auto coll = catalogManager->getCollection(ns);
+    auto coll = catalogManager->getCollection(txn, ns);
     if (!coll.isOK()) {
         return coll.getStatus();
     }
@@ -129,7 +131,8 @@ Status MetadataLoader::_initCollection(CatalogManager* catalogManager,
     return Status::OK();
 }
 
-Status MetadataLoader::initChunks(CatalogManager* catalogManager,
+Status MetadataLoader::initChunks(OperationContext* txn,
+                                  CatalogManager* catalogManager,
                                   const string& ns,
                                   const string& shard,
                                   const CollectionMetadata* oldMetadata,
@@ -175,7 +178,7 @@ Status MetadataLoader::initChunks(CatalogManager* catalogManager,
         std::vector<ChunkType> chunks;
         const auto diffQuery = differ.configDiffQuery();
         Status status = catalogManager->getChunks(
-            diffQuery.query, diffQuery.sort, boost::none, &chunks, nullptr);
+            txn, diffQuery.query, diffQuery.sort, boost::none, &chunks, nullptr);
         if (!status.isOK()) {
             if (status == ErrorCodes::HostUnreachable) {
                 // Make our metadata invalid
@@ -190,7 +193,7 @@ Status MetadataLoader::initChunks(CatalogManager* catalogManager,
         // last time).  If not, something has changed on the config server (potentially between
         // when we read the collection data and when we read the chunks data).
         //
-        int diffsApplied = differ.calculateConfigDiff(chunks);
+        int diffsApplied = differ.calculateConfigDiff(txn, chunks);
         if (diffsApplied > 0) {
             // Chunks found, return ok
             LOG(2) << "loaded " << diffsApplied << " chunks into new metadata for " << ns

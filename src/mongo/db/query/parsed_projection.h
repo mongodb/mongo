@@ -48,8 +48,7 @@ public:
     static Status make(const BSONObj& spec,
                        const MatchExpression* const query,
                        ParsedProjection** out,
-                       const MatchExpressionParser::WhereCallback& whereCallback =
-                           MatchExpressionParser::WhereCallback());
+                       const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     /**
      * Returns true if the projection requires match details from the query,
@@ -96,16 +95,15 @@ public:
         return _returnKey;
     }
 
+    bool wantSortKey() const {
+        return _wantSortKey;
+    }
+
 private:
     /**
      * Must go through ::make
      */
-    ParsedProjection()
-        : _requiresMatchDetails(false),
-          _requiresDocument(true),
-          _wantGeoNearDistance(false),
-          _wantGeoNearPoint(false),
-          _returnKey(false) {}
+    ParsedProjection() = default;
 
     /**
      * Returns true if field name refers to a positional projection.
@@ -127,17 +125,20 @@ private:
     // TODO: stringdata?
     std::vector<std::string> _requiredFields;
 
-    bool _requiresMatchDetails;
+    bool _requiresMatchDetails = false;
 
-    bool _requiresDocument;
+    bool _requiresDocument = true;
 
     BSONObj _source;
 
-    bool _wantGeoNearDistance;
+    bool _wantGeoNearDistance = false;
 
-    bool _wantGeoNearPoint;
+    bool _wantGeoNearPoint = false;
 
-    bool _returnKey;
+    bool _returnKey = false;
+
+    // Whether this projection includes a sortKey meta-projection.
+    bool _wantSortKey = false;
 };
 
 }  // namespace mongo

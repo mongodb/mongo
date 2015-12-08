@@ -52,6 +52,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -65,8 +66,10 @@ UpdateResult update(OperationContext* txn,
     invariant(!request.isExplain());
 
     auto client = txn->getClient();
-    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
-    auto lastOpAtOperationStart = lastOpHolder.getLastOp();
+    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                                                txn);
 
     const NamespaceString& nsString = request.getNamespaceString();
     Collection* collection = db->getCollection(nsString.ns());
@@ -108,10 +111,11 @@ UpdateResult update(OperationContext* txn,
         uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, opDebug));
 
     uassertStatusOK(exec->executePlan());
-
-    // No-ops need to reset lastOp in the client, for write concern.
-    if (lastOpHolder.getLastOp() == lastOpAtOperationStart) {
-        lastOpHolder.setLastOpToSystemLastOpTime(txn);
+    if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
+        // If this operation has already generated a new lastOp, don't bother setting it here.
+        // No-op updates will not generate a new lastOp, so we still need the guard to fire in that
+        // case.
+        lastOpSetterGuard.Dismiss();
     }
 
     return UpdateStage::makeUpdateResult(*exec, opDebug);

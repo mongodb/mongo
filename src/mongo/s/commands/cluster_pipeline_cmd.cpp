@@ -51,6 +51,7 @@
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
@@ -110,7 +111,7 @@ public:
         shared_ptr<DBConfig> conf = status.getValue();
 
         if (!conf->isShardingEnabled()) {
-            return aggPassthrough(conf, cmdObj, result, options);
+            return aggPassthrough(txn, conf, cmdObj, result, options);
         }
 
         intrusive_ptr<ExpressionContext> mergeCtx =
@@ -131,7 +132,7 @@ public:
         }
 
         if (!conf->isSharded(fullns)) {
-            return aggPassthrough(conf, cmdObj, result, options);
+            return aggPassthrough(txn, conf, cmdObj, result, options);
         }
 
         // If the first $match stage is an exact match on the shard key, we only have to send it
@@ -161,7 +162,7 @@ public:
         }
 
         const std::initializer_list<StringData> fieldsToPropagateToShards = {
-            "$queryOptions", "$readMajorityTemporaryName", LiteParsedQuery::cmdOptionMaxTimeMS,
+            "$queryOptions", "readConcern", LiteParsedQuery::cmdOptionMaxTimeMS,
         };
         for (auto&& field : fieldsToPropagateToShards) {
             commandBuilder[field] = Value(cmdObj[field]);
@@ -200,8 +201,13 @@ public:
 
         if (!needSplit) {
             invariant(shardResults.size() == 1);
-            const auto& reply = shardResults[0].result;
-            storePossibleCursor(shardResults[0].target.toString(), reply);
+            invariant(shardResults[0].target.getServers().size() == 1);
+            auto executorPool = grid.shardRegistry()->getExecutorPool();
+            const BSONObj reply =
+                uassertStatusOK(storePossibleCursor(shardResults[0].target.getServers()[0],
+                                                    shardResults[0].result,
+                                                    executorPool->getArbitraryExecutor(),
+                                                    grid.getCursorManager()));
             result.appendElements(reply);
             return reply["ok"].trueValue();
         }
@@ -221,7 +227,7 @@ public:
                 Value(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
         }
 
-        // Not propagating $readMajorityTemporaryName to merger since it doesn't do local reads.
+        // Not propagating readConcern to merger since it doesn't do local reads.
 
         string outputNsOrEmpty;
         if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pipeline->output())) {
@@ -234,7 +240,7 @@ public:
         const auto& mergingShardId = needPrimaryShardMerger
             ? conf->getPrimaryId()
             : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
-        const auto mergingShard = grid.shardRegistry()->getShard(mergingShardId);
+        const auto mergingShard = grid.shardRegistry()->getShard(txn, mergingShardId);
         ShardConnection conn(mergingShard->getConnString(), outputNsOrEmpty);
         BSONObj mergedResults =
             aggRunCommand(conn.get(), dbname, mergeCmd.freeze().toBson(), options);
@@ -258,10 +264,11 @@ private:
     // host the command was run on which is necessary for cursor support. The exact host
     // could be different from conn->getServerAddress() for connections that map to
     // multiple servers such as for replica sets. These also take care of registering
-    // returned cursors with mongos's cursorCache.
+    // returned cursors.
     BSONObj aggRunCommand(DBClientBase* conn, const string& db, BSONObj cmd, int queryOptions);
 
-    bool aggPassthrough(shared_ptr<DBConfig> conf,
+    bool aggPassthrough(OperationContext* txn,
+                        shared_ptr<DBConfig> conf,
                         BSONObj cmd,
                         BSONObjBuilder& result,
                         int queryOptions);
@@ -394,16 +401,21 @@ BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn,
         throw RecvStaleConfigException("command failed because of stale config", result);
     }
 
-    uassertStatusOK(storePossibleCursor(cursor->originalHost(), result));
+    auto executorPool = grid.shardRegistry()->getExecutorPool();
+    result = uassertStatusOK(storePossibleCursor(HostAndPort(cursor->originalHost()),
+                                                 result,
+                                                 executorPool->getArbitraryExecutor(),
+                                                 grid.getCursorManager()));
     return result;
 }
 
-bool PipelineCommand::aggPassthrough(shared_ptr<DBConfig> conf,
+bool PipelineCommand::aggPassthrough(OperationContext* txn,
+                                     shared_ptr<DBConfig> conf,
                                      BSONObj cmd,
                                      BSONObjBuilder& out,
                                      int queryOptions) {
     // Temporary hack. See comment on declaration for details.
-    const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
+    const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
     ShardConnection conn(shard->getConnString(), "");
     BSONObj result = aggRunCommand(conn.get(), conf->name(), cmd, queryOptions);
     conn.done();

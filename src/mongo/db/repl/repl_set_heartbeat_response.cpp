@@ -119,10 +119,7 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder, bool isProtoco
     }
     if (_opTimeSet) {
         if (isProtocolVersionV1) {
-            BSONObjBuilder opTime(builder->subobjStart(kOpTimeFieldName));
-            opTime.append(kTimestampFieldName, _opTime.getTimestamp());
-            opTime.append(kTermFieldName, _opTime.getTerm());
-            opTime.done();
+            _opTime.append(builder, kOpTimeFieldName);
         } else {
             builder->appendDate(kOpTimeFieldName,
                                 Date_t::fromMillisSinceEpoch(_opTime.getTimestamp().asLL()));
@@ -206,6 +203,11 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     }
 
     _isReplSet = doc[kIsReplSetFieldName].trueValue();
+
+    Status termStatus = bsonExtractIntegerField(doc, kTermFieldName, &_term);
+    if (!termStatus.isOK() && termStatus != ErrorCodes::NoSuchKey) {
+        return termStatus;
+    }
 
     // In order to support both the 3.0(V0) and 3.2(V1) heartbeats we must parse the OpTime
     // field based on its type. If it is a Date, we parse it as the timestamp and use

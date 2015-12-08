@@ -37,6 +37,7 @@
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_cursor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/strnlen.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -866,9 +867,9 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
         case bsonTimestamp:
             // unsigned compare for timestamps - note they are not really dates but (ordinal +
             // time_t)
-            if (l.date() < r.date())
+            if (l.timestamp() < r.timestamp())
                 return -1;
-            return l.date() == r.date() ? 0 : 1;
+            return l.timestamp() == r.timestamp() ? 0 : 1;
         case Date:
             // Signed comparisons for Dates.
             {

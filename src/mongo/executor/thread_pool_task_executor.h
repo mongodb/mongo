@@ -80,6 +80,13 @@ public:
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle) override;
 
+    void appendConnectionStats(BSONObjBuilder* b) override;
+
+    /**
+     * Cancels all commands on the network interface.
+     */
+    void cancelAllCommands();
+
 private:
     class CallbackState;
     class EventState;
@@ -87,34 +94,43 @@ private:
     using EventList = stdx::list<std::shared_ptr<EventState>>;
 
     /**
-     * Creates a new callback on "queue" with the "work" function. If "when" is
-     * not Date_t{}, the new callback's readyDate is set to "when".
+     * Returns an EventList containing one unsignaled EventState. This is a helper function for
+     * performing allocations outside of _mutex, and should only be called by makeSingletonWork and
+     * makeEvent().
      */
-    StatusWith<CallbackHandle> enqueueCallbackState_inlock(WorkQueue* queue,
-                                                           CallbackFn work,
-                                                           Date_t when = {});
+    static EventList makeSingletonEventList();
 
     /**
-     * Makes a new event object.
+     * Returns an object suitable for passing to enqueueCallbackState_inlock that represents
+     * executing "work" no sooner than "when" (defaults to ASAP). This function may and should be
+     * called outside of _mutex.
      */
-    StatusWith<EventHandle> makeEvent_inlock();
+    static WorkQueue makeSingletonWorkQueue(CallbackFn work, Date_t when = {});
+
+    /**
+     * Moves the single callback in "wq" to the end of "queue". It is required that "wq" was
+     * produced via a call to makeSingletonWorkQueue().
+     */
+    StatusWith<CallbackHandle> enqueueCallbackState_inlock(WorkQueue* queue, WorkQueue* wq);
 
     /**
      * Signals the given event.
      */
-    void signalEvent_inlock(const EventHandle& event);
+    void signalEvent_inlock(const EventHandle& event, stdx::unique_lock<stdx::mutex> lk);
 
     /**
      * Schedules all items from "fromQueue" into the thread pool and moves them into
      * _poolInProgressQueue.
      */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue);
+    void scheduleIntoPool_inlock(WorkQueue* fromQueue, stdx::unique_lock<stdx::mutex> lk);
 
     /**
      * Schedules the given item from "fromQueue" into the thread pool and moves it into
      * _poolInProgressQueue.
      */
-    void scheduleIntoPool_inlock(WorkQueue* fromQueue, const WorkQueue::iterator& iter);
+    void scheduleIntoPool_inlock(WorkQueue* fromQueue,
+                                 const WorkQueue::iterator& iter,
+                                 stdx::unique_lock<stdx::mutex> lk);
 
     /**
      * Schedules entries from "begin" through "end" in "fromQueue" into the thread pool
@@ -122,7 +138,8 @@ private:
      */
     void scheduleIntoPool_inlock(WorkQueue* fromQueue,
                                  const WorkQueue::iterator& begin,
-                                 const WorkQueue::iterator& end);
+                                 const WorkQueue::iterator& end,
+                                 stdx::unique_lock<stdx::mutex> lk);
 
     /**
      * Executes the callback specified by "cbState".

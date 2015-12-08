@@ -175,13 +175,13 @@ void OplogStart::doInvalidate(OperationContext* txn, const RecordId& dl, Invalid
     }
 
     for (size_t i = 0; i < _subIterators.size(); i++) {
-        _subIterators[i]->invalidate(dl);
+        _subIterators[i]->invalidate(txn, dl);
     }
 }
 
 void OplogStart::doSaveState() {
     for (size_t i = 0; i < _subIterators.size(); i++) {
-        _subIterators[i]->savePositioned();
+        _subIterators[i]->save();
     }
 }
 

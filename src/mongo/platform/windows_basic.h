@@ -82,9 +82,23 @@
 // tell windows.h not to include a bunch of headers we don't need:
 #define WIN32_LEAN_AND_MEAN
 
+// Tell windows.h not to define any NT status codes, so that we can
+// get the definitions from ntstatus.h, which has a more complete list.
+#define WIN32_NO_STATUS
+
 #include <winsock2.h>  //this must be included before the first windows.h include
 #include <ws2tcpip.h>
 #include <windows.h>
+
+#undef WIN32_NO_STATUS
+
+// Obtain a definition for the ntstatus type.
+#include <winternl.h>
+
+// Add back in the status definitions so that macro expansions for
+// things like STILL_ACTIVE and WAIT_OBJECT_O can be resolved (they
+// expand to STATUS_ codes).
+#include <ntstatus.h>
 
 // Should come either from the command line, or if not set there, the inclusion of sdkddkver.h
 // via windows.h above should set it based in _WIN32_WINNT, which is assuredly set by now.

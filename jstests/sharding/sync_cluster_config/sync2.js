@@ -1,7 +1,9 @@
-// sync2.js
+(function () {
 
-var s = new ShardingTest( "sync2" , 3 , 50 , 2 , { sync : true } );
-s.stopBalancer()
+var s = new ShardingTest({ name: "sync2",
+                           shards: 3,
+                           mongos: 2,
+                           other: { sync : true } });
 
 var s2 = s._mongos[1];
 
@@ -112,3 +114,5 @@ for (i = 1; i < hashes.length; i++) {
 }
 
 s.stop();
+
+})();

@@ -1,24 +1,31 @@
 /* test initial sync options
  *
  * Make sure member can't sync from a member with a different buildIndexes setting.
+ *
+ * If all nodes in a replica set are using an ephemeral storage engine, the set will not be able to
+ * survive a scenario where all index-building members are down simultaneously. In such a
+ * scenario, none of the members will have any data, and upon restart will each look for a member to
+ * inital sync from. They cannot sync from a member which does not build indexes, so no primary will
+ * be elected. This test induces such a scenario, so cannot be run on ephemeral storage engines.
+ * @tags: [requires_persistence]
  */
 
 
 load("jstests/replsets/rslib.js");
 var name = "initialsync3";
 var host = getHostName();
-var port = allocatePorts(7);
 
 print("Start set with three nodes");
 var replTest = new ReplSetTest( {name: name, nodes: 3} );
 var nodes = replTest.startSet();
 replTest.initiate({
-    _id : name,
-    members : [
-        {_id:0, host : host+":"+port[0], priority: 10},
-        {_id:1, host : host+":"+port[1], priority: 0},
-        {_id:2, host : host+":"+port[2], priority : 0, buildIndexes : false},
-               ]});
+    _id: name,
+    members: [
+        {_id: 0, host: host + ":" + nodes[0].port, priority: 10},
+        {_id: 1, host: host + ":" + nodes[1].port, priority: 0},
+        {_id: 2, host: host + ":" + nodes[2].port, priority: 0, buildIndexes: false},
+    ]
+});
 
 var master = replTest.getMaster();
 

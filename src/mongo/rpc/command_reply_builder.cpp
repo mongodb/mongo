@@ -35,53 +35,52 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {
 
-CommandReplyBuilder::CommandReplyBuilder() : _message{stdx::make_unique<Message>()} {}
+CommandReplyBuilder::CommandReplyBuilder() : CommandReplyBuilder(Message{}) {}
 
-CommandReplyBuilder::CommandReplyBuilder(std::unique_ptr<Message> message)
-    : _message{std::move(message)} {}
-
-CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
-    invariant(_state == State::kMetadata);
-
-    metadata.appendSelfToBufBuilder(_builder);
-    _state = State::kCommandReply;
-    return *this;
+CommandReplyBuilder::CommandReplyBuilder(Message&& message) : _message{std::move(message)} {
+    _builder.skip(mongo::MsgData::MsgDataHeaderSize);
 }
 
 CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(const BSONObj& commandReply) {
     invariant(_state == State::kCommandReply);
-
     commandReply.appendSelfToBufBuilder(_builder);
+    _state = State::kMetadata;
+    return *this;
+}
+
+BufBuilder& CommandReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
+    invariant(_state == State::kCommandReply);
+    // Eagerly allocate reserveBytes bytes.
+    _builder.reserveBytes(reserveBytes);
+    // Claim our reservation immediately so we can actually write data to it.
+    _builder.claimReservedBytes(reserveBytes);
+    _state = State::kMetadata;
+    return _builder;
+}
+
+CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
+    invariant(_state == State::kMetadata);
+    metadata.appendSelfToBufBuilder(_builder);
     _state = State::kOutputDocs;
     return *this;
 }
+
 
 Status CommandReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
     invariant(_state == State::kOutputDocs);
     auto rangeData = outputDocs.data();
     auto dataSize = rangeData.length();
-    auto hasSpace = _hasSpaceFor(dataSize);
-    if (!hasSpace.isOK()) {
-        return hasSpace;
-    }
-
     _builder.appendBuf(rangeData.data(), dataSize);
     return Status::OK();
 }
 
 Status CommandReplyBuilder::addOutputDoc(const BSONObj& outputDoc) {
     invariant(_state == State::kOutputDocs);
-
-    auto dataSize = static_cast<std::size_t>(outputDoc.objsize());
-    auto hasSpace = _hasSpaceFor(dataSize);
-    if (!hasSpace.isOK()) {
-        return hasSpace;
-    }
-
     outputDoc.appendSelfToBufBuilder(_builder);
     return Status::OK();
 }
@@ -95,42 +94,26 @@ Protocol CommandReplyBuilder::getProtocol() const {
 }
 
 void CommandReplyBuilder::reset() {
-    // If we are in State::kMetadata, we are already in the 'start' state, so by
+    // If we are in State::kCommandReply, we are already in the 'start' state, so by
     // immediately returning, we save a heap allocation.
-    if (_state == State::kMetadata) {
+    if (_state == State::kCommandReply) {
         return;
     }
     _builder.reset();
-    _message = stdx::make_unique<Message>();
-    _state = State::kMetadata;
+    _builder.skip(mongo::MsgData::MsgDataHeaderSize);
+    _message.reset();
+    _state = State::kCommandReply;
 }
 
-std::unique_ptr<Message> CommandReplyBuilder::done() {
+Message CommandReplyBuilder::done() {
     invariant(_state == State::kOutputDocs);
-    // TODO: we can elide a large copy here by transferring the internal buffer of
-    // the BufBuilder to the Message.
-    _message->setData(dbCommandReply, _builder.buf(), _builder.len());
+    MsgData::View msg = _builder.buf();
+    msg.setLen(_builder.len());
+    msg.setOperation(dbCommandReply);
+    _builder.decouple();                     // release ownership from BufBuilder
+    _message.setData(msg.view2ptr(), true);  // transfer ownership to Message
     _state = State::kDone;
     return std::move(_message);
-}
-
-std::size_t CommandReplyBuilder::availableBytes() const {
-    int intLen = _builder.len();
-    invariant(0 <= intLen);
-    std::size_t len = static_cast<std::size_t>(intLen);
-    std::size_t msgHeaderSz = static_cast<std::size_t>(MsgData::MsgDataHeaderSize);
-    invariant(len + msgHeaderSz <= mongo::MaxMessageSizeBytes);
-    return mongo::MaxMessageSizeBytes - len - msgHeaderSz;
-}
-
-Status CommandReplyBuilder::_hasSpaceFor(std::size_t dataSize) const {
-    size_t availBytes = availableBytes();
-    if (availBytes < dataSize) {
-        return Status(ErrorCodes::Overflow,
-                      str::stream() << "Not enough space to store " << dataSize << " bytes. Only "
-                                    << availBytes << " bytes are available.");
-    }
-    return Status::OK();
 }
 
 }  // rpc

@@ -65,9 +65,16 @@ typedef enum {
 	}								\
 } while (0)
 
-#define	WT_TIMEDIFF(end, begin)						\
-	(1000000000 * (uint64_t)((end).tv_sec - (begin).tv_sec) +	\
+#define	WT_TIMEDIFF_NS(end, begin)					\
+	(WT_BILLION * (uint64_t)((end).tv_sec - (begin).tv_sec) +	\
 	    (uint64_t)(end).tv_nsec - (uint64_t)(begin).tv_nsec)
+#define	WT_TIMEDIFF_US(end, begin)					\
+	(WT_TIMEDIFF_NS((end), (begin)) / WT_THOUSAND)
+#define	WT_TIMEDIFF_MS(end, begin)					\
+	(WT_TIMEDIFF_NS((end), (begin)) / WT_MILLION)
+#define	WT_TIMEDIFF_SEC(end, begin)					\
+	(WT_TIMEDIFF_NS((end), (begin)) / WT_BILLION)
+
 #define	WT_TIMECMP(t1, t2)						\
 	((t1).tv_sec < (t2).tv_sec ? -1 :				\
 	     (t1).tv_sec == (t2.tv_sec) ?				\
@@ -93,7 +100,7 @@ struct __wt_fh {
 	wt_off_t extend_size;			/* File extended size */
 	wt_off_t extend_len;			/* File extend chunk size */
 
-	int	direct_io;			/* O_DIRECT configured */
+	bool	 direct_io;			/* O_DIRECT configured */
 
 	enum {					/* file extend configuration */
 	    WT_FALLOCATE_AVAILABLE,
@@ -101,5 +108,5 @@ struct __wt_fh {
 	    WT_FALLOCATE_POSIX,
 	    WT_FALLOCATE_STD,
 	    WT_FALLOCATE_SYS } fallocate_available;
-	int	fallocate_requires_locking;
+	bool fallocate_requires_locking;
 };

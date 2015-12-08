@@ -10,12 +10,12 @@ st.stopBalancer();
 
 var badConfStr = st.c1.name + ',' + st.c0.name + ',' + st.c2.name;
 
-var otherMongos = MongoRunner.runMongos({ port: 30998, configdb: badConfStr });
+var otherMongos = MongoRunner.runMongos({configdb: badConfStr});
 var configDB = otherMongos.getDB('config');
 
 var res = configDB.user.insert({ x: 1 });
 assert.writeError(res);
-MongoRunner.stopMongos(30998);
+MongoRunner.stopMongos(otherMongos.port);
 
 st.stop();
 

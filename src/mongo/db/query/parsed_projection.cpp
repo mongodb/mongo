@@ -48,17 +48,12 @@ using std::string;
 Status ParsedProjection::make(const BSONObj& spec,
                               const MatchExpression* const query,
                               ParsedProjection** out,
-                              const MatchExpressionParser::WhereCallback& whereCallback) {
-    // Are we including or excluding fields?  Values:
-    // -1 when we haven't initialized it.
-    // 1 when we're including
-    // 0 when we're excluding.
-    int include_exclude = -1;
+                              const ExtensionsCallback& extensionsCallback) {
+    // Whether we're including or excluding fields.
+    enum class IncludeExclude { kUninitialized, kInclude, kExclude };
+    IncludeExclude includeExclude = IncludeExclude::kUninitialized;
 
-    // If any of these are 'true' the projection isn't covered.
-    bool include = true;
-    bool hasNonSimple = false;
-    bool hasDottedField = false;
+    bool requiresDocument = false;
 
     bool includeID = true;
 
@@ -66,6 +61,7 @@ Status ParsedProjection::make(const BSONObj& spec,
 
     bool wantGeoNearPoint = false;
     bool wantGeoNearDistance = false;
+    bool wantSortKey = false;
 
     // Until we see a positional or elemMatch operator we're normal.
     ArrayOpType arrayOpType = ARRAY_OP_NORMAL;
@@ -73,10 +69,6 @@ Status ParsedProjection::make(const BSONObj& spec,
     BSONObjIterator it(spec);
     while (it.more()) {
         BSONElement e = it.next();
-
-        if (!e.isNumber() && !e.isBoolean()) {
-            hasNonSimple = true;
-        }
 
         if (Object == e.type()) {
             BSONObj obj = e.embeddedObject();
@@ -105,6 +97,9 @@ Status ParsedProjection::make(const BSONObj& spec,
                     return Status(ErrorCodes::BadValue,
                                   "$slice only supports numbers and [skip, limit] arrays");
                 }
+
+                // Projections with $slice aren't covered.
+                requiresDocument = true;
             } else if (mongoutils::str::equals(e2.fieldName(), "$elemMatch")) {
                 // Validate $elemMatch arguments and dependencies.
                 if (Object != e2.type()) {
@@ -130,10 +125,13 @@ Status ParsedProjection::make(const BSONObj& spec,
 
                 // TODO: Is there a faster way of validating the elemMatchObj?
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, whereCallback);
+                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback);
                 if (!statusWithMatcher.isOK()) {
                     return statusWithMatcher.getStatus();
                 }
+
+                // Projections with $elemMatch aren't covered.
+                requiresDocument = true;
             } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
                 // Field for meta must be top level.  We can relax this at some point.
                 if (mongoutils::str::contains(e.fieldName(), '.')) {
@@ -150,7 +148,8 @@ Status ParsedProjection::make(const BSONObj& spec,
                     e2.valuestr() != LiteParsedQuery::metaRecordId &&
                     e2.valuestr() != LiteParsedQuery::metaIndexKey &&
                     e2.valuestr() != LiteParsedQuery::metaGeoNearDistance &&
-                    e2.valuestr() != LiteParsedQuery::metaGeoNearPoint) {
+                    e2.valuestr() != LiteParsedQuery::metaGeoNearPoint &&
+                    e2.valuestr() != LiteParsedQuery::metaSortKey) {
                     return Status(ErrorCodes::BadValue, "unsupported $meta operator: " + e2.str());
                 }
 
@@ -161,6 +160,13 @@ Status ParsedProjection::make(const BSONObj& spec,
                     wantGeoNearDistance = true;
                 } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
                     wantGeoNearPoint = true;
+                } else if (e2.valuestr() == LiteParsedQuery::metaSortKey) {
+                    wantSortKey = true;
+                }
+
+                // Of the $meta projections, only sortKey can be covered.
+                if (e2.valuestr() != LiteParsedQuery::metaSortKey) {
+                    requiresDocument = true;
                 }
             } else {
                 return Status(ErrorCodes::BadValue,
@@ -171,22 +177,20 @@ Status ParsedProjection::make(const BSONObj& spec,
         } else {
             // Projections of dotted fields aren't covered.
             if (mongoutils::str::contains(e.fieldName(), '.')) {
-                hasDottedField = true;
+                requiresDocument = true;
             }
 
-            // Validate input.
-            if (include_exclude == -1) {
-                // If we haven't specified an include/exclude, initialize include_exclude.
-                // We expect further include/excludes to match it.
-                include_exclude = e.trueValue();
-                include = !e.trueValue();
-            } else if (static_cast<bool>(include_exclude) != e.trueValue()) {
-                // Make sure that the incl./excl. matches the previous.
+            // If we haven't specified an include/exclude, initialize includeExclude. We expect
+            // further include/excludes to match it.
+            if (includeExclude == IncludeExclude::kUninitialized) {
+                includeExclude =
+                    e.trueValue() ? IncludeExclude::kInclude : IncludeExclude::kExclude;
+            } else if ((includeExclude == IncludeExclude::kInclude && !e.trueValue()) ||
+                       (includeExclude == IncludeExclude::kExclude && e.trueValue())) {
                 return Status(ErrorCodes::BadValue,
                               "Projection cannot have a mix of inclusion and exclusion.");
             }
         }
-
 
         if (_isPositionalOperator(e.fieldName())) {
             // Validate the positional op.
@@ -225,6 +229,13 @@ Status ParsedProjection::make(const BSONObj& spec,
         }
     }
 
+    // If includeExclude is uninitialized or set to exclude fields, then we can't use an index
+    // because we don't know what fields we're missing.
+    if (includeExclude == IncludeExclude::kUninitialized ||
+        includeExclude == IncludeExclude::kExclude) {
+        requiresDocument = true;
+    }
+
     // Fill out the returned obj.
     unique_ptr<ParsedProjection> pp(new ParsedProjection());
 
@@ -236,15 +247,12 @@ Status ParsedProjection::make(const BSONObj& spec,
     verify(spec.isOwned());
     pp->_source = spec;
     pp->_returnKey = hasIndexKeyProjection;
+    pp->_requiresDocument = requiresDocument;
 
-    // Dotted fields aren't covered, non-simple require match details, and as for include, "if
-    // we default to including then we can't use an index because we don't know what we're
-    // missing."
-    pp->_requiresDocument = include || hasNonSimple || hasDottedField;
-
-    // Add geoNear projections.
+    // Add meta-projections.
     pp->_wantGeoNearPoint = wantGeoNearPoint;
     pp->_wantGeoNearDistance = wantGeoNearDistance;
+    pp->_wantSortKey = wantSortKey;
 
     // If it's possible to compute the projection in a covered fashion, populate _requiredFields
     // so the planner can perform projection analysis.
@@ -253,13 +261,21 @@ Status ParsedProjection::make(const BSONObj& spec,
             pp->_requiredFields.push_back("_id");
         }
 
-        // The only way we could be here is if spec is only simple non-dotted-field projections.
-        // Therefore we can iterate over spec to get the fields required.
+        // The only way we could be here is if spec is only simple non-dotted-field inclusions or
+        // the $meta sortKey projection. Therefore we can iterate over spec to get the fields
+        // required.
         BSONObjIterator srcIt(spec);
         while (srcIt.more()) {
             BSONElement elt = srcIt.next();
             // We've already handled the _id field before entering this loop.
             if (includeID && mongoutils::str::equals(elt.fieldName(), "_id")) {
+                continue;
+            }
+            // $meta sortKey should not be checked as a part of _requiredFields, since it can
+            // potentially produce a covered projection as long as the sort key is covered.
+            if (BSONType::Object == elt.type()) {
+                dassert(elt.Obj() == BSON("$meta"
+                                          << "sortKey"));
                 continue;
             }
             if (elt.trueValue()) {
@@ -268,8 +284,8 @@ Status ParsedProjection::make(const BSONObj& spec,
         }
     }
 
-    // returnKey clobbers everything.
-    if (hasIndexKeyProjection) {
+    // returnKey clobbers everything except for sortKey meta-projection.
+    if (hasIndexKeyProjection && !wantSortKey) {
         pp->_requiresDocument = false;
     }
 

@@ -10,7 +10,6 @@ executor:
     fixture:
       class: ReplicaSetFixture
       mongod_options:
-        nopreallocj: ''
         set_parameters:
           enableTestCommands: 1
       num_nodes: 2

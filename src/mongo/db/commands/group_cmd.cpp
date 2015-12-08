@@ -32,10 +32,12 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/group.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 
 namespace mongo {
@@ -70,6 +72,10 @@ private:
         return true;
     }
 
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
+    }
+
     virtual void help(std::stringstream& help) const {
         help << "http://dochub.mongodb.org/core/aggregation";
     }
@@ -95,6 +101,7 @@ private:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         GroupRequest groupRequest;
         Status parseRequestStatus = _parseRequest(dbname, cmdObj, &groupRequest);
@@ -159,6 +166,12 @@ private:
         }
 
         invariant(planExecutor->isEOF());
+
+        PlanSummaryStats summaryStats;
+        Explain::getSummaryStats(*planExecutor, &summaryStats);
+        if (coll) {
+            coll->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+        }
 
         invariant(STAGE_GROUP == planExecutor->getRootStage()->stageType());
         GroupStage* groupStage = static_cast<GroupStage*>(planExecutor->getRootStage());

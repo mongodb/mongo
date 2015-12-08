@@ -312,22 +312,66 @@ public:
  * A response to a DbMessage.
  */
 struct DbResponse {
-    Message* response;
+    Message response;
     MSGID responseTo;
     std::string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
-    DbResponse(Message* r, MSGID rt) : response(r), responseTo(rt) {}
-    DbResponse() {
-        response = 0;
+    DbResponse(Message r, MSGID rt) : response(std::move(r)), responseTo(rt) {}
+    DbResponse() = default;
+};
+
+/**
+ * Prepares query replies to legacy finds (opReply to dbQuery) in place. This is also used for
+ * command responses that don't use the new dbCommand protocol.
+ */
+class OpQueryReplyBuilder {
+    MONGO_DISALLOW_COPYING(OpQueryReplyBuilder);
+
+public:
+    OpQueryReplyBuilder();
+
+    /**
+     * Returns the BufBuilder that should be used for placing result objects. It will be positioned
+     * where the first (or next) object should go.
+     *
+     * You must finish the BSONObjBuilder that uses this (by destruction or calling doneFast())
+     * before calling any more methods on this object.
+     */
+    BufBuilder& bufBuilderForResults() {
+        return _buffer;
     }
-    ~DbResponse() {
-        delete response;
-    }
+
+    /**
+     * Finishes the reply and transfers the message buffer into 'out'.
+     */
+    void putInMessage(Message* out,
+                      int queryResultFlags,
+                      int nReturned,
+                      int startingFrom = 0,
+                      long long cursorId = 0);
+
+    /**
+     * Finishes the reply and sends the message out to 'destination'.
+     */
+    void send(AbstractMessagingPort* destination,
+              int queryResultFlags,
+              Message& requestMsg,  // should be const but MessagePort::reply takes non-const.
+              int nReturned,
+              int startingFrom = 0,
+              long long cursorId = 0);
+
+    /**
+     * Similar to send() but used for replying to a command.
+     */
+    void sendCommandReply(AbstractMessagingPort* destination, Message& requestMsg);
+
+private:
+    BufBuilder _buffer;
 };
 
 void replyToQuery(int queryResultFlags,
                   AbstractMessagingPort* p,
                   Message& requestMsg,
-                  void* data,
+                  const void* data,
                   int size,
                   int nReturned,
                   int startingFrom = 0,

@@ -57,6 +57,9 @@ public:
         kStorage,
         kJournal,
         kWrite,
+        kFTDC,
+        kASIO,
+        kBridge,
         kNumLogComponents
     };
 

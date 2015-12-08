@@ -215,6 +215,22 @@ TEST_F(ConfigUpgradeTests, ClusterIDVersion) {
     ASSERT_EQUALS(newVersion.getClusterId(), clusterId);
 }
 
+TEST_F(ConfigUpgradeTests, InitialUpgrade) {
+    //
+    // Tests initializing the config server to the initial version
+    //
+
+    string errMsg;
+    ASSERT_OK(grid.catalogManager(&_txn)->initConfigVersion(&_txn));
+
+    VersionType version;
+    ASSERT_OK(getConfigVersion(grid.catalogManager(&_txn), &version));
+
+    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, version.getMinCompatibleVersion());
+    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, version.getCurrentVersion());
+    ASSERT_TRUE(version.getClusterId().isSet());
+}
+
 TEST_F(ConfigUpgradeTests, BadVersionUpgrade) {
     //
     // Tests that we can't upgrade from a config version we don't have an upgrade path for
@@ -226,25 +242,7 @@ TEST_F(ConfigUpgradeTests, BadVersionUpgrade) {
 
     // Default version (not upgradeable)
     ASSERT_EQ(ErrorCodes::IncompatibleShardingMetadata,
-              grid.catalogManager(&_txn)->checkAndUpgrade(false));
-}
-
-TEST_F(ConfigUpgradeTests, CheckMongoVersion) {
-    //
-    // Tests basic detection of existing mongos and mongod versions from mongos ping
-    // and shard info.  Fuller tests require conns to multiple version mongos processes, not
-    // done here.
-    //
-
-    storeShardsAndPings(5, 10);  // 5 shards, 10 pings
-
-    // Our version is >= 2.2, so this works
-    Status status = checkClusterMongoVersions(grid.catalogManager(&_txn), "2.2");
-    ASSERT(status.isOK());
-
-    // Our version is < 9.9, so this doesn't work (until we hit v99.99)
-    status = checkClusterMongoVersions(grid.catalogManager(&_txn), "99.99");
-    ASSERT(status.code() == ErrorCodes::RemoteValidationError);
+              grid.catalogManager(&_txn)->initConfigVersion(&_txn));
 }
 
 }  // namespace

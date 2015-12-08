@@ -139,8 +139,9 @@ void ExpressionParams::parse2dsphereParams(const BSONObj& infoObj, S2IndexingPar
     // Determine which version of this index we're using.  If none was set in the descriptor,
     // assume S2_INDEX_VERSION_1 (alas, the first version predates the existence of the version
     // field).
-    bsonExtractIntegerFieldWithDefault(
+    Status status = bsonExtractIntegerFieldWithDefault(
         infoObj, kIndexVersionFieldName, S2_INDEX_VERSION_1, &indexVersion);
+    uassertStatusOK(status);
 
     out->indexVersion = static_cast<S2IndexVersion>(indexVersion);
 
@@ -160,12 +161,17 @@ void ExpressionParams::parse2dsphereParams(const BSONObj& infoObj, S2IndexingPar
 
     long long finestIndexedLevel, coarsestIndexedLevel, maxCellsInCovering;
 
-    bsonExtractIntegerFieldWithDefault(
+    status = bsonExtractIntegerFieldWithDefault(
         infoObj, "finestIndexedLevel", defaultFinestIndexedLevel, &finestIndexedLevel);
-    bsonExtractIntegerFieldWithDefault(
+    uassertStatusOK(status);
+
+    status = bsonExtractIntegerFieldWithDefault(
         infoObj, "coarsestIndexedLevel", defaultCoarsestIndexedLevel, &coarsestIndexedLevel);
-    bsonExtractIntegerFieldWithDefault(
+    uassertStatusOK(status);
+
+    status = bsonExtractIntegerFieldWithDefault(
         infoObj, "maxCellsInCovering", defaultMaxCellsInCovering, &maxCellsInCovering);
+    uassertStatusOK(status);
 
     // This is advisory.
     out->maxCellsInCovering = maxCellsInCovering;

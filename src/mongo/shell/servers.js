@@ -101,28 +101,25 @@ MongoRunner = function(){}
     
 MongoRunner.dataDir = "/data/db"
 MongoRunner.dataPath = "/data/db/"
-MongoRunner.usedPortMap = {}
 
 MongoRunner.VersionSub = function(regex, version) {
     this.regex = regex;
     this.version = version;
 }
 
-// These patterns allow substituting the binary versions used for each
-// version string to support the dev/stable MongoDB release cycle.
+// These patterns allow substituting the binary versions used for each version string to support the
+// dev/stable MongoDB release cycle.
+//
+// If you add a new version substitution to this list, you should add it to the lists of versions
+// being checked in '0_test_launching.js' to verify it is susbstituted correctly.
 MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
-                               new MongoRunner.VersionSub(/^oldest-supported$/, "1.8"),
-                               // To-be-updated when 3.4 becomes available
+                               // To-be-updated when we branch for the next release.
                                new MongoRunner.VersionSub(/^last-stable$/, "3.0"),
-                               // Latest unstable and next stable are effectively the
-                               // same release
-                               // 2.8 and 3.0 are equivalent.
-                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, "3.0"),
                                new MongoRunner.VersionSub(/^3\.1(\..*){0,1}/, ""),
                                new MongoRunner.VersionSub(/^3\.2(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
- 
+
     // If this is a version iterator, iterate the version via toString()
     if (version instanceof MongoRunner.versionIterator.iterator) {
         version = version.toString();
@@ -143,7 +140,7 @@ MongoRunner.getBinVersionFor = function(version) {
     }
 
     return version;
-}
+};
 
 MongoRunner.areBinVersionsTheSame = function(versionA, versionB) {
 
@@ -178,7 +175,8 @@ MongoRunner.logicalOptions = { runId : true,
                                noJournalPrealloc : true,
                                noJournal : true,
                                binVersion : true,
-                               waitForConnect : true }
+                               waitForConnect : true,
+                               bridgeOptions : true }
 
 MongoRunner.toRealPath = function( path, pathOpts ){
     
@@ -186,7 +184,7 @@ MongoRunner.toRealPath = function( path, pathOpts ){
     pathOpts = pathOpts || {}
     path = path.replace( /\$dataPath/g, MongoRunner.dataPath )
     path = path.replace( /\$dataDir/g, MongoRunner.dataDir )
-    for( key in pathOpts ){
+    for( var key in pathOpts ){
         path = path.replace( RegExp( "\\$" + RegExp.escape(key), "g" ), pathOpts[ key ] )
     }
     
@@ -217,16 +215,6 @@ MongoRunner.toRealDir = function( path, pathOpts ){
 }
 
 MongoRunner.toRealFile = MongoRunner.toRealDir
-
-MongoRunner.nextOpenPort = function(){
-
-    var i = 0;
-    while( MongoRunner.usedPortMap[ "" + ( 27000 + i ) ] ) i++;
-    MongoRunner.usedPortMap[ "" + ( 27000 + i ) ] = true
-    
-    return 27000 + i
-
-}
 
 /**
  * Returns an iterator object which yields successive versions on toString(), starting from a
@@ -363,8 +351,7 @@ MongoRunner.arrToOpts = function( arr ){
 
 MongoRunner.savedOptions = {}
 
-MongoRunner.mongoOptions = function( opts ){
-   
+MongoRunner.mongoOptions = function(opts) {
     // Don't remember waitForConnect
     var waitForConnect = opts.waitForConnect;
     delete opts.waitForConnect;
@@ -403,32 +390,37 @@ MongoRunner.mongoOptions = function( opts ){
     // If we passed in restart : <conn> or runId : <conn>
     if( isObject( opts.runId ) && opts.runId.runId ) opts.runId = opts.runId.runId
     
-    if( opts.restart && opts.remember ) opts = Object.merge( MongoRunner.savedOptions[ opts.runId ], opts )
+    if (opts.restart && opts.remember) {
+        opts = Object.merge(MongoRunner.savedOptions[ opts.runId ], opts);
+    }
 
     // Create a new runId
     opts.runId = opts.runId || ObjectId()
-    
-    // Save the port if required
-    if( ! opts.forgetPort ) opts.port = opts.port || MongoRunner.nextOpenPort()
-    
-    var shouldRemember = ( ! opts.restart && ! opts.noRemember ) || ( opts.restart && opts.appendOptions )
-    
-    // Normalize and get the binary version to use
-    opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
-        
-    if ( shouldRemember ){
-        MongoRunner.savedOptions[ opts.runId ] = Object.merge( opts, {} )
-    }
-    
-    // Default for waitForConnect is true
-    opts.waitForConnect = (waitForConnect == undefined || waitForConnect == null) ?
-        true : waitForConnect;
 
-    opts.port = opts.port || MongoRunner.nextOpenPort()
-    MongoRunner.usedPortMap[ "" + parseInt( opts.port ) ] = true
-    
-    opts.pathOpts = Object.merge( opts.pathOpts || {}, { port : "" + opts.port, runId : "" + opts.runId } )    
-   
+    if (opts.forgetPort) {
+        delete opts.port;
+    }
+
+    // Normalize and get the binary version to use
+    if (opts.hasOwnProperty('binVersion')) {
+        opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
+    }
+
+    // Default for waitForConnect is true
+    opts.waitForConnect =
+        (waitForConnect == undefined || waitForConnect == null) ? true : waitForConnect;
+
+    opts.port = opts.port || allocatePort();
+
+    opts.pathOpts = Object.merge(opts.pathOpts || {},
+                                 { port : "" + opts.port, runId : "" + opts.runId });
+
+    var shouldRemember =
+        (!opts.restart && !opts.noRemember ) || (opts.restart && opts.appendOptions);
+    if (shouldRemember) {
+        MongoRunner.savedOptions[opts.runId] = Object.merge(opts, {});
+    }
+
     return opts
 }
 
@@ -470,8 +462,11 @@ MongoRunner.mongodOptions = function( opts ){
     if( jsTestOptions().noJournalPrealloc || opts.noJournalPrealloc )
         opts.nopreallocj = ""
 
-    if( (jsTestOptions().noJournal || opts.noJournal) && !('journal' in opts))
+    if((jsTestOptions().noJournal || opts.noJournal) &&
+            !('journal' in opts) &&
+            !('configsvr' in opts)) {
         opts.nojournal = ""
+    }
 
     if( jsTestOptions().keyFile && !opts.keyFile) {
         opts.keyFile = jsTestOptions().keyFile
@@ -503,15 +498,26 @@ MongoRunner.mongodOptions = function( opts ){
         opts.encryptionKeyFile = jsTestOptions().encryptionKeyFile;
     }
 
+    if (opts.hasOwnProperty("auditDestination")) {
+        // opts.auditDestination, if set, must be a string
+        if (typeof opts.auditDestination !== "string") {
+            throw new Error("The auditDestination option must be a string if it is specified");
+        }
+    } else if (jsTestOptions().auditDestination !== undefined) {
+        if (typeof(jsTestOptions().auditDestination) !== "string") {
+            throw new Error("The auditDestination option must be a string if it is specified");
+        }
+        opts.auditDestination = jsTestOptions().auditDestination;
+    }
+
     if( opts.noReplSet ) opts.replSet = null
     if( opts.arbiter ) opts.oplogSize = 1
             
     return opts
 }
 
-MongoRunner.mongosOptions = function( opts ){
-
-    opts = MongoRunner.mongoOptions( opts )
+MongoRunner.mongosOptions = function( opts ) {
+    opts = MongoRunner.mongoOptions(opts);
     
     // Normalize configdb option to be host string if currently a host
     if( opts.configdb && opts.configdb.getDB ){
@@ -533,10 +539,27 @@ MongoRunner.mongosOptions = function( opts ){
         opts.logpath = opts.logFile;
     }
 
-    if( jsTestOptions().keyFile && !opts.keyFile) {
-        opts.keyFile = jsTestOptions().keyFile
+    var testOptions = jsTestOptions();
+    if (testOptions.keyFile && !opts.keyFile) {
+        opts.keyFile = testOptions.keyFile;
     }
-    
+
+    if (opts.hasOwnProperty("auditDestination")) {
+        // opts.auditDestination, if set, must be a string
+        if (typeof opts.auditDestination !== "string") {
+            throw new Error("The auditDestination option must be a string if it is specified");
+        }
+    } else if (testOptions.auditDestination !== undefined) {
+        if (typeof(testOptions.auditDestination) !== "string") {
+            throw new Error("The auditDestination option must be a string if it is specified");
+        }
+        opts.auditDestination = testOptions.auditDestination;
+    }
+
+    if (!opts.hasOwnProperty('binVersion') && testOptions.mongosBinVersion) {
+        opts.binVersion = MongoRunner.getBinVersionFor(testOptions.mongosBinVersion);
+    }
+
     return opts
 }
 
@@ -596,7 +619,7 @@ MongoRunner.runMongod = function( opts ){
     }
 
     var mongod = MongoRunner.startWithArgs(opts, waitForConnect);
-    if (!waitForConnect) mongos = {};
+    if (!waitForConnect) mongod = {};
     if (!mongod) return null;
     
     mongod.commandLine = MongoRunner.arrToOpts( opts )
@@ -611,24 +634,23 @@ MongoRunner.runMongod = function( opts ){
     return mongod
 }
 
-MongoRunner.runMongos = function( opts ){
-    
+MongoRunner.runMongos = function(opts) {
     opts = opts || {}
+
     var useHostName = false;
     var runId = null;
     var waitForConnect = true;
     var fullOptions = opts;
     
-    if( isObject( opts ) ) {
-        
+    if (isObject(opts)) {
         opts = MongoRunner.mongosOptions( opts );
         fullOptions = opts;
-        
+
         useHostName = opts.useHostName || opts.useHostname;
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
-        
-        opts = MongoRunner.arrOptions( "mongos", opts )
+
+        opts = MongoRunner.arrOptions("mongos", opts);
     }
     
     var mongos = MongoRunner.startWithArgs(opts, waitForConnect);
@@ -678,33 +700,11 @@ MongoRunner.stopMongod = function( port, signal, opts ){
         var opts = MongoRunner.savedOptions( port )
         if( opts ) port = parseInt( opts.port )
     }
-    
-    var exitCode = _stopMongoProgram( parseInt( port ), parseInt( signal ), opts )
-    
-    delete MongoRunner.usedPortMap[ "" + parseInt( port ) ]
 
-    return exitCode
+    return _stopMongoProgram(parseInt(port), parseInt(signal), opts);
 }
 
-MongoRunner.stopMongos = MongoRunner.stopMongod
-
-MongoRunner.isStopped = function( port ){
-    
-    if( ! port ) {
-        print( "Cannot detect if process " + port + " is stopped." )
-        return
-    }
-    
-    if( port.port )
-        port = parseInt( port.port )
-    
-    if( port instanceof ObjectId ){
-        var opts = MongoRunner.savedOptions( port )
-        if( opts ) port = parseInt( opts.port )
-    }
-    
-    return MongoRunner.usedPortMap[ "" + parseInt( port ) ] ? false : true
-}
+MongoRunner.stopMongos = MongoRunner.stopMongod;
 
 /**
  * Starts an instance of the specified mongo tool
@@ -749,17 +749,15 @@ _startMongodEmpty = function () {
 
     return startMongoProgram.apply(null, args);
 }
+
 _startMongod = function () {
     print("startMongod WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING ONLY");
     return _startMongodEmpty.apply(null, arguments);
 }
+
 _startMongodNoReset = function(){
     var args = createMongoArgs( "mongod" , arguments );
     return startMongoProgram.apply( null, args );
-}
-
-startMongos = function(args){
-    return MongoRunner.runMongos(args);
 }
 
 /**
@@ -767,7 +765,8 @@ startMongos = function(args){
  */
 function appendSetParameterArgs(argArray) {
     var programName = argArray[0];
-    if (programName.endsWith('mongod') || programName.endsWith('mongos')) {
+    if (programName.endsWith('mongod') || programName.endsWith('mongos')
+        || programName.startsWith('mongod-') || programName.startsWith('mongos-')) {
         if (jsTest.options().enableTestCommands) {
             argArray.push.apply(argArray, ['--setParameter', "enableTestCommands=1"]);
         }
@@ -790,7 +789,7 @@ function appendSetParameterArgs(argArray) {
             argArray.push.apply(argArray, ['--setParameter', "enableLocalhostAuthBypass=false"]);
         }
 
-        // mongos only options
+        // mongos only options. Note: excludes mongos with version suffix (ie. mongos-3.0).
         if (programName.endsWith('mongos')) {
             // apply setParameters for mongos
             if (jsTest.options().setParametersMongos) {
@@ -802,7 +801,7 @@ function appendSetParameterArgs(argArray) {
                 }
             }
         }
-        // mongod only options
+        // mongod only options. Note: excludes mongos with version suffix (ie. mongos-3.0).
         else if (programName.endsWith('mongod')) {
             // set storageEngine for mongod
             if (jsTest.options().storageEngine) {
@@ -827,9 +826,6 @@ function appendSetParameterArgs(argArray) {
                         if (p) argArray.push.apply(argArray, ['--setParameter', p])
                     });
                 }
-            }
-            if (argArray.indexOf('--configsvr') > 0 && argArray.indexOf('--replSet') > 0) {
-                argArray.push.apply(argArray, ['--setParameter', "enableReplSnapshotThread=1"]);
             }
         }
     }

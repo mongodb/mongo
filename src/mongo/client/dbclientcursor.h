@@ -191,7 +191,7 @@ public:
     }
 
     Message* getMessage() {
-        return batch.m.get();
+        return &batch.m;
     }
 
     /**
@@ -215,13 +215,13 @@ public:
     class Batch {
         MONGO_DISALLOW_COPYING(Batch);
         friend class DBClientCursor;
-        std::unique_ptr<Message> m;
-        int nReturned;
-        int pos;
-        const char* data;
+        Message m;
+        int nReturned{0};
+        int pos{0};
+        const char* data{nullptr};
 
     public:
-        Batch() : m(new Message()), nReturned(), pos(), data() {}
+        Batch() = default;
     };
 
     /**

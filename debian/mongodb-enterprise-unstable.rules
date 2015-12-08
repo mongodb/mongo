@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-TOOLS=bsondump mongodump mongoexport mongofiles mongoimport mongooplog mongoperf mongorestore mongostat mongotop
+TOOLS=bsondump mongodecrypt mongodump mongoexport mongofiles mongoimport mongooplog mongoperf mongorestore mongostat mongotop
 
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1
@@ -25,7 +25,10 @@ build-stamp: configure-stamp
 	echo -n > debian/mongodb-enterprise-unstable-tools.manpages
 	for binary in ${TOOLS} ; \
 	do \
-	  echo debian/$$binary.1 >> debian/mongodb-enterprise-unstable-tools.manpages ; \
+		if [ -e debian/$$binary.1 ] ; \
+		then \
+			echo debian/$$binary.1 >> debian/mongodb-enterprise-tools.manpages ; \
+		fi ; \
 	done
 
 	echo debian/mongo.1 > debian/mongodb-enterprise-unstable-shell.manpages

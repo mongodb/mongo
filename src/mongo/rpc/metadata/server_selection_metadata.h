@@ -53,7 +53,6 @@ class ServerSelectionMetadata {
 public:
     static const OperationContext::Decoration<ServerSelectionMetadata> get;
 
-    // TODO: Remove when StatusWith supports default-constructible types (SERVER-18007).
     ServerSelectionMetadata() = default;
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -71,10 +70,14 @@ public:
      */
     static StatusWith<ServerSelectionMetadata> readFromMetadata(const BSONObj& metadataObj);
 
+    static StatusWith<ServerSelectionMetadata> readFromMetadata(const BSONElement& metadataElem);
+
     /**
      * Writes this operation's ServerSelectionMetadata to a metadata object.
      */
     Status writeToMetadata(BSONObjBuilder* metadataBob) const;
+
+    BSONObj toBSON() const;
 
     /**
      * Rewrites the ServerSelectionMetadata from the metadata object format to the legacy OP_QUERY
@@ -107,8 +110,17 @@ public:
      */
     const boost::optional<ReadPreferenceSetting>& getReadPreference() const;
 
+    /**
+     * Returns true if this operation can run on secondary.
+     */
+    bool canRunOnSecondary() const;
+
     ServerSelectionMetadata(bool secondaryOk,
                             boost::optional<ReadPreferenceSetting> readPreference);
+
+    static StringData fieldName() {
+        return "$ssm";
+    }
 
 private:
     bool _secondaryOk{false};

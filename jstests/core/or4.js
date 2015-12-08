@@ -1,13 +1,6 @@
 t = db.jstests_or4;
 t.drop();
 
-// v8 does not have a builtin Array.sort
-if (!Array.sort) {
-  Array.sort = function(arr) {
-    return arr.sort();
-  };
-}
-
 checkArrs = function( a, b ) {
     m = "[" + a + "] != [" + b + "]";
     a = eval( a );

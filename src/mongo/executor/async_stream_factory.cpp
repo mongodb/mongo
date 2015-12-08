@@ -38,9 +38,9 @@
 namespace mongo {
 namespace executor {
 
-std::unique_ptr<AsyncStreamInterface> AsyncStreamFactory::makeStream(asio::io_service* io_service,
-                                                                     const HostAndPort&) {
-    return stdx::make_unique<AsyncStream>(io_service);
+std::unique_ptr<AsyncStreamInterface> AsyncStreamFactory::makeStream(
+    asio::io_service::strand* strand, const HostAndPort&) {
+    return stdx::make_unique<AsyncStream>(strand);
 }
 
 }  // namespace executor

@@ -32,7 +32,7 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 		WT_ERR(cursor->get_key(cursor, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
-		else if (strcmp(uri, WT_METAFILE_URI) == 0)
+		if (strcmp(uri, WT_METAFILE_URI) == 0)
 			continue;
 
 		/*
@@ -46,8 +46,8 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 			WT_SAVE_DHANDLE(session,
 			    ret = func(session, cfg));
 			if (WT_META_TRACKING(session))
-				WT_TRET(
-				    __wt_meta_track_handle_lock(session, 0));
+				WT_TRET(__wt_meta_track_handle_lock(
+				    session, false));
 			else
 				WT_TRET(__wt_session_release_btree(session));
 		} else if (ret == EBUSY)

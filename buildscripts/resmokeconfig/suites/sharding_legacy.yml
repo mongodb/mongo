@@ -3,6 +3,9 @@ selector:
     roots:
     - jstests/sharding/*.js
     - jstests/sharding/sync_cluster_config/*.js
+    exclude_files:
+    - jstests/sharding/csrs_upgrade.js  # SERVER-20694
+    - jstests/sharding/csrs_upgrade_during_migrate.js  # SERVER-20580
 
 executor:
   js_test:
@@ -12,3 +15,4 @@ executor:
           TestData:
             useLegacyConfigServers: true
         nodb: ''
+        readMode: commands

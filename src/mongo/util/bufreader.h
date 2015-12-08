@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/platform/strnlen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

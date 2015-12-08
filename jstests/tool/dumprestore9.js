@@ -1,4 +1,8 @@
-if (0) { // Test disabled until SERVER-3853 is finished.
+// Test disabled until SERVER-3853 is finished
+if(0) {
+
+(function() {
+
 var name = "dumprestore9";
 function step(msg) {
     msg = msg || "";
@@ -6,7 +10,10 @@ function step(msg) {
     print('\n' + name + ".js step " + this.x + ' ' + msg);
 }
 
-s = new ShardingTest( "dumprestore9a", 2, 0, 3, { chunksize : 1, enableBalancer : 1 } );
+var s = new ShardingTest({ name: "dumprestore9a",
+                           shards: 2,
+                           mongos: 3,
+                           other: { chunkSize: 1, enableBalancer : 1 } });
 
 step("Shard collection");
 
@@ -46,7 +53,10 @@ step("Shutting down cluster");
 s.stop();
 
 step("Starting up clean cluster");
-s = new ShardingTest( "dumprestore9b", 2, 0, 3, {chunksize:1} );
+s = new ShardingTest({ name: "dumprestore9b",
+                       shards: 2,
+                       mongos: 3,
+                       other: {chunkSize:1} });
 
 db = s.getDB( "aaa" );
 coll = db.foo;
@@ -77,4 +87,7 @@ for (var i = 0; i < s._connections.length; i++) {
 step("Stop cluster");
 s.stop();
 step("SUCCESS");
+
+})();
+
 }

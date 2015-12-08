@@ -116,24 +116,40 @@ def filter_jstests(roots,
     include_files = utils.default_if_none(include_files, [])
     exclude_files = utils.default_if_none(exclude_files, [])
 
-    include_with_all_tags = set(utils.default_if_none(include_with_all_tags, []))
-    include_with_any_tags = set(utils.default_if_none(include_with_any_tags, []))
-    exclude_with_all_tags = set(utils.default_if_none(exclude_with_all_tags, []))
-    exclude_with_any_tags = set(utils.default_if_none(exclude_with_any_tags, []))
+    # Command line options override the YAML options, and all should be defaulted to an empty list
+    # if not specified.
+    tags = {
+        "exclude_with_all_tags": exclude_with_all_tags,
+        "exclude_with_any_tags": exclude_with_any_tags,
+        "include_with_all_tags": include_with_all_tags,
+        "include_with_any_tags": include_with_any_tags,
+    }
+    cmd_line_values = (
+        ("exclude_with_all_tags", config.EXCLUDE_WITH_ALL_TAGS),
+        ("exclude_with_any_tags", config.EXCLUDE_WITH_ANY_TAGS),
+        ("include_with_all_tags", config.INCLUDE_WITH_ALL_TAGS),
+        ("include_with_any_tags", config.INCLUDE_WITH_ANY_TAGS),
+    )
+    for (tag_category, cmd_line_val) in cmd_line_values:
+        if cmd_line_val is not None:
+            # Ignore the empty string when it is used as a tag. Specifying an empty string on the
+            # command line allows a user to unset the list of tags specified in the YAML
+            # configuration.
+            tags[tag_category] = set([tag for tag in cmd_line_val.split(",") if tag != ""])
+        else:
+            tags[tag_category] = set(utils.default_if_none(tags[tag_category], []))
 
     using_tags = 0
-    for (name, value) in (("include_with_all_tags", include_with_all_tags),
-                          ("include_with_any_tags", include_with_any_tags),
-                          ("exclude_with_all_tags", exclude_with_all_tags),
-                          ("exclude_with_any_tags", exclude_with_any_tags)):
-        if not utils.is_string_set(value):
+    for name in tags:
+        if not utils.is_string_set(tags[name]):
             raise TypeError("%s must be a list of strings" % (name))
-        if len(value) > 0:
+        if len(tags[name]) > 0:
             using_tags += 1
 
     if using_tags > 1:
         raise ValueError("Can only specify one of 'include_with_all_tags', 'include_with_any_tags',"
-                         " 'exclude_with_all_tags', and 'exclude_with_any_tags'")
+                         " 'exclude_with_all_tags', and 'exclude_with_any_tags'. If you wish to"
+                         " unset one of these options, use --includeWithAllTags='' or similar")
 
     jstests = []
     for root in roots:
@@ -157,16 +173,16 @@ def filter_jstests(roots,
 
     for filename in jstests:
         file_tags = set(jscomment.get_tags(filename))
-        if include_with_all_tags and not include_with_all_tags - file_tags:
+        if tags["include_with_all_tags"] and not tags["include_with_all_tags"] - file_tags:
             included.add(filename)
-        elif include_with_any_tags and include_with_any_tags & file_tags:
+        elif tags["include_with_any_tags"] and tags["include_with_any_tags"] & file_tags:
             included.add(filename)
-        elif exclude_with_all_tags and not exclude_with_all_tags - file_tags:
+        elif tags["exclude_with_all_tags"] and not tags["exclude_with_all_tags"] - file_tags:
             excluded.add(filename)
-        elif exclude_with_any_tags and exclude_with_any_tags & file_tags:
+        elif tags["exclude_with_any_tags"] and tags["exclude_with_any_tags"] & file_tags:
             excluded.add(filename)
 
-    if include_with_all_tags or include_with_any_tags:
+    if tags["include_with_all_tags"] or tags["include_with_any_tags"]:
         if exclude_files:
             return list((included & jstests) - excluded)
         return list(included)

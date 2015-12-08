@@ -13,7 +13,7 @@
  *	Configure the underlying cache.
  */
 static int
-__cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
+__cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
@@ -76,11 +76,11 @@ __cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
  *	Configure or reconfigure the current cache and shared cache.
  */
 int
-__wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
+__wt_cache_config(WT_SESSION_IMPL *session, bool reconfigure, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	int now_shared, was_shared;
+	bool now_shared, was_shared;
 
 	conn = S2C(session);
 
@@ -137,7 +137,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
-	WT_RET(__wt_cache_config(session, 0, cfg));
+	WT_RET(__wt_cache_config(session, false, cfg));
 
 	/*
 	 * The target size must be lower than the trigger size or we will never
@@ -148,15 +148,16 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 		    "eviction target must be lower than the eviction trigger");
 
 	WT_ERR(__wt_cond_alloc(session,
-	    "cache eviction server", 0, &cache->evict_cond));
+	    "cache eviction server", false, &cache->evict_cond));
 	WT_ERR(__wt_cond_alloc(session,
-	    "eviction waiters", 0, &cache->evict_waiter_cond));
+	    "eviction waiters", false, &cache->evict_waiter_cond));
 	WT_ERR(__wt_spin_init(session, &cache->evict_lock, "cache eviction"));
 	WT_ERR(__wt_spin_init(session, &cache->evict_walk_lock, "cache walk"));
 
 	/* Allocate the LRU eviction queue. */
 	cache->evict_slots = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
-	WT_ERR(__wt_calloc_def(session, cache->evict_slots, &cache->evict));
+	WT_ERR(__wt_calloc_def(session,
+	    cache->evict_slots, &cache->evict_queue));
 
 	/*
 	 * We get/set some values in the cache statistics (rather than have
@@ -178,12 +179,12 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	WT_CONNECTION_STATS *stats;
+	WT_CONNECTION_STATS **stats;
 	uint64_t inuse, leaf, used;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	stats = &conn->stats;
+	stats = conn->stats;
 
 	inuse = __wt_cache_bytes_inuse(cache);
 	/*
@@ -193,19 +194,23 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	used = cache->bytes_overflow + cache->bytes_internal;
 	leaf = inuse > used ? inuse - used : 0;
 
-	WT_STAT_SET(stats, cache_bytes_max, conn->cache_size);
-	WT_STAT_SET(stats, cache_bytes_inuse, inuse);
+	WT_STAT_SET(session, stats, cache_bytes_max, conn->cache_size);
+	WT_STAT_SET(session, stats, cache_bytes_inuse, inuse);
 
-	WT_STAT_SET(stats, cache_overhead, cache->overhead_pct);
-	WT_STAT_SET(stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
-	WT_STAT_SET(stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
-	WT_STAT_SET(stats,
+	WT_STAT_SET(session, stats, cache_overhead, cache->overhead_pct);
+	WT_STAT_SET(
+	    session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
+	WT_STAT_SET(
+	    session, stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
+	WT_STAT_SET(session, stats,
 	    cache_eviction_maximum_page_size, cache->evict_max_page_size);
-	WT_STAT_SET(stats, cache_pages_dirty, cache->pages_dirty);
+	WT_STAT_SET(session, stats, cache_pages_dirty, cache->pages_dirty);
 
-	WT_STAT_SET(stats, cache_bytes_internal, cache->bytes_internal);
-	WT_STAT_SET(stats, cache_bytes_overflow, cache->bytes_overflow);
-	WT_STAT_SET(stats, cache_bytes_leaf, leaf);
+	WT_STAT_SET(
+	    session, stats, cache_bytes_internal, cache->bytes_internal);
+	WT_STAT_SET(
+	    session, stats, cache_bytes_overflow, cache->bytes_overflow);
+	WT_STAT_SET(session, stats, cache_bytes_leaf, leaf);
 }
 
 /*
@@ -246,7 +251,7 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &cache->evict_lock);
 	__wt_spin_destroy(session, &cache->evict_walk_lock);
 
-	__wt_free(session, cache->evict);
+	__wt_free(session, cache->evict_queue);
 	__wt_free(session, conn->cache);
 	return (ret);
 }

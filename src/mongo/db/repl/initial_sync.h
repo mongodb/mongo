@@ -41,18 +41,21 @@ class BackgroundSyncInterface;
 class InitialSync : public SyncTail {
 public:
     virtual ~InitialSync();
-    InitialSync(BackgroundSyncInterface* q);
+    InitialSync(BackgroundSyncInterface* q, MultiSyncApplyFunc func);
+
 
     /**
      * applies up to endOpTime, fetching missing documents as needed.
      */
     void oplogApplication(OperationContext* txn, const OpTime& endOpTime);
 
-    // Initial sync will ignore all journal requirement flags and doesn't wait until
-    // operations are durable before updating the last OpTime.
-    virtual bool supportsWaitingUntilDurable() {
-        return false;
-    }
+private:
+    /**
+     * Applies oplog entries until reaching "endOpTime".
+     *
+     * NOTE:Will not transition or check states
+     */
+    void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
 };
 
 // Used for ReplSetTest testing.

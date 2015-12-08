@@ -29,6 +29,7 @@
 #include "mongo/db/query/canonical_query.h"
 
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/unittest/unittest.h"
 
@@ -46,7 +47,7 @@ static const NamespaceString nss("testdb.testcoll");
  * and return the MatchExpression*.
  */
 MatchExpression* parseMatchExpression(const BSONObj& obj) {
-    StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj, ExtensionsCallbackNoop());
     if (!status.isOK()) {
         mongoutils::str::stream ss;
         ss << "failed to parse query: " << obj.toString()
@@ -397,6 +398,28 @@ TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
 
     // Invalid: TEXT and snapshot.
     ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
+}
+
+TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
+    // Passing a sortKey meta-projection without a sort is an error.
+    {
+        const bool isExplain = false;
+        auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(
+            nss, fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}}"), isExplain));
+        auto cq = CanonicalQuery::canonicalize(lpq.release());
+        ASSERT_NOT_OK(cq.getStatus());
+    }
+
+    // Should be able to successfully create a CQ when there is a sort.
+    {
+        const bool isExplain = false;
+        auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(
+            nss,
+            fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}, sort: {bar: 1}}"),
+            isExplain));
+        auto cq = CanonicalQuery::canonicalize(lpq.release());
+        ASSERT_OK(cq.getStatus());
+    }
 }
 
 //

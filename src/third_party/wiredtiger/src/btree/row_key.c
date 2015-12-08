@@ -61,7 +61,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (rip = page->pg_row_d, i = 0; i < page->pg_row_entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
 			WT_ERR(__wt_row_leaf_key_work(
-			    session, page, rip, key, 1));
+			    session, page, rip, key, true));
 
 	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
@@ -112,7 +112,7 @@ int
 __wt_row_leaf_key_copy(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_ITEM *key)
 {
-	WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
+	WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
 
 	/* The return buffer may only hold a reference to a key, copy it. */
 	if (!WT_DATA_IN_ITEM(key))
@@ -128,7 +128,7 @@ __wt_row_leaf_key_copy(
  */
 int
 __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *keyb, int instantiate)
+    WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *keyb, bool instantiate)
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_BTREE *btree;
@@ -448,7 +448,8 @@ next:		switch (direction) {
 			 * update the page's memory footprint, on failure, free
 			 * the allocated memory.
 			 */
-			if (WT_ATOMIC_CAS8(WT_ROW_KEY_COPY(rip), copy, ikey))
+			if (__wt_atomic_cas_ptr(
+			    (void *)&WT_ROW_KEY_COPY(rip), copy, ikey))
 				__wt_cache_page_inmem_incr(session,
 				    page, sizeof(WT_IKEY) + ikey->size);
 			else
@@ -525,7 +526,7 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, oldv == 0 || (oldv & WT_IK_FLAG) != 0);
 	WT_ASSERT(session, ref->state != WT_REF_SPLIT);
 	WT_ASSERT(session,
-	    WT_ATOMIC_CAS8(ref->key.ikey, (WT_IKEY *)oldv, ikey));
+	    __wt_atomic_cas_ptr(&ref->key.ikey, (WT_IKEY *)oldv, ikey));
 	}
 #else
 	ref->key.ikey = ikey;

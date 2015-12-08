@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <array>
 #include <boost/optional.hpp>
 #include <time.h>
 
@@ -90,8 +91,12 @@
 #include "mongo/rpc/request_interface.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
+#include "mongo/rpc/protocol.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
 #include "mongo/util/fail_point_service.h"
@@ -111,12 +116,10 @@ using std::unique_ptr;
 // This is a special flag that allows for testing of snapshot behavior by skipping the replication
 // related checks and isolating the storage/query side of snapshotting.
 bool testingSnapshotBehaviorInIsolation = false;
-ExportedServerParameter<bool> TestingSnapshotBehaviorInIsolation(
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly> TestingSnapshotBehaviorInIsolation(
     ServerParameterSet::getGlobal(),
     "testingSnapshotBehaviorInIsolation",
-    &testingSnapshotBehaviorInIsolation,
-    true,
-    false);
+    &testingSnapshotBehaviorInIsolation);
 
 
 class CmdShutdownMongoD : public CmdShutdown {
@@ -209,7 +212,7 @@ public:
         }
 
         Status status = dropDatabase(txn, dbname);
-        if (status == ErrorCodes::DatabaseNotFound) {
+        if (status == ErrorCodes::NamespaceNotFound) {
             return appendCommandStatus(result, Status::OK());
         }
         if (status.isOK()) {
@@ -340,20 +343,23 @@ public:
         // Needs to be locked exclusively, because creates the system.profile collection
         // in the local database.
         ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-        OldClientContext ctx(txn, dbname);
+        AutoGetDb ctx(txn, dbname, MODE_X);
+        Database* db = ctx.getDb();
 
         BSONElement e = cmdObj.firstElement();
-        result.append("was", ctx.db()->getProfilingLevel());
+        result.append("was", db ? db->getProfilingLevel() : serverGlobalParams.defaultProfile);
         result.append("slowms", serverGlobalParams.slowMS);
 
         int p = (int)e.number();
         Status status = Status::OK();
 
-        if (p == -1)
-            status = Status::OK();
-        else if (p >= 0 && p <= 2) {
-            status = ctx.db()->setProfilingLevel(txn, p);
+        if (p >= 0 && p <= 2) {
+            if (!db) {
+                // When setting the profiling level, create the database if it didn't already exist.
+                // When just reading the profiling level, we do not create the database.
+                db = dbHolder().openDb(txn, dbname);
+            }
+            status = db->setProfilingLevel(txn, p);
         }
 
         const BSONElement slow = cmdObj["slowms"];
@@ -1157,6 +1163,22 @@ private:
     bool maintenanceModeSet;
 };
 
+namespace {
+
+// Symbolic names for indexes to make code more readable.
+const std::size_t kCmdOptionMaxTimeMSField = 0;
+const std::size_t kHelpField = 1;
+const std::size_t kShardVersionField = 2;
+const std::size_t kQueryOptionMaxTimeMSField = 3;
+
+// We make an array of the fields we need so we can call getFields once. This saves repeated
+// scans over the command object.
+const std::array<StringData, 4> neededFieldNames{LiteParsedQuery::cmdOptionMaxTimeMS,
+                                                 Command::kHelpFieldName,
+                                                 OperationShardVersion::fieldName(),
+                                                 LiteParsedQuery::queryOptionMaxTimeMS};
+}  // namespace
+
 /**
  * this handles
  - auth
@@ -1175,39 +1197,42 @@ void Command::execCommand(OperationContext* txn,
             stdx::lock_guard<Client> lk(*txn->getClient());
             CurOp::get(txn)->setCommand_inlock(command);
         }
+
+        rpc::setOperationProtocol(txn, request.getProtocol());  // SERVER-21485.  Remove after 3.2
+
         // TODO: move this back to runCommands when mongos supports OperationContext
         // see SERVER-18515 for details.
         uassertStatusOK(rpc::readRequestMetadata(txn, request.getMetadata()));
 
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
+        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
 
         std::string dbname = request.getDatabase().toString();
         unique_ptr<MaintenanceModeSetter> mmSetter;
 
-        if (isHelpRequest(request)) {
+
+        std::array<BSONElement, std::tuple_size<decltype(neededFieldNames)>::value>
+            extractedFields{};
+        request.getCommandArgs().getFields(neededFieldNames, &extractedFields);
+
+        if (isHelpRequest(extractedFields[kHelpField])) {
             CurOp::get(txn)->ensureStarted();
             generateHelpResponse(txn, request, replyBuilder, *command);
             return;
         }
 
-        repl::ReplicationCoordinator* replCoord =
-            repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
         ImpersonationSessionGuard guard(txn);
-
         uassertStatusOK(
             _checkAuthorization(command, txn->getClient(), dbname, request.getCommandArgs()));
 
+        repl::ReplicationCoordinator* replCoord =
+            repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
+        const bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
+
         {
-            bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
             bool commandCanRunOnSecondary = command->slaveOk();
 
             bool commandIsOverriddenToRunOnSecondary = command->slaveOverrideOk() &&
-
-                // The $secondaryOk option is set.
-                (rpc::ServerSelectionMetadata::get(txn).isSecondaryOk() ||
-
-                 // Or the command has a read preference (may be incorrect, see SERVER-18194).
-                 (rpc::ServerSelectionMetadata::get(txn).getReadPreference() != boost::none));
+                rpc::ServerSelectionMetadata::get(txn).canRunOnSecondary();
 
             bool iAmStandalone = !txn->writesAreReplicated();
             bool canRunHere = iAmPrimary || commandCanRunOnSecondary ||
@@ -1215,7 +1240,7 @@ void Command::execCommand(OperationContext* txn,
 
             // This logic is clearer if we don't have to invert it.
             if (!canRunHere && command->slaveOverrideOk()) {
-                uasserted(ErrorCodes::NotMasterNoSlaveOkCode, "not master and slaveOk=false");
+                uasserted(ErrorCodes::NotMasterNoSlaveOk, "not master and slaveOk=false");
             }
 
             uassert(ErrorCodes::NotMaster, "not master", canRunHere);
@@ -1224,7 +1249,7 @@ void Command::execCommand(OperationContext* txn,
                 replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
                 !replCoord->canAcceptWritesForDatabase(dbname) &&
                 !replCoord->getMemberState().secondary()) {
-                uasserted(ErrorCodes::NotMasterOrSecondaryCode, "node is recovering");
+                uasserted(ErrorCodes::NotMasterOrSecondary, "node is recovering");
             }
         }
 
@@ -1242,17 +1267,43 @@ void Command::execCommand(OperationContext* txn,
         }
 
         // Handle command option maxTimeMS.
-        int maxTimeMS =
-            uassertStatusOK(LiteParsedQuery::parseMaxTimeMSCommand(request.getCommandArgs()));
+        int maxTimeMS = uassertStatusOK(
+            LiteParsedQuery::parseMaxTimeMS(extractedFields[kCmdOptionMaxTimeMSField]));
 
         uassert(ErrorCodes::InvalidOptions,
                 "no such command option $maxTimeMs; use maxTimeMS instead",
-                !request.getCommandArgs().hasField("$maxTimeMS"));
+                extractedFields[kQueryOptionMaxTimeMSField].eoo());
 
         CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS) * 1000);
 
-        // Handle shard version that may have been sent along with the command.
-        OperationShardVersion::get(txn).initializeFromCommand(request.getCommandArgs());
+        // Operations are only versioned against the primary. We also make sure not to redo shard
+        // version handling if this command was issued via the direct client.
+        if (iAmPrimary && !txn->getClient()->isInDirectClient()) {
+            // Handle shard version and config optime information that may have been sent along with
+            // the command.
+            auto& operationShardVersion = OperationShardVersion::get(txn);
+            invariant(!operationShardVersion.hasShardVersion());
+
+            auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
+            operationShardVersion.initializeFromCommand(commandNS,
+                                                        extractedFields[kShardVersionField]);
+
+            auto shardingState = ShardingState::get(txn);
+            if (shardingState->enabled()) {
+                // TODO(spencer): Do this unconditionally once all nodes are sharding aware
+                // by default.
+                shardingState->updateConfigServerOpTimeFromMetadata(txn);
+            } else {
+                massert(
+                    28807,
+                    str::stream()
+                        << "Received a command with sharding chunk version information but this "
+                           "node is not sharding aware: " << request.getCommandArgs().jsonString(),
+                    !operationShardVersion.hasShardVersion() ||
+                        ChunkVersion::isIgnoredVersion(
+                            operationShardVersion.getShardVersion(commandNS)));
+            }
+        }
 
         // Can throw
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
@@ -1271,7 +1322,15 @@ void Command::execCommand(OperationContext* txn,
             command->_commandsFailed.increment();
         }
     } catch (const DBException& exception) {
-        Command::generateErrorResponse(txn, replyBuilder, exception, request, command);
+        BSONObj metadata = rpc::makeEmptyMetadata();
+        if (ShardingState::get(txn)->enabled()) {
+            auto opTime = grid.shardRegistry()->getConfigOpTime();
+            BSONObjBuilder metadataBob;
+            rpc::ConfigServerMetadata(opTime).writeToMetadata(&metadataBob);
+            metadata = metadataBob.obj();
+        }
+
+        Command::generateErrorResponse(txn, replyBuilder, exception, request, command, metadata);
     }
 }
 
@@ -1282,60 +1341,79 @@ void Command::execCommand(OperationContext* txn,
 bool Command::run(OperationContext* txn,
                   const rpc::RequestInterface& request,
                   rpc::ReplyBuilderInterface* replyBuilder) {
-    BSONObjBuilder replyBuilderBob;
+    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(reserveBytesForReply()));
 
     repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
 
-    repl::ReadConcernArgs readConcern;
+    repl::ReadConcernArgs readConcernArgs;
     {
         // parse and validate ReadConcernArgs
-        auto readConcernParseStatus = readConcern.initialize(request.getCommandArgs());
+        auto readConcernParseStatus = readConcernArgs.initialize(request.getCommandArgs());
         if (!readConcernParseStatus.isOK()) {
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                .setCommandReply(readConcernParseStatus);
-            return false;
+            auto result = appendCommandStatus(inPlaceReplyBob, readConcernParseStatus);
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
         }
 
         if (!supportsReadConcern()) {
             // Only return an error if a non-nullish readConcern was parsed, but do not process
             // readConcern regardless.
-            if (!readConcern.getOpTime().isNull() ||
-                readConcern.getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
-                replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                    .setCommandReply({ErrorCodes::InvalidOptions,
-                                      str::stream()
-                                          << "Command " << name << " does not support "
-                                          << repl::ReadConcernArgs::kReadConcernFieldName});
-                return false;
+            if (!readConcernArgs.getOpTime().isNull() ||
+                readConcernArgs.getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
+                auto result = appendCommandStatus(
+                    inPlaceReplyBob,
+                    {ErrorCodes::InvalidOptions,
+                     str::stream() << "Command " << name << " does not support "
+                                   << repl::ReadConcernArgs::kReadConcernFieldName});
+                inPlaceReplyBob.doneFast();
+                replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+                return result;
             }
         } else {
             // Skip waiting for the OpTime when testing snapshot behavior.
             if (!testingSnapshotBehaviorInIsolation) {
                 // Wait for readConcern to be satisfied.
-                auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcern);
-                readConcernResult.appendInfo(&replyBuilderBob);
+                auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcernArgs);
+                readConcernResult.appendInfo(&inPlaceReplyBob);
                 if (!readConcernResult.getStatus().isOK()) {
-                    replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                        .setCommandReply(readConcernResult.getStatus(), replyBuilderBob.done());
-                    return false;
+                    auto result =
+                        appendCommandStatus(inPlaceReplyBob, readConcernResult.getStatus());
+                    inPlaceReplyBob.doneFast();
+                    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+                    return result;
                 }
             }
 
             if ((replCoord->getReplicationMode() ==
                      repl::ReplicationCoordinator::Mode::modeReplSet ||
                  testingSnapshotBehaviorInIsolation) &&
-                readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+                readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+                // ReadConcern Majority is not supported in ProtocolVersion 0.
+                if (!testingSnapshotBehaviorInIsolation && !replCoord->isV1ElectionProtocol()) {
+                    auto result = appendCommandStatus(
+                        inPlaceReplyBob,
+                        {ErrorCodes::ReadConcernMajorityNotEnabled,
+                         str::stream() << "Replica sets running protocol version 0 do not support "
+                                          "readConcern: majority"});
+                    inPlaceReplyBob.doneFast();
+                    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+                    return result;
+                }
+
                 Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
 
                 // Wait until a snapshot is available.
                 while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
-                    replCoord->waitForNewSnapshot(txn);
+                    replCoord->waitUntilSnapshotCommitted(txn, SnapshotName::min());
                     status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
                 }
 
                 if (!status.isOK()) {
-                    replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
-                    return false;
+                    auto result = appendCommandStatus(inPlaceReplyBob, status);
+                    inPlaceReplyBob.doneFast();
+                    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+                    return result;
                 }
             }
         }
@@ -1349,37 +1427,35 @@ bool Command::run(OperationContext* txn,
     // run expects const db std::string (can't bind to temporary)
     const std::string db = request.getDatabase().toString();
 
+
     // TODO: remove queryOptions parameter from command's run method.
-    bool result = this->run(txn, db, cmd, 0, errmsg, replyBuilderBob);
+    bool result = this->run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
+    appendCommandStatus(inPlaceReplyBob, result, errmsg);
+    inPlaceReplyBob.doneFast();
 
     BSONObjBuilder metadataBob;
 
+    const bool isShardingAware = ShardingState::get(txn)->enabled();
     bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
     if (isReplSet) {
         repl::OpTime lastOpTimeFromClient =
             repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
-        replCoord->prepareReplResponseMetadata(
-            request, lastOpTimeFromClient, readConcern, &metadataBob);
+        replCoord->prepareReplResponseMetadata(request, lastOpTimeFromClient, &metadataBob);
 
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18326
-        if (ShardingState::get(txn)->enabled()) {
-            rpc::ShardingMetadata(lastOpTimeFromClient.getTimestamp(), replCoord->getElectionId())
-                .writeToMetadata(&metadataBob);
+        if (isShardingAware || serverGlobalParams.configsvr) {
+            rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
+                .writeToMetadata(&metadataBob, request.getProtocol());
         }
     }
 
-    auto cmdResponse = replyBuilderBob.done();
-    replyBuilder->setMetadata(metadataBob.done());
-
-    if (result) {
-        replyBuilder->setCommandReply(std::move(cmdResponse));
-    } else {
-        // maintain existing behavior of returning all data appended to builder
-        // even if command returned false
-        replyBuilder->setCommandReply(Status(ErrorCodes::CommandFailed, errmsg),
-                                      std::move(cmdResponse));
+    if (isShardingAware) {
+        auto opTime = grid.shardRegistry()->getConfigOpTime();
+        rpc::ConfigServerMetadata(opTime).writeToMetadata(&metadataBob);
     }
+
+    replyBuilder->setMetadata(metadataBob.done());
 
     return result;
 }

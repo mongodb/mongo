@@ -28,25 +28,11 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-class CatalogManager;
 class DBClientCursor;
-class Status;
-
-/**
- * Tries to check the versions of all active hosts in a cluster.  Not 100% accurate, but pretty
- * effective if hosts are reachable.
- *
- * Returns OK if hosts are compatible as far as we know, RemoteValidationError if hosts are not
- * compatible, and an error Status if anything else goes wrong.
- */
-Status checkClusterMongoVersions(CatalogManager* catalogManager,
-                                 const std::string& minMongoVersion);
 
 //
 // Needed to normalize exception behavior of connections and cursors

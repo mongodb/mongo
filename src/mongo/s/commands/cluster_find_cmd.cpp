@@ -30,16 +30,14 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/cluster_explain.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/strategy.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace {
@@ -47,6 +45,8 @@ namespace {
 using std::unique_ptr;
 using std::string;
 using std::vector;
+
+const char kTermField[] = "term";
 
 /**
  * Implements the find command on mongos.
@@ -92,20 +92,16 @@ public:
     Status checkAuthForCommand(ClientBasic* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
-
-        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+        NamespaceString nss(parseNs(dbname, cmdObj));
+        auto hasTerm = cmdObj.hasField(kTermField);
+        return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
     }
 
     Status explain(OperationContext* txn,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
+                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const final {
         const string fullns = parseNs(dbname, cmdObj);
         const NamespaceString nss(fullns);
@@ -116,34 +112,13 @@ public:
 
         // Parse the command BSON to a LiteParsedQuery.
         bool isExplain = true;
-        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
-        if (!lpqStatus.isOK()) {
-            return lpqStatus.getStatus();
+        auto lpq = LiteParsedQuery::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
+        if (!lpq.isOK()) {
+            return lpq.getStatus();
         }
 
-        auto& lpq = lpqStatus.getValue();
-
-        BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
-
-        // We will time how long it takes to run the commands on the shards.
-        Timer timer;
-
-        vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(txn,
-                            dbname,
-                            explainCmdBob.obj(),
-                            lpq->getOptions(),
-                            fullns,
-                            lpq->getFilter(),
-                            &shardResults);
-
-        long long millisElapsed = timer.millis();
-
-        const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
-
-        return ClusterExplain::buildExplainResult(
-            shardResults, mongosStageName, millisElapsed, out);
+        return Strategy::explainFind(
+            txn, cmdObj, *lpq.getValue(), verbosity, serverSelectionMetadata, out);
     }
 
     bool run(OperationContext* txn,
@@ -168,41 +143,33 @@ public:
             return appendCommandStatus(result, lpq.getStatus());
         }
 
-        auto cq = CanonicalQuery::canonicalize(lpq.getValue().release(), WhereCallbackNoop());
+        auto cq = CanonicalQuery::canonicalize(lpq.getValue().release(), ExtensionsCallbackNoop());
         if (!cq.isOK()) {
             return appendCommandStatus(result, cq.getStatus());
         }
 
         // Extract read preference. If no read preference is specified in the query, will we pass
-        // down a "primaryOnly" read pref.
-        ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
-        BSONElement readPrefElt;
-        auto status = bsonExtractTypedField(
-            cmdObj, LiteParsedQuery::kFindCommandReadPrefField, BSONType::Object, &readPrefElt);
-        if (status.isOK()) {
-            auto statusWithReadPref = ReadPreferenceSetting::fromBSON(readPrefElt.Obj());
-            if (!statusWithReadPref.isOK()) {
-                return appendCommandStatus(result, statusWithReadPref.getStatus());
-            }
-            readPref = statusWithReadPref.getValue();
-        } else if (status != ErrorCodes::NoSuchKey) {
-            return appendCommandStatus(result, status);
+        // down a "primaryOnly" or "secondary" read pref, depending on the slaveOk setting.
+        auto readPref =
+            ClusterFind::extractUnwrappedReadPref(cmdObj, options & QueryOption_SlaveOk);
+        if (!readPref.isOK()) {
+            return appendCommandStatus(result, readPref.getStatus());
         }
 
         // Do the work to generate the first batch of results. This blocks waiting to get responses
         // from the shard(s).
         std::vector<BSONObj> batch;
-        auto cursorId = ClusterFind::runQuery(txn, *cq.getValue(), readPref, &batch);
+        auto cursorId = ClusterFind::runQuery(txn, *cq.getValue(), readPref.getValue(), &batch);
         if (!cursorId.isOK()) {
             return appendCommandStatus(result, cursorId.getStatus());
         }
 
         // Build the response document.
-        BSONArrayBuilder arr;
+        CursorResponseBuilder firstBatch(/*firstBatch*/ true, &result);
         for (const auto& obj : batch) {
-            arr.append(obj);
+            firstBatch.append(obj);
         }
-        appendCursorResponseObject(cursorId.getValue(), nss.ns(), arr.arr(), &result);
+        firstBatch.done(cursorId.getValue(), nss.ns());
         return true;
     }
 

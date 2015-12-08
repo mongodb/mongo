@@ -42,7 +42,7 @@ ReplicationCoordinator* getGlobalReplicationCoordinator() {
 
 void setGlobalReplicationCoordinator(ReplicationCoordinator* coord) {
     repl::ReplicationCoordinator::set(getGlobalServiceContext(),
-                                      std::move(std::unique_ptr<ReplicationCoordinator>(coord)));
+                                      std::unique_ptr<ReplicationCoordinator>(coord));
 }
 }  // namespace repl
 }  // namespace mongo

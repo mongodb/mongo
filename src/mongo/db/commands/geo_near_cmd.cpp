@@ -39,13 +39,16 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/platform/unordered_map.h"
@@ -71,6 +74,10 @@ public:
     }
     bool supportsReadConcern() const final {
         return true;
+    }
+
+    std::size_t reserveBytesForReply() const override {
+        return FindCommon::kInitReplyBufferSize;
     }
 
     void help(stringstream& h) const {
@@ -184,9 +191,9 @@ public:
         BSONObj projObj = BSON("$pt" << BSON("$meta" << LiteParsedQuery::metaGeoNearPoint) << "$dis"
                                      << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
 
-        const WhereCallbackReal whereCallback(txn, nss.db());
+        const ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), whereCallback);
+            nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;
@@ -212,7 +219,8 @@ public:
 
         BSONObj currObj;
         long long results = 0;
-        while ((results < numWanted) && PlanExecutor::ADVANCED == exec->getNext(&currObj, NULL)) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&currObj, NULL))) {
             // Come up with the correct distance.
             double dist = currObj["$dis"].number() * distanceMultiplier;
             totalDistance += dist;
@@ -249,10 +257,29 @@ public:
             }
             oneResultBuilder.append("obj", resObj);
             oneResultBuilder.done();
+
             ++results;
+
+            // Break if we have the number of requested result documents.
+            if (results >= numWanted) {
+                break;
+            }
         }
 
         resultBuilder.done();
+
+        // Return an error if execution fails for any reason.
+        if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+            log() << "Plan executor error during geoNear command: " << PlanExecutor::statestr(state)
+                  << ", stats: " << Explain::statsToBSON(*stats);
+
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::OperationFailed,
+                                              str::stream()
+                                                  << "Executor error during geoNear command: "
+                                                  << WorkingSetCommon::toStatusString(currObj)));
+        }
 
         // Fill out the stats subobj.
         BSONObjBuilder stats(result.subobjStart("stats"));
@@ -260,10 +287,14 @@ public:
         // Fill in nscanned from the explain.
         PlanSummaryStats summary;
         Explain::getSummaryStats(*exec, &summary);
+        collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+
         stats.appendNumber("nscanned", summary.totalKeysExamined);
         stats.appendNumber("objectsLoaded", summary.totalDocsExamined);
 
-        stats.append("avgDistance", totalDistance / results);
+        if (results > 0) {
+            stats.append("avgDistance", totalDistance / results);
+        }
         stats.append("maxDistance", farthestDist);
         stats.append("time", CurOp::get(txn)->elapsedMillis());
         stats.done();

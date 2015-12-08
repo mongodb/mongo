@@ -56,7 +56,7 @@ __insert_simple_func(WT_SESSION_IMPL *session,
 	for (i = 0; i < skipdepth; i++) {
 		WT_INSERT *old_ins = *ins_stack[i];
 		if (old_ins != new_ins->next[i] ||
-		    !WT_ATOMIC_CAS8(*ins_stack[i], old_ins, new_ins))
+		    !__wt_atomic_cas_ptr(ins_stack[i], old_ins, new_ins))
 			return (i == 0 ? WT_RESTART : 0);
 	}
 
@@ -93,7 +93,7 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 	for (i = 0; i < skipdepth; i++) {
 		WT_INSERT *old_ins = *ins_stack[i];
 		if (old_ins != new_ins->next[i] ||
-		    !WT_ATOMIC_CAS8(*ins_stack[i], old_ins, new_ins))
+		    !__wt_atomic_cas_ptr(ins_stack[i], old_ins, new_ins))
 			return (i == 0 ? WT_RESTART : 0);
 		if (ins_head->tail[i] == NULL ||
 		    ins_stack[i] == &ins_head->tail[i]->next[i])
@@ -123,7 +123,7 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 	 * If the application didn't specify a record number, allocate a new one
 	 * and set up for an append.
 	 */
-	if ((recno = WT_INSERT_RECNO(new_ins)) == 0) {
+	if ((recno = WT_INSERT_RECNO(new_ins)) == WT_RECNO_OOB) {
 		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
 		WT_ASSERT(session, WT_SKIP_LAST(ins_head) == NULL ||
 		    recno > WT_INSERT_RECNO(WT_SKIP_LAST(ins_head)));
@@ -202,8 +202,8 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 {
 	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
-	int simple;
 	u_int i;
+	bool simple;
 
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
@@ -211,10 +211,10 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	/* Clear references to memory we now own and must free on error. */
 	*new_insp = NULL;
 
-	simple = 1;
+	simple = true;
 	for (i = 0; i < skipdepth; i++)
 		if (new_ins->next[i] == NULL)
-			simple = 0;
+			simple = false;
 
 	if (simple)
 		ret = __insert_simple_func(
@@ -256,6 +256,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 {
 	WT_DECL_RET;
 	WT_UPDATE *obsolete, *upd = *updp;
+	uint64_t txn;
 
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
@@ -271,7 +272,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * Swap the update into place.  If that fails, a new update was added
 	 * after our search, we raced.  Check if our update is still permitted.
 	 */
-	while (!WT_ATOMIC_CAS8(*srch_upd, upd->next, upd)) {
+	while (!__wt_atomic_cas_ptr(srch_upd, upd->next, upd)) {
 		if ((ret = __wt_txn_update_check(
 		    session, upd->next = *srch_upd)) != 0) {
 			/* Free unused memory on error. */
@@ -292,25 +293,36 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	__wt_page_modify_set(session, page);
 
 	/*
-	 * If there are subsequent WT_UPDATE structures, we're evicting pages
-	 * and the page-scanning mutex isn't held, discard obsolete WT_UPDATE
-	 * structures.  Serialization is needed so only one thread does the
-	 * obsolete check at a time, and to protect updates from disappearing
-	 * under reconciliation.
+	 * If there are no subsequent WT_UPDATE structures we are done here.
 	 */
-	if (upd->next != NULL &&
-	    __wt_txn_visible_all(session, page->modify->obsolete_check_txn)) {
-		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
-		/* If we can't lock it, don't scan, that's okay. */
-		if (ret != 0)
-			return (0);
-		obsolete = __wt_update_obsolete_check(session, page, upd->next);
-		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
-		if (obsolete != NULL) {
-			page->modify->obsolete_check_txn = WT_TXN_NONE;
-			__wt_update_obsolete_free(session, page, obsolete);
+	if (upd->next == NULL)
+		return (0);
+
+	/*
+	 * We would like to call __wt_txn_update_oldest only in the event that
+	 * there are further updates to this page, the check against WT_TXN_NONE
+	 * is used as an indicator of there being further updates on this page.
+	 */
+	if ((txn = page->modify->obsolete_check_txn) != WT_TXN_NONE) {
+		if (!__wt_txn_visible_all(session, txn)) {
+			/* Try to move the oldest ID forward and re-check. */
+			__wt_txn_update_oldest(session, false);
+
+			if (!__wt_txn_visible_all(session, txn))
+				return (0);
 		}
+
+		page->modify->obsolete_check_txn = WT_TXN_NONE;
 	}
+
+	/* If we can't lock it, don't scan, that's okay. */
+	if (__wt_fair_trylock(session, &page->page_lock) != 0)
+		return (0);
+
+	obsolete = __wt_update_obsolete_check(session, page, upd->next);
+	WT_RET(__wt_fair_unlock(session, &page->page_lock));
+	if (obsolete != NULL)
+		__wt_update_obsolete_free(session, page, obsolete);
 
 	return (0);
 }

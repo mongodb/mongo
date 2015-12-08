@@ -29,51 +29,53 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/db/global_timestamp.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/log.h"
 
-namespace {
-mongo::stdx::mutex globalTimestampMutex;
-mongo::Timestamp globalTimestamp(0, 0);
-
-bool skewed(const mongo::Timestamp& val) {
-    if (val.getInc() & 0x80000000) {
-        mongo::warning() << "clock skew detected  prev: " << val.getSecs()
-                         << " now: " << (unsigned)time(0) << std::endl;
-        return true;
-    }
-
-    return false;
-}
-}
-
 namespace mongo {
+namespace {
+AtomicUInt64 globalTimestamp(0);
+}  // namespace
+
 void setGlobalTimestamp(const Timestamp& newTime) {
-    stdx::lock_guard<stdx::mutex> lk(globalTimestampMutex);
-    globalTimestamp = newTime;
+    globalTimestamp.store(newTime.asULL());
 }
 
 Timestamp getLastSetTimestamp() {
-    stdx::lock_guard<stdx::mutex> lk(globalTimestampMutex);
-    return globalTimestamp;
+    return Timestamp(globalTimestamp.load());
 }
 
 Timestamp getNextGlobalTimestamp() {
-    stdx::lock_guard<stdx::mutex> lk(globalTimestampMutex);
+    const unsigned now = Date_t::now().toMillisSinceEpoch() / 1000;
 
-    const unsigned now = (unsigned)time(0);
-    const unsigned globalSecs = globalTimestamp.getSecs();
-    if (globalSecs == now) {
-        globalTimestamp = Timestamp(globalSecs, globalTimestamp.getInc() + 1);
-    } else if (now < globalSecs) {
-        globalTimestamp = Timestamp(globalSecs, globalTimestamp.getInc() + 1);
-        // separate function to keep out of the hot code path
-        fassert(17449, !skewed(globalTimestamp));
-    } else {
-        globalTimestamp = Timestamp(now, 1);
+    // Optimistic approach: just increment the timestamp, assuming the seconds still match.
+    auto next = globalTimestamp.addAndFetch(1);
+    unsigned globalSecs = Timestamp(next).getSecs();
+
+    // Fail if time is not moving forward for 2**31 calls to getNextGlobalTimestamp.
+    if (globalSecs > now && Timestamp(next).getInc() >= 1U << 31) {
+        mongo::warning() << "clock skew detected, prev: " << Timestamp(next).getSecs()
+                         << " now: " << now << std::endl;
+        fassertFailed(17449);
     }
 
-    return globalTimestamp;
+    //  While the seconds need to be updated, try to do it.
+    while (globalSecs < now) {
+        const auto expected = next;
+        const auto desired = Timestamp(now, 1).asULL();
+
+        // If the compareAndSwap was not successful, assume someone else updated the seconds.
+        auto actual = globalTimestamp.compareAndSwap(expected, desired);
+        if (actual == expected) {
+            next = desired;
+        } else {
+            next = globalTimestamp.addAndFetch(1);
+        }
+
+        // Either way, the seconds should no longer be less than now, but repeat if we raced.
+        globalSecs = Timestamp(next).getSecs();
+    }
+
+    return Timestamp(next);
 }
-}
+}  // namespace mongo

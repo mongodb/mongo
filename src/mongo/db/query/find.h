@@ -84,7 +84,8 @@ void beginQueryOp(OperationContext* txn,
                   long long ntoskip);
 
 /**
- * Fills out CurOp for "txn" with information regarding this query's execution.
+ * 1) Fills out CurOp for "txn" with information regarding this query's execution.
+ * 2) Reports index usage to the CollectionInfoCache.
  *
  * Uses explain functionality to extract stats from 'exec'.
  *
@@ -92,6 +93,7 @@ void beginQueryOp(OperationContext* txn,
  * do expensive stats gathering.
  */
 void endQueryOp(OperationContext* txn,
+                Collection* collection,
                 const PlanExecutor& exec,
                 int dbProfilingLevel,
                 long long numResults,

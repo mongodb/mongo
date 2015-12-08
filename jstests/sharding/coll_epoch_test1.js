@@ -75,9 +75,13 @@ var getOtherShard = function( shard ){
     }
 }
 
-admin.runCommand({ movePrimary : coll.getDB() + "", 
-                   to : getOtherShard( config.databases.findOne({ _id : coll.getDB() + "" }).primary ) })
-
+var otherShard = getOtherShard(config.databases.findOne({_id: coll.getDB() + ""}).primary);
+assert.commandWorked(admin.runCommand({movePrimary: coll.getDB() + "", to: otherShard}));
+if (st.configRS) {
+    // If we are in CSRS mode need to make sure that staleMongos will actually get
+    // the most recent config data.
+    st.configRS.awaitLastOpCommitted();
+}
 jsTest.log( "moved primary..." )
 
 bulk = insertMongos.getCollection( coll + "" ).initializeUnorderedBulkOp();

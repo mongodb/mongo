@@ -35,54 +35,40 @@
 #include "mongo/executor/async_secure_stream_factory.h"
 #include "mongo/executor/async_stream_factory.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/network_interface_impl.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
 namespace executor {
 
-namespace {
-
-const char kNetworkImplASIO[] = "ASIO";
-const char kNetworkImplThreadPool[] = "threadPool";
-
-}  // namespace
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(outboundNetworkImpl, std::string, kNetworkImplThreadPool);
-MONGO_INITIALIZER(outboundNetworkImpl)(InitializerContext*) {
-    if (outboundNetworkImpl != kNetworkImplThreadPool && outboundNetworkImpl != kNetworkImplASIO) {
-        return Status(ErrorCodes::BadValue,
-                      "unsupported networking option: " + outboundNetworkImpl);
-    }
-    return Status::OK();
-}
-
-std::unique_ptr<NetworkInterface> makeNetworkInterface() {
-    return makeNetworkInterface(nullptr);
+std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string instanceName) {
+    return makeNetworkInterface(std::move(instanceName), nullptr, nullptr);
 }
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
-    std::unique_ptr<NetworkConnectionHook> hook) {
-    if (outboundNetworkImpl == kNetworkImplASIO) {
-#ifdef MONGO_CONFIG_SSL
-        if (SSLManagerInterface* manager = getSSLManager()) {
-            auto factory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
-            return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
-        }
-#endif
-        auto factory = stdx::make_unique<AsyncStreamFactory>();
-        return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
+    std::string instanceName,
+    std::unique_ptr<NetworkConnectionHook> hook,
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+    NetworkInterfaceASIO::Options options{};
+    options.instanceName = std::move(instanceName);
+    options.networkConnectionHook = std::move(hook);
+    options.metadataHook = std::move(metadataHook);
+    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
 
-    } else {
-        if (hook) {
-            return stdx::make_unique<NetworkInterfaceImpl>(std::move(hook));
-        } else {
-            return stdx::make_unique<NetworkInterfaceImpl>();
-        }
+#ifdef MONGO_CONFIG_SSL
+    if (SSLManagerInterface* manager = getSSLManager()) {
+        options.streamFactory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
     }
+#endif
+
+    if (!options.streamFactory)
+        options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+
+    return stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
 }
 
 }  // namespace executor

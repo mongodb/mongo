@@ -44,21 +44,29 @@ extern const char kReplSetMetadataFieldName[];
  */
 class ReplSetMetadata {
 public:
+    /**
+     * Default primary index. Also used to indicate in metadata that there is no
+     * primary.
+     */
+    static const int kNoPrimary = -1;
+
     ReplSetMetadata() = default;
     ReplSetMetadata(long long term,
                     repl::OpTime committedOpTime,
                     repl::OpTime visibleOpTime,
                     long long configVersion,
-                    int currentPrimaryIndex);
+                    int currentPrimaryIndex,
+                    int currentSyncSourceIndex);
 
     /**
      * format:
      * {
      *     term: 0,
-     *     lastOpCommitted: {ts: Timestamp(0, 0), term: 0}
-     *     lastOpVisible: {ts: Timestamp(0, 0), term: 0}
+     *     lastOpCommitted: {ts: Timestamp(0, 0), term: 0},
+     *     lastOpVisible: {ts: Timestamp(0, 0), term: 0},
      *     configVersion: 0,
-     *     primaryIndex: 0
+     *     primaryIndex: 0,
+     *     syncSourceIndex: 0
      * }
      */
     static StatusWith<ReplSetMetadata> readFromMetadata(const BSONObj& doc);
@@ -87,9 +95,18 @@ public:
 
     /**
      * Returns the index of the current primary from the perspective of the sender.
+     * Returns kNoPrimary if there is no primary.
      */
-    long long getPrimaryIndex() const {
+    int getPrimaryIndex() const {
         return _currentPrimaryIndex;
+    }
+
+    /**
+     * Returns the index of the sync source of the sender.
+     * Returns -1 if it has no sync source.
+     */
+    int getSyncSourceIndex() const {
+        return _currentSyncSourceIndex;
     }
 
     /**
@@ -100,13 +117,12 @@ public:
     }
 
 private:
-    repl::OpTime _lastOpCommitted =
-        repl::OpTime(Timestamp(0, 0), repl::OpTime::kProtocolVersionV0Term);
-    repl::OpTime _lastOpVisible =
-        repl::OpTime(Timestamp(0, 0), repl::OpTime::kProtocolVersionV0Term);
+    repl::OpTime _lastOpCommitted = repl::OpTime(Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+    repl::OpTime _lastOpVisible = repl::OpTime(Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
     long long _currentTerm = -1;
     long long _configVersion = -1;
-    int _currentPrimaryIndex = -1;
+    int _currentPrimaryIndex = kNoPrimary;
+    int _currentSyncSourceIndex = -1;
 };
 
 }  // namespace rpc

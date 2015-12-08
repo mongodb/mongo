@@ -1,7 +1,16 @@
+/**
+ * Tests that a mongod started with --directoryperdb will write data for database x into a direcotry
+ * named x inside the dbpath.
+ *
+ * This test does not make sense for in-memory storage engines, since they will not produce any data
+ * files.
+ * @tags: [requires_persistence]
+ */
+
 (function() {
     'use strict';
+
     var baseDir = "jstests_directoryperdb";
-    var port = allocatePorts( 1 )[ 0 ];
     var dbpath = MongoRunner.dataPath + baseDir + "/";
 
     var isDirectoryPerDBSupported =
@@ -11,7 +20,6 @@
 
     var m = MongoRunner.runMongod({
         dbpath: dbpath,
-        port: port,
         directoryperdb: ''});
 
     if (!isDirectoryPerDBSupported) {
@@ -37,11 +45,10 @@
     files = listFiles( files[0].name );
     assert( files.length > 0 );
 
-    MongoRunner.stopMongod(port);
+    MongoRunner.stopMongod(m.port);
 
     // Subsequent attempt to start server using same dbpath without directoryperdb should fail.
     assert.isnull(MongoRunner.runMongod({
         dbpath: dbpath,
-        port: port,
         restart: true}));
 }());

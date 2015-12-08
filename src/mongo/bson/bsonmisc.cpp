@@ -72,6 +72,11 @@ BSONObjBuilderValueStream::BSONObjBuilderValueStream(BSONObjBuilder* builder) {
     _builder = builder;
 }
 
+void BSONObjBuilderValueStream::reset() {
+    _fieldName = StringData();
+    _subobj.reset();
+}
+
 BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const BSONElement& e) {
     _builder->appendAs(e, _fieldName);
     _fieldName = StringData();

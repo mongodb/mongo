@@ -35,6 +35,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -89,6 +90,16 @@ std::string DBDirectClient::getServerAddress() const {
     return "localhost";  // TODO: should this have the port?
 }
 
+// Returned version should match the incoming connections restrictions.
+int DBDirectClient::getMinWireVersion() {
+    return WireSpec::instance().minWireVersionIncoming;
+}
+
+// Returned version should match the incoming connections restrictions.
+int DBDirectClient::getMaxWireVersion() {
+    return WireSpec::instance().maxWireVersionIncoming;
+}
+
 bool DBDirectClient::callRead(Message& toSend, Message& response) {
     return call(toSend, response);
 }
@@ -121,11 +132,11 @@ bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, str
     DbResponse dbResponse;
     CurOp curOp(_txn);
     assembleResponse(_txn, toSend, dbResponse, dummyHost);
-    verify(dbResponse.response);
+    verify(!dbResponse.response.empty());
 
     // can get rid of this if we make response handling smarter
-    dbResponse.response->concat();
-    response = std::move(*dbResponse.response);
+    dbResponse.response.concat();
+    response = std::move(dbResponse.response);
 
     return true;
 }

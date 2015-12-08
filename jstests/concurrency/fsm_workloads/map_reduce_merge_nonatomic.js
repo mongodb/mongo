@@ -30,7 +30,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        this.outDBName = uniqueDBName(prefix, this.tid);
+        this.outDBName = db.getName() + uniqueDBName(prefix, this.tid);
         var outDB = db.getSiblingDB(this.outDBName);
         assertAlways.commandWorked(outDB.createCollection(collName));
     };
@@ -55,7 +55,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + prefix + '\\d+$');
+        var pattern = new RegExp('^' + db.getName() + prefix + '\\d+$');
         dropDatabases(db, pattern);
     };
 

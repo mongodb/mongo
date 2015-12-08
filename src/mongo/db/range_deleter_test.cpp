@@ -51,7 +51,7 @@ OperationContext* const noTxn = NULL;  // MockEnv doesn't need txn XXX SERVER-13
 // Capped sleep interval is 640 mSec, Nyquist frequency is 1280 mSec => round up to 2 sec.
 const int MAX_IMMEDIATE_DELETE_WAIT_SECS = 2;
 
-const mongo::repl::ReplSettings replSettings;
+const mongo::repl::ReplSettings replSettings = {};
 
 // Should not be able to queue deletes if deleter workers were not started.
 TEST(QueueDelete, CantAfterStop) {

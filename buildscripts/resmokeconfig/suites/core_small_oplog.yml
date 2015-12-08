@@ -19,6 +19,5 @@ executor:
       class: MasterSlaveFixture
       mongod_options:
         oplogSize: 511
-        nopreallocj: ''
         set_parameters:
           enableTestCommands: 1

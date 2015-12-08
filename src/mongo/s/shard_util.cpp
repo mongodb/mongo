@@ -39,20 +39,15 @@
 namespace mongo {
 namespace shardutil {
 
-StatusWith<long long> retrieveTotalShardSize(ShardId shardId, ShardRegistry* shardRegistry) {
-    auto shard = shardRegistry->getShard(shardId);
-    if (!shard) {
-        return {ErrorCodes::ShardNotFound, str::stream() << "shard " << shardId << " not found"};
-    }
-
-    auto shardHostStatus =
-        shard->getTargeter()->findHost({ReadPreference::PrimaryPreferred, TagSet::primaryOnly()});
-    if (!shardHostStatus.isOK()) {
-        return shardHostStatus.getStatus();
-    }
-
+StatusWith<long long> retrieveTotalShardSize(OperationContext* txn,
+                                             ShardId shardId,
+                                             ShardRegistry* shardRegistry) {
     auto listDatabasesStatus =
-        shardRegistry->runCommand(shardHostStatus.getValue(), "admin", BSON("listDatabases" << 1));
+        shardRegistry->runCommandOnShard(txn,
+                                         shardId,
+                                         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                                         "admin",
+                                         BSON("listDatabases" << 1));
     if (!listDatabasesStatus.isOK()) {
         return listDatabasesStatus.getStatus();
     }

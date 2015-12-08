@@ -150,7 +150,7 @@ public:
         ShardingState* shardingState = ShardingState::get(txn);
 
         if (shardingState->enabled()) {
-            result.append("configServer", shardingState->getConfigServer(txn));
+            result.append("configServer", shardingState->getConfigServer(txn).toString());
         } else {
             result.append("configServer", "");
         }
@@ -248,17 +248,13 @@ bool shardVersionOk(OperationContext* txn,
     // If there is a version attached to the OperationContext, use it as the received version.
     // Otherwise, get the received version from the ShardedConnectionInfo.
     if (OperationShardVersion::get(txn).hasShardVersion()) {
-        received = OperationShardVersion::get(txn).getShardVersion();
+        received = OperationShardVersion::get(txn).getShardVersion(NamespaceString(ns));
     } else {
         ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, false);
         if (!info) {
             // There is no shard version information on either 'txn' or 'client'. This means that
             // the operation represented by 'txn' is unversioned, and the shard version is always OK
             // for unversioned operations.
-            return true;
-        }
-
-        if (info->inForceVersionOkMode()) {
             return true;
         }
 
@@ -316,17 +312,6 @@ bool shardVersionOk(OperationContext* txn,
 }
 
 }  // namespace
-
-ShardForceVersionOkModeBlock::ShardForceVersionOkModeBlock(Client* client) {
-    info = ShardedConnectionInfo::get(client, false);
-    if (info)
-        info->enterForceVersionOkMode();
-}
-
-ShardForceVersionOkModeBlock::~ShardForceVersionOkModeBlock() {
-    if (info)
-        info->leaveForceVersionOkMode();
-}
 
 bool haveLocalShardingInfo(Client* client, const string& ns) {
     if (!ShardingState::get(client->getServiceContext())->enabled())

@@ -52,6 +52,7 @@
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/text.h"
 #include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/s/sharding_state.h"
@@ -125,7 +126,7 @@ PlanStage* buildStages(OperationContext* txn,
             return NULL;
         }
         return new SortKeyGeneratorStage(
-            txn, childStage, ws, collection, keyGenNode->sortSpec, keyGenNode->queryObj);
+            txn, childStage, ws, keyGenNode->sortSpec, keyGenNode->queryObj);
     } else if (STAGE_PROJECTION == root->getType()) {
         const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
         PlanStage* childStage = buildStages(txn, collection, qsol, pn->children[0], ws);
@@ -133,7 +134,7 @@ PlanStage* buildStages(OperationContext* txn,
             return NULL;
         }
 
-        ProjectionStageParams params(WhereCallbackReal(txn, collection->ns().db()));
+        ProjectionStageParams params(ExtensionsCallbackReal(txn, &collection->ns()));
         params.projObj = pn->projection;
 
         // Stuff the right data into the params depending on what proj impl we use.
@@ -255,40 +256,22 @@ PlanStage* buildStages(OperationContext* txn,
         return new GeoNear2DSphereStage(params, txn, ws, collection, s2Index);
     } else if (STAGE_TEXT == root->getType()) {
         const TextNode* node = static_cast<const TextNode*>(root);
-
-        if (NULL == collection) {
-            warning() << "Null collection for text";
-            return NULL;
-        }
-        vector<IndexDescriptor*> idxMatches;
-        collection->getIndexCatalog()->findIndexByType(txn, "text", idxMatches);
-        if (1 != idxMatches.size()) {
-            warning() << "No text index, or more than one text index";
-            return NULL;
-        }
-        IndexDescriptor* index = idxMatches[0];
+        IndexDescriptor* desc =
+            collection->getIndexCatalog()->findIndexByKeyPattern(txn, node->indexKeyPattern);
+        invariant(desc);
         const FTSAccessMethod* fam =
-            static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(index));
-        TextStageParams params(fam->getSpec());
+            static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
+        invariant(fam);
 
-        // params.collection = collection;
-        params.index = index;
+        TextStageParams params(fam->getSpec());
+        params.index = desc;
         params.spec = fam->getSpec();
         params.indexPrefix = node->indexPrefix;
-
-        const std::string& language =
-            ("" == node->language ? fam->getSpec().defaultLanguage().str() : node->language);
-
-        Status parseStatus = params.query.parse(node->query,
-                                                language,
-                                                node->caseSensitive,
-                                                node->diacriticSensitive,
-                                                fam->getSpec().getTextIndexVersion());
-        if (!parseStatus.isOK()) {
-            warning() << "Can't parse text search query";
-            return NULL;
-        }
-
+        // We assume here that node->ftsQuery is an FTSQueryImpl, not an FTSQueryNoop. In practice,
+        // this means that it is illegal to use the StageBuilder on a QuerySolution created by
+        // planning a query that contains "no-op" expressions. TODO: make StageBuilder::build()
+        // fail in this case (this improvement is being tracked by SERVER-21510).
+        params.query = static_cast<FTSQueryImpl&>(*node->ftsQuery);
         return new TextStage(txn, params, ws, node->filter.get());
     } else if (STAGE_SHARDING_FILTER == root->getType()) {
         const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
@@ -296,11 +279,11 @@ PlanStage* buildStages(OperationContext* txn,
         if (NULL == childStage) {
             return NULL;
         }
-        return new ShardFilterStage(txn,
-                                    ShardingState::get(getGlobalServiceContext())
-                                        ->getCollectionMetadata(collection->ns().ns()),
-                                    ws,
-                                    childStage);
+        return new ShardFilterStage(
+            txn,
+            ShardingState::get(txn)->getCollectionMetadata(collection->ns().ns()),
+            ws,
+            childStage);
     } else if (STAGE_KEEP_MUTATIONS == root->getType()) {
         const KeepMutationsNode* km = static_cast<const KeepMutationsNode*>(root);
         PlanStage* childStage = buildStages(txn, collection, qsol, km->children[0], ws);

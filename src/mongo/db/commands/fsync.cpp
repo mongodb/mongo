@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/db.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -47,11 +48,13 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"
 
@@ -91,7 +94,7 @@ public:
     bool locked;
     bool pendingUnlock;
     SimpleMutex m;  // protects locked var above
-    string err;
+    Status status = Status::OK();
 
     stdx::condition_variable_any _threadSync;
     stdx::condition_variable_any _unlockSync;
@@ -141,17 +144,15 @@ public:
             }
 
             stdx::lock_guard<SimpleMutex> lk(m);
-            err = "";
+            status = Status::OK();
 
             (new FSyncLockThread())->go();
-            while (!locked && err.size() == 0) {
+            while (!locked && status.isOK()) {
                 _threadSync.wait(m);
             }
 
-            if (err.size()) {
-                errmsg = err;
-                return false;
-            }
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
 
             log() << "db is now locked, no writes allowed. db.fsyncUnlock() to unlock" << endl;
             log() << "    For more info see " << FSyncCommand::url() << endl;
@@ -242,20 +243,31 @@ void FSyncLockThread::doRealWork() {
         getDur().syncDataAndTruncateJournal(&txn);
     } catch (std::exception& e) {
         error() << "error doing syncDataAndTruncateJournal: " << e.what() << endl;
-        fsyncCmd.err = e.what();
+        fsyncCmd.status = Status(ErrorCodes::CommandFailed, e.what());
         fsyncCmd._threadSync.notify_one();
         fsyncCmd.locked = false;
         return;
     }
-
     txn.lockState()->downgradeGlobalXtoSForMMAPV1();
+    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
 
     try {
-        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->flushAllFiles(true);
     } catch (std::exception& e) {
         error() << "error doing flushAll: " << e.what() << endl;
-        fsyncCmd.err = e.what();
+        fsyncCmd.status = Status(ErrorCodes::CommandFailed, e.what());
+        fsyncCmd._threadSync.notify_one();
+        fsyncCmd.locked = false;
+        return;
+    }
+    try {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            uassertStatusOK(storageEngine->beginBackup(&txn));
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "beginBackup", "global");
+    } catch (const DBException& e) {
+        error() << "storage engine unable to begin backup : " << e.toString() << endl;
+        fsyncCmd.status = e.toStatus();
         fsyncCmd._threadSync.notify_one();
         fsyncCmd.locked = false;
         return;
@@ -269,10 +281,13 @@ void FSyncLockThread::doRealWork() {
     while (!fsyncCmd.pendingUnlock) {
         fsyncCmd._unlockSync.wait(fsyncCmd.m);
     }
+
+    storageEngine->endBackup(&txn);
+
     fsyncCmd.pendingUnlock = false;
 
     fsyncCmd.locked = false;
-    fsyncCmd.err = "unlocked";
+    fsyncCmd.status = Status::OK();
 
     fsyncCmd._unlockSync.notify_one();
 }

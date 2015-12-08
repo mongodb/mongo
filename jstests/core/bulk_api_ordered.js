@@ -124,7 +124,7 @@ var executeTests = function() {
     // Basic properties check
     assert.eq(1, result.nInserted);
     assert.eq(true, result.hasWriteErrors());
-    assert(1, result.getWriteErrorCount());
+    assert.eq(1, result.getWriteErrorCount());
 
     // Individual error checking
     var error = result.getWriteErrorAt(0);

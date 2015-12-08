@@ -94,6 +94,13 @@ Status ModifierBit::init(const BSONElement& modExpr, const Options& opts, bool* 
                                     << ". You must pass in an embedded document: "
                                        "{$bit: {field: {and/or/xor: #}}");
 
+    if (modExpr.embeddedObject().isEmpty()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "You must pass in at least one bitwise operation. "
+                                    << "The format is: "
+                                       "{$bit: {field: {and/or/xor: #}}");
+    }
+
     BSONObjIterator opsIterator(modExpr.embeddedObject());
 
     while (opsIterator.more()) {

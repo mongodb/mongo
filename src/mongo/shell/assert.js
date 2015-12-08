@@ -1,4 +1,4 @@
-doassert = function(msg) {
+doassert = function(msg, obj) {
     // eval if msg is a function
     if (typeof(msg) == "function")
         msg = msg();
@@ -8,12 +8,23 @@ doassert = function(msg) {
     else
         print("assert: " + msg);
 
-    var ex = Error(msg);
+    var ex;
+    if (obj) {
+        ex = _getErrorWithCode(obj, msg);
+    } else {
+        ex = Error(msg);
+    }
     print(ex.stack);
     throw ex;
 }
 
 assert = function(b, msg){
+    if (arguments.length > 2) {
+        doassert("Too many parameters to assert().");
+    }
+    if (arguments.length > 1 && typeof(msg) !== "string") {
+        doassert("Non-string 'msg' parameters are invalid for assert().");
+    }
     if (assert._debug && msg) print("in assert for: " + msg);
     if (b)
         return;
@@ -229,13 +240,14 @@ assert.doesNotThrow = function(func, params, msg) {
     if (params && typeof(params) == "string") {
         throw ("2nd argument to assert.throws has to be an array, not " + params);
     }
+    var res;
     try {
-        func.apply(null, params);
+        res = func.apply(null, params);
     }
     catch (e) {
         doassert("threw unexpected exception: " + e + " : " + msg);
     }
-    return;
+    return res;
 };
 
 assert.throws.automsg = function(func, params) {
@@ -251,7 +263,7 @@ assert.commandWorked = function(res, msg){
 
     if (res.ok == 1)
         return res;
-    doassert("command failed: " + tojson(res) + " : " + msg);
+    doassert("command failed: " + tojson(res) + " : " + msg, res);
 }
 
 assert.commandFailed = function(res, msg){
@@ -390,14 +402,16 @@ assert.writeOK = function(res, msg) {
         errMsg = "write command failed: " + tojson(res);
     }
     else {
-        errMsg = "unknown type of write result, cannot check ok: " 
-                 + tojson(res);
+        if (!res || !res.ok) {
+            errMsg = "unknown type of write result, cannot check ok: "
+                     + tojson(res);
+        }
     }
     
     if (errMsg) {
         if (msg)
             errMsg = errMsg + ": " + msg;
-        doassert(errMsg);
+        doassert(errMsg, res);
     }
     
     return res;
@@ -423,8 +437,10 @@ assert.writeError = function(res, msg) {
         // No-op since we're expecting an error
     }
     else {
-        errMsg = "unknown type of write result, cannot check error: "
-                 + tojson(res);
+        if (!res || res.ok) {
+            errMsg = "unknown type of write result, cannot check error: "
+                     + tojson(res);
+        }
     }
     
     if (errMsg) {
@@ -454,7 +470,7 @@ assert.gleOK = function(res, msg) {
     if (errMsg) {
         if (msg)
             errMsg = errMsg + ": " + msg;
-        doassert(errMsg);
+        doassert(errMsg, res);
     }
     
     return res;
@@ -465,7 +481,7 @@ assert.gleSuccess = function(dbOrGLEDoc, msg) {
     if (gle.err) {
         if (typeof(msg) == "function") 
             msg = msg(gle);
-        doassert("getLastError not null:" + tojson(gle) + " :" + msg);
+        doassert("getLastError not null:" + tojson(gle) + " :" + msg, gle);
     }
     return gle;
 }

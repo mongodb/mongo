@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env use_system_version_of_library usemozjs usev8 v8suffix boostSuffix")
+Import("env use_system_version_of_library usemozjs boostSuffix get_option")
 Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
@@ -29,13 +29,14 @@ if not use_system_version_of_library('snappy'):
     thirdPartyIncludePathList.append(
         ('snappy', '#/src/third_party/snappy' + snappySuffix))
 
+# Valgrind is a header only include as valgrind.h includes everything we need
+if not use_system_version_of_library('valgrind'):
+    thirdPartyIncludePathList.append(
+        ('valgrind', '#/src/third_party/valgrind-3.11.0/include'))
+
 if not use_system_version_of_library('zlib'):
     thirdPartyIncludePathList.append(
         ('zlib', '#/src/third_party/zlib' + zlibSuffix))
-
-if not use_system_version_of_library('v8'):
-    thirdPartyIncludePathList.append(
-        ('v8', '#/src/third_party/v8' + v8suffix + '/include'))
 
 # TODO: figure out if we want to offer system versions of mozjs.  Mozilla
 # hasn't offered a source tarball since 24, but in theory they could.
@@ -76,10 +77,10 @@ if not use_system_version_of_library('intel_decimal128'):
         ('intel_decimal128', '#/src/third_party/IntelRDFPMathLib20U1/LIBRARY'))
 
 def injectAllThirdPartyIncludePaths(thisEnv):
-    thisEnv.AppendUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
+    thisEnv.PrependUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
 
 def injectThirdPartyIncludePaths(thisEnv, libraries):
-    thisEnv.AppendUnique(CPPPATH=[
+    thisEnv.PrependUnique(CPPPATH=[
         entry[1] for entry in thirdPartyIncludePathList if entry[0] in libraries])
 
 env.AddMethod(injectAllThirdPartyIncludePaths, 'InjectAllThirdPartyIncludePaths')
@@ -130,6 +131,7 @@ if use_system_version_of_library("boost"):
                 env['LIBDEPS_BOOST_THREAD_SYSLIBDEP'],
                 env['LIBDEPS_BOOST_SYSTEM_SYSLIBDEP'],
                 env['LIBDEPS_BOOST_CHRONO_SYSLIBDEP'],
+                env['LIBDEPS_BOOST_REGEX_SYSLIBDEP'],
             ])
 else:
     boostDirectory = 'boost' + boostSuffix
@@ -143,6 +145,7 @@ else:
             boostDirectory + '/boost_thread',
             boostDirectory + '/boost_system',
             boostDirectory + '/boost_chrono',
+            boostDirectory + '/boost_regex',
         ])
 
 boostEnv.Library(
@@ -193,27 +196,6 @@ zlibEnv.Library(
     source=[
         'shim_zlib.cpp',
     ])
-
-if usev8:
-    if use_system_version_of_library("v8"):
-        v8Env = env.Clone(
-            SYSLIBDEPS=[
-                env['LIBDEPS_V8_SYSLIBDEP'],
-            ])
-    else:
-        v8Env = env.Clone()
-        v8Env.InjectThirdPartyIncludePaths(libraries=['v8'])
-        v8Env.SConscript('v8' + v8suffix + '/SConscript', exports={'env' : v8Env })
-        v8Env = v8Env.Clone(
-            LIBDEPS=[
-                'v8' + v8suffix + '/v8'
-            ])
-
-    v8Env.Library(
-        target="shim_v8",
-        source=[
-            'shim_v8.cpp',
-        ])
 
 if usemozjs:
     mozjsEnv = env.Clone()
@@ -353,22 +335,23 @@ asioEnv.Library(
         'shim_asio.cpp'
     ])
 
-if use_system_version_of_library("intel_decimal128"):
-    intelDecimal128Env = env.Clone(
-        SYSLIBDEPS=[
-            env['LIBDEPS_INTEL_DECIMAL128_SYSLIBDEP'],
-        ])
-else:
-    intelDecimal128Env = env.Clone()
-    intelDecimal128Env.InjectThirdPartyIncludePaths(libraries=['intel_decimal128'])
-    intelDecimal128Env.SConscript('IntelRDFPMathLib20U1/SConscript', exports={ 'env' : intelDecimal128Env })
-    intelDecimal128Env = intelDecimal128Env.Clone(
-        LIBDEPS=[
-            'IntelRDFPMathLib20U1/intel_decimal128',
-        ])
+if get_option("experimental-decimal-support") == "on":
+    if use_system_version_of_library("intel_decimal128"):
+        intelDecimal128Env = env.Clone(
+            SYSLIBDEPS=[
+                env['LIBDEPS_INTEL_DECIMAL128_SYSLIBDEP'],
+            ])
+    else:
+        intelDecimal128Env = env.Clone()
+        intelDecimal128Env.InjectThirdPartyIncludePaths(libraries=['intel_decimal128'])
+        intelDecimal128Env.SConscript('IntelRDFPMathLib20U1/SConscript', exports={ 'env' : intelDecimal128Env })
+        intelDecimal128Env = intelDecimal128Env.Clone(
+            LIBDEPS=[
+                'IntelRDFPMathLib20U1/intel_decimal128',
+            ])
 
-intelDecimal128Env.Library(
-    target="shim_intel_decimal128",
-    source=[
-        'shim_intel_decimal128.cpp'
-    ])
+    intelDecimal128Env.Library(
+        target="shim_intel_decimal128",
+        source=[
+            'shim_intel_decimal128.cpp'
+        ])

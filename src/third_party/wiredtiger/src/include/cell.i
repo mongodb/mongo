@@ -182,7 +182,7 @@ __wt_cell_pack_addr(WT_CELL *cell, u_int cell_type, uint64_t recno, size_t size)
 
 	p = cell->__chunk + 1;
 
-	if (recno == 0)
+	if (recno == WT_RECNO_OOB)
 		cell->__chunk[0] = cell_type;		/* Type */
 	else {
 		cell->__chunk[0] = cell_type | WT_CELL_64V;
@@ -230,11 +230,12 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, size_t size)
  */
 static inline int
 __wt_cell_pack_data_match(
-    WT_CELL *page_cell, WT_CELL *val_cell, const uint8_t *val_data, int *matchp)
+    WT_CELL *page_cell, WT_CELL *val_cell, const uint8_t *val_data,
+    bool *matchp)
 {
 	const uint8_t *a, *b;
 	uint64_t av, bv;
-	int rle;
+	bool rle;
 
 	*matchp = 0;				/* Default to no-match */
 
@@ -252,7 +253,7 @@ __wt_cell_pack_data_match(
 		av = a[0] >> WT_CELL_SHORT_SHIFT;
 		++a;
 	} else if (WT_CELL_TYPE(a[0]) == WT_CELL_VALUE) {
-		rle = a[0] & WT_CELL_64V ? 1 : 0;	/* Skip any RLE */
+		rle = (a[0] & WT_CELL_64V) != 0;	/* Skip any RLE */
 		++a;
 		if (rle)
 			WT_RET(__wt_vunpack_uint(&a, 0, &av));
@@ -264,7 +265,7 @@ __wt_cell_pack_data_match(
 		bv = b[0] >> WT_CELL_SHORT_SHIFT;
 		++b;
 	} else if (WT_CELL_TYPE(b[0]) == WT_CELL_VALUE) {
-		rle = b[0] & WT_CELL_64V ? 1 : 0;	/* Skip any RLE */
+		rle = (b[0] & WT_CELL_64V) != 0;	/* Skip any RLE */
 		++b;
 		if (rle)
 			WT_RET(__wt_vunpack_uint(&b, 0, &bv));
@@ -273,7 +274,7 @@ __wt_cell_pack_data_match(
 		return (0);
 
 	if (av == bv)
-		*matchp = memcmp(a, val_data, av) == 0 ? 1 : 0;
+		*matchp = memcmp(a, val_data, av) == 0;
 	return (0);
 }
 
@@ -547,7 +548,8 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
  *	Unpack a WT_CELL into a structure during verification.
  */
 static inline int
-__wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
+__wt_cell_unpack_safe(
+    WT_CELL *cell, WT_CELL_UNPACK *unpack, const void *start, const void *end)
 {
 	struct {
 		uint32_t len;
@@ -560,14 +562,15 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	copy.v = 0;			/* -Werror=maybe-uninitialized */
 
 	/*
-	 * The verification code specifies an end argument, a pointer to 1 past
-	 * the end-of-page.  In that case, make sure we don't go past the end
-	 * of the page when reading.  If an error occurs, we simply return the
-	 * error code, the verification code takes care of complaining (and, in
-	 * the case of salvage, it won't complain at all, it's OK to fail).
+	 * The verification code specifies start/end arguments, pointers to the
+	 * start of the page and to 1 past the end-of-page. In which case, make
+	 * sure all reads are inside the page image. If an error occurs, return
+	 * an error code but don't output messages, our caller handles that.
 	 */
-#define	WT_CELL_LEN_CHK(p, len) do {					\
-	if (end != NULL && (((uint8_t *)p) + (len)) > end)		\
+#define	WT_CELL_LEN_CHK(t, len) do {					\
+	if (start != NULL &&						\
+	    ((uint8_t *)t < (uint8_t *)start ||				\
+	    (((uint8_t *)t) + (len)) > (uint8_t *)end))			\
 		return (WT_ERROR);					\
 } while (0)
 
@@ -630,7 +633,7 @@ restart:
 	 */
 	if (cell->__chunk[0] & WT_CELL_64V)		/* skip value */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->v));
+		    &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &unpack->v));
 
 	/*
 	 * Handle special actions for a few different cell types and set the
@@ -647,7 +650,7 @@ restart:
 		 * earlier cell.
 		 */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
+		    &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &v));
 		copy.len = WT_PTRDIFF32(p, cell);
 		copy.v = unpack->v;
 		cell = (WT_CELL *)((uint8_t *)cell - v);
@@ -675,7 +678,7 @@ restart:
 		 * data.
 		 */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
+		    &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &v));
 
 		if (unpack->raw == WT_CELL_KEY ||
 		    unpack->raw == WT_CELL_KEY_PFX ||
@@ -716,7 +719,7 @@ done:	WT_CELL_LEN_CHK(cell, unpack->__len);
 static inline void
 __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
-	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
+	(void)__wt_cell_unpack_safe(cell, unpack, NULL, NULL);
 }
 
 /*

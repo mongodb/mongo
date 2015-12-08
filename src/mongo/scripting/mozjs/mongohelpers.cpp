@@ -57,7 +57,7 @@ std::string parseJSFunctionOrExpression(JSContext* cx, const StringData input) {
     JS::RootedValue jsStrIn(cx);
 
     ValueReader(cx, &jsStrIn).fromStringData(input);
-    ObjectWrapper helpersWrapper(cx, getScope(cx)->getMongoHelpersProto().getProto());
+    ObjectWrapper helpersWrapper(cx, getScope(cx)->getProto<MongoHelpersInfo>().getProto());
 
     helpersWrapper.callMethod("functionExpressionParser", JS::HandleValueArray(jsStrIn), &jsStrOut);
 
@@ -87,6 +87,7 @@ void MongoHelpersInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::H
     exportsWrapper.enumerate([&](JS::HandleId _id) {
         exportsWrapper.getValue(_id, &copyExport);
         protoWrapper.setValue(_id, copyExport);
+        return true;
     });
 }
 

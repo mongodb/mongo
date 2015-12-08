@@ -41,6 +41,9 @@ public:
     // this value, no further documents are added).
     static const int kMaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 
+    // The initial size of the query response buffer.
+    static const int kInitReplyBufferSize = 32768;
+
     /**
      * Returns true if enough results have been prepared to stop adding more to the first batch.
      *

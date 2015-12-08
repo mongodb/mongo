@@ -1,13 +1,7 @@
-// count1.js
+(function() {
 
-s = new ShardingTest( "count1" , 2 , 1 );
-db = s.getDB( "test" );
-
-// Stop balancer since doing manual stuff
-// Make sure we totally stop here, otherwise balancing round can intermittently slip by
-// Counts during balancing are only approximate (as of 7/28/12).
-// If we fix that, we should write a test for it elsewhere
-s.stopBalancer();
+var s = new ShardingTest({ name: "count1", shards: 2 });
+var db = s.getDB( "test" );
 
 // ************** Test Set #1 *************
 // Basic counts on "bar" collections, not yet sharded
@@ -177,3 +171,5 @@ assert( ! negSkipLimitResult.ok , "negative skip value with limit shouldn't work
 assert( negSkipLimitResult.errmsg.length > 0 , "no error msg for negative skip" );
 
 s.stop();
+
+})();

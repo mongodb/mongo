@@ -123,6 +123,10 @@ public:
      */
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
                                                            bool isForward = true) const;
+    /**
+     * Returns a pseudo-random cursor over 'this' index.
+     */
+    std::unique_ptr<SortedDataInterface::Cursor> newRandomCursor(OperationContext* txn) const;
 
     // ------ index level operations ------
 

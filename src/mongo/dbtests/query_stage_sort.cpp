@@ -114,7 +114,7 @@ public:
         params.limit = limit();
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
-            &_txn, queuedDataStage.release(), ws.get(), coll, params.pattern, BSONObj());
+            &_txn, queuedDataStage.release(), ws.get(), params.pattern, BSONObj());
 
         auto ss = make_unique<SortStage>(&_txn, params, ws.get(), keyGenStage.release());
 
@@ -153,7 +153,7 @@ public:
         params.limit = limit();
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
-            &_txn, queuedDataStage.release(), ws.get(), coll, params.pattern, BSONObj());
+            &_txn, queuedDataStage.release(), ws.get(), params.pattern, BSONObj());
 
         auto sortStage = make_unique<SortStage>(&_txn, params, ws.get(), keyGenStage.release());
 
@@ -170,6 +170,7 @@ public:
         // totally) correct.
         BSONObj last;
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&last, NULL));
+        last = last.getOwned();
 
         // Count 'last'.
         int count = 1;
@@ -181,7 +182,7 @@ public:
             // pattern.
             ASSERT(cmp == 0 || cmp == 1);
             ++count;
-            last = current;
+            last = current.getOwned();
         }
 
         checkCount(count);
@@ -555,7 +556,7 @@ public:
         params.limit = 0;
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
-            &_txn, queuedDataStage.release(), ws.get(), coll, params.pattern, BSONObj());
+            &_txn, queuedDataStage.release(), ws.get(), params.pattern, BSONObj());
 
         auto sortStage = make_unique<SortStage>(&_txn, params, ws.get(), keyGenStage.release());
 

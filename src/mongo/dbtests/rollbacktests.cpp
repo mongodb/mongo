@@ -1,5 +1,3 @@
-// rollbacktests.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -86,11 +84,10 @@ Status truncateCollection(OperationContext* txn, const NamespaceString& nss) {
     Collection* coll = dbHolder().get(txn, nss.db())->getCollection(nss.ns());
     return coll->truncate(txn);
 }
-RecordId insertRecord(OperationContext* txn, const NamespaceString& nss, const BSONObj& data) {
+
+void insertRecord(OperationContext* txn, const NamespaceString& nss, const BSONObj& data) {
     Collection* coll = dbHolder().get(txn, nss.db())->getCollection(nss.ns());
-    StatusWith<RecordId> status = coll->insertDocument(txn, data, false);
-    ASSERT_OK(status.getStatus());
-    return status.getValue();
+    ASSERT_OK(coll->insertDocument(txn, data, false));
 }
 void assertOnlyRecord(OperationContext* txn, const NamespaceString& nss, const BSONObj& data) {
     Collection* coll = dbHolder().get(txn, nss.db())->getCollection(nss.ns());
@@ -126,7 +123,7 @@ size_t getNumIndexEntries(OperationContext* txn,
     if (desc) {
         auto cursor = catalog->getIndex(desc)->newCursor(txn);
 
-        for (auto kv = cursor->seek(minKey, true); kv; kv = cursor->next()) {
+        for (auto kv = cursor->seek(kMinBSONKey, true); kv; kv = cursor->next()) {
             numEntries++;
         }
     }

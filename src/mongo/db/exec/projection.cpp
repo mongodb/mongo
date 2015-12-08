@@ -62,7 +62,7 @@ ProjectionStage::ProjectionStage(OperationContext* opCtx,
 
     if (ProjectionStageParams::NO_FAST_PATH == _projImpl) {
         _exec.reset(
-            new ProjectionExec(params.projObj, params.fullExpression, *params.whereCallback));
+            new ProjectionExec(params.projObj, params.fullExpression, *params.extensionsCallback));
     } else {
         // We shouldn't need the full expression if we're fast-pathing.
         invariant(NULL == params.fullExpression);
@@ -84,9 +84,7 @@ ProjectionStage::ProjectionStage(OperationContext* opCtx,
             BSONObjIterator kpIt(_coveredKeyObj);
             while (kpIt.more()) {
                 BSONElement elt = kpIt.next();
-                unordered_set<StringData, StringData::Hasher>::iterator fieldIt;
-                fieldIt = _includedFields.find(elt.fieldNameStringData());
-
+                auto fieldIt = _includedFields.find(elt.fieldNameStringData());
                 if (_includedFields.end() == fieldIt) {
                     // Push an unused value on the back to keep _includeKey and _keyFieldNames
                     // in sync.
@@ -94,7 +92,7 @@ ProjectionStage::ProjectionStage(OperationContext* opCtx,
                     _includeKey.push_back(false);
                 } else {
                     // If we are including this key field store its field name.
-                    _keyFieldNames.push_back(*fieldIt);
+                    _keyFieldNames.push_back(fieldIt->first);
                     _includeKey.push_back(true);
                 }
             }
@@ -120,11 +118,11 @@ void ProjectionStage::getSimpleInclusionFields(const BSONObj& projObj, FieldSet*
             includeId = false;
             continue;
         }
-        includedFields->insert(elt.fieldNameStringData());
+        (*includedFields)[elt.fieldNameStringData()] = true;
     }
 
     if (includeId) {
-        includedFields->insert(kIdField);
+        (*includedFields)[kIdField] = true;
     }
 }
 
@@ -136,8 +134,7 @@ void ProjectionStage::transformSimpleInclusion(const BSONObj& in,
     BSONObjIterator inputIt(in);
     while (inputIt.more()) {
         BSONElement elt = inputIt.next();
-        unordered_set<StringData, StringData::Hasher>::const_iterator fieldIt;
-        fieldIt = includedFields.find(elt.fieldNameStringData());
+        auto fieldIt = includedFields.find(elt.fieldNameStringData());
         if (includedFields.end() != fieldIt) {
             // If so, add it to the builder.
             bob.append(elt);
@@ -247,7 +244,7 @@ unique_ptr<PlanStageStats> ProjectionStage::getStats() {
     projStats->projObj = _projObj;
     ret->specific = std::move(projStats);
 
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
     return ret;
 }
 

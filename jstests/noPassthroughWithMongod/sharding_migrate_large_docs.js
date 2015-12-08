@@ -54,6 +54,8 @@ jsTest.log( "Starting migration..." );
 assert( admin.runCommand({ moveChunk : coll + "", find : { _id : 0 }, to : shards[1]._id }).ok );
 assert( admin.runCommand({ moveChunk : coll + "", find : { _id : -1 }, to : shards[1]._id }).ok );
 
+// Ensure that the doc count is correct and that the mongos query path can handle docs near the 16MB
+// user BSON size limit.
 assert.eq( 9, coll.find().itcount() );
 
 jsTest.log( "DONE!" );

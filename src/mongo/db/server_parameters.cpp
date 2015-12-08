@@ -78,8 +78,8 @@ void ServerParameterSet::add(ServerParameter* sp) {
     x = sp;
 }
 
-template <typename T>
-Status ExportedServerParameter<T>::setFromString(const string& str) {
+template <typename T, ServerParameterType paramType>
+Status ExportedServerParameter<T, paramType>::setFromString(const string& str) {
     T value;
     Status status = parseNumberFromString(str, &value);
     if (!status.isOK())
@@ -87,26 +87,38 @@ Status ExportedServerParameter<T>::setFromString(const string& str) {
     return set(value);
 }
 
-template Status ExportedServerParameter<int>::setFromString(const string& str);
-template Status ExportedServerParameter<long long>::setFromString(const string& str);
-template Status ExportedServerParameter<double>::setFromString(const string& str);
+#define EXPORTED_SERVER_PARAMETER(PARAM_TYPE)                                                   \
+    template <>                                                                                 \
+    Status ExportedServerParameter<bool, PARAM_TYPE>::setFromString(const string& str) {        \
+        if (str == "true" || str == "1")                                                        \
+            return set(true);                                                                   \
+        if (str == "false" || str == "0")                                                       \
+            return set(false);                                                                  \
+        return Status(ErrorCodes::BadValue, "can't convert string to bool");                    \
+    }                                                                                           \
+                                                                                                \
+    template Status ExportedServerParameter<int, PARAM_TYPE>::setFromString(const string& str); \
+                                                                                                \
+    template Status ExportedServerParameter<long long, PARAM_TYPE>::setFromString(              \
+        const string& str);                                                                     \
+                                                                                                \
+    template Status ExportedServerParameter<double, PARAM_TYPE>::setFromString(const string& str);
+
+// Define instances for each possible combination of number types we support, and
+// ServerParameterType
+EXPORTED_SERVER_PARAMETER(ServerParameterType::kStartupOnly);
+EXPORTED_SERVER_PARAMETER(ServerParameterType::kRuntimeOnly);
+EXPORTED_SERVER_PARAMETER(ServerParameterType::kStartupAndRuntime);
 
 template <>
-Status ExportedServerParameter<string>::setFromString(const string& str) {
+Status ExportedServerParameter<string, ServerParameterType::kStartupOnly>::setFromString(
+    const string& str) {
     return set(str);
 }
 
 template <>
-Status ExportedServerParameter<bool>::setFromString(const string& str) {
-    if (str == "true" || str == "1")
-        return set(true);
-    if (str == "false" || str == "0")
-        return set(false);
-    return Status(ErrorCodes::BadValue, "can't convert string to bool");
-}
-
-template <>
-Status ExportedServerParameter<vector<string>>::setFromString(const string& str) {
+Status ExportedServerParameter<vector<string>, ServerParameterType::kStartupOnly>::setFromString(
+    const string& str) {
     vector<string> v;
     splitStringDelim(str, &v, ',');
     return set(v);

@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <string>
 #include <vector>
 
 #include "mongo/config.h"
@@ -116,6 +117,7 @@ TEST(LockerImpl, ConflictUpgradeWithTimeout) {
     locker1.unlockAll();
     locker2.unlockAll();
 }
+
 
 TEST(LockerImpl, ReadTransaction) {
     DefaultLockerImpl locker;
@@ -251,6 +253,52 @@ TEST(LockerImpl, MMAPV1Locker) {
     ASSERT_EQUALS(resId, info.locks[2].resourceId);
 
     ASSERT(locker.unlockAll());
+}
+
+TEST(LockerImpl, CanceledDeadlockUnblocks) {
+    const ResourceId db1(RESOURCE_DATABASE, std::string("db1"));
+    const ResourceId db2(RESOURCE_DATABASE, std::string("db2"));
+
+    DefaultLockerImpl locker1;
+    DefaultLockerImpl locker2;
+    DefaultLockerImpl locker3;
+
+    ASSERT(LOCK_OK == locker1.lockGlobal(MODE_IX));
+    ASSERT(LOCK_OK == locker1.lock(db1, MODE_S));
+
+    ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IX));
+    ASSERT(LOCK_OK == locker2.lock(db2, MODE_X));
+
+    // Set up locker1 and locker2 for deadlock
+    ASSERT(LOCK_WAITING == locker1.lockBegin(db2, MODE_X));
+    ASSERT(LOCK_WAITING == locker2.lockBegin(db1, MODE_X));
+
+    // Locker3 blocks behind locker 2
+    ASSERT(LOCK_OK == locker3.lockGlobal(MODE_IX));
+    ASSERT(LOCK_WAITING == locker3.lockBegin(db1, MODE_S));
+
+    // Detect deadlock, canceling our request
+    ASSERT(LOCK_DEADLOCK == locker2.lockComplete(db1, MODE_X, 1, /*checkDeadlock*/ true));
+
+    // Now locker3 must be able to complete its request
+    ASSERT(LOCK_OK == locker3.lockComplete(db1, MODE_S, 1, /*checkDeadlock*/ false));
+
+    // Locker1 still can't complete its request
+    ASSERT(LOCK_TIMEOUT == locker1.lockComplete(db2, MODE_X, 1, false));
+
+    // Check ownership for db1
+    ASSERT(locker1.getLockMode(db1) == MODE_S);
+    ASSERT(locker2.getLockMode(db1) == MODE_NONE);
+    ASSERT(locker3.getLockMode(db1) == MODE_S);
+
+    // Check ownership for db2
+    ASSERT(locker1.getLockMode(db2) == MODE_NONE);
+    ASSERT(locker2.getLockMode(db2) == MODE_X);
+    ASSERT(locker3.getLockMode(db2) == MODE_NONE);
+
+    ASSERT(locker1.unlockAll());
+    ASSERT(locker2.unlockAll());
+    ASSERT(locker3.unlockAll());
 }
 
 

@@ -30,8 +30,8 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/getmore_response.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
@@ -55,10 +55,6 @@ public:
     }
 
     bool slaveOk() const final {
-        return false;
-    }
-
-    bool slaveOverrideOk() const final {
         return true;
     }
 
@@ -91,7 +87,7 @@ public:
         const GetMoreRequest& request = parseStatus.getValue();
 
         return AuthorizationSession::get(client)
-            ->checkAuthForGetMore(request.nss, request.cursorid);
+            ->checkAuthForGetMore(request.nss, request.cursorid, request.term.is_initialized());
     }
 
     bool run(OperationContext* txn,
@@ -114,7 +110,7 @@ public:
             return appendCommandStatus(result, response.getStatus());
         }
 
-        response.getValue().toBSON(&result);
+        response.getValue().addToBSON(CursorResponse::ResponseType::SubsequentResponse, &result);
         return true;
     }
 

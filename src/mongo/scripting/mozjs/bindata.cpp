@@ -34,9 +34,11 @@
 #include <cctype>
 
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
@@ -45,9 +47,9 @@ namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec BinDataInfo::methods[4] = {
-    MONGO_ATTACH_JS_FUNCTION(base64),
-    MONGO_ATTACH_JS_FUNCTION(hex),
-    MONGO_ATTACH_JS_FUNCTION(toString),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(base64, BinDataInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(hex, BinDataInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(toString, BinDataInfo),
     JS_FS_END,
 };
 
@@ -89,7 +91,7 @@ void hexToBinData(JSContext* cx,
 
     args[0].setInt32(type);
     ValueReader(cx, args[1]).fromStringData(encoded);
-    return scope->getBinDataProto().newInstance(args, out);
+    return scope->getProto<BinDataInfo>().newInstance(args, out);
 }
 
 std::string* getEncoded(JS::HandleValue thisv) {
@@ -110,7 +112,7 @@ void BinDataInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     }
 }
 
-void BinDataInfo::Functions::UUID(JSContext* cx, JS::CallArgs args) {
+void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "UUID needs 1 argument");
 
@@ -123,7 +125,7 @@ void BinDataInfo::Functions::UUID(JSContext* cx, JS::CallArgs args) {
     hexToBinData(cx, bdtUUID, arg, args.rval());
 }
 
-void BinDataInfo::Functions::MD5(JSContext* cx, JS::CallArgs args) {
+void BinDataInfo::Functions::MD5::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "MD5 needs 1 argument");
 
@@ -136,7 +138,7 @@ void BinDataInfo::Functions::MD5(JSContext* cx, JS::CallArgs args) {
     hexToBinData(cx, MD5Type, arg, args.rval());
 }
 
-void BinDataInfo::Functions::HexData(JSContext* cx, JS::CallArgs args) {
+void BinDataInfo::Functions::HexData::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 2)
         uasserted(ErrorCodes::BadValue, "HexData needs 2 arguments");
 
@@ -149,28 +151,28 @@ void BinDataInfo::Functions::HexData(JSContext* cx, JS::CallArgs args) {
     hexToBinData(cx, type.toInt32(), args.get(1), args.rval());
 }
 
-void BinDataInfo::Functions::toString(JSContext* cx, JS::CallArgs args) {
+void BinDataInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     ObjectWrapper o(cx, args.thisv());
 
     auto str = getEncoded(args.thisv());
 
     str::stream ss;
 
-    ss << "BinData(" << o.getNumber("type") << ",\"" << *str << "\")";
+    ss << "BinData(" << o.getNumber(InternedString::type) << ",\"" << *str << "\")";
 
     ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
 }
 
-void BinDataInfo::Functions::base64(JSContext* cx, JS::CallArgs args) {
+void BinDataInfo::Functions::base64::call(JSContext* cx, JS::CallArgs args) {
     auto str = getEncoded(args.thisv());
 
     ValueReader(cx, args.rval()).fromStringData(*str);
 }
 
-void BinDataInfo::Functions::hex(JSContext* cx, JS::CallArgs args) {
+void BinDataInfo::Functions::hex::call(JSContext* cx, JS::CallArgs args) {
     auto str = getEncoded(args.thisv());
 
-    std::string data = base64::decode(*str);
+    std::string data = mongo::base64::decode(*str);
     std::stringstream ss;
     ss.setf(std::ios_base::hex, std::ios_base::basefield);
     ss.fill('0');
@@ -208,14 +210,14 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto tmpBase64 = base64::decode(str);
 
     JS::RootedObject thisv(cx);
-    scope->getBinDataProto().newObject(&thisv);
+    scope->getProto<BinDataInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     JS::RootedValue len(cx);
     len.setInt32(tmpBase64.length());
 
-    o.defineProperty("len", len, JSPROP_READONLY);
-    o.defineProperty("type", type, JSPROP_READONLY);
+    o.defineProperty(InternedString::len, len, JSPROP_READONLY);
+    o.defineProperty(InternedString::type, type, JSPROP_READONLY);
 
     JS_SetPrivate(thisv, new std::string(std::move(str)));
 

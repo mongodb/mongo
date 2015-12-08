@@ -154,6 +154,14 @@ public:
      */
     void shuttingDown();
 
+    bool isEphemeral();
+    /**
+     * Waits until all commits that happened before this call are durable, either by flushing
+     * the log or forcing a checkpoint if forceCheckpoint is true or the journal is disabled.
+     * Uses a temporary session. Safe to call without any locks, even during shutdown.
+     */
+    void waitUntilDurable(bool forceCheckpoint);
+
     WT_CONNECTION* conn() const {
         return _conn;
     }
@@ -176,11 +184,15 @@ private:
     AtomicUInt32 _shuttingDown;
     static const uint32_t kShuttingDownMask = 1 << 31;
 
-    SpinLock _cacheLock;
+    stdx::mutex _cacheLock;
     typedef std::vector<WiredTigerSession*> SessionCache;
     SessionCache _sessions;
 
     // Bumped when all open sessions need to be closed
     AtomicUInt64 _epoch;  // atomic so we can check it outside of the lock
+
+    // Counter and critical section mutex for waitUntilDurable
+    AtomicUInt32 _lastSyncTime;
+    stdx::mutex _lastSyncMutex;
 };
-}
+}  // namespace

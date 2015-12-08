@@ -58,13 +58,13 @@ public:
                                    const executor::RemoteCommandResponse& isMasterReply);
 
     /**
-     * Currently a no-op.
+     * Makes a SetShardVersion request for initializing sharding information on the new connection.
      */
     StatusWith<boost::optional<executor::RemoteCommandRequest>> makeRequest(
         const HostAndPort& remoteHost) override;
 
     /**
-     * Currently a no-op.
+     * Confirms that the SetShardVersion request made in makeRequest ran successfully.
      */
     Status handleReply(const HostAndPort& remoteHost,
                        executor::RemoteCommandResponse&& response) override;

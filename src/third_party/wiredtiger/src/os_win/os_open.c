@@ -14,7 +14,7 @@
  */
 int
 __wt_open(WT_SESSION_IMPL *session,
-    const char *name, int ok_create, int exclusive, int dio_type, WT_FH **fhp)
+    const char *name, bool ok_create, bool exclusive, int dio_type, WT_FH **fhp)
 {
 	DWORD dwCreationDisposition;
 	HANDLE filehandle, filehandle_secondary;
@@ -22,7 +22,8 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_FH *fh, *tfh;
 	uint64_t bucket, hash;
-	int direct_io, f, matched, share_mode;
+	int f, share_mode;
+	bool direct_io, matched;
 	char *path;
 
 	conn = S2C(session);
@@ -30,20 +31,20 @@ __wt_open(WT_SESSION_IMPL *session,
 	path = NULL;
 	filehandle = INVALID_HANDLE_VALUE;
 	filehandle_secondary = INVALID_HANDLE_VALUE;
-	direct_io = 0;
+	direct_io = false;
 	hash = __wt_hash_city64(name, strlen(name));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: open", name));
 
 	/* Increment the reference count if we already have the file open. */
-	matched = 0;
+	matched = false;
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_FOREACH(tfh, &conn->fhhash[bucket], hashq)
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;
-			matched = 1;
+			matched = true;
 			break;
 		}
 	__wt_spin_unlock(session, &conn->fh_lock);
@@ -77,9 +78,18 @@ __wt_open(WT_SESSION_IMPL *session,
 	} else
 		dwCreationDisposition = OPEN_EXISTING;
 
+	/*
+	 * direct_io means no OS file caching. This requires aligned buffer
+	 * allocations like O_DIRECT.
+	 */
 	if (dio_type && FLD_ISSET(conn->direct_io, dio_type)) {
-		f |= FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH;
-		direct_io = 1;
+		f |= FILE_FLAG_NO_BUFFERING;
+		direct_io = true;
+	}
+
+	/* FILE_FLAG_WRITE_THROUGH does not require aligned buffers */
+	if (dio_type && FLD_ISSET(conn->write_through, dio_type)) {
+		f |= FILE_FLAG_WRITE_THROUGH;
 	}
 
 	if (dio_type == WT_FILE_TYPE_LOG &&
@@ -158,18 +168,18 @@ setupfh:
 	 * Repeat the check for a match, but then link onto the database's list
 	 * of files.
 	 */
-	matched = 0;
+	matched = false;
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_FOREACH(tfh, &conn->fhhash[bucket], hashq)
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;
-			matched = 1;
+			matched = true;
 			break;
 		}
 	if (!matched) {
 		WT_CONN_FILE_INSERT(conn, fh, bucket);
-		(void)WT_ATOMIC_ADD4(conn->open_file_count, 1);
+		(void)__wt_atomic_add32(&conn->open_file_count, 1);
 
 		*fhp = fh;
 	}
@@ -217,7 +227,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 	/* Remove from the list. */
 	bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
 	WT_CONN_FILE_REMOVE(conn, fh, bucket);
-	(void)WT_ATOMIC_SUB4(conn->open_file_count, 1);
+	(void)__wt_atomic_sub32(&conn->open_file_count, 1);
 
 	__wt_spin_unlock(session, &conn->fh_lock);
 

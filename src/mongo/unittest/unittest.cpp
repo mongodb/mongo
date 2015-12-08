@@ -42,6 +42,7 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/message_log_domain.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -56,6 +57,11 @@ using std::string;
 namespace unittest {
 
 namespace {
+
+bool stringContains(const std::string& haystack, const std::string& needle) {
+    return haystack.find(needle) != std::string::npos;
+}
+
 logger::MessageLogDomain* unittestOutput = logger::globalLogManager()->getNamedDomain("unittest");
 
 typedef std::map<std::string, std::shared_ptr<Suite>> SuiteMap;
@@ -207,6 +213,12 @@ void Test::stopCapturingLogMessages() {
     _captureAppender = logger::globalLogDomain()->detachAppender(_captureAppenderHandle);
     checked_cast<StringVectorAppender*>(_captureAppender.get())->disable();
     _isCapturingLogMessages = false;
+}
+
+int64_t Test::countLogLinesContaining(const std::string& needle) {
+    return std::count_if(getCapturedLogMessages().begin(),
+                         getCapturedLogMessages().end(),
+                         stdx::bind(stringContains, stdx::placeholders::_1, needle));
 }
 
 Suite::Suite(const std::string& name) : _name(name) {

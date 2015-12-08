@@ -82,7 +82,7 @@ public:
     }
     virtual Decimal128 getNumberDecimal(const char* field) = 0;
 
-    virtual void setElement(const char* field, const BSONElement& e) = 0;
+    virtual void setElement(const char* field, const BSONElement& e, const BSONObj& parent) = 0;
     virtual void setNumber(const char* field, double val) = 0;
     virtual void setString(const char* field, StringData val) = 0;
     virtual void setObject(const char* field, const BSONObj& obj, bool readOnly = true) = 0;
@@ -102,6 +102,8 @@ public:
     virtual bool isKillPending() const = 0;
 
     virtual void gc() = 0;
+
+    virtual void advanceGeneration() = 0;
 
     virtual ScriptingFunction createFunction(const char* code);
 
@@ -235,9 +237,16 @@ public:
         return createScope();
     }
 
+    virtual Scope* newScopeForCurrentThread() {
+        return createScopeForCurrentThread();
+    }
+
     virtual void runTest() = 0;
 
     virtual bool utf8Ok() const = 0;
+
+    virtual void enableJIT(bool value) = 0;
+    virtual bool isJITEnabled() const = 0;
 
     static void setup();
     static void dropScopeCache();
@@ -272,6 +281,7 @@ public:
 
 protected:
     virtual Scope* createScope() = 0;
+    virtual Scope* createScopeForCurrentThread() = 0;
     void (*_scopeInitCallback)(Scope&);
 
 private:

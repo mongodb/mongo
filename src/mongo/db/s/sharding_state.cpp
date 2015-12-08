@@ -32,17 +32,24 @@
 
 #include "mongo/db/s/sharding_state.h"
 
-#include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/metadata_loader.h"
+#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharded_connection_info.h"
+#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"
@@ -58,6 +65,9 @@ using std::vector;
 namespace {
 
 const auto getShardingState = ServiceContext::declareDecoration<ShardingState>();
+
+// Max number of concurrent config server refresh threads
+const int kMaxConfigServerRefreshThreads = 3;
 
 enum class VersionChoice { Local, Remote, Unknown };
 
@@ -103,13 +113,14 @@ VersionChoice chooseNewestVersion(ChunkVersion prevLocalVersion,
 
 }  // namespace
 
-bool isMongos() {
-    return false;
-}
+//
+// ShardingState
+//
 
 ShardingState::ShardingState()
-    : _enabled(false),
-      _configServerTickets(3 /* max number of concurrent config server refresh threads */) {}
+    : _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
+      _initializationStatus(Status(ErrorCodes::InternalError, "Uninitialized value")),
+      _configServerTickets(kMaxConfigServerRefreshThreads) {}
 
 ShardingState::~ShardingState() = default;
 
@@ -121,44 +132,62 @@ ShardingState* ShardingState::get(OperationContext* operationContext) {
     return ShardingState::get(operationContext->getServiceContext());
 }
 
-bool ShardingState::enabled() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _enabled;
+bool ShardingState::enabled() const {
+    return _getInitializationState() == InitializationState::kInitialized;
 }
 
-string ShardingState::getConfigServer(OperationContext* txn) {
+ConnectionString ShardingState::getConfigServer(OperationContext* txn) {
+    invariant(enabled());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_enabled);
-
-    return grid.shardRegistry()->getConfigServerConnectionString().toString();
+    return grid.shardRegistry()->getConfigServerConnectionString();
 }
 
 string ShardingState::getShardName() {
+    invariant(enabled());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_enabled);
-
     return _shardName;
 }
 
-void ShardingState::initialize(const string& server) {
-    uassert(18509,
-            "Unable to obtain host name during sharding initialization.",
-            !getHostName().empty());
+void ShardingState::shutDown(OperationContext* txn) {
+    bool mustEnterShutdownState = false;
 
+    {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+        while (_getInitializationState() == InitializationState::kInitializing) {
+            _initializationFinishedCondition.wait(lk);
+        }
+
+        if (_getInitializationState() == InitializationState::kNew) {
+            _setInitializationState_inlock(InitializationState::kInitializing);
+            mustEnterShutdownState = true;
+        }
+    }
+
+    // Initialization completion must be signalled outside of the mutex
+    if (mustEnterShutdownState) {
+        _signalInitializationComplete(
+            Status(ErrorCodes::ShutdownInProgress,
+                   "Sharding state unavailable because the system is shutting down"));
+    }
+
+    auto catalogMgr = grid.catalogManager(txn);
+    if (catalogMgr) {
+        catalogMgr->shutDown(txn);
+    }
+}
+
+void ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (_enabled) {
-        // TODO: Do we need to throw exception if the config servers have changed from what we
-        // already have in place? How do we test for that?
+    if (serverGlobalParams.configsvrMode != CatalogManager::ConfigServerMode::NONE) {
+        // Nothing to do if we're a config server ourselves.
         return;
     }
 
-    ShardedConnectionInfo::addHook();
-
-    ConnectionString configServerCS = uassertStatusOK(ConnectionString::parse(server));
-    uassertStatusOK(initializeGlobalShardingState(configServerCS));
-
-    _enabled = true;
+    boost::optional<repl::OpTime> opTime = rpc::ConfigServerMetadata::get(txn).getOpTime();
+    if (opTime) {
+        grid.shardRegistry()->advanceConfigOpTime(*opTime);
+    }
 }
 
 void ShardingState::setShardName(const string& name) {
@@ -463,20 +492,129 @@ Status ShardingState::refreshMetadataIfNeeded(OperationContext* txn,
                << ", need to verify with config server";
     }
 
-    return doRefreshMetadata(txn, ns, reqShardVersion, true, latestShardVersion);
+    return _refreshMetadata(txn, ns, reqShardVersion, true, latestShardVersion);
 }
 
 Status ShardingState::refreshMetadataNow(OperationContext* txn,
                                          const string& ns,
                                          ChunkVersion* latestShardVersion) {
-    return doRefreshMetadata(txn, ns, ChunkVersion(0, 0, OID()), false, latestShardVersion);
+    return _refreshMetadata(txn, ns, ChunkVersion(0, 0, OID()), false, latestShardVersion);
 }
 
-Status ShardingState::doRefreshMetadata(OperationContext* txn,
-                                        const string& ns,
-                                        const ChunkVersion& reqShardVersion,
-                                        bool useRequestedVersion,
-                                        ChunkVersion* latestShardVersion) {
+void ShardingState::initialize(OperationContext* txn, const string& configSvr) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        if (_getInitializationState() == InitializationState::kNew) {
+            uassert(18509,
+                    "Unable to obtain host name during sharding initialization.",
+                    !getHostName().empty());
+
+            ConnectionString configSvrConnStr = uassertStatusOK(ConnectionString::parse(configSvr));
+
+            _setInitializationState_inlock(InitializationState::kInitializing);
+
+            stdx::thread thread([this, configSvrConnStr] { _initializeImpl(configSvrConnStr); });
+            thread.detach();
+        }
+    }
+
+    uassertStatusOK(_waitForInitialization(txn));
+
+    updateConfigServerOpTimeFromMetadata(txn);
+}
+
+void ShardingState::_initializeImpl(ConnectionString configSvr) {
+    Client::initThread("ShardingState initialization");
+    auto txn = cc().makeOperationContext();
+
+    // Do this initialization outside of the lock, since we are already protected by having entered
+    // the kInitializing state.
+    ShardedConnectionInfo::addHook();
+    ReplicaSetMonitor::setSynchronousConfigChangeHook(
+        &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
+
+    try {
+        Status status = initializeGlobalShardingState(txn.get(), configSvr, false);
+        _signalInitializationComplete(status);
+    } catch (const DBException& ex) {
+        _signalInitializationComplete(ex.toStatus());
+    }
+}
+
+Status ShardingState::_waitForInitialization(OperationContext* txn) {
+    if (enabled())
+        return Status::OK();
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    {
+        const Microseconds timeRemaining(txn->getRemainingMaxTimeMicros());
+        while (_getInitializationState() == InitializationState::kInitializing ||
+               _getInitializationState() == InitializationState::kNew) {
+            if (timeRemaining.count()) {
+                const auto deadline = stdx::chrono::system_clock::now() + timeRemaining;
+
+                if (stdx::cv_status::timeout ==
+                    _initializationFinishedCondition.wait_until(lk, deadline)) {
+                    return Status(ErrorCodes::ExceededTimeLimit,
+                                  "Initializing sharding state exceeded time limit");
+                }
+            } else {
+                _initializationFinishedCondition.wait(lk);
+            }
+        }
+    }
+
+    auto initializationState = _getInitializationState();
+    if (initializationState == InitializationState::kInitialized) {
+        fassertStatusOK(34349, _initializationStatus);
+        return Status::OK();
+    }
+    if (initializationState == InitializationState::kError) {
+        return Status(ErrorCodes::ManualInterventionRequired,
+                      str::stream()
+                          << "Server's sharding metadata manager failed to initialize and will "
+                             "remain in this state until the instance is manually reset"
+                          << causedBy(_initializationStatus));
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+ShardingState::InitializationState ShardingState::_getInitializationState() const {
+    return static_cast<InitializationState>(_initializationState.load());
+}
+
+void ShardingState::_setInitializationState_inlock(InitializationState newState) {
+    _initializationState.store(static_cast<uint32_t>(newState));
+}
+
+void ShardingState::_signalInitializationComplete(Status status) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    invariant(_getInitializationState() == InitializationState::kInitializing);
+
+    if (!status.isOK()) {
+        _initializationStatus = status;
+        _setInitializationState_inlock(InitializationState::kError);
+    } else {
+        _initializationStatus = Status::OK();
+        _setInitializationState_inlock(InitializationState::kInitialized);
+    }
+
+    _initializationFinishedCondition.notify_all();
+}
+
+Status ShardingState::_refreshMetadata(OperationContext* txn,
+                                       const string& ns,
+                                       const ChunkVersion& reqShardVersion,
+                                       bool useRequestedVersion,
+                                       ChunkVersion* latestShardVersion) {
+    Status status = _waitForInitialization(txn);
+    if (!status.isOK())
+        return status;
+
     // The idea here is that we're going to reload the metadata from the config server, but
     // we need to do so outside any locks.  When we get our result back, if the current metadata
     // has changed, we may not be able to install the new metadata.
@@ -489,10 +627,8 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
     shared_ptr<CollectionMetadata> beforeMetadata;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-
         // We can't reload if sharding is not enabled - i.e. without a config server location
-        if (!_enabled) {
+        if (!enabled()) {
             string errMsg = str::stream() << "cannot refresh metadata for " << ns
                                           << " before sharding has been enabled";
 
@@ -500,6 +636,7 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
             return Status(ErrorCodes::NotYetInitialized, errMsg);
         }
 
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         // We also can't reload if a shard name has not yet been set.
         if (_shardName.empty()) {
             string errMsg = str::stream() << "cannot refresh metadata for " << ns
@@ -557,7 +694,8 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
     long long refreshMillis;
 
     {
-        Status status = mdLoader.makeCollectionMetadata(grid.catalogManager(txn),
+        Status status = mdLoader.makeCollectionMetadata(txn,
+                                                        grid.catalogManager(txn),
                                                         ns,
                                                         getShardName(),
                                                         fullReload ? NULL : beforeMetadata.get(),
@@ -610,16 +748,16 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
         // Get the metadata now that the load has completed
         //
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-
         // Don't reload if our config server has changed or sharding is no longer enabled
-        if (!_enabled) {
+        if (!enabled()) {
             string errMsg = str::stream() << "could not refresh metadata for " << ns
                                           << ", sharding is no longer enabled";
 
             warning() << errMsg;
             return Status(ErrorCodes::NotYetInitialized, errMsg);
         }
+
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         CollectionMetadataMap::iterator it = _collMetadata.find(ns);
         if (it != _collMetadata.end())
@@ -751,12 +889,12 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
 }
 
 void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    builder.appendBool("enabled", _enabled);
-    if (!_enabled) {
+    const bool isEnabled = enabled();
+    builder.appendBool("enabled", isEnabled);
+    if (!isEnabled)
         return;
-    }
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     builder.append("configServer",
                    grid.shardRegistry()->getConfigServerConnectionString().toString());
@@ -773,14 +911,18 @@ void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
     versionB.done();
 }
 
-bool ShardingState::needCollectionMetadata(Client* client, const string& ns) const {
-    if (!_enabled)
+bool ShardingState::needCollectionMetadata(OperationContext* txn, const string& ns) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (!enabled())
         return false;
 
-    if (!ShardedConnectionInfo::get(client, false))
-        return false;
+    Client* client = txn->getClient();
 
-    return true;
+    // Shard version information received from mongos may either by attached to the Client or
+    // directly to the OperationContext.
+    return ShardedConnectionInfo::get(client, false) ||
+        OperationShardVersion::get(txn).hasShardVersion();
 }
 
 shared_ptr<CollectionMetadata> ShardingState::getCollectionMetadata(const string& ns) {
@@ -792,6 +934,13 @@ shared_ptr<CollectionMetadata> ShardingState::getCollectionMetadata(const string
     } else {
         return it->second;
     }
+}
+
+/**
+ * Global free function.
+ */
+bool isMongos() {
+    return false;
 }
 
 }  // namespace mongo

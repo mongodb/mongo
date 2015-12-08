@@ -35,10 +35,12 @@
 #include <vector>
 
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
@@ -70,6 +72,16 @@ using std::vector;
 using stdx::chrono::milliseconds;
 using unittest::assertGet;
 
+const BSONObj kReplMetadata();
+const BSONObj kSecondaryOkMetadata{rpc::ServerSelectionMetadata(true, boost::none).toBSON()};
+
+const BSONObj kReplSecondaryOkMetadata{[] {
+    BSONObjBuilder o;
+    o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    o.append(rpc::kReplSetMetadataFieldName, 1);
+    return o.obj();
+}()};
+
 class ShardCollectionTest : public CatalogManagerReplSetTestFixture {
 public:
     void setUp() override {
@@ -81,7 +93,7 @@ public:
     void expectGetDatabase(const DatabaseType& expectedDb) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
@@ -94,7 +106,7 @@ public:
             ASSERT_EQ(BSONObj(), query->getSort());
             ASSERT_EQ(1, query->getLimit().get());
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             return vector<BSONObj>{expectedDb.toBSON()};
         });
@@ -112,19 +124,14 @@ public:
 
             ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
-            BatchedUpdateRequest actualBatchedUpdate;
+            BatchedInsertRequest actualBatchedInsert;
             std::string errmsg;
-            ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
-            ASSERT_EQUALS(ChunkType::ConfigNS, actualBatchedUpdate.getNS().ns());
-            auto updates = actualBatchedUpdate.getUpdates();
-            ASSERT_EQUALS(1U, updates.size());
-            auto update = updates.front();
+            ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+            ASSERT_EQUALS(ChunkType::ConfigNS, actualBatchedInsert.getNS().ns());
+            auto inserts = actualBatchedInsert.getDocuments();
+            ASSERT_EQUALS(1U, inserts.size());
 
-            ASSERT_TRUE(update->getUpsert());
-            ASSERT_FALSE(update->getMulti());
-            ASSERT_EQUALS(BSON(ChunkType::name(expectedChunk.getName())), update->getQuery());
-
-            BSONObj chunkObj = update->getUpdateExpr();
+            BSONObj chunkObj = inserts.front();
             ASSERT_EQUALS(expectedChunk.getName(), chunkObj["_id"].String());
             ASSERT_EQUALS(Timestamp(expectedChunk.getVersion().toLong()),
                           chunkObj[ChunkType::DEPRECATED_lastmod()].timestamp());
@@ -151,7 +158,7 @@ public:
     void expectReloadChunks(const std::string& ns, const vector<ChunkType>& chunks) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
@@ -167,7 +174,7 @@ public:
             ASSERT_EQ(expectedSort, query->getSort());
             ASSERT_FALSE(query->getLimit().is_initialized());
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             vector<BSONObj> chunksToReturn;
 
@@ -211,7 +218,7 @@ public:
     void expectReloadCollection(const CollectionType& collection) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
@@ -228,7 +235,7 @@ public:
             }
             ASSERT_EQ(BSONObj(), query->getSort());
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             return vector<BSONObj>{collection.toBSON()};
         });
@@ -237,7 +244,7 @@ public:
     void expectLoadNewestChunk(const string& ns, const ChunkType& chunk) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
@@ -252,7 +259,7 @@ public:
             ASSERT_EQ(expectedSort, query->getSort());
             ASSERT_EQ(1, query->getLimit().get());
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             return vector<BSONObj>{chunk.toBSON()};
         });
@@ -308,6 +315,7 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
         Status::OK());
 
     auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
         ASSERT_EQUALS(
             ErrorCodes::AlreadyInitialized,
             catalogManager()->shardCollection(
@@ -332,7 +340,8 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     setupShards(vector<ShardType>{shard});
 
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard.getName())->getTargeter())
         ->setFindHostReturnValue(shardHost);
 
     string ns = "db1.foo";
@@ -350,12 +359,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     expectedChunk.setMin(keyPattern.getKeyPattern().globalMin());
     expectedChunk.setMax(keyPattern.getKeyPattern().globalMax());
     expectedChunk.setShard(shard.getName());
-    {
-        ChunkVersion expectedVersion;
-        expectedVersion.incEpoch();
-        expectedVersion.incMajor();
-        expectedChunk.setVersion(expectedVersion);
-    }
+    expectedChunk.setVersion(ChunkVersion(1, 0, OID::gen()));
 
     distLock()->expectLock(
         [&](StringData name,
@@ -369,6 +373,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
         ASSERT_OK(catalogManager()->shardCollection(
             operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
     });
@@ -385,12 +390,8 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
                             << shard.getName() + ":" + shard.getHost() << "initShards"
                             << BSONArray() << "numChunks" << 1);
         expectChangeLogCreate(configHost, BSON("ok" << 1));
-        expectChangeLogInsert(configHost,
-                              clientHost.toString(),
-                              network()->now(),
-                              "shardCollection.start",
-                              ns,
-                              logChangeDetail);
+        expectChangeLogInsert(
+            configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
     }
 
     // Report that no documents exist for the given collection on the primary shard
@@ -430,9 +431,8 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
-                          clientHost.toString(),
                           network()->now(),
-                          "shardCollection",
+                          "shardCollection.end",
                           ns,
                           BSON("version" << actualVersion.toString()));
 
@@ -459,11 +459,14 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
 
     setupShards(vector<ShardType>{shard0, shard1, shard2});
 
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard0.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard0.getName())->getTargeter())
         ->setFindHostReturnValue(shard0Host);
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard1.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard1.getName())->getTargeter())
         ->setFindHostReturnValue(shard1Host);
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard2.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard2.getName())->getTargeter())
         ->setFindHostReturnValue(shard2Host);
 
     string ns = "db1.foo";
@@ -480,9 +483,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     BSONObj splitPoint2 = BSON("_id" << 200);
     BSONObj splitPoint3 = BSON("_id" << 300);
 
-    ChunkVersion expectedVersion;
-    expectedVersion.incEpoch();
-    expectedVersion.incMajor();
+    ChunkVersion expectedVersion(1, 0, OID::gen());
 
     ChunkType expectedChunk0;
     expectedChunk0.setNS(ns);
@@ -543,6 +544,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
         set<ShardId> shards{shard0.getName(), shard1.getName(), shard2.getName()};
         ASSERT_OK(catalogManager()->shardCollection(
             operationContext(),
@@ -566,12 +568,8 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
                             << BSON_ARRAY(shard0.getName() << shard1.getName() << shard2.getName())
                             << "numChunks" << (int)expectedChunks.size());
         expectChangeLogCreate(configHost, BSON("ok" << 1));
-        expectChangeLogInsert(configHost,
-                              clientHost.toString(),
-                              network()->now(),
-                              "shardCollection.start",
-                              ns,
-                              logChangeDetail);
+        expectChangeLogInsert(
+            configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
     }
 
     for (auto& expectedChunk : expectedChunks) {
@@ -610,9 +608,8 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
 
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
-                          clientHost.toString(),
                           network()->now(),
-                          "shardCollection",
+                          "shardCollection.end",
                           ns,
                           BSON("version" << expectedChunks[4].getVersion().toString()));
 
@@ -628,7 +625,8 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     setupShards(vector<ShardType>{shard});
 
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard.getName())->getTargeter())
         ->setFindHostReturnValue(shardHost);
 
     string ns = "db1.foo";
@@ -645,9 +643,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     BSONObj splitPoint2 = BSON("_id" << 200);
     BSONObj splitPoint3 = BSON("_id" << 300);
 
-    ChunkVersion expectedVersion;
-    expectedVersion.incEpoch();
-    expectedVersion.incMajor();
+    ChunkVersion expectedVersion(1, 0, OID::gen());
 
     ChunkType expectedChunk0;
     expectedChunk0.setNS(ns);
@@ -708,6 +704,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
         ASSERT_OK(catalogManager()->shardCollection(
             operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
     });
@@ -724,12 +721,8 @@ TEST_F(ShardCollectionTest, withInitialData) {
                             << shard.getName() + ":" + shard.getHost() << "initShards"
                             << BSONArray() << "numChunks" << 1);
         expectChangeLogCreate(configHost, BSON("ok" << 1));
-        expectChangeLogInsert(configHost,
-                              clientHost.toString(),
-                              network()->now(),
-                              "shardCollection.start",
-                              ns,
-                              logChangeDetail);
+        expectChangeLogInsert(
+            configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
     }
 
     // Report that documents exist for the given collection on the primary shard, so that calling
@@ -750,7 +743,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
         ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
 
-        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+        ASSERT_EQUALS(rpc::ServerSelectionMetadata(true, boost::none).toBSON(), request.metadata);
 
         return BSON("ok" << 1 << "splitKeys"
                          << BSON_ARRAY(splitPoint0 << splitPoint1 << splitPoint2 << splitPoint3));
@@ -792,9 +785,8 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
-                          clientHost.toString(),
                           network()->now(),
-                          "shardCollection",
+                          "shardCollection.end",
                           ns,
                           BSON("version" << expectedChunks[4].getVersion().toString()));
 

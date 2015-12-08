@@ -45,7 +45,7 @@ class Collection;
  * RAII-style class, which acquires a lock on the specified database in the requested mode and
  * obtains a reference to the database. Used as a shortcut for calls to dbHolder().get().
  *
- * It is guaranteed that locks will be released when this object goes out of scope, therefore
+ * It is guaranteed that the lock will be released when this object goes out of scope, therefore
  * the database reference returned by this class should not be retained.
  */
 class AutoGetDb {
@@ -61,6 +61,33 @@ public:
 private:
     const Lock::DBLock _dbLock;
     Database* const _db;
+};
+
+/**
+ * RAII-style class, which acquires a locks on the specified database and collection in the
+ * requested mode and obtains references to both.
+ *
+ * It is guaranteed that locks will be released when this object goes out of scope, therefore
+ * the database and the collection references returned by this class should not be retained.
+ */
+class AutoGetCollection {
+    MONGO_DISALLOW_COPYING(AutoGetCollection);
+
+public:
+    AutoGetCollection(OperationContext* txn, const NamespaceString& nss, LockMode mode);
+
+    Database* getDb() const {
+        return _autoDb.getDb();
+    }
+
+    Collection* getCollection() const {
+        return _coll;
+    }
+
+private:
+    const AutoGetDb _autoDb;
+    const Lock::CollectionLock _collLock;
+    Collection* const _coll;
 };
 
 /**
@@ -100,7 +127,9 @@ private:
 
 /**
  * RAII-style class, which would acquire the appropritate hierarchy of locks for obtaining
- * a particular collection and would retrieve a reference to the collection.
+ * a particular collection and would retrieve a reference to the collection. In addition, this
+ * utility validates the shard version for the specified namespace and sets the current operation's
+ * namespace for the duration while this object is alive.
  *
  * It is guaranteed that locks will be released when this object goes out of scope, therefore
  * database and collection references returned by this class should not be retained.
@@ -114,23 +143,21 @@ public:
     ~AutoGetCollectionForRead();
 
     Database* getDb() const {
-        return _db.getDb();
+        return _autoColl->getDb();
     }
 
     Collection* getCollection() const {
-        return _coll;
+        return _autoColl->getCollection();
     }
 
 private:
     void _init(const std::string& ns, StringData coll);
+    void _ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss);
 
     const Timer _timer;
     OperationContext* const _txn;
     const ScopedTransaction _transaction;
-    const AutoGetDb _db;
-    const Lock::CollectionLock _collLock;
-
-    Collection* _coll;
+    boost::optional<AutoGetCollection> _autoColl;
 };
 
 /**
@@ -149,13 +176,6 @@ public:
      * or just created.
      */
     OldClientContext(OperationContext* txn, const std::string& ns, Database* db, bool justCreated);
-
-    /**
-     * note: this does not call _finishInit -- i.e., does not call
-     * ensureShardVersionOKOrThrow for example.
-     * see also: reset().
-     */
-    OldClientContext(OperationContext* txn, const std::string& ns, Database* db);
 
     ~OldClientContext();
 

@@ -296,5 +296,104 @@ TEST(FTSElementIterator, Test6) {
     ASSERT_EQUALS("danish", val._language->str());
     ASSERT_EQUALS(5, val._weight);
 }
+
+// Multi-language : Test Version 2 Language Override
+TEST(FTSElementIterator, LanguageOverrideV2) {
+    BSONObj obj = fromjson(
+        "{ a :"
+        "  { b :"
+        "    [ { c : \"walked\", language : \"english\" },"
+        "      { c : \"camminato\", language : \"italian\" },"
+        "      { c : \"ging\", language : \"german\" } ]"
+        "   },"
+        "  d : \"Feliz Año Nuevo!\","
+        "  language : \"spanish\""
+        " }");
+
+    BSONObj indexSpec =
+        fromjson("{ key : { \"a.b.c\" : \"text\", d : \"text\" }, textIndexVersion: 2.0 }");
+
+    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+
+    FTSElementIterator it(spec, obj);
+
+    ASSERT(it.more());
+    FTSIteratorValue val = it.next();
+    ASSERT_EQUALS("walked", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("camminato", string(val._text));
+    ASSERT_EQUALS("italian", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("ging", string(val._text));
+    ASSERT_EQUALS("german", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("Feliz Año Nuevo!", string(val._text));
+    ASSERT_EQUALS("spanish", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
 }
+
+// Multi-language : Test Version 3 Language Override
+TEST(FTSElementIterator, LanguageOverrideV3) {
+    BSONObj obj = fromjson(
+        "{ a :"
+        "  { b :"
+        "    [ { c : \"walked\", language : \"english\" },"
+        "      { c : \"camminato\", language : \"italian\" },"
+        "      { c : \"ging\", language : \"german\" } ]"
+        "   },"
+        "  d : \"Feliz Año Nuevo!\","
+        "  language : \"spanish\""
+        " }");
+
+    BSONObj indexSpec =
+        fromjson("{ key : { \"a.b.c\" : \"text\", d : \"text\" }, textIndexVersion: 3.0 }");
+
+    FTSSpec spec(FTSSpec::fixSpec(indexSpec));
+
+    FTSElementIterator it(spec, obj);
+
+    ASSERT(it.more());
+    FTSIteratorValue val = it.next();
+    ASSERT_EQUALS("walked", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("camminato", string(val._text));
+    ASSERT_EQUALS("italian", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("ging", string(val._text));
+    ASSERT_EQUALS("german", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
+
+    ASSERT(it.more());
+    val = it.next();
+    ASSERT_EQUALS("Feliz Año Nuevo!", string(val._text));
+    ASSERT_EQUALS("spanish", val._language->str());
+    ASSERT_EQUALS(val._language, FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
 }
+
+}  // namespace fts
+}  // namespace mongo

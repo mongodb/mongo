@@ -161,11 +161,15 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
 
             // Connected to at least one member, but in all cases we were too stale to use them
             // as a sync source.
-            error() << "too stale to catch up";
+            error() << "too stale to catch up -- entering maintenance mode";
             log() << "our last optime : " << lastOpTimeFetched;
             log() << "oldest available is " << oldestOpTimeSeen;
             log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
-            setMinValid(txn, oldestOpTimeSeen);
+            setMinValid(txn, {lastOpTimeFetched, oldestOpTimeSeen});
+            auto status = replCoord->setMaintenanceMode(true);
+            if (!status.isOK()) {
+                warning() << "Failed to transition into maintenance mode.";
+            }
             bool worked = replCoord->setFollowerMode(MemberState::RS_RECOVERING);
             if (!worked) {
                 warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
@@ -183,7 +187,8 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
         // Read the first (oldest) op and confirm that it's not newer than our last
         // fetched op. Otherwise, we have fallen off the back of that source's oplog.
         BSONObj remoteOldestOp(findOne(rsOplogName.c_str(), Query()));
-        OpTime remoteOldOpTime = fassertStatusOK(28776, OpTime::parseFromBSON(remoteOldestOp));
+        OpTime remoteOldOpTime =
+            fassertStatusOK(28776, OpTime::parseFromOplogEntry(remoteOldestOp));
 
         // remoteOldOpTime may come from a very old config, so we cannot compare their terms.
         if (!lastOpTimeFetched.isNull() &&
@@ -198,6 +203,10 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
             }
             continue;
         }
+
+
+        // TODO: If we were too stale (recovering with maintenance mode on), then turn it off, to
+        //       allow becoming secondary/etc.
 
         // Got a valid sync source.
         return;

@@ -119,6 +119,11 @@
  *
  *    Same correct/incorrect usage as for MONGO_COMPILER_API_EXPORT.
  *
+ *
+ * MONGO_COMPILER_ALWAYS_INLINE
+ *
+ *    Overrides compiler heuristics to force that a particular function should always
+ *    be inlined.
  */
 
 #if defined(_MSC_VER)

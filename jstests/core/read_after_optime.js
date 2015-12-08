@@ -11,7 +11,7 @@ var res = assert.commandFailed(db.runCommand({
     find: 'user',
     filter: { x: 1 },
     readConcern: {
-        afterOpTime: { ts: futureOpTime, term: 0 }
+        afterOpTime: { ts: futureOpTime, t: 0 }
     }
 }));
 

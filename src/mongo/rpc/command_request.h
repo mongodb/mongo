@@ -42,8 +42,6 @@ namespace rpc {
 /**
  * An immutable view of an OP_COMMAND message. The underlying bytes are owned
  * by a mongo::Message, which must outlive any Reply instances created from it.
- *
- * TODO: BSON validation. See SERVER-18167 for details.
  */
 class CommandRequest : public RequestInterface {
 public:
@@ -97,8 +95,8 @@ private:
     const Message* _message;
     StringData _database;
     StringData _commandName;
-    BSONObj _metadata;
     BSONObj _commandArgs;
+    BSONObj _metadata;
     DocumentRange _inputDocs;
 };
 

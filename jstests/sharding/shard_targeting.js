@@ -3,11 +3,11 @@
 // If the optional query is not given, mongos will wrongly use the command
 // BSONObj itself as the query to target shards, which could return wrong
 // shards if the shard key happens to be one of the fields in the command object.
+(function() {
 
-var s = new ShardingTest("shard_targeting", 2, 0, 1);
+var s = new ShardingTest({ name: "shard_targeting", shards: 2 });
 s.adminCommand({ enablesharding : "test" });
 s.ensurePrimaryShard('test', 'shard0001');
-s.stopBalancer();
 
 var db = s.getDB("test");
 var res;
@@ -17,7 +17,7 @@ var res;
 //
 
 // Shard key is the same with command name.
-s.shardGo("foo", {count: 1}, { count: "" })
+s.shardColl("foo", {count: 1}, { count: "" })
 
 for (var i=0; i<50; i++) {
   db.foo.insert({count: i}); // chunk [MinKey, ""), including numbers
@@ -25,7 +25,7 @@ for (var i=0; i<50; i++) {
 }
 
 var theOtherShard = s.getOther( s.getServer( "test" ) ).name;
-printShardingStatus();
+s.printShardingStatus();
 
 // Count documents on both shards
 
@@ -40,14 +40,14 @@ assert.eq(res.n, 100);
 //
 db.foo.drop();
 // Shard key is the same with command name.
-s.shardGo("foo", {mapReduce: 1}, { mapReduce: "" })
+s.shardColl("foo", {mapReduce: 1}, { mapReduce: "" })
 
 for (var i=0; i<50; i++) {
   db.foo.insert({mapReduce: i}); // to the chunk including number
   db.foo.insert({mapReduce: "" + i}); // to the chunk including string
 }
 
-printShardingStatus();
+s.printShardingStatus();
 
 function m() { emit("total", 1); }
 function r(k, v) { return Array.sum(v); }
@@ -63,3 +63,5 @@ res = db.foo.runCommand(
 assert.eq(res.results[0].value, 100);
 
 s.stop();
+
+})();

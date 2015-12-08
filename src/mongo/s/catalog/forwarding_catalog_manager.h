@@ -48,9 +48,16 @@ struct ReadPreferenceSetting;
 /**
  * The ForwardingCatalogManager is an indirection layer that allows for dynamic switching of
  * catalog manager implementations at runtime, to facilitate upgrade.
+ * Inheriting privately from CatalogManager is intentional.  All callers of CatalogManager methods
+ * on a ForwardingCatalogManager will get access to the FCM pointer by calling
+ * FCM::getCatalogManagerToUse, which can return a CatalogManager* because it is a member of FCM
+ * and thus knows that FCM inherits from CatalogManager.  This makes it obvious if we try to call
+ * CatalogManager methods directly on a ForwardingCatalogManager pointer.
  */
-class ForwardingCatalogManager final : public CatalogManager {
+class ForwardingCatalogManager final : private CatalogManager {
 public:
+    class ScopedDistLock;
+
     ForwardingCatalogManager(ServiceContext* service,
                              const ConnectionString& configCS,
                              ShardRegistry* shardRegistry,
@@ -59,13 +66,21 @@ public:
     /**
      * Constructor for use in tests.
      */
-    explicit ForwardingCatalogManager(ServiceContext* service,
-                                      std::unique_ptr<CatalogManager> actual,
-                                      ShardRegistry* shardRegistry,
-                                      const HostAndPort& thisHost);
+    ForwardingCatalogManager(ServiceContext* service,
+                             std::unique_ptr<CatalogManager> actual,
+                             ShardRegistry* shardRegistry,
+                             const HostAndPort& thisHost);
 
     virtual ~ForwardingCatalogManager();
 
+    // Only public because of unit tests
+    DistLockManager* getDistLockManager() override;
+
+    /**
+     * If desiredMode doesn't equal _actual->getMode(), schedules work to swap the actual catalog
+     * manager to one of the type specified by desiredMode.
+     * Currently only supports going to CSRS mode from SCCC mode.
+     */
     Status scheduleReplaceCatalogManagerIfNeeded(ConfigServerMode desiredMode,
                                                  StringData replSetName,
                                                  const HostAndPort& knownServer);
@@ -74,15 +89,40 @@ public:
      * Blocking method, which will waits for a previously scheduled catalog manager change to
      * complete. It is illegal to call unless scheduleReplaceCatalogManagerIfNeeded has been called.
      */
-    void waitForCatalogManagerChange();
+    void waitForCatalogManagerChange(OperationContext* txn);
 
+    /**
+     * Returns a ScopedDistLock which is the RAII type for holding a distributed lock.
+     * ScopedDistLock prevents the underlying CatalogManager from being swapped as long as it is
+     * in scope.
+     */
+    StatusWith<ScopedDistLock> distLock(
+        OperationContext* txn,
+        StringData name,
+        StringData whyMessage,
+        stdx::chrono::milliseconds waitFor = DistLockManager::kDefaultSingleLockAttemptTimeout,
+        stdx::chrono::milliseconds lockTryInterval = DistLockManager::kDefaultLockRetryInterval);
+
+    /**
+     * Returns a pointer to the CatalogManager that should be used for general CatalogManager
+     * operation.  Most of the time it will return 'this' - the ForwardingCatalogManager.  If there
+     * is a distributed lock held as part of this operation, however, it will return the underlying
+     * CatalogManager to prevent deadlock from occurring by trying to swap the catalog manager while
+     * a distlock is held.
+     */
+    CatalogManager* getCatalogManagerToUse(OperationContext* txn);
+
+    Status appendInfoForConfigServerDatabases(OperationContext* txn,
+                                              BSONArrayBuilder* builder) override;
+
+private:
     ConfigServerMode getMode() override;
 
-    Status startup() override;
+    Status startup(OperationContext* txn, bool allowNetworking) override;
 
-    void shutDown(bool allowNetworking = true) override;
+    void shutDown(OperationContext* txn, bool allowNetworking = true) override;
 
-    Status enableSharding(const std::string& dbName) override;
+    Status enableSharding(OperationContext* txn, const std::string& dbName) override;
 
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
@@ -99,99 +139,100 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
-    Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
+    Status updateDatabase(OperationContext* txn,
+                          const std::string& dbName,
+                          const DatabaseType& db) override;
 
-    StatusWith<OpTimePair<DatabaseType>> getDatabase(const std::string& dbName) override;
+    StatusWith<OpTimePair<DatabaseType>> getDatabase(OperationContext* txn,
+                                                     const std::string& dbName) override;
 
-    Status updateCollection(const std::string& collNs, const CollectionType& coll) override;
+    Status updateCollection(OperationContext* txn,
+                            const std::string& collNs,
+                            const CollectionType& coll) override;
 
-    StatusWith<OpTimePair<CollectionType>> getCollection(const std::string& collNs) override;
+    StatusWith<OpTimePair<CollectionType>> getCollection(OperationContext* txn,
+                                                         const std::string& collNs) override;
 
-    Status getCollections(const std::string* dbName,
+    Status getCollections(OperationContext* txn,
+                          const std::string* dbName,
                           std::vector<CollectionType>* collections,
                           repl::OpTime* opTime) override;
 
     Status dropCollection(OperationContext* txn, const NamespaceString& ns) override;
 
-    Status getDatabasesForShard(const std::string& shardName,
+    Status getDatabasesForShard(OperationContext* txn,
+                                const std::string& shardName,
                                 std::vector<std::string>* dbs) override;
 
-    Status getChunks(const BSONObj& query,
+    Status getChunks(OperationContext* txn,
+                     const BSONObj& query,
                      const BSONObj& sort,
                      boost::optional<int> limit,
                      std::vector<ChunkType>* chunks,
                      repl::OpTime* opTime) override;
 
-    Status getTagsForCollection(const std::string& collectionNs,
+    Status getTagsForCollection(OperationContext* txn,
+                                const std::string& collectionNs,
                                 std::vector<TagsType>* tags) override;
 
-    StatusWith<std::string> getTagForChunk(const std::string& collectionNs,
+    StatusWith<std::string> getTagForChunk(OperationContext* txn,
+                                           const std::string& collectionNs,
                                            const ChunkType& chunk) override;
 
-    Status getAllShards(std::vector<ShardType>* shards) override;
+    StatusWith<OpTimePair<std::vector<ShardType>>> getAllShards(OperationContext* txn) override;
 
-    bool runUserManagementWriteCommand(const std::string& commandName,
+    bool runUserManagementWriteCommand(OperationContext* txn,
+                                       const std::string& commandName,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* result) override;
 
-    bool runReadCommand(const std::string& dbname,
-                        const BSONObj& cmdObj,
-                        BSONObjBuilder* result) override;
-
-    bool runUserManagementReadCommand(const std::string& dbname,
+    bool runUserManagementReadCommand(OperationContext* txn,
+                                      const std::string& dbname,
                                       const BSONObj& cmdObj,
                                       BSONObjBuilder* result) override;
 
-    Status applyChunkOpsDeprecated(const BSONArray& updateOps,
+    Status applyChunkOpsDeprecated(OperationContext* txn,
+                                   const BSONArray& updateOps,
                                    const BSONArray& preCondition) override;
 
-    void logAction(const ActionLogType& actionLog) override;
+    Status logAction(OperationContext* txn,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) override;
 
-    void logChange(const std::string& clientAddress,
-                   const std::string& what,
-                   const std::string& ns,
-                   const BSONObj& detail) override;
+    Status logChange(OperationContext* txn,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) override;
 
-    StatusWith<SettingsType> getGlobalSettings(const std::string& key) override;
+    StatusWith<SettingsType> getGlobalSettings(OperationContext* txn,
+                                               const std::string& key) override;
 
-    void writeConfigServerDirect(const BatchedCommandRequest& request,
+    void writeConfigServerDirect(OperationContext* txn,
+                                 const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
 
-    Status createDatabase(const std::string& dbName) override;
+    Status insertConfigDocument(OperationContext* txn,
+                                const std::string& ns,
+                                const BSONObj& doc) override;
 
-    DistLockManager* getDistLockManager() override;
+    StatusWith<bool> updateConfigDocument(OperationContext* txn,
+                                          const std::string& ns,
+                                          const BSONObj& query,
+                                          const BSONObj& update,
+                                          bool upsert) override;
 
-    Status checkAndUpgrade(bool checkOnly) override;
+    Status removeConfigDocuments(OperationContext* txn,
+                                 const std::string& ns,
+                                 const BSONObj& query) override;
 
-    class ScopedDistLock {
-        MONGO_DISALLOW_COPYING(ScopedDistLock);
+    Status createDatabase(OperationContext* txn, const std::string& dbName) override;
 
-    public:
-        ScopedDistLock(ForwardingCatalogManager* fcm, DistLockManager::ScopedDistLock theLock);
-        ScopedDistLock(ScopedDistLock&& other);
-        ~ScopedDistLock();
+    Status initConfigVersion(OperationContext* txn) override;
 
-        ScopedDistLock& operator=(ScopedDistLock&& other);
-
-        Status checkStatus() {
-            return _lock.checkStatus();
-        }
-
-    private:
-        ForwardingCatalogManager* _fcm;
-        DistLockManager::ScopedDistLock _lock;
-    };
-
-    StatusWith<ScopedDistLock> distLock(
-        StringData name,
-        StringData whyMessage,
-        stdx::chrono::milliseconds waitFor = DistLockManager::kDefaultSingleLockAttemptTimeout,
-        stdx::chrono::milliseconds lockTryInterval = DistLockManager::kDefaultLockRetryInterval);
-
-private:
     template <typename Callable>
-    auto retry(Callable&& c) -> decltype(std::forward<Callable>(c)());
+    auto retry(OperationContext* txn, Callable&& c) -> decltype(std::forward<Callable>(c)());
 
     void _replaceCatalogManager(const executor::TaskExecutor::CallbackArgs& args);
 
@@ -211,6 +252,38 @@ private:
 
     ConnectionString _nextConfigConnectionString;                   // Guarded by _observerMutex.
     executor::TaskExecutor::EventHandle _nextConfigChangeComplete;  // Guarded by _observerMutex.
+};
+
+class ForwardingCatalogManager::ScopedDistLock {
+    MONGO_DISALLOW_COPYING(ScopedDistLock);
+
+public:
+    ScopedDistLock(OperationContext* txn,
+                   ForwardingCatalogManager* fcm,
+                   DistLockManager::ScopedDistLock theLock);
+    ScopedDistLock(ScopedDistLock&& other);
+    ~ScopedDistLock();
+
+    ScopedDistLock& operator=(ScopedDistLock&& other);
+
+    /**
+     * Checks to see if we are currently waiting to swap the catalog manager.  If so, holding on to
+     * this ScopedDistLock will block the swap from happening, so it is important that if this
+     * returns a non-OK status the caller must release the lock (most likely by failing the current
+     * operation).
+     */
+    Status checkForPendingCatalogSwap();
+
+    /**
+     * Queries the config server to make sure the lock is still present, as well as checking
+     * if we need to swap the catalog manager
+     */
+    Status checkStatus();
+
+private:
+    OperationContext* _txn;
+    ForwardingCatalogManager* _fcm;
+    DistLockManager::ScopedDistLock _lock;
 };
 
 }  // namespace mongo

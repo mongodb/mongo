@@ -34,6 +34,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
@@ -175,7 +176,8 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                                      minObj,
                                                      maxObj,
                                                      snapshot,
-                                                     false);  // explain
+                                                     false,  // explain
+                                                     ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
 
     ASSERT_OK(QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector()));
@@ -240,7 +242,8 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                                      minObj,
                                                      maxObj,
                                                      snapshot,
-                                                     false);  // explain
+                                                     false,  // explain
+                                                     ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
 
     Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector());
@@ -256,8 +259,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     std::unique_ptr<LiteParsedQuery> lpq(
         assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain)));
 
-    WhereCallbackNoop whereCallback;
-    auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), whereCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
 
     Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector());

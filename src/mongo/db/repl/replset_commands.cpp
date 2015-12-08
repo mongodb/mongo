@@ -40,23 +40,26 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
@@ -64,11 +67,21 @@ namespace repl {
 using std::string;
 using std::stringstream;
 
+
+class ReplExecutorSSM : public ServerStatusMetric {
+public:
+    ReplExecutorSSM() : ServerStatusMetric("repl.executor") {}
+    virtual void appendAtLeaf(BSONObjBuilder& b) const {
+        ReplicationExecutor* exec = getGlobalReplicationCoordinator()->getExecutor();
+        b.append("executor", exec->getDiagnosticBSON());
+    }
+} replExecutorSSM;
+
 // Testing only, enabled via command-line.
 class CmdReplSetTest : public ReplSetCommand {
 public:
     virtual void help(stringstream& help) const {
-        help << "Just for regression tests.\n";
+        help << "Just for tests.\n";
     }
     // No auth needed because it only works when enabled via command line.
     virtual Status checkAuthForCommand(ClientBasic* client,
@@ -85,18 +98,56 @@ public:
                      BSONObjBuilder& result) {
         log() << "replSetTest command received: " << cmdObj.toString();
 
+        auto replCoord = ReplicationCoordinator::get(getGlobalServiceContext());
+
         if (cmdObj.hasElement("forceInitialSyncFailure")) {
             replSetForceInitialSyncFailure = (unsigned)cmdObj["forceInitialSyncFailure"].Number();
             return true;
+        } else if (cmdObj.hasElement("waitForMemberState")) {
+            long long stateVal;
+            auto status = bsonExtractIntegerField(cmdObj, "waitForMemberState", &stateVal);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+            MemberState expectedState(stateVal);
+            if (expectedState.toString().empty()) {
+                return appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::BadValue,
+                           str::stream() << "Unrecognized numerical state: " << stateVal));
+            }
+
+            long long timeoutMillis;
+            status = bsonExtractIntegerField(cmdObj, "timeoutMillis", &timeoutMillis);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+            Milliseconds timeout(timeoutMillis);
+            log() << "replSetTest: waiting " << timeout << " for member state to become "
+                  << expectedState;
+
+            status = replCoord->waitForMemberState(expectedState, timeout);
+
+            return appendCommandStatus(result, status);
+        } else if (cmdObj.hasElement("waitForDrainFinish")) {
+            long long timeoutMillis;
+            auto status = bsonExtractIntegerField(cmdObj, "waitForDrainFinish", &timeoutMillis);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+            Milliseconds timeout(timeoutMillis);
+            log() << "replSetTest: waiting " << timeout << " for applier buffer to finish draining";
+
+            status = replCoord->waitForDrainFinish(timeout);
+
+            return appendCommandStatus(result, status);
         }
 
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return appendCommandStatus(result, status);
-
-        return false;
+        Status status = replCoord->checkReplEnabledForCommand(&result);
+        return appendCommandStatus(result, status);
     }
 };
+
 MONGO_INITIALIZER(RegisterReplSetTestCmd)(InitializerContext* context) {
     if (Command::testCommandsEnabled) {
         // Leaked intentionally: a Command registers itself when constructed.
@@ -694,11 +745,19 @@ public:
 
         /* we want to keep heartbeat connections open when relinquishing primary.
            tag them here. */
-        {
-            AbstractMessagingPort* mp = txn->getClient()->port();
-            if (mp)
-                mp->tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
+        AbstractMessagingPort* mp = txn->getClient()->port();
+        unsigned originalTag = 0;
+        if (mp) {
+            originalTag = mp->tag;
+            mp->tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
         }
+
+        // Unset the tag on block exit
+        ON_BLOCK_EXIT([mp, originalTag]() {
+            if (mp) {
+                mp->tag = originalTag;
+            }
+        });
 
         // Process heartbeat based on the version of request. The missing fields in mismatched
         // version will be empty.

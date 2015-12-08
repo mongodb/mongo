@@ -26,6 +26,7 @@ var getDirectShardedConn = function( st, collName ) {
                        authoritative : true,
                        configdb : configConnStr,
                        version : maxChunk.lastmod,
+                       shard: 'shard0000',
                        versionEpoch : maxChunk.lastmodEpoch };
 
     printjson( ssvInitCmd );

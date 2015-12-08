@@ -329,11 +329,11 @@ Status addMongodOptions(moe::OptionSection* options) {
         .setSources(moe::SourceAllLegacy)
         .incompatibleWith("storage.mmapv1.journal.debugFlags");
 
-    storage_options.addOptionChaining("storage.mmapv1.journal.commitIntervalMs",
+    storage_options.addOptionChaining("storage.journal.commitIntervalMs",
                                       "journalCommitInterval",
-                                      moe::Unsigned,
+                                      moe::Int,
                                       "how often to group/batch commit (ms)",
-                                      "storage.journal.commitIntervalMs");
+                                      "storage.mmapv1.journal.commitIntervalMs");
 
     // Deprecated option that we don't want people to use for performance reasons
     storage_options.addOptionChaining("nopreallocj",
@@ -418,6 +418,11 @@ Status addMongodOptions(moe::OptionSection* options) {
                    "specify index prefetching behavior (if secondary) [none|_id_only|all]")
         .format("(:?none)|(:?_id_only)|(:?all)", "(none/_id_only/all)");
 
+    rs_options.addOptionChaining("replication.enableMajorityReadConcern",
+                                 "enableMajorityReadConcern",
+                                 moe::Switch,
+                                 "enables majority readConcern");
+
     // Sharding Options
 
     sharding_options.addOptionChaining(
@@ -427,7 +432,8 @@ Status addMongodOptions(moe::OptionSection* options) {
                          "declare this is a config db of a cluster; default port 27019; "
                          "default dir /data/configdb")
         .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("shardsvr");
+        .incompatibleWith("shardsvr")
+        .incompatibleWith("nojournal");
 
     sharding_options.addOptionChaining("sharding.configsvrMode",
                                        "configsvrMode",
@@ -435,7 +441,7 @@ Status addMongodOptions(moe::OptionSection* options) {
                                        "Controls what config server protocol is in use. When set to"
                                        " \"sccc\" keeps server in legacy SyncClusterConnection mode"
                                        " even when the service is running as a replSet")
-        .setSources(moe::SourceAllLegacy);
+        .setSources(moe::SourceAll);
 
     sharding_options.addOptionChaining(
                          "shardsvr",
@@ -582,9 +588,7 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
     if (params.count("version") && params["version"].as<bool>() == true) {
         setPlainConsoleLogger();
         log() << mongodVersion() << endl;
-        printGitVersion();
-        printOpenSSLVersion();
-        printCompiledModules();
+        printBuildInfo();
         return false;
     }
     if (params.count("sysinfo") && params["sysinfo"].as<bool>() == true) {
@@ -1035,16 +1039,19 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         storageGlobalParams.dur = params["storage.journal.enabled"].as<bool>();
     }
 
-    if (params.count("storage.mmapv1.journal.commitIntervalMs")) {
+    if (params.count("storage.journal.commitIntervalMs")) {
         // don't check if dur is false here as many will just use the default, and will default
         // to off on win32.  ie no point making life a little more complex by giving an error on
         // a dev environment.
-        mmapv1GlobalOptions.journalCommitInterval =
-            params["storage.mmapv1.journal.commitIntervalMs"].as<unsigned>();
-        if (mmapv1GlobalOptions.journalCommitInterval <= 1 ||
-            mmapv1GlobalOptions.journalCommitInterval > 300) {
+        storageGlobalParams.journalCommitIntervalMs =
+            params["storage.journal.commitIntervalMs"].as<int>();
+        if (storageGlobalParams.journalCommitIntervalMs < 1 ||
+            storageGlobalParams.journalCommitIntervalMs >
+                StorageGlobalParams::kMaxJournalCommitIntervalMs) {
             return Status(ErrorCodes::BadValue,
-                          "--journalCommitInterval out of allowed range (0-300ms)");
+                          str::stream() << "--journalCommitInterval out of allowed range (1-"
+                                        << StorageGlobalParams::kMaxJournalCommitIntervalMs
+                                        << "ms)");
         }
     }
     if (params.count("storage.mmapv1.journal.debugFlags")) {
@@ -1138,6 +1145,10 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
             params["replication.secondaryIndexPrefetch"].as<std::string>();
     }
 
+    if (params.count("replication.enableMajorityReadConcern")) {
+        replSettings.majorityReadConcernEnabled = true;
+    }
+
     if (params.count("storage.indexBuildRetry")) {
         serverGlobalParams.indexBuildRetry = params["storage.indexBuildRetry"].as<bool>();
     }
@@ -1213,9 +1224,11 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         if (!params.count("storage.dbPath")) {
             storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
         }
-        replSettings.master = true;
-        if (!params.count("replication.oplogSizeMB"))
-            replSettings.oplogSize = 5 * 1024 * 1024;
+        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::SCCC) {
+            replSettings.master = true;  // To force SCCC config servers to have an oplog for backup
+            if (!params.count("replication.oplogSizeMB"))
+                replSettings.oplogSize = 5 * 1024 * 1024;
+        }
     }
 
     if (params.count("sharding.configsvrMode")) {
@@ -1230,6 +1243,10 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
                           " Only supported value is \"sccc\"");
         }
         serverGlobalParams.configsvrMode = CatalogManager::ConfigServerMode::SCCC;
+    }
+
+    if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::CSRS) {
+        replSettings.majorityReadConcernEnabled = true;
     }
 
     if (params.count("sharding.archiveMovedChunks")) {

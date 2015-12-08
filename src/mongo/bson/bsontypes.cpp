@@ -34,10 +34,10 @@
 namespace mongo {
 
 const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
-const BSONObj maxKey(kMaxKeyData);
+const BSONObj kMaxBSONKey(kMaxKeyData);
 
 const char kMinKeyData[] = {7, 0, 0, 0, static_cast<char>(MinKey), 0, 0};
-const BSONObj minKey(kMinKeyData);
+const BSONObj kMinBSONKey(kMinKeyData);
 
 /* take a BSONType and return the name of that type as a char* */
 const char* typeName(BSONType type) {

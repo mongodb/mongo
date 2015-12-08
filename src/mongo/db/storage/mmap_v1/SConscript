@@ -26,7 +26,6 @@ env.Library(
                "mmap_v1_engine.cpp",
                "mmap_v1_extent_manager.cpp",
                "mmap_v1_init.cpp",
-               "mmap_v1_options.cpp",
                "repair_database.cpp",
              ],
     LIBDEPS = [
@@ -38,7 +37,11 @@ env.Library(
         'compress',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/storage/paths',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Many undefined symbols
+        'incomplete',
+    ],
     )
 
 compressEnv = env.Clone()
@@ -150,7 +153,6 @@ env.CppUnitTest(
             ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/serveronly',
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/util/ntservice_mock',
         ],
     NO_CRUTCH=True,

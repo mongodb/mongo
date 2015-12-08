@@ -1,17 +1,14 @@
-// TODO: move back to sharding suite after SERVER-13402 is fixed
-
 /**
  * This test sets moveParanoia flag and then check that the directory is created with the moved data
  */
 var st = new ShardingTest( { shards: 2,
                              mongos:1,
                              other : {
-                                 chunksize : 1,
+                                 chunkSize: 1,
                                  shardOptions: { noMoveParanoia:"" }}});
 
 load("jstests/sharding/movechunk_include.js")
 setupMoveChunkTest(st);
-
 
 var shards = [st.shard0, st.shard1];
 for(i in shards) {

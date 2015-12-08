@@ -30,22 +30,20 @@
 
 #include "mongo/scripting/mozjs/maxkey.h"
 
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 
 namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec MaxKeyInfo::methods[2] = {
-    MONGO_ATTACH_JS_FUNCTION(tojson), JS_FS_END,
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MaxKeyInfo), JS_FS_END,
 };
 
 const char* const MaxKeyInfo::className = "MaxKey";
-
-namespace {
-const char* const kSingleton = "singleton";
-}  // namespace
 
 void MaxKeyInfo::construct(JSContext* cx, JS::CallArgs args) {
     call(cx, args);
@@ -59,24 +57,34 @@ void MaxKeyInfo::construct(JSContext* cx, JS::CallArgs args) {
 void MaxKeyInfo::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
-    ObjectWrapper o(cx, scope->getMaxKeyProto().getProto());
+    ObjectWrapper o(cx, scope->getProto<MaxKeyInfo>().getProto());
 
     JS::RootedValue val(cx);
 
-    if (!o.hasField(kSingleton)) {
+    if (!o.hasField(InternedString::singleton)) {
         JS::RootedObject thisv(cx);
-        scope->getMaxKeyProto().newObject(&thisv);
+        scope->getProto<MaxKeyInfo>().newObject(&thisv);
 
         val.setObjectOrNull(thisv);
-        o.setValue(kSingleton, val);
+        o.setValue(InternedString::singleton, val);
     } else {
-        o.getValue(kSingleton, &val);
+        o.getValue(InternedString::singleton, &val);
+
+        if (!getScope(cx)->getProto<MaxKeyInfo>().instanceOf(val))
+            uasserted(ErrorCodes::BadValue, "MaxKey singleton not of type MaxKey");
     }
 
-    args.rval().setObjectOrNull(val.toObjectOrNull());
+    args.rval().set(val);
 }
 
-void MaxKeyInfo::Functions::tojson(JSContext* cx, JS::CallArgs args) {
+void MaxKeyInfo::hasInstance(JSContext* cx,
+                             JS::HandleObject obj,
+                             JS::MutableHandleValue vp,
+                             bool* bp) {
+    *bp = getScope(cx)->getProto<MaxKeyInfo>().instanceOf(vp);
+}
+
+void MaxKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData("{ \"$maxKey\" : 1 }");
 }
 
@@ -84,10 +92,10 @@ void MaxKeyInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleO
     ObjectWrapper protoWrapper(cx, proto);
 
     JS::RootedValue value(cx);
-    getScope(cx)->getMaxKeyProto().newObject(&value);
+    getScope(cx)->getProto<MaxKeyInfo>().newObject(&value);
 
-    ObjectWrapper(cx, global).setValue("MaxKey", value);
-    protoWrapper.setValue(kSingleton, value);
+    ObjectWrapper(cx, global).setValue(InternedString::MaxKey, value);
+    protoWrapper.setValue(InternedString::singleton, value);
 }
 
 }  // namespace mozjs

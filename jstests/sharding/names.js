@@ -1,9 +1,13 @@
 // Test that having replica set names the same as the names of other shards works fine
+(function() {
 
-var st = new ShardingTest( name = "test", shards = 0, verbose = 2, mongos = 2, other = { rs : true } )
+var st = new ShardingTest({ name: "HostNames",
+                            shards: 0,
+                            mongos: 2,
+                            other: { rs : true } });
 
-var rsA = new ReplSetTest({ nodes : 2, name : "rsA", startPort : 28000 })
-var rsB = new ReplSetTest({ nodes : 2, name : "rsB", startPort : 28010 })
+var rsA = new ReplSetTest({ nodes : 2, name : "rsA" })
+var rsB = new ReplSetTest({ nodes : 2, name : "rsB" })
 
 rsA.startSet()
 rsB.startSet()
@@ -41,4 +45,6 @@ assert.eq(2, config.shards.count(), "Error re-adding a shard");
 assert.eq(rsB.getURL(), config.shards.findOne({_id:rsA.name})["host"], "Wrong host for shard rsA 3");
 assert.eq(rsA.getURL(), config.shards.findOne({_id:rsB.name})["host"], "Wrong host for shard rsB 3");
 
-st.stop()
+st.stop();
+
+})();

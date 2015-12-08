@@ -187,22 +187,18 @@ void signalProcessingThread() {
 #endif
 }  // namespace
 
-void setupSignalHandlers(bool handleControlC) {
+void setupSignalHandlers() {
     setupSynchronousSignalHandlers();
 #ifdef _WIN32
-    if (!handleControlC) {
-        massert(10297,
-                "Couldn't register Windows Ctrl-C handler",
-                SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), TRUE));
-    }
+    massert(10297,
+            "Couldn't register Windows Ctrl-C handler",
+            SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), TRUE));
 #else
     // asyncSignals is a global variable listing the signals that should be handled by the
     // interrupt thread, once it is started via startSignalProcessingThread().
     sigemptyset(&asyncSignals);
     sigaddset(&asyncSignals, SIGHUP);
-    if (!handleControlC) {
-        sigaddset(&asyncSignals, SIGINT);
-    }
+    sigaddset(&asyncSignals, SIGINT);
     sigaddset(&asyncSignals, SIGTERM);
     sigaddset(&asyncSignals, SIGUSR1);
     sigaddset(&asyncSignals, SIGXCPU);

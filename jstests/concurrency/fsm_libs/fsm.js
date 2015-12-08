@@ -4,6 +4,8 @@ var fsm = (function() {
     // args.data = 'this' object of the state functions
     // args.db = database object
     // args.collName = collection name
+    // args.cluster = connection strings for all cluster nodes (see fsm_libs/cluster.js for format)
+    // args.passConnectionCache = boolean, whether to pass a connection cache to the workload states
     // args.startState = name of initial state function
     // args.states = state functions of the form
     //               { stateName: function(db, collName) { ... } }
@@ -13,12 +15,43 @@ var fsm = (function() {
     // args.iterations = number of iterations to run the FSM for
     function runFSM(args) {
         var currentState = args.startState;
+
+        // We build a cache of connections that can be used in workload states. This cache
+        // allows state functions to access arbitrary cluster nodes for verification checks.
+        // See fsm_libs/cluster.js for the format of args.cluster.
+        var connCache;
+        if (args.passConnectionCache) {
+            connCache = {
+                mongos: [],
+                config: [],
+                shards: {}
+            };
+            connCache.mongos = args.cluster.mongos.map(connStr => new Mongo(connStr));
+            connCache.config = args.cluster.config.map(connStr => new Mongo(connStr));
+
+            var shardNames = Object.keys(args.cluster.shards);
+
+
+            shardNames.forEach(name =>
+                connCache.shards[name] = args.cluster.shards[name].map(connStr =>
+                    new Mongo(connStr)));
+        }
+
         for (var i = 0; i < args.iterations; ++i) {
             var fn = args.states[currentState];
             assert.eq('function', typeof fn, 'states.' + currentState + ' is not a function');
-            fn.call(args.data, args.db, args.collName);
+            fn.call(args.data, args.db, args.collName, connCache);
             var nextState = getWeightedRandomChoice(args.transitions[currentState], Random.rand());
             currentState = nextState;
+        }
+
+        if (args.passConnectionCache) {
+            connCache.mongos.forEach(conn => conn = null);
+            connCache.config.forEach(conn => conn = null);
+
+            var shardNames = Object.keys(connCache.shards);
+            shardNames.forEach(name => connCache.shards[name].forEach(conn => conn = null));
+            gc();
         }
     }
 

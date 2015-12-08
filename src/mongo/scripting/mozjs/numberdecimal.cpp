@@ -35,6 +35,7 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/text.h"
 
@@ -42,7 +43,7 @@ namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec NumberDecimalInfo::methods[2] = {
-    MONGO_ATTACH_JS_FUNCTION(toString), JS_FS_END,
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberDecimalInfo), JS_FS_END,
 };
 
 const char* const NumberDecimalInfo::className = "NumberDecimal";
@@ -66,7 +67,7 @@ Decimal128 NumberDecimalInfo::ToNumberDecimal(JSContext* cx, JS::HandleObject th
     return x ? *x : Decimal128(0);
 }
 
-void NumberDecimalInfo::Functions::toString(JSContext* cx, JS::CallArgs args) {
+void NumberDecimalInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     Decimal128 val = NumberDecimalInfo::ToNumberDecimal(cx, args.thisv());
 
     str::stream ss;
@@ -80,7 +81,7 @@ void NumberDecimalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     JS::RootedObject thisv(cx);
 
-    scope->getNumberDecimalProto().newObject(&thisv);
+    scope->getProto<NumberDecimalInfo>().newObject(&thisv);
 
     Decimal128 x(0);
 
@@ -100,7 +101,7 @@ void NumberDecimalInfo::construct(JSContext* cx, JS::CallArgs args) {
 void NumberDecimalInfo::make(JSContext* cx, JS::MutableHandleValue thisv, Decimal128 decimal) {
     auto scope = getScope(cx);
 
-    scope->getNumberDecimalProto().newInstance(thisv);
+    scope->getProto<NumberDecimalInfo>().newInstance(thisv);
     JS_SetPrivate(thisv.toObjectOrNull(), new Decimal128(decimal));
 }
 

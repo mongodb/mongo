@@ -47,7 +47,7 @@ LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) 
     QueryResult::View qr = _message->singleData().view2ptr();
 
     // should be checked by caller.
-    invariant(qr.msgdata().getOperation() == opReply);
+    invariant(qr.msgdata().getNetworkOp() == opReply);
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Got legacy command reply with a bad cursorId field,"
@@ -67,27 +67,7 @@ LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) 
     std::tie(_commandReply, _metadata) =
         uassertStatusOK(rpc::upconvertReplyMetadata(BSONObj(qr.data())));
 
-    // Copy the bson array of documents from the message into
-    // a contiguous area of memory owned by _docBuffer so
-    // DocumentRange can be used to iterate over documents
-    auto cursorElem = _commandReply[LegacyReplyBuilder::kCursorTag];
-    if (cursorElem.eoo())
-        return;
-
-    BSONObj cursorObj = cursorElem.Obj();
-    auto firstBatchElem = cursorObj[LegacyReplyBuilder::kFirstBatchTag];
-    if (firstBatchElem.eoo())
-        return;
-
-    for (BSONObjIterator it(firstBatchElem.Obj()); it.more(); it.next()) {
-        invariant((*it).isABSONObj());
-        BSONObj doc = (*it).Obj();
-        doc.appendSelfToBufBuilder(_docBuffer);
-    }
-    const char* dataBegin = _docBuffer.buf();
-    const char* dataEnd = dataBegin + _docBuffer.len();
-    _outputDocs = DocumentRange(dataBegin, dataEnd);
-
+    _outputDocs = DocumentRange{};
     return;
 }
 

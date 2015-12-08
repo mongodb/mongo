@@ -1062,6 +1062,9 @@ extern bool
 SetClassAndProto(JSContext* cx, HandleObject obj,
                  const Class* clasp, Handle<TaggedProto> proto);
 
+extern bool
+IsStandardPrototype(JSObject* obj, JSProtoKey key);
+
 } /* namespace js */
 
 /*

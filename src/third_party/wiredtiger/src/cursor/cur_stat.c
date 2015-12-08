@@ -103,7 +103,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 	size_t size;
 	uint64_t *v;
-	const char **p;
+	const char *desc, **p;
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	va_start(ap, cursor);
@@ -111,15 +111,13 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 
 	WT_CURSOR_NEEDVALUE(cursor);
 
+	WT_ERR(cst->stats_desc(cst, WT_STAT_KEY_OFFSET(cst), &desc));
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(__wt_struct_size(session, &size, cursor->value_format,
-		    cst->stats[WT_STAT_KEY_OFFSET(cst)].desc,
-		    cst->pv.data, cst->v));
+		    desc, cst->pv.data, cst->v));
 		WT_ERR(__wt_buf_initsize(session, &cursor->value, size));
 		WT_ERR(__wt_struct_pack(session, cursor->value.mem, size,
-		    cursor->value_format,
-		    cst->stats[WT_STAT_KEY_OFFSET(cst)].desc,
-		    cst->pv.data, cst->v));
+		    cursor->value_format, desc, cst->pv.data, cst->v));
 
 		item = va_arg(ap, WT_ITEM *);
 		item->data = cursor->value.data;
@@ -130,7 +128,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 		 * pointer support isn't documented, but it's a cheap test.
 		 */
 		if ((p = va_arg(ap, const char **)) != NULL)
-			*p = cst->stats[WT_STAT_KEY_OFFSET(cst)].desc;
+			*p = desc;
 		if ((p = va_arg(ap, const char **)) != NULL)
 			*p = cst->pv.data;
 		if ((v = va_arg(ap, uint64_t *)) != NULL)
@@ -201,25 +199,31 @@ __curstat_next(WT_CURSOR *cursor)
 	/* Initialize on demand. */
 	if (cst->notinitialized) {
 		WT_ERR(__wt_curstat_init(
-		    session, cursor->internal_uri, cst->cfg, cst));
-		cst->notinitialized = 0;
+		    session, cursor->internal_uri, NULL, cst->cfg, cst));
+		if (cst->next_set != NULL)
+			WT_ERR((*cst->next_set)(session, cst, true, true));
+		cst->notinitialized = false;
 	}
 
 	/* Move to the next item. */
 	if (cst->notpositioned) {
-		cst->notpositioned = 0;
+		cst->notpositioned = false;
 		cst->key = WT_STAT_KEY_MIN(cst);
 	} else if (cst->key < WT_STAT_KEY_MAX(cst))
 		++cst->key;
-	else {
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	else if (cst->next_set != NULL)
+		WT_ERR((*cst->next_set)(session, cst, true, false));
+	else
 		WT_ERR(WT_NOTFOUND);
-	}
-	cst->v = cst->stats[WT_STAT_KEY_OFFSET(cst)].v;
+
+	cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END_RET(session, ret);
+	if (0) {
+err:		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	}
+	API_END_RET(session, ret);
 }
 
 /*
@@ -239,26 +243,31 @@ __curstat_prev(WT_CURSOR *cursor)
 	/* Initialize on demand. */
 	if (cst->notinitialized) {
 		WT_ERR(__wt_curstat_init(
-		    session, cursor->internal_uri, cst->cfg, cst));
-		cst->notinitialized = 0;
+		    session, cursor->internal_uri, NULL, cst->cfg, cst));
+		if (cst->next_set != NULL)
+			WT_ERR((*cst->next_set)(session, cst, false, true));
+		cst->notinitialized = false;
 	}
 
 	/* Move to the previous item. */
 	if (cst->notpositioned) {
-		cst->notpositioned = 0;
+		cst->notpositioned = false;
 		cst->key = WT_STAT_KEY_MAX(cst);
 	} else if (cst->key > WT_STAT_KEY_MIN(cst))
 		--cst->key;
-	else {
-		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+	else if (cst->next_set != NULL)
+		WT_ERR((*cst->next_set)(session, cst, false, false));
+	else
 		WT_ERR(WT_NOTFOUND);
-	}
 
-	cst->v = cst->stats[WT_STAT_KEY_OFFSET(cst)].v;
+	cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END_RET(session, ret);
+	if (0) {
+err:		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	}
+	API_END_RET(session, ret);
 }
 
 /*
@@ -275,7 +284,7 @@ __curstat_reset(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 
-	cst->notinitialized = cst->notpositioned = 1;
+	cst->notinitialized = cst->notpositioned = true;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END_RET(session, ret);
@@ -301,14 +310,14 @@ __curstat_search(WT_CURSOR *cursor)
 	/* Initialize on demand. */
 	if (cst->notinitialized) {
 		WT_ERR(__wt_curstat_init(
-		    session, cursor->internal_uri, cst->cfg, cst));
-		cst->notinitialized = 0;
+		    session, cursor->internal_uri, NULL, cst->cfg, cst));
+		cst->notinitialized = false;
 	}
 
 	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
 		WT_ERR(WT_NOTFOUND);
 
-	cst->v = cst->stats[WT_STAT_KEY_OFFSET(cst)].v;
+	cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -332,6 +341,7 @@ __curstat_close(WT_CURSOR *cursor)
 	__curstat_free_config(session, cst);
 
 	__wt_buf_free(session, &cst->pv);
+	__wt_free(session, cst->desc_buf);
 
 	WT_ERR(__wt_cursor_close(cursor));
 
@@ -354,13 +364,14 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	 * Optionally clear the connection statistics.
 	 */
 	__wt_conn_stat_init(session);
-	cst->u.conn_stats = conn->stats;
+	__wt_stat_connection_aggregate(conn->stats, &cst->u.conn_stats);
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
-		__wt_stat_refresh_connection_stats(&conn->stats);
+		__wt_stat_connection_clear_all(conn->stats);
 
-	cst->stats = (WT_STATS *)&cst->u.conn_stats;
+	cst->stats = (int64_t *)&cst->u.conn_stats;
 	cst->stats_base = WT_CONNECTION_STATS_BASE;
-	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
+	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(int64_t);
+	cst->stats_desc = __wt_stat_connection_desc;
 }
 
 /*
@@ -383,7 +394,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 		filename = uri;
 		if (!WT_PREFIX_SKIP(filename, "file:"))
 			return (EINVAL);
-		__wt_stat_init_dsrc_stats(&cst->u.dsrc_stats);
+		__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
 		WT_RET(__wt_block_manager_size(
 		    session, filename, &cst->u.dsrc_stats));
 		__wt_curstat_dsrc_final(cst);
@@ -398,9 +409,10 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	 * Optionally clear the data source statistics.
 	 */
 	if ((ret = __wt_btree_stat_init(session, cst)) == 0) {
-		cst->u.dsrc_stats = dhandle->stats;
+		__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
+		__wt_stat_dsrc_aggregate(dhandle->stats, &cst->u.dsrc_stats);
 		if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
-			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
+			__wt_stat_dsrc_clear_all(dhandle->stats);
 		__wt_curstat_dsrc_final(cst);
 	}
 
@@ -417,10 +429,100 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 void
 __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst)
 {
-
-	cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
+	cst->stats = (int64_t *)&cst->u.dsrc_stats;
 	cst->stats_base = WT_DSRC_STATS_BASE;
-	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
+	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(int64_t);
+	cst->stats_desc = __wt_stat_dsrc_desc;
+}
+
+/*
+ * __curstat_join_next_set --
+ *	Advance to another index used in a join to give another set of
+ *	statistics.
+ */
+static int
+__curstat_join_next_set(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst,
+    bool forw, bool init)
+{
+	WT_CURSOR_JOIN *cjoin;
+	WT_JOIN_STATS_GROUP *join_group;
+	ssize_t pos;
+
+	WT_ASSERT(session, WT_STREQ(cst->iface.uri, "statistics:join"));
+	join_group = &cst->u.join_stats_group;
+	cjoin = join_group->join_cursor;
+	if (init)
+		pos = forw ? 0 : (ssize_t)cjoin->entries_next - 1;
+	else
+		pos = join_group->join_cursor_entry + (forw ? 1 : -1);
+	if (pos < 0 || (size_t)pos >= cjoin->entries_next)
+		return (WT_NOTFOUND);
+
+	join_group->join_cursor_entry = pos;
+	if (cjoin->entries[pos].index == NULL) {
+		WT_ASSERT(session, WT_PREFIX_MATCH(cjoin->iface.uri, "join:"));
+		join_group->desc_prefix = cjoin->iface.uri + 5;
+	} else
+		join_group->desc_prefix = cjoin->entries[pos].index->name;
+	join_group->join_stats = cjoin->entries[pos].stats;
+	if (!init)
+		cst->key = forw ? WT_STAT_KEY_MIN(cst) : WT_STAT_KEY_MAX(cst);
+	return (0);
+}
+
+/*
+ * __curstat_join_desc --
+ *	Assemble the description field based on current index and statistic.
+ */
+static int
+__curstat_join_desc(WT_CURSOR_STAT *cst, int slot, const char **resultp)
+{
+	size_t len;
+	const char *static_desc;
+	WT_JOIN_STATS_GROUP *sgrp;
+	WT_SESSION_IMPL *session;
+
+	sgrp = &cst->u.join_stats_group;
+	session = (WT_SESSION_IMPL *)sgrp->join_cursor->iface.session;
+	WT_RET(__wt_stat_join_desc(cst, slot, &static_desc));
+	len = strlen("join: ") + strlen(sgrp->desc_prefix) +
+	    strlen(static_desc) + 1;
+	WT_RET(__wt_realloc(session, NULL, len, &cst->desc_buf));
+	snprintf(cst->desc_buf, len, "join: %s%s", sgrp->desc_prefix,
+	    static_desc);
+	*resultp = cst->desc_buf;
+	return (0);
+}
+
+/*
+ * __curstat_join_init --
+ *	Initialize the statistics for a joined cursor.
+ */
+static int
+__curstat_join_init(WT_SESSION_IMPL *session,
+    WT_CURSOR *curjoin, const char *cfg[], WT_CURSOR_STAT *cst)
+{
+	WT_CURSOR_JOIN *cjoin;
+	WT_DECL_RET;
+
+	WT_UNUSED(cfg);
+
+	if (curjoin == NULL && cst->u.join_stats_group.join_cursor != NULL)
+		curjoin = &cst->u.join_stats_group.join_cursor->iface;
+	if (curjoin == NULL || !WT_PREFIX_MATCH(curjoin->uri, "join:"))
+		WT_ERR_MSG(session, EINVAL,
+		    "join cursor must be used with statistics:join");
+	cjoin = (WT_CURSOR_JOIN *)curjoin;
+	memset(&cst->u.join_stats_group, 0, sizeof(WT_JOIN_STATS_GROUP));
+	cst->u.join_stats_group.join_cursor = cjoin;
+
+	cst->stats = (int64_t *)&cst->u.join_stats_group.join_stats;
+	cst->stats_base = WT_JOIN_STATS_BASE;
+	cst->stats_count = sizeof(WT_JOIN_STATS) / sizeof(int64_t);
+	cst->stats_desc = __curstat_join_desc;
+	cst->next_set = __curstat_join_next_set;
+
+err:	return (ret);
 }
 
 /*
@@ -429,7 +531,7 @@ __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst)
  */
 int
 __wt_curstat_init(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
+    const char *uri, WT_CURSOR *curjoin, const char *cfg[], WT_CURSOR_STAT *cst)
 {
 	const char *dsrc_uri;
 
@@ -439,6 +541,9 @@ __wt_curstat_init(WT_SESSION_IMPL *session,
 	}
 
 	dsrc_uri = uri + strlen("statistics:");
+
+	if (WT_STREQ(dsrc_uri, "join"))
+		return (__curstat_join_init(session, curjoin, cfg, cst));
 
 	if (WT_PREFIX_MATCH(dsrc_uri, "colgroup:"))
 		return (
@@ -465,7 +570,7 @@ __wt_curstat_init(WT_SESSION_IMPL *session,
  */
 int
 __wt_curstat_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
+    const char *uri, WT_CURSOR *other, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR_STATIC_INIT(iface,
@@ -495,7 +600,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 
-	WT_ERR(__wt_calloc_one(session, &cst));
+	WT_RET(__wt_calloc_one(session, &cst));
 	cursor = &cst->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
@@ -579,11 +684,11 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	 * objects like tables, we need to a valid set of statistics when before
 	 * the open returns.
 	 */
-	WT_ERR(__wt_curstat_init(session, uri, cst->cfg, cst));
-	cst->notinitialized = 0;
+	WT_ERR(__wt_curstat_init(session, uri, other, cst->cfg, cst));
+	cst->notinitialized = false;
 
 	/* The cursor isn't yet positioned. */
-	cst->notpositioned = 1;
+	cst->notpositioned = true;
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));

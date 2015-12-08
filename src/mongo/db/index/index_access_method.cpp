@@ -43,7 +43,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 
@@ -166,6 +166,11 @@ void IndexAccessMethod::removeOneKey(OperationContext* txn,
 std::unique_ptr<SortedDataInterface::Cursor> IndexAccessMethod::newCursor(OperationContext* txn,
                                                                           bool isForward) const {
     return _newInterface->newCursor(txn, isForward);
+}
+
+std::unique_ptr<SortedDataInterface::Cursor> IndexAccessMethod::newRandomCursor(
+    OperationContext* txn) const {
+    return _newInterface->newRandomCursor(txn);
 }
 
 // Remove the provided doc from the index.

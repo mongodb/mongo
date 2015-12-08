@@ -30,13 +30,15 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	/* WT_SESSION_IMPL array. */
 	WT_RET(__wt_calloc(session,
 	    conn->session_size, sizeof(WT_SESSION_IMPL), &conn->sessions));
+	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, conn->sessions);
 
 	/*
 	 * Open the default session.  We open this before starting service
 	 * threads because those may allocate and use session resources that
 	 * need to get cleaned up on close.
 	 */
-	WT_RET(__wt_open_internal_session(conn, "connection", 1, 0, &session));
+	WT_RET(__wt_open_internal_session(
+	    conn, "connection", false, 0, &session));
 
 	/*
 	 * The connection's default session is originally a static structure,
@@ -92,7 +94,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * transaction ID will catch up with the current ID.
 	 */
 	for (;;) {
-		__wt_txn_update_oldest(session, 1);
+		__wt_txn_update_oldest(session, true);
 		if (txn_global->oldest_id == txn_global->current)
 			break;
 		__wt_yield();
@@ -110,16 +112,22 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_CLR(conn, WT_CONN_SERVER_RUN);
 	WT_TRET(__wt_async_destroy(session));
 	WT_TRET(__wt_lsm_manager_destroy(session));
+	WT_TRET(__wt_sweep_destroy(session));
 
 	F_SET(conn, WT_CONN_CLOSING);
 
 	WT_TRET(__wt_checkpoint_server_destroy(session));
-	WT_TRET(__wt_statlog_destroy(session, 1));
-	WT_TRET(__wt_sweep_destroy(session));
+	WT_TRET(__wt_statlog_destroy(session, true));
 	WT_TRET(__wt_evict_destroy(session));
+
+	/* Shut down the lookaside table, after all eviction is complete. */
+	WT_TRET(__wt_las_destroy(session));
 
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(session));
+
+	/* Shut down metadata tracking, required before creating tables. */
+	WT_TRET(__wt_meta_track_destroy(session));
 
 	/*
 	 * Now that all data handles are closed, tell logging that a checkpoint
@@ -131,7 +139,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
 	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE))
 		WT_TRET(__wt_txn_checkpoint_log(
-		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
+		    session, true, WT_TXN_LOG_CKPT_STOP, NULL));
 	F_CLR(conn, WT_CONN_LOG_SERVER_RUN);
 	WT_TRET(__wt_logmgr_destroy(session));
 
@@ -223,34 +231,47 @@ int
 __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	/*
-	 * Start the eviction thread.
-	 */
-	WT_RET(__wt_evict_create(session));
-
-	/*
 	 * Start the optional statistics thread.  Start statistics first so that
 	 * other optional threads can know if statistics are enabled or not.
 	 */
 	WT_RET(__wt_statlog_create(session, cfg));
 	WT_RET(__wt_logmgr_create(session, cfg));
 
-	/* Run recovery. */
+	/*
+	 * Run recovery.
+	 * NOTE: This call will start (and stop) eviction if recovery is
+	 * required.  Recovery must run before the lookaside table is created
+	 * (because recovery will update the metadata), and before eviction is
+	 * started for real.
+	 */
 	WT_RET(__wt_txn_recover(session));
 
 	/*
-	 * Start the handle sweep thread.
+	 * Start the optional logging/archive threads.
+	 * NOTE: The log manager must be started before checkpoints so that the
+	 * checkpoint server knows if logging is enabled.  It must also be
+	 * started before any operation that can commit, or the commit can
+	 * block.
 	 */
+	WT_RET(__wt_logmgr_open(session));
+
+	/* Initialize metadata tracking, required before creating tables. */
+	WT_RET(__wt_meta_track_init(session));
+
+	/* Create the lookaside table. */
+	WT_RET(__wt_las_create(session));
+
+	/*
+	 * Start eviction threads.
+	 * NOTE: Eviction must be started after the lookaside table is created.
+	 */
+	WT_RET(__wt_evict_create(session));
+
+	/* Start the handle sweep thread. */
 	WT_RET(__wt_sweep_create(session));
 
 	/* Start the optional async threads. */
 	WT_RET(__wt_async_create(session, cfg));
-
-	/*
-	 * Start the optional logging/archive thread.
-	 * NOTE: The log manager must be started before checkpoints so that the
-	 * checkpoint server knows if logging is enabled.
-	 */
-	WT_RET(__wt_logmgr_open(session));
 
 	/* Start the optional checkpoint thread. */
 	WT_RET(__wt_checkpoint_server_create(session, cfg));

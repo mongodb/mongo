@@ -1,6 +1,10 @@
 //
 // Tests what happens when a shard goes down with pooled connections.
 //
+// This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
+// A restarted standalone will lose all data when using an ephemeral storage engine.
+// @tags: [requires_persistence]
+//
 
 // Run through the same test twice, once with a hard -9 kill, once with a regular shutdown
 

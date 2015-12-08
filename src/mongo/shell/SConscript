@@ -30,7 +30,8 @@ js_header = env.JSHeader(
         "utils_auth.js",
     ]
 )
-env.Depends(js_header, env.Alias('generated-sources'))
+
+env.Alias('generated-sources', js_header)
 
 # Files added here need to be added in shell/shell_utils.cpp and buildscripts/vcxproj.header as
 # well.
@@ -41,9 +42,11 @@ env.JSHeader(
         "shardingtest.js",
         "servers_misc.js",
         "replsettest.js",
-        "replsetbridge.js"
+        "bridge.js"
     ],
 )
+
+env.Alias('generated-sources', "mongo-server.cpp")
 
 env.Library(
     target='mongojs',
@@ -51,5 +54,6 @@ env.Library(
         'mongo.cpp',
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/base"
     ],
 )

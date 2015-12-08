@@ -36,6 +36,11 @@ var $config = (function() {
     function setup(db, collName, cluster) {
         // index on 'value', the field being updated
         assertAlways.commandWorked(db[collName].ensureIndex({ value: 1 }));
+
+        // numDocs should be much less than threadCount, to make more threads use the same docs.
+        this.numDocs = Math.floor(this.threadCount / 5);
+        assertAlways.gt(this.numDocs, 0, 'numDocs should be a positive number');
+
         for (var i = 0; i < this.numDocs; ++i) {
             // make sure the inserted docs have a 'value' field, so they won't need
             // to grow when this workload runs against a capped collection
@@ -45,9 +50,8 @@ var $config = (function() {
         }
     }
 
-    var threadCount = 20;
     return {
-        threadCount: threadCount,
+        threadCount: 20,
         iterations: 20,
         startState: 'set',
         states: states,
@@ -91,9 +95,6 @@ var $config = (function() {
             doUpdate: function doUpdate(db, collName, query, updater) {
                 return db[collName].update(query, updater);
             },
-
-            // numDocs should be much less than threadCount, to make more threads use the same docs
-            numDocs: Math.floor(threadCount / 5)
         },
         setup: setup
     };

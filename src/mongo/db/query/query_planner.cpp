@@ -371,7 +371,7 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
     // cases, and we proceed by using the PlanCacheIndexTree to tag the query tree.
 
     // Create a copy of the expression tree.  We use cachedSoln to annotate this with indices.
-    unique_ptr<MatchExpression> clone = std::move(query.root()->shallowClone());
+    unique_ptr<MatchExpression> clone = query.root()->shallowClone();
 
     LOG(5) << "Tagging the match expression according to cache data: " << endl
            << "Filter:" << endl

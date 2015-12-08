@@ -59,15 +59,23 @@ public:
     static const size_t kMaxMembers = 50;
     static const size_t kMaxVotingMembers = 7;
 
-    // TODO: Consider returning different default heartbeat interval based on protocol version.
     static const Milliseconds kDefaultElectionTimeoutPeriod;
     static const Milliseconds kDefaultHeartbeatInterval;
     static const Seconds kDefaultHeartbeatTimeoutPeriod;
+    static const bool kDefaultChainingAllowed;
 
     /**
      * Initializes this ReplicaSetConfig from the contents of "cfg".
+     * The default protocol version is 0 to keep backward-compatibility.
+     * If usePV1ByDefault is true, the protocol version will be 1 when it's not specified in "cfg".
      */
-    Status initialize(const BSONObj& cfg);
+    Status initialize(const BSONObj& cfg, bool usePV1ByDefault = false);
+
+    /**
+     * Same as the generic initialize() above except will default "configsvr" setting to the value
+     * of serverGlobalParams.configsvr.
+     */
+    Status initializeForInitiate(const BSONObj& cfg, bool usePV1ByDefault = false);
 
     /**
      * Returns true if this object has been successfully initialized or copied from
@@ -277,11 +285,22 @@ public:
         return _protocolVersion;
     }
 
+    /**
+     * Returns the duration to wait before running for election when this node (indicated by
+     * "memberIdx") sees that it has higher priority than the current primary.
+     */
+    Milliseconds getPriorityTakeoverDelay(int memberIdx) const;
+
 private:
     /**
      * Parses the "settings" subdocument of a replica set configuration.
      */
     Status _parseSettingsSubdocument(const BSONObj& settings);
+
+    /**
+     * Return the number of members with a priority greater than "priority".
+     */
+    int _calculatePriorityRank(double priority) const;
 
     /**
      * Calculates and stores the majority for electing a primary (_majorityVoteCount).
@@ -293,18 +312,20 @@ private:
      */
     void _addInternalWriteConcernModes();
 
+    Status _initialize(const BSONObj& cfg, bool forInitiate, bool usePV1ByDefault);
+
     bool _isInitialized = false;
-    long long _version;
+    long long _version = 1;
     std::string _replSetName;
     std::vector<MemberConfig> _members;
     WriteConcernOptions _defaultWriteConcern;
-    Milliseconds _electionTimeoutPeriod = Milliseconds(2000);
+    Milliseconds _electionTimeoutPeriod = kDefaultElectionTimeoutPeriod;
     Milliseconds _heartbeatInterval = kDefaultHeartbeatInterval;
-    Seconds _heartbeatTimeoutPeriod = Seconds(0);
-    bool _chainingAllowed;
-    int _majorityVoteCount;
-    int _writeMajority;
-    int _totalVotingMembers;
+    Seconds _heartbeatTimeoutPeriod = kDefaultHeartbeatTimeoutPeriod;
+    bool _chainingAllowed = kDefaultChainingAllowed;
+    int _majorityVoteCount = 0;
+    int _writeMajority = 0;
+    int _totalVotingMembers = 0;
     ReplicaSetTagConfig _tagConfig;
     StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
     long long _protocolVersion = 0;

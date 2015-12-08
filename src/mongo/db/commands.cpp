@@ -38,10 +38,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/global_conn_pool.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -55,7 +52,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
@@ -72,19 +68,16 @@ Command::CommandMap* Command::_commandsByBestName;
 Command::CommandMap* Command::_webCommands;
 Command::CommandMap* Command::_commands;
 
-int Command::testCommandsEnabled = 0;
-
 Counter64 Command::unknownCommands;
 static ServerStatusMetricField<Counter64> displayUnknownCommands("commands.<UNKNOWN>",
                                                                  &Command::unknownCommands);
 
 namespace {
-ExportedServerParameter<int> testCommandsParameter(ServerParameterSet::getGlobal(),
-                                                   "enableTestCommands",
-                                                   &Command::testCommandsEnabled,
-                                                   true,
-                                                   false);
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsParameter(
+    ServerParameterSet::getGlobal(), "enableTestCommands", &Command::testCommandsEnabled);
 }
+
+Command::~Command() = default;
 
 string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const {
     BSONElement first = cmdObj.firstElement();
@@ -390,9 +383,11 @@ Status Command::_checkAuthorization(Command* c,
     return status;
 }
 
-bool Command::isHelpRequest(const rpc::RequestInterface& request) {
-    return request.getCommandArgs()["help"].trueValue();
+bool Command::isHelpRequest(const BSONElement& helpElem) {
+    return !helpElem.eoo() && helpElem.trueValue();
 }
+
+const char Command::kHelpFieldName[] = "help";
 
 void Command::generateHelpResponse(OperationContext* txn,
                                    const rpc::RequestInterface& request,
@@ -405,23 +400,21 @@ void Command::generateHelpResponse(OperationContext* txn,
     helpBuilder.append("help", ss.str());
     helpBuilder.append("lockType", command.isWriteCommandForConfigServer() ? 1 : 0);
 
-    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
     replyBuilder->setCommandReply(helpBuilder.done());
+    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 }
 
 namespace {
 
 void _generateErrorResponse(OperationContext* txn,
                             rpc::ReplyBuilderInterface* replyBuilder,
-                            const DBException& exception) {
+                            const DBException& exception,
+                            const BSONObj& metadata) {
     Command::registerError(txn, exception);
 
     // We could have thrown an exception after setting fields in the builder,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
-
-    // No metadata is needed for an error reply.
-    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 
     // We need to include some extra information for SendStaleConfig.
     if (exception.getCode() == ErrorCodes::SendStaleConfig) {
@@ -429,11 +422,14 @@ void _generateErrorResponse(OperationContext* txn,
             static_cast<const SendStaleConfigException&>(exception);
         replyBuilder->setCommandReply(scex.toStatus(),
                                       BSON("ns" << scex.getns() << "vReceived"
-                                                << scex.getVersionReceived().toBSON() << "vWanted"
-                                                << scex.getVersionWanted().toBSON()));
+                                                << BSONArray(scex.getVersionReceived().toBSON())
+                                                << "vWanted"
+                                                << BSONArray(scex.getVersionWanted().toBSON())));
     } else {
         replyBuilder->setCommandReply(exception.toStatus());
     }
+
+    replyBuilder->setMetadata(metadata);
 }
 
 }  // namespace
@@ -442,14 +438,15 @@ void Command::generateErrorResponse(OperationContext* txn,
                                     rpc::ReplyBuilderInterface* replyBuilder,
                                     const DBException& exception,
                                     const rpc::RequestInterface& request,
-                                    Command* command) {
+                                    Command* command,
+                                    const BSONObj& metadata) {
     LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
            << "on database '" << request.getDatabase() << "' "
            << "with arguments '" << command->getRedactedCopyForLogging(request.getCommandArgs())
            << "' "
            << "and metadata '" << request.getMetadata() << "': " << exception.toString();
 
-    _generateErrorResponse(txn, replyBuilder, exception);
+    _generateErrorResponse(txn, replyBuilder, exception, metadata);
 }
 
 void Command::generateErrorResponse(OperationContext* txn,
@@ -459,21 +456,21 @@ void Command::generateErrorResponse(OperationContext* txn,
     LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
            << "on database '" << request.getDatabase() << "': " << exception.toString();
 
-    _generateErrorResponse(txn, replyBuilder, exception);
+    _generateErrorResponse(txn, replyBuilder, exception, rpc::makeEmptyMetadata());
 }
 
 void Command::generateErrorResponse(OperationContext* txn,
                                     rpc::ReplyBuilderInterface* replyBuilder,
                                     const DBException& exception) {
     LOG(1) << "assertion while executing command: " << exception.toString();
-    _generateErrorResponse(txn, replyBuilder, exception);
+    _generateErrorResponse(txn, replyBuilder, exception, rpc::makeEmptyMetadata());
 }
 
 void runCommands(OperationContext* txn,
                  const rpc::RequestInterface& request,
                  rpc::ReplyBuilderInterface* replyBuilder) {
     try {
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
+        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
 
         Command* c = nullptr;
         // In the absence of a Command object, no redaction is possible. Therefore
@@ -492,6 +489,12 @@ void runCommands(OperationContext* txn,
         LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
                << c->getRedactedCopyForLogging(request.getCommandArgs());
 
+        {
+            // Try to set this as early as possible, as soon as we have figured out the command.
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            CurOp::get(txn)->setLogicalOp_inlock(c->getLogicalOp());
+        }
+
         Command::execCommand(txn, c, request, replyBuilder);
     }
 
@@ -499,71 +502,5 @@ void runCommands(OperationContext* txn,
         Command::generateErrorResponse(txn, replyBuilder, ex, request);
     }
 }
-
-class PoolFlushCmd : public Command {
-public:
-    PoolFlushCmd() : Command("connPoolSync", false, "connpoolsync") {}
-    virtual void help(stringstream& help) const {
-        help << "internal";
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::connPoolSync);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
-
-    virtual bool run(OperationContext* txn,
-                     const string&,
-                     mongo::BSONObj&,
-                     int,
-                     std::string&,
-                     mongo::BSONObjBuilder& result) {
-        shardConnectionPool.flush();
-        globalConnPool.flush();
-        return true;
-    }
-    virtual bool slaveOk() const {
-        return true;
-    }
-
-} poolFlushCmd;
-
-class PoolStats : public Command {
-public:
-    PoolStats() : Command("connPoolStats") {}
-    virtual void help(stringstream& help) const {
-        help << "stats about connection pool";
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::connPoolStats);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
-    virtual bool run(OperationContext* txn,
-                     const string&,
-                     mongo::BSONObj&,
-                     int,
-                     std::string&,
-                     mongo::BSONObjBuilder& result) {
-        globalConnPool.appendInfo(result);
-        result.append("numDBClientConnection", DBClientConnection::getNumConnections());
-        result.append("numAScopedConnection", AScopedConnection::getNumConnections());
-        return true;
-    }
-    virtual bool slaveOk() const {
-        return true;
-    }
-
-} poolStatsCmd;
 
 }  // namespace mongo

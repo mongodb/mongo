@@ -146,7 +146,7 @@ public:
     }
 
 private:
-    std::atomic<WordType> _value;
+    std::atomic<WordType> _value;  // NOLINT
 };
 
 #define _ATOMIC_WORD_DECLARE(NAME, WTYPE)                                                          \

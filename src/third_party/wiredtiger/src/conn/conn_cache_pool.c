@@ -22,21 +22,22 @@
  */
 #define	WT_CACHE_POOL_REDUCE_THRESHOLD	20
 /* Balancing passes after a bump before a connection is a candidate. */
-#define	WT_CACHE_POOL_BUMP_SKIPS	10
+#define	WT_CACHE_POOL_BUMP_SKIPS	5
 /* Balancing passes after a reduction before a connection is a candidate. */
-#define	WT_CACHE_POOL_REDUCE_SKIPS	5
+#define	WT_CACHE_POOL_REDUCE_SKIPS	10
 
 /*
  * Constants that control how much influence different metrics have on
  * the pressure calculation.
  */
-#define	WT_CACHE_POOL_APP_EVICT_MULTIPLIER	10
-#define	WT_CACHE_POOL_APP_WAIT_MULTIPLIER	50
+#define	WT_CACHE_POOL_APP_EVICT_MULTIPLIER	3
+#define	WT_CACHE_POOL_APP_WAIT_MULTIPLIER	6
 #define	WT_CACHE_POOL_READ_MULTIPLIER	1
 
-static int __cache_pool_adjust(WT_SESSION_IMPL *, uint64_t, uint64_t, int *);
+static int __cache_pool_adjust(
+    WT_SESSION_IMPL *, uint64_t, uint64_t, bool, bool *);
 static int __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
-static int __cache_pool_balance(WT_SESSION_IMPL *);
+static int __cache_pool_balance(WT_SESSION_IMPL *, bool);
 
 /*
  * __wt_cache_pool_config --
@@ -50,17 +51,17 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	char *pool_name;
-	int created, updating;
-	uint64_t chunk, reserve, size, used_cache;
+	bool created, updating;
+	uint64_t chunk, quota, reserve, size, used_cache;
 
 	conn = S2C(session);
-	created = updating = 0;
+	created = updating = false;
 	pool_name = NULL;
 	cp = NULL;
 	size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
-		updating = 1;
+		updating = true;
 	else {
 		WT_RET(__wt_config_gets_none(
 		    session, cfg, "shared_cache.name", &cval));
@@ -98,14 +99,14 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		WT_ASSERT(session, !updating);
 		/* Create a cache pool. */
 		WT_ERR(__wt_calloc_one(session, &cp));
-		created = 1;
+		created = true;
 		cp->name = pool_name;
 		pool_name = NULL; /* Belongs to the cache pool now. */
 		TAILQ_INIT(&cp->cache_pool_qh);
 		WT_ERR(__wt_spin_init(
 		    session, &cp->cache_pool_lock, "cache shared pool"));
 		WT_ERR(__wt_cond_alloc(session,
-		    "cache pool server", 0, &cp->cache_pool_cond));
+		    "cache pool server", false, &cp->cache_pool_cond));
 
 		__wt_process.cache_pool = cp;
 		WT_ERR(__wt_verbose(session,
@@ -142,6 +143,11 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 			chunk = (uint64_t)cval.val;
 		else
 			chunk = cp->chunk;
+		if (__wt_config_gets(session, &cfg[1],
+		    "shared_cache.quota", &cval) == 0 && cval.val != 0)
+			quota = (uint64_t)cval.val;
+		else
+			quota = cp->quota;
 	} else {
 		/*
 		 * The only time shared cache configuration uses default
@@ -155,6 +161,9 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		    session, cfg, "shared_cache.chunk", &cval));
 		WT_ASSERT(session, cval.val != 0);
 		chunk = (uint64_t)cval.val;
+		WT_ERR(__wt_config_gets(
+		    session, cfg, "shared_cache.quota", &cval));
+		quota = (uint64_t)cval.val;
 	}
 
 	/*
@@ -197,8 +206,10 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	/* The configuration is verified - it's safe to update the pool. */
 	cp->size = size;
 	cp->chunk = chunk;
+	cp->quota = quota;
 
 	conn->cache->cp_reserved = reserve;
+	conn->cache->cp_quota = quota;
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (updating)
@@ -232,6 +243,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	uint32_t session_flags;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -241,8 +253,9 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * Create a session that can be used by the cache pool thread, do
 	 * it in the main thread to avoid shutdown races
 	 */
+	session_flags = WT_SESSION_NO_DATA_HANDLES;
 	if ((ret = __wt_open_internal_session(
-		conn, "cache-pool", 0, 0, &cache->cp_session)) != 0)
+	    conn, "cache-pool", false, session_flags, &cache->cp_session)) != 0)
 		WT_RET_MSG(NULL, ret,
 		    "Failed to create session for cache pool");
 
@@ -264,7 +277,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * in each connection saves having a complex election process when
 	 * the active connection shuts down.
 	 */
-	F_SET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE);
+	F_SET(cp, WT_CACHE_POOL_ACTIVE);
 	F_SET(cache, WT_CACHE_POOL_RUN);
 	WT_RET(__wt_thread_create(session, &cache->cp_tid,
 	    __wt_cache_pool_server, cache->cp_session));
@@ -288,21 +301,21 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	int cp_locked, found;
+	bool cp_locked, found;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	cp_locked = found = 0;
+	cp_locked = found = false;
 	cp = __wt_process.cache_pool;
 
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL))
 		return (0);
 
 	__wt_spin_lock(session, &cp->cache_pool_lock);
-	cp_locked = 1;
+	cp_locked = true;
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq)
 		if (entry == conn) {
-			found = 1;
+			found = true;
 			break;
 		}
 
@@ -325,7 +338,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		 * operation.
 		 */
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
-		cp_locked = 0;
+		cp_locked = false;
 
 		F_CLR(cache, WT_CACHE_POOL_RUN);
 		WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
@@ -340,7 +353,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		 * participant.
 		 */
 		__wt_spin_lock(session, &cp->cache_pool_lock);
-		cp_locked = 1;
+		cp_locked = true;
 	}
 
 	/*
@@ -355,10 +368,10 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 
 	if (--cp->refs == 0) {
 		WT_ASSERT(session, TAILQ_EMPTY(&cp->cache_pool_qh));
-		F_CLR_ATOMIC(cp, WT_CACHE_POOL_ACTIVE);
+		F_CLR(cp, WT_CACHE_POOL_ACTIVE);
 	}
 
-	if (!F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE)) {
+	if (!F_ISSET(cp, WT_CACHE_POOL_ACTIVE)) {
 		WT_TRET(__wt_verbose(
 		    session, WT_VERB_SHARED_CACHE, "Destroying cache pool"));
 		__wt_spin_lock(session, &__wt_process.spinlock);
@@ -372,7 +385,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		__wt_process.cache_pool = NULL;
 		__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
-		cp_locked = 0;
+		cp_locked = false;
 
 		/* Now free the pool. */
 		__wt_free(session, cp->name);
@@ -387,7 +400,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 
 		/* Notify other participants if we were managing */
 		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER)) {
-			F_CLR_ATOMIC(cp, WT_CACHE_POOL_MANAGED);
+			cp->pool_managed = 0;
 			WT_TRET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 			    "Shutting down shared cache manager connection"));
 		}
@@ -402,15 +415,15 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
  *	effectively used.
  */
 static int
-__cache_pool_balance(WT_SESSION_IMPL *session)
+__cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 {
 	WT_CACHE_POOL *cp;
 	WT_DECL_RET;
-	int adjusted;
+	bool adjusted;
 	uint64_t bump_threshold, highest;
 
 	cp = __wt_process.cache_pool;
-	adjusted = 0;
+	adjusted = false;
 	highest = 0;
 
 	__wt_spin_lock(NULL, &cp->cache_pool_lock);
@@ -421,16 +434,16 @@ __cache_pool_balance(WT_SESSION_IMPL *session)
 
 	WT_ERR(__cache_pool_assess(session, &highest));
 	bump_threshold = WT_CACHE_POOL_BUMP_THRESHOLD;
+
 	/*
 	 * Actively attempt to:
 	 * - Reduce the amount allocated, if we are over the budget
 	 * - Increase the amount used if there is capacity and any pressure.
 	 */
-	for (bump_threshold = WT_CACHE_POOL_BUMP_THRESHOLD;
-	    F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
-	    F_ISSET(S2C(session)->cache, WT_CACHE_POOL_RUN);) {
+	while (F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
+	    F_ISSET(S2C(session)->cache, WT_CACHE_POOL_RUN)) {
 		WT_ERR(__cache_pool_adjust(
-		    session, highest, bump_threshold, &adjusted));
+		    session, highest, bump_threshold, forward, &adjusted));
 		/*
 		 * Stop if the amount of cache being used is stable, and we
 		 * aren't over capacity.
@@ -456,30 +469,39 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
 	uint64_t app_evicts, app_waits, reads;
-	uint64_t entries, highest, tmp;
+	uint64_t balanced_size, entries, highest, tmp;
 
 	cp = __wt_process.cache_pool;
-	entries = 0;
+	balanced_size = entries = 0;
 	highest = 1; /* Avoid divide by zero */
+
+	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
+		if (entry->cache_size == 0 || entry->cache == NULL)
+			continue;
+		++entries;
+	}
+
+	if (entries > 0)
+		balanced_size = cp->currently_used / entries;
 
 	/* Generate read pressure information. */
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
-		if (entry->cache_size == 0 ||
-		    entry->cache == NULL)
+		if (entry->cache_size == 0 || entry->cache == NULL)
 			continue;
 		cache = entry->cache;
-		++entries;
 
 		/*
 		 * Figure out a delta since the last time we did an assessment
 		 * for each metric we are tracking.  Watch out for wrapping
 		 * of values.
+		 *
+		 * Count pages read, assuming pages are 4KB.
 		 */
-		tmp = cache->bytes_read;
+		tmp = cache->bytes_read >> 12;
 		if (tmp >= cache->cp_saved_read)
 			reads = tmp - cache->cp_saved_read;
 		else
-			reads = (UINT64_MAX - cache->cp_saved_read) + tmp;
+			reads = tmp;
 		cache->cp_saved_read = tmp;
 
 		/* Update the application eviction count information */
@@ -500,11 +522,18 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 			    (UINT64_MAX - cache->cp_saved_app_waits) + tmp;
 		cache->cp_saved_app_waits = tmp;
 
-		/* Calculate the weighted pressure for this member */
-		cache->cp_pass_pressure =
-		    (app_evicts * WT_CACHE_POOL_APP_EVICT_MULTIPLIER) +
+		/* Calculate the weighted pressure for this member. */
+		tmp = (app_evicts * WT_CACHE_POOL_APP_EVICT_MULTIPLIER) +
 		    (app_waits * WT_CACHE_POOL_APP_WAIT_MULTIPLIER) +
 		    (reads * WT_CACHE_POOL_READ_MULTIPLIER);
+
+		/* Weight smaller caches higher. */
+		tmp = (uint64_t)(tmp *
+		    ((double)balanced_size / entry->cache_size));
+
+		/* Smooth over history. */
+		cache->cp_pass_pressure =
+		    (9 * cache->cp_pass_pressure + tmp) / 10;
 
 		if (cache->cp_pass_pressure > highest)
 			highest = cache->cp_pass_pressure;
@@ -524,24 +553,25 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 
 /*
  * __cache_pool_adjust --
- *	Adjust the allocation of cache to each connection. If force is set
+ *	Adjust the allocation of cache to each connection. If full is set
  *	ignore cache load information, and reduce the allocation for every
  *	connection allocated more than their reserved size.
  */
 static int
 __cache_pool_adjust(WT_SESSION_IMPL *session,
-    uint64_t highest, uint64_t bump_threshold, int *adjustedp)
+    uint64_t highest, uint64_t bump_threshold, bool forward, bool *adjustedp)
 {
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
-	uint64_t adjusted, highest_percentile, pressure, reserved;
-	int force, grew;
+	uint64_t adjustment, highest_percentile, pressure, reserved, smallest;
+	u_int pct_full;
+	bool busy, pool_full, grow;
 
-	*adjustedp = 0;
+	*adjustedp = false;
 	cp = __wt_process.cache_pool;
-	force = (cp->currently_used > cp->size);
-	grew = 0;
+	grow = false;
+	pool_full = cp->currently_used >= cp->size;
 	/* Highest as a percentage, avoid 0 */
 	highest_percentile = (highest / 100) + 1;
 
@@ -549,13 +579,17 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		WT_RET(__wt_verbose(session,
 		    WT_VERB_SHARED_CACHE, "Cache pool distribution: "));
 		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
-		    "\t" "cache_size, pressure, skips: "));
+		    "\t" "cache (MB), pressure, skips, busy, %% full:"));
 	}
 
-	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
+	for (entry = forward ? TAILQ_FIRST(&cp->cache_pool_qh) :
+	    TAILQ_LAST(&cp->cache_pool_qh, __wt_cache_pool_qh);
+	    entry != NULL;
+	    entry = forward ? TAILQ_NEXT(entry, cpq) :
+	    TAILQ_PREV(entry, __wt_cache_pool_qh, cpq)) {
 		cache = entry->cache;
 		reserved = cache->cp_reserved;
-		adjusted = 0;
+		adjustment = 0;
 
 		/*
 		 * The read pressure is calculated as a percentage of how
@@ -565,84 +599,109 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 * assigned.
 		 */
 		pressure = cache->cp_pass_pressure / highest_percentile;
+		busy = __wt_eviction_needed(entry->default_session, &pct_full);
+
 		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
-		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
-		    entry->cache_size, pressure, cache->cp_skip_count));
+		    "\t%5" PRIu64 ", %3" PRIu64 ", %2" PRIu32 ", %d, %2u",
+		    entry->cache_size >> 20, pressure, cache->cp_skip_count,
+		    busy, pct_full));
 
 		/* Allow to stabilize after changes. */
 		if (cache->cp_skip_count > 0 && --cache->cp_skip_count > 0)
 			continue;
+
 		/*
 		 * If the entry is currently allocated less than the reserved
-		 * size, increase it's allocation. This should only happen if:
-		 *  - It's the first time we've seen this member
-		 *  - The reserved size has been adjusted
+		 * size, increase its allocation. This should only happen if:
+		 *  - it's the first time we've seen this member, or
+		 *  - the reserved size has been adjusted
 		 */
 		if (entry->cache_size < reserved) {
-			grew = 1;
-			adjusted = reserved - entry->cache_size;
-
+			grow = true;
+			adjustment = reserved - entry->cache_size;
 		/*
 		 * Conditions for reducing the amount of resources for an
 		 * entry:
-		 *  - If we are forcing and this entry has more than the
-		 *    minimum amount of space in use.
-		 *  - If the read pressure in this entry is below the
-		 *    threshold, other entries need more cache, the entry has
-		 *    more than the minimum space and there is no available
-		 *    space in the pool.
+		 *  - the pool is full,
+		 *  - application threads are not busy doing eviction already,
+		 *  - this entry has more than the minimum amount of space in
+		 *    use,
+		 *  - the read pressure in this entry is below the threshold,
+		 *    other entries need more cache, the entry has more than
+		 *    the minimum space and there is no available space in the
+		 *    pool.
 		 */
-		} else if ((force && entry->cache_size > reserved) ||
-		    (pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
-		    highest > 1 && entry->cache_size > reserved &&
-		    cp->currently_used >= cp->size)) {
-			grew = 0;
+		} else if (pool_full && !busy &&
+		    entry->cache_size > reserved &&
+		    pressure < WT_CACHE_POOL_REDUCE_THRESHOLD && highest > 1) {
+			grow = false;
 			/*
-			 * Shrink by a chunk size if that doesn't drop us
-			 * below the reserved size.
+			 * Don't drop the size down too much - or it can
+			 * trigger aggressive eviction in the connection,
+			 * which is likely to lead to lower throughput and
+			 * potentially a negative feedback loop in the
+			 * balance algorithm.
 			 */
-			if (entry->cache_size > cp->chunk + reserved)
-				adjusted = cp->chunk;
-			else
-				adjusted = entry->cache_size - reserved;
+			smallest = (100 * __wt_cache_bytes_inuse(cache)) /
+			    cache->eviction_trigger;
+			if (entry->cache_size > smallest)
+				adjustment = WT_MIN(cp->chunk,
+				    (entry->cache_size - smallest) / 2);
+			adjustment =
+			    WT_MIN(adjustment, entry->cache_size - reserved);
 		/*
 		 * Conditions for increasing the amount of resources for an
 		 * entry:
-		 *  - There was some activity across the pool
-		 *  - This entry is using less than the entire cache pool
-		 *  - The connection is using enough cache to require eviction
-		 *  - There is space available in the pool
-		 *  - Additional cache would benefit the connection OR
-		 *  - The pool is less than half distributed
+		 *  - there is space available in the pool
+		 *  - the connection isn't over quota
+		 *  - the connection is using enough cache to require eviction
+		 *  - there was some activity across the pool
+		 *  - this entry is using less than the entire cache pool
+		 *  - additional cache would benefit the connection OR
+		 *  - the pool is less than half distributed
 		 */
-		} else if (entry->cache_size < cp->size &&
+		} else if (!pool_full &&
+		    (cache->cp_quota == 0 ||
+		    entry->cache_size < cache->cp_quota) &&
 		    __wt_cache_bytes_inuse(cache) >=
 		    (entry->cache_size * cache->eviction_target) / 100 &&
-		    ((cp->currently_used < cp->size &&
-		    pressure > bump_threshold) ||
+		    (pressure > bump_threshold ||
 		    cp->currently_used < cp->size * 0.5)) {
-			grew = 1;
-			adjusted = WT_MIN(cp->chunk,
-			    cp->size - cp->currently_used);
+			grow = true;
+			adjustment = WT_MIN(WT_MIN(cp->chunk,
+			    cp->size - cp->currently_used),
+			    cache->cp_quota - entry->cache_size);
 		}
-		if (adjusted > 0) {
-			*adjustedp = 1;
-			if (grew > 0) {
+		/*
+		 * Bounds checking: don't go over the pool size or under the
+		 * reserved size for this cache.
+		 *
+		 * Shrink by a chunk size if that doesn't drop us
+		 * below the reserved size.
+		 *
+		 * Limit the reduction to half of the free space in the
+		 * connection's cache.  This should reduce cache sizes
+		 * gradually without stalling application threads.
+		 */
+		if (adjustment > 0) {
+			*adjustedp = true;
+			if (grow) {
 				cache->cp_skip_count = WT_CACHE_POOL_BUMP_SKIPS;
-				entry->cache_size += adjusted;
-				cp->currently_used += adjusted;
+				entry->cache_size += adjustment;
+				cp->currently_used += adjustment;
 			} else {
 				cache->cp_skip_count =
 				    WT_CACHE_POOL_REDUCE_SKIPS;
 				WT_ASSERT(session,
-				    entry->cache_size >= adjusted &&
-				    cp->currently_used >= adjusted);
-				entry->cache_size -= adjusted;
-				cp->currently_used -= adjusted;
+				    entry->cache_size >= adjustment &&
+				    cp->currently_used >= adjustment);
+				entry->cache_size -= adjustment;
+				cp->currently_used -= adjustment;
 			}
 			WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 			    "Allocated %s%" PRId64 " to %s",
-			    grew ? "" : "-", adjusted, entry->home));
+			    grow ? "" : "-", adjustment, entry->home));
+
 			/*
 			 * TODO: Add a loop waiting for connection to give up
 			 * cache.
@@ -663,29 +722,30 @@ __wt_cache_pool_server(void *arg)
 	WT_CACHE_POOL *cp;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	bool forward;
 
 	session = (WT_SESSION_IMPL *)arg;
 
 	cp = __wt_process.cache_pool;
 	cache = S2C(session)->cache;
+	forward = true;
 
-	while (F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
+	while (F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
 	    F_ISSET(cache, WT_CACHE_POOL_RUN)) {
 		if (cp->currently_used <= cp->size)
 			WT_ERR(__wt_cond_wait(session,
-			    cp->cache_pool_cond, 1000000));
+			    cp->cache_pool_cond, WT_MILLION));
 
 		/*
 		 * Re-check pool run flag - since we want to avoid getting the
 		 * lock on shutdown.
 		 */
-		if (!F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
+		if (!F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
 		    F_ISSET(cache, WT_CACHE_POOL_RUN))
 			break;
 
 		/* Try to become the managing thread */
-		F_CAS_ATOMIC(cp, WT_CACHE_POOL_MANAGED, ret);
-		if (ret == 0) {
+		if (__wt_atomic_cas8(&cp->pool_managed, 0, 1)) {
 			F_SET(cache, WT_CACHE_POOL_MANAGER);
 			WT_ERR(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 			    "Cache pool switched manager thread"));
@@ -695,8 +755,10 @@ __wt_cache_pool_server(void *arg)
 		 * Continue even if there was an error. Details of errors are
 		 * reported in the balance function.
 		 */
-		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER))
-			(void)__cache_pool_balance(session);
+		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER)) {
+			(void)__cache_pool_balance(session, forward);
+			forward = !forward;
+		}
 	}
 
 	if (0) {

@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -140,7 +139,7 @@ public:
             return false;
         }
 
-        const auto to = grid.shardRegistry()->getShard(toString);
+        const auto to = grid.shardRegistry()->getShard(txn, toString);
         if (!to) {
             string msg(str::stream() << "Could not move chunk in '" << nss.ns() << "' to shard '"
                                      << toString << "' because that shard does not exist");
@@ -208,7 +207,7 @@ public:
         }
 
         {
-            const auto from = grid.shardRegistry()->getShard(chunk->getShardId());
+            const auto from = grid.shardRegistry()->getShard(txn, chunk->getShardId());
             if (from->getId() == to->getId()) {
                 errmsg = "that chunk is already on that shard";
                 return false;
@@ -217,7 +216,8 @@ public:
 
         LOG(0) << "CMD: movechunk: " << cmdObj;
 
-        StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSCommand(cmdObj);
+        StatusWith<int> maxTimeMS =
+            LiteParsedQuery::parseMaxTimeMS(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
 
         if (!maxTimeMS.isOK()) {
             errmsg = maxTimeMS.getStatus().reason();

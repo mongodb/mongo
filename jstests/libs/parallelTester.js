@@ -113,8 +113,7 @@ if ( typeof _threadInject != "undefined" ){
         }
         
         // some tests can't run in parallel with most others
-        var skipTests = makeKeys([ "dbadmin.js",
-                                   "repair.js",
+        var skipTests = makeKeys([ "repair.js",
                                    "cursor8.js",
                                    "recstore.js",
                                    "extent.js",
@@ -157,6 +156,10 @@ if ( typeof _threadInject != "undefined" ){
                                    "update_setOnInsert.js", // SERVER-9982
                                    "max_time_ms.js", // Sensitive to query execution time, by design
                                    "collection_info_cache_race.js", // Requires collection exists
+
+                                   // This overwrites MinKey/MaxKey's singleton which breaks
+                                   // any other test that uses MinKey/MaxKey
+                                   "type6.js",
                                ] );
         
         var parallelFilesDir = "jstests/core";
@@ -260,7 +263,8 @@ if ( typeof _threadInject != "undefined" ){
         
         runners.forEach( function( x ) { x.start(); } );
         var nFailed = 0;
-        // v8 doesn't like it if we exit before all threads are joined (SERVER-529)
+        // SpiderMonkey doesn't like it if we exit before all threads are joined
+        // (see SERVER-19615 for a similar issue).
         runners.forEach( function( x ) { if( !x.returnData() ) { ++nFailed; } } );        
         assert.eq( 0, nFailed, msg );
     }

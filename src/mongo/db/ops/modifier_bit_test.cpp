@@ -100,6 +100,11 @@ TEST(Init, FailToInitWithInvalidValue) {
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
                            ModifierInterface::Options::normal()));
 
+    // An empty document is an invalid $bit argument.
+    modObj = fromjson("{$bit: {a: {}}}");
+    ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
+
     // An object with value not in ('and', 'or') is an invalid $bit argument
     modObj = fromjson("{ $bit : { a : { foo : 4 } } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),

@@ -18,3 +18,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_names',
     ],
 )
+
+env.CppUnitTest(
+    target='index_key_validate_test',
+    source=[
+        'index_key_validate_test.cpp',
+    ],
+    LIBDEPS=[
+        'index_key_validate',
+    ]
+)

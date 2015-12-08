@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/rpc/protocol.h"
 
 namespace mongo {
@@ -59,13 +60,19 @@ public:
 
     virtual ~ReplyBuilderInterface() = default;
 
-    virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;
 
     /**
      * Sets the raw command reply. This should probably not be used in favor of the
      * variants that accept a Status or StatusWith.
      */
     virtual ReplyBuilderInterface& setRawCommandReply(const BSONObj& reply) = 0;
+
+    /**
+     * Returns a BufBuilder suitable for building a command reply in place.
+     */
+    virtual BufBuilder& getInPlaceReplyBuilder(std::size_t reserveBytes) = 0;
+
+    virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;
 
     /**
      * Sets the reply for this command. If an engaged StatusWith<BSONObj> is passed, the command
@@ -85,7 +92,8 @@ public:
      * interfacing with legacy code that adds additional data to a failed command reply and
      * its use is discouraged in new code.
      */
-    ReplyBuilderInterface& setCommandReply(Status nonOKStatus, const BSONObj& extraErrorInfo);
+    virtual ReplyBuilderInterface& setCommandReply(Status nonOKStatus,
+                                                   const BSONObj& extraErrorInfo);
 
     /**
      * Add a range of output documents to the reply. This method can be called multiple times
@@ -122,16 +130,10 @@ public:
     virtual void reset() = 0;
 
     /**
-     * Returns available space in bytes, should be used to verify that the message have enough
-     * space for ouput documents.
-     */
-    virtual std::size_t availableBytes() const = 0;
-
-    /**
      * Writes data then transfers ownership of the message to the caller. The behavior of
      * calling any methods on the builder is subsequently undefined.
      */
-    virtual std::unique_ptr<Message> done() = 0;
+    virtual Message done() = 0;
 
 protected:
     ReplyBuilderInterface() = default;

@@ -1,0 +1,64 @@
+// Simple test to make sure things get balanced 
+
+(function() {
+
+var s = new ShardingTest({ name: "slow_sharding_balance3",
+                           shards: 2,
+                           mongos: 1,
+                           other: { chunkSize: 1, enableBalancer : true } });
+
+s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
+
+s.config.settings.find().forEach( printjson );
+
+db = s.getDB( "test" );
+
+bigString = ""
+while ( bigString.length < 10000 )
+    bigString += "asdasdasdasdadasdasdasdasdasdasdasdasda";
+
+inserted = 0;
+num = 0;
+var bulk = db.foo.initializeUnorderedBulkOp();
+while ( inserted < ( 40 * 1024 * 1024 ) ){
+    bulk.insert({ _id: num++, s: bigString });
+    inserted += bigString.length;
+}
+assert.writeOK(bulk.execute());
+
+s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
+assert.lt( 20 , s.config.chunks.count()  , "setup2" );
+
+function diff1(){
+    var x = s.chunkCounts( "foo" );
+    printjson( x )
+    return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
+}
+
+assert.lt( 10 , diff1() );
+
+// Wait for balancer to kick in.
+var initialDiff = diff1();
+assert.soon(function() {
+                return diff1() != initialDiff;
+            }, "Balancer did not kick in");
+
+print("* A");
+print( "disabling the balancer" );
+s.config.settings.update( { _id : "balancer" }, { $set : { stopped : true } } , true );
+s.config.settings.find().forEach( printjson );
+print("* B");
+
+
+print( diff1() )
+
+var currDiff = diff1();
+assert.repeat( function(){
+    var d = diff1();
+    return d != currDiff;
+} , "balance with stopped flag should not have happened" , 1000 * 60 , 5000 );
+
+s.stop();
+
+})();

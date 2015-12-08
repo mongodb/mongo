@@ -26,21 +26,24 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/network_interface_asio.h"
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
@@ -54,29 +57,38 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     rpc::LegacyRequestBuilder requestBuilder{};
     requestBuilder.setDatabase("admin");
     requestBuilder.setCommandName("isMaster");
+
+    BSONObjBuilder bob;
+    bob.append("isMaster", 1);
+
+    if (Command::testCommandsEnabled) {
+        // Only include the host:port of this process in the isMaster command request if test
+        // commands are enabled. mongobridge uses this field to identify the process opening a
+        // connection to it.
+        StringBuilder sb;
+        sb << getHostName() << ':' << serverGlobalParams.port;
+        bob.append("hostInfo", sb.str());
+    }
+
+    requestBuilder.setCommandArgs(bob.done());
     requestBuilder.setMetadata(rpc::makeEmptyMetadata());
-    requestBuilder.setCommandArgs(BSON("isMaster" << 1));
 
     // Set current command to ismaster request and run
-    auto& cmd = op->beginCommand(std::move(*(requestBuilder.done())), now());
+    auto beginStatus = op->beginCommand(
+        requestBuilder.done(), AsyncCommand::CommandType::kRPC, op->request().target);
+    if (!beginStatus.isOK()) {
+        return _completeOperation(op, beginStatus);
+    }
 
     // Callback to parse protocol information out of received ismaster response
     auto parseIsMaster = [this, op]() {
 
-        auto swCommandReply = op->command().response(rpc::Protocol::kOpQuery, now());
+        auto swCommandReply = op->command()->response(rpc::Protocol::kOpQuery, now());
         if (!swCommandReply.isOK()) {
             return _completeOperation(op, swCommandReply.getStatus());
         }
 
         auto commandReply = std::move(swCommandReply.getValue());
-
-        if (_hook) {
-            // Run the validation hook.
-            auto validHost = _hook->validateHost(op->request().target, commandReply);
-            if (!validHost.isOK()) {
-                return _completeOperation(op, validHost);
-            }
-        }
 
         auto protocolSet = rpc::parseProtocolSetFromIsMasterReply(commandReply.data);
         if (!protocolSet.isOK())
@@ -84,6 +96,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
         op->connection().setServerProtocols(protocolSet.getValue());
 
+        invariant(op->connection().clientProtocols() != rpc::supports::kNone);
         // Set the operation protocol
         auto negotiatedProtocol =
             rpc::negotiate(op->connection().serverProtocols(), op->connection().clientProtocols());
@@ -94,11 +107,20 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
         op->setOperationProtocol(negotiatedProtocol.getValue());
 
+        if (_hook) {
+            // Run the validation hook.
+            auto validHost = callNoexcept(
+                *_hook, &NetworkConnectionHook::validateHost, op->request().target, commandReply);
+            if (!validHost.isOK()) {
+                return _completeOperation(op, validHost);
+            }
+        }
+
         return _authenticate(op);
 
     };
 
-    _asyncRunCommand(&cmd,
+    _asyncRunCommand(op,
                      [this, op, parseIsMaster](std::error_code ec, size_t bytes) {
                          _validateAndRun(op, ec, std::move(parseIsMaster));
                      });
@@ -126,14 +148,20 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     // authenticateClient will use this to run auth-related commands over our connection.
     auto runCommandHook = [this, op](executor::RemoteCommandRequest request,
                                      auth::AuthCompletionHandler handler) {
-        auto& cmd = op->beginCommand(request, op->operationProtocol(), now());
+
+        // SERVER-14170: Set the metadataHook to nullptr explicitly as we cannot write metadata
+        // here.
+        auto beginStatus = op->beginCommand(request, nullptr);
+        if (!beginStatus.isOK()) {
+            return handler(beginStatus);
+        }
 
         auto callAuthCompletionHandler = [this, op, handler]() {
-            auto authResponse = op->command().response(op->operationProtocol(), now());
+            auto authResponse = op->command()->response(op->operationProtocol(), now(), nullptr);
             handler(authResponse);
         };
 
-        _asyncRunCommand(&cmd,
+        _asyncRunCommand(op,
                          [this, op, callAuthCompletionHandler](std::error_code ec, size_t bytes) {
                              _validateAndRun(op, ec, callAuthCompletionHandler);
                          });

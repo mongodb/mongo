@@ -55,23 +55,23 @@ TEST(ServerSelectionMetadata, ReadFromMetadata) {
     }
     {
         // Set secondaryOk but not readPreference.
-        auto ss = checkParse(BSON("$secondaryOk" << 1));
+        auto ss = checkParse(BSON("$ssm" << BSON("$secondaryOk" << 1)));
         ASSERT_TRUE(ss.isSecondaryOk());
         ASSERT_FALSE(ss.getReadPreference().is_initialized());
     }
     {
         // Set readPreference but not secondaryOk.
-        auto ss = checkParse(BSON("$readPreference" << BSON("mode"
-                                                            << "primary")));
+        auto ss = checkParse(BSON("$ssm" << BSON("$readPreference" << BSON("mode"
+                                                                           << "primary"))));
         ASSERT_FALSE(ss.isSecondaryOk());
         ASSERT_TRUE(ss.getReadPreference().is_initialized());
         ASSERT_TRUE(ss.getReadPreference()->pref == ReadPreference::PrimaryOnly);
     }
     {
         // Set both.
-        auto ss = checkParse(
-            BSON("$secondaryOk" << 1 << "$readPreference" << BSON("mode"
-                                                                  << "secondaryPreferred")));
+        auto ss = checkParse(BSON("$ssm" << BSON("$secondaryOk" << 1 << "$readPreference"
+                                                                << BSON("mode"
+                                                                        << "secondaryPreferred"))));
         ASSERT_TRUE(ss.isSecondaryOk());
         ASSERT_TRUE(ss.getReadPreference()->pref == ReadPreference::SecondaryPreferred);
     }
@@ -102,12 +102,13 @@ void checkUpconvert(const BSONObj& legacyCommand,
 
 TEST(ServerSelectionMetadata, UpconvertValidMetadata) {
     // Wrapped in $query, with readPref and slaveOk bit set.
-    checkUpconvert(BSON("$query" << BSON("ping" << 1) << "$readPreference" << BSON("mode"
-                                                                                   << "secondary")),
-                   mongo::QueryOption_SlaveOk,
-                   BSON("ping" << 1),
-                   BSON("$secondaryOk" << 1 << "$readPreference" << BSON("mode"
-                                                                         << "secondary")));
+    checkUpconvert(
+        BSON("$query" << BSON("ping" << 1) << "$readPreference" << BSON("mode"
+                                                                        << "secondary")),
+        mongo::QueryOption_SlaveOk,
+        BSON("ping" << 1),
+        BSON("$ssm" << BSON("$secondaryOk" << 1 << "$readPreference" << BSON("mode"
+                                                                             << "secondary"))));
 
     // Wrapped in 'query', with readPref.
     checkUpconvert(BSON("query" << BSON("pong" << 1 << "foo"
@@ -119,10 +120,10 @@ TEST(ServerSelectionMetadata, UpconvertValidMetadata) {
                    0,
                    BSON("pong" << 1 << "foo"
                                << "bar"),
-                   BSON("$readPreference" << BSON("mode"
-                                                  << "primary"
-                                                  << "tags" << BSON("dc"
-                                                                    << "ny"))));
+                   BSON("$ssm" << BSON("$readPreference" << BSON("mode"
+                                                                 << "primary"
+                                                                 << "tags" << BSON("dc"
+                                                                                   << "ny")))));
     // Unwrapped, no readPref, no slaveOk
     checkUpconvert(BSON("ping" << 1), 0, BSON("ping" << 1), BSONObj());
 
@@ -137,10 +138,10 @@ TEST(ServerSelectionMetadata, UpconvertValidMetadata) {
                    0,
                    BSON("pang"
                         << "pong"),
-                   BSON("$readPreference" << BSON("mode"
-                                                  << "nearest"
-                                                  << "tags" << BSON("rack"
-                                                                    << "city"))));
+                   BSON("$ssm" << BSON("$readPreference" << BSON("mode"
+                                                                 << "nearest"
+                                                                 << "tags" << BSON("rack"
+                                                                                   << "city")))));
 }
 
 void checkUpconvertFails(const BSONObj& legacyCommand, ErrorCodes::Error error) {

@@ -110,14 +110,12 @@ enum UpgradeHistory {
      * + config.locks { ts: 1 } index is no longer unique.
      */
     UpgradeHistory_DummyBumpPre2_8 = 6,  // Note: 2.8 is also known as 3.0.
-
-    UpgradeHistory_DummyBumpPre3_2 = 7,
 };
 
 // Earliest version we're compatible with
-const int MIN_COMPATIBLE_CONFIG_VERSION = UpgradeHistory_DummyBumpPre2_8;
+const int MIN_COMPATIBLE_CONFIG_VERSION = UpgradeHistory_DummyBumpPre2_6;
 
 // Latest version we know how to communicate with
-const int CURRENT_CONFIG_VERSION = UpgradeHistory_DummyBumpPre3_2;
+const int CURRENT_CONFIG_VERSION = UpgradeHistory_DummyBumpPre2_8;
 
 }  // namespace mongo

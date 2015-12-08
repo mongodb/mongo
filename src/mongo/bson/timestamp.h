@@ -58,9 +58,7 @@ public:
 
     Timestamp(Seconds s, unsigned increment) : Timestamp(s.count(), increment) {}
 
-    Timestamp(unsigned a, unsigned b) : i(b), secs(a) {
-        dassert(secs <= static_cast<unsigned>(std::numeric_limits<int>::max()));
-    }
+    Timestamp(unsigned a, unsigned b) : i(b), secs(a) {}
 
     Timestamp() = default;
 

@@ -214,15 +214,17 @@ Status StorageEngineMetadata::write() const {
         std::ofstream ofs(filenameTemp.c_str(), std::ios_base::out | std::ios_base::binary);
         if (!ofs) {
             return Status(ErrorCodes::FileNotOpen,
-                          str::stream() << "Failed to write metadata to " << filenameTemp);
+                          str::stream() << "Failed to write metadata to " << filenameTemp << ": "
+                                        << errnoWithDescription());
         }
 
         BSONObj obj = BSON(
             "storage" << BSON("engine" << _storageEngine << "options" << _storageEngineOptions));
         ofs.write(obj.objdata(), obj.objsize());
         if (!ofs) {
-            return Status(ErrorCodes::InternalError,
-                          str::stream() << "Failed to write BSON data to " << filenameTemp);
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "Failed to write BSON data to " << filenameTemp << ": "
+                                        << errnoWithDescription());
         }
     }
 

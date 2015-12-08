@@ -1,10 +1,15 @@
-s = new ShardingTest( "remove_shard1", 2 );
+(function() {
+
+var s = new ShardingTest({ name: "remove_shard1", shards: 2 });
 
 assert.eq( 2, s.config.shards.count() , "initial server count wrong" );
 
 assert.writeOK(s.config.databases.insert({ _id: 'needToMove',
                                            partitioned: false,
                                            primary: 'shard0000'}));
+
+// Returns an error when trying to remove a shard that doesn't exist.
+assert.commandFailed(s.admin.runCommand({ removeshard: "shardz" }));
 
 // first remove puts in draining mode, the second tells me a db needs to move, the third actually removes
 assert( s.admin.runCommand( { removeshard: "shard0000" } ).ok , "failed to start draining shard" );
@@ -23,3 +28,5 @@ assert.eq( 2, s.config.shards.count(), "new server does not appear in count" );
 
 MongoRunner.stopMongod(conn);
 s.stop();
+
+})();

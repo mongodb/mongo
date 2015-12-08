@@ -1,3 +1,12 @@
+// Tests that we can restart a replica set completely. Also tests that the config is saved properly
+// between restarts.
+//
+// If all data-bearing nodes in a replica set are using an ephemeral storage engine, the set will
+// not be able to survive a scenario where all data-bearing nodes are down simultaneously. In such a
+// scenario, none of the members will have any replica set configuration document after a restart,
+// so cannot elect a primary. This test induces such a scenario, so cannot be run on ephemeral
+// storage engines.
+// @tags: [requires_persistence]
 
 (function() {
     var compare_configs = function(c1, c2) {
@@ -10,9 +19,6 @@
             assert.eq(c1.members[i].host, c2.members[i].host, 'host is equal in both configs');
         }
     };
-
-    // Make sure that we can restart a replica set completely
-    // Also, ensure config is saved properly between restarts.
 
     // Create a new replica set test. Specify set name and the number of nodes you want.
     var replTest = new ReplSetTest( {name: 'testSet', nodes: 3} );
@@ -45,7 +51,7 @@
     replTest.stop( s2Id );
     replTest.waitForState(s1, replTest.DOWN);
     replTest.waitForState(s2, replTest.DOWN);
-    
+
     replTest.stop( mId );
 
     // Now let's restart these nodes

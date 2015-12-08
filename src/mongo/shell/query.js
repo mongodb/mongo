@@ -24,33 +24,36 @@ if ( typeof DBQuery == "undefined" ){
 }
 
 DBQuery.prototype.help = function () {
-    print("find() modifiers")
-    print("\t.sort( {...} )")
-    print("\t.limit( n )")
-    print("\t.skip( n )")
-    print("\t.count(applySkipLimit) - total # of objects matching query. by default ignores skip,limit")
+    print("find(<predicate>, <projection>) modifiers")
+    print("\t.sort({...})")
+    print("\t.limit(<n>)")
+    print("\t.skip(<n>)")
+    print("\t.batchSize(<n>) - sets the number of docs to return per getMore")
+    print("\t.hint({...})")
+    print("\t.readConcern(<level>)")
+    print("\t.readPref(<mode>, <tagset>)")
+    print("\t.count(<applySkipLimit>) - total # of objects matching query. by default ignores skip,limit")
     print("\t.size() - total # of objects cursor would return, honors skip,limit")
-    print("\t.explain([verbose])")
-    print("\t.hint(...)")
-    print("\t.addOption(n) - adds op_query options -- see wire protocol")
-    print("\t._addSpecial(name, value) - http://dochub.mongodb.org/core/advancedqueries#AdvancedQueries-Metaqueryoperators")
-    print("\t.batchSize(n) - sets the number of docs to return per getMore")
-    print("\t.showDiskLoc() - Deprecated. Use showRecordId().")
-    print("\t.showRecordId() - adds a $recordId field to each returned object")
-    print("\t.min(idxDoc)")
-    print("\t.max(idxDoc)")
-    print("\t.comment(comment)")
+    print("\t.explain(<verbosity>) - accepted verbosities are {'queryPlanner', 'executionStats', 'allPlansExecution'}")
+    print("\t.min({...})")
+    print("\t.max({...})")
+    print("\t.maxScan(<n>)")
+    print("\t.maxTimeMS(<n>)")
+    print("\t.comment(<comment>)")
     print("\t.snapshot()")
+    print("\t.tailable(<isAwaitData>)")
+    print("\t.noCursorTimeout()")
+    print("\t.allowPartialResults()")
     print("\t.returnKey()")
-    print("\t.maxScan(n)")
-    print("\t.readPref(mode, tagset)")
+    print("\t.showRecordId() - adds a $recordId field to each returned object")
 
     print("\nCursor methods");
     print("\t.toArray() - iterates through docs and returns an array of the results")
-    print("\t.forEach( func )")
-    print("\t.map( func )")
+    print("\t.forEach(<func>)")
+    print("\t.map(<func>)")
     print("\t.hasNext()")
     print("\t.next()")
+    print("\t.close()")
     print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
     print("\t.itcount() - iterates through documents and counts them")
     print("\t.getQueryPlan() - get query plans associated with shape. To get more info on query plans, " +
@@ -96,11 +99,16 @@ DBQuery.prototype._exec = function(){
         this._cursorSeen = 0;
 
         if (this._mongo.useReadCommands() && this._canUseFindCommand()) {
-            var findCmd = this._convertToCommand();
-            var cmdRes = this._db.runCommand(findCmd);
+            var canAttachReadPref = true;
+            var findCmd = this._convertToCommand(canAttachReadPref);
+            var cmdRes = this._db.runReadCommand(findCmd, null, this._options);
             this._cursor = new DBCommandCursor(this._mongo, cmdRes, this._batchSize);
         }
         else {
+            if (this._special && this._query.readConcern) {
+                throw new Error("readConcern requires use of read commands");
+            }
+
             this._cursor = this._mongo.find(this._ns,
                                             this._query,
                                             this._fields,
@@ -115,8 +123,11 @@ DBQuery.prototype._exec = function(){
 
 /**
  * Internal helper used to convert this cursor into the format required by the find command.
+ *
+ * If canAttachReadPref is true, may attach a read preference to the resulting command using the
+ * "wrapped form": { $query: { <cmd>: ... }, $readPreference: { ... } }.
  */
-DBQuery.prototype._convertToCommand = function() {
+DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
     var cmd = {};
 
     cmd["find"] = this._collection.getName();
@@ -161,10 +172,6 @@ DBQuery.prototype._convertToCommand = function() {
         cmd["hint"] = this._query.$hint;
     }
 
-    if ("$readPreference" in this._query) {
-       cmd["$readPreference"] = this._query.$readPreference;
-    }
-
     if ("$comment" in this._query) {
         cmd["comment"] = this._query.$comment;
     }
@@ -197,12 +204,12 @@ DBQuery.prototype._convertToCommand = function() {
         cmd["snapshot"] = this._query.$snapshot;
     }
 
-    if ((this._options & DBQuery.Option.tailable) != 0) {
-        cmd["tailable"] = true;
+    if ("readConcern" in this._query) {
+        cmd["readConcern"] = this._query.readConcern;
     }
 
-    if ((this._options & DBQuery.Option.slaveOk) != 0) {
-        cmd["slaveOk"] = true;
+    if ((this._options & DBQuery.Option.tailable) != 0) {
+        cmd["tailable"] = true;
     }
 
     if ((this._options & DBQuery.Option.oplogReplay) != 0) {
@@ -218,7 +225,15 @@ DBQuery.prototype._convertToCommand = function() {
     }
 
     if ((this._options & DBQuery.Option.partial) != 0) {
-        cmd["partial"] = true;
+        cmd["allowPartialResults"] = true;
+    }
+
+    if (canAttachReadPref) {
+        // If there is a readPreference, use the wrapped command form.
+        if ("$readPreference" in this._query) {
+            var prefObj = this._query.$readPreference;
+            cmd = this._db._attachReadPreferenceToCommand(cmd, prefObj);
+        }
     }
 
     return cmd;
@@ -251,8 +266,10 @@ DBQuery.prototype.skip = function( skip ){
 DBQuery.prototype.hasNext = function(){
     this._exec();
 
-    if ( this._limit > 0 && this._cursorSeen >= this._limit )
+    if ( this._limit > 0 && this._cursorSeen >= this._limit ) {
+        this._cursor.close();
         return false;
+    }
     var o = this._cursor.hasNext();
     return o;
 }
@@ -314,6 +331,9 @@ DBQuery.prototype._convertToCountCmd = function( applySkipLimit ) {
             if ( this._query.$hint ) {
                 cmd.hint = this._query.$hint;
             }
+            if ( this._query.readConcern ) {
+                cmd.readConcern = this._query.readConcern;
+            }
         }
         else {
             cmd.query = this._query;
@@ -360,16 +380,22 @@ DBQuery.prototype.countReturn = function(){
 */
 DBQuery.prototype.itcount = function(){
     var num = 0;
+
+    // Track how many bytes we've used this cursor to iterate iterated.  This function can be called
+    // with some very large cursors.  SpiderMonkey appears happy to allow these objects to
+    // accumulate, so regular gc() avoids an overly large memory footprint.
+    //
+    // TODO: migrate this function into c++
+    var bytesSinceGC = 0;
+
     while ( this.hasNext() ){
         num++;
-        this.next();
+        var nextDoc = this.next();
+        bytesSinceGC += Object.bsonsize(nextDoc);
 
-        // This function can be called with some very large cursors.
-        // SpiderMonkey appears happy to allow these objects to accumulate, so
-        // regular gc() avoids an overly large memory footprint.
-        //
-        // TODO: migrate this function into c++
-        if (num % 10000 == 0) {
+        // Garbage collect every 10 MB.
+        if (bytesSinceGC > (10 * 1024 * 1024)) {
+            bytesSinceGC = 0;
             gc();
         }
     }
@@ -415,6 +441,14 @@ DBQuery.prototype.showRecordId = function() {
 
 DBQuery.prototype.maxTimeMS = function( maxTimeMS ) {
     return this._addSpecial( "$maxTimeMS" , maxTimeMS );
+}
+
+DBQuery.prototype.readConcern = function( level ) {
+    var readConcernObj = {
+        level: level
+    };
+
+    return this._addSpecial( "readConcern", readConcernObj );
 }
 
 /**
@@ -620,6 +654,10 @@ DBQuery.prototype.modifiers = function(document) {
     return this;
 }
 
+DBQuery.prototype.close = function() {
+    this._cursor.close()
+}
+
 DBQuery.shellBatchSize = 20;
 
 /**
@@ -637,7 +675,10 @@ DBQuery.Option = {
 };
 
 function DBCommandCursor(mongo, cmdResult, batchSize) {
-    assert.commandWorked(cmdResult)
+    if (cmdResult.ok != 1) {
+        throw _getErrorWithCode(cmdResult, "error: " + tojson(cmdResult));
+    }
+
     this._batch = cmdResult.cursor.firstBatch.reverse(); // modifies input to allow popping
 
     if (mongo.useReadCommands()) {
@@ -661,6 +702,24 @@ function DBCommandCursor(mongo, cmdResult, batchSize) {
 
 DBCommandCursor.prototype = {};
 
+DBCommandCursor.prototype.close = function() {
+    if (!this._useReadCommands) {
+        this._cursor.close();
+    } else if (this._cursorid != 0) {
+        var killCursorCmd = {
+            killCursors: this._collName,
+            cursors: [ this._cursorid ],
+        };
+        var cmdRes = this._db.runCommand(killCursorCmd);
+        if (cmdRes.ok != 1) {
+            throw _getErrorWithCode(cmdRes, "killCursors command failed: " + tojson(cmdRes));
+        }
+
+        this._cursorHandle.zeroCursorId();
+        this._cursorid = NumberLong(0);
+    }
+}
+
 /**
  * Fills out this._batch by running a getMore command. If the cursor is exhausted, also resets
  * this._cursorid to 0.
@@ -680,7 +739,9 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
 
     // Deliver the getMore command, and check for errors in the response.
     var cmdRes = this._db.runCommand(getMoreCmd);
-    assert.commandWorked(cmdRes);
+    if (cmdRes.ok != 1) {
+        throw _getErrorWithCode(cmdRes, "getMore command failed: " + tojson(cmdRes));
+    }
 
     if (this._ns !== cmdRes.cursor.ns) {
         throw Error("unexpected collection in getMore response: " +
@@ -765,6 +826,7 @@ DBCommandCursor.prototype.help = function () {
     print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
     print("\t.itcount() - iterates through documents and counts them")
     print("\t.pretty() - pretty print each document, possibly over multiple lines")
+    print("\t.close()")
 }
 
 // Copy these methods from DBQuery

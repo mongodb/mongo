@@ -36,9 +36,14 @@ namespace mongo {
 namespace repl {
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxSyncSourceLagSecs, int, 30);
-MONGO_INITIALIZER(maxSyncSourceLagSecsCheck)(InitializerContext*) {
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replElectionTimeoutOffsetLimitFraction, double, 0.15);
+
+MONGO_INITIALIZER(replSettingsCheck)(InitializerContext*) {
     if (maxSyncSourceLagSecs < 1) {
         return Status(ErrorCodes::BadValue, "maxSyncSourceLagSecs must be > 0");
+    }
+    if (replElectionTimeoutOffsetLimitFraction <= 0.01) {
+        return Status(ErrorCodes::BadValue, "electionTimeoutOffsetLimitFraction must be > 0.01");
     }
     return Status::OK();
 }

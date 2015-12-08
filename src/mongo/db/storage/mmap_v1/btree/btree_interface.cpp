@@ -68,9 +68,10 @@ public:
                        RecordStore* recordStore,
                        SavedCursorRegistry* cursorRegistry,
                        const Ordering& ordering,
-                       const string& indexName) {
+                       const string& indexName,
+                       bool isUnique) {
         _btree.reset(new BtreeLogic<OnDiskFormat>(
-            headManager, recordStore, cursorRegistry, ordering, indexName));
+            headManager, recordStore, cursorRegistry, ordering, indexName, isUnique));
     }
 
     virtual ~BtreeInterfaceImpl() {}
@@ -146,7 +147,7 @@ public:
         void setEndPosition(const BSONObj& key, bool inclusive) override {
             if (key.isEmpty()) {
                 // This means scan to end of index.
-                _endState = {};
+                _endState = boost::none;
                 return;
             }
 
@@ -196,7 +197,7 @@ public:
             return curr(parts);
         }
 
-        void savePositioned() override {
+        void save() override {
             if (!_lastMoveWasRestore)
                 _savedEOF = isEOF();
 
@@ -213,7 +214,7 @@ public:
         }
 
         void saveUnpositioned() override {
-            // Don't leak our registration if savePositioned() was previously called.
+            // Don't leak our registration if save() was previously called.
             if (!_saved.bucket.isNull())
                 _btree->savedCursors()->unregisterCursor(&_saved);
 
@@ -241,7 +242,8 @@ public:
             }
 
             _lastMoveWasRestore = isEOF()  // We weren't EOF but now are.
-                || getDiskLoc() != _saved.loc || compareKeys(getKey(), _saved.key) != 0;
+                || (!_btree->isUnique() && getDiskLoc() != _saved.loc) ||
+                compareKeys(getKey(), _saved.key) != 0;
         }
 
         void detachFromOperationContext() final {
@@ -346,6 +348,59 @@ public:
         return stdx::make_unique<Cursor>(txn, _btree.get(), isForward);
     }
 
+    class RandomCursor final : public SortedDataInterface::Cursor {
+    public:
+        RandomCursor(OperationContext* txn, const BtreeLogic<OnDiskFormat>* btree)
+            : _txn(txn), _btree(btree) {}
+
+        boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
+            if (_btree->isEmpty(_txn)) {
+                return {};
+            }
+            return _btree->getRandomEntry(_txn);
+        }
+
+        void detachFromOperationContext() final {
+            _txn = nullptr;
+        }
+
+        void reattachToOperationContext(OperationContext* txn) final {
+            _txn = txn;
+        }
+
+        //
+        // Should never be called.
+        //
+        void setEndPosition(const BSONObj& key, bool inclusive) override {
+            MONGO_UNREACHABLE;
+        }
+        boost::optional<IndexKeyEntry> seek(const BSONObj& key,
+                                            bool inclusive,
+                                            RequestedInfo parts) override {
+            MONGO_UNREACHABLE;
+        }
+        boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
+                                            RequestedInfo parts) override {
+            MONGO_UNREACHABLE;
+        }
+
+        //
+        // May be called, but are no-ops.
+        //
+        void save() override {}
+        void saveUnpositioned() override {}
+        void restore() override {}
+
+    private:
+        OperationContext* _txn;
+        const BtreeLogic<OnDiskFormat>* const _btree;
+    };
+
+    virtual std::unique_ptr<SortedDataInterface::Cursor> newRandomCursor(
+        OperationContext* txn) const {
+        return stdx::make_unique<RandomCursor>(txn, _btree.get());
+    }
+
     virtual Status initAsEmpty(OperationContext* txn) {
         return _btree->initAsEmpty(txn);
     }
@@ -360,14 +415,15 @@ SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
                                         SavedCursorRegistry* cursorRegistry,
                                         const Ordering& ordering,
                                         const string& indexName,
-                                        int version) {
+                                        int version,
+                                        bool isUnique) {
     if (0 == version) {
         return new BtreeInterfaceImpl<BtreeLayoutV0>(
-            headManager, recordStore, cursorRegistry, ordering, indexName);
+            headManager, recordStore, cursorRegistry, ordering, indexName, isUnique);
     } else {
         invariant(1 == version);
         return new BtreeInterfaceImpl<BtreeLayoutV1>(
-            headManager, recordStore, cursorRegistry, ordering, indexName);
+            headManager, recordStore, cursorRegistry, ordering, indexName, isUnique);
     }
 }
 

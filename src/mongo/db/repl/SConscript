@@ -21,8 +21,13 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/fail_point',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on files from serverOnlyFiles
+        'incomplete',
     ],
 )
 
@@ -106,6 +111,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/internal_plans',
         '$BUILD_DIR/mongo/db/query/query',
     ],
+    LIBDEPS_TAGS=[
+        # Depends on files like db_raii.cpp from serverOnlyFiles
+        'incomplete',
+    ],
 )
 
 env.Library(
@@ -139,6 +148,25 @@ env.Library(
         'roll_back_local_operations',
         'rollback_source_impl',
     ],
+    LIBDEPS_TAGS=[
+        # Depends on files in serverOnlyFiles, and has other unresolved symbols.
+        'incomplete',
+    ]
+)
+
+env.Library(
+    target="isself",
+    source=[
+        'isself.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
 )
 
 env.CppUnitTest(
@@ -150,7 +178,6 @@ env.CppUnitTest(
         'oplog_interface_mock',
         'replmocks',
         'rs_rollback',
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
@@ -167,6 +194,11 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         'oplog_interface_remote',
     ],
+    LIBDEPS_TAGS=[
+        # Depends on symbols that are not in a library, only in the serverOnlyFiles list.
+        'incomplete'
+    ],
+
 )
 
 env.Library(
@@ -182,6 +214,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'repl_coordinator_global',
     ],
+    LIBDEPS_TAGS=[
+        # Many undefined symbols in sync_tail.cpp
+        'incomplete'
+    ]
 )
 
 env.CppUnitTest(
@@ -192,7 +228,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'replmocks',
         'sync_tail',
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
@@ -215,6 +250,7 @@ env.Library('topology_coordinator_impl',
                 'topology_coordinator_impl.cpp',
             ],
             LIBDEPS=[
+                '$BUILD_DIR/mongo/db/audit',
                 'replication_executor',
                 'replica_set_messages',
                 'repl_settings',
@@ -229,7 +265,16 @@ env.CppUnitTest('repl_set_heartbeat_response_test',
 env.CppUnitTest('topology_coordinator_impl_test',
                 'topology_coordinator_impl_test.cpp',
                 LIBDEPS=['topology_coordinator_impl',
-                         'replica_set_messages'])
+                         'replica_set_messages',
+                         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+                ])
+
+env.CppUnitTest('topology_coordinator_impl_v1_test',
+                'topology_coordinator_impl_v1_test.cpp',
+                LIBDEPS=['topology_coordinator_impl',
+                         'replica_set_messages',
+                         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+                ])
 
 env.Library('repl_coordinator_impl',
             [
@@ -270,16 +315,22 @@ env.Library('repl_coordinator_test_fixture',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/unittest/unittest',
+                '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
                 'repl_coordinator_impl',
                 'replmocks',
                 'topology_coordinator_impl',\
             ])
 
-env.CppUnitTest('repl_coordinator_impl_test',
-                [
-                    'replication_coordinator_impl_test.cpp',
-                ],
-                LIBDEPS=['repl_coordinator_test_fixture'])
+env.CppUnitTest(
+    target='repl_coordinator_impl_test',
+    source=[
+        'replication_coordinator_impl_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/concurrency',
+        'repl_coordinator_test_fixture',
+    ],
+)
 
 env.CppUnitTest('replica_set_config_checks_test',
                 'replica_set_config_checks_test.cpp',
@@ -428,7 +479,6 @@ env.CppUnitTest('isself_test',
                 ],
                 LIBDEPS=[
                     '$BUILD_DIR/mongo/db/serveronly',
-                    '$BUILD_DIR/mongo/db/coredb',
                     "$BUILD_DIR/mongo/util/ntservice_mock",
                 ],
                 NO_CRUTCH = True)
@@ -443,7 +493,13 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/coredb',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        'replica_set_messages',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on files in serverOnlyFiles
+        'incomplete',
     ],
 )
 
@@ -596,7 +652,12 @@ env.Library(target='optime',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base',
-            ])
+            ],
+            LIBDEPS_TAGS=[
+                # Circular with bson_extract library
+                'incomplete',
+            ],
+)
 
 env.Library(
     target='applier',

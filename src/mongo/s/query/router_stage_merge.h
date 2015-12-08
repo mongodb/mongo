@@ -43,11 +43,15 @@ namespace mongo {
  */
 class RouterStageMerge final : public RouterExecStage {
 public:
-    RouterStageMerge(executor::TaskExecutor* executor, ClusterClientCursorParams params);
+    RouterStageMerge(executor::TaskExecutor* executor, ClusterClientCursorParams&& params);
 
     StatusWith<boost::optional<BSONObj>> next() final;
 
     void kill() final;
+
+    bool remotesExhausted() final;
+
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
 private:
     // Not owned here.

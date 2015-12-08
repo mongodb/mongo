@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/tokenizer.h"
@@ -43,7 +43,7 @@ class FTSMatcher {
     MONGO_DISALLOW_COPYING(FTSMatcher);
 
 public:
-    FTSMatcher(const FTSQuery& query, const FTSSpec& spec);
+    FTSMatcher(const FTSQueryImpl& query, const FTSSpec& spec);
 
     /**
      * Returns whether 'obj' matches the query.  An object is considered to match the query
@@ -109,7 +109,7 @@ private:
     FTSTokenizer::Options _getTokenizerOptions() const;
 
     // TODO These should be unowned pointers instead of owned copies.
-    const FTSQuery _query;
+    const FTSQueryImpl _query;
     const FTSSpec _spec;
 };
 }

@@ -21,7 +21,9 @@
 #define	WT_METADATA_TURTLE_SET	"WiredTiger.turtle.set"	/* Turtle temp file */
 
 #define	WT_METADATA_URI		"metadata:"		/* Metadata alias */
-#define	WT_METAFILE_URI		"file:WiredTiger.wt"	/* Metadata file URI */
+#define	WT_METAFILE_URI		"file:WiredTiger.wt"	/* Metadata table URI */
+
+#define	WT_LAS_URI		"file:WiredTigerLAS.wt"	/* Lookaside table URI*/
 
 /*
  * Pre computed hash for the metadata file. Used to optimize comparisons
@@ -36,6 +38,16 @@
 
 #define	WT_METADATA_VERSION	"WiredTiger version"	/* Version keys */
 #define	WT_METADATA_VERSION_STR	"WiredTiger version string"
+
+/*
+ * WT_WITH_TURTLE_LOCK --
+ *	Acquire the turtle file lock, perform an operation, drop the lock.
+ */
+#define	WT_WITH_TURTLE_LOCK(session, op) do {				\
+	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_TURTLE));\
+	WT_WITH_LOCK(session,						\
+	    &S2C(session)->turtle_lock, WT_SESSION_LOCKED_TURTLE, op);	\
+} while (0)
 
 /*
  * WT_CKPT --

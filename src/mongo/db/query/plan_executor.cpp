@@ -253,19 +253,18 @@ OperationContext* PlanExecutor::getOpCtx() const {
 
 void PlanExecutor::saveState() {
     invariant(_currentState == kUsable || _currentState == kSaved);
-    if (!killed()) {
-        _root->saveState();
-    }
 
     // Doc-locking storage engines drop their transactional context after saving state.
     // The query stages inside this stage tree might buffer record ids (e.g. text, geoNear,
     // mergeSort, sort) which are no longer protected by the storage engine's transactional
-    // boundaries. Force-fetch the documents for any such record ids so that we have our
-    // own copy in the working set.
+    // boundaries.
     if (supportsDocLocking()) {
         WorkingSetCommon::prepareForSnapshotChange(_workingSet.get());
     }
 
+    if (!killed()) {
+        _root->saveState();
+    }
     _currentState = kSaved;
 }
 
@@ -371,9 +370,11 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
         //   3) we need to yield and retry due to a WriteConflictException.
         // In all cases, the actual yielding happens here.
         if (_yieldPolicy->shouldYield()) {
-            _yieldPolicy->yield(fetcher.get());
+            if (!_yieldPolicy->yield(fetcher.get())) {
+                // A return of false from a yield should only happen if we've been killed during the
+                // yield.
+                invariant(killed());
 
-            if (killed()) {
                 if (NULL != objOut) {
                     Status status(ErrorCodes::OperationFailed,
                                   str::stream() << "Operation aborted because: " << *_killReason);

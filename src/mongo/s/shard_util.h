@@ -34,6 +34,7 @@
 
 namespace mongo {
 
+class OperationContext;
 class ShardRegistry;
 template <typename T>
 class StatusWith;
@@ -50,7 +51,9 @@ namespace shardutil {
  *  ShardNotFound if shard by that id is not available on the registry
  *  NoSuchKey if the total shard size could not be retrieved
  */
-StatusWith<long long> retrieveTotalShardSize(ShardId shardId, ShardRegistry* shardRegistry);
+StatusWith<long long> retrieveTotalShardSize(OperationContext* txn,
+                                             ShardId shardId,
+                                             ShardRegistry* shardRegistry);
 };
 
 }  // namespace mongo

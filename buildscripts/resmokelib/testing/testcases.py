@@ -307,7 +307,15 @@ class JSTestCase(TestCase):
 
         global_vars["MongoRunner.dataDir"] = data_dir
         global_vars["MongoRunner.dataPath"] = data_path
+
+        test_data = global_vars.get("TestData", {}).copy()
+        test_data["minPort"] = core.network.PortAllocator.min_test_port(fixture.job_num)
+        test_data["maxPort"] = core.network.PortAllocator.max_test_port(fixture.job_num)
+
+        global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
+
+        shutil.rmtree(data_dir, ignore_errors=True)
 
         try:
             os.makedirs(data_dir)

@@ -67,9 +67,9 @@ public:
     virtual void abortUnitOfWork() = 0;
 
     /**
-     * Waits until all writes prior to this call are durable. Returns true, unless the storage
-     * engine cannot guarantee durability, which should never happen when isDurable() returned
-     * true.
+     * Waits until all commits that happened before this call are durable. Returns true, unless the
+     * storage engine cannot guarantee durability, which should never happen when isDurable()
+     * returned true. This cannot be called from inside a unit of work, and should fail if it is.
      */
     virtual bool waitUntilDurable() = 0;
 
@@ -94,7 +94,7 @@ public:
      * change snapshots.
      *
      * If no snapshot has yet been marked as Majority Committed, returns a status with error
-     * code ReadConcernNotAvailableYet. After this returns successfully, at any point where
+     * code ReadConcernMajorityNotAvailableYet. After this returns successfully, at any point where
      * implementations attempt to acquire committed snapshot, if there are none available due to a
      * call to SnapshotManager::dropAllSnapshots(), a UserException with the same code should be
      * thrown.
@@ -104,7 +104,7 @@ public:
      */
     virtual Status setReadFromMajorityCommittedSnapshot() {
         return {ErrorCodes::CommandNotSupported,
-                "Current storage engine does not support $readMajorityTemporaryName"};
+                "Current storage engine does not support majority readConcerns"};
     }
 
     /**
@@ -164,6 +164,50 @@ public:
      * may not be called during commit or rollback.
      */
     virtual void registerChange(Change* change) = 0;
+
+    /**
+     * Registers a callback to be called if the current WriteUnitOfWork rolls back.
+     *
+     * Be careful about the lifetimes of all variables captured by the callback!
+     */
+    template <typename Callback>
+    void onRollback(Callback callback) {
+        class OnRollbackChange final : public Change {
+        public:
+            OnRollbackChange(Callback&& callback) : _callback(std::move(callback)) {}
+            void rollback() final {
+                _callback();
+            }
+            void commit() final {}
+
+        private:
+            Callback _callback;
+        };
+
+        registerChange(new OnRollbackChange(std::move(callback)));
+    }
+
+    /**
+     * Registers a callback to be called if the current WriteUnitOfWork commits.
+     *
+     * Be careful about the lifetimes of all variables captured by the callback!
+     */
+    template <typename Callback>
+    void onCommit(Callback callback) {
+        class OnCommitChange final : public Change {
+        public:
+            OnCommitChange(Callback&& callback) : _callback(std::move(callback)) {}
+            void rollback() final {}
+            void commit() final {
+                _callback();
+            }
+
+        private:
+            Callback _callback;
+        };
+
+        registerChange(new OnCommitChange(std::move(callback)));
+    }
 
     //
     // The remaining methods probably belong on DurRecoveryUnit rather than on the interface.

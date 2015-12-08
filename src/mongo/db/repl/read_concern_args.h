@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/db/json.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/time_support.h"
 
@@ -46,9 +47,7 @@ enum class ReadConcernLevel { kLocalReadConcern, kMajorityReadConcern, kLineariz
 class ReadConcernArgs {
 public:
     static const std::string kReadConcernFieldName;
-    static const std::string kOpTermFieldName;
-    static const std::string kOpTimeFieldName;
-    static const std::string kOpTimestampFieldName;
+    static const std::string kAfterOpTimeFieldName;
     static const std::string kLevelFieldName;
 
     ReadConcernArgs();
@@ -65,12 +64,21 @@ public:
      *    }
      * }
      */
-    Status initialize(const BSONObj& cmdObj);
+    Status initialize(const BSONObj& cmdObj) {
+        return initialize(cmdObj[kReadConcernFieldName]);
+    }
+
+    /**
+     * Initializes the object from the readConcern element in a command object.
+     * Use this if you are already iterating over the fields in the command object.
+     * This method correctly handles missing BSONElements.
+     */
+    Status initialize(const BSONElement& readConcernElem);
 
     /**
      * Appends level and afterOpTime.
      */
-    void appendInfo(BSONObjBuilder* builder);
+    void appendInfo(BSONObjBuilder* builder) const;
 
     ReadConcernLevel getLevel() const;
     OpTime getOpTime() const;

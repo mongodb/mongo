@@ -31,6 +31,8 @@
 #include "mongo/scripting/mozjs/mongo.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/global_conn_pool.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
@@ -40,33 +42,47 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec MongoBase::methods[] = {
-    MONGO_ATTACH_JS_FUNCTION(auth),
-    MONGO_ATTACH_JS_FUNCTION(copyDatabaseWithSCRAM),
-    MONGO_ATTACH_JS_FUNCTION(cursorFromId),
-    MONGO_ATTACH_JS_FUNCTION(cursorHandleFromId),
-    MONGO_ATTACH_JS_FUNCTION(find),
-    MONGO_ATTACH_JS_FUNCTION(getClientRPCProtocols),
-    MONGO_ATTACH_JS_FUNCTION(getServerRPCProtocols),
-    MONGO_ATTACH_JS_FUNCTION(insert),
-    MONGO_ATTACH_JS_FUNCTION(logout),
-    MONGO_ATTACH_JS_FUNCTION(remove),
-    MONGO_ATTACH_JS_FUNCTION(runCommand),
-    MONGO_ATTACH_JS_FUNCTION(runCommandWithMetadata),
-    MONGO_ATTACH_JS_FUNCTION(setClientRPCProtocols),
-    MONGO_ATTACH_JS_FUNCTION(update),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(auth, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        copyDatabaseWithSCRAM, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorFromId, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        cursorHandleFromId, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(find, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        getClientRPCProtocols, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        getServerRPCProtocols, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(insert, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(logout, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(remove, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommand, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        runCommandWithMetadata, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        setClientRPCProtocols, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(update, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        getMinWireVersion, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        getMaxWireVersion, MongoLocalInfo, MongoExternalInfo),
     JS_FS_END,
 };
 
 const char* const MongoBase::className = "Mongo";
 
-const JSFunctionSpec MongoExternalInfo::freeFunctions[3] = {
-    MONGO_ATTACH_JS_FUNCTION(load), MONGO_ATTACH_JS_FUNCTION(quit), JS_FS_END,
+const JSFunctionSpec MongoExternalInfo::freeFunctions[4] = {
+    MONGO_ATTACH_JS_FUNCTION(_forgetReplSet),
+    MONGO_ATTACH_JS_FUNCTION(load),
+    MONGO_ATTACH_JS_FUNCTION(quit),
+    JS_FS_END,
 };
 
 namespace {
@@ -102,7 +118,7 @@ void MongoBase::finalize(JSFreeOp* fop, JSObject* obj) {
     }
 }
 
-void MongoBase::Functions::runCommand(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 3)
         uasserted(ErrorCodes::BadValue, "runCommand needs 3 args");
 
@@ -126,10 +142,12 @@ void MongoBase::Functions::runCommand(JSContext* cx, JS::CallArgs args) {
     conn->runCommand(database, cmdObj, cmdRes, queryOptions);
 
     // the returned object is not read only as some of our tests depend on modifying it.
-    ValueReader(cx, args.rval()).fromBSON(cmdRes, false /* read only */);
+    //
+    // Also, we make a copy here because we want a copy after we dump cmdRes
+    ValueReader(cx, args.rval()).fromBSON(cmdRes.getOwned(), nullptr, false /* read only */);
 }
 
-void MongoBase::Functions::runCommandWithMetadata(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 4)
         uasserted(ErrorCodes::BadValue, "runCommandWithMetadata needs 4 args");
 
@@ -161,11 +179,11 @@ void MongoBase::Functions::runCommandWithMetadata(JSContext* cx, JS::CallArgs ar
     mergedResultBob.append("commandReply", res->getCommandReply());
     mergedResultBob.append("metadata", res->getMetadata());
 
-    auto mergedResult = mergedResultBob.done();
-    ValueReader(cx, args.rval()).fromBSON(mergedResult, false);
+    auto mergedResult = mergedResultBob.obj();
+    ValueReader(cx, args.rval()).fromBSON(mergedResult, nullptr, false);
 }
 
-void MongoBase::Functions::find(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (args.length() != 7)
@@ -184,14 +202,12 @@ void MongoBase::Functions::find(JSContext* cx, JS::CallArgs args) {
     bool haveFields = false;
 
     if (args.get(2).isObject()) {
-        size_t i = 0;
-
         JS::RootedObject obj(cx, args.get(2).toObjectOrNull());
 
-        ObjectWrapper(cx, obj).enumerate([&i](jsid) { ++i; });
-
-        if (i > 0)
+        ObjectWrapper(cx, obj).enumerate([&](jsid) {
             haveFields = true;
+            return false;
+        });
     }
 
     if (haveFields)
@@ -209,14 +225,14 @@ void MongoBase::Functions::find(JSContext* cx, JS::CallArgs args) {
     }
 
     JS::RootedObject c(cx);
-    scope->getCursorProto().newInstance(&c);
+    scope->getProto<CursorInfo>().newObject(&c);
 
     setCursor(c, std::move(cursor), args);
 
     args.rval().setObjectOrNull(c);
 }
 
-void MongoBase::Functions::insert(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (args.length() != 3)
@@ -227,7 +243,7 @@ void MongoBase::Functions::insert(JSContext* cx, JS::CallArgs args) {
 
     ObjectWrapper o(cx, args.thisv());
 
-    if (o.hasField("readOnly") && o.getBoolean("readOnly"))
+    if (o.hasField(InternedString::readOnly) && o.getBoolean(InternedString::readOnly))
         uasserted(ErrorCodes::BadValue, "js db in read only mode");
 
     auto conn = getConnection(args);
@@ -244,10 +260,10 @@ void MongoBase::Functions::insert(JSContext* cx, JS::CallArgs args) {
 
         ObjectWrapper ele(cx, elementObj);
 
-        if (!ele.hasField("_id")) {
+        if (!ele.hasField(InternedString::_id)) {
             JS::RootedValue value(cx);
-            scope->getOidProto().newInstance(&value);
-            ele.setValue("_id", value);
+            scope->getProto<OIDInfo>().newInstance(&value);
+            ele.setValue(InternedString::_id, value);
         }
 
         return ValueWriter(cx, value).toBSON();
@@ -268,6 +284,8 @@ void MongoBase::Functions::insert(JSContext* cx, JS::CallArgs args) {
             array.getValue(id, &value);
 
             bos.push_back(addId(value));
+
+            return true;
         });
 
         if (!foundElement)
@@ -281,7 +299,7 @@ void MongoBase::Functions::insert(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::remove(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::remove::call(JSContext* cx, JS::CallArgs args) {
     if (!(args.length() == 2 || args.length() == 3))
         uasserted(ErrorCodes::BadValue, "remove needs 2 or 3 args");
 
@@ -290,7 +308,7 @@ void MongoBase::Functions::remove(JSContext* cx, JS::CallArgs args) {
 
     ObjectWrapper o(cx, args.thisv());
 
-    if (o.hasField("readOnly") && o.getBoolean("readOnly"))
+    if (o.hasOwnField(InternedString::readOnly) && o.getBoolean(InternedString::readOnly))
         uasserted(ErrorCodes::BadValue, "js db in read only mode");
 
     auto conn = getConnection(args);
@@ -307,7 +325,7 @@ void MongoBase::Functions::remove(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::update(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() < 3)
         uasserted(ErrorCodes::BadValue, "update needs at least 3 args");
 
@@ -319,7 +337,7 @@ void MongoBase::Functions::update(JSContext* cx, JS::CallArgs args) {
 
     ObjectWrapper o(cx, args.thisv());
 
-    if (o.hasField("readOnly") && o.getBoolean("readOnly"))
+    if (o.hasOwnField(InternedString::readOnly) && o.getBoolean(InternedString::readOnly))
         uasserted(ErrorCodes::BadValue, "js db in read only mode");
 
     auto conn = getConnection(args);
@@ -335,7 +353,7 @@ void MongoBase::Functions::update(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::auth(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
     if (!conn)
         uasserted(ErrorCodes::BadValue, "no connection");
@@ -361,7 +379,7 @@ void MongoBase::Functions::auth(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(true);
 }
 
-void MongoBase::Functions::logout(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "logout needs 1 arg");
 
@@ -374,16 +392,18 @@ void MongoBase::Functions::logout(JSContext* cx, JS::CallArgs args) {
         conn->logout(db, ret);
     }
 
-    ValueReader(cx, args.rval()).fromBSON(ret, false);
+    // Make a copy because I want to insulate us from whether conn->logout
+    // writes an owned bson or not
+    ValueReader(cx, args.rval()).fromBSON(ret.getOwned(), nullptr, false);
 }
 
-void MongoBase::Functions::cursorFromId(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (!(args.length() == 2 || args.length() == 3))
         uasserted(ErrorCodes::BadValue, "cursorFromId needs 2 or 3 args");
 
-    if (!scope->getNumberLongProto().instanceOf(args.get(1)))
+    if (!scope->getProto<NumberLongInfo>().instanceOf(args.get(1)))
         uasserted(ErrorCodes::BadValue, "2nd arg must be a NumberLong");
 
     if (!(args.get(2).isNumber() || args.get(2).isUndefined()))
@@ -401,34 +421,34 @@ void MongoBase::Functions::cursorFromId(JSContext* cx, JS::CallArgs args) {
         cursor->setBatchSize(ValueWriter(cx, args.get(2)).toInt32());
 
     JS::RootedObject c(cx);
-    scope->getCursorProto().newInstance(&c);
+    scope->getProto<CursorInfo>().newObject(&c);
 
     setCursor(c, std::move(cursor), args);
 
     args.rval().setObjectOrNull(c);
 }
 
-void MongoBase::Functions::cursorHandleFromId(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (args.length() != 1) {
         uasserted(ErrorCodes::BadValue, "cursorHandleFromId needs 1 arg");
     }
-    if (!scope->getNumberLongProto().instanceOf(args.get(0))) {
+    if (!scope->getProto<NumberLongInfo>().instanceOf(args.get(0))) {
         uasserted(ErrorCodes::BadValue, "1st arg must be a NumberLong");
     }
 
     long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(0));
 
     JS::RootedObject c(cx);
-    scope->getCursorHandleProto().newInstance(&c);
+    scope->getProto<CursorHandleInfo>().newObject(&c);
 
     setCursorHandle(c, cursorId, args);
 
     args.rval().setObjectOrNull(c);
 }
 
-void MongoBase::Functions::copyDatabaseWithSCRAM(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (!conn)
@@ -497,7 +517,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM(JSContext* cx, JS::CallArgs arg
             if (code == ErrorCodes::OK)
                 code = ErrorCodes::UnknownError;
 
-            ValueReader(cx, args.rval()).fromBSON(inputObj, true);
+            ValueReader(cx, args.rval()).fromBSON(inputObj, nullptr, true);
             return;
         }
 
@@ -509,10 +529,10 @@ void MongoBase::Functions::copyDatabaseWithSCRAM(JSContext* cx, JS::CallArgs arg
         uasserted(ErrorCodes::InternalError, "copydb client finished before server.");
     }
 
-    ValueReader(cx, args.rval()).fromBSON(inputObj, true);
+    ValueReader(cx, args.rval()).fromBSON(inputObj, nullptr, true);
 }
 
-void MongoBase::Functions::getClientRPCProtocols(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::getClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 0)
@@ -526,7 +546,7 @@ void MongoBase::Functions::getClientRPCProtocols(JSContext* cx, JS::CallArgs arg
     ValueReader(cx, args.rval()).fromStringData(protoStr);
 }
 
-void MongoBase::Functions::setClientRPCProtocols(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::setClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 1)
@@ -544,7 +564,7 @@ void MongoBase::Functions::setClientRPCProtocols(JSContext* cx, JS::CallArgs arg
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::getServerRPCProtocols(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::getServerRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 0)
@@ -569,13 +589,13 @@ void MongoLocalInfo::construct(JSContext* cx, JS::CallArgs args) {
     conn.reset(createDirectClient(scope->getOpContext()));
 
     JS::RootedObject thisv(cx);
-    scope->getMongoLocalProto().newObject(&thisv);
+    scope->getProto<MongoLocalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     JS_SetPrivate(thisv, new std::shared_ptr<DBClientBase>(conn.release()));
 
-    o.setBoolean("slaveOk", false);
-    o.setString("host", "EMBEDDED");
+    o.setBoolean(InternedString::slaveOk, false);
+    o.setString(InternedString::host, "EMBEDDED");
 
     args.rval().setObjectOrNull(thisv);
 }
@@ -589,10 +609,9 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         host = ValueWriter(cx, args.get(0)).toString();
     }
 
-    auto statusWithHost = ConnectionString::parse(host);
+    auto statusWithHost = MongoURI::parse(host);
     uassertStatusOK(statusWithHost);
-
-    const ConnectionString cs(statusWithHost.getValue());
+    auto cs = statusWithHost.getValue();
 
     std::string errmsg;
     std::unique_ptr<DBClientBase> conn(cs.connect(errmsg));
@@ -601,19 +620,34 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::InternalError, errmsg);
     }
 
+    ScriptEngine::runConnectCallback(*conn);
+
     JS::RootedObject thisv(cx);
-    scope->getMongoExternalProto().newObject(&thisv);
+    scope->getProto<MongoExternalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     JS_SetPrivate(thisv, new std::shared_ptr<DBClientBase>(conn.release()));
 
-    o.setBoolean("slaveOk", false);
-    o.setString("host", host);
+    o.setBoolean(InternedString::slaveOk, false);
+    o.setString(InternedString::host, host);
+    o.setString(InternedString::defaultDB, cs.getDatabase());
 
     args.rval().setObjectOrNull(thisv);
 }
 
-void MongoExternalInfo::Functions::load(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::getMinWireVersion::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+
+    args.rval().setInt32(conn->getMinWireVersion());
+}
+
+void MongoBase::Functions::getMaxWireVersion::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+
+    args.rval().setInt32(conn->getMaxWireVersion());
+}
+
+void MongoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     for (unsigned i = 0; i < args.length(); ++i) {
@@ -627,12 +661,25 @@ void MongoExternalInfo::Functions::load(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(true);
 }
 
-void MongoExternalInfo::Functions::quit(JSContext* cx, JS::CallArgs args) {
+void MongoExternalInfo::Functions::quit::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     scope->setQuickExit(args.get(0).isNumber() ? args.get(0).toNumber() : 0);
 
     uasserted(ErrorCodes::JSUncatchableError, "Calling Quit");
+}
+
+void MongoExternalInfo::Functions::_forgetReplSet::call(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 1) {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "_forgetReplSet takes exactly 1 argument, but was given "
+                                << args.length());
+    }
+
+    std::string rsName = ValueWriter(cx, args.get(0)).toString();
+    globalRSMonitorManager.removeMonitor(rsName);
+
+    args.rval().setUndefined();
 }
 
 }  // namespace mozjs

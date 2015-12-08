@@ -1,59 +1,43 @@
-// dumprestore3.js
+// mongodump/mongoexport from primary should succeed.  mongorestore and mongoimport to a
+// secondary node should fail.
 
 var name = "dumprestore3";
-
-function step(msg) {
-    msg = msg || "";
-    this.x = (this.x || 0) + 1;
-    print('\n' + name + ".js step " + this.x + ' ' + msg);
-}
-
-step();
 
 var replTest = new ReplSetTest( {name: name, nodes: 2} );
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var primary = replTest.getPrimary();
+var secondary = replTest.getSecondary();
 
-{
-    step("populate master");
-    var foo = master.getDB("foo");
-    for (i = 0; i < 20; i++) {
-        foo.bar.insert({ x: i, y: "abc" });
-    }
+jsTestLog("populate primary");
+var foo = primary.getDB("foo");
+for (i = 0; i < 20; i++) {
+    foo.bar.insert({ x: i, y: "abc" });
 }
 
-{
-    step("wait for slaves");
-    replTest.awaitReplication();
-}
+jsTestLog("wait for secondary");
+replTest.awaitReplication();
 
-{
-    step("dump & restore a db into a slave");
-    var conn = MongoRunner.runMongod({});
-    var c = conn.getDB("foo").bar;
-    c.save({ a: 22 });
-    assert.eq(1, c.count(), "setup2");
-}
-
-step("try mongorestore to slave");
-
+jsTestLog("mongodump from primary");
 var data = MongoRunner.dataDir + "/dumprestore3-other1/";
 resetDbpath(data);
-runMongoProgram( "mongodump", "--host", "127.0.0.1:"+conn.port, "--out", data );
+var ret = runMongoProgram( "mongodump", "--host", primary.host, "--out", data );
+assert.eq(ret, 0, "mongodump should exit w/ 0 on primary");
 
-var x = runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+replTest.ports[1], "--dir", data );
-assert.neq(x, 0, "mongorestore should exit w/ 1 on slave");
+jsTestLog("try mongorestore to secondary");
+ret = runMongoProgram( "mongorestore", "--host", secondary.host, "--dir", data );
+assert.neq(ret, 0, "mongorestore should exit w/ 1 on secondary");
 
-step("try mongoimport to slave");
-
+jsTestLog("mongoexport from primary");
 dataFile = MongoRunner.dataDir + "/dumprestore3-other2.json";
-runMongoProgram( "mongoexport", "--host", "127.0.0.1:"+conn.port, "--out", dataFile, "--db", "foo", "--collection", "bar" );
+ret = runMongoProgram( "mongoexport", "--host", primary.host, "--out",
+                       dataFile, "--db", "foo", "--collection", "bar" );
+assert.eq(ret, 0, "mongoexport should exit w/ 0 on primary");
 
-x = runMongoProgram( "mongoimport", "--host", "127.0.0.1:"+replTest.ports[1], "--file", dataFile );
-assert.neq(x, 0, "mongoreimport should exit w/ 1 on slave");
+jsTestLog("mongoimport from secondary");
+ret = runMongoProgram( "mongoimport", "--host", secondary.host, "--file", dataFile );
+assert.neq(ret, 0, "mongoreimport should exit w/ 1 on secondary");
 
-step("stopSet");
+jsTestLog("stopSet");
 replTest.stopSet();
-
-step("SUCCESS");
+jsTestLog("SUCCESS");

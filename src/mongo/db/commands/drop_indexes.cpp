@@ -191,6 +191,15 @@ public:
             wunit.commit();
         }
 
+        // Do not allow majority reads from this collection until all original indexes are visible.
+        // This was also done when dropAllIndexes() committed, but we need to ensure that no one
+        // tries to read in the intermediate state where all indexes are newer than the current
+        // snapshot so are unable to be used.
+        auto replCoord = repl::ReplicationCoordinator::get(txn);
+        auto snapshotName = replCoord->reserveSnapshotName(txn);
+        replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
+        collection->setMinimumVisibleSnapshot(snapshotName);
+
         result.append("nIndexes", (int)all.size());
         result.append("indexes", all);
 

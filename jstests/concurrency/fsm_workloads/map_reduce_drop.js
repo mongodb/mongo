@@ -36,7 +36,7 @@ var $config = (function() {
     var states = (function() {
 
         function dropColl(db, collName) {
-            var mapReduceDB = db.getSiblingDB(uniqueDBName);
+            var mapReduceDB = db.getSiblingDB(db.getName() + uniqueDBName);
 
             // We don't check the return value of drop() because the collection
             // might not exist due to a drop() in another thread.
@@ -44,14 +44,14 @@ var $config = (function() {
         }
 
         function dropDB(db, collName) {
-            var mapReduceDB = db.getSiblingDB(uniqueDBName);
+            var mapReduceDB = db.getSiblingDB(db.getName() + uniqueDBName);
 
             var res = mapReduceDB.dropDatabase();
             assertAlways.commandWorked(res);
         }
 
         function mapReduce(db, collName) {
-            var mapReduceDB = db.getSiblingDB(uniqueDBName);
+            var mapReduceDB = db.getSiblingDB(db.getName() + uniqueDBName);
 
             // Try to ensure that some documents have been inserted before running
             // the mapReduce command.  Although it's possible for the documents to
@@ -96,7 +96,7 @@ var $config = (function() {
     };
 
     function teardown(db, collName, cluster) {
-        var mapReduceDB = db.getSiblingDB(uniqueDBName);
+        var mapReduceDB = db.getSiblingDB(db.getName() + uniqueDBName);
 
         // Ensure that the database that was created solely for this workload
         // has been dropped, in case it hasn't already been dropped by a

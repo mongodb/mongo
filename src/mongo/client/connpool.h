@@ -39,6 +39,7 @@
 
 namespace mongo {
 
+class BSONObjBuilder;
 class DBConnectionPool;
 
 /**
@@ -54,13 +55,15 @@ public:
         : _created(0),
           _minValidCreationTimeMicroSec(0),
           _type(ConnectionString::INVALID),
-          _maxPoolSize(kPoolSizeUnlimited) {}
+          _maxPoolSize(kPoolSizeUnlimited),
+          _checkedOut(0) {}
 
     PoolForHost(const PoolForHost& other)
         : _created(other._created),
           _minValidCreationTimeMicroSec(other._minValidCreationTimeMicroSec),
           _type(other._type),
-          _maxPoolSize(other._maxPoolSize) {
+          _maxPoolSize(other._maxPoolSize),
+          _checkedOut(other._checkedOut) {
         verify(_created == 0);
         verify(other._pool.size() == 0);
     }
@@ -83,6 +86,10 @@ public:
 
     int numAvailable() const {
         return (int)_pool.size();
+    }
+
+    int numInUse() const {
+        return _checkedOut;
     }
 
     void createdOne(DBClientBase* base);
@@ -145,6 +152,9 @@ private:
 
     // The maximum number of connections we'll save in the pool
     int _maxPoolSize;
+
+    // The number of currently active connections from this pool
+    int _checkedOut;
 };
 
 class DBConnectionHook {

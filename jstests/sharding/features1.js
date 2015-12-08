@@ -1,8 +1,6 @@
-// features1.js
+(function() {
 
-s = new ShardingTest( "features1" , 2 , 1 , 1 );
-
-s.stopBalancer();
+var s = new ShardingTest({ name: "features1", shards: 2, mongos: 1 });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -194,8 +192,9 @@ assert( ! s.admin.runCommand( { shardcollection : "test.foo9" , key : { a : 1 } 
 // --- listDatabases ---
 
 r = db.getMongo().getDBs()
-assert.eq( 3 , r.databases.length , "listDatabases 1 : " + tojson( r ) )
+assert.eq(2, r.databases.length, tojson(r));
 assert.eq( "number", typeof(r.totalSize) , "listDatabases 2 : " + tojson( r ) );
 
-s.stop()
+s.stop();
 
+})();

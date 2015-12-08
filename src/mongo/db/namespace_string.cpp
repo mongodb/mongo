@@ -28,16 +28,21 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
 using std::string;
 
-/*  A map of characters to escape. Instead of printing certain characters we output
+namespace {
+
+/**
+ *  A map of characters to escape. Instead of printing certain characters we output
  *  based on the following table.
  */
-static const std::string escapeTable[256] = {
+const string escapeTable[256] = {
     ".00",  ".01",  ".02",  ".03",  ".04",  ".05",  ".06",  ".07",  ".08",  ".09",  ".10",  ".11",
     ".12",  ".13",  ".14",  ".15",  ".16",  ".17",  ".18",  ".19",  ".20",  ".21",  ".22",  ".23",
     ".24",  ".25",  ".26",  ".27",  ".28",  ".29",  ".30",  ".31",  ".32",  ".33",  ".34",  ".35",
@@ -61,6 +66,12 @@ static const std::string escapeTable[256] = {
     ".240", ".241", ".242", ".243", ".244", ".245", ".246", ".247", ".248", ".249", ".250", ".251",
     ".252", ".253", ".254", ".255"};
 
+const char kConfigCollection[] = "admin.system.version";
+
+const StringData listIndexesCursorNSPrefix("$cmd.listIndexes.", StringData::LiteralTag());
+
+}  // namespace
+
 bool legalClientSystemNS(StringData ns, bool write) {
     if (ns == "local.system.replset")
         return true;
@@ -70,7 +81,7 @@ bool legalClientSystemNS(StringData ns, bool write) {
 
     if (ns == "admin.system.roles")
         return true;
-    if (ns == "admin.system.version")
+    if (ns == kConfigCollection)
         return true;
     if (ns == "admin.system.new_users")
         return true;
@@ -83,13 +94,11 @@ bool legalClientSystemNS(StringData ns, bool write) {
     return false;
 }
 
+const NamespaceString NamespaceString::kConfigCollectionNamespace(kConfigCollection);
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == StringData("$cmd.listCollections", StringData::LiteralTag());
 }
-
-namespace {
-const StringData listIndexesCursorNSPrefix("$cmd.listIndexes.", StringData::LiteralTag());
-}  // namespace
 
 bool NamespaceString::isListIndexesCursorNS() const {
     return coll().size() > listIndexesCursorNSPrefix.size() &&
@@ -112,4 +121,5 @@ string NamespaceString::escapeDbName(const StringData dbname) {
     }
     return escapedDbName;
 }
-}
+
+}  // namespace mongo

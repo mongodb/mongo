@@ -38,8 +38,8 @@ var $config = (function() {
 
         function init(db, collName) {
             var num = 0;
-            this.fromDBName = uniqueDBName(this.prefix, this.tid, num++);
-            this.toDBName = uniqueDBName(this.prefix, this.tid, num++);
+            this.fromDBName = db.getName() + uniqueDBName(this.prefix, this.tid, num++);
+            this.toDBName = db.getName() + uniqueDBName(this.prefix, this.tid, num++);
 
             var fromDB = db.getSiblingDB(this.fromDBName);
             assertAlways.commandWorked(fromDB.createCollection(collName, options));
@@ -93,7 +93,7 @@ var $config = (function() {
     };
 
     function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
+        var pattern = new RegExp('^' + db.getName() + this.prefix + '\\d+_\\d+$');
         dropDatabases(db, pattern);
     }
 

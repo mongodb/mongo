@@ -58,7 +58,7 @@ void LegacyDistLockManager::startUp() {
     _pinger = stdx::make_unique<LegacyDistLockPinger>();
 }
 
-void LegacyDistLockManager::shutDown(bool allowNetworking) {
+void LegacyDistLockManager::shutDown(OperationContext* txn, bool allowNetworking) {
     stdx::unique_lock<stdx::mutex> sl(_mutex);
     _isStopped = true;
 
@@ -72,7 +72,11 @@ void LegacyDistLockManager::shutDown(bool allowNetworking) {
 }
 
 StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
-    StringData name, StringData whyMessage, milliseconds waitFor, milliseconds lockTryInterval) {
+    OperationContext* txn,
+    StringData name,
+    StringData whyMessage,
+    milliseconds waitFor,
+    milliseconds lockTryInterval) {
     auto distLock = stdx::make_unique<DistributedLock>(_configServer, name.toString());
 
     {
@@ -98,13 +102,19 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
     while (waitFor <= milliseconds::zero() || milliseconds(timer.millis()) < waitFor) {
         bool acquired = false;
         BSONObj lockDoc;
+        OID lockID(OID::gen());
+
         try {
-            acquired = distLock->lock_try(
-                whyMessage.toString(), &lockDoc, durationCount<Seconds>(kDefaultSocketTimeout));
+            acquired = distLock->lock_try(lockID,
+                                          whyMessage.toString(),
+                                          &lockDoc,
+                                          durationCount<Seconds>(kDefaultSocketTimeout));
 
             if (!acquired) {
                 lastStatus = Status(ErrorCodes::LockBusy,
                                     str::stream() << "Lock for " << whyMessage << " is taken.");
+                // cleanup failed attempt to acquire lock.
+                _pinger->addUnlockOID(lockID);
             }
         } catch (const LockException& lockExcep) {
             OID needUnlockID(lockExcep.getMustUnlockID());
@@ -115,6 +125,7 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
             lastStatus = lockExcep.toStatus();
         } catch (...) {
             lastStatus = exceptionToStatus();
+            _pinger->addUnlockOID(lockID);
         }
 
         if (acquired) {
@@ -135,7 +146,7 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
                 _lockMap.insert(std::make_pair(lock.getLockID(), std::move(distLock)));
             }
 
-            return ScopedDistLock(lock.getLockID(), this);
+            return ScopedDistLock(txn, lock.getLockID(), this);
         }
 
         if (waitFor == milliseconds::zero())
@@ -161,7 +172,8 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
     return lastStatus;
 }
 
-void LegacyDistLockManager::unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT {
+void LegacyDistLockManager::unlock(OperationContext* txn,
+                                   const DistLockHandle& lockHandle) BOOST_NOEXCEPT {
     unique_ptr<DistributedLock> distLock;
 
     {
@@ -185,7 +197,7 @@ void LegacyDistLockManager::unlock(const DistLockHandle& lockHandle) BOOST_NOEXC
     }
 }
 
-Status LegacyDistLockManager::checkStatus(const DistLockHandle& lockHandle) {
+Status LegacyDistLockManager::checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) {
     // Note: this should not happen when locks are managed through ScopedDistLock.
     if (_pinger->willUnlockOID(lockHandle)) {
         return Status(ErrorCodes::LockFailed,

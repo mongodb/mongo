@@ -69,7 +69,13 @@ var $config = (function() {
     };
 
     function setup(db, collName, cluster) {
-        db[collName].insert({ _id: this.id });
+        var doc = { _id: this.id };
+
+        // Pre-populate the fields we need to avoid size change for capped collections.
+        for (var i = 0; i < this.threadCount; ++i) {
+            doc['t' + i] = 0;
+        }
+        db[collName].insert(doc);
     }
 
     return {

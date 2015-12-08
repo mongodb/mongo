@@ -126,7 +126,7 @@ public:
             return false;
         }
 
-        shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(to);
+        shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(txn, to);
         if (!toShard) {
             string msg(str::stream() << "Could not move database '" << dbname << "' to shard '"
                                      << to << "' because the shard does not exist");
@@ -134,7 +134,7 @@ public:
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
 
-        shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(config->getPrimaryId());
+        shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(txn, config->getPrimaryId());
         invariant(fromShard);
 
         if (fromShard->getConnString().sameLogicalEndpoint(toShard->getConnString())) {
@@ -146,8 +146,8 @@ public:
               << " to: " << toShard->toString();
 
         string whyMessage(str::stream() << "Moving primary shard of " << dbname);
-        auto catalogManager = grid.catalogManager(txn);
-        auto scopedDistLock = catalogManager->distLock(dbname + "-movePrimary", whyMessage);
+        auto scopedDistLock =
+            grid.forwardingCatalogManager()->distLock(txn, dbname + "-movePrimary", whyMessage);
 
         if (!scopedDistLock.isOK()) {
             return appendCommandStatus(result, scopedDistLock.getStatus());
@@ -160,8 +160,8 @@ public:
         BSONObj moveStartDetails =
             _buildMoveEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls);
 
-        catalogManager->logChange(
-            txn->getClient()->clientAddress(true), "movePrimary.start", dbname, moveStartDetails);
+        auto catalogManager = grid.catalogManager(txn);
+        catalogManager->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
 
         BSONArrayBuilder barr;
         barr.append(shardedColls);
@@ -188,7 +188,8 @@ public:
 
         ScopedDbConnection fromconn(fromShard->getConnString());
 
-        config->setPrimary(txn, toShard->getConnString().toString());
+        config->setPrimary(txn, toShard->getId());
+        config->reload(txn);
 
         if (shardedColls.empty()) {
             // TODO: Collections can be created in the meantime, and we should handle in the future.
@@ -239,8 +240,7 @@ public:
         BSONObj moveFinishDetails =
             _buildMoveEntry(dbname, oldPrimary, toShard->toString(), shardedColls);
 
-        catalogManager->logChange(
-            txn->getClient()->clientAddress(true), "movePrimary", dbname, moveFinishDetails);
+        catalogManager->logChange(txn, "movePrimary", dbname, moveFinishDetails);
         return true;
     }
 

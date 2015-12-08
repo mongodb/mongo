@@ -1,9 +1,10 @@
 // Tests splitting a chunk twice
+(function() {
 
-s = new ShardingTest( "shard_keycount" , 2, 0, 1, /* chunkSize */1);
-
-// Kill balancer
-s.config.settings.update({ _id: "balancer" }, { $set : { stopped: true } }, true )
+var s = new ShardingTest({ name: "shard_keycount",
+                           shards: 2,
+                           mongos: 1,
+                           other:{ chunkSize: 1 } });
 
 dbName = "test"
 collName = "foo"
@@ -45,3 +46,5 @@ coll.update({ _id : 3 }, { _id : 3 })
 s.adminCommand({ split : ns, find : { _id : 3 } })
 
 s.stop();
+
+});

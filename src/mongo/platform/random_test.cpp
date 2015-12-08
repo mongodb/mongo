@@ -29,6 +29,7 @@
  */
 
 #include <set>
+#include <vector>
 
 #include "mongo/platform/random.h"
 
@@ -98,6 +99,118 @@ TEST(RandomTest, R2) {
     ASSERT_EQUALS(100U, s.size());
 }
 
+/**
+ * Test that if two PsuedoRandom's have the same seed, then subsequent calls to
+ * nextCanonicalDouble() will return the same value.
+ */
+TEST(RandomTest, NextCanonicalSameSeed) {
+    PseudoRandom a(12);
+    PseudoRandom b(12);
+    for (int i = 0; i < 100; i++) {
+        ASSERT_EQUALS(a.nextCanonicalDouble(), b.nextCanonicalDouble());
+    }
+}
+
+/**
+ * Test that if two PsuedoRandom's have different seeds, then nextCanonicalDouble() will return
+ * different values.
+ */
+TEST(RandomTest, NextCanonicalDifferentSeeds) {
+    PseudoRandom a(12);
+    PseudoRandom b(11);
+    ASSERT_NOT_EQUALS(a.nextCanonicalDouble(), b.nextCanonicalDouble());
+}
+
+/**
+ * Test that nextCanonicalDouble() avoids returning a value soon after it has previously returned
+ * that value.
+ */
+TEST(RandomTest, NextCanonicalDistinctValues) {
+    PseudoRandom a(11);
+    std::set<double> s;
+    for (int i = 0; i < 100; i++) {
+        s.insert(a.nextCanonicalDouble());
+    }
+    ASSERT_EQUALS(100U, s.size());
+}
+
+/**
+ * Test that nextCanonicalDouble() always returns values between 0 and 1.
+ */
+TEST(RandomTest, NextCanonicalWithinRange) {
+    PseudoRandom prng(10);
+    for (int i = 0; i < 100; i++) {
+        double next = prng.nextCanonicalDouble();
+        ASSERT_LTE(0.0, next);
+        ASSERT_LT(next, 1.0);
+    }
+}
+
+TEST(RandomTest, NextInt32SanityCheck) {
+    // Generate 1000 int32s and assert that each bit is set between 40% and 60% of the time. This is
+    // a bare minimum sanity check, not an attempt to ensure quality random numbers.
+
+    PseudoRandom a(11);
+    std::vector<int32_t> nums;
+    for (int i = 0; i < 1000; i++) {
+        nums.push_back(a.nextInt32());
+    }
+
+    for (int bit = 0; bit < 32; bit++) {
+        int onesCount = 0;
+        for (auto&& num : nums) {
+            bool isSet = (num >> bit) & 1;
+            if (isSet)
+                onesCount++;
+        }
+
+        if (onesCount < 400 || onesCount > 600)
+            FAIL(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
+                               << "% of the time.");
+    }
+}
+
+TEST(RandomTest, NextInt64SanityCheck) {
+    // Generate 1000 int64s and assert that each bit is set between 40% and 60% of the time. This is
+    // a bare minimum sanity check, not an attempt to ensure quality random numbers.
+
+    PseudoRandom a(11);
+    std::vector<int64_t> nums;
+    for (int i = 0; i < 1000; i++) {
+        nums.push_back(a.nextInt64());
+    }
+
+    for (int bit = 0; bit < 64; bit++) {
+        int onesCount = 0;
+        for (auto&& num : nums) {
+            bool isSet = (num >> bit) & 1;
+            if (isSet)
+                onesCount++;
+        }
+
+        if (onesCount < 400 || onesCount > 600)
+            FAIL(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
+                               << "% of the time.");
+    }
+}
+
+TEST(RandomTest, NextInt32InRange) {
+    PseudoRandom a(11);
+    for (int i = 0; i < 1000; i++) {
+        auto res = a.nextInt32(10);
+        ASSERT_GTE(res, 0);
+        ASSERT_LT(res, 10);
+    }
+}
+
+TEST(RandomTest, NextInt64InRange) {
+    PseudoRandom a(11);
+    for (int i = 0; i < 1000; i++) {
+        auto res = a.nextInt64(10);
+        ASSERT_GTE(res, 0);
+        ASSERT_LT(res, 10);
+    }
+}
 
 TEST(RandomTest, Secure1) {
     SecureRandom* a = SecureRandom::create();

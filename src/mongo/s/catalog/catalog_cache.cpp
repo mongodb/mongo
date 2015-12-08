@@ -55,7 +55,7 @@ StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn
     }
 
     // Need to load from the store
-    auto status = grid.catalogManager(txn)->getDatabase(dbName);
+    auto status = grid.catalogManager(txn)->getDatabase(txn, dbName);
     if (!status.isOK()) {
         return status.getStatus();
     }

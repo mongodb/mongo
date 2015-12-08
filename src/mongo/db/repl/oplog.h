@@ -52,6 +52,10 @@ class RecordId;
 namespace repl {
 class ReplSettings;
 
+/**
+ * Truncates the oplog after, and including, the "truncateTimestamp" entry.
+ */
+void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp);
 
 /**
  * Create a new capped collection for the oplog if it doesn't yet exist.
@@ -70,14 +74,14 @@ void createOplog(OperationContext* txn);
 // used internally by replication secondaries after they have applied ops.  Updates the global
 // optime.
 // Returns the optime for the last op inserted.
-OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops);
+OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops);
 
 extern std::string rsOplogName;
 extern std::string masterSlaveOplogName;
 
 extern int OPLOG_VERSION;
 
-/** Log an operation to the local oplog
+/* Log operation(s) to the local oplog
  *
  * @param opstr
  *  "i" insert
@@ -86,8 +90,16 @@ extern int OPLOG_VERSION;
  *  "c" db cmd
  *  "n" no-op
  *  "db" declares presence of a database (ns is set to the db name + '.')
- *
- * For 'u' records, 'obj' captures the mutation made to the object but not
+ */
+
+void logOps(OperationContext* txn,
+            const char* opstr,
+            const NamespaceString& nss,
+            std::vector<BSONObj>::const_iterator begin,
+            std::vector<BSONObj>::const_iterator end,
+            bool fromMigrate);
+
+/* For 'u' records, 'obj' captures the mutation made to the object but not
  * the object itself. 'o2' captures the the criteria for the object that will be modified.
  *
  * Sets replCoord last optime if 'updateReplOpTime' is true.
@@ -102,12 +114,12 @@ void _logOp(OperationContext* txn,
             ReplicationCoordinator::Mode replicationMode,
             bool updateReplOpTime);
 
-void _logOp(OperationContext* txn,
-            const char* opstr,
-            const char* ns,
-            const BSONObj& obj,
-            BSONObj* o2,
-            bool fromMigrate);
+void logOp(OperationContext* txn,
+           const char* opstr,
+           const char* ns,
+           const BSONObj& obj,
+           BSONObj* o2,
+           bool fromMigrate);
 
 // Flush out the cached pointers to the local database and oplog.
 // Used by the closeDatabase command to ensure we don't cache closed things.
@@ -145,5 +157,11 @@ void setNewTimestamp(const Timestamp& newTime);
  * Detects the current replication mode and sets the "_oplogCollectionName" accordingly.
  */
 void setOplogCollectionName();
+
+/**
+ * Signal any waiting AwaitData queries on the oplog that there is new data or metadata available.
+ */
+void signalOplogWaiters();
+
 }  // namespace repl
 }  // namespace mongo

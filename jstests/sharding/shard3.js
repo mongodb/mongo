@@ -1,9 +1,9 @@
-// shard3.js
+(function() {
 
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
 
-s = new ShardingTest( "shard3" , 2 , 1 , 2 , { enableBalancer : 1 } );
+var s = new ShardingTest({name: "shard3", shards: 2, mongos: 2, other: { enableBalancer: true }});
 
 s2 = s._mongos[1];
 
@@ -11,13 +11,17 @@ db = s.getDB( "test" )
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
+if (s.configRS) {
+    // Ensure that the second mongos will see the movePrimary
+    s.configRS.awaitLastOpCommitted();
+}
 
 assert( sh.getBalancerState() , "A1" )
-sh.setBalancerState( false ) 
+sh.setBalancerState(false);
 assert( ! sh.getBalancerState() , "A2" )
-sh.setBalancerState( true ) 
+sh.setBalancerState(true);
 assert( sh.getBalancerState() , "A3" )
-sh.setBalancerState( false )
+sh.setBalancerState(false);
 assert( ! sh.getBalancerState() , "A4" )
 
 s.config.databases.find().forEach( printjson )
@@ -169,3 +173,5 @@ y = dbb.foo.stats()
 printjson( y )
 
 s.stop();
+
+})();

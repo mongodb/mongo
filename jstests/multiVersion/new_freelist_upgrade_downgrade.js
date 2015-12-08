@@ -16,7 +16,12 @@ function repair(conn, version) {
 
 
 // start out running tooOld
-var conn = MongoRunner.runMongod({ remember: true, binVersion: tooOld, smallfiles: "" });
+var conn = MongoRunner.runMongod({
+    remember: true,
+    binVersion: tooOld,
+    smallfiles: "",
+    nohttpinterface: ""
+});
 assert(conn);
 
 // can go from tooOld to newEnough

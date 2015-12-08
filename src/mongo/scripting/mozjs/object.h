@@ -41,8 +41,8 @@ namespace mozjs {
  */
 struct ObjectInfo : public BaseInfo {
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(bsonsize);
-        MONGO_DEFINE_JS_FUNCTION(invalidForStorage);
+        MONGO_DECLARE_JS_FUNCTION(bsonsize);
+        MONGO_DECLARE_JS_FUNCTION(invalidForStorage);
     };
 
     static const JSFunctionSpec methods[3];

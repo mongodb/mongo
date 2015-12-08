@@ -41,6 +41,7 @@
 
 namespace mongo {
 
+class PseudoRandom;
 class RecordStore;
 class SavedCursorRegistry;
 
@@ -82,12 +83,14 @@ public:
                RecordStore* store,
                SavedCursorRegistry* cursors,
                const Ordering& ordering,
-               const std::string& indexName)
+               const std::string& indexName,
+               bool isUnique)
         : _headManager(head),
           _recordStore(store),
           _cursorRegistry(cursors),
           _ordering(ordering),
-          _indexName(indexName) {}
+          _indexName(indexName),
+          _isUnique(isUnique) {}
 
     //
     // Public-facing
@@ -177,6 +180,12 @@ public:
 
     BSONObj getKey(OperationContext* txn, const DiskLoc& bucketLoc, const int keyOffset) const;
 
+    /**
+     * Returns a pseudo-random element from the tree. It is an error to call this method if the tree
+     * is empty.
+     */
+    IndexKeyEntry getRandomEntry(OperationContext* txn) const;
+
     DiskLoc getHead(OperationContext* txn) const {
         return DiskLoc::fromRecordId(_headManager->getHead(txn));
     }
@@ -236,6 +245,10 @@ public:
     int customBSONCmp(const BSONObj& inIndex_left,
                       const IndexSeekPoint& seekPoint_right,
                       int direction) const;
+
+    bool isUnique() const {
+        return _isUnique;
+    }
 
 private:
     friend class BtreeLogic::Builder;
@@ -541,6 +554,13 @@ private:
 
     DiskLoc getRootLoc(OperationContext* txn) const;
 
+    void recordRandomWalk(OperationContext* txn,
+                          PseudoRandom* prng,
+                          BucketType* curBucket,
+                          int64_t nBucketsInCurrentLevel,
+                          std::vector<int64_t>* nKeysInLevel,
+                          std::vector<FullKey>* selectedKeys) const;
+
     //
     // Data
     //
@@ -557,6 +577,9 @@ private:
     Ordering _ordering;
 
     std::string _indexName;
+
+    // True if this is a unique index, i.e. if duplicate key values are disallowed.
+    const bool _isUnique;
 };
 
 }  // namespace mongo

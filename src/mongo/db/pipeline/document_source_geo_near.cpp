@@ -66,10 +66,6 @@ boost::optional<Document> DocumentSourceGeoNear::getNext() {
     return output.freeze();
 }
 
-void DocumentSourceGeoNear::setSource(DocumentSource*) {
-    uasserted(16602, "$geoNear is only allowed as the first pipeline stage");
-}
-
 bool DocumentSourceGeoNear::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {
     DocumentSourceLimit* limitSrc = dynamic_cast<DocumentSourceLimit*>(pNextSource.get());
     if (limitSrc) {

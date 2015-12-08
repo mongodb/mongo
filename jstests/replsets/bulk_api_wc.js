@@ -1,10 +1,12 @@
-//
 // Tests write-concern-related bulk api functionality
 //
+// This test asserts that a journaled write to a mongod running with --nojournal should be rejected,
+// so cannot be run on the ephemeralForTest storage engine, as it accepts all journaled writes.
+// @tags: [SERVER-21420]
 
 jsTest.log("Starting bulk api write concern tests...");
 
-// Start a single-node replica set with no journal
+// Start a 2-node replica set with no journal
 //Allows testing immediate write concern failures and wc application failures
 var rst = new ReplSetTest({ nodes : 2 });
 rst.startSet({ nojournal : "" });

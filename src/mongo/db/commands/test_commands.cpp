@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
+#include <string>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
@@ -100,12 +102,11 @@ public:
                 return false;
             }
         }
-        StatusWith<RecordId> res = collection->insertDocument(txn, obj, false);
-        Status status = res.getStatus();
+        Status status = collection->insertDocument(txn, obj, false);
         if (status.isOK()) {
             wunit.commit();
         }
-        return appendCommandStatus(result, res.getStatus());
+        return appendCommandStatus(result, status);
     }
 };
 
@@ -115,20 +116,43 @@ public:
     virtual bool isWriteCommandForConfigServer() const {
         return false;
     }
+
     virtual bool adminOnly() const {
         return true;
     }
+
     virtual bool slaveOk() const {
         return true;
     }
+
     virtual void help(stringstream& help) const {
-        help << "internal testing command.  Makes db block (in a read lock) for 100 seconds\n";
-        help << "w:true write lock. secs:<seconds>";
+        help << "internal testing command. Run a no-op command for an arbitrary amount of time. ";
+        help << "If neither 'secs' nor 'millis' is set, command will sleep for 10 seconds. ";
+        help << "If both are set, command will sleep for the sum of 'secs' and 'millis.'\n";
+        help << "   w:<bool> (deprecated: use 'lock' instead) if true, takes a write lock.\n";
+        help << "   lock: r, w, none. If r or w, db will block under a lock. Defaults to r.";
+        help << " 'lock' and 'w' may not both be set.\n";
+        help << "   secs:<seconds> Amount of time to sleep, in seconds.\n";
+        help << "   millis:<milliseconds> Amount of time to sleep, in ms.\n";
     }
+
     // No auth needed because it only works when enabled via command line.
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}
+
+    void _sleepInReadLock(mongo::OperationContext* txn, long long millis) {
+        ScopedTransaction transaction(txn, MODE_S);
+        Lock::GlobalRead lk(txn->lockState());
+        sleepmillis(millis);
+    }
+
+    void _sleepInWriteLock(mongo::OperationContext* txn, long long millis) {
+        ScopedTransaction transaction(txn, MODE_X);
+        Lock::GlobalWrite lk(txn->lockState());
+        sleepmillis(millis);
+    }
+
     CmdSleep() : Command("sleep") {}
     bool run(OperationContext* txn,
              const string& ns,
@@ -137,24 +161,40 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         log() << "test only command sleep invoked" << endl;
-        long long millis = 10 * 1000;
+        long long millis = 0;
 
-        if (cmdObj["secs"].isNumber() && cmdObj["millis"].isNumber()) {
-            millis = cmdObj["secs"].numberLong() * 1000 + cmdObj["millis"].numberLong();
-        } else if (cmdObj["secs"].isNumber()) {
-            millis = cmdObj["secs"].numberLong() * 1000;
-        } else if (cmdObj["millis"].isNumber()) {
-            millis = cmdObj["millis"].numberLong();
+        if (cmdObj["secs"] || cmdObj["millis"]) {
+            if (cmdObj["secs"]) {
+                uassert(34344, "'secs' must be a number.", cmdObj["secs"].isNumber());
+                millis += cmdObj["secs"].numberLong() * 1000;
+            }
+            if (cmdObj["millis"]) {
+                uassert(34345, "'millis' must be a number.", cmdObj["millis"].isNumber());
+                millis += cmdObj["millis"].numberLong();
+            }
+        } else {
+            millis = 10 * 1000;
         }
 
-        if (cmdObj.getBoolField("w")) {
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lk(txn->lockState());
-            sleepmillis(millis);
+        if (!cmdObj["lock"]) {
+            // Legacy implementation
+            if (cmdObj.getBoolField("w")) {
+                _sleepInWriteLock(txn, millis);
+            } else {
+                _sleepInReadLock(txn, millis);
+            }
         } else {
-            ScopedTransaction transaction(txn, MODE_S);
-            Lock::GlobalRead lk(txn->lockState());
-            sleepmillis(millis);
+            uassert(34346, "Only one of 'w' and 'lock' may be set.", !cmdObj["w"]);
+
+            std::string lock(cmdObj.getStringField("lock"));
+            if (lock == "none") {
+                sleepmillis(millis);
+            } else if (lock == "w") {
+                _sleepInWriteLock(txn, millis);
+            } else {
+                uassert(34347, "'lock' must be one of 'r', 'w', 'none'.", lock == "r");
+                _sleepInReadLock(txn, millis);
+            }
         }
 
         // Interrupt point for testing (e.g. maxTimeMS).
@@ -184,29 +224,47 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        string coll = cmdObj["captrunc"].valuestrsafe();
-        uassert(13416, "captrunc must specify a collection", !coll.empty());
-        NamespaceString nss(dbname, coll);
+        const std::string fullNs = parseNsCollectionRequired(dbname, cmdObj);
         int n = cmdObj.getIntField("n");
         bool inc = cmdObj.getBoolField("inc");  // inclusive range?
 
-        OldClientWriteContext ctx(txn, nss.ns());
+        OldClientWriteContext ctx(txn, fullNs);
         Collection* collection = ctx.getCollection();
-        massert(13417, "captrunc collection not found or empty", collection);
+
+        if (!collection) {
+            return appendCommandStatus(
+                result,
+                {ErrorCodes::NamespaceNotFound,
+                 str::stream() << "collection " << fullNs << " does not exist"});
+        }
+
+        if (!collection->isCapped()) {
+            return appendCommandStatus(result,
+                                       {ErrorCodes::IllegalOperation, "collection must be capped"});
+        }
 
         RecordId end;
         {
+            // Scan backwards through the collection to find the document to start truncating from.
+            // We will remove 'n' documents, so start truncating from the (n + 1)th document to the
+            // end.
             std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-                txn, nss.ns(), collection, PlanExecutor::YIELD_MANUAL, InternalPlanner::BACKWARD));
-            // We remove 'n' elements so the start is one past that
+                txn, fullNs, collection, PlanExecutor::YIELD_MANUAL, InternalPlanner::BACKWARD));
+
             for (int i = 0; i < n + 1; ++i) {
-                PlanExecutor::ExecState state = exec->getNext(NULL, &end);
-                massert(13418, "captrunc invalid n", PlanExecutor::ADVANCED == state);
+                PlanExecutor::ExecState state = exec->getNext(nullptr, &end);
+                if (PlanExecutor::ADVANCED != state) {
+                    return appendCommandStatus(result,
+                                               {ErrorCodes::IllegalOperation,
+                                                str::stream()
+                                                    << "invalid n, collection contains fewer than "
+                                                    << n << " documents"});
+                }
             }
         }
-        WriteUnitOfWork wuow(txn);
+
         collection->temp_cappedTruncateAfter(txn, end, inc);
-        wuow.commit();
+
         return true;
     }
 };

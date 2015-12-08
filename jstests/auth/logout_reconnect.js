@@ -4,11 +4,8 @@
  * It is a regression test for SERVER-8798.
  */
 
-port = allocatePorts( 1 )[ 0 ];
-
-conn = MongoRunner.runMongod({ 
+var conn = MongoRunner.runMongod({
     auth : "",
-    port : port,
     remember : true
 });
 

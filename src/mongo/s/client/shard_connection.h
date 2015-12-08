@@ -38,6 +38,18 @@ class ChunkManager;
 
 class ShardConnection : public AScopedConnection {
 public:
+    /**
+     * Instantiates a new sharded connection, which will be associated with the specified chunk
+     * manager for versioning purposes.
+     *
+     * @param connectionString Connection string for the host to use.
+     * @param ns Namespace to associate the version with.
+     * @param manager The chunk manager, which should be used for obtaining shard version
+     *  information to be set on the connection. This value can be nullptr, if the connection will
+     *  not be versioned and not associated with a namespace, in which case only the
+     *  setShardVersion command will be invoked to initialize the remote shard. Otherwise, the
+     *  chunk manager will be used to obtain the shard version to set on the connection.
+     */
     ShardConnection(const ConnectionString& connectionString,
                     const std::string& ns,
                     std::shared_ptr<ChunkManager> manager = nullptr);

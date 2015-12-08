@@ -642,7 +642,7 @@
         // Simple count no arguments, applying hint
         countExecutor({
           insert: [{ _id: 1, x:11 }, { _id: 2, x:22 }, { _id: 3, x:33 }],
-          params: [{}, {hint: "_id"}],
+          params: [{}, {hint: { "_id": 1}}],
           result: 3,
           expected: [{ _id: 1, x:11 }, { _id: 2, x:22 }, { _id: 3, x:33 }]
         });
@@ -694,9 +694,9 @@
 
         // Simple tailable cursor
         var cursor = coll.find({}).sort({a:1}).tailable();
-        assert.eq(34, cursor._options);
+        assert.eq(34, (cursor._options & ~DBQuery.Option.slaveOk));
         var cursor = coll.find({}).sort({a:1}).tailable(false);
-        assert.eq(2, cursor._options);
+        assert.eq(2, (cursor._options & ~DBQuery.Option.slaveOk));
 
         // Check modifiers
         var cursor = coll.find({}).modifiers({$hint:'a_1'});
@@ -704,15 +704,15 @@
 
         // allowPartialResults
         var cursor = coll.find({}).allowPartialResults();
-        assert.eq(128, cursor._options);
+        assert.eq(128, (cursor._options & ~DBQuery.Option.slaveOk));
 
         // noCursorTimeout
         var cursor = coll.find({}).noCursorTimeout();
-        assert.eq(16, cursor._options);
+        assert.eq(16, (cursor._options & ~DBQuery.Option.slaveOk));
 
         // oplogReplay
         var cursor = coll.find({}).oplogReplay();
-        assert.eq(8, cursor._options);
+        assert.eq(8, (cursor._options & ~DBQuery.Option.slaveOk));
 
         //
         // Aggregation
@@ -722,22 +722,13 @@
         // Insert all of them
         coll.insertMany([{a:0, b:0}, {a:1, b:1}]);
 
-        // TODO: When SERVER-19569 is done, we should be able to run this test regardless of whether
-        // we are using the find/getMore commands, both against a standalone server and passed
-        // through mongos.
-        if (!db.getMongo().useReadCommands()) {
-            // Simple aggregation with useCursor
-            var result = coll.aggregate([{$match: {}}], {useCursor:true}).toArray();
-            assert.eq(2, result.length);
+        // Simple aggregation with useCursor
+        var result = coll.aggregate([{$match: {}}], {useCursor:true}).toArray();
+        assert.eq(2, result.length);
 
-            // Simple aggregation with batchSize
-            var result = coll.aggregate([{$match: {}}], {batchSize:2}).toArray();
-            assert.eq(2, result.length);
-
-            // Set the maxTimeMS and allowDiskUse on aggregation query
-            var result = coll.aggregate([{$match: {}}], {batchSize:2, maxTimeMS:100, allowDiskUse:true}).toArray();
-            assert.eq(2, result.length);
-        }
+        // Simple aggregation with batchSize
+        var result = coll.aggregate([{$match: {}}], {batchSize:2}).toArray();
+        assert.eq(2, result.length);
 
         // Drop collection
         coll.drop();

@@ -74,14 +74,18 @@ class ShardedClusterFixture(interface.Fixture):
 
     def setup(self):
         if self.separate_configsvr:
-            self.configsvr = self._new_configsvr()
+            if self.configsvr is None:
+                self.configsvr = self._new_configsvr()
             self.configsvr.setup()
 
+        if not self.shards:
+            for i in xrange(self.num_shards):
+                shard = self._new_shard(i)
+                self.shards.append(shard)
+
         # Start up each of the shards
-        for i in xrange(self.num_shards):
-            shard = self._new_shard(i)
+        for shard in self.shards:
             shard.setup()
-            self.shards.append(shard)
 
     def await_ready(self):
         # Wait for the config server
@@ -92,8 +96,10 @@ class ShardedClusterFixture(interface.Fixture):
         for shard in self.shards:
             shard.await_ready()
 
+        if self.mongos is None:
+            self.mongos = self._new_mongos()
+
         # Start up the mongos
-        self.mongos = self._new_mongos()
         self.mongos.setup()
 
         # Wait for the mongos
@@ -176,7 +182,6 @@ class ShardedClusterFixture(interface.Fixture):
         mongod_options["configsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
         mongod_options["replSet"] = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
-        mongod_options["set_parameters"]["enableReplSnapshotThread"] = 1
         mongod_options["storageEngine"] = "wiredTiger"
 
         return replicaset.ReplicaSetFixture(mongod_logger,
@@ -266,8 +271,7 @@ class _MongoSFixture(interface.Fixture):
             self.mongos_options["chunkSize"] = 50
 
         if "port" not in self.mongos_options:
-            with core.network.UnusedPort() as port:
-                self.mongos_options["port"] = port.num
+            self.mongos_options["port"] = core.network.PortAllocator.next_fixture_port(self.job_num)
         self.port = self.mongos_options["port"]
 
         mongos = core.programs.mongos_program(self.logger,
@@ -308,7 +312,7 @@ class _MongoSFixture(interface.Fixture):
                         % (self.port, standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
 
                 self.logger.info("Waiting to connect to mongos on port %d.", self.port)
-                time.sleep(1)  # Wait a little bit before trying again.
+                time.sleep(0.1)  # Wait a little bit before trying again.
 
         self.logger.info("Successfully contacted the mongos on port %d.", self.port)
 

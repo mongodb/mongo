@@ -1,5 +1,11 @@
 /**
- * Test 'captrunc' command on indexed capped collections
+ * Test running the 'captrunc' command on various kinds of collections:
+ *   - indexed capped collections
+ *   - nonexistent collections
+ *   - non-capped collections
+ *
+ * This test fails with the ephemeralForTest storage engine.
+ * @tags: [SERVER-21658]
  */
 (function() {
     'use strict';
@@ -15,6 +21,11 @@
         assert.writeOK(t.insert({x:j}));
     }
 
+    // It is an error to try and remove more documents than what exist in the capped collection.
+    assert.commandFailed(db.runCommand({ captrunc: "capped_truncate", n: 20 }),
+                         "captrunc didn't return an error when attempting to remove more" +
+                         " documents than what the collection contains");
+
     assert.commandWorked(db.runCommand({ captrunc: "capped_truncate", n: 5, inc: false }));
     assert.eq(5, t.count(), "wrong number of documents in capped collection after truncate");
     assert.eq(5, t.distinct("_id").length, "wrong number of entries in _id index after truncate");
@@ -23,4 +34,15 @@
     assert.neq(null, t.findOne({_id: last._id}),
                tojson(last) + " is in _id index, but not in capped collection after truncate");
 
+    // It is an error to run the captrunc command on a nonexistent collection.
+    assert.commandFailed(db.runCommand({ captrunc: "nonexistent", n: 1 }),
+                         "captrunc didn't return an error for a nonexistent collection");
+
+    // It is an error to run the captrunc command on a non-capped collection.
+    assert.commandWorked(db.runCommand({ create: "noncapped", capped: false }));
+    for (var j = 1; j <= 10; j++) {
+        assert.writeOK(db.noncapped.insert({x:j}));
+    }
+    assert.commandFailed(db.runCommand({ captrunc: "noncapped", n: 5 }),
+                         "captrunc didn't return an error for a non-capped collection");
 })();

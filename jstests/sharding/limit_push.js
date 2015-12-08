@@ -1,12 +1,9 @@
 // This test is to ensure that limit() clauses are pushed down to the shards and evaluated
 // See: http://jira.mongodb.org/browse/SERVER-1896
+(function() {
 
-s = new ShardingTest( "limit_push", 2, 1, 1 );
-
-// Stop balancer since we do manual moves.
-s.stopBalancer();
-
-db = s.getDB( "test" );
+var s = new ShardingTest({ name: "limit_push", shards: 2, mongos: 1 });
+var db = s.getDB( "test" );
 
 // Create some data
 for (i=0; i < 100; i++) { db.limit_push.insert({ _id : i, x: i}); } 
@@ -50,3 +47,5 @@ for (var j in execStages.shards) {
 }
 
 s.stop();
+
+})();

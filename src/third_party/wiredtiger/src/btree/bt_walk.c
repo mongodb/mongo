@@ -81,11 +81,11 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
-	int empty_internal, prev, skip;
+	bool empty_internal, prev, skip;
 	uint32_t slot;
 
 	btree = S2BT(session);
-	empty_internal = 0;
+	empty_internal = false;
 
 	/*
 	 * Tree walks are special: they look inside page structures that splits
@@ -93,6 +93,9 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
 	 * window.
 	 */
 	WT_ENTER_PAGE_INDEX(session);
+
+	/* Walk should never instantiate deleted pages. */
+	LF_SET(WT_READ_NO_EMPTY);
 
 	/*
 	 * !!!
@@ -174,11 +177,12 @@ ascend:	/*
 
 			/*
 			 * If we got all the way through an internal page and
-			 * all of the child pages were deleted, evict it.
+			 * all of the child pages were deleted, mark it for
+			 * eviction.
 			 */
-			if (empty_internal) {
+			if (empty_internal && pindex->entries > 1) {
 				__wt_page_evict_soon(ref->page);
-				empty_internal = 0;
+				empty_internal = false;
 			}
 
 			/* Optionally skip internal pages. */
@@ -240,8 +244,9 @@ ascend:	/*
 			 * If we see any child states other than deleted, the
 			 * page isn't empty.
 			 */
-			if (ref->state != WT_REF_DELETED)
-				empty_internal = 0;
+			if (ref->state != WT_REF_DELETED &&
+			    !LF_ISSET(WT_READ_TRUNCATE))
+				empty_internal = false;
 
 			if (LF_ISSET(WT_READ_CACHE)) {
 				/*
@@ -257,7 +262,7 @@ ascend:	/*
 				 * to delete it again.
 				 */
 				if (ref->state == WT_REF_DELETED &&
-				    __wt_delete_page_skip(session, ref))
+				    __wt_delete_page_skip(session, ref, false))
 					break;
 				/*
 				 * If deleting a range, try to delete the page
@@ -266,6 +271,7 @@ ascend:	/*
 				WT_ERR(__wt_delete_page(session, ref, &skip));
 				if (skip)
 					break;
+				empty_internal = false;
 			} else if (LF_ISSET(WT_READ_COMPACT)) {
 				/*
 				 * Skip deleted pages, rewriting them doesn't
@@ -294,7 +300,7 @@ ascend:	/*
 				 * Try to skip deleted pages visible to us.
 				 */
 				if (ref->state == WT_REF_DELETED &&
-				    __wt_delete_page_skip(session, ref))
+				    __wt_delete_page_skip(session, ref, false))
 					break;
 			}
 
@@ -302,7 +308,7 @@ ascend:	/*
 
 			/*
 			 * Not-found is an expected return when only walking
-			 * in-cache pages.
+			 * in-cache pages, or if we see a deleted page.
 			 */
 			if (ret == WT_NOTFOUND) {
 				ret = 0;
@@ -358,7 +364,7 @@ descend:		couple = ref;
 			if (WT_PAGE_IS_INTERNAL(page)) {
 				WT_INTL_INDEX_GET(session, page, pindex);
 				slot = prev ? pindex->entries - 1 : 0;
-				empty_internal = 1;
+				empty_internal = true;
 			} else {
 				*refp = ref;
 				goto done;

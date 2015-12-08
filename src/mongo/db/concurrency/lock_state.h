@@ -205,10 +205,6 @@ private:
     // and condition variable every time.
     CondVarLockGrantNotification _notify;
 
-    // Timer for measuring duration and timeouts. This value is set when lock acquisition is
-    // about to wait and is sampled at grant time.
-    uint64_t _requestStartTime;
-
     // Per-locker locking statistics. Reported in the slow-query log message and through
     // db.currentOp. Complementary to the per-instance locking statistics.
     SingleThreadedLockStats _stats;

@@ -12,16 +12,20 @@ function check() {
     assert.eq.automsg( "1", "db[ baseName ].count()" );
 }
 
-port = allocatePorts( 1 )[ 0 ];
-dbpath = MongoRunner.dataPath + baseName + "/";
-repairpath = dbpath + "repairDir/";
-longDBName = Array(61).join('a');
-longRepairPath = dbpath + Array(61).join('b') + '/';
+var dbpath = MongoRunner.dataPath + baseName + "/";
+var repairpath = dbpath + "repairDir/";
+var longDBName = Array(61).join('a');
+var longRepairPath = dbpath + Array(61).join('b') + '/';
 
 resetDbpath( dbpath );
 resetDbpath( repairpath );
 
-m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+var m = MongoRunner.runMongod({
+    directoryperdb: "",
+    dbpath: dbpath,
+    repairpath: repairpath,
+    noCleanData: true,
+});
 db = m.getDB( baseName );
 db[ baseName ].save( {} );
 assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles:true} ) );
@@ -41,48 +45,97 @@ for( f in files ) {
 assert( fileCount > 0, "Expected more than zero nondirectory files in the database directory" );
 
 check();
-MongoRunner.stopMongod( port );
+MongoRunner.stopMongod( m.port );
 
 resetDbpath( repairpath );
-m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+m = MongoRunner.runMongod({
+    port: m.port,
+    directoryperdb: "",
+    dbpath: dbpath,
+    noCleanData: true,
+});
 db = m.getDB( baseName );
 assert.commandWorked( db.runCommand( {repairDatabase:1} ) );
 check();
-MongoRunner.stopMongod( port );
+MongoRunner.stopMongod( m.port );
 
 //Test long database names
 resetDbpath( repairpath );
-m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+m = MongoRunner.runMongod({
+    port: m.port,
+    directoryperdb: "",
+    dbpath: dbpath,
+    noCleanData: true,
+});
 db = m.getDB( longDBName );
 assert.writeOK(db[ baseName ].save( {} ));
 assert.commandWorked( db.runCommand( {repairDatabase:1} ) );
-MongoRunner.stopMongod( port );
+MongoRunner.stopMongod( m.port );
 
 //Test long repairPath
 resetDbpath( longRepairPath )
-m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", longRepairPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+m = MongoRunner.runMongod({
+    port: m.port,
+    directoryperdb: "",
+    dbpath: dbpath,
+    repairpath: longRepairPath,
+    noCleanData: true,
+});
 db = m.getDB( longDBName );
 assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles: true} ) );
 check();
-MongoRunner.stopMongod( port );
+MongoRunner.stopMongod( m.port );
 
 //Test database name and repairPath with --repair
 resetDbpath( longRepairPath )
-m = startMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", longRepairPath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+var returnCode = runMongoProgram("mongod",
+                                 "--port", m.port,
+                                 "--repair",
+                                 "--directoryperdb",
+                                 "--dbpath", dbpath,
+                                 "--repairpath", longRepairPath);
+assert.eq(returnCode, 0);
+m = MongoRunner.runMongod({
+    port: m.port,
+    directoryperdb: "",
+    dbpath: dbpath,
+    noCleanData: true,
+});
 db = m.getDB( longDBName );
 check();
-MongoRunner.stopMongod( port );
+MongoRunner.stopMongod( m.port );
 
 resetDbpath( repairpath );
-runMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+returnCode = runMongoProgram("mongod",
+                             "--port", m.port,
+                             "--repair",
+                             "--directoryperdb",
+                             "--dbpath", dbpath,
+                             "--repairpath", repairpath);
+assert.eq(returnCode, 0);
+m = MongoRunner.runMongod({
+    port: m.port,
+    directoryperdb: "",
+    dbpath: dbpath,
+    repairpath: repairpath,
+    noCleanData: true,
+});
 db = m.getDB( baseName );
 check();
-MongoRunner.stopMongod( port );
+MongoRunner.stopMongod( m.port );
 
 resetDbpath( repairpath );
-runMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+returnCode = runMongoProgram("mongod",
+                             "--port", m.port,
+                             "--repair",
+                             "--directoryperdb",
+                             "--dbpath", dbpath);
+assert.eq(returnCode, 0);
+m = MongoRunner.runMongod({
+    port: m.port,
+    directoryperdb: "",
+    dbpath: dbpath,
+    noCleanData: true,
+});
 db = m.getDB( baseName );
 check();

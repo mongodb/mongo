@@ -26,16 +26,26 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/async_stream.h"
+#include "mongo/executor/async_stream_common.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace executor {
 
 using asio::ip::tcp;
 
-AsyncStream::AsyncStream(asio::io_service* io_service) : _stream(*io_service) {}
+AsyncStream::AsyncStream(asio::io_service::strand* strand)
+    : _strand(strand), _stream(_strand->get_io_service()) {}
+
+AsyncStream::~AsyncStream() {
+    destroyStream(&_stream, _connected);
+}
 
 void AsyncStream::connect(tcp::resolver::iterator iter, ConnectHandler&& connectHandler) {
     asio::async_connect(
@@ -43,17 +53,42 @@ void AsyncStream::connect(tcp::resolver::iterator iter, ConnectHandler&& connect
         std::move(iter),
         // We need to wrap this with a lambda of the right signature so it compiles, even
         // if we don't actually use the resolver iterator.
-        [this, connectHandler](std::error_code ec, tcp::resolver::iterator) {
+        _strand->wrap([this, connectHandler](std::error_code ec, tcp::resolver::iterator iter) {
+            if (ec) {
+                return connectHandler(ec);
+            }
+
+            // We assume that our owner is responsible for keeping us alive until we call
+            // connectHandler, so _connected should always be a valid memory location.
+            ec = setStreamNonBlocking(&_stream);
+            if (ec) {
+                return connectHandler(ec);
+            }
+
+            ec = setStreamNoDelay(&_stream);
+            if (ec) {
+                return connectHandler(ec);
+            }
+
+            _connected = true;
             return connectHandler(ec);
-        });
+        }));
 }
 
 void AsyncStream::write(asio::const_buffer buffer, StreamHandler&& streamHandler) {
-    asio::async_write(_stream, asio::buffer(buffer), std::move(streamHandler));
+    writeStream(&_stream, _strand, _connected, buffer, std::move(streamHandler));
 }
 
 void AsyncStream::read(asio::mutable_buffer buffer, StreamHandler&& streamHandler) {
-    asio::async_read(_stream, asio::buffer(buffer), std::move(streamHandler));
+    readStream(&_stream, _strand, _connected, buffer, std::move(streamHandler));
+}
+
+void AsyncStream::cancel() {
+    cancelStream(&_stream, _connected);
+}
+
+bool AsyncStream::isOpen() {
+    return checkIfStreamIsOpen(&_stream, _connected);
 }
 
 }  // namespace executor

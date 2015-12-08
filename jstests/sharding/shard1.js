@@ -2,7 +2,7 @@
 * this tests some of the ground work
 */
 
-s = new ShardingTest( "shard1" , 2 );
+s = new ShardingTest({name: "shard1", shards: 2});
 
 db = s.getDB( "test" );
 db.foo.insert( { num : 1 , name : "eliot" } );

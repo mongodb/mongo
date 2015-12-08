@@ -261,8 +261,8 @@ namespace NamespaceDetailsTests {
             RecordId l[ N ];
             for ( int i = 0; i < N; ++i ) {
                 BSONObj b = bigObj();
-                StatusWith<RecordId> status = collection()->insertDocument( &txn, b, true );
-                ASSERT( status.isOK() );
+                StatusWith<RecordId> status =
+                ASSERT( collection()->insertDocument( &txn, b, true ).isOK() );
                 l[ i ] = status.getValue();
                 ASSERT( !l[ i ].isNull() );
                 ASSERT( nRecords() <= Q );
@@ -283,8 +283,8 @@ namespace NamespaceDetailsTests {
 
             RecordId l[ 8 ];
             for ( int i = 0; i < 8; ++i ) {
-                StatusWith<RecordId> status = collection()->insertDocument( &txn, bigObj(), true );
-                ASSERT( status.isOK() );
+                StatusWith<RecordId> status =
+                ASSERT( collection()->insertDocument( &txn, bigObj(), true ).isOK() );
                 l[ i ] = status.getValue();
                 ASSERT( !l[ i ].isNull() );
                 //ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
@@ -298,8 +298,7 @@ namespace NamespaceDetailsTests {
             bob.appendOID( "_id", NULL, true );
             bob.append( "a", string( MinExtentSize + 500, 'a' ) ); // min extent size is now 4096
             BSONObj bigger = bob.done();
-            StatusWith<RecordId> status = collection()->insertDocument( &txn, bigger, false );
-            ASSERT( !status.isOK() );
+            ASSERT( !collection()->insertDocument( &txn, bigger, false ).isOK() );
             ASSERT_EQUALS( 0, nRecords() );
         }
     private:
@@ -421,8 +420,7 @@ namespace NamespaceDetailsTests {
             bob.appendOID("_id", 0, true);
             bob.append( "a", string( MinExtentSize + 300, 'a' ) );
             BSONObj bigger = bob.done();
-            StatusWith<RecordId> status = collection()->insertDocument( &txn, bigger, true );
-            ASSERT( !status.isOK() );
+            ASSERT( !collection()->insertDocument( &txn, bigger, true ).isOK() );
             ASSERT_EQUALS( 0, nRecords() );
         }
     public:

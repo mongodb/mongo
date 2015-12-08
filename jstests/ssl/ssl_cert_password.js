@@ -2,7 +2,6 @@
 // This tests that providing a proper password works and that providing no password or incorrect
 // password fails.  It uses both mongod and mongo to run the tests, since the mongod binary
 // does not return error statuses to indicate an error.
-port = allocatePorts( 1 )[ 0 ];
 var baseName = "jstests_ssl_ssl_cert_password";
 var dbpath = MongoRunner.dataPath + baseName;
 var external_scratch_dir = MongoRunner.dataPath + baseName + "/external/";
@@ -11,7 +10,6 @@ mkdir(external_scratch_dir);
 
 // Password is correct
 var md = MongoRunner.runMongod({nopreallocj: "",
-                                port: port,
                                 dbpath: dbpath,
                                 sslMode: "requireSSL",
                                 sslPEMKeyFile: "jstests/libs/password_protected.pem",
@@ -21,7 +19,7 @@ var md = MongoRunner.runMongod({nopreallocj: "",
 
 // Password incorrect; error logged is:
 //  error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad decrypt
-var exit_code = runMongoProgram("mongo", "--port", port,
+var exit_code = runMongoProgram("mongo", "--port", md.port,
                                 "--ssl", "--sslAllowInvalidCertificates",
                                 "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                                 "--sslPEMKeyPassword", "barf");
@@ -36,7 +34,7 @@ c.save({ a : 22 });
 assert.eq(1, c.count(), "failed to insert document into dumprestore_ssl.foo collection");
 
 exit_code = runMongoProgram("mongodump", "--out", external_scratch_dir,
-                            "--port", port,
+                            "--port", md.port,
                             "--ssl",
                             "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                             "--sslPEMKeyPassword", "qwerty");
@@ -47,7 +45,7 @@ c.drop();
 assert.eq(0, c.count(), "dumprestore_ssl.foo collection is not empty after drop");
 
 exit_code = runMongoProgram("mongorestore", "--dir", external_scratch_dir,
-                            "--port", port,
+                            "--port", md.port,
                             "--ssl",
                             "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                             "--sslPEMKeyPassword", "qwerty");
@@ -71,7 +69,7 @@ var exportimport_file = "data.json";
 
 exit_code = runMongoProgram("mongoexport", "--out", external_scratch_dir + exportimport_file,
                             "-d", exportimport_ssl_dbname, "-c", "foo",
-                            "--port", port,
+                            "--port", md.port,
                             "--ssl",
                             "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                             "--sslPEMKeyPassword", "qwerty");
@@ -83,7 +81,7 @@ assert.eq(0, c.count(), "afterdrop", "-d", exportimport_ssl_dbname, "-c", "foo")
 
 exit_code = runMongoProgram("mongoimport", "--file", external_scratch_dir + exportimport_file,
                             "-d", exportimport_ssl_dbname, "-c", "foo",
-                            "--port", port,
+                            "--port", md.port,
                             "--ssl",
                             "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                             "--sslPEMKeyPassword", "qwerty");
@@ -104,7 +102,7 @@ source_filename = 'jstests/ssl/ssl_cert_password.js'
 filename = 'ssl_cert_password.js'
 
 exit_code = runMongoProgram("mongofiles", "-d", mongofiles_ssl_dbname, "put", source_filename,
-                            "--port", port,
+                            "--port", md.port,
                             "--ssl",
                             "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                             "--sslPEMKeyPassword", "qwerty");
@@ -122,7 +120,7 @@ assert.eq(md5, md5_computed, "md5 computed incorrectly by server");
 
 exit_code = runMongoProgram("mongofiles", "-d", mongofiles_ssl_dbname, "get", source_filename,
                             "-l", external_scratch_dir + filename,
-                            "--port", port,
+                            "--port", md.port,
                             "--ssl",
                             "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                             "--sslPEMKeyPassword", "qwerty");
@@ -134,6 +132,6 @@ assert.eq(md5, md5_stored, "hash of stored file does not match the expected valu
 
 if (!_isWindows()) {
     // Stop the server
-    var exitCode = MongoRunner.stopMongod(port, 15);
+    var exitCode = MongoRunner.stopMongod(md.port, 15);
     assert(exitCode == 0);
 }

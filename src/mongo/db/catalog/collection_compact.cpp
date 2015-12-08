@@ -125,10 +125,6 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
         return StatusWith<CompactStats>(ErrorCodes::BadValue,
                                         "cannot compact when indexes in progress");
 
-
-    // same data, but might perform a little different after compact?
-    _infoCache.reset(txn);
-
     vector<BSONObj> indexSpecs;
     {
         IndexCatalog::IndexIterator ii(_indexCatalog.getIndexIterator(txn, false));

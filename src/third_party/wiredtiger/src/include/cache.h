@@ -18,11 +18,6 @@
 #define	WT_EVICT_WALK_BASE	300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR	100	/* Pages added each walk */
 
-#define	WT_EVICT_PASS_AGGRESSIVE	0x01
-#define	WT_EVICT_PASS_ALL		0x02
-#define	WT_EVICT_PASS_DIRTY		0x04
-#define	WT_EVICT_PASS_WOULD_BLOCK	0x08
-
 /*
  * WT_EVICT_ENTRY --
  *	Encapsulation of an eviction candidate.
@@ -43,6 +38,14 @@ struct __wt_evict_worker {
 #define	WT_EVICT_WORKER_RUN	0x01
 	uint32_t flags;
 };
+
+/* Cache operations. */
+typedef enum __wt_cache_op {
+	WT_SYNC_CHECKPOINT,
+	WT_SYNC_CLOSE,
+	WT_SYNC_DISCARD,
+	WT_SYNC_WRITE_LEAVES
+} WT_CACHE_OP;
 
 /*
  * WiredTiger cache structure.
@@ -96,7 +99,7 @@ struct __wt_cache {
 	/*
 	 * LRU eviction list information.
 	 */
-	WT_EVICT_ENTRY *evict;		/* LRU pages being tracked */
+	WT_EVICT_ENTRY *evict_queue;	/* LRU pages being tracked */
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
 	uint32_t evict_candidates;	/* LRU list pages to evict */
 	uint32_t evict_entries;		/* LRU entries in the queue */
@@ -109,6 +112,7 @@ struct __wt_cache {
 	 * Cache pool information.
 	 */
 	uint64_t cp_pass_pressure;	/* Calculated pressure from this pass */
+	uint64_t cp_quota;		/* Maximum size for this cache */
 	uint64_t cp_reserved;		/* Base size for this cache */
 	WT_SESSION_IMPL *cp_session;	/* May be used for cache management */
 	uint32_t cp_skip_count;		/* Post change stabilization */
@@ -117,6 +121,15 @@ struct __wt_cache {
 	uint64_t cp_saved_app_evicts;	/* User eviction count at last review */
 	uint64_t cp_saved_app_waits;	/* User wait count at last review */
 	uint64_t cp_saved_read;		/* Read count at last review */
+
+	/*
+	 * Work state.
+	 */
+#define	WT_EVICT_PASS_AGGRESSIVE	0x01
+#define	WT_EVICT_PASS_ALL		0x02
+#define	WT_EVICT_PASS_DIRTY		0x04
+#define	WT_EVICT_PASS_WOULD_BLOCK	0x08
+	uint32_t state;
 
 	/*
 	 * Flags.
@@ -140,12 +153,14 @@ struct __wt_cache_pool {
 	const char *name;
 	uint64_t size;
 	uint64_t chunk;
+	uint64_t quota;
 	uint64_t currently_used;
 	uint32_t refs;		/* Reference count for structure. */
 	/* Locked: List of connections participating in the cache pool. */
 	TAILQ_HEAD(__wt_cache_pool_qh, __wt_connection_impl) cache_pool_qh;
 
-#define	WT_CACHE_POOL_MANAGED	0x01	/* Cache pool has a manager thread */
-#define	WT_CACHE_POOL_ACTIVE	0x02	/* Cache pool is active */
-	uint8_t flags_atomic;
+	uint8_t pool_managed;		/* Cache pool has a manager thread */
+
+#define	WT_CACHE_POOL_ACTIVE	0x01	/* Cache pool is active */
+	uint8_t flags;
 };

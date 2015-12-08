@@ -78,9 +78,16 @@
     cmdRes = db.runCommand({
         getMore: cmdRes.cursor.id,
         collection: collName,
-        batchSize: NumberInt(10)
+        batchSize: NumberInt(11)
     });
     assert.eq(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.nextBatch.length, 10);
+
+    // Find command with batchSize and singleBatch.
+    cmdRes = db.runCommand({find: collName, batchSize: 10, singleBatch: true});
+    assert.commandWorked(cmdRes);
+    assert.eq(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.firstBatch.length, 10);
 })();

@@ -729,11 +729,14 @@ class TCMallocImplementation : public MallocExtension {
     ThreadCache::BecomeIdle();
   }
 
-  virtual void ShrinkCacheIfAboveSize(size_t min_size) {
-    ThreadCache::ShrinkCacheIfAboveSize(min_size);
-  }
-
   virtual void MarkThreadBusy();  // Implemented below
+
+  virtual size_t GetThreadCacheSize() {
+    ThreadCache* tc = ThreadCache::GetCacheIfPresent();
+    if (!tc)
+      return 0;
+    return tc->Size();
+  }
 
   virtual SysAllocator* GetSystemAllocator() {
     SpinLockHolder h(Static::pageheap_lock());

@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -52,16 +53,16 @@ class VoteRequester {
     MONGO_DISALLOW_COPYING(VoteRequester);
 
 public:
-    enum VoteRequestResult {
-        SuccessfullyElected,
-        StaleTerm,
-        InsufficientVotes,
+    enum class Result {
+        kSuccessfullyElected,
+        kStaleTerm,
+        kInsufficientVotes,
     };
 
     class Algorithm : public ScatterGatherAlgorithm {
     public:
         Algorithm(const ReplicaSetConfig& rsConfig,
-                  long long candidateId,
+                  long long candidateIndex,
                   long long term,
                   bool dryRun,
                   OpTime lastOplogEntry);
@@ -72,19 +73,25 @@ public:
         virtual bool hasReceivedSufficientResponses() const;
 
         /**
-         * Returns a VoteRequestResult indicating the result of the election.
+         * Returns a VoteRequest::Result indicating the result of the election.
          *
          * It is invalid to call this before hasReceivedSufficientResponses returns true.
          */
-        VoteRequestResult getResult() const;
+        Result getResult() const;
+
+        /**
+         * Returns the list of nodes that responded to the VoteRequest command.
+         */
+        unordered_set<HostAndPort> getResponders() const;
 
     private:
         const ReplicaSetConfig _rsConfig;
-        const long long _candidateId;
+        const long long _candidateIndex;
         const long long _term;
         bool _dryRun = false;  // this bool indicates this is a mock election when true
         const OpTime _lastOplogEntry;
         std::vector<HostAndPort> _targets;
+        unordered_set<HostAndPort> _responders;
         bool _staleTerm = false;
         long long _responsesProcessed = 0;
         long long _votes = 1;
@@ -105,7 +112,7 @@ public:
     StatusWith<ReplicationExecutor::EventHandle> start(
         ReplicationExecutor* executor,
         const ReplicaSetConfig& rsConfig,
-        long long candidateId,
+        long long candidateIndex,
         long long term,
         bool dryRun,
         OpTime lastOplogEntry,
@@ -119,7 +126,8 @@ public:
      */
     void cancel(ReplicationExecutor* executor);
 
-    VoteRequestResult getResult() const;
+    Result getResult() const;
+    unordered_set<HostAndPort> getResponders() const;
 
 private:
     std::unique_ptr<Algorithm> _algorithm;

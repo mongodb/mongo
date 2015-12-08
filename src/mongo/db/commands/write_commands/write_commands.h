@@ -84,6 +84,7 @@ private:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const;
 
     // Type of batch (e.g. insert).

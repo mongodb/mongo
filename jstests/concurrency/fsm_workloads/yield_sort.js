@@ -5,9 +5,6 @@
  *
  * Intersperse queries which use the SORT stage with updates and deletes of documents they may
  * match.
- * This workload is blacklisted until SERVER-15176 is resolved, which allows the query system to
- * distinguish between batchSize and limit. Updates during sort stage can cause docs to be returned
- * out of order if it's an unindexed query with non-default batch sizes.
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield_sort_merge.js'); // for $config
@@ -27,7 +24,7 @@ var $config = extendWorkload($config, function($config, $super) {
         var verifier = function sortVerifier(doc, prevDoc) {
             var correctOrder = true;
             if (prevDoc !== null) {
-                correctOrder = (doc._id <= prevDoc._id);
+                correctOrder = (doc.c <= prevDoc.c);
             }
             return doc.a < nMatches && correctOrder;
         };
@@ -36,8 +33,8 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
-        var newA = Random.randInt($config.data.nDocs);
-        var newC = Random.randInt($config.data.nDocs);
+        var newA = Random.randInt(this.nDocs);
+        var newC = Random.randInt(this.nDocs);
         return { $set: { a: newA, c: newC } };
     };
 

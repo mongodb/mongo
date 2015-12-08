@@ -15,13 +15,13 @@ t.ensureIndex({baz: 1, bar:1})
 // foo == 1
 // We would (internally) use "": MinKey and "": MaxKey for the bar index bounds.
 ixscan1 = {ixscan: {args:{keyPattern:{foo: 1, bar:1},
-                          startKey: {"": 1, "": 0},
-                          endKey: {"": 1, "": 100000}, endKeyInclusive: true,
+                          startKey: {foo: 1, bar: 0},
+                          endKey: {foo: 1, bar: 100000}, endKeyInclusive: true,
                           direction: 1}}};
 // baz == 1
 ixscan2 = {ixscan: {args:{keyPattern:{baz: 1, bar:1},
-                          startKey: {"": 1, "": 0},
-                          endKey: {"": 1, "": 100000}, endKeyInclusive: true,
+                          startKey: {baz: 1, bar: 0},
+                          endKey: {baz: 1, bar: 100000}, endKeyInclusive: true,
                           direction: 1}}};
 
 mergesort = {mergeSort: {args: {nodes: [ixscan1, ixscan2], pattern: {bar: 1}}}};

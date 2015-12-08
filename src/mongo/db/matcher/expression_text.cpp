@@ -29,82 +29,83 @@
  */
 
 #include "mongo/platform/basic.h"
+
 #include "mongo/db/matcher/expression_text.h"
+
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/fts/fts_language.h"
+#include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/index/fts_access_method.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-using std::string;
-using std::unique_ptr;
-using stdx::make_unique;
+Status TextMatchExpression::init(OperationContext* txn,
+                                 const NamespaceString& nss,
+                                 TextParams params) {
+    _ftsQuery.setQuery(std::move(params.query));
+    _ftsQuery.setLanguage(std::move(params.language));
+    _ftsQuery.setCaseSensitive(params.caseSensitive);
+    _ftsQuery.setDiacriticSensitive(params.diacriticSensitive);
 
-Status TextMatchExpression::init(const string& query,
-                                 const string& language,
-                                 bool caseSensitive,
-                                 bool diacriticSensitive) {
-    _query = query;
-    _language = language;
-    _caseSensitive = caseSensitive;
-    _diacriticSensitive = diacriticSensitive;
+    fts::TextIndexVersion version;
+    {
+        // Find text index.
+        ScopedTransaction transaction(txn, MODE_IS);
+        AutoGetDb autoDb(txn, nss.db(), MODE_IS);
+        Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IS);
+        Database* db = autoDb.getDb();
+        if (!db) {
+            return {ErrorCodes::IndexNotFound,
+                    str::stream() << "text index required for $text query (no such collection '"
+                                  << nss.ns() << "')"};
+        }
+        Collection* collection = db->getCollection(nss);
+        if (!collection) {
+            return {ErrorCodes::IndexNotFound,
+                    str::stream() << "text index required for $text query (no such collection '"
+                                  << nss.ns() << "')"};
+        }
+        std::vector<IndexDescriptor*> idxMatches;
+        collection->getIndexCatalog()->findIndexByType(txn, IndexNames::TEXT, idxMatches);
+        if (idxMatches.empty()) {
+            return {ErrorCodes::IndexNotFound, "text index required for $text query"};
+        }
+        if (idxMatches.size() > 1) {
+            return {ErrorCodes::IndexNotFound, "more than one text index found for $text query"};
+        }
+        invariant(idxMatches.size() == 1);
+        IndexDescriptor* index = idxMatches[0];
+        const FTSAccessMethod* fam =
+            static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(index));
+        invariant(fam);
+
+        // Extract version and default language from text index.
+        version = fam->getSpec().getTextIndexVersion();
+        if (_ftsQuery.getLanguage().empty()) {
+            _ftsQuery.setLanguage(fam->getSpec().defaultLanguage().str());
+        }
+    }
+
+    Status parseStatus = _ftsQuery.parse(version);
+    if (!parseStatus.isOK()) {
+        return parseStatus;
+    }
+
     return initPath("_fts");
 }
 
-bool TextMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    // See ops/update.cpp.
-    // This node is removed by the query planner.  It's only ever called if we're getting an
-    // elemMatchKey.
-    return true;
-}
-
-void TextMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
-    debug << "TEXT : query=" << _query << ", language=" << _language
-          << ", caseSensitive=" << _caseSensitive << ", diacriticSensitive=" << _diacriticSensitive
-          << ", tag=";
-    MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
-        td->debugString(&debug);
-    } else {
-        debug << "NULL";
-    }
-    debug << "\n";
-}
-
-void TextMatchExpression::toBSON(BSONObjBuilder* out) const {
-    out->append("$text",
-                BSON("$search" << _query << "$language" << _language << "$caseSensitive"
-                               << _caseSensitive << "$diacriticSensitive" << _diacriticSensitive));
-}
-
-bool TextMatchExpression::equivalent(const MatchExpression* other) const {
-    if (matchType() != other->matchType()) {
-        return false;
-    }
-    const TextMatchExpression* realOther = static_cast<const TextMatchExpression*>(other);
-
-    // TODO This is way too crude.  It looks for string equality, but it should be looking for
-    // common parsed form
-    if (realOther->getQuery() != _query) {
-        return false;
-    }
-    if (realOther->getLanguage() != _language) {
-        return false;
-    }
-    if (realOther->getCaseSensitive() != _caseSensitive) {
-        return false;
-    }
-    if (realOther->getDiacriticSensitive() != _diacriticSensitive) {
-        return false;
-    }
-    return true;
-}
-
-unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
-    unique_ptr<TextMatchExpression> next = make_unique<TextMatchExpression>();
-    next->init(_query, _language, _caseSensitive, _diacriticSensitive);
+std::unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
+    auto expr = stdx::make_unique<TextMatchExpression>();
+    // We initialize _ftsQuery here directly rather than calling init(), to avoid needing to examine
+    // the index catalog.
+    expr->_ftsQuery = _ftsQuery;
+    invariantOK(expr->initPath("_fts"));
     if (getTag()) {
-        next->setTag(getTag()->clone());
+        expr->setTag(getTag()->clone());
     }
-    return std::move(next);
+    return std::move(expr);
 }
-}
+
+}  // namespace mongo

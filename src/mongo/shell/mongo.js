@@ -189,30 +189,40 @@ connect = function(url, user, pass) {
     if (0 == url.length) {
         throw Error("Empty connection string");
     }
-    var colon = url.lastIndexOf(":");
-    var slash = url.lastIndexOf("/");
-    if (0 == colon || 0 == slash) {
-        throw Error("Missing host name in connection string \"" + url + "\"");
-    }
-    if (colon == slash - 1 || colon == url.length - 1) {
-        throw Error("Missing port number in connection string \"" + url + "\"");
-    }
-    if (colon != -1 && colon < slash) {
-        var portNumber = url.substring(colon + 1, slash);
-        if (portNumber.length > 5 || !/^\d*$/.test(portNumber) || parseInt(portNumber) > 65535) {
-            throw Error("Invalid port number \"" + portNumber +
-                        "\" in connection string \"" + url + "\"");
+    if (!url.startsWith("mongodb://")) {
+        var colon = url.lastIndexOf(":");
+        var slash = url.lastIndexOf("/");
+        if (0 == colon || 0 == slash) {
+            throw Error("Missing host name in connection string \"" + url + "\"");
         }
-    }
-    if (slash == url.length - 1) {
-        throw Error("Missing database name in connection string \"" + url + "\"");
+        if (colon == slash - 1 || colon == url.length - 1) {
+            throw Error("Missing port number in connection string \"" + url + "\"");
+        }
+        if (colon != -1 && colon < slash) {
+            var portNumber = url.substring(colon + 1, slash);
+            if (portNumber.length > 5 ||
+                    !/^\d*$/.test(portNumber) ||
+                    parseInt(portNumber) > 65535) {
+                throw Error("Invalid port number \"" + portNumber +
+                            "\" in connection string \"" + url + "\"");
+            }
+        }
+        if (slash == url.length - 1) {
+            throw Error("Missing database name in connection string \"" + url + "\"");
+        }
     }
 
     chatty("connecting to: " + url)
     var db;
-    if (slash == -1)
+    if (url.startsWith("mongodb://")) {
+        db = new Mongo(url);
+        if (db.defaultDB.length == 0) {
+            throw Error("Missing database name in connection string \"" + url + "\"");
+        }
+        db = db.getDB(db.defaultDB);
+    } else if (slash == -1)
         db = new Mongo().getDB(url);
-    else 
+    else
         db = new Mongo(url.substring(0, slash)).getDB(url.substring(slash + 1));
 
     if (user && pass) {
@@ -235,27 +245,15 @@ Mongo.prototype.forceWriteMode = function( mode ) {
 }
 
 Mongo.prototype.hasWriteCommands = function() {
-    if ( !('_hasWriteCommands' in this) ) {
-        var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
-        this._hasWriteCommands = (isMaster.ok && 
-                                  'minWireVersion' in isMaster &&
-                                  isMaster.minWireVersion <= 2 && 
-                                  2 <= isMaster.maxWireVersion );
-    }
-    
-    return this._hasWriteCommands;
+    var hasWriteCommands = (this.getMinWireVersion() <= 2 &&
+                            2 <= this.getMaxWireVersion());
+    return hasWriteCommands;
 }
 
 Mongo.prototype.hasExplainCommand = function() {
-    if ( !('_hasExplainCommand' in this) ) {
-        var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
-        this._hasExplainCommand = (isMaster.ok &&
-                                   'minWireVersion' in isMaster &&
-                                   isMaster.minWireVersion <= 3 &&
-                                   3 <= isMaster.maxWireVersion );
-    }
-
-    return this._hasExplainCommand;
+    var hasExplain = (this.getMinWireVersion() <= 3 &&
+                      3 <= this.getMaxWireVersion());
+    return hasExplain;
 }
 
 /**
@@ -297,27 +295,57 @@ Mongo.prototype.useReadCommands = function() {
 }
 
 /**
- * Get the readMode string (either "commands" for find/getMore commands or "compatibility" for
- * OP_QUERY find and OP_GET_MORE).
+ * For testing, forces the shell to use the readMode specified in 'mode'. Must be either "commands"
+ * (use the find/getMore commands), "legacy" (use legacy OP_QUERY/OP_GET_MORE wire protocol reads),
+ * or "compatibility" (auto-detect mode based on wire version).
+ */
+Mongo.prototype.forceReadMode = function(mode) {
+    if (mode !== "commands" && mode !== "compatibility" && mode !== "legacy") {
+        throw new Error("Mode must be one of {commands, compatibility, legacy}, but got: " + mode);
+    }
+
+    this._readMode = mode;
+};
+
+/**
+ * Get the readMode string (either "commands" for find/getMore commands, "legacy" for OP_QUERY find
+ * and OP_GET_MORE, or "compatibility" for detecting based on wire version).
  */
 Mongo.prototype.readMode = function() {
-    if ("_readMode" in this) {
+    if ("_readMode" in this && this._readMode !== "compatibility") {
         // We already have determined our read mode. Just return it.
         return this._readMode;
     }
 
-    // Determine read mode based on shell params.
-    //
-    // TODO: Detect what to use based on wire protocol version.
-    if (_readMode) {
+    // Get the readMode from the shell params.
+    if (typeof _readMode === "function") {
         this._readMode = _readMode();
     }
-    else {
-        this._readMode = "compatibility";
+
+    // If we're in compatibility mode, determine whether the server supports the find/getMore
+    // commands. If it does, use commands mode. If not, degrade to legacy mode.
+    if (this._readMode === "compatibility") {
+        try {
+            var hasReadCommands = (this.getMinWireVersion() <= 4 &&
+                                   4 <= this.getMaxWireVersion());
+            if (hasReadCommands) {
+                this._readMode = "commands";
+            }
+            else {
+                print("Cannot use 'commands' readMode, degrading to 'legacy' mode");
+                this._readMode = "legacy";
+            }
+        }
+        catch (e) {
+            // We failed trying to determine whether the remote node supports the find/getMore
+            // commands. In this case, we keep _readMode as "compatibility" and the shell should
+            // issue legacy reads. Next time around we will issue another isMaster to try to
+            // determine the readMode decisively.
+        }
     }
 
     return this._readMode;
-}
+};
 
 //
 // Write Concern can be set at the connection level, and is used for all write operations unless

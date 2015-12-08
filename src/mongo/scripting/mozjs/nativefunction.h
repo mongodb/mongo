@@ -48,7 +48,6 @@ namespace mozjs {
  * in JS via ::make() from C++.
  */
 struct NativeFunctionInfo : public BaseInfo {
-    static void construct(JSContext* cx, JS::CallArgs args);
     static void call(JSContext* cx, JS::CallArgs args);
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
@@ -58,7 +57,7 @@ struct NativeFunctionInfo : public BaseInfo {
     static const InstallType installType = InstallType::Private;
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(toString);
+        MONGO_DECLARE_JS_FUNCTION(toString);
     };
 
     static const JSFunctionSpec methods[2];

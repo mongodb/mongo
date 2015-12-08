@@ -5,8 +5,8 @@ function shardSetup(shardConfig, dbName, collName) {
     var configDB = st.s.getDB('config');
 
     // Disable the balancer to not interfere with the test, but keep the balancer settings on
-    // so the auto split logic will be able to move chunks around.
-    st.startBalancer();
+    // (with default empty document) so the auto split logic will be able to move chunks around.
+    assert.writeOK(st.s.getDB('config').settings.remove({ _id: 'balancer' }));
     db.adminCommand({configureFailPoint: 'skipBalanceRound', mode: 'alwaysOn'});
     return st;
 }
@@ -24,9 +24,7 @@ function runTest(test) {
     jsTest.log(tojson(test));
 
     // Setup
-    // Enable sharding, set primary shard and shard collection
-    assert.commandWorked(db.adminCommand({enableSharding: dbName}));
-    db.adminCommand({movePrimary: dbName, to: 'shard0000'});
+    // Shard collection
     assert.commandWorked(db.adminCommand({shardCollection: coll + "", key: {x: 1}}));
 
     // Pre-split, move chunks & create tags
@@ -99,7 +97,7 @@ function runTest(test) {
 // Main
 var dbName = "test";
 var collName = "topchunk";
-var st = shardSetup({name: "topchunk", shards: 4, chunksize: 1}, dbName, collName);
+var st = shardSetup({name: "topchunk", shards: 4, chunkSize: 1}, dbName, collName);
 var db = st.getDB(dbName);
 var coll = db[collName];
 var configDB = st.s.getDB('config');
@@ -235,6 +233,9 @@ var tests = [
     }
 ];
 
+assert.commandWorked(db.adminCommand({enableSharding: dbName}));
+db.adminCommand({movePrimary: dbName, to: 'shard0000'});
+
 // Execute all test objects
 for (var i = 0; i < tests.length; i++) {
     runTest(tests[i]);
@@ -243,7 +244,7 @@ for (var i = 0; i < tests.length; i++) {
 st.stop();
 
 // Single node shard Tests
-st = shardSetup({name: "singleNode", shards: 1, chunksize: 1}, dbName, collName);
+st = shardSetup({name: "singleNode", shards: 1, chunkSize: 1}, dbName, collName);
 db = st.getDB(dbName);
 coll = db[collName];
 configDB = st.s.getDB('config');
@@ -267,6 +268,9 @@ var singleNodeTests = [
     }
 ];
 
+assert.commandWorked(db.adminCommand({enableSharding: dbName}));
+db.adminCommand({movePrimary: dbName, to: 'shard0000'});
+
 // Execute all test objects
 for (var i = 0; i < singleNodeTests.length; i++) {
     runTest(singleNodeTests[i]);
@@ -276,7 +280,7 @@ st.stop();
 
 // maxSize test
 // To set maxSize, must manually add the shards
-st = shardSetup({name: "maxSize", shards: 2, chunksize: 1, other: {manualAddShard: true}},
+st = shardSetup({name: "maxSize", shards: 2, chunkSize: 1, other: {manualAddShard: true}},
                 dbName,
                 collName);
 db = st.getDB(dbName);
@@ -310,11 +314,15 @@ var maxSizeTests = [
     }
 ];
 
-// Execute all test objects
 // SERVER-17070 Auto split moves to shard node running WiredTiger, if exceeding maxSize
-var unsupported = ["wiredTiger", "rocksdb"];
+var unsupported = ["wiredTiger", "rocksdb", "inMemory", "ephemeralForTest"];
 if (unsupported.indexOf(st.d0.adminCommand({serverStatus : 1}).storageEngine.name) == -1 &&
     unsupported.indexOf(st.d1.adminCommand({serverStatus : 1}).storageEngine.name) == -1) {
+
+    assert.commandWorked(db.adminCommand({enableSharding: dbName}));
+    db.adminCommand({movePrimary: dbName, to: 'shard0000'});
+
+    // Execute all test objects
     for (var i = 0; i < maxSizeTests.length; i++) {
         runTest(maxSizeTests[i]);
     }

@@ -47,7 +47,7 @@ const char* TextMatchStage::kStageType = "TEXT_MATCH";
 
 TextMatchStage::TextMatchStage(OperationContext* opCtx,
                                unique_ptr<PlanStage> child,
-                               const FTSQuery& query,
+                               const FTSQueryImpl& query,
                                const FTSSpec& spec,
                                WorkingSet* ws)
     : PlanStage(kStageType, opCtx), _ftsMatcher(query, spec), _ws(ws) {
@@ -65,7 +65,7 @@ std::unique_ptr<PlanStageStats> TextMatchStage::getStats() {
 
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_TEXT_MATCH);
     ret->specific = make_unique<TextMatchStats>(_specificStats);
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
 
     return ret;
 }

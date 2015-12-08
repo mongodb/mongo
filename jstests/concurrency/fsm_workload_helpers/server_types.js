@@ -20,11 +20,11 @@ function isMongod(db) {
 }
 
 /**
- * Returns true if the current storage engine is mmapv1,
- * and false otherwise.
+ * Returns the name of the current storage engine.
  *
+ * Throws an error if db is connected to a mongos, or if there is no reported storage engine.
  */
-function isMMAPv1(db) {
+function getStorageEngineName(db) {
     var status = db.serverStatus();
     assert.commandWorked(status);
 
@@ -33,22 +33,27 @@ function isMMAPv1(db) {
     assert.neq('undefined', typeof status.storageEngine,
                'missing storage engine info in server status');
 
-    return status.storageEngine.name === 'mmapv1';
+    return status.storageEngine.name;
 }
 
 /**
- * Returns true if the current storage engine is wiredTiger
- * and false otherwise.
- *
+ * Returns true if the current storage engine is mmapv1, and false otherwise.
+ */
+function isMMAPv1(db) {
+    return getStorageEngineName(db) === 'mmapv1';
+}
+
+/**
+ * Returns true if the current storage engine is wiredTiger, and false otherwise.
  */
 function isWiredTiger(db) {
-    var status = db.serverStatus();
-    assert.commandWorked(status);
+    return getStorageEngineName(db) === 'wiredTiger';
+}
 
-    assert(isMongod(db),
-           'no storage engine is reported when connected to mongos');
-    assert.neq('undefined', typeof status.storageEngine,
-               'missing storage engine info in server status');
-
-    return status.storageEngine.name === 'wiredTiger';
+/**
+ * Returns true if the current storage engine is ephemeral, and false otherwise.
+ */
+function isEphemeral(db) {
+    var engine = getStorageEngineName(db);
+    return (engine === 'inMemory') || (engine === 'ephemeralForTest');
 }

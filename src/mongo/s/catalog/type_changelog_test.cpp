@@ -127,18 +127,6 @@ TEST(ChangeLogType, MissingWhat) {
     ASSERT_EQ(ErrorCodes::NoSuchKey, changeLogResult.getStatus());
 }
 
-TEST(ChangeLogType, MissingNS) {
-    BSONObj obj = BSON(ChangeLogType::changeId("host.local-2012-11-21T19:14:10-8")
-                       << ChangeLogType::server("host.local")
-                       << ChangeLogType::clientAddr("192.168.0.189:51128")
-                       << ChangeLogType::time(Date_t::fromMillisSinceEpoch(1))
-                       << ChangeLogType::what("split") << ChangeLogType::details(BSON("dummy"
-                                                                                      << "info")));
-
-    auto changeLogResult = ChangeLogType::fromBSON(obj);
-    ASSERT_EQ(ErrorCodes::NoSuchKey, changeLogResult.getStatus());
-}
-
 TEST(ChangeLogType, MissingDetails) {
     BSONObj obj = BSON(ChangeLogType::changeId("host.local-2012-11-21T19:14:10-8")
                        << ChangeLogType::server("host.local")

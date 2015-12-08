@@ -46,7 +46,8 @@ assert.eq( 1, t.find( {a:{$type:5}} ).itcount() );
 // Type Timestamp
 t.remove({});
 t.save( {a:new Timestamp()} );
-assert.eq( 1, t.find( {a:{$type:17}} ).itcount() );
+t.save( {a:new Timestamp(0x80008000, 0)} );
+assert.eq( 2, t.find( {a:{$type:17}} ).itcount() );
 assert.eq( 0, t.find( {a:{$type:9}} ).itcount() );
 
 // Type Date

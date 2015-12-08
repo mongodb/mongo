@@ -72,8 +72,7 @@ doIt("while(1) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count({i:
 doIt("while(1) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); }", true);
 doIt("while(1) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); }", false);
 
-// try/catch with tight-loop kill tests.  Catch testing is important
-// due to v8::TerminateExecution internals.
+// try/catch with tight-loop kill tests.
 // native callback with nested invoke(), drop JS exceptions
 doIt("while(1) {                                  " +
      "   for(var i = 0; i < 10000; ++i) {;}       " +

@@ -62,11 +62,6 @@ public:
     void doReattachToOperationContext() final;
 
     /**
-     * Make obj the next object returned by getNext().
-     */
-    void pushBack(const BSONObj& obj);
-
-    /**
      * Return a shared pointer to the PlanExecutor that feeds the pipeline. The returned
      * pointer may be NULL.
      */
@@ -91,7 +86,7 @@ public:
 private:
     boost::optional<BSONObj> getNextBson();
 
-    // Things in the _stash sould be returned before pulling items from _pipeline.
+    // Things in the _stash should be returned before pulling items from _pipeline.
     const boost::intrusive_ptr<Pipeline> _pipeline;
     std::vector<BSONObj> _stash;
     const bool _includeMetaData;

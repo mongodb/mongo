@@ -39,8 +39,6 @@
 
 namespace mongo {
 
-using mongo::fts::FTSQuery;
-
 class GeoNearExpression;
 
 /**
@@ -141,7 +139,7 @@ struct QuerySolutionNode {
             other->children.push_back(this->children[i]->clone());
         }
         if (NULL != this->filter) {
-            other->filter = std::move(this->filter->shallowClone());
+            other->filter = this->filter->shallowClone();
         }
     }
 
@@ -247,10 +245,7 @@ struct TextNode : public QuerySolutionNode {
     BSONObjSet _sort;
 
     BSONObj indexKeyPattern;
-    std::string query;
-    std::string language;
-    bool caseSensitive;
-    bool diacriticSensitive;
+    std::unique_ptr<fts::FTSQuery> ftsQuery;
 
     // "Prefix" fields of a text index can handle equality predicates.  We group them with the
     // text node while creating the text leaf node and convert them into a BSONObj index prefix

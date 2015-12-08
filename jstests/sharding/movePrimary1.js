@@ -1,6 +1,6 @@
+(function() {
 
-
-s = new ShardingTest( "movePrimary1" , 2 );
+var s = new ShardingTest({ name: "movePrimary1", shards: 2 });
 
 initDB = function( name ){
     var db = s.getDB( name );
@@ -8,7 +8,7 @@ initDB = function( name ){
     c.save( { a : 1 } );
     c.save( { a : 2 } );
     c.save( { a : 3 } );
-    assert( 3 , c.count() );
+    assert.eq( 3 , c.count() );
     
     return s.getServer( name );
 }
@@ -49,3 +49,4 @@ assert.eq(res.code, 70, 'ShardNotFound code not used');
 
 s.stop();
 
+})();

@@ -44,6 +44,7 @@
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/json.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
@@ -56,12 +57,15 @@
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/data_protector.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -128,9 +132,9 @@ RecordId Helpers::findOne(OperationContext* txn,
     if (!collection)
         return RecordId();
 
-    const WhereCallbackReal whereCallback(txn, collection->ns().db());
+    const ExtensionsCallbackReal extensionsCallback(txn, &collection->ns());
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, whereCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, extensionsCallback);
     massert(17244, "Could not canonicalize " + query.toString(), statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -364,7 +368,6 @@ long long Helpers::removeRange(OperationContext* txn,
             PlanExecutor::ExecState state;
             // This may yield so we cannot touch nsd after this.
             state = exec->getNext(&obj, &rloc);
-            exec.reset();
             if (PlanExecutor::IS_EOF == state) {
                 break;
             }
@@ -390,13 +393,13 @@ long long Helpers::removeRange(OperationContext* txn,
 
                 // We should never be able to turn off the sharding state once enabled, but
                 // in the future we might want to.
-                verify(ShardingState::get(getGlobalServiceContext())->enabled());
+                verify(ShardingState::get(txn)->enabled());
 
                 bool docIsOrphan;
 
                 // In write lock, so will be the most up-to-date version
                 std::shared_ptr<CollectionMetadata> metadataNow =
-                    ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(ns);
+                    ShardingState::get(txn)->getCollectionMetadata(ns);
                 if (metadataNow) {
                     ShardKeyPattern kp(metadataNow->getKeyPattern());
                     BSONObj key = kp.extractShardKeyFromDoc(obj);
@@ -562,10 +565,11 @@ void Helpers::emptyCollection(OperationContext* txn, const char* ns) {
     bool shouldReplicateWrites = txn->writesAreReplicated();
     txn->setReplicatedWrites(false);
     ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
-    deleteObjects(txn, context.db(), ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
+    Collection* collection = context.db() ? context.db()->getCollection(ns) : nullptr;
+    deleteObjects(txn, collection, ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
 }
 
-Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string& why) : _out(0) {
+Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string& why) {
     static int NUM = 0;
 
     _root = storageGlobalParams.dbpath;
@@ -580,29 +584,104 @@ Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string
     stringstream ss;
     ss << why << "." << terseCurrentTime(false) << "." << NUM++ << ".bson";
     _file /= ss.str();
+
+    auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
+    if (hooks->enabled()) {
+        _protector = hooks->getDataProtector();
+        _file += hooks->getProtectedPathSuffix();
+    }
 }
 
 Helpers::RemoveSaver::~RemoveSaver() {
-    if (_out) {
-        _out->close();
-        delete _out;
-        _out = 0;
+    if (_protector && _out) {
+        auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
+        invariant(hooks->enabled());
+
+        size_t protectedSizeMax = hooks->additionalBytesForProtectedBuffer();
+        std::unique_ptr<uint8_t[]> protectedBuffer(new uint8_t[protectedSizeMax]);
+
+        size_t resultLen;
+        Status status = _protector->finalize(protectedBuffer.get(), protectedSizeMax, &resultLen);
+        if (!status.isOK()) {
+            severe() << "Unable to finalize DataProtector while closing RemoveSaver: "
+                     << status.reason();
+            fassertFailed(34350);
+        }
+
+        _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
+        if (_out->fail()) {
+            severe() << "Couldn't write finalized DataProtector data to: " << _file.string()
+                     << " for remove saving: " << errnoWithDescription();
+            fassertFailed(34351);
+        }
+
+        protectedBuffer.reset(new uint8_t[protectedSizeMax]);
+        status = _protector->finalizeTag(protectedBuffer.get(), protectedSizeMax, &resultLen);
+        if (!status.isOK()) {
+            severe() << "Unable to get finalizeTag from DataProtector while closing RemoveSaver: "
+                     << status.reason();
+            fassertFailed(34352);
+        }
+        if (resultLen != _protector->getNumberOfBytesReservedForTag()) {
+            severe() << "Attempted to write tag of size " << resultLen
+                     << " when DataProtector only reserved "
+                     << _protector->getNumberOfBytesReservedForTag() << " bytes";
+            fassertFailed(34353);
+        }
+        _out->seekp(0);
+        _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
+        if (_out->fail()) {
+            severe() << "Couldn't write finalizeTag from DataProtector to: " << _file.string()
+                     << " for remove saving: " << errnoWithDescription();
+            fassertFailed(34354);
+        }
     }
 }
 
-void Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
+Status Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
     if (!_out) {
         boost::filesystem::create_directories(_root);
-        _out = new ofstream();
-        _out->open(_file.string().c_str(), ios_base::out | ios_base::binary);
-        if (!_out->good()) {
-            error() << "couldn't create file: " << _file.string() << " for remove saving" << endl;
-            delete _out;
+        _out.reset(new ofstream(_file.string().c_str(), ios_base::out | ios_base::binary));
+        if (_out->fail()) {
+            string msg = str::stream() << "couldn't create file: " << _file.string()
+                                       << " for remove saving: " << errnoWithDescription();
+            error() << msg;
+            _out.reset();
             _out = 0;
-            return;
+            return Status(ErrorCodes::FileNotOpen, msg);
         }
     }
-    _out->write(o.objdata(), o.objsize());
+
+    const uint8_t* data = reinterpret_cast<const uint8_t*>(o.objdata());
+    size_t dataSize = o.objsize();
+
+    std::unique_ptr<uint8_t[]> protectedBuffer;
+    if (_protector) {
+        auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
+        invariant(hooks->enabled());
+
+        size_t protectedSizeMax = dataSize + hooks->additionalBytesForProtectedBuffer();
+        protectedBuffer.reset(new uint8_t[protectedSizeMax]);
+
+        size_t resultLen;
+        Status status = _protector->protect(
+            data, dataSize, protectedBuffer.get(), protectedSizeMax, &resultLen);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        data = protectedBuffer.get();
+        dataSize = resultLen;
+    }
+
+    _out->write(reinterpret_cast<const char*>(data), dataSize);
+    if (_out->fail()) {
+        string msg = str::stream() << "couldn't write document to file: " << _file.string()
+                                   << " for remove saving: " << errnoWithDescription();
+        error() << msg;
+        return Status(ErrorCodes::OperationFailed, msg);
+    }
+    return Status::OK();
 }
 
 

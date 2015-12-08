@@ -5,7 +5,7 @@ Random.setRandomSeed();
 
 t = db.test_index_check10;
 
-function doIt( indexVersion ) {
+function doIt() {
 
     t.drop();
 
@@ -95,9 +95,8 @@ function doIt( indexVersion ) {
                      size -= f.length;
                 }
 
-                var max = indexVersion == 0 ? 819 : 818;
-
-                if ( size <= max /* KeyMax */ ) {
+                var max = 818; // KeyMax
+                if ( size <= max ) {
                     assert.eq( c1, c3 , "size: " + size );
                 }
             }
@@ -110,7 +109,7 @@ function doIt( indexVersion ) {
     }
     assert.writeOK(bulk.execute());
 
-    t.ensureIndex( idx , { v : indexVersion } );
+    t.ensureIndex( idx );
     check();
 
     bulk = t.initializeUnorderedBulkOp();
@@ -133,9 +132,5 @@ function doIt( indexVersion ) {
 }
 
 for( var z = 0; z < 5; ++z ) {
-    var indexVersion = z % 2;
-    var storageEngine = jsTest.options().storageEngine;
-    if (storageEngine === 'mmapv1' || indexVersion !== 0) {
-        doIt(indexVersion);
-    }
+    doIt();
 }

@@ -47,7 +47,7 @@ TEST(SortStageTest, SortEmptyWorkingSet) {
     // QueuedDataStage will be owned by SortStage.
     auto queuedDataStage = stdx::make_unique<QueuedDataStage>(nullptr, &ws);
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-        nullptr, queuedDataStage.release(), &ws, nullptr, BSONObj(), BSONObj());
+        nullptr, queuedDataStage.release(), &ws, BSONObj(), BSONObj());
     SortStageParams params;
     SortStage sort(nullptr, params, &ws, sortKeyGen.release());
 
@@ -113,7 +113,7 @@ void testWork(const char* patternStr,
     params.limit = limit;
 
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-        nullptr, queuedDataStage.release(), &ws, nullptr, params.pattern, fromjson(queryStr));
+        nullptr, queuedDataStage.release(), &ws, params.pattern, fromjson(queryStr));
 
     SortStage sort(nullptr, params, &ws, sortKeyGen.release());
 

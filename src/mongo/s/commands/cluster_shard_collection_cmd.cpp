@@ -171,7 +171,7 @@ public:
         // The rest of the checks require a connection to the primary db
         ConnectionString shardConnString;
         {
-            const auto shard = grid.shardRegistry()->getShard(config->getPrimaryId());
+            const auto shard = grid.shardRegistry()->getShard(txn, config->getPrimaryId());
             shardConnString = shard->getConnString();
         }
 
@@ -324,7 +324,7 @@ public:
             // 5. If no useful index exists, and collection empty, create one on proposedKey.
             //    Only need to call ensureIndex on primary shard, since indexes get copied to
             //    receiving shard whenever a migrate occurs.
-            Status status = clusterCreateIndex(txn, ns, proposedKey, careAboutUnique, NULL);
+            Status status = clusterCreateIndex(txn, ns, proposedKey, careAboutUnique);
             if (!status.isOK()) {
                 errmsg = str::stream() << "ensureIndex failed to create index on "
                                        << "primary shard: " << status.reason();
@@ -416,7 +416,7 @@ public:
             int i = 0;
             for (ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c, ++i) {
                 const ShardId& shardId = shardIds[i % numShards];
-                const auto to = grid.shardRegistry()->getShard(shardId);
+                const auto to = grid.shardRegistry()->getShard(txn, shardId);
                 if (!to) {
                     continue;
                 }

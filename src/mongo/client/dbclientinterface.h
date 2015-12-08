@@ -962,32 +962,20 @@ class DBClientBase : public DBClientWithCommands {
 protected:
     static AtomicInt64 ConnectionIdSequence;
     long long _connectionId;  // unique connection id for this connection
-    int _minWireVersion;
-    int _maxWireVersion;
 
 public:
     static const uint64_t INVALID_SOCK_CREATION_TIME;
 
     DBClientBase() {
         _connectionId = ConnectionIdSequence.fetchAndAdd(1);
-        _minWireVersion = _maxWireVersion = 0;
     }
 
     long long getConnectionId() const {
         return _connectionId;
     }
 
-    void setWireVersions(int minWireVersion, int maxWireVersion) {
-        _minWireVersion = minWireVersion;
-        _maxWireVersion = maxWireVersion;
-    }
-
-    int getMinWireVersion() {
-        return _minWireVersion;
-    }
-    int getMaxWireVersion() {
-        return _maxWireVersion;
-    }
+    virtual int getMinWireVersion() = 0;
+    virtual int getMaxWireVersion() = 0;
 
     /** send a query to the database.
      @param ns namespace to query, format is <dbname>.<collectname>[.<collectname>]*
@@ -1214,6 +1202,19 @@ public:
         return _port ? _port->isStillConnected() : true;
     }
 
+    void setWireVersions(int minWireVersion, int maxWireVersion) {
+        _minWireVersion = minWireVersion;
+        _maxWireVersion = maxWireVersion;
+    }
+
+    int getMinWireVersion() final {
+        return _minWireVersion;
+    }
+
+    int getMaxWireVersion() final {
+        return _maxWireVersion;
+    }
+
     MessagingPort& port() {
         verify(_port);
         return *_port;
@@ -1274,6 +1275,9 @@ public:
     uint64_t getSockCreationMicroSec() const;
 
 protected:
+    int _minWireVersion{0};
+    int _maxWireVersion{0};
+
     friend class SyncClusterConnection;
     virtual void _auth(const BSONObj& params);
 

@@ -46,5 +46,6 @@ SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
                                         SavedCursorRegistry* cursorRegistry,
                                         const Ordering& ordering,
                                         const std::string& indexName,
-                                        int version);
+                                        int version,
+                                        bool isUnique);
 }  // namespace mongo

@@ -61,4 +61,58 @@ assert.eq( "b" , res[1]['name.first'] , "Z3" )
 assert.eq( 2 , res[0].count , "Z4" )
 assert.eq( 1 , res[1].count , "Z5" )
 
+// SERVER-15851 Test invalid user input.
+p = {
+        ns: "group1",
+        key: {"name.first": true},
+        $reduce: function(obj, prev){prev.count++;},
+        initial: {count: 0},
+        finalize: "abc"
+    };
+assert.commandFailedWithCode(db.runCommand({group: p}),
+                             ErrorCodes.JSInterpreterFailure,
+                             "Illegal finalize function");
 
+p = {
+        ns: "group1",
+        key: {"name.first": true},
+        $reduce: function(obj, prev){prev.count++;},
+        initial: {count: 0},
+        finalize: function(obj){ob}
+    };
+assert.commandFailedWithCode(db.runCommand({group: p}),
+                             ErrorCodes.JSInterpreterFailure,
+                             "Illegal finalize function 2");
+
+p = {
+        ns: "group1",
+        $keyf: "a" ,
+        $reduce: function(obj, prev){prev.count++;},
+        initial: {count: 0},
+        finalize: function(obj){ob}
+    };
+assert.commandFailedWithCode(db.runCommand({group: p}),
+                             ErrorCodes.JSInterpreterFailure,
+                             "Illegal keyf function");
+
+p = {
+        ns: "group1",
+        key: {"name.first": true},
+        $reduce: "abc",
+        initial: {count: 0}
+    };
+assert.commandFailedWithCode(db.runCommand({group: p}),
+                             ErrorCodes.JSInterpreterFailure,
+                             "Illegal reduce function");
+
+p = {
+        ns: "group1",
+        key: {"name.first": true},
+        $reduce: function(obj, pre){prev.count++;},
+        initial: {count: 0}
+    };
+assert.commandFailedWithCode(db.runCommand({group: p}),
+                             ErrorCodes.JSInterpreterFailure,
+                             "Illegal reduce function 2");
+
+t.drop();

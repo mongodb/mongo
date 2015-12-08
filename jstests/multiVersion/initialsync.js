@@ -2,7 +2,7 @@
 load("./jstests/multiVersion/libs/multi_rs.js");
 load("./jstests/replsets/rslib.js");
 
-var oldVersion = "2.6";
+var oldVersion = "last-stable";
 var newVersion = "latest";
 
 var name = "multiversioninitsync";
@@ -14,7 +14,12 @@ var multitest = function(replSetVersion, newNodeVersion) {
     print("Start up a two-node " + replSetVersion + " replica set.");
     var rst = new ReplSetTest({name: name, nodes: nodes});
     rst.startSet();
-    rst.initiate();
+    var config = rst.getReplSetConfig();
+    // Set protocol version to 0 for 3.2 replset.
+    if (replSetVersion == newVersion) {
+        config.protocolVersion = 0;
+    }
+    rst.initiate(config);
 
     // Wait for a primary node.
     var primary = rst.getPrimary();
@@ -43,13 +48,13 @@ var multitest = function(replSetVersion, newNodeVersion) {
 // *****************************************
 // Test A:
 // "Latest" version secondary is synced from
-// a 2.6 ReplSet.
+// an old ReplSet.
 // *****************************************
 multitest(oldVersion, newVersion);
 
 // *****************************************
 // Test B:
-// 2.6 Secondary is synced from a "latest"
+// Old Secondary is synced from a "latest"
 // version ReplSet.
 // *****************************************
 multitest(newVersion, oldVersion);

@@ -136,6 +136,7 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
         for (size_t i = 0; i < _children.size(); ++i) {
             auto& child = _children[i];
             for (size_t j = 0; j < kLookAheadWorks; ++j) {
+                // Cache the result in _lookAheadResults[i].
                 StageState childStatus = child->work(&_lookAheadResults[i]);
 
                 if (PlanStage::IS_EOF == childStatus) {
@@ -144,9 +145,10 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
                     _dataMap.clear();
                     return PlanStage::IS_EOF;
                 } else if (PlanStage::ADVANCED == childStatus) {
-                    // We have a result cached in _lookAheadResults[i].  Stop looking at this
-                    // child.
-                    break;
+                    // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we
+                    // yield.
+                    _ws->get(_lookAheadResults[i])->makeObjOwnedIfNeeded();
+                    break;  // Stop looking at this child.
                 } else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
                     // Propage error to parent.
                     *out = _lookAheadResults[i];
@@ -282,6 +284,9 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
+
+        // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+        member->makeObjOwnedIfNeeded();
 
         // Update memory stats.
         _memUsage += member->getMemUsage();
@@ -485,7 +490,7 @@ unique_ptr<PlanStageStats> AndHashStage::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_AND_HASH);
     ret->specific = make_unique<AndHashStats>(_specificStats);
     for (size_t i = 0; i < _children.size(); ++i) {
-        ret->children.push_back(_children[i]->getStats().release());
+        ret->children.emplace_back(_children[i]->getStats());
     }
 
     return ret;

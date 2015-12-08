@@ -3,7 +3,7 @@
 *               an upsert is not missing when autosplit takes place.
 */
 
-var st = new ShardingTest({ shards : 1, mongos : 1, verbose : 1, chunksize : 1 });
+var st = new ShardingTest({ shards : 1, mongos : 1, verbose : 1, chunkSize: 1 });
 
 var testDB = st.getDB("test");
 var coll = "foo";

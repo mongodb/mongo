@@ -36,8 +36,14 @@ testColl.remove({ y: 2 });
 var oplogColl = repl1Conn.getCollection('local.oplog.rs');
 oplogColl.insert({ ts: new Timestamp(), op: 'n', ns: testColl.getFullName(), 'o': { x: 'noop' }});
 
-var repl2 = new ReplSetTest({ name: 'rs2', startPort: 31100, nodes: [{ nopreallocj: '' },
-    { arbiter: true }, { arbiter: true }]});
+var repl2 = new ReplSetTest({
+    name: 'rs2',
+    nodes: [
+        {nopreallocj: ''},
+        {arbiter: true},
+        {arbiter: true}
+    ]
+});
 
 repl2.startSet({ oplogSize: 10 });
 repl2.initiate();

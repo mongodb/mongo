@@ -1,3 +1,7 @@
+// Tests authentication with replica sets using key files.
+//
+// This test requires users to persist across a restart.
+// @tags: [requires_persistence]
 
 var testInvalidAuthStates = function() {
     print("check that 0 is in recovering");
@@ -14,16 +18,16 @@ var testInvalidAuthStates = function() {
 
     rs.waitForState(rs.nodes[0], rs.SECONDARY);
 
-    rs.restart(1, {"keyFile" : path+"key1"});
-    rs.restart(2, {"keyFile" : path+"key1"});
+    rs.restart(1, {"keyFile" : key1});
+    rs.restart(2, {"keyFile" : key1});
 };
 
 var name = "rs_auth2";
 var path = "jstests/libs/";
 
-print("change permissions on #1 & #2");
-run("chmod", "600", path+"key1");
-run("chmod", "600", path+"key2");
+// These keyFiles have their permissions set to 600 later in the test.
+var key1 = path+"key1";
+var key2 = path+"key2";
 
 var rs = new ReplSetTest({name: name, nodes: 3});
 var nodes = rs.startSet();
@@ -44,9 +48,9 @@ var m = rs.nodes[0];
 
 print("starting 1 and 2 with key file");
 rs.stop(1);
-rs.restart(1, {"keyFile" : path+"key1"});
+rs.restart(1, {"keyFile" : key1});
 rs.stop(2);
-rs.restart(2, {"keyFile" : path+"key1"});
+rs.restart(2, {"keyFile" : key1});
 
 // auth to all nodes with auth
 rs.nodes[1].getDB("admin").auth("foo", "bar");
@@ -56,7 +60,7 @@ testInvalidAuthStates();
 print("restart mongod with bad keyFile");
 
 rs.stop(0);
-m = rs.restart(0, {"keyFile" : path+"key2"});
+m = rs.restart(0, {"keyFile" : key2});
 
 //auth to all nodes
 rs.nodes[0].getDB("admin").auth("foo", "bar");
@@ -65,6 +69,6 @@ rs.nodes[2].getDB("admin").auth("foo", "bar");
 testInvalidAuthStates();
 
 rs.stop(0);
-m = rs.restart(0, {"keyFile" : path+"key1"});
+m = rs.restart(0, {"keyFile" : key1});
 
 print("0 becomes a secondary");

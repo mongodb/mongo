@@ -46,7 +46,7 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/mmap_v1/file_allocator.h"
 #include "mongo/util/log.h"
 
@@ -58,6 +58,8 @@ using std::ifstream;
 using std::string;
 using std::stringstream;
 using std::vector;
+
+MMAPV1Options mmapv1GlobalOptions;
 
 namespace {
 
@@ -321,6 +323,14 @@ void MMAPV1Engine::_listDatabases(const std::string& directory, std::vector<std:
 
 int MMAPV1Engine::flushAllFiles(bool sync) {
     return MongoFile::flushAll(sync);
+}
+
+Status MMAPV1Engine::beginBackup(OperationContext* txn) {
+    return Status::OK();
+}
+
+void MMAPV1Engine::endBackup(OperationContext* txn) {
+    return;
 }
 
 bool MMAPV1Engine::isDurable() const {

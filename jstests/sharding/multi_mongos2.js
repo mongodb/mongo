@@ -1,9 +1,7 @@
-// multi_mongos2.js
 // This tests sharding an existing collection that both shards are aware of (SERVER-2828)
+(function() {
 
-
-// setup sharding with two mongos, s1 and s2
-s1 = new ShardingTest( "multi_mongos1" , 2 , 1 , 2 );
+var s1 = new ShardingTest({ name: "multi_mongos1", shards: 2, mongos: 2 });
 s2 = s1._mongos[1];
 
 s1.adminCommand( { enablesharding : "test" } );
@@ -28,7 +26,7 @@ res = s2.getDB( "admin" ).runCommand( { moveChunk: "test.existing" , find : { _i
 
 assert.eq(1 , res.ok, tojson(res));
 
-s1.setBalancer( true )
+s1.startBalancer();
 
 printjson( s2.adminCommand( {"getShardVersion" : "test.existing" } ) )
 printjson( new Mongo(s1.getServer( "test" ).name).getDB( "admin" ).adminCommand( {"getShardVersion" : "test.existing" } ) )
@@ -56,7 +54,7 @@ s1.getDB('test').existing3.insert({_id:1})
 assert.eq(1, s1.getDB('test').existing3.count({_id:1}));
 assert.eq(1, s2.getDB('test').existing3.count({_id:1}));
 
-s1.stopBalancer()
+s1.stopBalancer();
 
 s2.adminCommand( { shardcollection : "test.existing3" , key : { _id : 1 } } );
 assert.commandWorked(s2.adminCommand({ split: "test.existing3", middle: { _id: 5 }}));
@@ -64,6 +62,8 @@ assert.commandWorked(s2.adminCommand({ split: "test.existing3", middle: { _id: 5
 res = s1.getDB( "admin" ).runCommand( { moveChunk: "test.existing3" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
 assert.eq(1 , res.ok, tojson(res));
 
-s1.setBalancer( true )
+s1.startBalancer();
 
 s1.stop();
+
+})();

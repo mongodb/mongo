@@ -30,7 +30,7 @@ LogMessageBase::LogMessageBase(LogstreamBuilder builder, const char* file, int l
 
 LogMessageBase::LogMessageBase(LogstreamBuilder builder) : _lsb(std::move(builder)) { }
 
-LogMessageInfo::LogMessageInfo() : LogMessageBase(std::move(mongo::log())) { }
+LogMessageInfo::LogMessageInfo() : LogMessageBase(mongo::log()) { }
 
 LogMessageWarning::LogMessageWarning(const char* file, int line) :
         LogMessageBase(mongo::warning(), file, line) { }

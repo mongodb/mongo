@@ -203,12 +203,14 @@ __wt_lsm_manager_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 int
 __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
 	WT_SESSION_IMPL *worker_session;
 	uint32_t i;
 
-	manager = &S2C(session)->lsm_manager;
+	conn = S2C(session);
+	manager = &conn->lsm_manager;
 
 	/*
 	 * We need at least a manager, a switch thread and a generic
@@ -225,7 +227,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	 */
 	for (i = 0; i < WT_LSM_MAX_WORKERS; i++) {
 		WT_ERR(__wt_open_internal_session(
-		    S2C(session), "lsm-worker", 1, 0, &worker_session));
+		    conn, "lsm-worker", false, 0, &worker_session));
 		worker_session->isolation = WT_ISO_READ_UNCOMMITTED;
 		manager->lsm_worker_cookies[i].session = worker_session;
 	}
@@ -234,7 +236,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_cookies[0].tid,
 	    __lsm_worker_manager, &manager->lsm_worker_cookies[0]));
 
-	F_SET(S2C(session), WT_CONN_SERVER_LSM);
+	F_SET(conn, WT_CONN_SERVER_LSM);
 
 	if (0) {
 err:		for (i = 0;
@@ -258,7 +260,7 @@ __wt_lsm_manager_free_work_unit(
 	if (entry != NULL) {
 		WT_ASSERT(session, entry->lsm_tree->queue_ref > 0);
 
-		(void)WT_ATOMIC_SUB4(entry->lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&entry->lsm_tree->queue_ref, 1);
 		__wt_free(session, entry);
 	}
 }
@@ -369,10 +371,10 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 	WT_LSM_TREE *lsm_tree;
 	struct timespec now;
 	uint64_t fillms, pushms;
-	int dhandle_locked;
+	bool dhandle_locked;
 
 	conn = S2C(session);
-	dhandle_locked = 0;
+	dhandle_locked = false;
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		__wt_sleep(0, 10000);
@@ -380,14 +382,13 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			continue;
 		__wt_spin_lock(session, &conn->dhandle_lock);
 		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST);
-		dhandle_locked = 1;
+		dhandle_locked = true;
 		TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 				continue;
 			WT_ERR(__wt_epoch(session, &now));
 			pushms = lsm_tree->work_push_ts.tv_sec == 0 ? 0 :
-			    WT_TIMEDIFF(
-			    now, lsm_tree->work_push_ts) / WT_MILLION;
+			    WT_TIMEDIFF_MS(now, lsm_tree->work_push_ts);
 			fillms = 3 * lsm_tree->chunk_fill_ms;
 			if (fillms == 0)
 				fillms = 10000;
@@ -440,7 +441,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 		}
 		__wt_spin_unlock(session, &conn->dhandle_lock);
 		F_CLR(session, WT_SESSION_LOCKED_HANDLE_LIST);
-		dhandle_locked = 0;
+		dhandle_locked = false;
 	}
 
 err:	if (dhandle_locked) {
@@ -611,7 +612,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *entry;
-	int pushed;
+	bool pushed;
 
 	manager = &S2C(session)->lsm_manager;
 
@@ -639,13 +640,13 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	 * on close, the flag is cleared and then the queue reference count
 	 * is checked.
 	 */
-	(void)WT_ATOMIC_ADD4(lsm_tree->queue_ref, 1);
+	(void)__wt_atomic_add32(&lsm_tree->queue_ref, 1);
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
-		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&lsm_tree->queue_ref, 1);
 		return (0);
 	}
 
-	pushed = 0;
+	pushed = false;
 	WT_ERR(__wt_epoch(session, &lsm_tree->work_push_ts));
 	WT_ERR(__wt_calloc_one(session, &entry));
 	entry->type = type;
@@ -662,12 +663,12 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	else
 		LSM_PUSH_ENTRY(&manager->appqh,
 		    &manager->app_lock, lsm_work_queue_app);
-	pushed = 1;
+	pushed = true;
 
 	WT_ERR(__wt_cond_signal(session, manager->work_cond));
 	return (0);
 err:
 	if (!pushed)
-		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&lsm_tree->queue_ref, 1);
 	return (ret);
 }

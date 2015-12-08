@@ -225,12 +225,12 @@ void testSetEndPosition_Restore_Forward(bool unique) {
 
     ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-    cursor->savePositioned();
+    cursor->save();
     cursor->restore();
 
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
 
-    cursor->savePositioned();
+    cursor->save();
     removeFromIndex(opCtx,
                     sorted,
                     {
@@ -261,12 +261,12 @@ void testSetEndPosition_Restore_Reverse(bool unique) {
 
     ASSERT_EQ(cursor->seek(key4, true), IndexKeyEntry(key4, loc1));
 
-    cursor->savePositioned();
+    cursor->save();
     cursor->restore();
 
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
 
-    cursor->savePositioned();
+    cursor->save();
     removeFromIndex(opCtx,
                     sorted,
                     {

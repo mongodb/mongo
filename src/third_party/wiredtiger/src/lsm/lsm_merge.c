@@ -94,7 +94,7 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_RET(__wt_epoch(session, &now));
 	msec_since_last_merge =
-	    WT_TIMEDIFF(now, lsm_tree->merge_aggressive_ts) / WT_MILLION;
+	    WT_TIMEDIFF_MS(now, lsm_tree->merge_aggressive_ts);
 
 	/*
 	 * If there is no estimate for how long it's taking to fill chunks
@@ -353,21 +353,18 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	WT_LSM_CHUNK *chunk;
 	uint32_t generation;
 	uint64_t insert_count, record_count;
-	u_int dest_id, end_chunk, i, nchunks, start_chunk, start_id;
-	u_int created_chunk, verb;
-	int create_bloom, locked, in_sync, tret;
+	u_int dest_id, end_chunk, i, nchunks, start_chunk, start_id, verb;
+	int tret;
+	bool created_chunk, create_bloom, locked, in_sync;
 	const char *cfg[3];
 	const char *drop_cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_drop), "force", NULL };
 
 	bloom = NULL;
 	chunk = NULL;
-	create_bloom = 0;
-	created_chunk = 0;
 	dest = src = NULL;
-	locked = 0;
 	start_id = 0;
-	in_sync = 0;
+	created_chunk = create_bloom = locked = in_sync = false;
 
 	/* Fast path if it's obvious no merges could be done. */
 	if (lsm_tree->nchunks < lsm_tree->merge_min &&
@@ -380,7 +377,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	 * long time.
 	 */
 	WT_RET(__wt_lsm_tree_writelock(session, lsm_tree));
-	locked = 1;
+	locked = true;
 
 	WT_ERR(__lsm_merge_span(session,
 	    lsm_tree, id, &start_chunk, &end_chunk, &record_count));
@@ -395,10 +392,10 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
 	WT_ERR(__wt_lsm_tree_writeunlock(session, lsm_tree));
-	locked = 0;
+	locked = false;
 
 	/* Allocate an ID for the merge. */
-	dest_id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
+	dest_id = __wt_atomic_add32(&lsm_tree->last, 1);
 
 	/*
 	 * We only want to do the chunk loop if we're running with verbose,
@@ -422,13 +419,13 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	}
 
 	WT_ERR(__wt_calloc_one(session, &chunk));
-	created_chunk = 1;
+	created_chunk = true;
 	chunk->id = dest_id;
 
 	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_MERGED) &&
 	    (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST) ||
 	    start_chunk > 0) && record_count > 0)
-		create_bloom = 1;
+		create_bloom = true;
 
 	/*
 	 * Special setup for the merge cursor:
@@ -460,7 +457,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
 
-#define	LSM_MERGE_CHECK_INTERVAL	1000
+#define	LSM_MERGE_CHECK_INTERVAL	WT_THOUSAND
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
@@ -493,8 +490,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	 * merge_syncing field so that compact knows it is still in
 	 * progress.
 	 */
-	(void)WT_ATOMIC_ADD4(lsm_tree->merge_syncing, 1);
-	in_sync = 1;
+	(void)__wt_atomic_add32(&lsm_tree->merge_syncing, 1);
+	in_sync = true;
 	/*
 	 * We've successfully created the new chunk.  Now install it.  We need
 	 * to ensure that the NO_CACHE flag is cleared and the bloom filter
@@ -512,7 +509,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	 * Don't block if the cache is full: our next unit of work may be to
 	 * discard some trees to free space.
 	 */
-	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+	F_SET(session, WT_SESSION_NO_EVICTION);
 
 	if (create_bloom) {
 		if (ret == 0)
@@ -544,13 +541,13 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	WT_TRET(dest->close(dest));
 	dest = NULL;
 	++lsm_tree->merge_progressing;
-	(void)WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
-	in_sync = 0;
+	(void)__wt_atomic_sub32(&lsm_tree->merge_syncing, 1);
+	in_sync = false;
 	WT_ERR_NOTFOUND_OK(ret);
 
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
 	WT_ERR(__wt_lsm_tree_writelock(session, lsm_tree));
-	locked = 1;
+	locked = true;
 
 	/*
 	 * Check whether we raced with another merge, and adjust the chunk
@@ -591,7 +588,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	lsm_tree->dsk_gen++;
 
 	/* Update the throttling while holding the tree lock. */
-	__wt_lsm_tree_throttle(session, lsm_tree, 1);
+	__wt_lsm_tree_throttle(session, lsm_tree, true);
 
 	/* Schedule a pass to discard old chunks */
 	WT_ERR(__wt_lsm_manager_push_entry(
@@ -600,7 +597,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	if (in_sync)
-		(void)WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
+		(void)__wt_atomic_sub32(&lsm_tree->merge_syncing, 1);
 	if (src != NULL)
 		WT_TRET(src->close(src));
 	if (dest != NULL)
@@ -632,6 +629,6 @@ err:	if (locked)
 			    "Merge failed with %s",
 			   __wt_strerror(session, ret, NULL, 0)));
 	}
-	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 	return (ret);
 }

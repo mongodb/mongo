@@ -165,7 +165,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * incrementing the reader value to match it.
 	 */
 	new.s.readers = new.s.users = old.s.users + 1;
-	return (WT_ATOMIC_CAS8(l->u, old.u, new.u) ? 0 : EBUSY);
+	return (__wt_atomic_cas64(&l->u, old.u, new.u) ? 0 : EBUSY);
 }
 
 /*
@@ -190,7 +190,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * value will wrap and two lockers will simultaneously be granted the
 	 * lock.
 	 */
-	ticket = WT_ATOMIC_FETCH_ADD2(l->s.users, 1);
+	ticket = __wt_atomic_fetch_add16(&l->s.users, 1);
 	for (pause_cnt = 0; ticket != l->s.readers;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
@@ -201,7 +201,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 		 * Don't sleep long when waiting on a read lock, hopefully we're
 		 * waiting on another read thread to increment the reader count.
 		 */
-		if (++pause_cnt < 1000)
+		if (++pause_cnt < WT_THOUSAND)
 			WT_PAUSE();
 		else
 			__wt_sleep(0, 10);
@@ -234,7 +234,7 @@ __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * Increment the writers value (other readers are doing the same, make
 	 * sure we don't race).
 	 */
-	WT_ATOMIC_ADD2(l->s.writers, 1);
+	(void)__wt_atomic_add16(&l->s.writers, 1);
 
 	return (0);
 }
@@ -267,7 +267,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	/* The replacement lock value is a result of allocating a new ticket. */
 	++new.s.users;
-	return (WT_ATOMIC_CAS8(l->u, old.u, new.u) ? 0 : EBUSY);
+	return (__wt_atomic_cas64(&l->u, old.u, new.u) ? 0 : EBUSY);
 }
 
 /*
@@ -292,7 +292,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * value will wrap and two lockers will simultaneously be granted the
 	 * lock.
 	 */
-	ticket = WT_ATOMIC_FETCH_ADD2(l->s.users, 1);
+	ticket = __wt_atomic_fetch_add16(&l->s.users, 1);
 	for (pause_cnt = 0; ticket != l->s.writers;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
@@ -300,7 +300,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 		 * situation happens if there are more threads than cores in the
 		 * system and we're thrashing on shared resources.
 		 */
-		if (++pause_cnt < 1000)
+		if (++pause_cnt < WT_THOUSAND)
 			WT_PAUSE();
 		else
 			__wt_sleep(0, 10);

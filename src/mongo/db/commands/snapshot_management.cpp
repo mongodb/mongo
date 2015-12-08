@@ -110,7 +110,7 @@ public:
     }
 
     virtual void help(std::stringstream& h) const {
-        h << "Sets the snapshot for $readMajorityTemporaryName";
+        h << "Sets the snapshot for {readConcern: {level: 'majority'}}";
     }
 
     bool run(OperationContext* txn,

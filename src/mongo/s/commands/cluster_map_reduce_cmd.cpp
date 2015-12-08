@@ -91,7 +91,7 @@ BSONObj fixForShards(const BSONObj& orig,
         if (fn == bypassDocumentValidationCommandOption() || fn == "map" || fn == "mapreduce" ||
             fn == "mapReduce" || fn == "mapparams" || fn == "reduce" || fn == "query" ||
             fn == "sort" || fn == "scope" || fn == "verbose" || fn == "$queryOptions" ||
-            fn == "$readMajorityTemporaryName" || fn == LiteParsedQuery::cmdOptionMaxTimeMS) {
+            fn == "readConcern" || fn == LiteParsedQuery::cmdOptionMaxTimeMS) {
             b.append(e);
         } else if (fn == "out" || fn == "finalize") {
             // We don't want to copy these
@@ -266,7 +266,7 @@ public:
         if (!shardedInput && !shardedOutput && !customOutDB) {
             LOG(1) << "simple MR, just passthrough";
 
-            const auto shard = grid.shardRegistry()->getShard(confIn->getPrimaryId());
+            const auto shard = grid.shardRegistry()->getShard(txn, confIn->getPrimaryId());
             ShardConnection conn(shard->getConnString(), "");
 
             BSONObj res;
@@ -312,7 +312,7 @@ public:
                 // Need to gather list of all servers even if an error happened
                 string server;
                 {
-                    const auto shard = grid.shardRegistry()->getShard(mrResult.shardTargetId);
+                    const auto shard = grid.shardRegistry()->getShard(txn, mrResult.shardTargetId);
                     server = shard->getConnString().toString();
                 }
                 servers.insert(server);
@@ -403,7 +403,7 @@ public:
         BSONObj singleResult;
 
         if (!shardedOutput) {
-            const auto shard = grid.shardRegistry()->getShard(confOut->getPrimaryId());
+            const auto shard = grid.shardRegistry()->getShard(txn, confOut->getPrimaryId());
             LOG(1) << "MR with single shard output, NS=" << finalColLong
                    << " primary=" << shard->toString();
 
@@ -454,7 +454,8 @@ public:
             map<BSONObj, int> chunkSizes;
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock = grid.catalogManager(txn)->distLock(
+                auto scopedDistLock = grid.forwardingCatalogManager()->distLock(
+                    txn,
                     finalColLong,
                     "mr-post-process",
                     stdx::chrono::milliseconds(-1),  // retry indefinitely
@@ -480,7 +481,8 @@ public:
                 for (const auto& mrResult : mrCommandResults) {
                     string server;
                     {
-                        const auto shard = grid.shardRegistry()->getShard(mrResult.shardTargetId);
+                        const auto shard =
+                            grid.shardRegistry()->getShard(txn, mrResult.shardTargetId);
                         server = shard->getConnString().toString();
                     }
                     singleResult = mrResult.result;
@@ -512,6 +514,12 @@ public:
 
             // Do the splitting round
             ChunkManagerPtr cm = confOut->getChunkManagerIfExists(txn, finalColLong);
+
+            uassert(34359,
+                    str::stream() << "Failed to write mapreduce output to " << finalColLong
+                                  << "; expected that collection to be sharded, but it was not",
+                    cm);
+
             for (const auto& chunkSize : chunkSizes) {
                 BSONObj key = chunkSize.first;
                 const int size = chunkSize.second;

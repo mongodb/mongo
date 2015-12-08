@@ -42,7 +42,8 @@ public:
     /**
      * Shortcut for unit-tests.
      */
-    static RemoteCommandTargeterMock* get(RemoteCommandTargeter* targeter);
+    static std::shared_ptr<RemoteCommandTargeterMock> get(
+        std::shared_ptr<RemoteCommandTargeter> targeter);
 
     /**
      * Returns the value last set by setConnectionStringReturnValue.
@@ -53,12 +54,18 @@ public:
      * Returns the return value last set by setFindHostReturnValue.
      * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
      */
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
+    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
+                                     Milliseconds maxWait) override;
 
     /**
      * No-op for the mock.
      */
     void markHostNotMaster(const HostAndPort& host) override;
+
+    /**
+     * No-op for the mock.
+     */
+    void markHostUnreachable(const HostAndPort& host) override;
 
     /**
      * Sets the return value for the next call to connectionString.

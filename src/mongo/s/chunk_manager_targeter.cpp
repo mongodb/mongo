@@ -273,7 +273,7 @@ Status ChunkManagerTargeter::init(OperationContext* txn) {
     }
 
     shared_ptr<DBConfig> config = status.getValue();
-    config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
+    config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
 
     return Status::OK();
 }
@@ -320,8 +320,7 @@ Status ChunkManagerTargeter::targetInsert(OperationContext* txn,
                                         << "; no metadata found");
         }
 
-        *endpoint =
-            new ShardEndpoint(_primary->getId(), ChunkVersionAndOpTime(ChunkVersion::UNSHARDED()));
+        *endpoint = new ShardEndpoint(_primary->getId(), ChunkVersion::UNSHARDED());
         return Status::OK();
     }
 }
@@ -419,9 +418,9 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
         endpoints->push_back(endpoint);
         return result;
     } else if (updateType == UpdateType_OpStyle) {
-        return targetQuery(query, endpoints);
+        return targetQuery(txn, query, endpoints);
     } else {
-        return targetDoc(updateExpr, endpoints);
+        return targetDoc(txn, updateExpr, endpoints);
     }
 }
 
@@ -465,18 +464,20 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* txn,
         endpoints->push_back(endpoint);
         return result;
     } else {
-        return targetQuery(deleteDoc.getQuery(), endpoints);
+        return targetQuery(txn, deleteDoc.getQuery(), endpoints);
     }
 }
 
-Status ChunkManagerTargeter::targetDoc(const BSONObj& doc,
+Status ChunkManagerTargeter::targetDoc(OperationContext* txn,
+                                       const BSONObj& doc,
                                        vector<ShardEndpoint*>* endpoints) const {
     // NOTE: This is weird and fragile, but it's the way our language works right now -
     // documents are either A) invalid or B) valid equality queries over themselves.
-    return targetQuery(doc, endpoints);
+    return targetQuery(txn, doc, endpoints);
 }
 
-Status ChunkManagerTargeter::targetQuery(const BSONObj& query,
+Status ChunkManagerTargeter::targetQuery(OperationContext* txn,
+                                         const BSONObj& query,
                                          vector<ShardEndpoint*>* endpoints) const {
     if (!_primary && !_manager) {
         return Status(ErrorCodes::NamespaceNotFound,
@@ -487,7 +488,7 @@ Status ChunkManagerTargeter::targetQuery(const BSONObj& query,
     set<ShardId> shardIds;
     if (_manager) {
         try {
-            _manager->getShardIdsForQuery(shardIds, query);
+            _manager->getShardIdsForQuery(txn, query, &shardIds);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
@@ -497,10 +498,7 @@ Status ChunkManagerTargeter::targetQuery(const BSONObj& query,
 
     for (const ShardId& shardId : shardIds) {
         endpoints->push_back(new ShardEndpoint(
-            shardId,
-            _manager
-                ? ChunkVersionAndOpTime(_manager->getVersion(shardId), _manager->getConfigOpTime())
-                : ChunkVersionAndOpTime(ChunkVersion::UNSHARDED())));
+            shardId, _manager ? _manager->getVersion(shardId) : ChunkVersion::UNSHARDED()));
     }
 
     return Status::OK();
@@ -520,9 +518,7 @@ Status ChunkManagerTargeter::targetShardKey(OperationContext* txn,
         _stats.chunkSizeDelta[chunk->getMin()] += estDataSize;
     }
 
-    *endpoint = new ShardEndpoint(chunk->getShardId(),
-                                  ChunkVersionAndOpTime(_manager->getVersion(chunk->getShardId()),
-                                                        _manager->getConfigOpTime()));
+    *endpoint = new ShardEndpoint(chunk->getShardId(), _manager->getVersion(chunk->getShardId()));
 
     return Status::OK();
 }
@@ -543,10 +539,7 @@ Status ChunkManagerTargeter::targetCollection(vector<ShardEndpoint*>* endpoints)
 
     for (const ShardId& shardId : shardIds) {
         endpoints->push_back(new ShardEndpoint(
-            shardId,
-            _manager
-                ? ChunkVersionAndOpTime(_manager->getVersion(shardId), _manager->getConfigOpTime())
-                : ChunkVersionAndOpTime(ChunkVersion::UNSHARDED())));
+            shardId, _manager ? _manager->getVersion(shardId) : ChunkVersion::UNSHARDED()));
     }
 
     return Status::OK();
@@ -564,10 +557,7 @@ Status ChunkManagerTargeter::targetAllShards(vector<ShardEndpoint*>* endpoints) 
 
     for (const ShardId& shardId : shardIds) {
         endpoints->push_back(new ShardEndpoint(
-            shardId,
-            _manager
-                ? ChunkVersionAndOpTime(_manager->getVersion(shardId), _manager->getConfigOpTime())
-                : ChunkVersionAndOpTime(ChunkVersion::UNSHARDED())));
+            shardId, _manager ? _manager->getVersion(shardId) : ChunkVersion::UNSHARDED()));
     }
 
     return Status::OK();
@@ -642,7 +632,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
     }
 
     shared_ptr<DBConfig> config = status.getValue();
-    config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
+    config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
 
     // We now have the latest metadata from the cache.
 
@@ -716,7 +706,7 @@ Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refre
         } catch (const DBException& ex) {
             return Status(ErrorCodes::UnknownError, ex.toString());
         }
-        config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
+        config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
     } else if (refreshType == RefreshType_ReloadDatabase) {
         try {
             // Dumps the db info, reloads it all, synchronization between threads happens
@@ -727,7 +717,7 @@ Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refre
             return Status(ErrorCodes::UnknownError, ex.toString());
         }
 
-        config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
+        config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
     }
 
     return Status::OK();

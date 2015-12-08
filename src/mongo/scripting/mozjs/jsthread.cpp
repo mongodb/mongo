@@ -33,6 +33,7 @@
 #include "mongo/scripting/mozjs/jsthread.h"
 
 #include <cstdio>
+#include "vm/PosixNSPR.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/scripting/mozjs/implscope.h"
@@ -48,6 +49,8 @@
 namespace mongo {
 namespace mozjs {
 
+// These are all executed on some object that owns a js thread, rather than a
+// jsthread itself, so CONSTRAINED_METHOD doesn't do the job here.
 const JSFunctionSpec JSThreadInfo::threadMethods[6] = {
     MONGO_ATTACH_JS_FUNCTION(init),
     MONGO_ATTACH_JS_FUNCTION(start),
@@ -77,7 +80,7 @@ const char* const JSThreadInfo::className = "JSThread";
 class JSThreadConfig {
 public:
     JSThreadConfig(JSContext* cx, JS::CallArgs args)
-        : _started(false), _done(false), _sharedData(new SharedData()) {
+        : _started(false), _done(false), _sharedData(new SharedData()), _jsthread(*this) {
         auto scope = getScope(cx);
 
         uassert(ErrorCodes::JSInterpreterFailure, "need at least one argument", args.length() > 0);
@@ -85,16 +88,12 @@ public:
                 "first argument must be a function",
                 args.get(0).isObject() && JS_ObjectIsFunction(cx, args.get(0).toObjectOrNull()));
 
-        BSONObjBuilder b;
-        for (unsigned i = 0; i < args.length(); ++i) {
-            // 10 decimal digits for a 32 bit unsigned, then 1 for the null
-            char buf[11];
-            std::sprintf(buf, "%i", i);
-
-            ValueWriter(cx, args.get(i)).writeThis(&b, buf);
+        JS::RootedObject robj(cx, JS_NewArrayObject(cx, args));
+        if (!robj) {
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_NewArrayObject");
         }
 
-        _sharedData->_args = b.obj();
+        _sharedData->_args = ObjectWrapper(cx, robj).toBSON();
 
         _sharedData->_stack = currentJSStackToString(cx);
 
@@ -106,14 +105,24 @@ public:
     void start() {
         uassert(ErrorCodes::JSInterpreterFailure, "Thread already started", !_started);
 
-        _thread = stdx::thread(JSThread(*this));
+        // Despite calling PR_CreateThread, we're actually using our own
+        // implementation of PosixNSPR.cpp in this directory. So these threads
+        // are actually hosted on top of stdx::threads and most of the flags
+        // don't matter.
+        _thread = PR_CreateThread(PR_USER_THREAD,
+                                  JSThread::run,
+                                  &_jsthread,
+                                  PR_PRIORITY_NORMAL,
+                                  PR_LOCAL_THREAD,
+                                  PR_JOINABLE_THREAD,
+                                  0);
         _started = true;
     }
 
     void join() {
         uassert(ErrorCodes::JSInterpreterFailure, "Thread not running", _started && !_done);
 
-        _thread.join();
+        PR_JoinThread(_thread);
         _done = true;
     }
 
@@ -178,19 +187,21 @@ private:
     public:
         JSThread(JSThreadConfig& config) : _sharedData(config._sharedData) {}
 
-        void operator()() {
+        static void run(void* priv) {
+            auto thisv = static_cast<JSThread*>(priv);
+
             try {
                 MozJSImplScope scope(static_cast<MozJSScriptEngine*>(globalScriptEngine));
 
-                scope.setParentStack(_sharedData->_stack);
-                _sharedData->_returnData = scope.callThreadArgs(_sharedData->_args);
+                scope.setParentStack(thisv->_sharedData->_stack);
+                thisv->_sharedData->_returnData = scope.callThreadArgs(thisv->_sharedData->_args);
             } catch (...) {
                 auto status = exceptionToStatus();
 
                 log() << "js thread raised js exception: " << status.reason()
-                      << _sharedData->_stack;
-                _sharedData->setErrored(true);
-                _sharedData->_returnData = BSON("ret" << BSONUndefined);
+                      << thisv->_sharedData->_stack;
+                thisv->_sharedData->setErrored(true);
+                thisv->_sharedData->_returnData = BSON("ret" << BSONUndefined);
             }
         }
 
@@ -200,18 +211,22 @@ private:
 
     bool _started;
     bool _done;
-    stdx::thread _thread;
+    PRThread* _thread = nullptr;
     std::shared_ptr<SharedData> _sharedData;
+    JSThread _jsthread;
 };
 
 namespace {
 
 JSThreadConfig* getConfig(JSContext* cx, JS::CallArgs args) {
     JS::RootedValue value(cx);
-    ObjectWrapper(cx, args.thisv()).getValue("_JSThreadConfig", &value);
+    ObjectWrapper(cx, args.thisv()).getValue(InternedString::_JSThreadConfig, &value);
 
     if (!value.isObject())
-        uasserted(ErrorCodes::InternalError, "_JSThreadConfig not an object");
+        uasserted(ErrorCodes::BadValue, "_JSThreadConfig not an object");
+
+    if (!getScope(cx)->getProto<JSThreadInfo>().instanceOf(value))
+        uasserted(ErrorCodes::BadValue, "_JSThreadConfig is not a JSThread");
 
     return static_cast<JSThreadConfig*>(JS_GetPrivate(value.toObjectOrNull()));
 }
@@ -227,41 +242,41 @@ void JSThreadInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     delete config;
 }
 
-void JSThreadInfo::Functions::init(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     JS::RootedObject obj(cx);
-    scope->getJSThreadProto().newObject(&obj);
+    scope->getProto<JSThreadInfo>().newObject(&obj);
     JSThreadConfig* config = new JSThreadConfig(cx, args);
     JS_SetPrivate(obj, config);
 
-    ObjectWrapper(cx, args.thisv()).setObject("_JSThreadConfig", obj);
+    ObjectWrapper(cx, args.thisv()).setObject(InternedString::_JSThreadConfig, obj);
 
     args.rval().setUndefined();
 }
 
-void JSThreadInfo::Functions::start(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::start::call(JSContext* cx, JS::CallArgs args) {
     getConfig(cx, args)->start();
 
     args.rval().setUndefined();
 }
 
-void JSThreadInfo::Functions::join(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::join::call(JSContext* cx, JS::CallArgs args) {
     getConfig(cx, args)->join();
 
     args.rval().setUndefined();
 }
 
-void JSThreadInfo::Functions::hasFailed(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::hasFailed::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(getConfig(cx, args)->hasFailed());
 }
 
-void JSThreadInfo::Functions::returnData(JSContext* cx, JS::CallArgs args) {
-    ValueReader(cx, args.rval())
-        .fromBSONElement(getConfig(cx, args)->returnData().firstElement(), true);
+void JSThreadInfo::Functions::returnData::call(JSContext* cx, JS::CallArgs args) {
+    auto obj = getConfig(cx, args)->returnData();
+    ValueReader(cx, args.rval()).fromBSONElement(obj.firstElement(), obj, true);
 }
 
-void JSThreadInfo::Functions::_threadInject(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::_threadInject::call(JSContext* cx, JS::CallArgs args) {
     uassert(ErrorCodes::JSInterpreterFailure,
             "threadInject takes exactly 1 argument",
             args.length() == 1);
@@ -277,8 +292,8 @@ void JSThreadInfo::Functions::_threadInject(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void JSThreadInfo::Functions::_scopedThreadInject(JSContext* cx, JS::CallArgs args) {
-    _threadInject(cx, args);
+void JSThreadInfo::Functions::_scopedThreadInject::call(JSContext* cx, JS::CallArgs args) {
+    _threadInject::call(cx, args);
 }
 
 }  // namespace mozjs

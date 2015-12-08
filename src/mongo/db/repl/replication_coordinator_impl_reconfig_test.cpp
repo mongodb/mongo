@@ -100,7 +100,7 @@ TEST_F(ReplCoordTest, ReconfigWithUninitializableConfig) {
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
 
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
@@ -133,7 +133,7 @@ TEST_F(ReplCoordTest, ReconfigWithWrongReplSetName) {
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
 
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
@@ -164,7 +164,7 @@ TEST_F(ReplCoordTest, ReconfigValidateFails) {
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
 
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
@@ -227,7 +227,7 @@ TEST_F(ReplCoordTest, ReconfigQuorumCheckFails) {
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
     stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
@@ -265,29 +265,14 @@ TEST_F(ReplCoordTest, ReconfigStoreLocalConfigDocumentFails) {
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
     getExternalState()->setStoreLocalConfigDocumentStatus(
         Status(ErrorCodes::OutOfDiskSpace, "The test set this"));
     stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
-    NetworkInterfaceMock* net = getNet();
-    getNet()->enterNetwork();
-    const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    const RemoteCommandRequest& request = noi->getRequest();
-    repl::ReplSetHeartbeatArgs hbArgs;
-    ASSERT_OK(hbArgs.initialize(request.cmdObj));
-    repl::ReplSetHeartbeatResponse hbResp;
-    hbResp.setSetName("mySet");
-    hbResp.setState(MemberState::RS_SECONDARY);
-    hbResp.setConfigVersion(2);
-    BSONObjBuilder respObj;
-    respObj << "ok" << 1;
-    hbResp.addToBSON(&respObj, false);
-    net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
-    net->runReadyNetworkOperations();
-    getNet()->exitNetwork();
+    replyToReceivedHeartbeat();
     reconfigThread.join();
     ASSERT_EQUALS(ErrorCodes::OutOfDiskSpace, status);
 }
@@ -305,7 +290,7 @@ TEST_F(ReplCoordTest, ReconfigWhileReconfiggingFails) {
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
     // first reconfig
@@ -382,7 +367,7 @@ TEST_F(ReplCoordTest, ReconfigSuccessful) {
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
     stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
@@ -421,7 +406,7 @@ TEST_F(ReplCoordTest, ReconfigDuringHBReconfigFails) {
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // set hbreconfig to hang while in progress
@@ -476,7 +461,7 @@ TEST_F(ReplCoordTest, HBReconfigDuringReconfigFails) {
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // start reconfigThread

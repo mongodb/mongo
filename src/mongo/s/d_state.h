@@ -38,13 +38,6 @@ class Client;
 class OperationContext;
 class ShardedConnectionInfo;
 
-struct ShardForceVersionOkModeBlock {
-    ShardForceVersionOkModeBlock(Client* client);
-    ~ShardForceVersionOkModeBlock();
-
-    ShardedConnectionInfo* info;
-};
-
 // -----------------
 // --- core ---
 // -----------------

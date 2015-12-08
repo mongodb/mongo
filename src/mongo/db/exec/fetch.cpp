@@ -128,6 +128,9 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
                     return NEED_TIME;
                 }
             } catch (const WriteConflictException& wce) {
+                // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may
+                // be freed when we yield.
+                member->makeObjOwnedIfNeeded();
                 _idRetrying = id;
                 *out = WorkingSet::INVALID_ID;
                 _commonStats.needYield++;
@@ -234,7 +237,7 @@ unique_ptr<PlanStageStats> FetchStage::getStats() {
 
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_FETCH);
     ret->specific = make_unique<FetchStats>(_specificStats);
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
     return ret;
 }
 

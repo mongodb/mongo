@@ -6,9 +6,21 @@
 var name = "read_committed";
 var replTest = new ReplSetTest({name: name,
                                 nodes: 3,
-                                nodeOptions: {setParameter: "enableReplSnapshotThread=true"}});
+                                nodeOptions: {enableMajorityReadConcern: ''}});
 var nodes = replTest.nodeList();
-var conns = replTest.startSet();
+
+try {
+    replTest.startSet();
+} catch (e) {
+    var conn = MongoRunner.runMongod();
+    if (!conn.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
+        jsTest.log("skipping test since storage engine doesn't support committed reads");
+        MongoRunner.stopMongod(conn);
+        return;
+    }
+    throw e;
+}
+
 replTest.initiate({"_id": name,
                    "members": [
                        { "_id": 0, "host": nodes[0] },
@@ -22,12 +34,6 @@ var secondary = replTest.liveNodes.slaves[0];
 var secondaryId = replTest.getNodeId(secondary);
 var db = primary.getDB(name);
 var t = db[name];
-
-if (!db.serverStatus().storageEngine.supportsCommittedReads) {
-    assert.neq(db.serverStatus().storageEngine.name, "wiredTiger");
-    jsTest.log("skipping test since storage engine doesn't support committed reads");
-    return;
-}
 
 function doDirtyRead() {
     var res = t.runCommand('find', {"readConcern": {"level": "local"}});

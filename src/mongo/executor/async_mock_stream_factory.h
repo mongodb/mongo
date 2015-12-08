@@ -54,12 +54,12 @@ class AsyncMockStreamFactory final : public AsyncStreamFactoryInterface {
 public:
     AsyncMockStreamFactory() = default;
 
-    std::unique_ptr<AsyncStreamInterface> makeStream(asio::io_service* io_service,
+    std::unique_ptr<AsyncStreamInterface> makeStream(asio::io_service::strand* strand,
                                                      const HostAndPort& host) override;
 
     class MockStream final : public AsyncStreamInterface {
     public:
-        MockStream(asio::io_service* io_service,
+        MockStream(asio::io_service::strand* strand,
                    AsyncMockStreamFactory* factory,
                    const HostAndPort& target);
 
@@ -69,6 +69,7 @@ public:
             kBlockedBeforeConnect,
             kBlockedBeforeRead,
             kBlockedAfterWrite,
+            kCanceled,
         };
 
         ~MockStream();
@@ -78,12 +79,18 @@ public:
         void write(asio::const_buffer buf, StreamHandler&& writeHandler) override;
         void read(asio::mutable_buffer buf, StreamHandler&& readHandler) override;
 
+        bool isOpen() override;
+
         HostAndPort target();
 
         StreamState waitUntilBlocked();
 
+        void cancel() override;
+
         std::vector<uint8_t> popWrite();
         void pushRead(std::vector<uint8_t> toRead);
+
+        void setError(std::error_code ec);
 
         void unblock();
 
@@ -92,21 +99,28 @@ public:
             const stdx::function<RemoteCommandResponse(RemoteCommandRequest)> replyFunc);
 
     private:
-        void _unblock_inlock(stdx::unique_lock<stdx::mutex>* lk);
-        void _block_inlock(StreamState state, stdx::unique_lock<stdx::mutex>* lk);
+        using Action = stdx::function<void()>;
 
-        asio::io_service* _io_service;
+        void _defer(StreamState state, Action&& handler);
+        void _defer_inlock(StreamState state, Action&& handler);
+        void _unblock_inlock();
+
+        asio::io_service::strand* _strand;
 
         AsyncMockStreamFactory* _factory;
         HostAndPort _target;
 
         stdx::mutex _mutex;
 
-        stdx::condition_variable _cv;
+        stdx::condition_variable _deferredCV;
         StreamState _state{kRunning};
 
         std::queue<std::vector<uint8_t>> _readQueue;
         std::queue<std::vector<uint8_t>> _writeQueue;
+
+        std::error_code _error;
+
+        Action _deferredAction;
     };
 
     MockStream* blockUntilStreamExists(const HostAndPort& host);

@@ -22,14 +22,12 @@ assert.binVersion = function(mongo, version) {
 assert.allBinVersions = function(versionsWanted, versionsFound) {
     
     for (var i = 0; i < versionsWanted.length; i++) {
-
+        var version = versionsWanted[i];
         var found = false;
         for (var j = 0; j < versionsFound.length; j++) {
-            if (MongoRunner.areBinVersionsTheSame(versionsWanted[i],
-                                                  versionsFound[j]))
-            {
+            if (MongoRunner.areBinVersionsTheSame(version,
+                                                  versionsFound[j])) {
                 found = true;
-                var version = versionsWanted[i];
                 break;
             }
         }

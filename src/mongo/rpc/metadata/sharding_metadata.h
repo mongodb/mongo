@@ -28,6 +28,8 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/rpc/protocol.h"
 
 namespace mongo {
 class BSONObj;
@@ -35,11 +37,13 @@ class BSONObjBuilder;
 class Status;
 template <typename T>
 class StatusWith;
+
 namespace rpc {
 
 /**
  * This class compromises the reply metadata fields that concern sharding. MongoD attaches
  * this information to a command reply, which MongoS uses to process getLastError.
+ * TODO(spencer): Rename this to ShardingResponseMetadata.
  */
 class ShardingMetadata {
 public:
@@ -50,8 +54,11 @@ public:
 
     /**
      * Writes ShardingMetadata to a metadata builder.
+     * If protocol is OP_QUERY, write the metadata in the old format recognizable by 3.0 mongos.
+     * TODO(SERVER-21631): Remove the 'protocol' argument and downconversion logic from this method
+     *   after 3.2 is out.
      */
-    Status writeToMetadata(BSONObjBuilder* metadataBob) const;
+    Status writeToMetadata(BSONObjBuilder* metadataBob, rpc::Protocol protocol) const;
 
     /**
      * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
@@ -70,20 +77,20 @@ public:
                             BSONObjBuilder* metadataBob);
 
     /**
-     * Gets the OpTime of the oplog entry of the last succssful write operation executed by the
+     * Gets the OpTime of the oplog entry of the last successful write operation executed by the
      * server that produced the metadata.
      */
-    const Timestamp& getLastOpTime() const;
+    const repl::OpTime& getLastOpTime() const;
 
     /**
      * Gets the most recent election id observed by the server that produced the metadata.
      */
     const OID& getLastElectionId() const;
 
-    ShardingMetadata(Timestamp lastOpTime, OID lastElectionId);
+    ShardingMetadata(repl::OpTime lastOpTime, OID lastElectionId);
 
 private:
-    Timestamp _lastOpTime;
+    repl::OpTime _lastOpTime;
     OID _lastElectionId;
 };
 

@@ -1,7 +1,7 @@
 // Change a write concern mode from 2 to 3 servers
 
 var host = getHostName();
-var replTest = new ReplSetTest( {name: "rstag", nodes: 4, startPort: 31000} );
+var replTest = new ReplSetTest({ name: "rstag", nodes: 4 });
 var nodes = replTest.startSet();
 var ports = replTest.ports;
 var conf = {_id : "rstag", version: 1, members : [

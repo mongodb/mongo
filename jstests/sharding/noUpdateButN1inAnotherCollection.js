@@ -6,7 +6,7 @@ function debug( str ) {
 var name = "badNonUpdate";
 debug("Starting sharded cluster test stuff");
 
-s = new ShardingTest( {name: name, shards : 2, mongos : 2, verbose:5, nopreallocj : true });
+var s = new ShardingTest({ name: name, shards: 2, mongos : 2 });
 
 var mongosA=s.s0;
 var mongosB=s.s1;
@@ -55,4 +55,3 @@ var res = mongosB.getDB("test").coll2.update({ _id: 0 }, { $set: { c: "333" }});
 assert.eq( 0, res.nModified );
 
 s.stop();
-

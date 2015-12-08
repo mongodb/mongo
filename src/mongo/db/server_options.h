@@ -50,7 +50,7 @@ struct ServerGlobalParams {
           defaultProfile(0),
           slowMS(100),
           defaultLocalThresholdMillis(15),
-          moveParanoia(true),
+          moveParanoia(false),
           noUnixSocket(false),
           doFork(0),
           socket("/tmp"),
@@ -78,7 +78,7 @@ struct ServerGlobalParams {
 
     bool indexBuildRetry;  // --noIndexBuildRetry
 
-    bool quiet;  // --quiet
+    std::atomic<bool> quiet;  // --quiet NOLINT
 
     bool configsvr;                                  // --configsvr
     CatalogManager::ConfigServerMode configsvrMode;  // -- configsvrMode

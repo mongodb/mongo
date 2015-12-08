@@ -300,10 +300,10 @@ public:
          * Prepares for state changes in underlying data in a way that allows the cursor's
          * current position to be restored.
          *
-         * It is safe to call savePositioned multiple times in a row.
+         * It is safe to call save multiple times in a row.
          * No other method (excluding destructor) may be called until successfully restored.
          */
-        virtual void savePositioned() = 0;
+        virtual void save() = 0;
 
         /**
          * Prepares for state changes in underlying data without necessarily saving the current
@@ -316,7 +316,7 @@ public:
          * No other method (excluding destructor) may be called until successfully restored.
          */
         virtual void saveUnpositioned() {
-            savePositioned();
+            save();
         }
 
         /**
@@ -325,7 +325,7 @@ public:
          * If the former position no longer exists, a following call to next() will return the
          * next closest position in the direction of the scan, if any.
          *
-         * This handles restoring after either savePositioned() or saveUnpositioned().
+         * This handles restoring after either save() or saveUnpositioned().
          */
         virtual void restore() = 0;
 
@@ -354,6 +354,24 @@ public:
      */
     virtual std::unique_ptr<Cursor> newCursor(OperationContext* txn,
                                               bool isForward = true) const = 0;
+
+    /**
+     * Constructs a cursor over an index that returns entries in a randomized order, and allows
+     * storage engines to provide a more efficient way to randomly sample a collection than
+     * MongoDB's default sampling methods, which are used when this method returns {}. Note if it is
+     * possible to implement RecordStore::getRandomCursor(), that method is preferred, as it will
+     * return the entire document, whereas this method will only return the index key and the
+     * RecordId, requiring an extra lookup.
+     *
+     * This method may be implemented using a pseudo-random walk over B-trees or a similar approach.
+     * Different cursors should return entries in a different order. Random cursors may return the
+     * same entry more than once and, as a result, may return more entries than exist in the index.
+     * Implementations should avoid obvious biases toward older, newer, larger smaller or other
+     * specific classes of entries.
+     */
+    virtual std::unique_ptr<Cursor> newRandomCursor(OperationContext* txn) const {
+        return {};
+    }
 
     //
     // Index creation

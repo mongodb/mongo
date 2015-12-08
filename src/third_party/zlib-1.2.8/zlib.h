@@ -956,7 +956,7 @@ ZEXTERN long ZEXPORT inflateMark OF((z_streamp strm));
    location in the input stream can be determined from avail_in and data_type
    as noted in the description for the Z_BLOCK flush parameter for inflate.
 
-     inflateMark returns the value noted above or -1 << 16 if the provided
+     inflateMark returns the value noted above or -65536 if the provided
    source stream state was inconsistent.
 */
 

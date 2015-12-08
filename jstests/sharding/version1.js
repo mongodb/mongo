@@ -1,6 +1,6 @@
-// version1.js
+(function() {
 
-s = new ShardingTest( "version1" , 1 , 2 )
+var s = new ShardingTest({ name: "version1", shards: 1 });
 
 s.adminCommand( { enablesharding : "alleyinsider" } );
 s.adminCommand( { shardcollection : "alleyinsider.foo" , key : { num : 1 } } );
@@ -10,30 +10,34 @@ s.printShardingStatus();
 
 a = s._connections[0].getDB( "admin" );
 
-assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).ok == 0 );
+assert.commandFailed(a.runCommand({ setShardVersion: "alleyinsider.foo", configdb: s._configDB }));
 
-assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , version : "a" } ).ok == 0 );
+assert.commandFailed(a.runCommand({ setShardVersion: "alleyinsider.foo",
+                                    configdb: s._configDB,
+                                    version: "a" }));
 
-assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , authoritative : true } ).ok == 0 );
+assert.commandFailed(a.runCommand({ setShardVersion: "alleyinsider.foo",
+                                    configdb: s._configDB,
+                                    authoritative: true }));
 
-assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
-                       configdb: s._configDB,
-                       version: new Timestamp(2, 0) }).ok == 0,
-        "should have failed b/c no auth" );
+assert.commandFailed(a.runCommand({ setShardVersion: "alleyinsider.foo",
+                                    configdb: s._configDB,
+                                    version: new Timestamp(2, 0)}),
+                     "should have failed b/c no auth" );
 
-assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
-                       configdb: s._configDB,
-                       version: new Timestamp(2, 0),
-                       authoritative: true }),
-        "should have failed because first setShardVersion needs shard info" );
+assert.commandFailed(a.runCommand({ setShardVersion: "alleyinsider.foo",
+                                    configdb: s._configDB,
+                                    version: new Timestamp(2, 0),
+                                    authoritative: true }),
+                     "should have failed because first setShardVersion needs shard info");
 
-assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
-                       configdb: s._configDB,
-                       version: new Timestamp(2, 0),
-                       authoritative: true,
-                       shard: "shard0000",
-                       shardHost: "localhost:30000" }),
-        "should have failed because version is config is 1|0" );
+assert.commandFailed(a.runCommand({ setShardVersion: "alleyinsider.foo",
+                                    configdb: s._configDB,
+                                    version: new Timestamp(2, 0),
+                                    authoritative: true,
+                                    shard: "shard0000",
+                                    shardHost: s.s.host }),
+                     "should have failed because version is config is 1|0");
 
 var epoch = s.getDB('config').chunks.findOne().lastmodEpoch;
 assert.commandWorked( a.runCommand({ setShardVersion: "alleyinsider.foo",
@@ -42,23 +46,23 @@ assert.commandWorked( a.runCommand({ setShardVersion: "alleyinsider.foo",
                                      versionEpoch: epoch,
                                      authoritative: true,
                                      shard: "shard0000",
-                                     shardHost: "localhost:30000" }),
+                                     shardHost: s.s.host }),
                      "should have worked" );
 
-assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
-                       configdb: "a",
-                       version: new Timestamp(0, 2),
-                       versionEpoch: epoch }).ok == 0, "A" );
+assert.commandFailed(a.runCommand({ setShardVersion: "alleyinsider.foo",
+                                    configdb: "a",
+                                    version: new Timestamp(0, 2),
+                                    versionEpoch: epoch }));
 
-assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
-                       configdb: s._configDB,
-                       version: new Timestamp(0, 2),
-                       versionEpoch: epoch }).ok == 0, "B" );
+assert.commandFailed(a.runCommand({ setShardVersion: "alleyinsider.foo",
+                                    configdb: s._configDB,
+                                    version: new Timestamp(0, 2),
+                                    versionEpoch: epoch }));
 
-assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
-                       configdb: s._configDB,
-                       version: new Timestamp(0, 1),
-                       versionEpoch: epoch }).ok == 0, "C" );
+assert.commandFailed(a.runCommand({ setShardVersion: "alleyinsider.foo",
+                                    configdb: s._configDB,
+                                    version: new Timestamp(0, 1),
+                                    versionEpoch: epoch }));
 
 // the only way that setSharVersion passes is if the shard agrees with the version
 // the shard takes its version from config directly
@@ -69,3 +73,5 @@ assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
 // assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" } ).global.i , 3 , "my get version B" );
 
 s.stop();
+
+})();

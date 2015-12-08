@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
@@ -48,43 +49,50 @@ void DBInfo::getProperty(JSContext* cx,
                          JS::HandleObject obj,
                          JS::HandleId id,
                          JS::MutableHandleValue vp) {
-    JS::RootedObject parent(cx);
-    if (!JS_GetPrototype(cx, obj, &parent))
-        uasserted(ErrorCodes::JSInterpreterFailure, "Couldn't get prototype");
-
-    auto scope = getScope(cx);
-
-    ObjectWrapper parentWrapper(cx, parent);
-
-    std::string sname = IdWrapper(cx, id).toString();
-
     // 2nd look into real values, may be cached collection object
     if (!vp.isUndefined()) {
-        if (vp.isObject()) {
+        auto scope = getScope(cx);
+        auto opContext = scope->getOpContext();
+
+        if (opContext && vp.isObject()) {
             ObjectWrapper o(cx, vp);
 
-            if (o.hasField("_fullName")) {
-                auto opContext = scope->getOpContext();
-
+            if (o.hasOwnField(InternedString::_fullName)) {
                 // need to check every time that the collection did not get sharded
-                if (opContext &&
-                    haveLocalShardingInfo(opContext->getClient(), o.getString("_fullName")))
+                if (haveLocalShardingInfo(opContext->getClient(),
+                                          o.getString(InternedString::_fullName)))
                     uasserted(ErrorCodes::BadValue, "can't use sharded collection from db.eval");
             }
         }
 
         return;
-    } else if (parentWrapper.hasField(id)) {
+    }
+
+    JS::RootedObject parent(cx);
+    if (!JS_GetPrototype(cx, obj, &parent))
+        uasserted(ErrorCodes::JSInterpreterFailure, "Couldn't get prototype");
+
+    ObjectWrapper parentWrapper(cx, parent);
+
+    if (parentWrapper.hasOwnField(id)) {
         parentWrapper.getValue(id, vp);
         return;
-    } else if (sname.length() == 0 || sname[0] == '_') {
-        // if starts with '_' we dont return collection, one must use getCollection()
-        return;
+    }
+
+    IdWrapper idw(cx, id);
+
+    // if starts with '_' we dont return collection, one must use getCollection()
+    if (idw.isString()) {
+        JSStringWrapper jsstr;
+        auto sname = idw.toStringData(&jsstr);
+        if (sname.size() == 0 || sname[0] == '_') {
+            return;
+        }
     }
 
     // no hit, create new collection
     JS::RootedValue getCollection(cx);
-    parentWrapper.getValue("getCollection", &getCollection);
+    parentWrapper.getValue(InternedString::getCollection, &getCollection);
 
     if (!(getCollection.isObject() && JS_ObjectIsFunction(cx, getCollection.toObjectOrNull()))) {
         uasserted(ErrorCodes::BadValue, "getCollection is not a function");
@@ -92,17 +100,17 @@ void DBInfo::getProperty(JSContext* cx,
 
     JS::AutoValueArray<1> args(cx);
 
-    ValueReader(cx, args[0]).fromStringData(sname);
+    idw.toValue(args[0]);
 
     JS::RootedValue coll(cx);
     ObjectWrapper(cx, obj).callMethod(getCollection, args, &coll);
 
     uassert(16861,
             "getCollection returned something other than a collection",
-            scope->getDbCollectionProto().instanceOf(coll));
+            getScope(cx)->getProto<DBCollectionInfo>().instanceOf(coll));
 
     // cache collection for reuse, don't enumerate
-    ObjectWrapper(cx, obj).defineProperty(sname.c_str(), coll, 0);
+    ObjectWrapper(cx, obj).defineProperty(id, coll, 0);
 
     vp.set(coll);
 }
@@ -120,11 +128,11 @@ void DBInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     JS::RootedObject thisv(cx);
-    scope->getDbProto().newObject(&thisv);
+    scope->getProto<DBInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    o.setValue("_mongo", args.get(0));
-    o.setValue("_name", args.get(1));
+    o.setValue(InternedString::_mongo, args.get(0));
+    o.setValue(InternedString::_name, args.get(1));
 
     std::string dbName = ValueWriter(cx, args.get(1)).toString();
 

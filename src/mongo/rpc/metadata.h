@@ -37,23 +37,11 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 class OperationContext;
+class StringData;
 
 /**
  * Utilities for converting metadata between the legacy OP_QUERY format and the new
  * OP_COMMAND format.
- *
- * Metadata consists of information independent of any particular command such as:
- *
- * Request/Reply/Both | (legacy) OP_QUERY format         | OP_COMMAND format
- *__________________________________________________________________________________________________
- * Request            | the slaveOk bit                  | $secondaryOk on metadata obj
- * Request            | $readPreference field of command | $readPreference on metadata obj
- * Request            | $impersonatedUsers on command obj| $impersonatedUsers on metadata obj
- * Request            | $impersonatedRoles on command obj| $impersonatedRoles on metadata obj
- * Request            | maxTimeMS on command obj         | $maxTimeMS on metadata obj
- * Reply              | $gleStats field on command reply | $gleStats on metadata obj
- *
- * TODO: currently only $secondaryOk (request only) is handled. SERVER-18236 will cover the rest.
  */
 namespace rpc {
 
@@ -115,14 +103,14 @@ StatusWith<BSONObj> downconvertReplyMetadata(const BSONObj& commandReply,
 
 /**
  * A function type for writing request metadata. The function takes a pointer to a
- * BSONObjBuilder used to construct the metadata object and returns a Status indicating
- * if the metadata was written successfully.
+ * BSONObjBuilder used to construct the metadata object and the server address of the
+ * target of the request and returns a Status indicating if the metadata was written successfully.
  */
-using RequestMetadataWriter = stdx::function<Status(BSONObjBuilder*)>;
+using RequestMetadataWriter = stdx::function<Status(BSONObjBuilder*, StringData)>;
 
 /**
  * A function type for reading reply metadata. The function takes a a reference to a
- * metadata object received in a command reply and a string containing the server address of the
+ * metadata object received in a command reply and the server address of the
  * host that executed the command and returns a Status indicating if the
  * metadata was read successfully.
  *

@@ -177,6 +177,30 @@ TEST(LiteParsedQueryTest, MinFieldsLessThanMax) {
                       .getStatus());
 }
 
+TEST(LiteParsedQueryTest, ForbidTailableWithNonNaturalSort) {
+    BSONObj cmdObj = fromjson(
+        "{find: 'testns',"
+        "tailable: true,"
+        "sort: {a: 1}}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(LiteParsedQueryTest, AllowTailableWithNaturalSort) {
+    BSONObj cmdObj = fromjson(
+        "{find: 'testns',"
+        "tailable: true,"
+        "sort: {$natural: 1}}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_OK(result.getStatus());
+    ASSERT_TRUE(result.getValue()->isTailable());
+    ASSERT_EQ(result.getValue()->getSort(), BSON("$natural" << 1));
+}
+
 // Helper function which returns the Status of creating a LiteParsedQuery object with the given
 // parameters.
 void assertLiteParsedQuerySuccess(const BSONObj& query, const BSONObj& proj, const BSONObj& sort) {
@@ -264,6 +288,7 @@ TEST(LiteParsedQueryTest, MakeAsFindCmdDefaultArgs) {
     ASSERT_EQUALS(BSONObj(), lpq->getProj());
     ASSERT_EQUALS(BSONObj(), lpq->getSort());
     ASSERT_EQUALS(BSONObj(), lpq->getHint());
+    ASSERT_EQUALS(BSONObj(), lpq->getReadConcern());
 
     ASSERT_FALSE(lpq->getSkip());
     ASSERT_FALSE(lpq->getLimit());
@@ -288,7 +313,7 @@ TEST(LiteParsedQueryTest, MakeAsFindCmdDefaultArgs) {
     ASSERT_FALSE(lpq->isOplogReplay());
     ASSERT_FALSE(lpq->isNoCursorTimeout());
     ASSERT_FALSE(lpq->isAwaitData());
-    ASSERT_FALSE(lpq->isPartial());
+    ASSERT_FALSE(lpq->isAllowPartialResults());
 }
 
 TEST(LiteParsedQueryTest, MakeFindCmdAllArgs) {
@@ -297,6 +322,7 @@ TEST(LiteParsedQueryTest, MakeFindCmdAllArgs) {
                                               BSON("b" << 1),
                                               BSON("c" << 1),
                                               BSON("d" << 1),
+                                              BSON("e" << 1),
                                               4,
                                               5,
                                               6,
@@ -325,6 +351,7 @@ TEST(LiteParsedQueryTest, MakeFindCmdAllArgs) {
     ASSERT_EQUALS(BSON("b" << 1), lpq->getProj());
     ASSERT_EQUALS(BSON("c" << 1), lpq->getSort());
     ASSERT_EQUALS(BSON("d" << 1), lpq->getHint());
+    ASSERT_EQUALS(BSON("e" << 1), lpq->getReadConcern());
 
     ASSERT_EQ(4, *lpq->getSkip());
     ASSERT_EQ(5, *lpq->getLimit());
@@ -350,7 +377,7 @@ TEST(LiteParsedQueryTest, MakeFindCmdAllArgs) {
     ASSERT_TRUE(lpq->isOplogReplay());
     ASSERT_TRUE(lpq->isNoCursorTimeout());
     ASSERT_TRUE(lpq->isAwaitData());
-    ASSERT_TRUE(lpq->isPartial());
+    ASSERT_TRUE(lpq->isAllowPartialResults());
 }
 
 TEST(LiteParsedQueryTest, MakeAsFindCmdNToReturn) {
@@ -359,6 +386,7 @@ TEST(LiteParsedQueryTest, MakeAsFindCmdNToReturn) {
                                               BSON("b" << 1),
                                               BSON("c" << 1),
                                               BSON("d" << 1),
+                                              BSON("e" << 1),
                                               4,
                                               boost::none,
                                               boost::none,
@@ -387,6 +415,7 @@ TEST(LiteParsedQueryTest, MakeAsFindCmdNToReturn) {
     ASSERT_EQUALS(BSON("b" << 1), lpq->getProj());
     ASSERT_EQUALS(BSON("c" << 1), lpq->getSort());
     ASSERT_EQUALS(BSON("d" << 1), lpq->getHint());
+    ASSERT_EQUALS(BSON("e" << 1), lpq->getReadConcern());
 
     ASSERT_EQ(4, *lpq->getSkip());
     ASSERT_FALSE(lpq->getLimit());
@@ -412,7 +441,7 @@ TEST(LiteParsedQueryTest, MakeAsFindCmdNToReturn) {
     ASSERT_TRUE(lpq->isOplogReplay());
     ASSERT_TRUE(lpq->isNoCursorTimeout());
     ASSERT_TRUE(lpq->isAwaitData());
-    ASSERT_TRUE(lpq->isPartial());
+    ASSERT_TRUE(lpq->isAllowPartialResults());
 }
 
 //
@@ -552,11 +581,10 @@ TEST(LiteParsedQueryTest, ParseFromCommandAllFlagsTrue) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"
         "tailable: true,"
-        "slaveOk: true,"
         "oplogReplay: true,"
         "noCursorTimeout: true,"
         "awaitData: true,"
-        "partial: true}");
+        "allowPartialResults: true}");
     const NamespaceString nss("test.testns");
     bool isExplain = false;
     unique_ptr<LiteParsedQuery> lpq(
@@ -564,11 +592,11 @@ TEST(LiteParsedQueryTest, ParseFromCommandAllFlagsTrue) {
 
     // Test that all the flags got set to true.
     ASSERT(lpq->isTailable());
-    ASSERT(lpq->isSlaveOk());
+    ASSERT(!lpq->isSlaveOk());
     ASSERT(lpq->isOplogReplay());
     ASSERT(lpq->isNoCursorTimeout());
     ASSERT(lpq->isAwaitData());
-    ASSERT(lpq->isPartial());
+    ASSERT(lpq->isAllowPartialResults());
 }
 
 TEST(LiteParsedQueryTest, ParseFromCommandCommentWithValidMinMax) {
@@ -596,6 +624,7 @@ TEST(LiteParsedQueryTest, ParseFromCommandAllNonOptionFields) {
         "sort: {b: 1},"
         "projection: {c: 1},"
         "hint: {d: 1},"
+        "readConcern: {e: 1},"
         "limit: 3,"
         "skip: 5,"
         "batchSize: 90,"
@@ -614,6 +643,8 @@ TEST(LiteParsedQueryTest, ParseFromCommandAllNonOptionFields) {
     ASSERT_EQUALS(0, expectedProj.woCompare(lpq->getProj()));
     BSONObj expectedHint = BSON("d" << 1);
     ASSERT_EQUALS(0, expectedHint.woCompare(lpq->getHint()));
+    BSONObj expectedReadConcern = BSON("e" << 1);
+    ASSERT_EQUALS(0, expectedReadConcern.woCompare(lpq->getReadConcern()));
     ASSERT_EQUALS(3, *lpq->getLimit());
     ASSERT_EQUALS(5, *lpq->getSkip());
     ASSERT_EQUALS(90, *lpq->getBatchSize());
@@ -892,13 +923,23 @@ TEST(LiteParsedQueryTest, ParseFromCommandPartialWrongType) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"
         "filter:  {a: 1},"
-        "exhaust: 3}");
+        "allowPartialResults: 3}");
     const NamespaceString nss("test.testns");
     bool isExplain = false;
     auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(LiteParsedQueryTest, ParseFromCommandReadConcernWrongType) {
+    BSONObj cmdObj = fromjson(
+        "{find: 'testns',"
+        "filter:  {a: 1},"
+        "readConcern: 'foo'}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_NOT_OK(result.getStatus());
+}
 //
 // Parsing errors where a field has the right type but a bad value.
 //
@@ -1146,7 +1187,7 @@ TEST(LiteParsedQueryTest, DefaultQueryParametersCorrect) {
     ASSERT_EQUALS(false, lpq->isNoCursorTimeout());
     ASSERT_EQUALS(false, lpq->isAwaitData());
     ASSERT_EQUALS(false, lpq->isExhaust());
-    ASSERT_EQUALS(false, lpq->isPartial());
+    ASSERT_EQUALS(false, lpq->isAllowPartialResults());
 }
 
 //
@@ -1173,6 +1214,40 @@ TEST(LiteParsedQueryTest, ParseFromCommandForbidExtraOption) {
     bool isExplain = false;
     auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
     ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSStringValueFails) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << "foo");
+    ASSERT_NOT_OK(LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSNonIntegralValueFails) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << 100.3);
+    ASSERT_NOT_OK(LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSOutOfRangeDoubleFails) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << 1e200);
+    ASSERT_NOT_OK(LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSNegativeValueFails) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << -400);
+    ASSERT_NOT_OK(LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSZeroSucceeds) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << 0);
+    auto maxTime = LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
+    ASSERT_OK(maxTime);
+    ASSERT_EQ(maxTime.getValue(), 0);
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSPositiveInRangeSucceeds) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << 300);
+    auto maxTime = LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
+    ASSERT_OK(maxTime);
+    ASSERT_EQ(maxTime.getValue(), 300);
 }
 
 }  // namespace mongo

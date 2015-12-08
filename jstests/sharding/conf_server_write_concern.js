@@ -1,8 +1,8 @@
 /**
- * Test write concern with w parameter when writing directly to the config servers will
- * not cause an error.
+ * Test write concern with w parameter when writing directly to the config servers works as expected
  */
 function writeToConfigTest(){
+    jsTestLog("Testing data writes to config server with write concern");
     var st = new ShardingTest({ shards: 2 });
     var confDB = st.s.getDB( 'config' );
 
@@ -10,10 +10,15 @@ function writeToConfigTest(){
                                           { $set: { stopped: true }},
                                           { writeConcern: { w: 'majority' }}));
 
-    // w:1 should still work
+    // w:1 should still work - it gets automatically upconverted to w:majority
     assert.writeOK(confDB.settings.update({ _id: 'balancer' },
                                           { $set: { stopped: true }},
                                           { writeConcern: { w: 1 }}));
+
+    // Write concerns other than w:1 and w:majority should fail.
+    assert.writeError(confDB.settings.update({ _id: 'balancer' },
+                                             { $set: { stopped: true }},
+                                             { writeConcern: { w: 2 }}));
 
     st.stop();
 }
@@ -23,7 +28,8 @@ function writeToConfigTest(){
  * would trigger writes to config servers (in this test, split chunks is used).
  */
 function configTest(){
-    var st = new ShardingTest({ shards: 1, rs: { oplogSize: 10 }, other: { chunkSize: 1 }});
+    jsTestLog("Testing metadata writes to config server with write concern");
+    var st = new ShardingTest({ shards: 1, rs: true, other: { chunkSize: 1 }});
      
     var mongos = st.s;
     var testDB = mongos.getDB( 'test' );
@@ -40,11 +46,17 @@ function configTest(){
     var currChunks = initChunks;
     var gleObj = null;
     var x = 0;
-     
-    while( currChunks <= initChunks ){
-        assert.writeOK(coll.insert({ x: x++ }, { writeConcern: { w: 'majority' }}));
+    var largeStr = new Array(1024*128).toString();
+
+    assert.soon(function() {
+        var bulk = coll.initializeUnorderedBulkOp();
+        for (var i = 0; i < 100; i++) {
+            bulk.insert({x: x++, largeStr: largeStr});
+        }
+        assert.writeOK(bulk.execute({w: 'majority', wtimeout: 60 * 1000}));
         currChunks = chunkCount();
-    }
+        return currChunks > initChunks;
+    }, function() { return "currChunks: " + currChunks + ", initChunks: " + initChunks; });
 
     st.stop();
 }

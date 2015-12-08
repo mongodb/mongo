@@ -1,7 +1,9 @@
-// presplit.js
+(function() {
 
-// Starts a new sharding environment limiting the chunksize to 1MB. 
-s = new ShardingTest( "presplit" , 2 , 2 , 1 , { chunksize : 1 } );
+var s = new ShardingTest({ name: "presplit",
+                           shards: 2,
+                           mongos: 1,
+                           other: { chunkSize : 1 } });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -37,3 +39,5 @@ assert.eq( num , primary.foo.count() );
 
 s.printChangeLog();
 s.stop();
+
+})();

@@ -157,11 +157,11 @@ struct ShardEndpoint {
     ShardEndpoint(const ShardEndpoint& other)
         : shardName(other.shardName), shardVersion(other.shardVersion) {}
 
-    ShardEndpoint(const std::string& shardName, const ChunkVersionAndOpTime& shardVersion)
+    ShardEndpoint(const std::string& shardName, const ChunkVersion& shardVersion)
         : shardName(shardName), shardVersion(shardVersion) {}
 
     const std::string shardName;
-    const ChunkVersionAndOpTime shardVersion;
+    const ChunkVersion shardVersion;
 };
 
 }  // namespace mongo

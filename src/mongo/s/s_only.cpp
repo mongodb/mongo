@@ -88,7 +88,7 @@ void Command::execCommand(OperationContext* txn,
                            cmdObj,
                            result);
 
-    replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(result.done());
+    replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
 }
 
 void Command::execCommandClientBasic(OperationContext* txn,
@@ -123,13 +123,15 @@ void Command::execCommandClientBasic(OperationContext* txn,
     }
 
     std::string errmsg;
-    bool ok;
+    bool ok = false;
     try {
         ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
     } catch (const DBException& e) {
-        ok = false;
-        int code = e.getCode();
-        if (code == RecvStaleConfigCode) {  // code for StaleConfigException
+        result.resetToEmpty();
+        const int code = e.getCode();
+
+        // Codes for StaleConfigException
+        if (code == ErrorCodes::RecvStaleConfig || code == ErrorCodes::SendStaleConfig) {
             throw;
         }
 

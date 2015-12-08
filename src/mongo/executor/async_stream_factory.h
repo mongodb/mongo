@@ -41,7 +41,7 @@ class AsyncStreamFactory final : public AsyncStreamFactoryInterface {
 public:
     AsyncStreamFactory() = default;
 
-    std::unique_ptr<AsyncStreamInterface> makeStream(asio::io_service* io_service,
+    std::unique_ptr<AsyncStreamInterface> makeStream(asio::io_service::strand* strand,
                                                      const HostAndPort&) override;
 };
 

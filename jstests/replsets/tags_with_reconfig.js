@@ -6,7 +6,7 @@
 
 // Start a replica set with 3 nodes
 var host = getHostName();
-var replTest = new ReplSetTest( {name: "tags_with_reconfig", nodes: 3, startPort: 32000} );
+var replTest = new ReplSetTest({ name: "tags_with_reconfig", nodes: 3 });
 var nodes = replTest.startSet();
 var ports = replTest.ports;
 

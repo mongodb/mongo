@@ -38,6 +38,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -62,6 +63,13 @@ using std::vector;
 using unittest::assertGet;
 
 static const stdx::chrono::seconds kFutureTimeout{5};
+
+const BSONObj kReplSecondaryOkMetadata{[] {
+    BSONObjBuilder o;
+    o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    o.append(rpc::kReplSetMetadataFieldName, 1);
+    return o.obj();
+}()};
 
 class RemoveShardTest : public CatalogManagerReplSetTestFixture {
 public:
@@ -172,7 +180,7 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
@@ -182,7 +190,7 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
         ASSERT_EQ(BSONObj(), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ShardType remainingShard;
         remainingShard.setHost("host1");
@@ -191,12 +199,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     });
 
     expectChangeLogCreate(configHost, BSON("ok" << 1));
-    expectChangeLogInsert(configHost,
-                          clientHost.toString(),
-                          network()->now(),
-                          "removeShard.start",
-                          "",
-                          BSON("shard" << shardName));
+    expectChangeLogInsert(
+        configHost, network()->now(), "removeShard.start", "", BSON("shard" << shardName));
 
     future.timed_get(kFutureTimeout);
 }
@@ -348,7 +352,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
@@ -358,7 +362,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         ASSERT_EQ(BSONObj(), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ShardType remainingShard;
         remainingShard.setHost("host1");
@@ -367,12 +371,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     });
 
     expectChangeLogCreate(configHost, BSON("ok" << 1));
-    expectChangeLogInsert(configHost,
-                          clientHost.toString(),
-                          network()->now(),
-                          "removeShard",
-                          "",
-                          BSON("shard" << shardName));
+    expectChangeLogInsert(
+        configHost, network()->now(), "removeShard", "", BSON("shard" << shardName));
 
     future.timed_get(kFutureTimeout);
 }

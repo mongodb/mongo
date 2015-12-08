@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class CappedDocumentDeleteCallback;
+class CappedCallback;
 class Collection;
 struct CompactOptions;
 struct CompactStats;
@@ -91,6 +91,11 @@ struct Record {
     RecordData data;
 };
 
+struct BsonRecord {
+    RecordId id;
+    const BSONObj* docPtr;
+};
+
 /**
  * Retrieves Records from a RecordStore.
  *
@@ -103,7 +108,7 @@ struct Record {
  * inside that context. Any cursor acquired inside a transaction is invalid outside
  * of that transaction, instead use the save and restore methods to reestablish the cursor.
  *
- * Any method other than invalidate and the save methods may throw WriteConflict exception. If
+ * Any method other than invalidate and the save methods may throw WriteConflictException. If
  * that happens, the cursor may not be used again until it has been saved and successfully
  * restored. If next() or restore() throw a WCE the cursor's position will be the same as before
  * the call (strong exception guarantee). All other methods leave the cursor in a valid state
@@ -116,6 +121,9 @@ struct Record {
  * Implementations may override any default implementation if they can provide a more
  * efficient implementation.
  *
+ * Storage engines only need to implement the derived SeekableRecordCursor, but may choose
+ * to implement this simpler interface for cursors used for repair or random traversal.
+ *
  * IMPORTANT NOTE FOR DOCUMENT-LOCKING ENGINES: If you implement capped collections with a
  * "visibility" system such that documents that exist in your snapshot but were inserted after
  * the last uncommitted document are hidden, you must follow the following rules:
@@ -125,8 +133,8 @@ struct Record {
  *   - When next() on a reverse cursor seeks to the end of the collection it must return the
  *     newest visible document. This should only return boost::none if there are no visible
  *     documents in the collection.
- *   - seekExact() must ignore the visibility filter and return the requested document even if
- *     it is supposed to be invisible.
+ *   - SeekableRecordCursor::seekExact() must ignore the visibility filter and return the requested
+ *     document even if it is supposed to be invisible.
  * TODO SERVER-18934 Handle this above the storage engine layer so storage engines don't have to
  * deal with capped visibility.
  */
@@ -141,22 +149,6 @@ public:
     virtual boost::optional<Record> next() = 0;
 
     //
-    // Seeking
-    //
-    // Warning: MMAPv1 cannot detect if RecordIds are valid. Therefore callers should only pass
-    // potentially deleted RecordIds to seek methods if they know that MMAPv1 is not the current
-    // storage engine. All new storage engines must support detecting the existence of Records.
-    //
-
-    /**
-     * Seeks to a Record with the provided id.
-     *
-     * If an exact match can't be found, boost::none will be returned and the resulting position
-     * of the cursor is unspecified.
-     */
-    virtual boost::optional<Record> seekExact(const RecordId& id) = 0;
-
-    //
     // Saving and restoring state
     //
 
@@ -164,24 +156,10 @@ public:
      * Prepares for state changes in underlying data in a way that allows the cursor's
      * current position to be restored.
      *
-     * It is safe to call savePositioned multiple times in a row.
+     * It is safe to call save multiple times in a row.
      * No other method (excluding destructor) may be called until successfully restored.
      */
-    virtual void savePositioned() = 0;
-
-    /**
-     * Prepares for state changes in underlying data without necessarily saving the current
-     * state.
-     *
-     * The cursor's position when restored is unspecified. Caller is expected to seek rather
-     * than call next() following the restore.
-     *
-     * It is safe to call saveUnpositioned multiple times in a row.
-     * No other method (excluding destructor) may be called until successfully restored.
-     */
-    virtual void saveUnpositioned() {
-        savePositioned();
-    }
+    virtual void save() = 0;
 
     /**
      * Recovers from potential state changes in underlying data.
@@ -194,7 +172,7 @@ public:
      * following call to next() will return the next closest position in the direction of the
      * scan, if any.
      *
-     * This handles restoring after either savePositioned() or saveUnpositioned().
+     * This handles restoring after either save() or SeekableRecordCursor::saveUnpositioned().
      */
     virtual bool restore() = 0;
 
@@ -216,13 +194,13 @@ public:
     virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
 
     /**
-     * Inform the cursor that this id is being invalidated.
-     * Must be called between save and restore.
+     * Inform the cursor that this id is being invalidated. Must be called between save and restore.
+     * The txn is that of the operation causing the invalidation, not the txn using the cursor.
      *
      * WARNING: Storage engines other than MMAPv1 should use the default implementation,
      *          and not depend on this being called.
      */
-    virtual void invalidate(const RecordId& id){};
+    virtual void invalidate(OperationContext* txn, const RecordId& id) {}
 
     //
     // RecordFetchers
@@ -243,6 +221,40 @@ public:
      */
     virtual std::unique_ptr<RecordFetcher> fetcherForNext() const {
         return {};
+    }
+};
+
+/**
+ * Adds explicit seeking of records. This functionality is separated out from RecordCursor,
+ * because some cursors, such as repair cursors, are not required to support seeking.
+ *
+ * Warning: MMAPv1 cannot detect if RecordIds are valid. Therefore callers should only pass
+ * potentially deleted RecordIds to seek methods if they know that MMAPv1 is not the current
+ * storage engine. All new storage engines must support detecting the existence of Records.
+ *
+ */
+class SeekableRecordCursor : public RecordCursor {
+public:
+    /**
+     * Seeks to a Record with the provided id.
+     *
+     * If an exact match can't be found, boost::none will be returned and the resulting position
+     * of the cursor is unspecified.
+     */
+    virtual boost::optional<Record> seekExact(const RecordId& id) = 0;
+
+    /**
+     * Prepares for state changes in underlying data without necessarily saving the current
+     * state.
+     *
+     * The cursor's position when restored is unspecified. Caller is expected to seek rather
+     * than call next() following the restore.
+     *
+     * It is safe to call saveUnpositioned multiple times in a row.
+     * No other method (excluding destructor) may be called until successfully restored.
+     */
+    virtual void saveUnpositioned() {
+        save();
     }
 
     /**
@@ -296,7 +308,7 @@ public:
 
     virtual bool isCapped() const = 0;
 
-    virtual void setCappedDeleteCallback(CappedDocumentDeleteCallback*) {
+    virtual void setCappedCallback(CappedCallback*) {
         invariant(false);
     }
 
@@ -362,6 +374,20 @@ public:
                                               const DocWriter* doc,
                                               bool enforceQuota) = 0;
 
+    virtual Status insertRecords(OperationContext* txn,
+                                 std::vector<Record>* records,
+                                 bool enforceQuota) {
+        for (auto& record : *records) {
+            StatusWith<RecordId> res =
+                insertRecord(txn, record.data.data(), record.data.size(), enforceQuota);
+            if (!res.isOK())
+                return res.getStatus();
+
+            record.id = res.getValue();
+        }
+        return Status::OK();
+    }
+
     /**
      * @param notifier - Only used by record stores which do not support doc-locking.
      *                   In the case of a document move, this is called after the document
@@ -370,6 +396,8 @@ public:
      *                   In the case of an in-place update, this is called just before the
      *                   in-place write occurs.
      * @return Status or RecordId, RecordId might be different
+     *
+     * For capped record stores, the record size will never change.
      */
     virtual StatusWith<RecordId> updateRecord(OperationContext* txn,
                                               const RecordId& oldLocation,
@@ -387,11 +415,19 @@ public:
      */
     virtual bool updateWithDamagesSupported() const = 0;
 
-    virtual Status updateWithDamages(OperationContext* txn,
-                                     const RecordId& loc,
-                                     const RecordData& oldRec,
-                                     const char* damageSource,
-                                     const mutablebson::DamageVector& damages) = 0;
+    /**
+     * Updates the record positioned at 'loc' in-place using the deltas described by 'damages'. The
+     * 'damages' vector describes contiguous ranges of 'damageSource' from which to copy and apply
+     * byte-level changes to the data.
+     *
+     * @return the updated version of the record. If unowned data is returned, then it is valid
+     * until the next modification of this Record or the lock on the collection has been released.
+     */
+    virtual StatusWith<RecordData> updateWithDamages(OperationContext* txn,
+                                                     const RecordId& loc,
+                                                     const RecordData& oldRec,
+                                                     const char* damageSource,
+                                                     const mutablebson::DamageVector& damages) = 0;
 
     /**
      * Returns a new cursor over this record store.
@@ -401,16 +437,13 @@ public:
      * are allowed to lazily seek to the first Record when next() is called rather than doing
      * it on construction.
      */
-    virtual std::unique_ptr<RecordCursor> getCursor(OperationContext* txn,
-                                                    bool forward = true) const = 0;
+    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+                                                            bool forward = true) const = 0;
 
     /**
      * Constructs a cursor over a potentially corrupted store, which can be used to salvage
      * damaged records. The iterator might return every record in the store if all of them
      * are reachable and not corrupted.  Returns NULL if not supported.
-     *
-     * Repair cursors are only required to support forward scanning, so it is illegal to call
-     * seekExact() on the returned cursor.
      */
     virtual std::unique_ptr<RecordCursor> getCursorForRepair(OperationContext* txn) const {
         return {};
@@ -426,8 +459,6 @@ public:
      * the same document more than once and, as a result, may return more documents than exist in
      * the record store. Implementations should avoid obvious biases toward older, newer, larger
      * smaller or other specific classes of documents.
-     *
-     * The seekExact() method may not be called for random cursors.
      */
     virtual std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* txn) const {
         return {};
@@ -436,13 +467,6 @@ public:
     /**
      * Returns many RecordCursors that partition the RecordStore into many disjoint sets.
      * Iterating all returned RecordCursors is equivalent to iterating the full store.
-     *
-     * Partition cursors are only required to support forward scanning, so it is illegal to call
-     * seekExact() on any of the returned cursors.
-     *
-     * WARNING: the first call to restore() on each cursor may (but is not guaranteed to) be on
-     * a different RecoveryUnit than the initial save. This will be made more sane as part of
-     * SERVER-17364.
      */
     virtual std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const {
         std::vector<std::unique_ptr<RecordCursor>> out(1);

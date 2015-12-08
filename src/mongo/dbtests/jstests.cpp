@@ -118,7 +118,8 @@ public:
         s->setNumber("notANumberVal", std::numeric_limits<double>::quiet_NaN());
         ASSERT(!s->getBoolean("notANumberVal"));
 
-        s->setElement("nullVal", BSONObjBuilder().appendNull("null").obj().getField("null"));
+        auto obj = BSONObjBuilder().appendNull("null").obj();
+        s->setElement("nullVal", obj.getField("null"), obj);
         ASSERT(!s->getBoolean("nullVal"));
 
         s->setNumber("zeroVal", 0);
@@ -400,42 +401,11 @@ public:
 
         BSONObj out;
 
-        /**
-         * TODO remove the v8 tests after we switch over
-         *
-         * Note that we've changed behavior so that uncaught js exceptions that
-         * bubble up actually convert into user exceptions, instead of just
-         * logging to stdout and silently failing otherwise.
-         */
-        auto ivs = globalScriptEngine->getInterpreterVersionString();
-        std::string prefix("MozJS");
-        if (ivs.compare(0, prefix.length(), prefix) == 0) {
-            ASSERT_THROWS(s->invoke("blah.y = 'e'", 0, 0), mongo::UserException);
-            ASSERT_THROWS(s->invoke("blah.a = 19;", 0, 0), mongo::UserException);
-            ASSERT_THROWS(s->invoke("blah.zz.a = 19;", 0, 0), mongo::UserException);
-            ASSERT_THROWS(s->invoke("blah.zz = { a : 19 };", 0, 0), mongo::UserException);
-            ASSERT_THROWS(s->invoke("delete blah['x']", 0, 0), mongo::UserException);
-        } else {
-            s->invoke("blah.y = 'e'", 0, 0);
-            out = s->getObject("blah");
-            ASSERT(strlen(out["y"].valuestr()) > 1);
-
-            s->invoke("blah.a = 19;", 0, 0);
-            out = s->getObject("blah");
-            ASSERT(out["a"].eoo());
-
-            s->invoke("blah.zz.a = 19;", 0, 0);
-            out = s->getObject("blah");
-            ASSERT(out["zz"].embeddedObject()["a"].eoo());
-
-            s->setObject("blah.zz", BSON("a" << 19));
-            out = s->getObject("blah");
-            ASSERT(out["zz"].embeddedObject()["a"].eoo());
-
-            s->invoke("delete blah['x']", 0, 0);
-            out = s->getObject("blah");
-            ASSERT(!out["x"].eoo());
-        }
+        ASSERT_THROWS(s->invoke("blah.y = 'e'", 0, 0), mongo::UserException);
+        ASSERT_THROWS(s->invoke("blah.a = 19;", 0, 0), mongo::UserException);
+        ASSERT_THROWS(s->invoke("blah.zz.a = 19;", 0, 0), mongo::UserException);
+        ASSERT_THROWS(s->invoke("blah.zz = { a : 19 };", 0, 0), mongo::UserException);
+        ASSERT_THROWS(s->invoke("delete blah['x']", 0, 0), mongo::UserException);
 
         // read-only object itself can be overwritten
         s->invoke("blah = {}", 0, 0);
@@ -880,12 +850,12 @@ public:
     }
 };
 
-class InvalidTimestamp {
+class MaxTimestamp {
 public:
     void run() {
         unique_ptr<Scope> s(globalScriptEngine->newScope());
 
-        // Timestamp 't' component cannot exceed max for int32_t.
+        // Timestamp 't' component can exceed max for int32_t.
         BSONObj in;
         {
             BSONObjBuilder b;
@@ -897,7 +867,7 @@ public:
         }
         s->setObject("a", in);
 
-        ASSERT_FALSE(s->exec("x = tojson( a ); ", "foo", false, true, false));
+        ASSERT(s->exec("x = tojson( a ); ", "foo", false, true, false));
     }
 };
 
@@ -1535,17 +1505,8 @@ class Undefined : public TestRoundTrip {
         return b.obj();
     }
 
-    // Don't need to return anything because we are overriding both jsonOut and jsonIn
     virtual string json() const {
-        return "";
-    }
-
-    // undefined values come out as null in the shell.  See SERVER-6102.
-    virtual string jsonIn() const {
         return "{ \"a\" : undefined }";
-    }
-    virtual string jsonOut() const {
-        return "{ \"a\" : null }";
     }
 };
 
@@ -2416,7 +2377,7 @@ public:
             add<NumberDecimalBigObject>();
         }
 
-        add<InvalidTimestamp>();
+        add<MaxTimestamp>();
         add<RenameTest>();
 
         add<WeirdObjects>();

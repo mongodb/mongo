@@ -163,7 +163,7 @@ const FTSLanguage* FTSSpec::_getLanguageToUseV2(const BSONObj& userDoc,
     uassert(17261,
             "found language override field in document with non-string type",
             e.type() == mongo::String);
-    StatusWithFTSLanguage swl = FTSLanguage::make(e.String(), TEXT_INDEX_VERSION_2);
+    StatusWithFTSLanguage swl = FTSLanguage::make(e.String(), getTextIndexVersion());
     uassert(17262, "language override unsupported: " + e.String(), swl.getStatus().isOK());
     return swl.getValue();
 }
@@ -357,6 +357,8 @@ BSONObj FTSSpec::fixSpec(const BSONObj& spec) {
     } else if (!spec["weights"].eoo()) {
         uasserted(17284, "text index option 'weights' must be an object");
     }
+
+    uassert(28823, "text index option 'weights' must specify fields or the wildcard", !m.empty());
 
     BSONObj weights;
     {

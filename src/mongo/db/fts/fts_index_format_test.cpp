@@ -221,5 +221,39 @@ TEST(FTSIndexFormat, LongWordTextIndexVersion2) {
 
     assertEqualsIndexKeys(expectedKeys, keys);
 }
+
+/**
+ * Tests keys for long terms using text index version 3.
+ * In version 3, long terms (longer than 256 characters)
+ * are hashed with md5 and appended to the first 224
+ * characters of the term to form the index key.
+ */
+TEST(FTSIndexFormat, LongWordTextIndexVersion3) {
+    FTSSpec spec(FTSSpec::fixSpec(BSON("key" << BSON("data"
+                                                     << "text") << "textIndexVersion" << 3)));
+    BSONObjSet keys;
+    string longPrefix(1024U, 'a');
+    // "aaa...aaacat"
+    string longWordCat = longPrefix + "cat";
+    // "aaa...aaasat"
+    string longWordSat = longPrefix + "sat";
+    string text = mongoutils::str::stream() << longWordCat << " " << longWordSat;
+    FTSIndexFormat::getKeys(spec, BSON("data" << text), &keys);
+
+    // Hard-coded expected computed keys for future-proofing.
+    std::set<string> expectedKeys;
+    // cat
+    expectedKeys.insert(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa256a476d3197f1d31d1834fe91b9ef46");
+    // sat
+    expectedKeys.insert(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab8c685737a761255443de66dae5d7d0a");
+
+    assertEqualsIndexKeys(expectedKeys, keys);
+}
 }
 }

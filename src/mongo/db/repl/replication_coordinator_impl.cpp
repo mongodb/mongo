@@ -77,8 +77,12 @@
 namespace mongo {
 namespace repl {
 
-namespace {
 using executor::NetworkInterface;
+using CallbackFn = executor::TaskExecutor::CallbackFn;
+using CallbackHandle = executor::TaskExecutor::CallbackHandle;
+using EventHandle = executor::TaskExecutor::EventHandle;
+
+namespace {
 
 void lockAndCall(stdx::unique_lock<stdx::mutex>* lk, const stdx::function<void()>& fn) {
     if (!lk->owns_lock()) {
@@ -237,9 +241,16 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
 ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
 void ReplicationCoordinatorImpl::waitForStartUpComplete() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
-        _rsConfigStateChange.wait(lk);
+    CallbackHandle handle;
+    {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
+            _rsConfigStateChange.wait(lk);
+        }
+        handle = _finishLoadLocalConfigCbh;
+    }
+    if (handle.isValid()) {
+        _replExecutor.wait(handle);
     }
 }
 
@@ -248,12 +259,32 @@ ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
     return _rsConfig;
 }
 
+Date_t ReplicationCoordinatorImpl::getElectionTimeout_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (!_handleElectionTimeoutCbh.isValid()) {
+        return Date_t();
+    }
+    return _handleElectionTimeoutWhen;
+}
+
+Date_t ReplicationCoordinatorImpl::getPriorityTakeover_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (!_priorityTakeoverCbh.isValid()) {
+        return Date_t();
+    }
+    return _priorityTakeoverWhen;
+}
+
 OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_currentCommittedSnapshot) {
         return _currentCommittedSnapshot->opTime;
     }
     return OpTime();
+}
+
+void ReplicationCoordinatorImpl::appendConnectionStats(BSONObjBuilder* b) {
+    _replExecutor.appendConnectionStats(b);
 }
 
 void ReplicationCoordinatorImpl::_updateLastVote(const LastVote& lastVote) {
@@ -286,17 +317,24 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
         fassertFailedNoTrace(28545);
     }
 
-    StatusWith<OpTime> lastOpTimeStatus = _externalState->loadLastOpTime(txn);
+    // Returns the last optime from the oplog, possibly truncating first if we need to recover.
+    _externalState->cleanUpLastApplyBatch(txn);
+    auto lastOpTimeStatus = _externalState->loadLastOpTime(txn);
 
     // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
     // that the server's networking layer be up and running and accepting connections, which
     // doesn't happen until startReplication finishes.
-    _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
-                                          this,
-                                          stdx::placeholders::_1,
-                                          localConfig,
-                                          lastOpTimeStatus,
-                                          lastVote));
+    auto handle = _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
+                                           this,
+                                           stdx::placeholders::_1,
+                                           localConfig,
+                                           lastOpTimeStatus,
+                                           lastVote));
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _finishLoadLocalConfigCbh = handle;
+    }
+
     return false;
 }
 
@@ -341,35 +379,42 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     OpTime lastOpTime;
     if (!isArbiter) {
         if (!lastOpTimeStatus.isOK()) {
-            warning() << "Failed to load timestamp of most recently applied operation; "
+            warning() << "Failed to load timestamp of most recently applied operation: "
                       << lastOpTimeStatus.getStatus();
         } else {
             lastOpTime = lastOpTimeStatus.getValue();
         }
     }
 
-    // Restore the current term according to the terms of last oplog entry and last vote.
-    long long term = lastOpTime.getTerm();
-    if (lastVoteStatus.isOK()) {
-        long long lastVoteTerm = lastVoteStatus.getValue().getTerm();
-        if (term < lastVoteTerm) {
-            term = lastVoteTerm;
+    long long term = OpTime::kUninitializedTerm;
+    if (localConfig.getProtocolVersion() == 1) {
+        // Restore the current term according to the terms of last oplog entry and last vote.
+        // The initial term of OpTime() is 0.
+        term = lastOpTime.getTerm();
+        if (lastVoteStatus.isOK()) {
+            long long lastVoteTerm = lastVoteStatus.getValue().getTerm();
+            if (term < lastVoteTerm) {
+                term = lastVoteTerm;
+            }
         }
     }
-    _updateTerm_incallback(term, nullptr);
-
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
-        _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
-    _setMyLastOptime_inlock(&lk, lastOpTime, false);
+        _setCurrentRSConfig_inlock(cbData, localConfig, myIndex.getValue());
+    _setMyLastOptimeAndReport_inlock(&lk, lastOpTime, false);
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
+    // Step down is impossible, so we don't need to wait for the returned event.
+    _updateTerm_incallback(term);
+    LOG(1) << "Current term is now " << term;
     if (lk.owns_lock()) {
         lk.unlock();
     }
     _performPostMemberStateUpdateAction(action);
-    _externalState->startThreads(&_replExecutor);
+    if (!isArbiter) {
+        _externalState->startThreads(_settings);
+    }
 }
 
 void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -397,6 +442,9 @@ void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
     }
 
     _replExecutor.startup();
+
+    _topCoord->setStorageEngineSupportsReadCommitted(
+        _externalState->isReadCommittedSupportedByStorageEngine(txn));
 
     bool doneLoadingConfig = _startLoadLocalConfig(txn);
     if (doneLoadingConfig) {
@@ -461,52 +509,61 @@ MemberState ReplicationCoordinatorImpl::_getMemberState_inlock() const {
     return _memberState;
 }
 
+Status ReplicationCoordinatorImpl::waitForMemberState(MemberState expectedState,
+                                                      Milliseconds timeout) {
+    if (timeout < Milliseconds(0)) {
+        return Status(ErrorCodes::BadValue, "Timeout duration cannot be negative");
+    }
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto pred = [this, expectedState]() { return _memberState == expectedState; };
+    if (!_memberStateChange.wait_for(lk, timeout, pred)) {
+        return Status(ErrorCodes::ExceededTimeLimit,
+                      str::stream() << "Timed out waiting for state to become "
+                                    << expectedState.toString() << ". Current state is "
+                                    << _memberState.toString());
+    }
+    return Status::OK();
+}
+
 Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_rsConfig.isInitialized());
-    uassert(28524, "Node not a member of the current set configuration", _selfIndex != -1);
+    if (_selfIndex == -1) {
+        // We aren't currently in the set. Return 0 seconds so we can clear out the applier's
+        // queue of work.
+        return Seconds(0);
+    }
     return _rsConfig.getMemberAt(_selfIndex).getSlaveDelay();
 }
 
 void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
-    CBHStatus cbh = _replExecutor.scheduleWork(
-        stdx::bind(&ReplicationCoordinatorImpl::_clearSyncSourceBlacklist_finish,
-                   this,
-                   stdx::placeholders::_1));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return;
-    }
-    fassert(18907, cbh.getStatus());
-    _replExecutor.wait(cbh.getValue());
+    auto work = [this](const CallbackArgs&) { _topCoord->clearSyncSourceBlacklist(); };
+    _scheduleWorkAndWaitForCompletion(work);
 }
 
-void ReplicationCoordinatorImpl::_clearSyncSourceBlacklist_finish(
-    const ReplicationExecutor::CallbackArgs& cbData) {
-    if (cbData.status == ErrorCodes::CallbackCanceled)
-        return;
-    _topCoord->clearSyncSourceBlacklist();
-}
-
-bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
+ReplicationExecutor::EventHandle ReplicationCoordinatorImpl::setFollowerMode_nonBlocking(
+    const MemberState& newState, bool* success) {
     StatusWith<ReplicationExecutor::EventHandle> finishedSettingFollowerMode =
         _replExecutor.makeEvent();
     if (finishedSettingFollowerMode.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return false;
+        return ReplicationExecutor::EventHandle();
     }
     fassert(18812, finishedSettingFollowerMode.getStatus());
+    _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
+                             this,
+                             stdx::placeholders::_1,
+                             newState,
+                             finishedSettingFollowerMode.getValue(),
+                             success));
+    return finishedSettingFollowerMode.getValue();
+}
+
+bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
     bool success = false;
-    CBHStatus cbh =
-        _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
-                                              this,
-                                              stdx::placeholders::_1,
-                                              newState,
-                                              finishedSettingFollowerMode.getValue(),
-                                              &success));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return false;
+    if (auto eventHandle = setFollowerMode_nonBlocking(newState, &success)) {
+        _replExecutor.waitForEvent(eventHandle);
     }
-    fassert(18699, cbh.getStatus());
-    _replExecutor.waitForEvent(finishedSettingFollowerMode.getValue());
     return success;
 }
 
@@ -530,14 +587,19 @@ void ReplicationCoordinatorImpl::_setFollowerModeFinish(
     }
 
     if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
-        // We are a candidate, which means _topCoord believs us to be in state RS_SECONDARY, and
+        // We are a candidate, which means _topCoord believes us to be in state RS_SECONDARY, and
         // we know that newState != RS_SECONDARY because we would have returned early, above if
         // the old and new state were equal.  So, cancel the running election and try again to
         // finish setting the follower mode.
-        invariant(_freshnessChecker);
-        _freshnessChecker->cancel(&_replExecutor);
-        if (_electCmdRunner) {
-            _electCmdRunner->cancel(&_replExecutor);
+        if (isV1ElectionProtocol()) {
+            invariant(_voteRequester);
+            _voteRequester->cancel(&_replExecutor);
+        } else {
+            invariant(_freshnessChecker);
+            _freshnessChecker->cancel(&_replExecutor);
+            if (_electCmdRunner) {
+                _electCmdRunner->cancel(&_replExecutor);
+            }
         }
         _replExecutor.onEvent(_electionFinishedEvent,
                               stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
@@ -577,10 +639,10 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     //     _isWaitingForDrainToComplete, set the flag allowing non-local database writes and
     //     drop the mutex.  At this point, no writes can occur from other threads, due to the
     //     global exclusive lock.
-    // 4.) Drop the global exclusive lock.
-    // 5.) Drop all temp collections.
-    // 6.) Log transition to primary in the oplog and set that OpTime as the floor for what we will
+    // 4.) Drop all temp collections.
+    // 5.) Log transition to primary in the oplog and set that OpTime as the floor for what we will
     //     consider to be committed.
+    // 6.) Drop the global exclusive lock.
     //
     // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
     // mode until we have the global exclusive lock, which forbids all other threads from making
@@ -594,24 +656,54 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
         return;
     }
     lk.unlock();
+
+    _externalState->recoverShardingState(txn);
+
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite globalWriteLock(txn->lockState());
+
     lk.lock();
     if (!_isWaitingForDrainToComplete) {
         return;
     }
     _isWaitingForDrainToComplete = false;
     _canAcceptNonLocalWrites = true;
+    _drainFinishedCond.notify_all();
     lk.unlock();
 
     _externalState->dropAllTempCollections(txn);
 
-    _externalState->logTransitionToPrimaryToOplog(txn);
+    // This is done for compatibility with PV0 replicas wrt how "n" ops are processed.
+    if (isV1ElectionProtocol()) {
+        _externalState->logTransitionToPrimaryToOplog(txn);
+    }
+
     StatusWith<OpTime> lastOpTime = _externalState->loadLastOpTime(txn);
-    fassert(28665, lastOpTime.getStatus().isOK());
+    fassertStatusOK(28665, lastOpTime.getStatus());
     _setFirstOpTimeOfMyTerm(lastOpTime.getValue());
 
+    lk.lock();
+    // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
+    // our election in logTransitionToPrimaryToOplog(), above.
+    _updateLastCommittedOpTime_inlock();
+    lk.unlock();
+
     log() << "transition to primary complete; database writes are now permitted" << rsLog;
+}
+
+Status ReplicationCoordinatorImpl::waitForDrainFinish(Milliseconds timeout) {
+    if (timeout < Milliseconds(0)) {
+        return Status(ErrorCodes::BadValue, "Timeout duration cannot be negative");
+    }
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto pred = [this]() { return !_isWaitingForDrainToComplete; };
+    if (!_drainFinishedCond.wait_for(lk, timeout, pred)) {
+        return Status(ErrorCodes::ExceededTimeLimit,
+                      "Timed out waiting to finish draining applier buffer");
+    }
+
+    return Status::OK();
 }
 
 void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
@@ -652,6 +744,7 @@ void ReplicationCoordinatorImpl::_updateSlaveInfoOptime_inlock(SlaveInfo* slaveI
                                                                const OpTime& opTime) {
     slaveInfo->opTime = opTime;
     slaveInfo->lastUpdate = _replExecutor.now();
+    slaveInfo->down = false;
 
     _updateLastCommittedOpTime_inlock();
     // Wake up any threads waiting for replication that now have their replication
@@ -727,7 +820,7 @@ Status ReplicationCoordinatorImpl::setLastOptimeForSlave(const OID& rid, const T
             getReplicationMode() == modeMasterSlave);
 
     // term == -1 for master-slave
-    OpTime opTime(ts, OpTime::kProtocolVersionV0Term);
+    OpTime opTime(ts, OpTime::kUninitializedTerm);
     SlaveInfo* slaveInfo = _findSlaveInfoByRID_inlock(rid);
     if (slaveInfo) {
         if (slaveInfo->opTime < opTime) {
@@ -743,49 +836,35 @@ Status ReplicationCoordinatorImpl::setLastOptimeForSlave(const OID& rid, const T
 }
 
 void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
-    CBHStatus cbh = _replExecutor.scheduleWork(stdx::bind(
+    _scheduleWorkAndWaitForCompletion(stdx::bind(
         &TopologyCoordinator::setMyHeartbeatMessage, _topCoord.get(), _replExecutor.now(), msg));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return;
-    }
-    fassert(28540, cbh.getStatus());
-    _replExecutor.wait(cbh.getValue());
 }
 
 void ReplicationCoordinatorImpl::setMyLastOptimeForward(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (opTime > _getMyLastOptime_inlock()) {
-        _setMyLastOptime_inlock(&lock, opTime, false);
+        _setMyLastOptimeAndReport_inlock(&lock, opTime, false);
     }
 }
 
 void ReplicationCoordinatorImpl::setMyLastOptime(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _setMyLastOptime_inlock(&lock, opTime, false);
+    _setMyLastOptimeAndReport_inlock(&lock, opTime, false);
 }
 
 void ReplicationCoordinatorImpl::resetMyLastOptime() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     // Reset to uninitialized OpTime
-    _setMyLastOptime_inlock(&lock, OpTime(), true);
+    _setMyLastOptimeAndReport_inlock(&lock, OpTime(), true);
 }
 
-void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(stdx::unique_lock<stdx::mutex>* lock,
-                                                         const OpTime& opTime,
-                                                         bool isRollbackAllowed) {
+void ReplicationCoordinatorImpl::_setMyLastOptimeAndReport_inlock(
+    stdx::unique_lock<stdx::mutex>* lock, const OpTime& opTime, bool isRollbackAllowed) {
     invariant(lock->owns_lock());
-    SlaveInfo* mySlaveInfo = &_slaveInfo[_getMyIndexInSlaveInfo_inlock()];
-    invariant(isRollbackAllowed || mySlaveInfo->opTime <= opTime);
-    _updateSlaveInfoOptime_inlock(mySlaveInfo, opTime);
+    _setMyLastOptime_inlock(opTime, isRollbackAllowed);
 
     if (getReplicationMode() != modeReplSet) {
         return;
-    }
-
-    for (auto& opTimeWaiter : _opTimeWaiterList) {
-        if (*(opTimeWaiter->opTime) <= opTime) {
-            opTimeWaiter->condVar->notify_all();
-        }
     }
 
     if (_getMemberState_inlock().primary()) {
@@ -797,6 +876,19 @@ void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(stdx::unique_lock<stdx:
     _externalState->forwardSlaveProgress();  // Must do this outside _mutex
 }
 
+void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(const OpTime& opTime,
+                                                         bool isRollbackAllowed) {
+    SlaveInfo* mySlaveInfo = &_slaveInfo[_getMyIndexInSlaveInfo_inlock()];
+    invariant(isRollbackAllowed || mySlaveInfo->opTime <= opTime);
+    _updateSlaveInfoOptime_inlock(mySlaveInfo, opTime);
+
+    for (auto& opTimeWaiter : _opTimeWaiterList) {
+        if (*(opTimeWaiter->opTime) <= opTime) {
+            opTimeWaiter->condVar->notify_all();
+        }
+    }
+}
+
 OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _getMyLastOptime_inlock();
@@ -804,32 +896,43 @@ OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
 
 ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext* txn,
                                                                 const ReadConcernArgs& settings) {
-    const auto ts = settings.getOpTime();
-    // Note that if 'settings' has no explicit after-optime, 'ts' will be the earliest
-    // possible optime, which means the comparisons with 'ts' below are always false.  This is
-    // intentional.
+    const bool isMajorityReadConcern =
+        settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
+
+    if (isMajorityReadConcern && !getSettings().majorityReadConcernEnabled) {
+        // This is an opt-in feature. Fail if the user didn't opt-in.
+        return ReadConcernResponse(
+            Status(ErrorCodes::ReadConcernMajorityNotEnabled,
+                   "Majority read concern requested, but server was not started with "
+                   "--enableMajorityReadConcern."));
+    }
+
+    const auto targetOpTime = settings.getOpTime();
+    if (targetOpTime.isNull()) {
+        return ReadConcernResponse(Status::OK(), Milliseconds(0));
+    }
 
     if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
         // For master/slave and standalone nodes, readAfterOpTime is not supported, so we return
         // an error. However, we consider all writes "committed" and can treat MajorityReadConcern
         // as LocalReadConcern, which is immediately satisfied since there is no OpTime to wait for.
-        if (!ts.isNull()) {
-            return ReadConcernResponse(
-                Status(ErrorCodes::NotAReplicaSet,
-                       "node needs to be a replica set member to use read concern"));
-
-        } else {
-            return ReadConcernResponse(Status::OK(), Milliseconds(0));
-        }
+        return ReadConcernResponse(
+            Status(ErrorCodes::NotAReplicaSet,
+                   "node needs to be a replica set member to use read concern"));
     }
 
     Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    bool isMajorityReadConcern = settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
-    auto loopCondition = [this, isMajorityReadConcern, ts] {
+    if (isMajorityReadConcern && !_externalState->snapshotsEnabled()) {
+        return ReadConcernResponse(
+            Status(ErrorCodes::CommandNotSupported,
+                   "Current storage engine does not support majority readConcerns"));
+    }
+
+    auto loopCondition = [this, isMajorityReadConcern, targetOpTime] {
         return isMajorityReadConcern
-            ? !_currentCommittedSnapshot || ts > _currentCommittedSnapshot->opTime
-            : ts > _getMyLastOptime_inlock();
+            ? !_currentCommittedSnapshot || targetOpTime > _currentCommittedSnapshot->opTime
+            : targetOpTime > _getMyLastOptime_inlock();
     };
 
     while (loopCondition()) {
@@ -849,7 +952,7 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
 
         WaiterInfo waitInfo(isMajorityReadConcern ? &_replicationWaiterList : &_opTimeWaiterList,
                             txn->getOpID(),
-                            &ts,
+                            &targetOpTime,
                             isMajorityReadConcern ? &writeConcern : nullptr,
                             &condVar);
 
@@ -882,7 +985,7 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
                                                          long long* configVersion) {
     if (_selfIndex == -1) {
         // Ignore updates when we're in state REMOVED
-        return Status(ErrorCodes::NotMasterOrSecondaryCode,
+        return Status(ErrorCodes::NotMasterOrSecondary,
                       "Received replSetUpdatePosition command but we are in state REMOVED");
     }
     invariant(getReplicationMode() == modeReplSet);
@@ -944,6 +1047,9 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
 
 void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    // Wake ops waiting for a new committed snapshot.
+    _currentCommittedSnapshotCond.notify_all();
+
     for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
          it != _replicationWaiterList.end();
          ++it) {
@@ -961,14 +1067,14 @@ void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
         }
     }
 
-    _replExecutor.scheduleWork(
-        stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
-                   this,
-                   stdx::placeholders::_1));
+    _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters, this));
 }
 
 void ReplicationCoordinatorImpl::interruptAll() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    // Wake ops waiting for a new committed snapshot.
+    _currentCommittedSnapshotCond.notify_all();
+
     for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
          it != _replicationWaiterList.end();
          ++it) {
@@ -980,10 +1086,7 @@ void ReplicationCoordinatorImpl::interruptAll() {
         opTimeWaiter->condVar->notify_all();
     }
 
-    _replExecutor.scheduleWork(
-        stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
-                   this,
-                   stdx::placeholders::_1));
+    _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters, this));
 }
 
 bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
@@ -1171,10 +1274,14 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
     return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
 }
 
-Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
-                                            bool force,
-                                            const Milliseconds& waitTime,
-                                            const Milliseconds& stepdownTime) {
+ReplicationCoordinatorImpl::StepDownNonBlockingResult
+ReplicationCoordinatorImpl::stepDown_nonBlocking(OperationContext* txn,
+                                                 bool force,
+                                                 const Milliseconds& waitTime,
+                                                 const Milliseconds& stepdownTime,
+                                                 Status* result) {
+    invariant(result);
+
     const Date_t startTime = _replExecutor.now();
     const Date_t stepDownUntil = startTime + stepdownTime;
     const Date_t waitUntil = startTime + waitTime;
@@ -1183,33 +1290,33 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
         // Note this check is inherently racy - it's always possible for the node to
         // stepdown from some other path before we acquire the global shared lock, but
         // that's okay because we are resiliant to that happening in _stepDownContinue.
-        return Status(ErrorCodes::NotMaster, "not primary so can't step down");
+        *result = Status(ErrorCodes::NotMaster, "not primary so can't step down");
+        return StepDownNonBlockingResult();
     }
 
-    LockResult lockState = txn->lockState()->lockGlobalBegin(MODE_S);
+    auto globalReadLock = stdx::make_unique<Lock::GlobalLock>(
+        txn->lockState(), MODE_S, Lock::GlobalLock::EnqueueOnly());
+
     // We've requested the global shared lock which will stop new writes from coming in,
     // but existing writes could take a long time to finish, so kill all user operations
     // to help us get the global lock faster.
     _externalState->killAllUserOperations(txn);
 
-    if (lockState == LOCK_WAITING) {
-        lockState = txn->lockState()->lockGlobalComplete(durationCount<Milliseconds>(stepdownTime));
-        if (lockState == LOCK_TIMEOUT) {
-            return Status(ErrorCodes::ExceededTimeLimit,
-                          "Could not acquire the global shared lock within the amount of time "
-                          "specified that we should step down for");
-        }
+    globalReadLock->waitForLock(durationCount<Milliseconds>(stepdownTime));
+
+    if (!globalReadLock->isLocked()) {
+        *result = Status(ErrorCodes::ExceededTimeLimit,
+                         "Could not acquire the global shared lock within the amount of time "
+                         "specified that we should step down for");
+        return StepDownNonBlockingResult();
     }
-    invariant(lockState == LOCK_OK);
-    ON_BLOCK_EXIT(&Locker::unlockAll, txn->lockState());
-    // From this point onward we are guaranteed to be holding the global shared lock.
 
     StatusWith<ReplicationExecutor::EventHandle> finishedEvent = _replExecutor.makeEvent();
     if (finishedEvent.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return finishedEvent.getStatus();
+        *result = finishedEvent.getStatus();
+        return StepDownNonBlockingResult();
     }
     fassert(26000, finishedEvent.getStatus());
-    Status result(ErrorCodes::InternalError, "didn't set status in _stepDownContinue");
     CBHStatus cbh =
         _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_stepDownContinue,
                                               this,
@@ -1219,31 +1326,30 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
                                               waitUntil,
                                               stepDownUntil,
                                               force,
-                                              &result));
+                                              true,  // restartHeartbeats
+                                              result));
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return cbh.getStatus();
+        *result = cbh.getStatus();
+        return StepDownNonBlockingResult();
     }
     fassert(18809, cbh.getStatus());
-    cbh = _replExecutor.scheduleWorkAt(
-        waitUntil,
-        stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
-                   this,
-                   stdx::placeholders::_1));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return cbh.getStatus();
-    }
-    fassert(26001, cbh.getStatus());
-    _replExecutor.waitForEvent(finishedEvent.getValue());
-    return result;
+    _scheduleWorkAt(waitUntil,
+                    stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters, this));
+    return std::make_pair(std::move(globalReadLock), finishedEvent.getValue());
 }
 
-void ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback(
-    const ReplicationExecutor::CallbackArgs& cbData) {
-    if (!cbData.status.isOK()) {
-        return;
+Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
+                                            bool force,
+                                            const Milliseconds& waitTime,
+                                            const Milliseconds& stepdownTime) {
+    Status result(ErrorCodes::InternalError, "didn't set status in _stepDownContinue");
+    auto globalReadLockAndEventHandle =
+        stepDown_nonBlocking(txn, force, waitTime, stepdownTime, &result);
+    const auto& eventHandle = globalReadLockAndEventHandle.second;
+    if (eventHandle.isValid()) {
+        _replExecutor.waitForEvent(eventHandle);
     }
-
-    _signalStepDownWaiters();
+    return result;
 }
 
 void ReplicationCoordinatorImpl::_signalStepDownWaiters() {
@@ -1261,6 +1367,7 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
     const Date_t waitUntil,
     const Date_t stepDownUntil,
     bool force,
+    bool restartHeartbeats,
     Status* result) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         // Cancelation only occurs on shutdown, which will also handle signaling the event.
@@ -1337,12 +1444,23 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
                                                      waitUntil,
                                                      stepDownUntil,
                                                      force,
+                                                     false,  // restartHeartbeats
                                                      result));
     if (!cbh.isOK()) {
         *result = cbh.getStatus();
         return;
     }
     allFinishedGuard.Dismiss();
+
+    // We send out a fresh round of heartbeats because stepping down successfully without
+    // {force: true} is dependent on timely heartbeat data.
+    // This callback is invoked every time a heartbeat response is processed so restart heartbeats
+    // only once.
+    if (!restartHeartbeats) {
+        return;
+    }
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _restartHeartbeats_inlock(cbData);
 }
 
 void ReplicationCoordinatorImpl::_handleTimePassing(
@@ -1411,7 +1529,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
                                                          const NamespaceString& ns,
                                                          bool slaveOk) {
     if (_memberState.rollback() && ns.isOplog()) {
-        return Status(ErrorCodes::NotMasterOrSecondaryCode,
+        return Status(ErrorCodes::NotMasterOrSecondary,
                       "cannot read from oplog collection while in rollback");
     }
     if (txn->getClient()->isInDirectClient()) {
@@ -1427,10 +1545,10 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
         if (_canServeNonLocalReads.loadRelaxed()) {
             return Status::OK();
         }
-        return Status(ErrorCodes::NotMasterOrSecondaryCode,
+        return Status(ErrorCodes::NotMasterOrSecondary,
                       "not master or secondary; cannot currently read from this replSet member");
     }
-    return Status(ErrorCodes::NotMasterNoSlaveOkCode, "not master and slaveOk=false");
+    return Status(ErrorCodes::NotMasterNoSlaveOk, "not master and slaveOk=false");
 }
 
 bool ReplicationCoordinatorImpl::isInPrimaryOrSecondaryState() const {
@@ -1512,7 +1630,11 @@ bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(BSONObjBuil
 
         BSONObjBuilder entry(arrayBuilder.subobjStart());
         entry.append("_id", itr->rid);
-        entry.append("optime", itr->opTime.getTimestamp());
+        if (isV1ElectionProtocol()) {
+            itr->opTime.append(&entry, "optime");
+        } else {
+            entry.append("optime", itr->opTime.getTimestamp());
+        }
         entry.append("memberId", itr->memberId);
         entry.append("cfgver", _rsConfig.getConfigVersion());
     }
@@ -1610,34 +1732,27 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result)
 }
 
 void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {
-    CBHStatus cbh = _replExecutor.scheduleWork(
-        stdx::bind(&ReplicationCoordinatorImpl::_processReplSetMetadata_helper,
-                   this,
-                   stdx::placeholders::_1,
-                   replMetadata));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return;
+    EventHandle evh;
+    _scheduleWorkAndWaitForCompletion([this, &evh, &replMetadata](const CallbackArgs& args) {
+        evh = _processReplSetMetadata_incallback(replMetadata);
+    });
+    if (evh.isValid()) {
+        _replExecutor.waitForEvent(evh);
     }
-    fassert(28710, cbh.getStatus());
-    _replExecutor.wait(cbh.getValue());
 }
 
-void ReplicationCoordinatorImpl::_processReplSetMetadata_helper(
-    const ReplicationExecutor::CallbackArgs& cbData, const rpc::ReplSetMetadata& replMetadata) {
-    if (cbData.status == ErrorCodes::CallbackCanceled) {
-        return;
-    }
-
-    _processReplSetMetadata_incallback(replMetadata);
+void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _cancelAndRescheduleElectionTimeout_inlock();
 }
 
-void ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
+EventHandle ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
     const rpc::ReplSetMetadata& replMetadata) {
     if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
-        return;
+        return EventHandle();
     }
     _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
-    _updateTerm_incallback(replMetadata.getTerm(), nullptr);
+    return _updateTerm_incallback(replMetadata.getTerm());
 }
 
 bool ReplicationCoordinatorImpl::getMaintenanceMode() {
@@ -1688,6 +1803,11 @@ void ReplicationCoordinatorImpl::_setMaintenanceMode_helper(
     const ReplicationExecutor::CallbackArgs& cbData, bool activate, Status* result) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+        return;
+    }
+
+    if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+        *result = Status(ErrorCodes::NotSecondary, "currently running for election");
         return;
     }
 
@@ -1814,6 +1934,9 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinish(
         return;
     }
     fassert(18910, cbData.status);
+
+    auto senderHost(args.getSenderHost());
+
     const Date_t now = _replExecutor.now();
     *outStatus = _topCoord->prepareHeartbeatResponse(
         now, args, _settings.ourSetName(), getMyLastOptime(), response);
@@ -1823,8 +1946,8 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinish(
         // back to any node that sends us a heartbeat, in case one of those remote nodes has
         // a configuration that contains us.  Chances are excellent that it will, since that
         // is the only reason for a remote node to send this node a heartbeat request.
-        if (!args.getSenderHost().empty() && _seedList.insert(args.getSenderHost()).second) {
-            _scheduleHeartbeatToTarget(args.getSenderHost(), -1, now);
+        if (!senderHost.empty() && _seedList.insert(senderHost).second) {
+            _scheduleHeartbeatToTarget(senderHost, -1, now);
         }
     } else if (outStatus->isOK() && response->getConfigVersion() < args.getConfigVersion()) {
         // Schedule a heartbeat to the sender to fetch the new config.
@@ -1832,8 +1955,8 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinish(
         // will trigger reconfig, which cancels and reschedules all heartbeats.
 
         if (args.hasSenderHost()) {
-            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(args.getSenderHost());
-            _scheduleHeartbeatToTarget(args.getSenderHost(), senderIndex, now);
+            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
+            _scheduleHeartbeatToTarget(senderHost, senderIndex, now);
         }
     }
 }
@@ -1893,7 +2016,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
     if (args.force) {
         newConfigObj = incrementConfigVersionByRandom(newConfigObj);
     }
-    Status status = newConfig.initialize(newConfigObj);
+    Status status = newConfig.initialize(newConfigObj, oldConfig.getProtocolVersion() == 1);
     if (!status.isOK()) {
         error() << "replSetReconfig got " << status << " while parsing " << newConfigObj;
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
@@ -1961,8 +2084,10 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigReconfiguring);
     invariant(_rsConfig.isInitialized());
-    const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
+    const PostMemberStateUpdateAction action =
+        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
     lk.unlock();
+    _resetElectionInfoOnProtocolVersionUpgrade(newConfig);
     _performPostMemberStateUpdateAction(action);
 }
 
@@ -2003,11 +2128,10 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
     }
 
     ReplicaSetConfig newConfig;
-    Status status = newConfig.initialize(configObj);
+    Status status = newConfig.initializeForInitiate(configObj, true);
     if (!status.isOK()) {
         error() << "replSet initiate got " << status << " while parsing " << configObj;
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
-        ;
     }
     if (replEnabled && newConfig.getReplSetName() != _settings.ourSetName()) {
         str::stream errmsg;
@@ -2045,9 +2169,10 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         }
     }
 
-    status = _externalState->storeLocalConfigDocument(txn, newConfig.toBSON());
+    status = _externalState->initializeReplSetStorage(txn, newConfig.toBSON(), replEnabled);
     if (!status.isOK()) {
-        error() << "replSetInitiate failed to store config document; " << status;
+        error() << "replSetInitiate failed to store config document or create the oplog; "
+                << status;
         return status;
     }
 
@@ -2064,16 +2189,11 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         configStateGuard.Dismiss();
         fassert(18654, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
-    }
 
-    // Create the oplog with the first entry, and start repl threads.
-    // If the node is running with replication enabled, we
-    // want initiateOplog() to eventually update the replication coordinator's
-    // last op time.
-    const auto updateReplOpTime = replEnabled;
-    _externalState->initiateOplog(txn, updateReplOpTime);
-    if (replEnabled) {
-        _externalState->startThreads(&_replExecutor);
+        // A configuration passed to replSetInitiate() with the current node as an arbiter
+        // will fail validation with a "replSet initiate got ... while validating" reason.
+        invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());
+        _externalState->startThreads(_settings);
     }
 
     return Status::OK();
@@ -2086,8 +2206,10 @@ void ReplicationCoordinatorImpl::_finishReplSetInitiate(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigInitiating);
     invariant(!_rsConfig.isInitialized());
-    const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
+    const PostMemberStateUpdateAction action =
+        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
     lk.unlock();
+    _resetElectionInfoOnProtocolVersionUpgrade(newConfig);
     _performPostMemberStateUpdateAction(action);
 }
 
@@ -2105,6 +2227,10 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
             invariant(_rsConfig.getNumMembers() == 1 && _selfIndex == 0 &&
                       _rsConfig.getMemberAt(0).isElectable());
+            if (isV1ElectionProtocol()) {
+                // Start election in protocol version 1
+                return kActionStartSingleNodeElection;
+            }
             return kActionWinElection;
         }
         return kActionNone;
@@ -2140,7 +2266,12 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         // overriding requirement is to elect this singleton node primary.
         invariant(_rsConfig.getNumMembers() == 1 && _selfIndex == 0 &&
                   _rsConfig.getMemberAt(0).isElectable());
-        result = kActionWinElection;
+        if (isV1ElectionProtocol()) {
+            // Start election in protocol version 1
+            result = kActionStartSingleNodeElection;
+        } else {
+            result = kActionWinElection;
+        }
     }
 
     if (newState.readable() && !_memberState.readable()) {
@@ -2180,6 +2311,13 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
 
     _memberState = newState;
     log() << "transition to " << newState.toString() << rsLog;
+
+    _cancelAndRescheduleElectionTimeout_inlock();
+
+    // Notifies waiters blocked in waitForMemberState().
+    // For testing only.
+    _memberStateChange.notify_all();
+
     return result;
 }
 
@@ -2202,13 +2340,21 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             _electionId = OID(_topCoord->getTerm());
             _topCoord->processWinElection(_electionId, getNextGlobalTimestamp());
             _isWaitingForDrainToComplete = true;
+            _externalState->signalApplierToCancelFetcher();
             const PostMemberStateUpdateAction nextAction =
                 _updateMemberStateFromTopologyCoordinator_inlock();
             invariant(nextAction != kActionWinElection);
             lk.unlock();
             _performPostMemberStateUpdateAction(nextAction);
+            // Notify all secondaries of the election win.
+            _scheduleElectionWinNotification();
             break;
         }
+        case kActionStartSingleNodeElection:
+            // In protocol version 1, single node replset will run an election instead of
+            // kActionWinElection as in protocol version 0.
+            _startElectSelfV1();
+            break;
         default:
             severe() << "Unknown post member state update action " << static_cast<int>(action);
             fassertFailed(26010);
@@ -2289,15 +2435,20 @@ void ReplicationCoordinatorImpl::_processReplSetElect_finish(
 }
 
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
-ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig,
-                                                       int myIndex) {
+ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
+    const ReplicationExecutor::CallbackArgs& cbData,
+    const ReplicaSetConfig& newConfig,
+    int myIndex) {
     invariant(_settings.usingReplSets());
-    _cancelHeartbeats();
+    _cancelHeartbeats_inlock();
     _setConfigState_inlock(kConfigSteady);
+
     // Must get this before changing our config.
     OpTime myOptime = _getMyLastOptime_inlock();
     _topCoord->updateConfig(newConfig, myIndex, _replExecutor.now(), myOptime);
+    _cachedTerm = _topCoord->getTerm();
     _rsConfig = newConfig;
+    _protVersion.store(_rsConfig.getProtocolVersion());
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
@@ -2307,12 +2458,15 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
         log() << "This node is not a member of the config";
     }
 
+    _cancelPriorityTakeover_inlock();
+    _cancelAndRescheduleElectionTimeout_inlock();
+
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
     _updateSlaveInfoFromConfig_inlock();
     if (_selfIndex >= 0) {
         // Don't send heartbeats if we're not in the config, if we get re-added one of the
         // nodes in the set will contact us.
-        _startHeartbeats();
+        _startHeartbeats_inlock(cbData);
     }
     _updateLastCommittedOpTime_inlock();
     _wakeReadyWaiters_inlock();
@@ -2488,7 +2642,18 @@ void ReplicationCoordinatorImpl::_chooseNewSyncSource(
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
+
+    HostAndPort oldSyncSource = _topCoord->getSyncSourceAddress();
+
     *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), lastTimestampFetched);
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    // If we lost our sync source, schedule new heartbeats immediately to update our knowledge
+    // of other members's state, allowing us to make informed sync source decisions.
+    if (newSyncSource->empty() && !oldSyncSource.empty() && _selfIndex >= 0 &&
+        !_getMemberState_inlock().primary()) {
+        _restartHeartbeats_inlock(cbData);
+    }
 }
 
 HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const Timestamp& lastTimestampFetched) {
@@ -2557,28 +2722,38 @@ void ReplicationCoordinatorImpl::resetLastOpTimeFromOplog(OperationContext* txn)
         lastOpTime = lastOpTimeStatus.getValue();
     }
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _setMyLastOptime_inlock(&lk, lastOpTime, true);
+    _setMyLastOptimeAndReport_inlock(&lk, lastOpTime, true);
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
 }
 
 void ReplicationCoordinatorImpl::_shouldChangeSyncSource(
     const ReplicationExecutor::CallbackArgs& cbData,
     const HostAndPort& currentSource,
+    const OpTime& syncSourceLastOpTime,
+    bool syncSourceHasSyncSource,
     bool* shouldChange) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
 
-    *shouldChange = _topCoord->shouldChangeSyncSource(currentSource, _replExecutor.now());
+    *shouldChange = _topCoord->shouldChangeSyncSource(currentSource,
+                                                      getMyLastOptime(),
+                                                      syncSourceLastOpTime,
+                                                      syncSourceHasSyncSource,
+                                                      _replExecutor.now());
 }
 
-bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource) {
+bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                        const OpTime& syncSourceLastOpTime,
+                                                        bool syncSourceHasSyncSource) {
     bool shouldChange(false);
     CBHStatus cbh =
         _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_shouldChangeSyncSource,
                                               this,
                                               stdx::placeholders::_1,
                                               currentSource,
+                                              syncSourceLastOpTime,
+                                              syncSourceHasSyncSource,
                                               &shouldChange));
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return false;
@@ -2604,16 +2779,14 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     }
 
     invariant(votingNodesOpTimes.size() > 0);
-    if (votingNodesOpTimes.size() < static_cast<unsigned long>(_rsConfig.getMajorityVoteCount())) {
+    if (votingNodesOpTimes.size() < static_cast<unsigned long>(_rsConfig.getWriteMajority())) {
         return;
     }
-
     std::sort(votingNodesOpTimes.begin(), votingNodesOpTimes.end());
 
     // need the majority to have this OpTime
     OpTime committedOpTime =
-        votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getMajorityVoteCount()];
-
+        votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getWriteMajority()];
     _setLastCommittedOpTime_inlock(committedOpTime);
 }
 
@@ -2631,7 +2804,13 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& co
         return;
     }
 
+    if (_getMemberState_inlock().arbiter()) {
+        _setMyLastOptime_inlock(committedOpTime, false);
+    }
+
     _lastCommittedOpTime = committedOpTime;
+
+    _externalState->notifyOplogMetadataWaiters();
 
     auto maxSnapshotForOpTime = SnapshotInfo{committedOpTime, SnapshotName::max()};
     if (!_uncommittedSnapshots.empty() && _uncommittedSnapshots.front() <= maxSnapshotForOpTime) {
@@ -2644,6 +2823,7 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& co
 
         // Forget about all snapshots <= the new commit point.
         _uncommittedSnapshots.erase(_uncommittedSnapshots.begin(), onePastCommitPoint);
+        _uncommittedSnapshotsSize.store(_uncommittedSnapshots.size());
 
         // Update committed snapshot and wake up any threads waiting on read concern or
         // write concern.
@@ -2672,7 +2852,9 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         return {ErrorCodes::BadValue, "not using election protocol v1"};
     }
 
-    updateTerm(args.getTerm());
+    auto termStatus = updateTerm(txn, args.getTerm());
+    if (!termStatus.isOK() && termStatus.code() != ErrorCodes::StaleTerm)
+        return termStatus;
 
     Status result{ErrorCodes::InternalError, "didn't set status in processReplSetRequestVotes"};
     CBHStatus cbh = _replExecutor.scheduleWork(
@@ -2689,7 +2871,7 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     if (response->getVoteGranted()) {
         LastVote lastVote;
         lastVote.setTerm(args.getTerm());
-        lastVote.setCandidateId(args.getCandidateId());
+        lastVote.setCandidateIndex(args.getCandidateIndex());
 
         Status status = _externalState->storeLocalLastVoteDocument(txn, lastVote);
         if (!status.isOK()) {
@@ -2721,7 +2903,8 @@ Status ReplicationCoordinatorImpl::processReplSetDeclareElectionWinner(
         return {ErrorCodes::BadValue, "not using election protocol v1"};
     }
 
-    updateTerm(args.getTerm());
+    // TODO(sz) Remove processReplSetDeclareElectionWinner rathen than passing nullptr.
+    updateTerm(nullptr, args.getTerm());
 
     Status result{ErrorCodes::InternalError,
                   "didn't set status in processReplSetDeclareElectionWinner"};
@@ -2753,7 +2936,6 @@ void ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish(
 
 void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestInterface& request,
                                                              const OpTime& lastOpTimeFromClient,
-                                                             const ReadConcernArgs& readConcern,
                                                              BSONObjBuilder* builder) {
     if (request.getMetadata().hasField(rpc::kReplSetMetadataFieldName)) {
         rpc::ReplSetMetadata metadata;
@@ -2763,7 +2945,6 @@ void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestI
                        this,
                        stdx::placeholders::_1,
                        lastOpTimeFromClient,
-                       readConcern,
                        &metadata));
 
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -2780,22 +2961,14 @@ void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestI
 void ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish(
     const ReplicationExecutor::CallbackArgs& cbData,
     const OpTime& lastOpTimeFromClient,
-    const ReadConcernArgs& readConcern,
     rpc::ReplSetMetadata* metadata) {
-    OpTime lastReadableOpTime = readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern
-        ? getCurrentCommittedSnapshotOpTime()
-        : getMyLastOptime();
+    OpTime lastReadableOpTime = getCurrentCommittedSnapshotOpTime();
     OpTime lastVisibleOpTime = std::max(lastOpTimeFromClient, lastReadableOpTime);
     _topCoord->prepareReplResponseMetadata(metadata, lastVisibleOpTime, getLastCommittedOpTime());
 }
 
-bool ReplicationCoordinatorImpl::_isV1ElectionProtocol_inlock() {
-    return _rsConfig.getProtocolVersion() == 1;
-}
-
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _isV1ElectionProtocol_inlock();
+    return _protVersion.load() == 1;
 }
 
 Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
@@ -2821,6 +2994,7 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
     }
     fassert(28645, cbh.getStatus());
     _replExecutor.wait(cbh.getValue());
+
     return result;
 }
 
@@ -2834,6 +3008,8 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinishV1(
         return;
     }
     fassert(28655, cbData.status);
+
+    auto senderHost(args.getSenderHost());
     const Date_t now = _replExecutor.now();
     *outStatus = _topCoord->prepareHeartbeatResponseV1(
         now, args, _settings.ourSetName(), getMyLastOptime(), response);
@@ -2844,17 +3020,26 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinishV1(
         // back to any node that sends us a heartbeat, in case one of those remote nodes has
         // a configuration that contains us.  Chances are excellent that it will, since that
         // is the only reason for a remote node to send this node a heartbeat request.
-        if (!args.getSenderHost().empty() && _seedList.insert(args.getSenderHost()).second) {
-            _scheduleHeartbeatToTarget(args.getSenderHost(), -1, now);
+        if (!senderHost.empty() && _seedList.insert(senderHost).second) {
+            _scheduleHeartbeatToTarget(senderHost, -1, now);
         }
     } else if (outStatus->isOK() && response->getConfigVersion() < args.getConfigVersion()) {
         // Schedule a heartbeat to the sender to fetch the new config.
         // We cannot cancel the enqueued heartbeat, but either this one or the enqueued heartbeat
         // will trigger reconfig, which cancels and reschedules all heartbeats.
         if (args.hasSender()) {
-            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(args.getSenderHost());
-            _scheduleHeartbeatToTarget(args.getSenderHost(), senderIndex, now);
+            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
+            _scheduleHeartbeatToTarget(senderHost, senderIndex, now);
         }
+    } else if (outStatus->isOK()) {
+        // Update liveness for sending node.
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        auto slaveInfo = _findSlaveInfoByMemberID_inlock(args.getSenderId());
+        if (!slaveInfo) {
+            return;
+        }
+        slaveInfo->lastUpdate = _replExecutor.now();
+        slaveInfo->down = false;
     }
 }
 
@@ -2897,89 +3082,85 @@ void ReplicationCoordinatorImpl::_getTerm_helper(const ReplicationExecutor::Call
     *term = _topCoord->getTerm();
 }
 
-Status ReplicationCoordinatorImpl::updateTerm(long long term) {
-    if (!isV1ElectionProtocol()) {
-        // Do not update if not in V1 protocol.
-        return Status::OK();
-    }
+EventHandle ReplicationCoordinatorImpl::updateTerm_forTest(
+    long long term, TopologyCoordinator::UpdateTermResult* updateResult) {
+    auto finishEvhStatus = _replExecutor.makeEvent();
+    invariantOK(finishEvhStatus.getStatus());
+    EventHandle finishEvh = finishEvhStatus.getValue();
+    auto signalFinishEvent =
+        [this, finishEvh](const CallbackArgs&) { this->_replExecutor.signalEvent(finishEvh); };
+    auto work = [this, term, updateResult, signalFinishEvent](const CallbackArgs& args) {
+        auto evh = _updateTerm_incallback(term, updateResult);
+        if (evh.isValid()) {
+            _replExecutor.onEvent(evh, signalFinishEvent);
+        } else {
+            signalFinishEvent(args);
+        }
+    };
+    _scheduleWork(work);
+    return finishEvh;
+}
 
+Status ReplicationCoordinatorImpl::updateTerm(OperationContext* txn, long long term) {
     // Term is only valid if we are replicating.
     if (getReplicationMode() != modeReplSet) {
         return {ErrorCodes::BadValue, "cannot supply 'term' without active replication"};
     }
 
-    bool updated = false;
-    CBHStatus cbh =
-        _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_updateTerm_helper,
-                                              this,
-                                              stdx::placeholders::_1,
-                                              term,
-                                              &updated,
-                                              nullptr));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return cbh.getStatus();
+    if (!isV1ElectionProtocol()) {
+        // Do not update if not in V1 protocol.
+        return Status::OK();
     }
-    fassert(28670, cbh.getStatus());
-    _replExecutor.wait(cbh.getValue());
 
-    if (updated) {
+    // Check we haven't acquired any lock, because potential stepdown needs global lock.
+    dassert(!txn->lockState()->isLocked());
+    TopologyCoordinator::UpdateTermResult updateTermResult;
+    EventHandle finishEvh;
+    auto work = [this, term, &updateTermResult, &finishEvh](const CallbackArgs&) {
+        finishEvh = _updateTerm_incallback(term, &updateTermResult);
+    };
+    _scheduleWorkAndWaitForCompletion(work);
+    // Wait for potential stepdown to finish.
+    if (finishEvh.isValid()) {
+        _replExecutor.waitForEvent(finishEvh);
+    }
+    if (updateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm ||
+        updateTermResult == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
         return {ErrorCodes::StaleTerm, "Replication term of this node was stale; retry query"};
     }
 
     return Status::OK();
 }
 
-bool ReplicationCoordinatorImpl::updateTerm_forTest(long long term) {
-    bool updated = false;
-    Handle cbHandle;
-    CBHStatus cbh =
-        _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_updateTerm_helper,
-                                              this,
-                                              stdx::placeholders::_1,
-                                              term,
-                                              &updated,
-                                              &cbHandle));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return false;
-    }
-    fassert(28673, cbh.getStatus());
-    _replExecutor.wait(cbh.getValue());
-    _replExecutor.wait(cbHandle);
-    return updated;
-}
-
-void ReplicationCoordinatorImpl::_updateTerm_helper(const ReplicationExecutor::CallbackArgs& cbData,
-                                                    long long term,
-                                                    bool* updated,
-                                                    Handle* cbHandle) {
-    if (cbData.status == ErrorCodes::CallbackCanceled) {
-        return;
+EventHandle ReplicationCoordinatorImpl::_updateTerm_incallback(
+    long long term, TopologyCoordinator::UpdateTermResult* updateTermResult) {
+    if (!isV1ElectionProtocol()) {
+        LOG(3) << "Cannot update term in election protocol version 0";
+        return EventHandle();
     }
 
-    *updated = _updateTerm_incallback(term, cbHandle);
-}
-
-bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, Handle* cbHandle) {
-    bool updated = _topCoord->updateTerm(term);
+    auto now = _replExecutor.now();
+    TopologyCoordinator::UpdateTermResult localUpdateTermResult = _topCoord->updateTerm(term, now);
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _cachedTerm = _topCoord->getTerm();
+
+        if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm) {
+            _cancelPriorityTakeover_inlock();
+            _cancelAndRescheduleElectionTimeout_inlock();
+        }
     }
 
-    if (updated && getMemberState().primary()) {
-        log() << "stepping down from primary, because a new term has begun";
-        _topCoord->prepareForStepDown();
-        CBHStatus cbh = _replExecutor.scheduleWorkWithGlobalExclusiveLock(
-            stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1));
-        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return true;
-        }
-        fassert(28672, cbh.getStatus());
-        if (cbHandle) {
-            *cbHandle = cbh.getValue();
-        }
+    if (updateTermResult) {
+        *updateTermResult = localUpdateTermResult;
     }
-    return updated;
+
+    if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
+        log() << "stepping down from primary, because a new term has begun: " << term;
+        _topCoord->prepareForStepDown();
+        return _stepDownStart();
+    }
+    return EventHandle();
 }
 
 SnapshotName ReplicationCoordinatorImpl::reserveSnapshotName(OperationContext* txn) {
@@ -2996,17 +3177,29 @@ void ReplicationCoordinatorImpl::forceSnapshotCreation() {
     _externalState->forceSnapshotCreation();
 }
 
-void ReplicationCoordinatorImpl::waitForNewSnapshot(OperationContext* txn) {
+void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* txn,
+                                                            const SnapshotName& untilSnapshot) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _snapshotCreatedCond.wait_for(lock, Microseconds(txn->getRemainingMaxTimeMicros()));
-    txn->checkForInterrupt();
+
+    while (!_currentCommittedSnapshot || _currentCommittedSnapshot->name < untilSnapshot) {
+        Microseconds waitTime(txn->getRemainingMaxTimeMicros());
+        if (waitTime == Microseconds(0)) {
+            _currentCommittedSnapshotCond.wait(lock);
+        } else {
+            _currentCommittedSnapshotCond.wait_for(lock, waitTime);
+        }
+        txn->checkForInterrupt();
+    }
+}
+
+size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
+    return _uncommittedSnapshotsSize.load();
 }
 
 void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     auto snapshotInfo = SnapshotInfo{timeOfSnapshot, name};
-    _snapshotCreatedCond.notify_all();
 
     if (timeOfSnapshot <= _lastCommittedOpTime) {
         // This snapshot is ready to be marked as committed.
@@ -3024,6 +3217,7 @@ void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot, Snapsho
         // isn't worth the effort and potential bugs that would introduce.
     }
     _uncommittedSnapshots.push_back(snapshotInfo);
+    _uncommittedSnapshotsSize.store(_uncommittedSnapshots.size());
 }
 
 void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
@@ -3038,6 +3232,7 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
         invariant(newCommittedSnapshot < _uncommittedSnapshots.front());
 
     _currentCommittedSnapshot = newCommittedSnapshot;
+    _currentCommittedSnapshotCond.notify_all();
 
     _externalState->updateCommittedSnapshot(newCommittedSnapshot.name);
 
@@ -3052,7 +3247,8 @@ void ReplicationCoordinatorImpl::dropAllSnapshots() {
 
 void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
     _uncommittedSnapshots.clear();
-    _currentCommittedSnapshot = {};
+    _uncommittedSnapshotsSize.store(_uncommittedSnapshots.size());
+    _currentCommittedSnapshot = boost::none;
     _externalState->dropAllSnapshots();
 }
 
@@ -3068,9 +3264,104 @@ void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
     }
 }
 
-void ReplicationCoordinatorImpl::waitForStepDownFinish_forTest() {
-    if (_stepDownFinishedEvent.isValid()) {
-        _replExecutor.waitForEvent(_stepDownFinishedEvent);
+void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
+    const ReplicaSetConfig& newConfig) {
+    // On protocol version upgrade, reset last vote as if I just learned the term 0 from other
+    // nodes.
+    if (!_rsConfig.isInitialized() ||
+        _rsConfig.getProtocolVersion() >= newConfig.getProtocolVersion()) {
+        return;
+    }
+
+    auto cbStatus = _replExecutor.scheduleDBWork([this](const CallbackArgs& cbData) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        invariant(cbData.txn);
+
+        LastVote lastVote;
+        lastVote.setTerm(OpTime::kInitialTerm);
+        lastVote.setCandidateIndex(-1);
+        auto status = _externalState->storeLocalLastVoteDocument(cbData.txn, lastVote);
+        invariant(status.isOK());
+    });
+    if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+
+    invariant(cbStatus.isOK());
+    _replExecutor.wait(cbStatus.getValue());
+}
+
+CallbackHandle ReplicationCoordinatorImpl::_scheduleWork(const CallbackFn& work) {
+    auto scheduleFn =
+        [this](const CallbackFn& workWrapped) { return _replExecutor.scheduleWork(workWrapped); };
+    return _wrapAndScheduleWork(scheduleFn, work);
+}
+
+CallbackHandle ReplicationCoordinatorImpl::_scheduleWorkAt(Date_t when, const CallbackFn& work) {
+    auto scheduleFn = [this, when](const CallbackFn& workWrapped) {
+        return _replExecutor.scheduleWorkAt(when, workWrapped);
+    };
+    return _wrapAndScheduleWork(scheduleFn, work);
+}
+
+void ReplicationCoordinatorImpl::_scheduleWorkAndWaitForCompletion(const CallbackFn& work) {
+    if (auto handle = _scheduleWork(work)) {
+        _replExecutor.wait(handle);
+    }
+}
+
+void ReplicationCoordinatorImpl::_scheduleWorkAtAndWaitForCompletion(Date_t when,
+                                                                     const CallbackFn& work) {
+    if (auto handle = _scheduleWorkAt(when, work)) {
+        _replExecutor.wait(handle);
+    }
+}
+
+// static
+CallbackHandle ReplicationCoordinatorImpl::_wrapAndScheduleWork(ScheduleFn scheduleFn,
+                                                                const CallbackFn& work) {
+    auto workWrapped = [work](const CallbackArgs& args) {
+        if (args.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        work(args);
+    };
+    auto cbh = scheduleFn(workWrapped);
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return CallbackHandle();
+    }
+    fassert(28800, cbh.getStatus());
+    return cbh.getValue();
+}
+
+EventHandle ReplicationCoordinatorImpl::_makeEvent() {
+    auto eventResult = this->_replExecutor.makeEvent();
+    if (eventResult.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return EventHandle();
+    }
+    fassert(28825, eventResult.getStatus());
+    return eventResult.getValue();
+}
+
+void ReplicationCoordinatorImpl::_scheduleElectionWinNotification() {
+    auto electionWinNotificationCallback = [this](const CallbackArgs& cbData) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (!_getMemberState_inlock().primary()) {
+            return;
+        }
+
+        _restartHeartbeats_inlock(cbData);
+    };
+
+    auto cbStatus = _replExecutor.scheduleWork(electionWinNotificationCallback);
+    if (!cbStatus.getStatus().isOK()) {
+        warning() << "Error in scheduling notification of election win: " << cbStatus.getStatus();
     }
 }
 

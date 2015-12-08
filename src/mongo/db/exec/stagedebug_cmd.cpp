@@ -54,6 +54,8 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_text_base.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -64,6 +66,19 @@ using std::unique_ptr;
 using std::string;
 using std::vector;
 using stdx::make_unique;
+
+namespace {
+
+BSONObj stripFieldNames(const BSONObj& obj) {
+    BSONObjIterator it(obj);
+    BSONObjBuilder bob;
+    while (it.more()) {
+        bob.appendAs(it.next(), "");
+    }
+    return bob.obj();
+}
+
+}  // namespace
 
 /**
  * A command for manually constructing a query tree and running it.
@@ -231,7 +246,7 @@ public:
             BSONObj argObj = e.Obj();
             if (filterTag == e.fieldName()) {
                 StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-                    argObj, WhereCallbackReal(txn, collection->ns().db()));
+                    argObj, ExtensionsCallbackReal(txn, &collection->ns()));
                 if (!statusWithMatcher.isOK()) {
                     return NULL;
                 }
@@ -263,8 +278,8 @@ public:
             IndexScanParams params;
             params.descriptor = desc;
             params.bounds.isSimpleRange = true;
-            params.bounds.startKey = nodeArgs["startKey"].Obj();
-            params.bounds.endKey = nodeArgs["endKey"].Obj();
+            params.bounds.startKey = stripFieldNames(nodeArgs["startKey"].Obj());
+            params.bounds.endKey = stripFieldNames(nodeArgs["endKey"].Obj());
             params.bounds.endKeyInclusive = nodeArgs["endKeyInclusive"].Bool();
             params.direction = nodeArgs["direction"].numberInt();
 
@@ -444,11 +459,11 @@ public:
 
             params.spec = fam->getSpec();
 
-            if (!params.query.parse(search,
-                                    fam->getSpec().defaultLanguage().str().c_str(),
-                                    fts::FTSQuery::caseSensitiveDefault,
-                                    fts::FTSQuery::diacriticSensitiveDefault,
-                                    fam->getSpec().getTextIndexVersion()).isOK()) {
+            params.query.setQuery(search);
+            params.query.setLanguage(fam->getSpec().defaultLanguage().str());
+            params.query.setCaseSensitive(TextMatchExpressionBase::kCaseSensitiveDefault);
+            params.query.setDiacriticSensitive(TextMatchExpressionBase::kDiacriticSensitiveDefault);
+            if (!params.query.parse(fam->getSpec().getTextIndexVersion()).isOK()) {
                 return NULL;
             }
 

@@ -40,6 +40,7 @@ class CatalogManager;
 class CollectionMetadata;
 class CollectionType;
 class DBClientCursor;
+class OperationContext;
 
 /**
  * The MetadataLoader is responsible for interfacing with the config servers and previous
@@ -89,7 +90,8 @@ public:
      * @return HostUnreachable if there was an error contacting the config servers
      * @return RemoteChangeDetected if the data loaded was modified by another operation
      */
-    Status makeCollectionMetadata(CatalogManager* catalogManager,
+    Status makeCollectionMetadata(OperationContext* txn,
+                                  CatalogManager* catalogManager,
                                   const std::string& ns,
                                   const std::string& shard,
                                   const CollectionMetadata* oldMetadata,
@@ -131,7 +133,8 @@ private:
      * @return RemoteChangeDetected if the collection doc loaded is unexpectedly different
      *
      */
-    Status _initCollection(CatalogManager* catalogManager,
+    Status _initCollection(OperationContext* txn,
+                           CatalogManager* catalogManager,
                            const std::string& ns,
                            const std::string& shard,
                            CollectionMetadata* metadata) const;
@@ -149,7 +152,8 @@ private:
      * @return NamespaceNotFound if there are no chunks loaded and an epoch change is detected
      * TODO: @return FailedToParse
      */
-    Status initChunks(CatalogManager* catalogManager,
+    Status initChunks(OperationContext* txn,
+                      CatalogManager* catalogManager,
                       const std::string& ns,
                       const std::string& shard,
                       const CollectionMetadata* oldMetadata,

@@ -46,6 +46,11 @@ JS_PUBLIC_API(size_t) get_max_bytes();
 }  // namespace sm
 }  // namespace mongo
 
+#ifdef DEBUG
+extern JS_PUBLIC_DATA(uint32_t) OOM_maxAllocations;
+extern JS_PUBLIC_DATA(uint32_t) OOM_counter;
+#endif
+
 JS_PUBLIC_API(void*) js_malloc(size_t bytes);
 JS_PUBLIC_API(void*) js_calloc(size_t bytes);
 JS_PUBLIC_API(void*) js_calloc(size_t nmemb, size_t size);

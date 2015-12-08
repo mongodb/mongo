@@ -67,8 +67,14 @@
 // Defined if std::make_unique is available
 @mongo_config_have_std_make_unique@
 
+// Defined if strnlen is available
+@mongo_config_have_strnlen@
+
 // Defined if building an optimized build
 @mongo_config_optimized_build@
 
 // Defined if SSL support is enabled
 @mongo_config_ssl@
+
+// Defined if WiredTiger storage engine is enabled
+@mongo_config_wiredtiger_enabled@

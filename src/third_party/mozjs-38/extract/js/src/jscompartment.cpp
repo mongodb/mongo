@@ -734,16 +734,25 @@ CreateLazyScriptsForCompartment(JSContext* cx)
     // clones. See bug 1105306.
     for (gc::ZoneCellIter i(cx->zone(), JSFunction::FinalizeKind); !i.done(); i.next()) {
         JSObject* obj = i.get<JSObject>();
-        if (obj->compartment() == cx->compartment() && obj->is<JSFunction>()) {
-            JSFunction* fun = &obj->as<JSFunction>();
-            if (fun->isInterpretedLazy()) {
-                LazyScript* lazy = fun->lazyScriptOrNull();
-                if (lazy && lazy->sourceObject() && !lazy->maybeScript() &&
-                    !lazy->hasUncompiledEnclosingScript())
-                {
-                    if (!lazyFunctions.append(fun))
-                        return false;
-                }
+
+        // Sweeping is incremental; take care to not delazify functions that
+        // are about to be finalized. GC things referenced by objects that are
+        // about to be finalized (e.g., in slots) may already be freed.
+        if (gc::IsObjectAboutToBeFinalized(&obj) ||
+            obj->compartment() != cx->compartment() ||
+            !obj->is<JSFunction>())
+        {
+            continue;
+        }
+
+        JSFunction* fun = &obj->as<JSFunction>();
+        if (fun->isInterpretedLazy()) {
+            LazyScript* lazy = fun->lazyScriptOrNull();
+            if (lazy && lazy->sourceObject() && !lazy->maybeScript() &&
+                !lazy->hasUncompiledEnclosingScript())
+            {
+                if (!lazyFunctions.append(fun))
+                    return false;
             }
         }
     }

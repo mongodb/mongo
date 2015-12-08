@@ -62,8 +62,6 @@ struct CollectionInfo {
 
     void resetCM(ChunkManager* cm);
 
-    void shard(OperationContext* txn, ChunkManager* cm);
-
     void unshard();
 
     bool isDirty() const {
@@ -145,7 +143,8 @@ public:
 
     // Atomically returns *either* the chunk manager *or* the primary shard for the collection,
     // neither if the collection doesn't exist.
-    void getChunkManagerOrPrimary(const std::string& ns,
+    void getChunkManagerOrPrimary(OperationContext* txn,
+                                  const std::string& ns,
                                   std::shared_ptr<ChunkManager>& manager,
                                   std::shared_ptr<Shard>& primary);
 
@@ -161,10 +160,14 @@ public:
     /**
      * Returns shard id for primary shard for the database for which this DBConfig represents.
      */
-    const ShardId& getShardId(const std::string& ns);
+    const ShardId& getShardId(OperationContext* txn, const std::string& ns);
 
-    void setPrimary(OperationContext* txn, const std::string& s);
+    void setPrimary(OperationContext* txn, const ShardId& newPrimaryId);
 
+    /**
+     * Returns true if it is successful at loading the DBConfig, false if the database is not found,
+     * and throws on all other errors.
+     */
     bool load(OperationContext* txn);
     bool reload(OperationContext* txn);
 
@@ -181,6 +184,10 @@ protected:
                                  std::set<ShardId>& shardIds,
                                  std::string& errmsg);
 
+    /**
+     * Returns true if it is successful at loading the DBConfig, false if the database is not found,
+     * and throws on all other errors.
+     */
     bool _load(OperationContext* txn);
 
     void _save(OperationContext* txn, bool db = true, bool coll = true);
@@ -211,8 +218,23 @@ class ConfigServer {
 public:
     static void reloadSettings(OperationContext* txn);
 
-    static void replicaSetChange(const std::string& setName,
-                                 const std::string& newConnectionString);
+    /**
+     * For use in mongos and mongod which needs notifications about changes to shard and config
+     * server replset membership to update the ShardRegistry.
+     *
+     * This is expected to be run in an existing thread.
+     */
+    static void replicaSetChangeShardRegistryUpdateHook(const std::string& setName,
+                                                        const std::string& newConnectionString);
+
+    /**
+     * For use in mongos which needs notifications about changes to shard replset membership to
+     * update the config.shards collection.
+     *
+     * This is expected to be run in a brand new thread.
+     */
+    static void replicaSetChangeConfigServerUpdateHook(const std::string& setName,
+                                                       const std::string& newConnectionString);
 };
 
 }  // namespace mongo

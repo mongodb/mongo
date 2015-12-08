@@ -88,8 +88,26 @@ elif [ "$OSTYPE" = "linux-gnu" ]; then
   MAKEFLAGS=-j4
   if [ "$VARIANT" = "arm-sim" ]; then
     USE_64BIT=false
-  elif [ "$UNAME_M" = "x86_64" ]; then
-    USE_64BIT=true
+  else
+    case "$platform" in
+    linux64)
+      USE_64BIT=true
+      ;;
+    linux64-debug)
+      USE_64BIT=true
+      ;;
+    linux)
+      USE_64BIT=false
+      ;;
+    linux-debug)
+      USE_64BIT=false
+      ;;
+    *)
+      if [ "$UNAME_M" = "x86_64" ]; then
+        USE_64BIT=true
+      fi
+      ;;
+    esac
   fi
 
   if [ "$UNAME_M" != "arm" ] && [ -n "$AUTOMATION" ]; then
@@ -102,10 +120,14 @@ elif [ "$OSTYPE" = "linux-gnu" ]; then
     fi
   fi
 elif [ "$OSTYPE" = "msys" ]; then
-  USE_64BIT=false
-  if [ "$platform" = "win64" ]; then
-      USE_64BIT=true
-  fi
+  case "$platform" in
+  win64*)
+    USE_64BIT=true
+    ;;
+  *)
+    USE_64BIT=false
+    ;;
+  esac
   MAKE=${MAKE:-mozmake}
   source "$ABSDIR/winbuildenv.sh"
 fi
@@ -114,12 +136,20 @@ MAKE=${MAKE:-make}
 
 if $USE_64BIT; then
   NSPR64="--enable-64bit"
+  if [ "$OSTYPE" = "msys" ]; then
+    CONFIGURE_ARGS="$CONFIGURE_ARGS --target=x86_64-pc-mingw32 --host=x86_64-pc-mingw32"
+  fi
 else
   NSPR64=""
   if [ "$OSTYPE" != "msys" ]; then
     export CC="${CC:-/usr/bin/gcc} -m32"
     export CXX="${CXX:-/usr/bin/g++} -m32"
     export AR=ar
+  fi
+  if [ "$OSTYPE" = "linux-gnu" ]; then
+    if [ "$UNAME_M" != "arm" ] && [ -n "$AUTOMATION" ]; then
+      CONFIGURE_ARGS="$CONFIGURE_ARGS --target=i686-pc-linux --host=i686-pc-linux"
+    fi
   fi
 fi
 
@@ -158,8 +188,14 @@ elif [[ "$VARIANT" = "compacting" ]]; then
     esac
 fi
 
-if [[ "$VARIANT" = "warnaserr" ]]; then
-    export JSTESTS_EXTRA_ARGS=--tbpl
+if [[ "$VARIANT" = "warnaserr" ||
+      "$VARIANT" = "warnaserrdebug" ||
+      "$VARIANT" = "plain" ]]; then
+    export JSTESTS_EXTRA_ARGS=--jitflags=all
+elif [[ "$VARIANT" = "arm-sim" ||
+        "$VARIANT" = "rootanalysis" ||
+        "$VARIANT" = "plaindebug" ]]; then
+    export JSTESTS_EXTRA_ARGS=--jitflags=debug
 fi
 
 $COMMAND_PREFIX $MAKE check || exit 1

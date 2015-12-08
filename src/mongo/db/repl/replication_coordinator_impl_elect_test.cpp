@@ -54,9 +54,14 @@ using executor::RemoteCommandResponse;
 
 class ReplCoordElectTest : public ReplCoordTest {
 protected:
+    void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
     void simulateEnoughHeartbeatsForElectability();
     void simulateFreshEnoughForElectability();
 };
+
+void ReplCoordElectTest::assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost) {
+    ReplCoordTest::assertStartSuccess(addProtocolVersion(configDoc, 0), selfHost);
+}
 
 void ReplCoordElectTest::simulateEnoughHeartbeatsForElectability() {
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
@@ -113,7 +118,7 @@ void ReplCoordElectTest::simulateFreshEnoughForElectability() {
     net->exitNetwork();
 }
 
-TEST_F(ReplCoordElectTest, ElectTooSoon) {
+TEST_F(ReplCoordElectTest, StartElectionDoesNotStartAnElectionWhenNodeHasNoOplogEntries) {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     // Election never starts because we haven't set a lastOpTimeApplied value yet, via a
     // heartbeat.
@@ -136,7 +141,7 @@ TEST_F(ReplCoordElectTest, ElectTooSoon) {
  * This test checks that an election can happen when only one node is up, and it has the
  * vote(s) to win.
  */
-TEST_F(ReplCoordElectTest, ElectTwoNodesWithOneZeroVoter) {
+TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     OperationContextReplMock txn;
     assertStartSuccess(
         BSON("_id"
@@ -150,6 +155,8 @@ TEST_F(ReplCoordElectTest, ElectTwoNodesWithOneZeroVoter) {
         HostAndPort("node1", 12345));
 
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+    // Fake OpTime from initiate, or a write op.
+    getExternalState()->setLastOpTime(OpTime{{0, 0}, 0});
 
     ASSERT(getReplCoord()->getMemberState().secondary())
         << getReplCoord()->getMemberState().toString();
@@ -183,7 +190,7 @@ TEST_F(ReplCoordElectTest, ElectTwoNodesWithOneZeroVoter) {
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 }
 
-TEST_F(ReplCoordElectTest, Elect1NodeSuccess) {
+TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     OperationContextReplMock txn;
     startCapturingLogMessages();
     assertStartSuccess(BSON("_id"
@@ -194,6 +201,9 @@ TEST_F(ReplCoordElectTest, Elect1NodeSuccess) {
                        HostAndPort("node1", 12345));
 
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+    // Fake OpTime from initiate, or a write op.
+    getExternalState()->setLastOpTime(OpTime{{0, 0}, 0});
 
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
@@ -210,7 +220,7 @@ TEST_F(ReplCoordElectTest, Elect1NodeSuccess) {
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 }
 
-TEST_F(ReplCoordElectTest, ElectManyNodesSuccess) {
+TEST_F(ReplCoordElectTest, ElectionSucceedsWhenAllNodesVoteYea) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version" << 1 << "members"
@@ -222,7 +232,9 @@ TEST_F(ReplCoordElectTest, ElectManyNodesSuccess) {
                                                          << "node3:12345")));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop txn;
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
+    getReplCoord()->setMyLastOptime(OpTime{{100, 1}, 0});
+    getExternalState()->setLastOpTime(OpTime{{100, 1}, 0});
+
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     startCapturingLogMessages();
     simulateSuccessfulElection();
@@ -230,7 +242,7 @@ TEST_F(ReplCoordElectTest, ElectManyNodesSuccess) {
     ASSERT_EQUALS(1, countLogLinesContaining("election succeeded"));
 }
 
-TEST_F(ReplCoordElectTest, ElectNotEnoughVotes) {
+TEST_F(ReplCoordElectTest, ElectionFailsWhenOneNodeVotesNay) {
     // one responds with -10000 votes, and one doesn't respond, and we are not elected
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
@@ -275,7 +287,7 @@ TEST_F(ReplCoordElectTest, ElectNotEnoughVotes) {
     ASSERT_EQUALS(1, countLogLinesContaining("couldn't elect self, only received -9999 votes"));
 }
 
-TEST_F(ReplCoordElectTest, ElectWrongTypeForVote) {
+TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
     // one responds with a bad 'vote' field, and one doesn't respond, and we are not elected
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
@@ -322,7 +334,39 @@ TEST_F(ReplCoordElectTest, ElectWrongTypeForVote) {
                   countLogLinesContaining("wrong type for vote argument in replSetElect command"));
 }
 
-TEST_F(ReplCoordElectTest, ElectionDuringHBReconfigFails) {
+TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345")));
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+    OperationContextNoop txn;
+    OpTime time1(Timestamp(100, 1), 0);
+    getReplCoord()->setMyLastOptime(time1);
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    simulateEnoughHeartbeatsForElectability();
+    simulateFreshEnoughForElectability();
+
+    bool success = false;
+    auto event = getReplCoord()->setFollowerMode_nonBlocking(MemberState::RS_ROLLBACK, &success);
+
+    // We do not need to respond to any pending network operations because setFollowerMode() will
+    // cancel the freshness checker and election command runner.
+    getReplCoord()->waitForElectionFinish_forTest();
+    getReplExec()->waitForEvent(event);
+    ASSERT_TRUE(success);
+    ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
+}
+
+TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     // start up, receive reconfig via heartbeat while at the same time, become candidate.
     // candidate state should be cleared.
     OperationContextNoop txn;
@@ -415,6 +459,77 @@ TEST_F(ReplCoordElectTest, ElectionDuringHBReconfigFails) {
                       "a configuration change"));
     getExternalState()->setStoreLocalConfigDocumentToHang(false);
 }
+
+TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrimary) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345"
+                                                      << "priority" << 2)
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345")));
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+
+    OperationContextNoop txn;
+    OpTime time1(Timestamp(100, 1), 0);
+    getReplCoord()->setMyLastOptime(time1);
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto net = getNet();
+    net->enterNetwork();
+    while (net->hasReadyRequests()) {
+        auto noi = net->getNextReadyRequest();
+        auto&& request = noi->getRequest();
+        log() << request.target << " processing " << request.cmdObj;
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+        ReplSetHeartbeatArgs hbArgs;
+        if (hbArgs.initialize(request.cmdObj).isOK()) {
+            ReplSetHeartbeatResponse hbResp;
+            hbResp.setSetName(config.getReplSetName());
+            if (request.target == HostAndPort("node2", 12345)) {
+                hbResp.setState(MemberState::RS_PRIMARY);
+            } else {
+                hbResp.setState(MemberState::RS_SECONDARY);
+            }
+            hbResp.setConfigVersion(config.getConfigVersion());
+            auto response = makeResponseStatus(hbResp.toBSON(replCoord->isV1ElectionProtocol()));
+            net->scheduleResponse(noi, net->now(), response);
+        } else {
+            error() << "Black holing unexpected request to " << request.target << ": "
+                    << request.cmdObj;
+            net->blackHole(noi);
+        }
+    }
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    net->enterNetwork();
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    auto&& request = noi->getRequest();
+    log() << request.target << " processing " << request.cmdObj;
+    ASSERT_EQUALS("replSetStepDown", request.cmdObj.firstElement().fieldNameStringData());
+    auto target = request.target;
+    ASSERT_EQUALS(HostAndPort("node2", 12345), target);
+    auto response = makeResponseStatus(BSON("ok" << 1));
+    net->scheduleResponse(noi, net->now(), response);
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+    startCapturingLogMessages();
+    net->runReadyNetworkOperations();
+    stopCapturingLogMessages();
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
+    net->exitNetwork();
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(str::stream() << "stepdown of primary("
+                                                        << target.toString() << ") succeeded"));
 }
-}
-}
+
+}  // namespace
+}  // namespace repl
+}  // namespace mongo

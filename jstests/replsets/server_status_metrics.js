@@ -8,9 +8,11 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     assert(ss.metrics.repl.network.readersCreated > 0, "no (oplog) readers created")
     assert(ss.metrics.repl.network.getmores.num > 0, "no getmores")
     assert(ss.metrics.repl.network.getmores.totalMillis > 0, "no getmores time")
-    // the first oplog entry may ore may not make it into network.ops now that we have two 
-    // n ops (initiate and new primary) before steady replication starts
-    assert.lte(ss.metrics.repl.network.ops, opCount + offset + 1, "wrong number of ops retrieved")
+    // The first oplog entry may or may not make it into network.ops now that we have two
+    // n ops (initiate and new primary) before steady replication starts.
+    // Sometimes, we disconnect from our sync source and since our find is a gte query, we may
+    // double count an oplog entry, so we need some wiggle room for that.
+    assert.lte(ss.metrics.repl.network.ops, opCount + offset + 5, "wrong number of ops retrieved")
     assert.gte(ss.metrics.repl.network.ops, opCount + offset, "wrong number of ops retrieved")
     assert(ss.metrics.repl.network.bytes > 0, "zero or missing network bytes")
 
@@ -24,7 +26,7 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     assert(ss.metrics.repl.preload.indexes.totalMillis >= 0, "preload.indexes time missing")
 
     assert(ss.metrics.repl.apply.batches.num > 0, "no batches")
-    assert(ss.metrics.repl.apply.batches.totalMillis > 0, "no batch time")
+    assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing batch time")
     assert.eq(ss.metrics.repl.apply.ops, opCount + offset, "wrong number of applied ops")
 }
 

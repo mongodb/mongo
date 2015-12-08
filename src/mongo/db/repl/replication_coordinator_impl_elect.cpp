@@ -274,7 +274,10 @@ void ReplicationCoordinatorImpl::_recoverFromElectionTie(
     if (!cbData.status.isOK()) {
         return;
     }
-    if (_topCoord->checkShouldStandForElection(_replExecutor.now(), getMyLastOptime())) {
+    auto now = _replExecutor.now();
+    auto lastOpApplied = getMyLastOptime();
+    if (_topCoord->checkShouldStandForElection(now, lastOpApplied)) {
+        fassert(28817, _topCoord->becomeCandidateIfElectable(now, lastOpApplied));
         _startElectSelf();
     }
 }

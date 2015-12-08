@@ -10,6 +10,7 @@
 
 load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
 load('jstests/concurrency/fsm_workloads/compact.js'); // for $config
+load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isEphemeral
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
@@ -22,7 +23,11 @@ var $config = extendWorkload($config, function($config, $super) {
             paddingBytes: 1024 * 5,
             force: true
         });
-        assertAlways.commandWorked(res);
+        if (!isEphemeral(db)) {
+            assertAlways.commandWorked(res);
+        } else {
+            assertAlways.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+        }
     };
 
     // no-op the query state because querying while compacting can result in closed cursors

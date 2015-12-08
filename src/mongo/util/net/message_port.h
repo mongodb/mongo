@@ -119,8 +119,7 @@ public:
 
 private:
     // this is the parsed version of remote
-    // mutable because its initialized only on call to remote()
-    mutable HostAndPort _remoteParsed;
+    HostAndPort _remoteParsed;
 
 public:
     static void closeAllSockets(unsigned tagMask = 0xffffffff);

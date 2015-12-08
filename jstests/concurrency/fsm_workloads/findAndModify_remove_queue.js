@@ -13,8 +13,6 @@
 var $config = (function() {
 
     var data =  {
-        numDocs: 1000,
-
         // Use the workload name as the database name, since the workload name is assumed to be
         // unique.
         uniqueDBName: 'findAndModify_remove_queue',
@@ -31,7 +29,7 @@ var $config = (function() {
 
         saveDocId: function saveDocId(db, collName, id) {
             // Use a separate database to avoid conflicts with other FSM workloads.
-            var ownedDB = db.getSiblingDB(this.uniqueDBName);
+            var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
 
             var updateDoc = { $push: {} };
             updateDoc.$push[this.opName] = id;
@@ -67,6 +65,8 @@ var $config = (function() {
             assertAlways.commandWorked(res);
 
             var doc = res.value;
+            assertWhenOwnColl.neq(
+                doc, null, 'findAndModify should have found and removed a matching document');
             if (doc !== null) {
                 this.saveDocId.call(this, db, collName, doc._id);
             }
@@ -83,6 +83,9 @@ var $config = (function() {
     };
 
     function setup(db, collName, cluster) {
+        // Each thread should remove exactly one document per iteration.
+        this.numDocs = this.iterations * this.threadCount;
+
         var bulk = db[collName].initializeUnorderedBulkOp();
         for (var i = 0; i < this.numDocs; ++i) {
             var doc = this.newDocForInsert(i);
@@ -100,7 +103,14 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
-        var ownedDB = db.getSiblingDB(this.uniqueDBName);
+        var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
+
+        if (this.opName === 'removed') {
+            // Each findAndModify should remove exactly one document, and this.numDocs ==
+            // this.iterations * this.threadCount, so there should not be any documents remaining.
+            assertWhenOwnColl.eq(
+                db[collName].find().itcount(), 0, 'Expected all documents to have been removed');
+        }
 
         assertWhenOwnColl(function() {
             var docs = ownedDB[collName].find().toArray();
@@ -115,7 +125,7 @@ var $config = (function() {
 
         var res = ownedDB.dropDatabase();
         assertAlways.commandWorked(res);
-        assertAlways.eq(this.uniqueDBName, res.dropped);
+        assertAlways.eq(db.getName() + this.uniqueDBName, res.dropped);
 
         function checkForDuplicateIds(ids, opName) {
             var indices = new Array(ids.length);
@@ -166,10 +176,9 @@ var $config = (function() {
         }
     }
 
-    var threadCount = 10;
     return {
-        threadCount: threadCount,
-        iterations: Math.floor(data.numDocs / threadCount),
+        threadCount: 10,
+        iterations: 100,
         data: data,
         startState: 'remove',
         states: states,

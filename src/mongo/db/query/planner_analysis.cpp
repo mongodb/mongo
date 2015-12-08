@@ -213,7 +213,7 @@ void explodeScan(IndexScanNode* isn,
 
         // Copy the filter, if there is one.
         if (isn->filter.get()) {
-            child->filter = std::move(isn->filter->shallowClone());
+            child->filter = isn->filter->shallowClone();
         }
 
         // Create child bounds.
@@ -319,8 +319,9 @@ BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
         if (elt.type() == mongo::String) {
             break;
         }
-        long long val = elt.safeNumberLong();
-        int sortOrder = val >= 0 ? 1 : -1;
+        // The canonical check as to whether a key pattern element is "ascending" or "descending" is
+        // (elt.number() >= 0). This is defined by the Ordering class.
+        int sortOrder = (elt.number() >= 0) ? 1 : -1;
         sortBob.append(elt.fieldName(), sortOrder);
     }
     return sortBob.obj();
@@ -656,25 +657,30 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
     //
     // 3. There is an index-provided sort.  Ditto above comment about merging.
     //
+    // 4. There is a SORT that is not at the root of solution tree. Ditto above comment about
+    // merging.
+    //
     // TODO: do we want some kind of pre-planning step where we look for certain nodes and cache
     // them?  We do lookups in the tree a few times.  This may not matter as most trees are
     // shallow in terms of query nodes.
-    bool cannotKeepFlagged = hasNode(solnRoot, STAGE_TEXT) ||
+    const bool hasNotRootSort = hasSortStage && STAGE_SORT != solnRoot->getType();
+
+    const bool cannotKeepFlagged = hasNode(solnRoot, STAGE_TEXT) ||
         hasNode(solnRoot, STAGE_GEO_NEAR_2D) || hasNode(solnRoot, STAGE_GEO_NEAR_2DSPHERE) ||
-        (!lpq.getSort().isEmpty() && !hasSortStage);
+        (!lpq.getSort().isEmpty() && !hasSortStage) || hasNotRootSort;
 
     // Only these stages can produce flagged results.  A stage has to hold state past one call
     // to work(...) in order to possibly flag a result.
-    bool couldProduceFlagged =
+    const bool couldProduceFlagged =
         hasAndHashStage || hasNode(solnRoot, STAGE_AND_SORTED) || hasNode(solnRoot, STAGE_FETCH);
 
-    bool shouldAddMutation = !cannotKeepFlagged && couldProduceFlagged;
+    const bool shouldAddMutation = !cannotKeepFlagged && couldProduceFlagged;
 
     if (shouldAddMutation && (params.options & QueryPlannerParams::KEEP_MUTATIONS)) {
         KeepMutationsNode* keep = new KeepMutationsNode();
 
         // We must run the entire expression tree to make sure the document is still valid.
-        keep->filter = std::move(query.root()->shallowClone());
+        keep->filter = query.root()->shallowClone();
 
         if (STAGE_SORT == solnRoot->getType()) {
             // We want to insert the invalidated results before the sort stage, if there is one.
@@ -760,6 +766,30 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
                     }
                 }
             }
+
+            // If we have a $meta sortKey, just use the project default path, as currently the
+            // project fast paths cannot handle $meta sortKey projections.
+            if (query.getProj()->wantSortKey()) {
+                projType = ProjectionNode::DEFAULT;
+                LOG(5) << "PROJECTION: needs $meta sortKey, using DEFAULT path instead";
+            }
+        }
+        // If we don't have a covered project, and we're not allowed to put an uncovered one in,
+        // bail out.
+        if (solnRoot->fetched() &&
+            (params.options & QueryPlannerParams::NO_UNCOVERED_PROJECTIONS)) {
+            delete solnRoot;
+            return nullptr;
+        }
+
+        // If there's no sort stage but we have a sortKey meta-projection, we need to add a stage to
+        // generate the sort key computed data.
+        if (!hasSortStage && query.getProj()->wantSortKey()) {
+            SortKeyGeneratorNode* keyGenNode = new SortKeyGeneratorNode();
+            keyGenNode->queryObj = lpq.getFilter();
+            keyGenNode->sortSpec = lpq.getSort();
+            keyGenNode->children.push_back(solnRoot);
+            solnRoot = keyGenNode;
         }
 
         // We now know we have whatever data is required for the projection.
