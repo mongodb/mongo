@@ -531,14 +531,42 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                     }
                     if (!ok) {
                         stats.errCount++;
-                    } else if (check) {
+                    }
+
+                    if (!result["cursor"].eoo()) {
+                        // The command returned a cursor, so iterate all results.
+                        auto cursorResponse =
+                            uassertStatusOK(CursorResponse::parseFromBSON(result));
+                        int count = cursorResponse.getBatch().size();
+                        while (cursorResponse.getCursorId() != 0) {
+                            GetMoreRequest getMoreRequest(cursorResponse.getNSS(),
+                                                          cursorResponse.getCursorId(),
+                                                          boost::none,   // batchSize
+                                                          boost::none,   // maxTimeMS
+                                                          boost::none,   // term
+                                                          boost::none);  // lastKnownCommittedOpTime
+                            BSONObj getMoreCommandResult;
+                            ok =
+                                conn->runCommand(ns, getMoreRequest.toBSON(), getMoreCommandResult);
+                            uassert(ErrorCodes::CommandFailed,
+                                    str::stream() << "getMore command failed; reply was: "
+                                                  << getMoreCommandResult,
+                                    ok);
+                            cursorResponse = uassertStatusOK(
+                                CursorResponse::parseFromBSON(getMoreCommandResult));
+                            count += cursorResponse.getBatch().size();
+                        }
+                        // Just give the count to the check function.
+                        result = BSON("count" << count << "context" << context);
+                    }
+
+                    if (check) {
                         int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
                         if (err) {
                             log() << "Error checking in benchRun thread [command]"
                                   << causedBy(scope->getError()) << endl;
 
                             stats.errCount++;
-
                             return;
                         }
                     }
