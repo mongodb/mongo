@@ -102,6 +102,7 @@ Encryptor
 Encryptors
 Enqueue
 Eron
+FALLOC
 FALLTHROUGH
 FH
 FLD
@@ -224,6 +225,7 @@ Obama
 Outfmt
 PARAM
 POSIX
+PPC
 PREDEFINE
 PRIu
 PRNG
@@ -358,6 +360,7 @@ arg
 argc
 args
 argv
+asm
 async
 asyncopp
 asyncops
@@ -594,6 +597,7 @@ free'd
 fscanf
 fstat
 fsync
+fsyncLock
 fsyncs
 ftruncate
 func
@@ -876,6 +880,7 @@ runtime
 rwlock
 sH
 sHQ
+scalability
 sched
 scr
 sd
