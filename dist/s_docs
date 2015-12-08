@@ -22,7 +22,8 @@ changelog()
 	(echo "WiredTiger Change Log"
 	 echo "====================="
 	 echo
-	 cat ../NEWS) > ../src/docs/changelog.md
+	 sed -e 's, \([0-9a-f]\{7\}\) , [\1](https://github.com/wiredtiger/wiredtiger/commit/\1) ,g' \
+	     -e 's,\(\(WT\|SERVER\)-[0-9]*\),[\1](https://jira.mongodb.org/browse/\1),g' ../NEWS) > ../src/docs/changelog.md
 }
 
 wtperf_config()
