@@ -200,6 +200,13 @@ Client::Context::Context(OperationContext* txn, const string& ns, bool doVersion
 AutoGetDb::AutoGetDb(OperationContext* txn, const StringData& ns, LockMode mode)
     : _dbLock(txn->lockState(), ns, mode), _db(dbHolder().get(txn, ns)) {}
 
+AutoGetCollection::AutoGetCollection(OperationContext* txn,
+                                     const NamespaceString& nss,
+                                     LockMode mode)
+    : _autoDb(txn, nss.db(), mode),
+      _collLock(txn->lockState(), nss.ns(), mode),
+      _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(nss) : nullptr) {}
+
 AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn, const StringData& ns, LockMode mode)
     : _transaction(txn, MODE_IX),
       _dbLock(txn->lockState(), ns, mode),

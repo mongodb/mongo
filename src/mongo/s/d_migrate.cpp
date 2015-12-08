@@ -1897,7 +1897,7 @@ public:
                 _errmsg = "UNKNOWN ERROR";
             }
 
-            error() << "migrate failed with unknown exception" << migrateLog;
+            severe() << "migrate failed with unknown exception" << migrateLog;
         }
 
         if (getState() != DONE) {
@@ -2385,33 +2385,54 @@ public:
         bool didAnything = false;
 
         if (xfer["deleted"].isABSONObj()) {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dlk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
-            Helpers::RemoveSaver rs("moveChunk", ns, "removedDuring");
+            scoped_ptr<Helpers::RemoveSaver> removeSaver;
+            if (serverGlobalParams.moveParanoia) {
+                removeSaver.reset(new Helpers::RemoveSaver("moveChunk", ns, "removedDuring"));
+            }
+
+            scoped_ptr<ScopedTransaction> autoXact;
+            scoped_ptr<AutoGetCollection> autoColl;
+
+            const int maxItersBeforeYield =
+                std::max(static_cast<int>(internalQueryExecYieldIterations), 1);
+            int opCounter = 0;
 
             BSONObjIterator i(xfer["deleted"].Obj());
             while (i.more()) {
-                Lock::CollectionLock clk(txn->lockState(), ns, MODE_X);
-                Client::Context ctx(txn, ns);
+                if (opCounter % maxItersBeforeYield == 0) {
+                    autoXact.reset();
+                    autoColl.reset();
+                    autoXact.reset(new ScopedTransaction(txn, MODE_IX));
+                    autoColl.reset(new AutoGetCollection(txn, NamespaceString(ns), MODE_X));
+                }
+
+                // If the collection does not exist there won't be any documents to remove. This
+                // condition can only happen if deletions are happening for an empty chunk or in the
+                // unlikely event that someone manually deleted the collection.
+                if (!autoColl->getCollection()) {
+                    break;
+                }
 
                 BSONObj id = i.next().Obj();
 
+                // Increment the counter before doing either the read or delete, so we yield the WT
+                // snapshot more aggressively
+                opCounter++;
+
                 // do not apply deletes if they do not belong to the chunk being migrated
                 BSONObj fullObj;
-                if (Helpers::findById(txn, ctx.db(), ns.c_str(), id, fullObj)) {
+                if (Helpers::findById(txn, autoColl->getDb(), ns.c_str(), id, fullObj)) {
                     if (!isInRange(fullObj, min, max, shardKeyPattern)) {
-                        log() << "not applying out of range deletion: " << fullObj << migrateLog;
-
                         continue;
                     }
                 }
 
-                if (serverGlobalParams.moveParanoia) {
-                    rs.goingToDelete(fullObj);
+                if (removeSaver) {
+                    removeSaver->goingToDelete(fullObj);
                 }
 
                 deleteObjects(txn,
-                              ctx.db(),
+                              autoColl->getDb(),
                               ns,
                               id,
                               PlanExecutor::YIELD_MANUAL,
@@ -2420,7 +2441,7 @@ public:
                               false /* god */,
                               true /* fromMigrate */);
 
-                *lastOpApplied = ctx.getClient()->getLastOp().asDate();
+                *lastOpApplied = txn->getClient()->getLastOp().asDate();
                 didAnything = true;
             }
         }
@@ -2636,7 +2657,9 @@ void migrateThread(std::string ns,
                    std::string fromShard,
                    OID epoch,
                    WriteConcernOptions writeConcern) {
-    Client::initThread("migrateThread");
+    const std::string migrateThreadName(str::stream() << "migrateThread-" << ns);
+    Client::initThread(migrateThreadName.c_str());
+
     OperationContextImpl txn;
     if (getGlobalAuthorizationManager()->isAuthEnabled()) {
         ShardedConnectionInfo::addHook();
