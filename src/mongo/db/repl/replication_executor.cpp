@@ -595,6 +595,11 @@ ReplicationExecutor::Callback::Callback(ReplicationExecutor* executor,
 
 ReplicationExecutor::Callback::~Callback() {}
 
+bool ReplicationExecutor::Callback::isCanceled() const {
+    stdx::unique_lock<stdx::mutex> lk(_executor->_mutex);
+    return _isCanceled;
+}
+
 void ReplicationExecutor::Callback::cancel() {
     stdx::unique_lock<stdx::mutex> lk(_executor->_mutex);
     _isCanceled = true;
