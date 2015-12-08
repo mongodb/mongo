@@ -922,6 +922,7 @@ void CatalogManagerReplicaSet::_runBatchWriteCommand(
                 Status(ErrorCodes::FailedToParse,
                        str::stream() << "Failed to parse config server response: " << errmsg),
                 batchResponse);
+            return;
         }
 
         // If one of the write operations failed (which is reported in the error details), see if
