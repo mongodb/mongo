@@ -85,7 +85,10 @@ for (i = 1; i < hashes.length; i++) {
         continue;
     }
     
-    assert.eq(hashes[0].numCollections , hashes[i].numCollections , "num collections does not match");
+    assert.eq(hashes[0].collections.length , hashes[i].collections.length ,
+              "number of collections do not match:\n" +
+              tojson(hashes[0].collections) + '\n' +
+              tojson(hashes[i].collections));
 
     for ( var k in hashes[0].collections ) {
         if (hashes[0].collections[k] == hashes[i].collections[k]) {
