@@ -360,6 +360,7 @@ arg
 argc
 args
 argv
+asm
 async
 asyncopp
 asyncops
