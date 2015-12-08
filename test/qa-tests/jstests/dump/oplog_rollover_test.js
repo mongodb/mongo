@@ -31,15 +31,15 @@ if (typeof getToolTest === 'undefined') {
     '  db.getSiblingDB(\'foo\').bar.insert({ x: longString }); ' +
     '}');
 
-  // Give some time for inserts to actually start before dumping, we only need
-  // one document to go in and 0.5 seconds should be enough unless your
-  // scheduler is wonky or your HDD is really slow.
-  sleep(500);
-
-  var countBeforeMongodump = db.bar.count();
-  // Crash if parallel shell hasn't started inserting yet
-  assert.gt(countBeforeMongodump, 0, 'Didn\'t successfully start inserting ' +
-    'large documents before mongodump');
+  // Give some time for inserts to actually start before dumping. In order for
+  // an oplog rollover to occur we need many documents to already be inserted. If the
+  // delay below is not long enough to trigger an oplog rollover, then increase the
+  // required document count.
+  var i = 0;
+  while (db.bar.count() < 175) {
+	assert.lt(i++, 120, 'Took longer than 120 seconds to insert 175 documents before mongodump.');
+	sleep(1000);
+  }
 
   var dumpArgs = ['dump', '--oplog'].concat(commonToolArgs);
 
