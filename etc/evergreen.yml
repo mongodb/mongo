@@ -282,42 +282,6 @@ functions:
 
         ${path_prefix} ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
-  "setup release credentials":
-    command: shell.exec
-    params:
-      silent: true
-      script: |
-        cat <<EOF > ~/.mongodb-jira.yaml
-        jira:
-          username: ${release_jira_username}
-          password: ${release_jira_password}
-          url: https://jira.mongodb.org/
-        EOF
-
-  "cleanup release credentials":
-    command: shell.exec
-    params:
-      script: |
-        rm -f ~/.mongodb-jira.yaml
-
-  "clone kernel-tools repo":
-    command: shell.exec
-    params:
-      script: |
-        git clone git@github.com:10gen/kernel-tools.git
-
-  "setup kernel-tools virtualenv":
-    command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        set -o verbose
-
-        cd kernel-tools/releases/release_tickets/
-        virtualenv --system-site-packages venv-release
-        . venv-release/bin/activate
-        pip install --retries 30 --timeout 30 jira==0.16 requests==2.7.0
-
   "run jstestfuzz":
     - command: shell.exec
       params:
@@ -2117,51 +2081,6 @@ tasks:
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
                'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl', 'windows-32'], }
 
-- name: jira_versions
-  patchable: false
-  depends_on:
-    - name: push
-      variant: linux-64
-  stepback: false
-  commands:
-    - func: "clone kernel-tools repo"
-    - func: "setup release credentials"
-    - func: "setup kernel-tools virtualenv"
-    - command: shell.exec
-      params:
-        working_dir: "kernel-tools/releases/release_tickets"
-        script: |
-          set -o errexit
-          set -o verbose
-
-          . venv-release/bin/activate
-
-          python release_fixversion.py ${version}
-          python create_fixversion.py ${version}
-          python make_ticket.py --execute --version ${version} --ticket deploy
-    - func: "cleanup release credentials"
-
-- name: docs_ticket
-  patchable: false
-  depends_on:
-    - name: push
-      variant: "*"
-  stepback: false
-  commands:
-    - func: "clone kernel-tools repo"
-    - func: "setup release credentials"
-    - func: "setup kernel-tools virtualenv"
-    - command: shell.exec
-      working_dir: "kernel-tools/releases/release_tickets"
-      params:
-        script: |
-          set -o errexit
-          set -o verbose
-
-          . venv-release/bin/activate
-
-          python make_ticket.py --execute --version ${version} --assignee ${release_notes_maintainer} --ticket docs
-    - func: "cleanup release credentials"
 
 #######################################
 #               Modules               #
@@ -5269,12 +5188,3 @@ buildvariants:
   - name: push
     distros:
     - rhel55-test
-
-- name: release
-  display_name: ~~ Release Process
-  modules: ~
-  run_on:
-  - ubuntu1404-docker
-  tasks:
-  - name: jira_versions
-  - name: docs_ticket
