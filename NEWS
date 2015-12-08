@@ -221,6 +221,7 @@ Other note worthy changes since the previous release:
 * e731ef8  WT-2251: Free addresses when we discard deleted page references.
 * 4fc3e39  WT-2253: Evict pages left behind by in-memory splits.
 * 2df5658  WT-2257: Fixes when given multiple thread workload configurations.
+* 4c49043  WT-2260: Avoid adding internal pages to the eviction queue
 
 WiredTiger release 2.6.1, 2015-05-13
 ------------------------------------
