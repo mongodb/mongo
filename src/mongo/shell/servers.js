@@ -510,20 +510,6 @@ MongoRunner.mongodOptions = function( opts ){
         opts.auditDestination = jsTestOptions().auditDestination;
     }
 
-    if (opts.hasOwnProperty("enableMajorityReadConcern")) {
-        // opts.enableMajorityReadConcern, if set, must be an empty string
-        if (opts.enableMajorityReadConcern !== "") {
-            throw new Error("The enableMajorityReadConcern option must be an empty string if " +
-                            "it is specified");
-        }
-    } else if (jsTestOptions().enableMajorityReadConcern !== undefined) {
-        if (jsTestOptions().enableMajorityReadConcern !== "") {
-            throw new Error("The enableMajorityReadConcern option must be an empty string if " +
-                            "it is specified");
-        }
-        opts.enableMajorityReadConcern = "";
-    }
-
     if( opts.noReplSet ) opts.replSet = null
     if( opts.arbiter ) opts.oplogSize = 1
             

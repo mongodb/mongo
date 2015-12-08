@@ -194,7 +194,6 @@ jsTestOptions = function(){
                               useLegacyConfigServers: TestData.useLegacyConfigServers || false,
                               useLegacyReplicationProtocol:
                                     TestData.useLegacyReplicationProtocol || false,
-                              enableMajorityReadConcern: TestData.enableMajorityReadConcern,
                               enableEncryption: TestData.enableEncryption,
                               encryptionKeyFile: TestData.encryptionKeyFile,
                               auditDestination: TestData.auditDestination,
