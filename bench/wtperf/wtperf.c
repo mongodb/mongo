@@ -2328,12 +2328,7 @@ start_threads(CONFIG *cfg,
 		 * We don't want the threads executing in lock-step, move each
 		 * new RNG state further along in the sequence.
 		 */
-		if (i == 0)
-			__wt_random_init(&thread->rnd);
-		else
-			thread->rnd = (thread - 1)->rnd;
-		for (j = 0; j < 1000; ++j)
-			(void)__wt_random(&thread->rnd);
+		__wt_random_init_seed(NULL, &thread->rnd);
 
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
