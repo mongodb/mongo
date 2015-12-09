@@ -1097,9 +1097,10 @@ monitor(void *arg)
 	uint32_t read_avg, read_min, read_max;
 	uint32_t insert_avg, insert_min, insert_max;
 	uint32_t update_avg, update_min, update_max;
-	uint32_t latency_max;
+	uint32_t latency_max, level;
 	u_int i;
-	int ret;
+	int msg_err, ret;
+	const char *str;
 	char buf[64], *path;
 
 	cfg = (CONFIG *)arg;
@@ -1197,25 +1198,41 @@ monitor(void *arg)
 
 		if (latency_max != 0 &&
 		    (read_max > latency_max || insert_max > latency_max ||
-		     update_max > latency_max))
-			/*
-			 * Make this a non-fatal error and print WARNING in
-			 * the output so Jenkins can flag it as unstable.
-			 */
-			lprintf(cfg, 0, 0,
-			    "WARNING: max latency exceeded: threshold %" PRIu32
+		     update_max > latency_max)) {
+			if (cfg->max_latency_fatal) {
+				level = 1;
+				msg_err = WT_PANIC;
+				str = "ERROR";
+			} else {
+				level = 0;
+				msg_err = 0;
+				str = "WARNING";
+			}
+			lprintf(cfg, msg_err, level,
+			    "%s: max latency exceeded: threshold %" PRIu32
 			    " read max %" PRIu32 " insert max %" PRIu32
-			    " update max %" PRIu32, latency_max,
+			    " update max %" PRIu32, str, latency_max,
 			    read_max, insert_max, update_max);
+		}
 		if (min_thr != 0 &&
 		    ((cur_reads != 0 && cur_reads < min_thr) ||
 		    (cur_inserts != 0 && cur_inserts < min_thr) ||
-		    (cur_updates != 0 && cur_updates < min_thr)))
-			lprintf(cfg, WT_PANIC, 0,
-			    "minimum throughput not met: threshold %" PRIu64
+		    (cur_updates != 0 && cur_updates < min_thr))) {
+			if (cfg->min_throughput_fatal) {
+				level = 1;
+				msg_err = WT_PANIC;
+				str = "ERROR";
+			} else {
+				level = 0;
+				msg_err = 0;
+				str = "WARNING";
+			}
+			lprintf(cfg, msg_err, level,
+			    "%s: minimum throughput not met: threshold %" PRIu64
 			    " reads %" PRIu64 " inserts %" PRIu64
-			    " updates %" PRIu64, min_thr, cur_reads,
+			    " updates %" PRIu64, str, min_thr, cur_reads,
 			    cur_inserts, cur_updates);
+		}
 		last_reads = reads;
 		last_inserts = inserts;
 		last_updates = updates;

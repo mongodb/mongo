@@ -13,10 +13,11 @@
  *	Pre-load a page.
  */
 int
-__wt_bm_preload(WT_BM *bm,
-    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+__wt_bm_preload(
+    WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
 	WT_BLOCK *block;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	wt_off_t offset;
 	uint32_t cksum, size;
@@ -24,7 +25,15 @@ __wt_bm_preload(WT_BM *bm,
 
 	WT_UNUSED(addr_size);
 	block = bm->block;
-	ret = EINVAL;		/* Play games due to conditional compilation */
+
+	/*
+	 * Turn off pre-load when direct I/O is configured for the file,
+	 * the kernel cache isn't interesting.
+	 */
+	if (block->fh->direct_io)
+		return (0);
+
+	WT_STAT_FAST_CONN_INCR(session, block_preload);
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
@@ -32,26 +41,19 @@ __wt_bm_preload(WT_BM *bm,
 	/* Check for a mapped block. */
 	mapped = bm->map != NULL && offset + size <= (wt_off_t)bm->maplen;
 	if (mapped)
-		WT_RET(__wt_mmap_preload(
+		return (__wt_mmap_preload(
 		    session, (uint8_t *)bm->map + offset, size));
-	else {
+
 #ifdef HAVE_POSIX_FADVISE
-		ret = posix_fadvise(block->fh->fd,
-		    (wt_off_t)offset, (wt_off_t)size, POSIX_FADV_WILLNEED);
+	if (posix_fadvise(block->fh->fd,
+	    (wt_off_t)offset, (wt_off_t)size, POSIX_FADV_WILLNEED) == 0)
+		return (0);
 #endif
-		if (ret != 0) {
-			WT_DECL_ITEM(tmp);
-			WT_RET(__wt_scr_alloc(session, size, &tmp));
-			ret = __wt_block_read_off(
-			    session, block, tmp, offset, size, cksum);
-			__wt_scr_free(session, &tmp);
-			WT_RET(ret);
-		}
-	}
 
-	WT_STAT_FAST_CONN_INCR(session, block_preload);
-
-	return (0);
+	WT_RET(__wt_scr_alloc(session, size, &tmp));
+	ret = __wt_block_read_off(session, block, tmp, offset, size, cksum);
+	__wt_scr_free(session, &tmp);
+	return (ret);
 }
 
 /*

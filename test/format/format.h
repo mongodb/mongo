@@ -185,6 +185,7 @@ typedef struct {
 	char	*c_data_source;
 	uint32_t c_delete_pct;
 	uint32_t c_dictionary;
+	uint32_t c_direct_io;
 	uint32_t c_evict_max;
 	uint32_t c_firstfit;
 	char	*c_file_type;
