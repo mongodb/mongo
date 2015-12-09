@@ -2316,7 +2316,7 @@ start_threads(CONFIG *cfg,
     WORKLOAD *workp, CONFIG_THREAD *base, u_int num, void *(*func)(void *))
 {
 	CONFIG_THREAD *thread;
-	u_int i, j;
+	u_int i;
 	int ret;
 
 	/* Initialize the threads. */
