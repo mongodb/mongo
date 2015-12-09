@@ -738,6 +738,10 @@ __evict_request_walk_clear(WT_SESSION_IMPL *session)
 
 	F_CLR(session, WT_SESSION_CLEAR_EVICT_WALK);
 
+	/* An error is unexpected - flag the failure. */
+	if (ret != 0)
+		__wt_err(session, ret, "Failed to clear eviction walk point");
+
 	return (ret);
 }
 
