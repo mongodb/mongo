@@ -67,7 +67,8 @@ __wt_random_init(WT_RAND_STATE volatile * rnd_state)
  * on a different random seed.
  */
 void
-__wt_random_init_seed(WT_SESSION *session, WT_RAND_STATE volatile * rnd_state)
+__wt_random_init_seed(
+    WT_SESSION_IMPL *session, WT_RAND_STATE volatile * rnd_state)
 {
 	WT_RAND_STATE rnd;
 	struct timespec ts;
