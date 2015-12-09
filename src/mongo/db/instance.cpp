@@ -215,6 +215,17 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
     response->setData(msgdata.view2ptr(), true);
 }
 
+/**
+ * Fills out CurOp / OpDebug with basic command info.
+ */
+void beginCommandOp(OperationContext* txn, const NamespaceString& nss, const BSONObj& queryObj) {
+    auto curop = CurOp::get(txn);
+    curop->debug().query = queryObj;
+    stdx::lock_guard<Client> lk(*txn->getClient());
+    curop->setQuery_inlock(queryObj);
+    curop->setNS_inlock(nss.ns());
+}
+
 }  // namespace
 
 static void receivedCommand(OperationContext* txn,
@@ -238,7 +249,7 @@ static void receivedCommand(OperationContext* txn,
         rpc::LegacyRequest request{&message};
         // Auth checking for Commands happens later.
         int nToReturn = queryMessage.ntoreturn;
-        beginQueryOp(txn, nss, queryMessage.query, nToReturn, queryMessage.ntoskip);
+        beginCommandOp(txn, nss, queryMessage.query);
         {
             stdx::lock_guard<Client> lk(*txn->getClient());
             op->markCommand_inlock();
@@ -284,7 +295,7 @@ void receivedRpc(OperationContext* txn, Client& client, DbResponse& dbResponse, 
         // We construct a legacy $cmd namespace so we can fill in curOp using
         // the existing logic that existed for OP_QUERY commands
         NamespaceString nss(request.getDatabase(), "$cmd");
-        beginQueryOp(txn, nss, request.getCommandArgs(), 1, 0);
+        beginCommandOp(txn, nss, request.getCommandArgs());
         {
             stdx::lock_guard<Client> lk(*txn->getClient());
             curOp->markCommand_inlock();

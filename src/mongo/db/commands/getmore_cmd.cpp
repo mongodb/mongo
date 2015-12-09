@@ -159,6 +159,8 @@ public:
         }
         const GetMoreRequest& request = parseStatus.getValue();
 
+        CurOp::get(txn)->debug().cursorid = request.cursorid;
+
         // Disable shard version checking - getmore commands are always unversioned
         OperationShardVersion::get(txn).setShardVersion(request.nss, ChunkVersion::IGNORED());
 
@@ -372,6 +374,10 @@ public:
         }
 
         nextBatch.done(respondWithId, request.nss.ns());
+
+        // Ensure log and profiler include the number of results returned in this getMore's response
+        // batch.
+        CurOp::get(txn)->debug().nreturned = numResults;
 
         if (respondWithId) {
             cursorFreer.Dismiss();

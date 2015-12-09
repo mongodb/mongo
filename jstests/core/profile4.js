@@ -157,6 +157,20 @@ try {
     assert.eq(lastOp.op, "getmore");
     assert.eq(lastOp.ns, coll.getFullName());
 
+    // getMore entry created by iterating the cursor should have the same format, regardless of
+    // readMode.
+    coll.find().batchSize(3).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "getmore");
+    assert.eq(lastOp.ns, coll.getFullName());
+    assert("getMore" in lastOp.query);
+    assert.eq(lastOp.query.getMore, lastOp.cursorid);
+    assert.eq(lastOp.query.collection, coll.getName());
+    assert.eq(lastOp.query.batchSize, 3)
+    assert.eq(lastOp.cursorExhausted, true)
+    assert.eq(lastOp.nreturned, 2);
+    assert("responseLength" in lastOp);
+
     // Ensure that special $-prefixed OP_QUERY options like $hint and $returnKey get added to the
     // profiler entry correctly.
     coll.find().hint({_id: 1}).itcount();
