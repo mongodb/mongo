@@ -37,7 +37,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/getmore_request.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -119,6 +121,20 @@ BSONObj upconvertQueryEntry(const BSONObj& query,
     }
 
     return bob.obj();
+}
+
+/**
+ * For a getMore using OP_GET_MORE, as opposed to getMore command, upconverts the "query" field so
+ * that the profiling entry matches that of the getMore command.
+ */
+BSONObj upconvertGetMoreEntry(const NamespaceString& nss, CursorId cursorId, int ntoreturn) {
+    return GetMoreRequest(nss,
+                          cursorId,
+                          ntoreturn,
+                          boost::none,  // awaitDataTimeout
+                          boost::none,  // term
+                          boost::none   // lastKnownCommittedOpTime
+                          ).toBSON();
 }
 
 }  // namespace
@@ -590,6 +606,9 @@ void OpDebug::append(const CurOp& curop,
     if (!iscommand && networkOp == dbQuery) {
         appendAsObjOrString(
             "query", upconvertQueryEntry(query, nss, ntoreturn, ntoskip), maxElementSize, &b);
+    } else if (!iscommand && networkOp == dbGetMore) {
+        appendAsObjOrString(
+            "query", upconvertGetMoreEntry(nss, cursorid, ntoreturn), maxElementSize, &b);
     } else if (!query.isEmpty()) {
         const char* fieldName = (logicalOp == LogicalOp::opCommand) ? "command" : "query";
         appendAsObjOrString(fieldName, query, maxElementSize, &b);
