@@ -8,7 +8,7 @@
 
 #include "wt_internal.h"
 
-static const u_char hex[] = "0123456789abcdef";
+const u_char __wt_hex[] = "0123456789abcdef";
 
 /*
  * __fill_hex --
@@ -25,8 +25,8 @@ __fill_hex(const uint8_t *src, size_t src_max,
 		--dest_max;
 	for (; src_max > 0 && dest_max > 1;
 	    src_max -= 1, dest_max -= 2, ++src) {
-		*dest++ = hex[(*src & 0xf0) >> 4];
-		*dest++ = hex[*src & 0x0f];
+		*dest++ = __wt_hex[(*src & 0xf0) >> 4];
+		*dest++ = __wt_hex[*src & 0x0f];
 	}
 	*dest++ = '\0';
 	if (lenp != NULL)
@@ -94,8 +94,8 @@ __wt_raw_to_esc_hex(
 			*t++ = *p;
 		} else {
 			*t++ = '\\';
-			*t++ = hex[(*p & 0xf0) >> 4];
-			*t++ = hex[*p & 0x0f];
+			*t++ = __wt_hex[(*p & 0xf0) >> 4];
+			*t++ = __wt_hex[*p & 0x0f];
 		}
 	*t++ = '\0';
 	to->size = WT_PTRDIFF(t, to->mem);

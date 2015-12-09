@@ -8,8 +8,6 @@
 
 #include "wt_internal.h"
 
-static const u_char hex[] = "0123456789abcdef";
-
 static size_t __json_unpack_put(WT_SESSION_IMPL *, void *, u_char *, size_t,
     WT_CONFIG_ITEM *);
 static inline int __json_struct_size(WT_SESSION_IMPL *, const void *, size_t,
@@ -355,8 +353,8 @@ __wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, bool force_unicode)
 		*buf++ = 'u';
 		*buf++ = '0';
 		*buf++ = '0';
-		*buf++ = hex[(ch & 0xf0) >> 4];
-		*buf++ = hex[ch & 0x0f];
+		*buf++ = __wt_hex[(ch & 0xf0) >> 4];
+		*buf++ = __wt_hex[ch & 0x0f];
 	}
 	return (6);
 }
