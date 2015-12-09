@@ -117,11 +117,17 @@ DEF_OPT_AS_BOOL(insert_rmw, 0,
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
 DEF_OPT_AS_BOOL(log_partial, 0, "perform partial logging on first table only.")
 DEF_OPT_AS_UINT32(min_throughput, 0,
-    "abort if any throughput measured is less than this amount.  Requires "
-    "sample_interval to be configured")
-DEF_OPT_AS_UINT32(max_latency, 0,
-    "abort if any latency measured exceeds this number of milliseconds."
+    "notify if any throughput measured is less than this amount. "
+    "Aborts or prints warning based on min_throughput_fatal setting. "
     "Requires sample_interval to be configured")
+DEF_OPT_AS_BOOL(min_throughput_fatal, 0,
+    "print warning (false) or abort (true) of min_throughput failure.")
+DEF_OPT_AS_UINT32(max_latency, 0,
+    "notify if any latency measured exceeds this number of milliseconds."
+    "Aborts or prints warning based on min_throughput_fatal setting. "
+    "Requires sample_interval to be configured")
+DEF_OPT_AS_BOOL(max_latency_fatal, 0,
+    "print warning (false) or abort (true) of max_latency failure.")
 DEF_OPT_AS_UINT32(pareto, 0, "use pareto distribution for random numbers. Zero "
     "to disable, otherwise a percentage indicating how aggressive the "
     "distribution should be.")
