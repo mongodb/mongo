@@ -205,6 +205,100 @@ try {
     lastOp = getLastOp();
     assert.eq(lastOp.query.snapshot, true);
 
+    // Tests for profiling findAndModify.
+    coll.drop();
+    for (var i = 0; i < 3; i++) {
+        assert.writeOK(coll.insert({_id: i, a: i}));
+    }
+
+    // Update as findAndModify.
+    assert.eq({_id: 2, a: 2}, coll.findAndModify({query: {a: 2}, update: {$inc: {b: 1}}}));
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "command");
+    assert.eq(lastOp.ns, coll.getFullName());
+    assert.eq(lastOp.command.query, {a: 2});
+    assert.eq(lastOp.command.update, {$inc: {b: 1}});
+    assert.eq(lastOp.updateobj, {$inc: {b: 1}});
+    assert.eq(lastOp.keysExamined, 0);
+    assert.eq(lastOp.docsExamined, 3);
+    assert.eq(lastOp.nMatched, 1);
+    assert.eq(lastOp.nModified, 1);
+
+    // Delete as findAndModify.
+    assert.eq({_id: 2, a: 2, b: 1}, coll.findAndModify({query: {a: 2}, remove: true}));
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "command");
+    assert.eq(lastOp.ns, coll.getFullName());
+    assert.eq(lastOp.command.query, {a: 2});
+    assert.eq(lastOp.command.remove, true);
+    assert(!("updateobj" in lastOp));
+    assert.eq(lastOp.ndeleted, 1);
+
+    // Update with {upsert: true} as findAndModify.
+    assert.eq({_id: 2, a: 2, b: 1}, coll.findAndModify({
+        query: {_id: 2, a: 2},
+        update: {$inc: {b: 1}},
+        upsert: true,
+        new: true
+    }));
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "command");
+    assert.eq(lastOp.ns, coll.getFullName());
+    assert.eq(lastOp.command.query, {_id: 2, a: 2});
+    assert.eq(lastOp.command.update, {$inc: {b: 1}});
+    assert.eq(lastOp.command.upsert, true);
+    assert.eq(lastOp.command.new, true);
+    assert.eq(lastOp.updateobj, {$inc: {b: 1}});
+    assert.eq(lastOp.keysExamined, 0);
+    assert.eq(lastOp.docsExamined, 0);
+    assert.eq(lastOp.nMatched, 1);
+    assert.eq(lastOp.nModified, 1);
+    assert.eq(lastOp.upsert, true);
+
+    // Idhack update as findAndModify.
+    assert.eq({_id: 2, a: 2, b: 1}, coll.findAndModify({
+        query: {_id: 2},
+        update: {$inc: {b: 1}}
+    }));
+    lastOp = getLastOp();
+    assert.eq(lastOp.keysExamined, 1);
+    assert.eq(lastOp.docsExamined, 1);
+    assert.eq(lastOp.nMatched, 1);
+    assert.eq(lastOp.nModified, 1);
+
+    // Update as findAndModify with projection.
+    assert.eq({a: 2}, coll.findAndModify({
+        query: {a: 2},
+        update: {$inc: {b: 1}},
+        fields: {_id: 0, a: 1}
+    }));
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "command");
+    assert.eq(lastOp.ns, coll.getFullName());
+    assert.eq(lastOp.command.query, {a: 2});
+    assert.eq(lastOp.command.update, {$inc: {b: 1}});
+    assert.eq(lastOp.command.fields, {_id: 0, a: 1});
+    assert.eq(lastOp.updateobj, {$inc: {b: 1}});
+    assert.eq(lastOp.keysExamined, 0);
+    assert.eq(lastOp.docsExamined, 3);
+    assert.eq(lastOp.nMatched, 1);
+    assert.eq(lastOp.nModified, 1);
+
+    // Delete as findAndModify with projection.
+    assert.eq({a: 2}, coll.findAndModify({
+        query: {a: 2},
+        remove: true,
+        fields: {_id: 0, a: 1}
+    }));
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "command");
+    assert.eq(lastOp.ns, coll.getFullName());
+    assert.eq(lastOp.command.query, {a: 2});
+    assert.eq(lastOp.command.remove, true);
+    assert.eq(lastOp.command.fields, {_id: 0, a: 1});
+    assert(!("updateobj" in lastOp));
+    assert.eq(lastOp.ndeleted, 1);
+
     db.setProfilingLevel(0);
     db.system.profile.drop();
 }

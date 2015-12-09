@@ -39,6 +39,7 @@
 namespace mongo {
 
 class OperationContext;
+struct PlanSummaryStats;
 
 struct UpdateStageParams {
     UpdateStageParams(const UpdateRequest* r, UpdateDriver* d, OpDebug* o)
@@ -97,15 +98,25 @@ public:
     static const char* kStageType;
 
     /**
-     * Converts the execution stats (stored by the update stage as an UpdateStats) for the
-     * update plan represented by 'exec' into the UpdateResult format used to report the results
-     * of writes.
+     * Gets a pointer to the UpdateStats inside 'exec'.
      *
-     * Also responsible for filling out 'opDebug' with execution info.
-     *
-     * Should only be called once this stage is EOF.
+     * The 'exec' must have an UPDATE stage as its root stage, and the plan must be EOF before
+     * calling this method.
      */
-    static UpdateResult makeUpdateResult(const PlanExecutor& exec, OpDebug* opDebug);
+    static const UpdateStats* getUpdateStats(const PlanExecutor* exec);
+
+    /**
+     * Populate 'opDebug' with stats from 'updateStats' and 'summaryStats' describing the execution
+     * of this update.
+     */
+    static void fillOutOpDebug(const UpdateStats* updateStats,
+                               const PlanSummaryStats* summaryStats,
+                               OpDebug* opDebug);
+
+    /**
+     * Converts 'updateStats' into an UpdateResult.
+     */
+    static UpdateResult makeUpdateResult(const UpdateStats* updateStats);
 
     /**
      * Computes the document to insert if the upsert flag is set to true and no matching
