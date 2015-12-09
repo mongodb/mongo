@@ -54,14 +54,23 @@
 
     assert.eq(countA, getUsageCount("a_1"));
 
-    // Confirm index stats tick on findAndModify().
-    var res = db.runCommand({findAndModify: colName, 
-                             query: {a: 1}, 
-                             update: {$set: {d: 1}}, 
+    // Confirm index stats tick on findAndModify() update.
+    var res = db.runCommand({findAndModify: colName,
+                             query: {a: 1},
+                             update: {$set: {d: 1}},
                              'new': true});
     assert.commandWorked(res);
     countA++;
     assert.eq(countA, getUsageCount("a_1"));
+
+    // Confirm index stats tick on findAndModify() delete.
+    res = db.runCommand({findAndModify: colName,
+                         query: {a: 2},
+                         remove: true});
+    assert.commandWorked(res);
+    countA++;
+    assert.eq(countA, getUsageCount("a_1"));
+    assert.writeOK(col.insert(res.value));
 
     // Confirm index stats tick on distinct().
     res = db.runCommand({distinct: colName, key: "b", query: {b: 1}});

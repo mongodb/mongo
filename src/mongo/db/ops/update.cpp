@@ -118,7 +118,12 @@ UpdateResult update(OperationContext* txn,
         lastOpSetterGuard.Dismiss();
     }
 
-    return UpdateStage::makeUpdateResult(*exec, opDebug);
+    PlanSummaryStats summaryStats;
+    Explain::getSummaryStats(*exec, &summaryStats);
+    const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
+    UpdateStage::fillOutOpDebug(updateStats, &summaryStats, opDebug);
+
+    return UpdateStage::makeUpdateResult(updateStats);
 }
 
 BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators) {

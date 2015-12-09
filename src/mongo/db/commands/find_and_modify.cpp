@@ -44,6 +44,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
@@ -69,26 +70,30 @@ namespace mongo {
 
 namespace {
 
-const UpdateStats* getUpdateStats(const PlanStageStats* stats) {
+const UpdateStats* getUpdateStats(const PlanExecutor* exec) {
     // The stats may refer to an update stage, or a projection stage wrapping an update stage.
-    if (StageType::STAGE_PROJECTION == stats->stageType) {
-        invariant(stats->children.size() == 1);
-        stats = stats->children[0].get();
+    if (StageType::STAGE_PROJECTION == exec->getRootStage()->stageType()) {
+        invariant(exec->getRootStage()->getChildren().size() == 1U);
+        invariant(StageType::STAGE_UPDATE == exec->getRootStage()->child()->stageType());
+        const SpecificStats* stats = exec->getRootStage()->child()->getSpecificStats();
+        return static_cast<const UpdateStats*>(stats);
+    } else {
+        invariant(StageType::STAGE_UPDATE == exec->getRootStage()->stageType());
+        return static_cast<const UpdateStats*>(exec->getRootStage()->getSpecificStats());
     }
-
-    invariant(StageType::STAGE_UPDATE == stats->stageType);
-    return static_cast<UpdateStats*>(stats->specific.get());
 }
 
-const DeleteStats* getDeleteStats(const PlanStageStats* stats) {
+const DeleteStats* getDeleteStats(const PlanExecutor* exec) {
     // The stats may refer to a delete stage, or a projection stage wrapping a delete stage.
-    if (StageType::STAGE_PROJECTION == stats->stageType) {
-        invariant(stats->children.size() == 1);
-        stats = stats->children[0].get();
+    if (StageType::STAGE_PROJECTION == exec->getRootStage()->stageType()) {
+        invariant(exec->getRootStage()->getChildren().size() == 1U);
+        invariant(StageType::STAGE_DELETE == exec->getRootStage()->child()->stageType());
+        const SpecificStats* stats = exec->getRootStage()->child()->getSpecificStats();
+        return static_cast<const DeleteStats*>(stats);
+    } else {
+        invariant(StageType::STAGE_DELETE == exec->getRootStage()->stageType());
+        return static_cast<const DeleteStats*>(exec->getRootStage()->getSpecificStats());
     }
-
-    invariant(StageType::STAGE_DELETE == stats->stageType);
-    return static_cast<DeleteStats*>(stats->specific.get());
 }
 
 /**
@@ -100,15 +105,9 @@ const DeleteStats* getDeleteStats(const PlanStageStats* stats) {
  */
 StatusWith<boost::optional<BSONObj>> advanceExecutor(OperationContext* txn,
                                                      PlanExecutor* exec,
-                                                     bool isRemove,
-                                                     Collection* collection) {
+                                                     bool isRemove) {
     BSONObj value;
     PlanExecutor::ExecState state = exec->getNext(&value, nullptr);
-    if (collection && PlanExecutor::DEAD != state) {
-        PlanSummaryStats summaryStats;
-        Explain::getSummaryStats(*exec, &summaryStats);
-        collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
-    }
 
     if (PlanExecutor::ADVANCED == state) {
         return boost::optional<BSONObj>(std::move(value));
@@ -165,13 +164,12 @@ void appendCommandResponse(PlanExecutor* exec,
                            bool isRemove,
                            const boost::optional<BSONObj>& value,
                            BSONObjBuilder& result) {
-    const std::unique_ptr<PlanStageStats> stats(exec->getStats());
     BSONObjBuilder lastErrorObjBuilder(result.subobjStart("lastErrorObject"));
 
     if (isRemove) {
-        lastErrorObjBuilder.appendNumber("n", getDeleteStats(stats.get())->docsDeleted);
+        lastErrorObjBuilder.appendNumber("n", getDeleteStats(exec)->docsDeleted);
     } else {
-        const UpdateStats* updateStats = getUpdateStats(stats.get());
+        const UpdateStats* updateStats = getUpdateStats(exec);
         lastErrorObjBuilder.appendBool("updatedExisting", updateStats->nMatched > 0);
         lastErrorObjBuilder.appendNumber("n", updateStats->inserted ? 1 : updateStats->nMatched);
         // Note we have to use the objInserted from the stats here, rather than 'value'
@@ -381,6 +379,13 @@ public:
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
                 Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
 
+                // Attach the namespace and database profiling level to the current op.
+                {
+                    stdx::lock_guard<Client> lk(*txn->getClient());
+                    CurOp::get(txn)
+                        ->enter_inlock(nsString.ns().c_str(), autoDb.getDb()->getProfilingLevel());
+                }
+
                 ensureShardVersionOKOrThrow(txn, nsString.ns());
 
                 Status isPrimary = checkCanAcceptWritesForDatabase(nsString);
@@ -396,10 +401,19 @@ public:
                     std::move(statusWithPlanExecutor.getValue());
 
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
-                    advanceExecutor(txn, exec.get(), args.isRemove(), collection);
+                    advanceExecutor(txn, exec.get(), args.isRemove());
                 if (!advanceStatus.isOK()) {
                     return appendCommandStatus(result, advanceStatus.getStatus());
                 }
+
+                PlanSummaryStats summaryStats;
+                Explain::getSummaryStats(*exec, &summaryStats);
+                if (collection) {
+                    collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+                }
+
+                // Fill out OpDebug with the number of deleted docs.
+                CurOp::get(txn)->debug().ndeleted = getDeleteStats(exec.get())->docsDeleted;
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);
@@ -421,6 +435,13 @@ public:
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
                 Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
+
+                // Attach the namespace and database profiling level to the current op.
+                {
+                    stdx::lock_guard<Client> lk(*txn->getClient());
+                    CurOp::get(txn)
+                        ->enter_inlock(nsString.ns().c_str(), autoDb.getDb()->getProfilingLevel());
+                }
 
                 ensureShardVersionOKOrThrow(txn, nsString.ns());
 
@@ -466,10 +487,17 @@ public:
                     std::move(statusWithPlanExecutor.getValue());
 
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
-                    advanceExecutor(txn, exec.get(), args.isRemove(), collection);
+                    advanceExecutor(txn, exec.get(), args.isRemove());
                 if (!advanceStatus.isOK()) {
                     return appendCommandStatus(result, advanceStatus.getStatus());
                 }
+
+                PlanSummaryStats summaryStats;
+                Explain::getSummaryStats(*exec, &summaryStats);
+                if (collection) {
+                    collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+                }
+                UpdateStage::fillOutOpDebug(getUpdateStats(exec.get()), &summaryStats, opDebug);
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);

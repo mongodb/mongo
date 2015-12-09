@@ -1223,7 +1223,15 @@ static void multiUpdate(OperationContext* txn,
                 uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug));
 
             uassertStatusOK(exec->executePlan());
-            UpdateResult res = UpdateStage::makeUpdateResult(*exec, debug);
+
+            PlanSummaryStats summary;
+            Explain::getSummaryStats(*exec, &summary);
+            collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+
+            const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
+            UpdateStage::fillOutOpDebug(updateStats, &summary, debug);
+
+            UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
 
             const long long numDocsModified = res.numDocsModified;
             const long long numMatched = res.numMatched;
@@ -1236,9 +1244,6 @@ static void multiUpdate(OperationContext* txn,
             result->getStats().n = didInsert ? 1 : numMatched;
             result->getStats().upsertedID = resUpsertedID;
 
-            PlanSummaryStats summary;
-            Explain::getSummaryStats(*exec, &summary);
-            collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
             if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                 // If this operation has already generated a new lastOp, don't bother setting it
                 // here. No-op updates will not generate a new lastOp, so we still need the guard to

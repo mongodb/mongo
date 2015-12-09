@@ -724,14 +724,20 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
 
                 // Run the plan and get stats out.
                 uassertStatusOK(exec->executePlan());
-                UpdateResult res = UpdateStage::makeUpdateResult(*exec, &op.debug());
-
-                // for getlasterror
-                LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
 
                 PlanSummaryStats summary;
                 Explain::getSummaryStats(*exec, &summary);
-                collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+                if (collection) {
+                    collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+                }
+
+                const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
+                UpdateStage::fillOutOpDebug(updateStats, &summary, &op.debug());
+
+                UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
+
+                // for getlasterror
+                LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
 
                 if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                     // If this operation has already generated a new lastOp, don't bother setting it
@@ -782,13 +788,17 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
 
         // Run the plan and get stats out.
         uassertStatusOK(exec->executePlan());
-        UpdateResult res = UpdateStage::makeUpdateResult(*exec, &op.debug());
-
-        LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
 
         PlanSummaryStats summary;
         Explain::getSummaryStats(*exec, &summary);
         collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+
+        const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
+        UpdateStage::fillOutOpDebug(updateStats, &summary, &op.debug());
+
+        UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
+
+        LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
 
         if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
             // If this operation has already generated a new lastOp, don't bother setting it

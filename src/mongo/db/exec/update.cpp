@@ -407,7 +407,6 @@ Status ensureIdAndFirst(mb::Document& doc) {
 
 }  // namespace
 
-// static
 const char* UpdateStage::kStageType = "UPDATE";
 
 UpdateStage::UpdateStage(OperationContext* txn,
@@ -597,7 +596,6 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     return newObj;
 }
 
-// static
 Status UpdateStage::applyUpdateOpsForInsert(const CanonicalQuery* cq,
                                             const BSONObj& query,
                                             UpdateDriver* driver,
@@ -1026,16 +1024,16 @@ const SpecificStats* UpdateStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-// static
-UpdateResult UpdateStage::makeUpdateResult(const PlanExecutor& exec, OpDebug* opDebug) {
-    // Get stats from the root stage.
-    invariant(exec.getRootStage()->isEOF());
-    invariant(exec.getRootStage()->stageType() == STAGE_UPDATE);
-    UpdateStage* updateStage = static_cast<UpdateStage*>(exec.getRootStage());
-    const UpdateStats* updateStats =
-        static_cast<const UpdateStats*>(updateStage->getSpecificStats());
+const UpdateStats* UpdateStage::getUpdateStats(const PlanExecutor* exec) {
+    invariant(exec->getRootStage()->isEOF());
+    invariant(exec->getRootStage()->stageType() == STAGE_UPDATE);
+    UpdateStage* updateStage = static_cast<UpdateStage*>(exec->getRootStage());
+    return static_cast<const UpdateStats*>(updateStage->getSpecificStats());
+}
 
-    // Use stats from the root stage to fill out opDebug.
+void UpdateStage::fillOutOpDebug(const UpdateStats* updateStats,
+                                 const PlanSummaryStats* summaryStats,
+                                 OpDebug* opDebug) {
     opDebug->nMatched = updateStats->nMatched;
     opDebug->nModified = updateStats->nModified;
     opDebug->upsert = updateStats->inserted;
@@ -1051,16 +1049,23 @@ UpdateResult UpdateStage::makeUpdateResult(const PlanExecutor& exec, OpDebug* op
         opDebug->nModified = 1;
     }
 
-    // Get summary information about the plan.
-    PlanSummaryStats stats;
-    Explain::getSummaryStats(exec, &stats);
-    opDebug->keysExamined = stats.totalKeysExamined;
-    opDebug->docsExamined = stats.totalDocsExamined;
+    // Copy summary information about the plan into OpDebug.
+    opDebug->keysExamined = summaryStats->totalKeysExamined;
+    opDebug->docsExamined = summaryStats->totalDocsExamined;
+}
+
+UpdateResult UpdateStage::makeUpdateResult(const UpdateStats* updateStats) {
+    // Historically, UpdateResult considers 'nMatched' and 'nModified' to be 1 (rather than 0) if
+    // there is an upsert that inserts a document. The UpdateStage does not participate in this
+    // madness in order to have saner stats reporting for explain. This means that we have to set
+    // these values "manually" in the case of an insert.
+    size_t nMatched = updateStats->inserted ? 1U : updateStats->nMatched;
+    size_t nModified = updateStats->inserted ? 1U : updateStats->nModified;
 
     return UpdateResult(updateStats->nMatched > 0 /* Did we update at least one obj? */,
                         !updateStats->isDocReplacement /* $mod or obj replacement */,
-                        opDebug->nModified /* number of modified docs, no no-ops */,
-                        opDebug->nMatched /* # of docs matched/updated, even no-ops */,
+                        nModified /* number of modified docs, no no-ops */,
+                        nMatched /* # of docs matched/updated, even no-ops */,
                         updateStats->objInserted);
 };
 
