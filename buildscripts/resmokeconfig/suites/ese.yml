@@ -2,6 +2,9 @@ selector:
   js_test:
     roots:
     - src/mongo/db/modules/*/jstests/encryptdb/*.js
+    exclude_files:
+    # TODO: re-enable under SERVER-21824.
+    - src/mongo/db/modules/*/jstests/encryptdb/kmip.js
 
 # Encrypted storage engine tests start their own mongod processes
 executor:
