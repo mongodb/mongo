@@ -5,7 +5,9 @@
  * Note that some of the replica start up parameters are not passed here,
  * but to the #startSet method.
  * 
- * @param {Object} opts
+ * @param {Object|string} opts If this value is a string, it specifies the connection string for
+ *      a MongoD host to be used for recreating a ReplSetTest from. Otherwise, if it is an object,
+ *      it must have the following contents:
  * 
  *   {
  *     name {string}: name of this replica set. Default: 'testReplSet'
@@ -92,6 +94,13 @@ var ReplSetTest = function(opts) {
      */
     function _clearLiveNodes() {
         self.liveNodes = { master: null, slaves: [] };
+    }
+    
+    /**
+     * Returns the config document reported from the specified connection.
+     */
+    function _replSetGetConfig(conn) {
+        return assert.commandWorked(conn.adminCommand({ replSetGetConfig: 1 })).config;
     }
 
     /**
@@ -410,22 +419,15 @@ var ReplSetTest = function(opts) {
      * if primary is available will return a connection to it. Otherwise throws an exception.
      */
     this.getPrimary = function(timeout) {
-        var tmo = timeout || 60000;
-        var master = null;
+        timeout = timeout || 60000;
+        var primary = null;
 
-        try {
-            assert.soon(function() {
-                master = _callIsMaster();
-                return master;
-            }, "Finding master", tmo);
-        }
-        catch (err) {
-            print("ReplSetTest getPrimary failed: " + tojson(err));
-            printStackTrace();
-            throw err;
-        }
+        assert.soon(function() {
+            primary = _callIsMaster();
+            return primary;
+        }, "Finding primary", timeout);
 
-        return master;
+        return primary;
     };
 
     this.awaitNoPrimary = function(msg, timeout) {
@@ -522,12 +524,9 @@ var ReplSetTest = function(opts) {
      * throws if any error occurs on the command.
      */
     this.getConfigFromPrimary = function() {
-        var primary = this.getPrimary(90 * 1000 /* 90 sec timeout */);
-        return assert.commandWorked(primary.adminCommand("replSetGetConfig")).config;
+        // Use 90 seconds timeout
+        return _replSetGetConfig(this.getPrimary(90 * 1000));
     };
-
-    // Aliases to match rs.conf* behavior in the shell.
-    this.conf = this.getConfigFromPrimary;
 
     this.reInitiate = function() {
         var config = this.getReplSetConfig();
@@ -629,13 +628,13 @@ var ReplSetTest = function(opts) {
 
         try {
             master = this.getPrimary();
-            configVersion = this.conf().version;
+            configVersion = this.getConfigFromPrimary().version;
             masterOpTime = _getLastOpTime(master);
             masterName = master.toString().substr(14); // strip "connection to "
         }
         catch (e) {
             master = this.getPrimary();
-            configVersion = this.conf().version;
+            configVersion = this.getConfigFromPrimary().version;
             masterOpTime = _getLastOpTime(master);
             masterName = master.toString().substr(14); // strip "connection to "
         }
@@ -1066,6 +1065,16 @@ var ReplSetTest = function(opts) {
     //
     // ReplSetTest initialization
     //
+
+    if (typeof opts === 'string' || opts instanceof String) {
+        var conf = _replSetGetConfig(new Mongo(opts));
+        print('Recreating replica set from config ' + tojson(conf));
+
+        var existingNodes = conf.members.map(member => member.host);
+        this.ports = existingNodes.map(node => node.split(':')[1]);
+        this.nodes = existingNodes.map(node => new Mongo(node));
+        return;
+    }
 
     this.name  = opts.name || "testReplSet";
     this.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
