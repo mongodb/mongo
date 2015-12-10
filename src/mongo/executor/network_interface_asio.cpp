@@ -189,7 +189,8 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         StatusWith<ConnectionPool::ConnectionHandle> swConn) {
 
         if (!swConn.isOK()) {
-            LOG(2) << "Failed to get connection from pool: " << swConn.getStatus();
+            LOG(2) << "Failed to get connection from pool for request " << request.id << ": "
+                   << swConn.getStatus();
 
             bool wasPreviouslyCanceled = false;
             {
@@ -265,7 +266,8 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
                 // The above conditional guarantees that the adjusted timeout will never underflow.
                 invariant(op->_request.timeout > getConnectionDuration);
-                auto adjustedTimeout = op->_request.timeout - getConnectionDuration;
+                const auto adjustedTimeout = op->_request.timeout - getConnectionDuration;
+                const auto requestId = op->_request.id;
 
                 op->_timeoutAlarm = op->_owner->_timerFactory->make(&op->_strand, adjustedTimeout);
 
@@ -277,28 +279,31 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                     generation = access->id;
                 }
 
-                op->_timeoutAlarm->asyncWait([this, op, access, generation](std::error_code ec) {
-                    if (!ec) {
-                        // We must pass a check for safe access before using op inside the
-                        // callback or we may attempt access on an invalid pointer.
-                        stdx::lock_guard<stdx::mutex> lk(access->mutex);
-                        if (generation != access->id) {
-                            // The operation has been cleaned up, do not access.
-                            return;
-                        }
+                op->_timeoutAlarm->asyncWait(
+                    [this, op, access, generation, requestId](std::error_code ec) {
+                        if (!ec) {
+                            // We must pass a check for safe access before using op inside the
+                            // callback or we may attempt access on an invalid pointer.
+                            stdx::lock_guard<stdx::mutex> lk(access->mutex);
+                            if (generation != access->id) {
+                                // The operation has been cleaned up, do not access.
+                                return;
+                            }
 
-                        LOG(2) << "Operation timed out: " << op->request().toString();
+                            LOG(2) << "Operation " << requestId << " timed out.";
 
-                        // An operation may be in mid-flight when it times out, so we
-                        // cancel any in-progress async calls but do not complete the operation now.
-                        op->_timedOut = 1;
-                        if (op->_connection) {
-                            op->_connection->cancel();
+                            // An operation may be in mid-flight when it times out, so we
+                            // cancel any in-progress async calls but do not complete the operation
+                            // now.
+                            op->_timedOut = 1;
+                            if (op->_connection) {
+                                op->_connection->cancel();
+                            }
+                        } else {
+                            LOG(2) << "Failed to time operation " << requestId
+                                   << " out: " << ec.message();
                         }
-                    } else {
-                        LOG(4) << "failed to time operation out: " << ec.message();
-                    }
-                });
+                    });
             }
 
             _beginCommunication(op);

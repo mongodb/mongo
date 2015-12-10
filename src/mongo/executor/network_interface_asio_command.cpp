@@ -340,7 +340,8 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
 }
 
 void NetworkInterfaceASIO::_asyncRunCommand(AsyncOp* op, NetworkOpHandler handler) {
-    LOG(2) << "Starting asynchronous command on host " << op->request().target.toString();
+    LOG(2) << "Starting asynchronous command " << op->request().id << " on host "
+           << op->request().target.toString();
     // We invert the following steps below to run a command:
     // 1 - send the given command
     // 2 - receive a header for the response

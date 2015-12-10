@@ -30,17 +30,52 @@
 
 #include "mongo/executor/remote_command_request.h"
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace executor {
+namespace {
+
+// Used to generate unique identifiers for requests so they can be traced throughout the
+// asynchronous networking logs
+AtomicUInt64 requestIdCounter(0);
+
+}  // namespace
 
 const Milliseconds RemoteCommandRequest::kNoTimeout{-1};
 const Date_t RemoteCommandRequest::kNoExpirationDate{Date_t::max()};
 
+RemoteCommandRequest::RemoteCommandRequest() : id(requestIdCounter.addAndFetch(1)) {}
+
+RemoteCommandRequest::RemoteCommandRequest(RequestId requestId,
+                                           const HostAndPort& theTarget,
+                                           const std::string& theDbName,
+                                           const BSONObj& theCmdObj,
+                                           const BSONObj& metadataObj,
+                                           Milliseconds timeoutMillis)
+    : id(requestId),
+      target(theTarget),
+      dbname(theDbName),
+      metadata(metadataObj),
+      cmdObj(theCmdObj),
+      timeout(timeoutMillis) {}
+
+RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& theTarget,
+                                           const std::string& theDbName,
+                                           const BSONObj& theCmdObj,
+                                           const BSONObj& metadataObj,
+                                           Milliseconds timeoutMillis)
+    : RemoteCommandRequest(requestIdCounter.addAndFetch(1),
+                           theTarget,
+                           theDbName,
+                           theCmdObj,
+                           metadataObj,
+                           timeoutMillis) {}
+
 std::string RemoteCommandRequest::toString() const {
     str::stream out;
-    out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;
+    out << "RemoteCommand " << id << " -- target:" << target.toString() << " db:" << dbname;
 
     if (expirationDate != kNoExpirationDate) {
         out << " expDate:" << expirationDate.toString();

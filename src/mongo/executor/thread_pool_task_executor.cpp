@@ -306,7 +306,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     if (!cbHandle.isOK())
         return cbHandle;
     const auto cbState = _networkInProgressQueue.back();
-    LOG(4) << "Scheduling remote command request: " << scheduledRequest.toString();
+    LOG(3) << "Scheduling remote command request: " << scheduledRequest.toString();
     lk.unlock();
     _net->startCommand(
         cbHandle.getValue(),
