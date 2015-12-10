@@ -111,7 +111,10 @@
                    ', collection: "' + coll.getName() + '"});'
         cleanup = startParallelShell(code);
         assert.soon(function() {
-            return (db.serverStatus().metrics.cursor.open.pinned == numPinnedBefore + 1);
+            // It's possible that the internally issued queries (e.g. syncing from primary to
+            // secondary in a replica set) can cause an additional cursor to be pinned. This is why
+            // we check "> numPinnedBefore" rather than "== numPinnedBefore + 1".
+            return (db.serverStatus().metrics.cursor.open.pinned > numPinnedBefore);
         }, "Failed to pin cursor. Cursors pinned before running getMore: " + numPinnedBefore);
 
         cmdRes = db.runCommand({isMaster: 1});
