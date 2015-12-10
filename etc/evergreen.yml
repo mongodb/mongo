@@ -3919,7 +3919,7 @@ buildvariants:
     test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
     has_debugsymbols: true
     has_packages: true
-    packager_script: packager.py
+    packager_script: packager-enterprise.py
     packager_distro: suse11
   tasks:
   - name: compile
@@ -3956,7 +3956,7 @@ buildvariants:
     test_flags: --continue-on-failure
     has_debugsymbols: true
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager.py
     packager_distro: suse11
   tasks:
   - name: compile
