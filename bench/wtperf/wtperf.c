@@ -60,6 +60,7 @@ static const CONFIG default_cfg = {
 	0,				/* total seconds running */
 	0,				/* has truncate */
 	{NULL, NULL},			/* the truncate queue */
+	{NULL, NULL},                   /* the config queue */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -2087,11 +2088,13 @@ int
 main(int argc, char *argv[])
 {
 	CONFIG *cfg, _cfg;
+	CONFIG_QUEUE_ENTRY *config_line;
+	FILE * fp;
 	size_t req_len;
 	int ch, monitor_set, ret;
 	const char *opts = "C:H:h:m:O:o:T:";
 	const char *config_opts;
-	char *cc_buf, *tc_buf, *user_cconfig, *user_tconfig;
+	char *cc_buf, *path, *tc_buf, *user_cconfig, *user_tconfig;
 
 	monitor_set = ret = 0;
 	config_opts = NULL;
@@ -2102,6 +2105,8 @@ main(int argc, char *argv[])
 	memset(cfg, 0, sizeof(*cfg));
 	if (config_assign(cfg, &default_cfg))
 		goto err;
+
+	TAILQ_INIT(&cfg->config_head);
 
 	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = __wt_getopt("wtperf", argc, argv, opts)) != EOF)
@@ -2307,6 +2312,31 @@ main(int argc, char *argv[])
 	/* Sanity-check the configuration. */
 	if ((ret = config_sanity(cfg)) != 0)
 		goto err;
+
+	/* Backup the config */
+	req_len = strlen(cfg->home) + 100;
+	if ((path = calloc(req_len, 1)) == NULL) {
+		(void)enomem(cfg);
+		goto err;
+	}
+
+	snprintf(path, req_len + 14, "%s/CONFIGBACKUP", cfg->home);
+	if ((fp = fopen(path, "w")) == NULL) {
+		lprintf(cfg, errno, 0, "%s", path);
+		goto err;
+	}
+
+	/* Print the config dump */
+	fp = fopen(path, "w+");
+	while (!TAILQ_EMPTY(&cfg->config_head)) {
+		config_line = TAILQ_FIRST(&cfg->config_head);
+		TAILQ_REMOVE(&cfg->config_head, config_line, c);
+		fprintf(fp, "%s\n", config_line->string);
+		free(config_line->string);
+		free(config_line);
+	}
+	free(path);
+	fclose(fp);
 
 	/* Display the configuration. */
 	if (cfg->verbose > 1)

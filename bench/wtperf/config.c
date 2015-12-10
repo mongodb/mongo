@@ -571,13 +571,26 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_PARSER *scan;
+	CONFIG_QUEUE_ENTRY *config_line;
 	int ret, t_ret;
+	char *string_copy;
+	size_t len;
 
+	len = strlen(optstr);
 	if ((ret = wiredtiger_config_parser_open(
-	    NULL, optstr, strlen(optstr), &scan)) != 0) {
+	    NULL, optstr, len, &scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_begin");
 		return (ret);
 	}
+
+	/* Append the current line to our copy of the config */
+	if ((string_copy = calloc(len + 1, 1)) == NULL) {
+		return (enomem(cfg));
+	}
+	config_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
+	strncpy(string_copy, optstr, len);
+	config_line->string = string_copy;
+	TAILQ_INSERT_TAIL(&cfg->config_head, config_line, c);
 
 	while (ret == 0) {
 		if ((ret = scan->next(scan, &k, &v)) != 0) {
