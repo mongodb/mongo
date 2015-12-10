@@ -66,7 +66,7 @@ var runTest = function(withRecovery) {
 
         var configOpTimeObj = shardingSection.lastSeenConfigServerOpTime;
         assert.neq(null, configOpTimeObj);
-        assert.gte(configOpTimeObj.ts, opTimeBeforeMigrate.ts);
+        assert.gte(configOpTimeObj.ts.getTime(), opTimeBeforeMigrate.ts.getTime());
         assert.gte(configOpTimeObj.t, opTimeBeforeMigrate.t);
     }
     else {
