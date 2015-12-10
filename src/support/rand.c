@@ -60,6 +60,29 @@ __wt_random_init(WT_RAND_STATE volatile * rnd_state)
 }
 
 /*
+ * __wt_random_init_seed --
+ *	Initialize the state of a 32-bit pseudo-random number.
+ * Use this, instead of __wt_random_init if we are running with multiple
+ * threads and we want each thread to initialize its own random state based
+ * on a different random seed.
+ */
+int
+__wt_random_init_seed(
+    WT_SESSION_IMPL *session, WT_RAND_STATE volatile * rnd_state)
+{
+	struct timespec ts;
+	WT_RAND_STATE rnd;
+
+	WT_RET(__wt_epoch(session, &ts));
+	M_W(rnd) = (uint32_t)(ts.tv_nsec + 521288629);
+	M_Z(rnd) = (uint32_t)(ts.tv_nsec + 362436069);
+
+	*rnd_state = rnd;
+
+	return (0);
+}
+
+/*
  * __wt_random --
  *	Return a 32-bit pseudo-random number.
  */
