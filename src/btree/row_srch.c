@@ -237,7 +237,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	 * it's faster when the cursor is being re-positioned.
 	 */
 	if (leaf != NULL) {
-		if (leaf->home) {
+		if (leaf->home != NULL) {
 			WT_RET(__check_leaf_key_range(
 			    session, srch_key, leaf, cbt));
 			if (cbt->compare != 0) {
