@@ -272,7 +272,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	const WT_PAGE_HEADER *dsk;
 	WT_PAGE_INDEX *pindex;
 	WT_REF **refp, *ref;
-	uint32_t i;
+	uint32_t hint, i;
 
 	btree = S2BT(session);
 	dsk = page->dsk;
@@ -284,9 +284,11 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
 	refp = pindex->index;
+	hint = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		ref = *refp++;
 		ref->home = page;
+		ref->pindex_hint = hint++;
 
 		__wt_cell_unpack(cell, unpack);
 		ref->addr = cell;
@@ -404,7 +406,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	const WT_PAGE_HEADER *dsk;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *ref, **refp;
-	uint32_t i;
+	uint32_t hint, i;
 	bool overflow_keys;
 
 	btree = S2BT(session);
@@ -421,9 +423,11 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
 	refp = pindex->index;
 	overflow_keys = false;
+	hint = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		ref = *refp;
 		ref->home = page;
+		ref->pindex_hint = hint++;
 
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
