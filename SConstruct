@@ -1408,8 +1408,8 @@ if env.TargetOSIs('posix'):
             pass
 
     if env.TargetOSIs('linux') and has_option( "gcov" ):
-        env.Append( CXXFLAGS=" -fprofile-arcs -ftest-coverage " )
-        env.Append( LINKFLAGS=" -fprofile-arcs -ftest-coverage " )
+        env.Append( CCFLAGS=["-fprofile-arcs", "-ftest-coverage"] )
+        env.Append( LINKFLAGS=["-fprofile-arcs", "-ftest-coverage"] )
 
     if optBuild:
         env.Append( CCFLAGS=["-O2"] )
