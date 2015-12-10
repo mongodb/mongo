@@ -3218,6 +3218,55 @@ buildvariants:
     distros:
     - rhel55-test
 
+- name: enterprise-windows-64-inmem
+  display_name: Enterprise Windows (inMemory)
+  modules:
+  - enterprise
+  run_on:
+  - windows-64-vs2013-test
+  expansions:
+    tooltags: "-tags 'ssl sasl'"
+    exe: ".exe"
+    gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
+    push_path: win32
+    push_bucket: downloads.10gen.com
+    push_name: win32
+    push_arch: x86_64-enterprise-windows-64
+    msi_target: msi
+    content_type: application/zip
+    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
+    num_jobs_available: 1
+    test_flags: --continueOnFailure --storageEngine=inMemory --excludeWithAnyTags=requires_persistence
+    ext: zip
+  tasks:
+  - name: compile
+    distros:
+    - windows-64-vs2013-compile
+  - name: audit
+  - name: audit_WT
+  - name: auth_audit
+  - name: dbtest
+  - name: concurrency
+    distros:
+    - windows-64-vs2013-compile  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  - name: concurrency_replication
+  - name: concurrency_sharded
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_small_oplog
+  - name: jsCore_small_oplog_rs
+  - name: jstestfuzz
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded_WT
+  - name: replicasets_auth
+  - name: sasl
+  - name: sharding_auth
+  - name: sharding_auth_audit_WT
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
+  - name: unittests
+
 - name: windows-64-2k8-ssl
   display_name: SSL Windows 2008R2
   modules: ~
