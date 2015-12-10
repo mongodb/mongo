@@ -46,6 +46,11 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 			return (0);
 		}
 
+	/*
+	 * We may not have been able to check if the next page's key is greater
+	 * than the search key; there's a reasonable chance, continue with the
+	 * leaf-page search.
+	 */
 	cbt->compare = 0;
 	return (0);
 }
