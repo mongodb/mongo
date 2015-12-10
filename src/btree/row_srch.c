@@ -230,11 +230,12 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	descend_right = true;
 
 	/*
-	 * We may be searching only a single leaf page, not the full tree. If
-	 * the page links to a parent (in other words, if it's a cursor with
-	 * a pinned page, not a page be re-instantiated in memory by the split
-	 * code), check the page's parent keys before doing the full search,
-	 * it's faster when the cursor is being re-positioned.
+	 * We may be searching only a single leaf page, not the full tree. In
+	 * the normal case where the page links to a parent, check the page's
+	 * parent keys before doing the full search, it's faster when the
+	 * cursor is being re-positioned. (One case where the page doesn't
+	 * have a parent is if it is being re-instantiated in memory as part
+	 * of a split).
 	 */
 	if (leaf != NULL) {
 		if (leaf->home != NULL) {
