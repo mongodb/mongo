@@ -23,7 +23,7 @@
             // In PV1, a voter writes the last vote to disk before granting the vote,
             // so it cannot vote while fsync locked in PV1. Use PV0 explicitly here.
             protocolVersion: 0});
-    replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
+    replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
     var master = replTest.getPrimary();
 
     // do a write
@@ -37,7 +37,7 @@
     // take down master
     replTest.stop(0);
 
-    replTest.waitForState(slave, replTest.PRIMARY, 90*1000);
+    replTest.waitForState(slave, ReplSetTest.State.PRIMARY, 90*1000);
 
     locked.getDB("admin").fsyncUnlock();
     replTest.stopSet();

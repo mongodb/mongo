@@ -22,7 +22,7 @@
     assert.commandWorked(
         replSet.nodes[0].adminCommand({
             replSetTest: 1,
-            waitForMemberState: replSet.PRIMARY,
+            waitForMemberState: ReplSetTest.State.PRIMARY,
             timeoutMillis: 60 * 1000,
         }),
         'node 0' + replSet.nodes[0].host + ' failed to become primary'
@@ -63,7 +63,7 @@
     assert.commandFailedWithCode(
         primary.adminCommand({
             replSetTest: 1,
-            waitForMemberState: replSet.PRIMARY,
+            waitForMemberState: ReplSetTest.State.PRIMARY,
             timeoutMillis: "what timeout",
         }),
         ErrorCodes.TypeMismatch,
@@ -83,7 +83,7 @@
     assert.commandFailedWithCode(
         primary.adminCommand({
             replSetTest: 1,
-            waitForMemberState: replSet.PRIMARY,
+            waitForMemberState: ReplSetTest.State.PRIMARY,
             timeoutMillis: -1000,
         }),
         ErrorCodes.BadValue,
@@ -93,7 +93,7 @@
     assert.commandFailedWithCode(
         primary.adminCommand({
             replSetTest: 1,
-            waitForMemberState: replSet.SECONDARY,
+            waitForMemberState: ReplSetTest.State.SECONDARY,
             timeoutMillis: 1000,
         }),
         ErrorCodes.ExceededTimeLimit,
@@ -104,7 +104,7 @@
     assert.commandWorked(
         secondary.adminCommand({
             replSetTest: 1,
-            waitForMemberState: replSet.SECONDARY,
+            waitForMemberState: ReplSetTest.State.SECONDARY,
             timeoutMillis: 1000,
         }),
         'replSetTest waitForMemberState(SECONDARY) failed on node 1 ' +

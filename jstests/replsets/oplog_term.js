@@ -8,7 +8,7 @@
      var replSet = new ReplSetTest({name: name, nodes: 1, protocolVersion: 0});
      replSet.startSet();
      replSet.initiate();
-     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 5 * 1000);
+     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 5 * 1000);
 
      // Protocol version 0 - 'term' field should be absent from oplog entry.
      var primary = replSet.getPrimary();
@@ -30,7 +30,7 @@
      config.protocolVersion = 1;
      config.version++;
      assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
-     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 5 * 1000);
+     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 5 * 1000);
 
      primary = replSet.getPrimary();
      collection = primary.getDB('test').getCollection(name);

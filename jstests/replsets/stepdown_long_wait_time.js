@@ -19,7 +19,7 @@
                           {"_id" : 1, "host" : nodes[1]},
                           {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]});
 
-    replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
+    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
     var primary = replSet.getPrimary();
 
     var secondary = replSet.getSecondary();
@@ -88,7 +88,7 @@
     );
 
     jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");
-    replSet.waitForState(primary, replSet.SECONDARY, secondaryCatchUpPeriodSecs * 1000);
+    replSet.waitForState(primary, ReplSetTest.State.SECONDARY, secondaryCatchUpPeriodSecs * 1000);
     var exitCode = stepDowner({checkExitSuccess: false});
     assert.neq(0, exitCode, "expected replSetStepDown to close the shell's connection");
 
@@ -97,5 +97,5 @@
     writer({checkExitSuccess: false});
 
     jsTestLog("Wait for SECONDARY " + secondary.host + " to become PRIMARY");
-    replSet.waitForState(secondary, replSet.PRIMARY, stepDownSecs * 1000);
+    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY, stepDownSecs * 1000);
 })();

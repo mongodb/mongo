@@ -9,6 +9,8 @@
 // @tags: [requires_persistence]
 
 (function() {
+    'use strict';
+
     var compare_configs = function(c1, c2) {
         assert.eq(c1.version, c2.version, 'version same');
         assert.eq(c1._id, c2._id, '_id same');

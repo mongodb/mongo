@@ -1062,49 +1062,6 @@ var ReplSetTest = function(opts) {
 
         return master;
     };
-    
-    /** 
-     * Overflows a replica set secondary or secondaries, specified by id or conn.
-     */
-    this.overflow = function(secondaries) {
-        // Create a new collection to overflow, allow secondaries to replicate
-        var master = this.getPrimary();
-        var overflowColl = master.getCollection("_overflow.coll");
-        overflowColl.insert({ replicated : "value" });
-        this.awaitReplication();
-
-        this.stop(secondaries);
-
-        var count = master.getDB("local").oplog.rs.count();
-        var prevCount = -1;
-
-        // Insert batches of documents until we exceed the capped size for the oplog and truncate it.
-
-        while (count > prevCount) {
-          print("ReplSetTest overflow inserting 10000");
-          var bulk = overflowColl.initializeUnorderedBulkOp();
-          for (var i = 0; i < 10000; i++) {
-            bulk.insert({ overflow : "Insert some large overflow value to eat oplog space faster." });
-          }
-          assert.writeOK(bulk.execute());
-
-          prevCount = count;
-          this.awaitReplication();
-          
-          count = master.getDB("local").oplog.rs.count();
-
-          print("ReplSetTest overflow count : " + count + " prev : " + prevCount);
-        }
-
-        // Do one writeConcern:2 write in order to ensure that all of the oplog gets propagated to
-        // the secondary which is online.
-        assert.writeOK(overflowColl.insert({ overflow: "Last overflow value" },
-                                           { writeConcern: { w: 2 } }));
-
-        // Restart all our secondaries and wait for recovery state
-        this.start(secondaries, { remember : true }, true, true);
-        this.waitForState(secondaries, ReplSetTest.State.RECOVERING, 5 * 60 * 1000);
-    };
 
     //
     // ReplSetTest initialization
@@ -1164,8 +1121,6 @@ var ReplSetTest = function(opts) {
     }
 
     _clearLiveNodes();
-
-    Object.extend(this, ReplSetTest.State);
 };
 
 /**

@@ -193,7 +193,7 @@ ElectionTimingTest.prototype.waitForNewPrimary = function(rst, secondary) {
     assert.commandWorked(
         secondary.adminCommand({
             replSetTest: 1,
-            waitForMemberState: rst.PRIMARY,
+            waitForMemberState: ReplSetTest.State.PRIMARY,
             timeoutMillis: 60 * 1000
         }),
         "node " + secondary.host + " failed to become primary"

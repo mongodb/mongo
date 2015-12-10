@@ -24,7 +24,7 @@
         assert.commandWorked(
             replSet.nodes[i].adminCommand({
                 replSetTest: 1,
-                waitForMemberState: replSet.PRIMARY,
+                waitForMemberState: ReplSetTest.State.PRIMARY,
                 timeoutMillis: 60 * 1000,
             }),
             'node ' + i + ' ' + replSet.nodes[i].host + ' failed to become primary'

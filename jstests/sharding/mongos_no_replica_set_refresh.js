@@ -20,7 +20,7 @@ var rsObj = st._rs[0].test;
 assert.commandWorked(
     rsObj.nodes[0].adminCommand({
         replSetTest: 1,
-        waitForMemberState: rsObj.PRIMARY,
+        waitForMemberState: ReplSetTest.State.PRIMARY,
         timeoutMillis: 60 * 1000,
     }),
     'node 0 ' + rsObj.nodes[0].host + ' failed to become primary'

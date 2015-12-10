@@ -33,7 +33,7 @@ try {
 } catch (e) {
     // expected since we close all connections after going into REMOVED
 }
-expectState(rst, rst.REMOVED);
+expectState(rst, ReplSetTest.State.REMOVED);
 rst.stopSet();
 })();
 
@@ -52,7 +52,7 @@ conf.configsvr = true;
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
 rst.getPrimary();
-expectState(rst, rst.PRIMARY);
+expectState(rst, ReplSetTest.State.PRIMARY);
 rst.stopSet();
 })();
 
@@ -72,7 +72,7 @@ conf.configsvr = true;
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
 rst.getPrimary();
-expectState(rst, rst.PRIMARY);
+expectState(rst, ReplSetTest.State.PRIMARY);
 
 var conf = rst.getPrimary().getDB('local').system.replset.findOne();
 assert(conf.configsvr, tojson(conf));
@@ -94,7 +94,7 @@ rst.startSet();
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: 1}));
 
 rst.getPrimary();
-expectState(rst, rst.PRIMARY);
+expectState(rst, ReplSetTest.State.PRIMARY);
 rst.stopSet();
 })();
 
@@ -112,7 +112,7 @@ var conf = rst.getReplSetConfig();
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
 rst.getPrimary();
-expectState(rst, rst.PRIMARY);
+expectState(rst, ReplSetTest.State.PRIMARY);
 assert.throws(function() {
                   rst.restart(0, {configsvr: ""});
               });
@@ -136,7 +136,7 @@ conf.configsvr = true;
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
 rst.getPrimary();
-expectState(rst, rst.PRIMARY);
+expectState(rst, ReplSetTest.State.PRIMARY);
 
 var node = rst.nodes[0];
 var options = node.savedOptions;
@@ -149,6 +149,5 @@ assert.eq(null, conn, "Mongod should have failed to start, but didn't");
 
 rst.stopSet();
 })();
-
 
 })();

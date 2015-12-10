@@ -12,7 +12,7 @@
                            {"_id" : 1, "host" : nodes[1]},
                            {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]});
 
-     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
+     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
 
      var primary = replSet.getPrimary();
      assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
@@ -57,7 +57,7 @@
      }
 
      jsTestLog("Waiting for former PRIMARY to become SECONDARY");
-     replSet.waitForState(primary, replSet.SECONDARY, 30000);
+     replSet.waitForState(primary, ReplSetTest.State.SECONDARY, 30000);
 
      var newPrimary = replSet.getPrimary();
      assert.neq(primary, newPrimary, "SECONDARY did not become PRIMARY");

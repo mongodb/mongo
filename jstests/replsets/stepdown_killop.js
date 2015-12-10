@@ -20,7 +20,7 @@
                            {"_id" : 1, "host" : nodes[1]},
                            {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]});
 
-     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
+     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
 
      var secondary = replSet.getSecondary();
      jsTestLog('Disable replication on the SECONDARY ' + secondary.host);
@@ -31,7 +31,7 @@
          'Failed to configure rsSyncApplyStop failpoint.'
      );
 
-     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
+     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
 
      var primary = replSet.getPrimary();
      assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
