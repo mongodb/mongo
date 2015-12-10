@@ -327,8 +327,8 @@ ascend:	/*
 
 			/*
 			 * Optionally skip leaf pages. If WT_READ_SKIP_LEAF is
-			 * set, we're passed in a count of leaf pages to skip.
-			 * If this page is disk-based, we can crack the cell
+			 * set, we're optionallypassed in a count of leaf pages
+			 * to skip. If this page is disk-based, crack the cell
 			 * and figure out it's a leaf page without reading it.
 			 * Decrement the count of pages to zero, and then take
 			 * the next leaf page we can; be cautious around the
@@ -339,9 +339,13 @@ ascend:	/*
 			 */
 			if (LF_ISSET(WT_READ_SKIP_LEAF)) {
 				WT_ERR(__ref_is_leaf(session, ref, &isleaf));
-				if (isleaf && *ignoreleafcntp > 0) {
-					--*ignoreleafcntp;
-					break;
+				if (isleaf) {
+					if (ignoreleafcntp == NULL)
+						break;
+					if (*ignoreleafcntp > 0) {
+						--*ignoreleafcntp;
+						break;
+					}
 				}
 			}
 
@@ -412,11 +416,14 @@ descend:			couple = ref;
 				 * if it was a leaf page, we had to acquire the
 				 * hazard pointer and check.
 				 */
-				if (LF_ISSET(WT_READ_SKIP_LEAF) &&
-				    *ignoreleafcntp > 0) {
+				if (LF_ISSET(WT_READ_SKIP_LEAF)) {
 					couple = ref;
-					--*ignoreleafcntp;
-					break;
+					if (ignoreleafcntp == NULL)
+						break;
+					if (*ignoreleafcntp > 0) {
+						--*ignoreleafcntp;
+						break;
+					}
 				}
 
 				*refp = ref;
