@@ -29,6 +29,7 @@ command_type: system
 variables:
 
 - &packaging_variants
+  - enterprise-linux-64-amazon-ami
   - enterprise-rhel-57-64-bit
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
@@ -2766,7 +2767,7 @@ buildvariants:
     test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
     has_debugsymbols: true
     has_packages: true
-    packager_script: packager.py
+    packager_script: packager-enterprise.py
     packager_distro: amazon
   tasks:
   - name: compile
@@ -2814,6 +2815,9 @@ buildvariants:
     compile_flags: --ssl --distmod=amazon -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: amazon
   tasks:
   - name: compile
     distros:
