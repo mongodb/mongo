@@ -96,7 +96,7 @@ __ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref, bool *isleafp)
  */
 int
 __wt_tree_walk(WT_SESSION_IMPL *session,
-    WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
+    WT_REF **refp, uint64_t *walkcntp, uint64_t *ignoreleafcntp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -247,7 +247,7 @@ ascend:	/*
 		else
 			++slot;
 
-		if (!LF_ISSET(WT_READ_SKIP_LEAF) && walkcntp != NULL)
+		if (walkcntp != NULL)
 			++*walkcntp;
 
 		for (;;) {
@@ -339,8 +339,8 @@ ascend:	/*
 			 */
 			if (LF_ISSET(WT_READ_SKIP_LEAF)) {
 				WT_ERR(__ref_is_leaf(session, ref, &isleaf));
-				if (isleaf && *walkcntp > 0) {
-					--*walkcntp;
+				if (isleaf && *ignoreleafcntp > 0) {
+					--*ignoreleafcntp;
 					break;
 				}
 			}
@@ -413,9 +413,9 @@ descend:			couple = ref;
 				 * hazard pointer and check.
 				 */
 				if (LF_ISSET(WT_READ_SKIP_LEAF) &&
-				    *walkcntp > 0) {
+				    *ignoreleafcntp > 0) {
 					couple = ref;
-					--*walkcntp;
+					--*ignoreleafcntp;
 					break;
 				}
 

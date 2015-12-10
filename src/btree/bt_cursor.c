@@ -893,7 +893,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		 * quickly.
 		 */
 		for (skip = cbt->rand_leaf_skip; cbt->ref == NULL || skip > 0;)
-			WT_ERR(__wt_tree_walk(session, &cbt->ref, &skip,
+			WT_ERR(__wt_tree_walk(session, &cbt->ref, NULL, &skip,
 			    WT_READ_NO_GEN | WT_READ_SKIP_INTL |
 			    WT_READ_SKIP_LEAF | WT_READ_WONT_NEED));
 	}

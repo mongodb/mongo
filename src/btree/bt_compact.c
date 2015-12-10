@@ -130,7 +130,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		 * read, set its generation to a low value so it is evicted
 		 * quickly.
 		 */
-		WT_ERR(__wt_tree_walk(session, &ref, NULL,
+		WT_ERR(__wt_tree_walk(session, &ref, NULL, NULL,
 		    WT_READ_COMPACT | WT_READ_NO_GEN | WT_READ_WONT_NEED));
 		if (ref == NULL)
 			break;
