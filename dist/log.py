@@ -220,8 +220,7 @@ __logrec_make_hex_str(WT_SESSION_IMPL *session, char **destp, WT_ITEM *item)
 
 \tneeded = item->size * 2 + 1;
 \tWT_RET(__wt_realloc(session, NULL, needed, destp));
-\t(void)(__wt_fill_hex(
-\t    item->data, item->size, (uint8_t *)*destp, needed, NULL));
+\t__wt_fill_hex(item->data, item->size, (uint8_t *)*destp, needed, NULL);
 \treturn (0);
 }
 ''')
