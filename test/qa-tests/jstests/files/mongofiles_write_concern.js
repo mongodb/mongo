@@ -34,7 +34,7 @@
 
   function noConnectTest() {
     return startMongoProgramNoConnect.apply(null,
-        ['mongofiles', '-d', 'dbOne', '--writeConcern={w:3}','--host',rs.nodes[0].host].
+        ['mongofiles', '-d', 'dbOne', '--writeConcern={w:3}','--host', rs.getMaster().host].
         concat(commonToolArgs).
         concat(['put', 'jstests/files/testdata/files1.txt'])
         );
