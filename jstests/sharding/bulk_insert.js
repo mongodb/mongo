@@ -1,14 +1,8 @@
-//
-// Tests bulk inserts to mongodb
-//
+// Tests bulk inserts to mongos
+(function() {
+'use strict';
 
-jsTest.log("Starting sharded cluster...")
-
-var st = new ShardingTest({shards : 2,
-                           mongos : 2,
-                           verbose : 0})
-
-st.stopBalancer();
+var st = new ShardingTest({ shards : 2, mongos : 2 });
 
 var mongos = st.s;
 var staleMongos = st.s1
@@ -16,7 +10,7 @@ var config = mongos.getDB("config");
 var admin = mongos.getDB("admin");
 var shards = config.shards.find().toArray()
 
-for ( var i = 0; i < shards.length; i++) {
+for (var i = 0; i < shards.length; i++) {
     shards[i].conn = new Mongo(shards[i].host);
 }
 
@@ -24,29 +18,32 @@ var collSh = mongos.getCollection(jsTestName() + ".collSharded");
 var collUn = mongos.getCollection(jsTestName() + ".collUnsharded");
 var collDi = shards[0].conn.getCollection(jsTestName() + ".collDirect");
 
-jsTest.log("Setting up collections...")
+jsTest.log('Checking write to config collections...');
+assert.writeOK(admin.TestColl.insert({ SingleDoc: 1 }));
+assert.writeError(admin.TestColl.insert([ { Doc1: 1 }, { Doc2: 1 } ]));
 
-printjson(admin.runCommand({enableSharding : collSh.getDB() + ""}))
-printjson(admin.runCommand({movePrimary : collSh.getDB() + "",
-                            to : shards[0]._id}));
-printjson(admin.runCommand({movePrimary : collUn.getDB() + "",
-                            to : shards[1]._id}));
+jsTest.log("Setting up collections...");
+
+assert.commandWorked(admin.runCommand({ enableSharding : collSh.getDB() + "" }))
+st.ensurePrimaryShard(collSh.getDB() + "", shards[0]._id);
+
+assert.commandWorked(admin.runCommand({ movePrimary : collUn.getDB() + "",
+                                        to : shards[1]._id}));
 
 printjson(collSh.ensureIndex({ukey : 1}, {unique : true}));
 printjson(collUn.ensureIndex({ukey : 1}, {unique : true}));
 printjson(collDi.ensureIndex({ukey : 1}, {unique : true}));
 
-printjson(admin.runCommand({shardCollection : collSh + "",
-                            key : {ukey : 1}}))
-printjson(admin.runCommand({split : collSh + "",
-                            middle : {ukey : 0}}));
-printjson(admin.runCommand({ moveChunk: collSh + "",
-                             find: { ukey: 0 },
-                             to: shards[0]._id,
-                             _waitForDelete: true }));
+assert.commandWorked(admin.runCommand({ shardCollection : collSh + "",
+                                        key : {ukey : 1} }));
+assert.commandWorked(admin.runCommand({ split : collSh + "",
+                                        middle : {ukey : 0} }));
+assert.commandWorked(admin.runCommand({ moveChunk: collSh + "",
+                                        find: { ukey: 0 },
+                                        to: shards[0]._id,
+                                        _waitForDelete: true }));
 
-var resetColls = function()
-{
+var resetColls = function() {
     assert.writeOK(collSh.remove({}));
     assert.writeOK(collUn.remove({}));
     assert.writeOK(collDi.remove({}));
@@ -278,23 +275,23 @@ assert.eq(6, collDi.find().itcount());
 // Test when WBL has to be invoked mid-insert
 //
 
-jsTest.log("Testing bulk insert (no COE) with WBL...")
+jsTest.log("Testing bulk insert (no COE) with WBL...");
 
 resetColls();
 var inserts = [{ukey : 1},
-               {ukey : -1}]
+               {ukey : -1}];
 
-staleCollSh = staleMongos.getCollection(collSh + "");
+var staleCollSh = staleMongos.getCollection(collSh + "");
 
 staleCollSh.findOne();
-printjson(admin.runCommand({moveChunk : collSh + "",
-                            find : {ukey : 0},
-                            to : shards[1]._id,
-                            _waitForDelete: true}));
-printjson(admin.runCommand({moveChunk : collSh + "",
-                            find : {ukey : 0},
-                            to : shards[0]._id,
-                            _waitForDelete: true}));
+assert.commandWorked(admin.runCommand({ moveChunk : collSh + "",
+                                        find : {ukey : 0},
+                                        to : shards[1]._id,
+                                        _waitForDelete: true }));
+assert.commandWorked(admin.runCommand({ moveChunk : collSh + "",
+                                        find : {ukey : 0},
+                                        to : shards[0]._id,
+                                        _waitForDelete: true}));
 
 assert.writeOK(staleCollSh.insert(inserts));
 
@@ -310,7 +307,7 @@ while (data1MB.length < 1024 * 1024)
     data1MB += data1MB;
 
 var data10MB = "";
-for ( var i = 0; i < 10; i++)
+for (var i = 0; i < 10; i++)
     data10MB += data1MB;
 
 resetColls();
@@ -326,15 +323,17 @@ var inserts = [{ukey : 1,
 staleCollSh = staleMongos.getCollection(collSh + "");
 
 staleCollSh.findOne();
-printjson(admin.runCommand({moveChunk : collSh + "",
-                            find : {ukey : 0},
-                            to : shards[1]._id,
-                            _waitForDelete: true}));
-printjson(admin.runCommand({moveChunk : collSh + "",
-                            find : {ukey : 0},
-                            to : shards[0]._id,
-                            _waitForDelete: true}));
+assert.commandWorked(admin.runCommand({ moveChunk : collSh + "",
+                                        find : {ukey : 0},
+                                        to : shards[1]._id,
+                                        _waitForDelete: true }));
+assert.commandWorked(admin.runCommand({ moveChunk : collSh + "",
+                                        find : {ukey : 0},
+                                        to : shards[0]._id,
+                                        _waitForDelete: true }));
 
 assert.writeOK(staleCollSh.insert(inserts));
 
-st.stop()
+st.stop();
+
+})();

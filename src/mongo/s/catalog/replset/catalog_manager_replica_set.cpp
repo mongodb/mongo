@@ -97,7 +97,7 @@ const int kMaxConfigVersionInitRetry = 3;
 const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
 
-void _toBatchError(const Status& status, BatchedCommandResponse* response) {
+void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
     response->setErrCode(status.code());
     response->setErrMessage(status.reason());
@@ -890,6 +890,15 @@ DistLockManager* CatalogManagerReplicaSet::getDistLockManager() {
 void CatalogManagerReplicaSet::writeConfigServerDirect(OperationContext* txn,
                                                        const BatchedCommandRequest& batchRequest,
                                                        BatchedCommandResponse* batchResponse) {
+    // We only support batch sizes of one for config writes
+    if (batchRequest.sizeWriteOps() != 1) {
+        toBatchError(Status(ErrorCodes::InvalidOptions,
+                            str::stream() << "Writes to config servers must have batch size of 1, "
+                                          << "found " << batchRequest.sizeWriteOps()),
+                     batchResponse);
+        return;
+    }
+
     _runBatchWriteCommand(txn, batchRequest, batchResponse, ShardRegistry::kNotMasterErrors);
 }
 
@@ -912,13 +921,13 @@ void CatalogManagerReplicaSet::_runBatchWriteCommand(
         auto response =
             grid.shardRegistry()->runCommandOnConfigWithRetries(txn, dbname, cmdObj, errorsToCheck);
         if (!response.isOK()) {
-            _toBatchError(response.getStatus(), batchResponse);
+            toBatchError(response.getStatus(), batchResponse);
             return;
         }
 
         string errmsg;
         if (!batchResponse->parseBSON(response.getValue(), &errmsg)) {
-            _toBatchError(
+            toBatchError(
                 Status(ErrorCodes::FailedToParse,
                        str::stream() << "Failed to parse config server response: " << errmsg),
                 batchResponse);
