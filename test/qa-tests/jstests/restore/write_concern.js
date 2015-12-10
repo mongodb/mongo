@@ -33,7 +33,7 @@
 
   function noConnectTest() {
     return startMongoProgramNoConnect.apply(null,
-        ['mongorestore','--writeConcern={w:3}','--host',rs.nodes[0].host].
+        ['mongorestore','--writeConcern={w:3}','--host',rs.getMaster().host].
         concat(getRestoreTarget(dumpTarget)).
         concat(commonToolArgs)
         );

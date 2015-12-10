@@ -26,17 +26,17 @@ var runWCTest = function runWCTest(progName, rs, toolTest, testWriteConcern, tes
 
   testWriteConcern(0, ['--writeConcern=majority'], progName+" with majority to a fully functioning repl-set should succeed");
 
-  testWriteConcern(0, ['--writeConcern={w:1,wtimeout:2000}'], progName+" with w:1,timeout:2000 to a fully functioning repl-set should succeed");
+  testWriteConcern(0, ['--writeConcern={w:1,wtimeout:10000}'], progName+" with w:1,timeout:10000 to a fully functioning repl-set should succeed");
 
-  testWriteConcern(0, ['--writeConcern={w:2,wtimeout:2000}'], progName+" with w:2,timeout:2000 to a fully functioning repl-set should succeed");
+  testWriteConcern(0, ['--writeConcern={w:2,wtimeout:10000}'], progName+" with w:2,timeout:10000 to a fully functioning repl-set should succeed");
 
   jsTest.log("stopping one node from doing any further syncing");
   member1.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
   sleep(2000);
 
-  testWriteConcern(0, ['--writeConcern={w:2,wtimeout:2000}'], progName+" with w:2,timeout:2000 repl-set with 2 working nodes should succeed");
+  testWriteConcern(0, ['--writeConcern={w:2,wtimeout:10000}'], progName+" with w:2,timeout:10000 repl-set with 2 working nodes should succeed");
 
-  testWriteConcern(0, ['--writeConcern=majority'], progName+" with majority with one working node should succeed");
+  testWriteConcern(0, ['--writeConcern=majority'], progName+" with majority with two working nodes should succeed");
 
   testWriteConcern(1, ['--writeConcern={w:3,wtimeout:2000}'], progName+" with w:3,timeout:2000 repl-set with two working nodes should fail");
 
@@ -46,9 +46,9 @@ var runWCTest = function runWCTest(progName, rs, toolTest, testWriteConcern, tes
 
   testWriteConcern(1, [windowsEscape('--writeConcern={w:"majority",wtimeout:2000}')], progName+" with majority with no working nodes should fail");
 
-  testWriteConcern(1, ['--writeConcern={w:2,wtimeout:2000}'], progName+" with w:2,timeout:2000 to a fully functioning repl-set should succeed");
+  testWriteConcern(1, ['--writeConcern={w:2,wtimeout:10000}'], progName+" with w:2,timeout:10000 to a fully functioning repl-set should succeed");
 
-  testWriteConcern(0, ['--writeConcern={w:1,wtimeout:2000}'], progName+" with w:1,timeout:2000 repl-set with one working nodes should succeed");
+  testWriteConcern(0, ['--writeConcern={w:1,wtimeout:10000}'], progName+" with w:1,timeout:10000 repl-set with one working nodes should succeed");
 
   jsTest.log(progName+" with w:3 concern and no working member and no timeout waits until member are available");
   pid = testProgramNoConnect()
@@ -62,7 +62,7 @@ var runWCTest = function runWCTest(progName, rs, toolTest, testWriteConcern, tes
   member1.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
   member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
 
-  jsTest.log("waiting for import to finish");
+  jsTest.log("waiting for "+progName+" to finish");
   ret = waitProgram(pid);
   assert.eq(0, ret, progName+" with w:3 should succeed once enough members start working");
 }

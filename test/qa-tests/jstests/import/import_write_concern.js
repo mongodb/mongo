@@ -33,7 +33,7 @@
 
   function noConnectTest() {
     return startMongoProgramNoConnect.apply(null,
-        ['mongoimport','--writeConcern={w:3}','--host',rs.nodes[0].host,'--file',fileTarget].
+        ['mongoimport','--writeConcern={w:3}','--host',rs.getMaster().host,'--file',fileTarget].
         concat(commonToolArgs)
         );
   }
