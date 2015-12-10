@@ -33,9 +33,9 @@
 	(F_ISSET(dhandle, WT_DHANDLE_DEAD) ||				\
 	!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN))
 
-/* Cursor's data handle. */
-#define	WT_CURSOR_DHANDLE(c)						\
-	(((WT_CURSOR_BTREE *)(c))->btree->dhandle)
+/* The metadata cursor's data handle. */
+#define	WT_SESSION_META_DHANDLE(s)					\
+	(((WT_CURSOR_BTREE *)((s)->meta_cursor))->btree->dhandle)
 
 /*
  * WT_DATA_HANDLE --

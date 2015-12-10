@@ -550,7 +550,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		saved_meta_next = session->meta_track_next;
 		session->meta_track_next = NULL;
 		WT_WITH_DHANDLE(session,
-		    WT_CURSOR_DHANDLE(session->meta_cursor),
+		    WT_SESSION_META_DHANDLE(session),
 		    ret = __wt_checkpoint(session, cfg));
 		session->meta_track_next = saved_meta_next;
 		WT_ERR(ret);
@@ -559,7 +559,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    "metadata sync completed", &verb_timer));
 	} else
 		WT_WITH_DHANDLE(session,
-		    WT_CURSOR_DHANDLE(session->meta_cursor),
+		    WT_SESSION_META_DHANDLE(session),
 		    ret = __wt_txn_checkpoint_log(
 		    session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
 

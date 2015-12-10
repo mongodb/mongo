@@ -272,7 +272,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 	/* If we're logging, make sure the metadata update was flushed. */
 	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED)) {
 		WT_WITH_DHANDLE(session,
-		    WT_CURSOR_DHANDLE(session->meta_cursor),
+		    WT_SESSION_META_DHANDLE(session),
 		    ret = __wt_txn_checkpoint_log(
 			session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
 		WT_RET(ret);
@@ -286,13 +286,13 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 		ckpt_session->txn.id = session->txn.id;
 		F_SET(ckpt_session, WT_SESSION_LOCKED_SCHEMA);
 		WT_WITH_DHANDLE(ckpt_session,
-		    WT_CURSOR_DHANDLE(session->meta_cursor),
+		    WT_SESSION_META_DHANDLE(session),
 		    ret = __wt_checkpoint(ckpt_session, NULL));
 		F_CLR(ckpt_session, WT_SESSION_LOCKED_SCHEMA);
 		ckpt_session->txn.id = WT_TXN_NONE;
 		WT_RET(ret);
 		WT_WITH_DHANDLE(session,
-		    WT_CURSOR_DHANDLE(session->meta_cursor),
+		    WT_SESSION_META_DHANDLE(session),
 		    ret = __wt_checkpoint_sync(session, NULL));
 		WT_RET(ret);
 	}
