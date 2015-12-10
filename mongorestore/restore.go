@@ -167,7 +167,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
 		defer bsonSource.Close()
 
-		documentCount, err = restore.RestoreCollectionToDB(intent.DB, intent.C, bsonSource, intent.Size)
+		documentCount, err = restore.RestoreCollectionToDB(intent.DB, intent.C, bsonSource, intent.BSONFile, intent.Size)
 		if err != nil {
 			return fmt.Errorf("error restoring from %v: %v", intent.Location, err)
 		}
@@ -192,7 +192,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 // RestoreCollectionToDB pipes the given BSON data into the database.
 // Returns the number of documents restored and any errors that occured.
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
-	bsonSource *db.DecodedBSONSource, fileSize int64) (int64, error) {
+	bsonSource *db.DecodedBSONSource, file PosReader, fileSize int64) (int64, error) {
 
 	var termErr error
 	session, err := restore.SessionProvider.GetSession()
@@ -272,7 +272,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 						log.Logf(log.Always, "error: %v", err)
 					}
 				}
-				watchProgressor.Inc(int64(len(rawDoc.Data)))
+				watchProgressor.Set(file.Pos())
 			}
 			err := bulk.Flush()
 			if err != nil {

@@ -211,6 +211,10 @@ func (muxIn *MuxIn) Read([]byte) (int, error) {
 	return 0, nil
 }
 
+func (muxIn *MuxIn) Pos() int64 {
+	return 0
+}
+
 // Close closes the chans in the MuxIn.
 // Ultimately the multiplexer will detect that they are closed and cause a
 // formatEOF to occur.

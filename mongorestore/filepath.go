@@ -30,13 +30,59 @@ func (errorWriter) Write([]byte) (int, error) {
 	return 0, os.ErrInvalid
 }
 
+type PosReader interface {
+	io.ReadCloser
+	Pos() int64
+}
+
+// posTrackingReader is a type for reading from a file and being able to determine
+// what position the file is at.
+type posTrackingReader struct {
+	io.ReadCloser
+	pos int64
+}
+
+func (f *posTrackingReader) Read(p []byte) (int, error) {
+	n, err := f.ReadCloser.Read(p)
+	f.pos += int64(n)
+	return n, err
+}
+
+func (f *posTrackingReader) Pos() int64 {
+	return f.pos
+}
+
+// mixedPosTrackingReader is a type for reading from one file but getting the position of a
+// different file. This is useful for compressed files where the appropriate position for progress
+// bars is that of the compressed file, but file should be read from the uncompressed file.
+type mixedPosTrackingReader struct {
+	readHolder PosReader
+	posHolder  PosReader
+}
+
+func (f *mixedPosTrackingReader) Read(p []byte) (int, error) {
+	return f.readHolder.Read(p)
+}
+
+func (f *mixedPosTrackingReader) Pos() int64 {
+	return f.posHolder.Pos()
+}
+
+func (f *mixedPosTrackingReader) Close() error {
+	err := f.readHolder.Close()
+	if err != nil {
+		return err
+	}
+	return f.posHolder.Close()
+}
+
 // realBSONFile implements the intents.file interface. It lets intents read from real BSON files
 // ok disk via an embedded os.File
 // The Read, Write and Close methods of the intents.file interface is implemented here by the
 // embedded os.File, the Write will return an error and not succeed
 type realBSONFile struct {
 	path string
-	io.ReadCloser
+	PosReader
 	// errorWrite adds a Write() method to this object allowing it to be an
 	// intent.file ( a ReadWriteOpenCloser )
 	errorWriter
@@ -55,14 +101,18 @@ func (f *realBSONFile) Open() (err error) {
 	if err != nil {
 		return fmt.Errorf("error reading BSON file %v: %v", f.path, err)
 	}
+	posFile := &posTrackingReader{file, 0}
 	if f.gzip {
-		gzFile, err := gzip.NewReader(file)
+		gzFile, err := gzip.NewReader(posFile)
+		posUncompressedFile := &posTrackingReader{gzFile, 0}
 		if err != nil {
 			return fmt.Errorf("error decompressing compresed BSON file %v: %v", f.path, err)
 		}
-		f.ReadCloser = &wrappedReadCloser{gzFile, file}
+		f.PosReader = &mixedPosTrackingReader{
+			readHolder: posUncompressedFile,
+			posHolder:  posFile}
 	} else {
-		f.ReadCloser = file
+		f.PosReader = posFile
 	}
 	return nil
 }
@@ -79,6 +129,7 @@ type realMetadataFile struct {
 	errorWriter
 	intent *intents.Intent
 	gzip   bool
+	pos    int64
 }
 
 // Open is part of the intents.file interface. realMetadataFiles need to be Opened before Read
@@ -103,17 +154,38 @@ func (f *realMetadataFile) Open() (err error) {
 	return nil
 }
 
+func (f *realMetadataFile) Read(p []byte) (int, error) {
+	n, err := f.ReadCloser.Read(p)
+	f.pos += int64(n)
+	return n, err
+}
+
+func (f *realMetadataFile) Pos() int64 {
+	return f.pos
+}
+
 // stdinFile implements the intents.file interface. They allow intents to read single collections
 // from standard input
 type stdinFile struct {
 	io.Reader
 	errorWriter
+	pos int64
 }
 
 // Open is part of the intents.file interface. stdinFile needs to have Open called on it before
 // Read can be called on it.
 func (f *stdinFile) Open() error {
 	return nil
+}
+
+func (f *stdinFile) Read(p []byte) (int, error) {
+	n, err := f.Reader.Read(p)
+	f.pos += int64(n)
+	return n, err
+}
+
+func (f *stdinFile) Pos() int64 {
+	return f.pos
 }
 
 // Close is part of the intents.file interface. After Close is called, Read will fail.

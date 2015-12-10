@@ -17,6 +17,12 @@ import (
 	"strings"
 )
 
+type NilPos struct{}
+
+func (NilPos) Pos() int64 {
+	return -1
+}
+
 type collectionInfo struct {
 	Name    string  `bson:"name"`
 	Options *bson.D `bson:"options"`
@@ -69,6 +75,7 @@ type realBSONFile struct {
 	errorReader
 	intent *intents.Intent
 	gzip   bool
+	NilPos
 }
 
 // Open is part of the intents.file interface. realBSONFiles need to have Open called before
@@ -133,6 +140,7 @@ type realMetadataFile struct {
 	// intent.file ( a ReadWriteOpenCloser )
 	intent *intents.Intent
 	gzip   bool
+	NilPos
 }
 
 // Open opens the file on disk that the intent indicates. Any directories needed are created.
@@ -166,6 +174,7 @@ func (f *realMetadataFile) Open() (err error) {
 type stdoutFile struct {
 	io.Writer
 	errorReader
+	NilPos
 }
 
 // Open is part of the intents.file interface.

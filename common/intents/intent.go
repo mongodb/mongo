@@ -11,6 +11,7 @@ import (
 type file interface {
 	io.ReadWriteCloser
 	Open() error
+	Pos() int64
 }
 
 // mongorestore first scans the directory to generate a list

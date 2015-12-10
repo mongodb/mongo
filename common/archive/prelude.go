@@ -15,6 +15,7 @@ import (
 type MetadataFile struct {
 	*bytes.Buffer
 	Intent *intents.Intent
+	pos    int64
 }
 
 func (md *MetadataFile) Open() error {
@@ -22,6 +23,16 @@ func (md *MetadataFile) Open() error {
 }
 func (md *MetadataFile) Close() error {
 	return nil
+}
+
+func (md *MetadataFile) Read(p []byte) (int, error) {
+	n, err := md.Buffer.Read(p)
+	md.pos += int64(n)
+	return n, err
+}
+
+func (md *MetadataFile) Pos() int64 {
+	return md.pos
 }
 
 // DirLike represents the group of methods done on directories and files in dump directories,
@@ -334,6 +345,7 @@ type MetadataPreludeFile struct {
 	Intent  *intents.Intent
 	Prelude *Prelude
 	*bytes.Buffer
+	pos int64
 }
 
 // Open is part of the intents.file interface, it finds the metadata in the prelude and creates a bytes.Buffer from it.
@@ -358,4 +370,14 @@ func (mpf *MetadataPreludeFile) Open() error {
 func (mpf *MetadataPreludeFile) Close() error {
 	mpf.Buffer = nil
 	return nil
+}
+
+func (mpf *MetadataPreludeFile) Read(p []byte) (int, error) {
+	n, err := mpf.Buffer.Read(p)
+	mpf.pos += int64(n)
+	return n, err
+}
+
+func (mpf *MetadataPreludeFile) Pos() int64 {
+	return mpf.pos
 }
