@@ -103,7 +103,7 @@
     log(assert.commandWorked(localDB.adminCommand("replSetGetStatus")));
     log("restart primary");
     replTest.restart(master);
-    replTest.waitForState(master, replTest.RECOVERING, 90000);
+    replTest.waitForState(master, ReplSetTest.State.RECOVERING, 90000);
 
     assert.soon(function() {
         var mv;

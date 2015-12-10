@@ -35,7 +35,7 @@ var replTest = new ReplSetTest({
 });
 var nodes = replTest.startSet();
 replTest.initiate();
-replTest.waitForState(nodes[0], replTest.PRIMARY, 60 * 1000);
+replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
 var master = replTest.getPrimary();
 
 // do a write

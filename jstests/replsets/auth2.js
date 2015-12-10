@@ -5,18 +5,18 @@
 
 var testInvalidAuthStates = function() {
     print("check that 0 is in recovering");
-    rs.waitForState(rs.nodes[0], rs.RECOVERING);
+    rs.waitForState(rs.nodes[0], ReplSetTest.State.RECOVERING);
 
     print("shut down 1, 0 still in recovering.");
     rs.stop(1);
     sleep(5);
 
-    rs.waitForState(rs.nodes[0], rs.RECOVERING);
+    rs.waitForState(rs.nodes[0], ReplSetTest.State.RECOVERING);
 
     print("shut down 2, 0 becomes a secondary.");
     rs.stop(2);
 
-    rs.waitForState(rs.nodes[0], rs.SECONDARY);
+    rs.waitForState(rs.nodes[0], ReplSetTest.State.SECONDARY);
 
     rs.restart(1, {"keyFile" : key1});
     rs.restart(2, {"keyFile" : key1});

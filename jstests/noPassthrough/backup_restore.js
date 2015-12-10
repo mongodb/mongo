@@ -255,7 +255,7 @@
         }
 
         // Wait up to 60 seconds until restarted node is in state secondary
-        rst.waitForState(rst.getSecondaries(), rst.SECONDARY, 60 * 1000);
+        rst.waitForState(rst.getSecondaries(), ReplSetTest.State.SECONDARY, 60 * 1000);
 
         // Add new hidden node to replSetTest
         var hiddenCfg = {
@@ -289,7 +289,9 @@
                              ' failed to reconfigure replSet ' + tojson(rsConfig));
 
         // Wait up to 60 seconds until the new hidden node is in state RECOVERING.
-        rst.waitForState(rst.nodes[numNodes], [rst.RECOVERING, rst.SECONDARY], 60 * 1000);
+        rst.waitForState(rst.nodes[numNodes],
+                         [ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY],
+                         60 * 1000);
 
         // Stop CRUD client and FSM client.
         assert(checkProgram(crudPid), testName + ' CRUD client was not running at end of test');
@@ -298,7 +300,7 @@
         stopMongoProgramByPid(fsmPid);
 
         // Wait up to 60 seconds until the new hidden node is in state SECONDARY.
-        rst.waitForState(rst.nodes[numNodes], rst.SECONDARY, 60 * 1000);
+        rst.waitForState(rst.nodes[numNodes], ReplSetTest.State.SECONDARY, 60 * 1000);
 
         // Stop set.
         rst.stopSet();

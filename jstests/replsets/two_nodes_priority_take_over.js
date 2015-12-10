@@ -31,7 +31,7 @@ var verbosity = {
 rst.nodes.forEach(function (node) {node.adminCommand(verbosity)});
 
 // The first node will be the primary at the beginning.
-rst.waitForState(rst.nodes[0], rst.PRIMARY, 60 * 1000);
+rst.waitForState(rst.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
 
 // Get the term when replset is stable.
 var res = rst.getPrimary().adminCommand("replSetGetStatus");
@@ -47,7 +47,7 @@ conf.version = 2;
 reconfig(rst, conf);
 
 // The second node will take over the primary.
-rst.waitForState(rst.nodes[1], rst.PRIMARY, 60 * 1000);
+rst.waitForState(rst.nodes[1], ReplSetTest.State.PRIMARY, 60 * 1000);
 
 res = rst.getPrimary().adminCommand("replSetGetStatus");
 assert.commandWorked(res);

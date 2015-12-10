@@ -13,13 +13,13 @@
                              {"_id" : 2, "host" : nodenames[2], "priority" : 3}]});
 
     // 2 should be master (give this a while to happen, as 0 will be elected, then demoted)
-    replTest.waitForState(nodes[2], replTest.PRIMARY, 120000);
+    replTest.waitForState(nodes[2], ReplSetTest.State.PRIMARY, 120000);
 
     // kill 2, 1 should take over
     replTest.stop(2);
 
     // 1 should eventually be master
-    replTest.waitForState(nodes[1], replTest.PRIMARY, 60000);
+    replTest.waitForState(nodes[1], ReplSetTest.State.PRIMARY, 60000);
     
     // do some writes on 1
     var master = replTest.getPrimary();
@@ -33,7 +33,7 @@
 
     // bring 2 back up, 2 should wait until caught up and then become master
     replTest.restart(2);
-    replTest.waitForState(nodes[2], replTest.PRIMARY, 60000);
+    replTest.waitForState(nodes[2], ReplSetTest.State.PRIMARY, 60000);
 
     // make sure nothing was rolled back
     master = replTest.getPrimary();

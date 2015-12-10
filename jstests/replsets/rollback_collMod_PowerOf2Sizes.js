@@ -79,6 +79,6 @@ try {
 catch (e) {
     // Ignore network disconnect.
 }
-replTest.waitForState(a_conn, replTest.PRIMARY);
+replTest.waitForState(a_conn, ReplSetTest.State.PRIMARY);
 assert.eq(getOptions(a_conn), originalCollectionOptions);
 }());

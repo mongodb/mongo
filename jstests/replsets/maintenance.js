@@ -5,7 +5,7 @@ var conns = replTest.startSet({ verbose: 1 });
 var config = replTest.getReplSetConfig();
 config.members[0].priority = 2;
 replTest.initiate(config);
-replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60000);
+replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY, 60000);
 
 // Make sure we have a master
 var master = replTest.getPrimary();

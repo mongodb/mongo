@@ -58,7 +58,7 @@
     primary.getDB("admin").shutdownServer({force:true});
 
     var electionTimeout = (isPV0 ? 60 : 20 ) * 1000; // Timeout in milliseconds
-    replSet.waitForState(secondary, replSet.PRIMARY, electionTimeout);
+    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY, electionTimeout);
 
     // Ensure new primary is not yet writable
     jsTestLog('New primary should not be writable yet');

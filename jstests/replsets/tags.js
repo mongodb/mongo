@@ -97,7 +97,7 @@
 
     var ensurePrimary = function(nodeId, expectedWritableNodes) {
         jsTestLog('Node ' + nodeId + ' (' + replTest.nodes[nodeId].host + ') should be primary.');
-        replTest.waitForState(replTest.nodes[nodeId], replTest.PRIMARY, 60 * 1000);
+        replTest.waitForState(replTest.nodes[nodeId], ReplSetTest.State.PRIMARY, 60 * 1000);
         primary = replTest.getPrimary();
         var writeConcern = {writeConcern: {w: expectedWritableNodes, wtimeout: 30 * 1000}};
         assert.writeOK(primary.getDB('foo').bar.insert({x: 100}, writeConcern));

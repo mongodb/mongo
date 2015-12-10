@@ -2,7 +2,6 @@
 // RECOVERING state, and don't break
 
 (function() {
-
 'use strict';
 
 var shardTest = new ShardingTest({ name: "recovering_slaveok",
@@ -89,7 +88,7 @@ rsA.restart(rsA.getSecondaries(),
 
 print("9: wait for recovery");
 
-rsA.waitForState(rsA.getSecondaries(), rsA.SECONDARY, 5 * 60 * 1000 );
+rsA.waitForState(rsA.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000 );
 
 print("10: check our regular and slaveOk query");
 

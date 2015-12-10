@@ -78,7 +78,9 @@ replTest.reInitiate(awaitTimeout * 2);
 secondary.setSlaveOk();
 // Wait for the secondary to get ReplSetInitiate command.
 replTest.waitForState(secondary,
-                      [replTest.STARTUP_2, replTest.RECOVERING, replTest.SECONDARY],
+                      [ReplSetTest.State.STARTUP_2,
+                       ReplSetTest.State.RECOVERING,
+                       ReplSetTest.State.SECONDARY],
                       60 * 1000);
 
 // This fail point will cause the first intial sync to fail, and leave an op in the buffer to 

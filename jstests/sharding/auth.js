@@ -1,7 +1,6 @@
 // Tests administrative sharding operations and map-reduce work or fail as expected, when key-based
 // authentication is used
 (function() {
-
 'use strict';
 
 var adminUser = {
@@ -128,7 +127,7 @@ assert.eq(result.ok, 1, tojson(result));
 s.getDB("admin").runCommand({enableSharding : "test"});
 s.getDB("admin").runCommand({shardCollection : "test.foo", key : {x : 1}});
 
-d1.waitForState( d1.getSecondaries(), d1.SECONDARY, 5 * 60 * 1000 )
+d1.waitForState( d1.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000 )
 
 s.getDB(testUser.db).createUser({user: testUser.username,
                                  pwd: testUser.password,
@@ -250,8 +249,8 @@ assert.eq(count, 500);
 
 logout(adminUser);
 
-d1.waitForState( d1.getSecondaries(), d1.SECONDARY, 5 * 60 * 1000 );
-d2.waitForState( d2.getSecondaries(), d2.SECONDARY, 5 * 60 * 1000 );
+d1.waitForState( d1.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000 );
+d2.waitForState( d2.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000 );
 
 authutil.asCluster(d1.nodes, "jstests/libs/key1", function() { d1.awaitReplication(120000); });
 authutil.asCluster(d2.nodes, "jstests/libs/key1", function() { d2.awaitReplication(120000); });

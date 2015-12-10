@@ -82,7 +82,8 @@ wait(function() {
       (config3 && config3.version == config.version);
   });
 
-replTest.waitForState(slave2, [replTest.SECONDARY, replTest.RECOVERING], 60 * 1000);
+replTest.waitForState(
+    slave2, [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING], 60 * 1000);
 
 print("7. Kill the secondary in the middle of syncing");
 replTest.stop(slave1);
@@ -90,12 +91,12 @@ replTest.stop(slave1);
 
 print("8. Eventually the new node should become a secondary");
 print("if initial sync has started, this will cause it to fail and sleep for 5 minutes");
-replTest.waitForState(slave2, replTest.SECONDARY, 60 * 1000);
+replTest.waitForState(slave2, ReplSetTest.State.SECONDARY, 60 * 1000);
 
 print("9. Bring the secondary back up");
 replTest.start(slave1, {}, true);
 reconnect(slave1);
-replTest.waitForState(slave1, [replTest.PRIMARY, replTest.SECONDARY], 60 * 1000);
+replTest.waitForState(slave1, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY], 60 * 1000);
 
 print("10. Insert some stuff");
 master = replTest.getPrimary();

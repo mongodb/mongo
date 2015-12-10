@@ -16,7 +16,7 @@
     replSet.startSet();
     replSet.initiate();
 
-    replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
+    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
     var primary = replSet.getPrimary();
 
     // Primary should step down long enough for election to occur on secondary.
@@ -30,8 +30,8 @@
                'replSetStepDown did not disconnect client');
 
     // Step down primary and wait for node 1 to be promoted to primary.
-    replSet.waitForState(replSet.nodes[1], replSet.PRIMARY, 60 * 1000);
+    replSet.waitForState(replSet.nodes[1], ReplSetTest.State.PRIMARY, 60 * 1000);
 
     // Eventually node 0 will stand for election again because it has a higher priorty.
-    replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, stepDownGuardMillis + 60 * 1000);
+    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, stepDownGuardMillis + 60 * 1000);
 })();
