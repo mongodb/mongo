@@ -86,6 +86,7 @@ variables:
   - osx
 
 - &packaging_variants
+  - enterprise-linux-64-amazon-ami
   - enterprise-rhel-57-64-bit
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-70-64-bit
@@ -2673,7 +2674,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
-    packager_script: packager.py
+    packager_script: packager-enterprise.py
     packager_distro: amazon
   tasks:
   - name: compile
@@ -2748,6 +2749,9 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: amazon
   tasks:
   - name: compile
     distros:
