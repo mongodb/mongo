@@ -45,7 +45,7 @@ import urlparse
 DEFAULT_ARCHES=["x86_64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS=["suse", "debian","redhat","ubuntu"]
+DISTROS=["suse", "debian","redhat","ubuntu","amazon"]
 
 
 class Spec(object):
@@ -111,7 +111,7 @@ class Spec(object):
         # our upstream version too).
         if re.search("^(debian|ubuntu)", distro.name()):
             return re.sub("-", "~", self.ver)
-        elif re.search("(suse|redhat|fedora|centos)", distro.name()):
+        elif re.search("(suse|redhat|fedora|centos|amazon)", distro.name()):
             return re.sub("-.*", "", self.ver)
         else:
             raise Exception("BUG: unsupported platform?")
@@ -135,7 +135,7 @@ class Distro(object):
     def archname(self, arch):
         if re.search("^(debian|ubuntu)", self.n):
             return "i386" if arch.endswith("86") else "amd64"
-        elif re.search("^(suse|centos|redhat|fedora)", self.n):
+        elif re.search("^(suse|centos|redhat|fedora|amazon)", self.n):
             return "i686" if arch.endswith("86") else "x86_64"
         else:
             raise Exception("BUG: unsupported platform?")
@@ -184,7 +184,7 @@ class Distro(object):
 
         if re.search("^(debian|ubuntu)", self.n):
             return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (self.n, self.repo_os_version(build_os), repo_directory, self.repo_component(), self.archname(arch))
-        elif re.search("(redhat|fedora|centos)", self.n):
+        elif re.search("(redhat|fedora|centos|amazon)", self.n):
             return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         elif re.search("(suse)", self.n):
             return "repo/zypper/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
@@ -204,11 +204,13 @@ class Distro(object):
     def repo_os_version(self, build_os):
         """Return an OS version suitable for package repo directory
         naming - e.g. 5, 6 or 7 for redhat/centos, "precise," "wheezy," etc.
-        for Ubuntu/Debian, 11 for suse"""
+        for Ubuntu/Debian, 11 for suse, "2013.03" for amazon"""
         if self.n == 'suse':
             return re.sub(r'^suse(\d+)$', r'\1', build_os)
         if self.n == 'redhat':
             return re.sub(r'^rhel(\d).*$', r'\1', build_os)
+        if self.n == 'amazon':
+            return "2013.03"
         elif self.n == 'ubuntu':
             if build_os == 'ubuntu1204':
                 return "precise"
@@ -227,7 +229,7 @@ class Distro(object):
     def make_pkg(self, build_os, arch, spec, srcdir):
         if re.search("^(debian|ubuntu)", self.n):
             return packager.make_deb(self, build_os, arch, spec, srcdir)
-        elif re.search("^(suse|centos|redhat|fedora)", self.n):
+        elif re.search("^(suse|centos|redhat|fedora|amazon)", self.n):
             return packager.make_rpm(self, build_os, arch, spec, srcdir)
         else:
             raise Exception("BUG: unsupported platform?")
@@ -241,6 +243,8 @@ class Distro(object):
             return [ "suse11", "suse12" ]
         if re.search("(redhat|fedora|centos)", self.n):
             return [ "rhel70", "rhel62", "rhel57" ]
+        elif self.n == 'amazon':
+            return [ "amazon" ]
         elif self.n == 'ubuntu':
             return [ "ubuntu1204", "ubuntu1404" ]
         elif self.n == 'debian':
@@ -252,7 +256,10 @@ class Distro(object):
         """Return the release distribution to use in the rpm - "el5" for rhel 5.x,
         "el6" for rhel 6.x, return anything else unchanged"""
 
-        return re.sub(r'^rh(el\d).*$', r'\1', build_os)
+        if self.n == 'amazon':
+          return 'amzn1'
+        else:
+          return re.sub(r'^rh(el\d).*$', r'\1', build_os)
 
 def main(argv):
 
@@ -361,7 +368,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
 def make_repo(repodir, distro, build_os, spec):
     if re.search("(debian|ubuntu)", repodir):
         make_deb_repo(repodir, distro, build_os, spec)
-    elif re.search("(suse|centos|redhat|fedora)", repodir):
+    elif re.search("(suse|centos|redhat|fedora|amazon)", repodir):
         packager.make_rpm_repo(repodir)
     else:
         raise Exception("BUG: unsupported platform?")
