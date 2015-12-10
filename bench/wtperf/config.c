@@ -583,7 +583,7 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 		return (ret);
 	}
 
-	/* Append the current line to our copy of the config */
+	/* Append the current line to our copy of the config. */
 	if ((string_copy = calloc(len + 1, 1)) == NULL) {
 		return (enomem(cfg));
 	}
@@ -663,6 +663,43 @@ config_sanity(CONFIG *cfg)
 		return (EINVAL);
 	}
 	return (0);
+}
+
+/*
+ * config_to_file --
+ *	Write the final config used in this execution to a file.
+ */
+void
+config_to_file(CONFIG *cfg)
+{
+	CONFIG_QUEUE_ENTRY *config_line;
+	FILE *fp;
+	size_t req_len;
+	char *path;
+
+	/* Backup the config */
+	req_len = strlen(cfg->home) + 100;
+	if ((path = calloc(req_len, 1)) == NULL) {
+		(void)enomem(cfg);
+		return;
+	}
+
+	snprintf(path, req_len + 14, "%s/CONFIGBACKUP", cfg->home);
+	if ((fp = fopen(path, "w")) == NULL) {
+		lprintf(cfg, errno, 0, "%s", path);
+		return;
+	}
+
+	/* Print the config dump */
+	while (!TAILQ_EMPTY(&cfg->config_head)) {
+		config_line = TAILQ_FIRST(&cfg->config_head);
+		TAILQ_REMOVE(&cfg->config_head, config_line, c);
+		fprintf(fp, "%s\n", config_line->string);
+		free(config_line->string);
+		free(config_line);
+	}
+	free(path);
+	fclose(fp);
 }
 
 /*
