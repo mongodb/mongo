@@ -41,7 +41,7 @@ void
 __wt_fill_hex(const uint8_t *src, size_t src_max,
     uint8_t *dest, size_t dest_max, size_t *lenp)
 {
-	return __fill_hex(src, src_max, dest, dest_max, lenp);
+	__fill_hex(src, src_max, dest, dest_max, lenp);
 }
 
 /*
