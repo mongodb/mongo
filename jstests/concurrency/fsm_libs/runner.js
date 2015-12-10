@@ -448,9 +448,34 @@ var runner = (function() {
         return true;
     }
 
-    function runWorkloadGroup(threadMgr, workloads, context, cluster, clusterOptions,
-                              executionMode, executionOptions, errors, maxAllowedThreads,
-                              dbHashBlacklist) {
+    function recordConfigServerData(cluster, workloads, configServerData, errors) {
+        const CONFIG_DATA_LENGTH = 3;
+
+        if (cluster.isSharded()) {
+            var newData;
+            try {
+                newData = cluster.recordAllConfigServerData();
+            } catch (e) {
+                var failureType = 'Config Server Data Collection';
+                errors.push(new WorkloadFailure(e.toString(), e.stack, failureType));
+                return;
+            }
+
+            newData.previousWorkloads = workloads;
+            newData.time = (new Date()).toISOString();
+            configServerData.push(newData);
+
+            // Limit the amount of data recorded to avoid logging too much info when a test
+            // fails.
+            while (configServerData.length > CONFIG_DATA_LENGTH) {
+                configServerData.shift();
+            }
+        }
+    }
+
+    function runWorkloadGroup(threadMgr, workloads, context, cluster, clusterOptions, executionMode,
+                              executionOptions, errors, maxAllowedThreads, dbHashBlacklist,
+                              configServerData) {
         var cleanup = [];
         var teardownFailed = false;
         var startTime = Date.now(); // Initialize in case setupWorkload fails below.
@@ -501,6 +526,8 @@ var runner = (function() {
             totalTime = Date.now() - startTime;
             jsTest.log('Workload(s) completed in ' + totalTime + ' ms: ' +
                         workloads.join(' '));
+
+            recordConfigServerData(cluster, workloads, configServerData, errors);
         }
 
         // Only drop the collections/databases if all the workloads ran successfully.
@@ -591,6 +618,7 @@ var runner = (function() {
         Random.setRandomSeed(clusterOptions.seed);
         var bgCleanup = [];
         var errors = [];
+        var configServerData = [];
 
         try {
             prepareCollections(bgWorkloads, bgContext, cluster, clusterOptions, executionOptions);
@@ -637,9 +665,9 @@ var runner = (function() {
                     });
 
                     // Run the next group of workloads in the schedule.
-                    runWorkloadGroup(threadMgr, workloads, groupContext, cluster,
-                                     clusterOptions, executionMode, executionOptions,
-                                     errors, maxAllowedThreads, dbHashBlacklist);
+                    runWorkloadGroup(threadMgr, workloads, groupContext, cluster, clusterOptions,
+                                     executionMode, executionOptions, errors, maxAllowedThreads,
+                                     dbHashBlacklist, configServerData);
                 });
             } finally {
                 // Set a flag so background threads know to terminate.
@@ -660,7 +688,13 @@ var runner = (function() {
                 // the foreground and background workloads. IterationEnd errors are ignored because
                 // they are thrown when the background workloads are instructed by the thread
                 // manager to terminate.
-                throwError(errors.filter(e => (e.err.startsWith('IterationEnd:') === false)));
+                var workloadErrors = errors.filter(e => !e.err.startsWith('IterationEnd:'));
+
+                if (cluster.isSharded() && workloadErrors.length) {
+                    jsTest.log('Config Server Data:\n' + tojsononeline(configServerData));
+                }
+
+                throwError(workloadErrors);
             } finally {
                 cluster.teardown();
             }
