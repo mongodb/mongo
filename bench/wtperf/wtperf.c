@@ -2342,10 +2342,13 @@ start_threads(CONFIG *cfg,
 		thread->workload = workp;
 
 		/*
-		 * We don't want the threads executing in lock-step, move each
-		 * new RNG state further along in the sequence.
+		 * We don't want the threads executing in lock-step, seed each
+		 * one differently.
 		 */
-		__wt_random_init_seed(NULL, &thread->rnd);
+		if ((ret = __wt_random_init_seed(NULL, &thread->rnd)) != 0) {
+			lprintf(cfg, ret, 0, "Error initializing RNG");
+			return (ret);
+		}
 
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
