@@ -14,7 +14,7 @@
  */
 int
 __wt_col_search(WT_SESSION_IMPL *session,
-    uint64_t recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
+    uint64_t search_recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
@@ -24,6 +24,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex, *parent_pindex;
 	WT_REF *current, *descent;
+	uint64_t recno;
 	uint32_t base, indx, limit;
 	int depth;
 
@@ -31,8 +32,16 @@ __wt_col_search(WT_SESSION_IMPL *session,
 
 	__cursor_pos_clear(cbt);
 
+	/*
+	 * When appending a new record, the search record number will be an
+	 * out-of-band value, search for the largest key in the table instead.
+	 */
+	if ((recno = search_recno) == WT_RECNO_OOB)
+		recno = UINT64_MAX;
+
 	/* We may only be searching a single leaf page, not the full tree. */
 	if (leaf != NULL) {
+		WT_ASSERT(session, search_recno != WT_RECNO_OOB);
 		current = leaf;
 		goto leaf_only;
 	}
@@ -127,7 +136,7 @@ leaf_only:
 	 * definition, and we figure out the record number and position when we
 	 * do the work.
 	 */
-	if (recno == UINT64_MAX) {
+	if (search_recno == WT_RECNO_OOB) {
 		cbt->compare = -1;
 		return (0);
 	}
