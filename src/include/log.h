@@ -267,6 +267,11 @@ struct __wt_log_desc {
 };
 
 /*
+ * Flags for __wt_txn_op_printlog.
+ */
+#define	WT_TXN_PRINTLOG_HEX	0x0001	/* Add hex output */
+
+/*
  * WT_LOG_REC_DESC --
  *	A descriptor for a log record type.
  */

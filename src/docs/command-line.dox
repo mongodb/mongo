@@ -32,7 +32,7 @@ on success and non-zero on error.
 
 The \c wt tool supports several commands.  If configured in the underlying
 database, some commands will run recovery when opening the database.  If
-the user wants to force recovery on any command, use the \c -r option.
+the user wants to force recovery on any command, use the \c -R option.
 In general, commands that modify the database or tables will run recovery
 by default and commands that only read data will not run recovery.
 
@@ -46,7 +46,7 @@ opened as a WiredTiger database.  See @ref backup for more information,
 and @ref file_permissions for specifics on the copied file permissions.
 
 @subsection util_backup_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] backup [-t uri] directory</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] backup [-t uri] directory</code>
 
 @subsection util_backup_options Options
 The following are command-specific options for the \c backup command:
@@ -64,7 +64,7 @@ The \c compact command attempts to rewrite the specified table or file
 to consume less disk space.
 
 @subsection util_compact_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] compact uri</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] compact uri</code>
 
 @subsection util_compact_options Options
 The \c compact command has no command-specific options.
@@ -78,7 +78,7 @@ configuration.  It is equivalent to a call to WT_SESSION::create with
 the specified string arguments.
 
 @subsection util_create_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] create [-c config] uri</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] create [-c config] uri</code>
 
 @subsection util_create_options Options
 The following are command-specific options for the \c create command:
@@ -94,7 +94,7 @@ The \c drop command drops the specified \c uri.  It is equivalent to a
 call to WT_SESSION::drop with the "force" configuration argument.
 
 @subsection util_drop_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] drop uri</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] drop uri</code>
 
 @subsection util_drop_options Options
 The \c drop command has no command-specific options.
@@ -109,7 +109,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection util_dump_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] dump [-jrx] [-c checkpoint] [-f output] uri</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] dump [-jrx] [-c checkpoint] [-f output] uri</code>
 
 @subsection util_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -143,7 +143,7 @@ the database.  If a URI is specified as an argument, only information about
 that data source is printed.
 
 @subsection util_list_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] list [-cv] [uri]</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] list [-cv] [uri]</code>
 
 @subsection util_list_options Options
 The following are command-specific options for the \c list command:
@@ -170,7 +170,7 @@ table will be overwritten by the new data (use the \c -n option to
 make an attempt to overwrite existing data return an error).
 
 @subsection util_load_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] load [-ajn] [-f input] [-r name] [uri configuration ...]</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] load [-ajn] [-f input] [-r name] [uri configuration ...]</code>
 
 @subsection util_load_options Options
 The following are command-specific options for the \c load command:
@@ -244,7 +244,7 @@ row-store table or file already exists, data in the table or file will
 be overwritten by the new data.
 
 @subsection util_loadtext_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] loadtext [-f input]</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] loadtext [-f input]</code>
 
 @subsection util_loadtext_options Options
 The following are command-specific options for the \c loadtext command:
@@ -260,7 +260,7 @@ Display the database log.
 The \c printlog command outputs the database log.
 
 @subsection util_printlog_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] printlog [-p] [-f output]</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] printlog [-x] [-f output]</code>
 
 @subsection util_printlog_options Options
 The following are command-specific options for the \c printlog command:
@@ -269,8 +269,9 @@ The following are command-specific options for the \c printlog command:
 By default, the \c printlog command output is written to the standard
 output; the \c -f option re-directs the output to the specified file.
 
-@par <code>-p</code>
-Display the log in a printable format.
+@par <code>-x</code>
+Keys and value items in the log are printed in hex format in addition
+to the default string format.
 
 <hr>
 @section util_read wt read
@@ -283,7 +284,7 @@ with string or record number keys and string values.
 The \c read command exits non-zero if a specified record is not found.
 
 @subsection util_read_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] read uri key ...</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] read uri key ...</code>
 
 @subsection util_read_options Options
 The \c read command has no command-specific options.
@@ -295,7 +296,7 @@ Rename a table or file.
 The \c rename command renames the specified table or file.
 
 @subsection util_rename_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] rename uri name</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] rename uri name</code>
 
 @subsection util_rename_options Options
 The \c rename command has no command-specific options.
@@ -309,7 +310,7 @@ data that cannot be recovered.  Underlying files are re-written in
 place, overwriting the original file contents.
 
 @subsection util_salvage_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] salvage [-F force] uri</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] salvage [-F force] uri</code>
 
 @subsection util_salvage_options Options
 The following are command-specific options for the \c salvage command:
@@ -327,7 +328,7 @@ The \c stat command outputs run-time statistics for the WiredTiger
 engine, or, if specified, for the URI on the command-line.
 
 @subsection util_stat_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] stat [-f] [uri]</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] stat [-f] [uri]</code>
 
 @subsection util_stat_options Options
 The following are command-specific options for the \c stat command:
@@ -345,7 +346,7 @@ success if the data source is up-to-date, and failure if the data source
 cannot be upgraded.
 
 @subsection util_upgrade_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] upgrade uri</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] upgrade uri</code>
 
 @subsection util_upgrade_options Options
 The \c upgrade command has no command-specific options.
@@ -359,7 +360,7 @@ success if the data source is correct, and failure if the data source is
 corrupted.
 
 @subsection util_verify_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-E secretkey ] [-h directory] verify uri</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] verify uri</code>
 
 @subsection util_verify_options Options
 The \c verify command has no command-specific options.
@@ -381,9 +382,9 @@ Attempting to overwrite an already existing record will fail.
 
 @subsection util_write_synopsis Synopsis
 <code>
-wt [-rVv] [-C config] [-E secretkey ] [-h directory] write -a uri value ...
+wt [-RVv] [-C config] [-E secretkey ] [-h directory] write -a uri value ...
 <br>
-wt [-rVv] [-C config] [-E secretkey ] [-h directory] write [-o] uri key value ...
+wt [-RVv] [-C config] [-E secretkey ] [-h directory] write [-o] uri key value ...
 </code>
 
 @subsection util_write_options Options

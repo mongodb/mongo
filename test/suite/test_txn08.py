@@ -82,6 +82,11 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['printlog'], outfilename='printlog.out')
         self.check_file_contains('printlog.out',
             '\\u0001\\u0002abcd\\u0003\\u0004')
+        self.runWt(['printlog', '-x'], outfilename='printlog-hex.out')
+        self.check_file_contains('printlog-hex.out',
+            '\\u0001\\u0002abcd\\u0003\\u0004')
+        self.check_file_contains('printlog-hex.out',
+            '0102616263640304')
 
 if __name__ == '__main__':
     wttest.run()

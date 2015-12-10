@@ -74,9 +74,7 @@ __wt_debug_set_verbose(WT_SESSION_IMPL *session, const char *v)
 static inline void
 __debug_hex_byte(WT_DBG *ds, uint8_t v)
 {
-	static const char hex[] = "0123456789abcdef";
-
-	__dmsg(ds, "#%c%c", hex[(v & 0xf0) >> 4], hex[v & 0x0f]);
+	__dmsg(ds, "#%c%c", __wt_hex[(v & 0xf0) >> 4], __wt_hex[v & 0x0f]);
 }
 
 /*
