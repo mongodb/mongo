@@ -98,9 +98,9 @@ public:
     static const char* kStageType;
 
     /**
-     * Extracts the number of documents deleted by the update plan 'exec'.
+     * Extracts the number of documents deleted by the delete plan 'exec'.
      *
-     * Should only be called if the root plan stage of 'exec' is UPDATE and if 'exec' is EOF.
+     * Should only be called if the root plan stage of 'exec' is DELETE and if 'exec' is EOF.
      */
     static long long getNumDeleted(const PlanExecutor& exec);
 
