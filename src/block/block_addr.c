@@ -194,7 +194,7 @@ __wt_block_ckpt_decode(WT_SESSION *wt_session,
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	return ( __block_buffer_to_ckpt(session, allocsize, p, ci));
+	return (__block_buffer_to_ckpt(session, (uint32_t)allocsize, p, ci));
 }
 
 /*

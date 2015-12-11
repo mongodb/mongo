@@ -182,10 +182,9 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 	WT_BLOCK_CKPT ci;
 	WT_DECL_RET;
 	WT_CKPT *ckpt, *ckptbase;
-	size_t len;
+	size_t allocsize, len;
 	time_t t;
 	uint64_t v;
-	size_t allocsize;
 
 	/*
 	 * We may not find any checkpoints for this file, in which case we don't
