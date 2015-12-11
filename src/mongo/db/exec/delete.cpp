@@ -39,7 +39,6 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/s/d_state.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -120,9 +119,6 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
             }
         }
 
-        const bool inMigratingRange =
-            isInMigratingChunk(_collection->ns().ns(), member->obj.value());
-
         _ws->free(id);
 
         BSONObj deletedDoc;
@@ -155,11 +151,14 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
                         log() << "Deleted object without id in collection " << _collection->ns()
                               << ", not logging.";
                     } else {
-                        repl::logDeleteOp(_txn,
-                                          _collection->ns().ns().c_str(),
-                                          deletedDoc,
-                                          _params.fromMigrate,
-                                          inMigratingRange);
+                        bool replJustOne = true;
+                        repl::logOp(_txn,
+                                    "d",
+                                    _collection->ns().ns().c_str(),
+                                    deletedDoc,
+                                    0,
+                                    &replJustOne,
+                                    _params.fromMigrate);
                     }
                 }
             }

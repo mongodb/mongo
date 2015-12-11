@@ -673,14 +673,7 @@ bool Cloner::go(OperationContext* txn,
 
                     c->deleteDocument(txn, *it, true, true, opts.logForRepl ? &id : NULL);
                     if (opts.logForRepl)
-                        repl::logDeleteOp(txn,
-                                          c->ns().ns().c_str(),
-                                          id,
-                                          false,   // fromMigrate
-                                          false);  // isInMigratingChunk; must be false as
-                                                   // this code path is only used during initial
-                                                   // sync, and a node cannot be donating a chunk
-                                                   // and doing an initial sync simultaneously.
+                        repl::logOp(txn, "d", c->ns().ns().c_str(), id);
                     wunit.commit();
                 }
 

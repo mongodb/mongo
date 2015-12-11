@@ -388,17 +388,6 @@ public:
         txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, op));
     }
 
-    bool isInMigratingChunk(StringData ns, const BSONObj& doc) {
-        dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
-        if (!_active) {
-            return false;
-        }
-        if (ns != _ns) {
-            return false;
-        }
-        return isInRange(doc, _min, _max, _shardKeyPattern);
-    }
-
     /**
      * Insert items from docIdList to a new array with the given fieldName in the given
      * builder. If explode is true, the inserted object will be the full version of the
@@ -911,10 +900,6 @@ void logOpForSharding(OperationContext* txn,
                       BSONObj* patt,
                       bool notInActiveChunk) {
     migrateFromStatus.logOp(txn, opstr, ns, obj, patt, notInActiveChunk);
-}
-
-bool isInMigratingChunk(StringData ns, const BSONObj& doc) {
-    return migrateFromStatus.isInMigratingChunk(ns, doc);
 }
 
 class TransferModsCommand : public ChunkCommandHelper {

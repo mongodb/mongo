@@ -449,11 +449,10 @@ long long Helpers::removeRange(OperationContext* txn,
             if (callback)
                 callback->goingToDelete(obj);
 
-            const auto inMigratingRange = isInMigratingChunk(ns, obj);
             BSONObj deletedId;
             collection->deleteDocument(txn, rloc, false, false, &deletedId);
             // The above throws on failure, and so is not logged
-            repl::logDeleteOp(txn, ns.c_str(), deletedId, fromMigrate, inMigratingRange);
+            repl::logOp(txn, "d", ns.c_str(), deletedId, 0, 0, fromMigrate);
             wuow.commit();
             numDeleted++;
         }

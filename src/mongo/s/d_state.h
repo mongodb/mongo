@@ -381,9 +381,4 @@ void logOpForSharding(OperationContext* txn,
                       const BSONObj& obj,
                       BSONObj* patt,
                       bool forMigrateCleanup);
-
-/**
- * Returns true if "doc" in collection "ns" is part of a chunk that is migrating from this node.
- */
-bool isInMigratingChunk(StringData ns, const BSONObj& doc);
 }
