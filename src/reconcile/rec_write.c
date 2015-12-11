@@ -1276,6 +1276,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		for (upd = upd_list; upd->next != NULL; upd = upd->next)
 			;
 		upd->next = append;
+		__wt_cache_page_inmem_incr(
+		    session, page, WT_UPDATE_MEMSIZE(append));
 	}
 
 	/*
