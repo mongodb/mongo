@@ -13,7 +13,9 @@ wait = function(f,msg) {
         if (++n == 4) {
             print("" + f);
         }
-        assert(n < 200, 'tried 200 times, giving up on ' + msg );
+        if (n >= 200) {
+            throw new Error('tried 200 times, giving up on ' + msg);
+        }
         sleep(1000);
     }
 };
