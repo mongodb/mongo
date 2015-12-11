@@ -255,8 +255,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../dsi/analysis/compare.py -b standalone.json -c oplog.json -t ${threshold}
-
+          python -u ../dsi/analysis/compare.py -b standalone.json -c oplog.json
 
 
 #######################################
@@ -395,7 +394,7 @@ tasks:
         compare_task: "industry_benchmarks_WT"
         variant1: "linux-standalone"
         variant2: "linux-1-node-replSet"
-        threshold: 70
+    - func: "analyze"
 
 - name: industry_benchmarks_MMAPv1_oplog_comp
   depends_on:
@@ -413,8 +412,8 @@ tasks:
         compare_task: "industry_benchmarks_MMAPv1"
         variant1: "linux-standalone"
         variant2: "linux-1-node-replSet"
-        threshold: 70
-
+    - func: "analyze"
+    
 - name: core_workloads_WT_oplog_comp
   depends_on:
     - name: industry_benchmarks_WT_oplog_comp
@@ -431,8 +430,8 @@ tasks:
         compare_task: "core_workloads_WT"
         variant1: "linux-standalone"
         variant2: "linux-1-node-replSet"
-        threshold: 70
-
+    - func: "analyze"
+    
 - name: core_workloads_MMAPv1_oplog_comp
   depends_on:
     - name: industry_benchmarks_MMAPv1_oplog_comp
@@ -449,8 +448,7 @@ tasks:
         compare_task: "core_workloads_MMAPv1"
         variant1: "linux-standalone"
         variant2: "linux-1-node-replSet"
-        threshold: 70
-
+    - func: "analyze"
 
 #######################################
 #            Buildvariants            #
