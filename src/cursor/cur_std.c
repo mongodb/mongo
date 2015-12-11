@@ -40,11 +40,11 @@ void
 __wt_cursor_set_notsup(WT_CURSOR *cursor)
 {
 	/*
-	 * Set all of the cursor methods (except for close and reset), to fail.
-	 * Close is unchanged so the cursor can be discarded, reset defaults to
+	 * Set cursor methods other than close, reconfigure and reset, to fail.
+	 * Close is unchanged so the cursor can be discarded; reset is set to
 	 * a no-op because session transactional operations reset all of the
-	 * cursors in a session, and random cursors shouldn't block transactions
-	 * or checkpoints.
+	 * cursors in a session. Reconfigure is left open in case it's possible
+	 * in the future to change these configurations.
 	 */
 	cursor->compare =
 	    (int (*)(WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;

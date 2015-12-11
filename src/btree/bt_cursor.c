@@ -830,6 +830,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	wt_off_t percent;
 	uint64_t skip;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -846,6 +847,16 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
 	/*
+	 * There are two algorithms, one where we select a record at random from
+	 * the whole tree on each retrieval, one where we first select a record
+	 * at random from the whole tree, and then subsequently sample forward
+	 * from that location. If the former, it's the same as a first retrieval
+	 * for the latter.
+	 */
+	if (cbt->next_random_sample_percent == 0)
+		goto no_sample;
+
+	/*
 	 * If we do not yet reference a page, pick a roughly random leaf page in
 	 * the tree  and choose a number of leaf pages to skip between samples.
 	 */
@@ -860,22 +871,25 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		 * aren't uniform. So, we skip past 1% of the leaf pages in the
 		 * tree between each random key return to compensate.
 		 *
-		 * Deciding how many leaf pages is roughly 1% of the file is not
-		 * simple. Use the underlying file size divided by its block
-		 * allocation size as our guess of leaf pages in the file (this
-		 * can be entirely wrong, as it depends on how many pages are in
-		 * this particular checkpoint, how large the leaf and internal
-		 * pages really are, and other factors). Then, divide that value
-		 * by 100 to get 1%, and increment the final result to make sure
-		 * tiny files don't leave us with a skip value of 0.
+		 * Deciding how many leaf pages to skip isn't simple. Use the
+		 * underlying file size divided by its block allocation size as
+		 * our guess of leaf pages in the file (this can be entirely
+		 * wrong, as it depends on how many pages are in this particular
+		 * checkpoint, how large the leaf and internal pages really are,
+		 * and other factors). Then, divide that value by 100 to get 1%
+		 * and increment the final result to make sure tiny files don't
+		 * leave us with a skip value of 0. Finally, the user configured
+		 * the percentage of the object to skip over.
 		 *
 		 * !!!
 		 * Ideally, the number would be prime to avoid restart issues.
 		 */
-		cbt->rand_leaf_skip = (uint32_t)
+		percent =
 		    ((btree->bm->block->fh->size / btree->allocsize) / 100) + 1;
+		cbt->next_random_leaf_skip =
+		    (uint32_t)(percent * cbt->next_random_sample_percent);
 
-		/*
+no_sample:	/*
 		 * Choose a leaf page from the tree.
 		 */
 		WT_ERR(__cursor_func_init(cbt, true));
@@ -894,7 +908,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		 * is read, set its generation to a low value so it is evicted
 		 * quickly.
 		 */
-		for (skip = cbt->rand_leaf_skip; cbt->ref == NULL || skip > 0;)
+		for (skip =
+		    cbt->next_random_leaf_skip; cbt->ref == NULL || skip > 0;)
 			WT_ERR(__wt_tree_walk(session, &cbt->ref, NULL, &skip,
 			    WT_READ_NO_GEN | WT_READ_SKIP_INTL |
 			    WT_READ_SKIP_LEAF | WT_READ_WONT_NEED));

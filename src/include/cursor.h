@@ -100,9 +100,16 @@ struct __wt_cursor_btree {
 	WT_INSERT	*next_stack[WT_SKIP_MAXDEPTH];
 
 	uint32_t page_deleted_count;	/* Deleted items on the page */
-	uint32_t rand_leaf_skip;	/* Leaf pages to skip (next_random) */
 
 	uint64_t recno;			/* Record number */
+
+	/*
+	 * Next-random cursors can optionally be configured to step through a
+	 * percentage of the total leaf pages to their next value. Note the
+	 * configured value and the calculated number of leaf pages to skip.
+	 */
+	uint32_t next_random_leaf_skip;
+	u_int	 next_random_sample_percent;
 
 	/*
 	 * The search function sets compare to:

@@ -2,6 +2,29 @@
 
 The \c next_random configuration to the WT_SESSION::open_cursor method
 configures the cursor to return a pseudo-random record from a row-store
-object (the configuration is not supported on other types of objects).
+object (the \c next_random configuration is not supported on other types
+of objects).
+
+Applications should use the WT_CURSOR::next method to retrieve records
+from the object, most other cursor methods are not supported. For
+example, it's not possible to update using a cursor configured for
+random retrieval.
+
+By default, records are pseudo-randomly selected from the underlying
+Btree as a whole. that can lead to skewed results when the Btree is
+unbalanced or records are not uniformly distributed. In such cases, the
+\c next_random_sample_percent configuration can additionally be
+specified.  Setting \c next_random_sample_percent to a non-zero value
+causes \c next_random cursors to randomly select the first returned
+value from the object as a whole, and on subsequent returns to skip
+forward through the specified percentage of pages in the tree, returning
+a value from the new location.
+
+For example, setting \c next_random_sample_percent to \c 10 would cause
+the cursor to skip forward through 10% of the underlying object, and
+each retrieved row would represent a sample from 10% of the object.
+Similarly, setting \c next_random_sample_percent to \c 1 would cause the
+cursor to skip forward through 1% of the underlying object, and each
+retrieved row would represent a sample from 1% of the object.
 
  */
