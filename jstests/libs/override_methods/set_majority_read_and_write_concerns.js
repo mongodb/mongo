@@ -59,7 +59,6 @@
         // These are reading commands that support majority readConcern.
         var commandsToForceReadConcern = [
             "count",
-            "dbStats",
             "distinct",
             "find",
             "geoNear",

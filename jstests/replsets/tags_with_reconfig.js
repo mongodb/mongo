@@ -24,7 +24,7 @@ replTest.initiate( conf );
 replTest.awaitReplication();
 
 
-master = replTest.getMaster();
+master = replTest.getPrimary();
 var db = master.getDB("test");
 
 // Insert a document with write concern : anydc
@@ -54,7 +54,7 @@ var config = master.getDB("local").system.replset.findOne();
 printjson(config);
 
 
-master = replTest.getMaster();
+master = replTest.getPrimary();
 var db = master.getDB("test");
 
 // Insert a document with write concern : anydc

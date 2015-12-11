@@ -16,7 +16,7 @@ print("Start set with two nodes");
 var replTest = new ReplSetTest( {name: name, nodes: 2} );
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var secondary = replTest.getSecondary();
 
 print("Initial sync");
@@ -79,7 +79,7 @@ assert.soon(function() { try {
 } catch (e) {
     return false;
 } });
-master = replTest.getMaster();
+master = replTest.getPrimary();
 printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
 var newConfig = master.getDB("local").system.replset.findOne();
 print("newConfig: " + tojson(newConfig));

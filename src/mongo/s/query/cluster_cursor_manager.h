@@ -104,6 +104,9 @@ public:
 
         // Count of open cursors registered with CursorType::NamespaceNotSharded.
         size_t cursorsNotSharded = 0;
+
+        // Count of pinned cursors.
+        size_t cursorsPinned = 0;
     };
 
     /**
@@ -426,6 +429,10 @@ private:
 
         Date_t getLastActive() const {
             return _lastActive;
+        }
+
+        bool isCursorOwned() const {
+            return static_cast<bool>(_cursor);
         }
 
         /**

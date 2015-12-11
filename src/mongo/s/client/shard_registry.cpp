@@ -695,6 +695,8 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithRetries
         }
 
         if (errorsToCheck.count(response.getStatus().code()) && retry < kOnErrorNumRetries) {
+            LOG(1) << "Command failed with retriable error and will be retried"
+                   << causedBy(response.getStatus());
             continue;
         }
 

@@ -1,4 +1,8 @@
 // TODO: remove test after we deprecate SyncClusterConnection
+//
+// This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
+// A restarted standalone will lose all data when using an ephemeral storage engine.
+// @tags: [requires_persistence]
 
 var test = new SyncCCTest( "sync1" );
 

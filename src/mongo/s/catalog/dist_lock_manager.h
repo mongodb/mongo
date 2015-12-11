@@ -61,7 +61,15 @@ class StatusWith;
  */
 class DistLockManager {
 public:
-    static const stdx::chrono::milliseconds kDefaultSingleLockAttemptTimeout;
+    // Default timeout which will be used if one is not passed to the lock method.
+    static const stdx::chrono::seconds kDefaultLockTimeout;
+
+    // Timeout value, which specifies that if the lock is not available immediately, no attempt
+    // should be made to wait for it to become free.
+    static const stdx::chrono::milliseconds kSingleLockAttemptTimeout;
+
+    // If timeout is passed to the lock call, what is the default frequency with which the lock will
+    // be checked for availability.
     static const stdx::chrono::milliseconds kDefaultLockRetryInterval;
 
     /**
@@ -122,7 +130,7 @@ public:
         OperationContext* txn,
         StringData name,
         StringData whyMessage,
-        stdx::chrono::milliseconds waitFor = kDefaultSingleLockAttemptTimeout,
+        stdx::chrono::milliseconds waitFor = kDefaultLockTimeout,
         stdx::chrono::milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
 
 protected:

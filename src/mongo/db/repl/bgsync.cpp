@@ -359,7 +359,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
                     metadataObj,
                     _replCoord->getConfig().getElectionTimeoutPeriod());
 
-    LOG(1) << "scheduling fetcher to read remote oplog on " << source;
+    LOG(1) << "scheduling fetcher to read remote oplog on " << source << " starting at "
+           << cmdObj["filter"];
     auto scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
         warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "
@@ -446,6 +447,14 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     const auto& documents = queryResponse.documents;
     auto firstDocToApply = documents.cbegin();
     auto lastDocToApply = documents.cend();
+
+    if (!documents.empty()) {
+        LOG(2) << "fetcher read " << documents.size()
+               << " operations from remote oplog starting at " << documents.front()["ts"]
+               << " and ending at " << documents.back()["ts"];
+    } else {
+        LOG(2) << "fetcher read 0 operations from remote oplog";
+    }
 
     // Check start of remote oplog and, if necessary, stop fetcher to execute rollback.
     if (queryResponse.first) {

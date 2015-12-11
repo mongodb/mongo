@@ -9,7 +9,7 @@ var rs = new ReplSetTest( {name: 'testSet', nodes: 3, nodeOptions: {verbose: 2}}
 var nodes = rs.startSet();
 rs.initiate();
 
-var master = rs.getMaster();
+var master = rs.getPrimary();
 
 var everyoneOkSoon = function() {
     var status;
@@ -133,7 +133,7 @@ for (i=0; i<n; i++) {
 
         try {
             master.adminCommand({replSetReconfig : config});
-            master = rs.getMaster();
+            master = rs.getPrimary();
             reconnect(master);
 
             version = master.getDB("local").system.replset.findOne().version;
@@ -148,7 +148,7 @@ for (i=0; i<n; i++) {
     print("\nreplsets_priority1.js wait for 2 slaves");
     
     assert.soon(function() {
-        rs.getMaster();
+        rs.getPrimary();
         return rs.liveNodes.slaves.length == 2;
     }, "2 slaves");
 
@@ -177,7 +177,7 @@ for (i=0; i<n; i++) {
 
     rs.stop(max._id);
 
-    var master = rs.getMaster();
+    var master = rs.getPrimary();
 
     print("\nkilled max primary.  Checking statuses.");
 
@@ -187,7 +187,7 @@ for (i=0; i<n; i++) {
     print("restart max " + max._id);
 
     rs.restart(max._id);
-    master = rs.getMaster();
+    master = rs.getPrimary();
 
     print("max restarted.  Checking statuses.");
     checkPrimaryIs(max);

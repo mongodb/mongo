@@ -6,7 +6,7 @@
 var replTest = new ReplSetTest({ name: 'testSet', nodes: 2 });
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 
 // do a write to allow stepping down of the primary;
 // otherwise, the primary will refuse to step down

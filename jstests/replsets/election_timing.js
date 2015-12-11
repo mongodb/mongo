@@ -37,6 +37,40 @@
     },
 
     {
+        name: "testV1StepDown",
+        description: "protocolVersion 1, primary is stepped down",
+        protocolVersion: 1,
+        testRuns: 1,
+        testCycles: 5,
+        electionTrigger: ElectionTimingTest.prototype.stepDownPrimary,
+        testReset: ElectionTimingTest.prototype.stepDownPrimaryReset,
+    },
+
+    {
+        name: "testV1StepDown1500",
+        description: "protocolVersion 1, primary is stepped down",
+        protocolVersion: 1,
+        testRuns: 1,
+        testCycles: 5,
+        electionTrigger: ElectionTimingTest.prototype.stepDownPrimary,
+        testReset: ElectionTimingTest.prototype.stepDownPrimaryReset,
+        // The settings object is merged into the replset config settings object.
+        settings: {electionTimeoutMillis: 1500}
+    },
+
+    {
+        name: "testV1StepDownLargeCluster",
+        description: "protocolVersion 1, primary is stepped down, 7 electable nodes",
+        protocolVersion: 1,
+        nodes: 7,
+        testRuns: 1,
+        testCycles: 5,
+        electionTrigger: ElectionTimingTest.prototype.stepDownPrimary,
+        testReset: function() {},
+        waitForNewPrimary : function(rst, secondary) { rst.getPrimary(); }
+    },
+
+    {
         name: "testV0Stop",
         description: "protocolVersion 0, primary is stopped",
         protocolVersion: 0,
@@ -56,11 +90,14 @@
         testSetup: function() {sleep(30 * 1000);},
         electionTrigger: ElectionTimingTest.prototype.stepDownPrimary,
         testReset: ElectionTimingTest.prototype.stepDownPrimaryReset
-    } ];
+    },
+
+    ];
 
     testCases.forEach(function (tc) {
         var testRun = new ElectionTimingTest(tc);
         tc.testResults = testRun.testResults;
+        tc.electionTimeoutLimitMillis = testRun.electionTimeoutLimitMillis;
 
         if (testRun.testErrors.length) {
             // Stop tests if we encounter an error.
@@ -85,9 +122,19 @@
         var resAvg = Array.avg(allResults);
         var resMin = Math.min(...allResults);
         var resMax = Math.max(...allResults);
+        var resStdDev = Array.stdDev(allResults);
+
         jsTestLog("Results: " + tc.name +
                   " Average over " +  allResults.length + " runs: " + resAvg +
-                  " Min: " +  resMin + " Max: " + resMax);
+                  " Min: " +  resMin + " Max: " + resMax +
+                  " Limit: " + tc.electionTimeoutLimitMillis/1000 +
+                  " StdDev: " + resStdDev.toFixed(4));
+
+        allResults.forEach(function(failoverElapsedMillis) {
+            assert.lte(failoverElapsedMillis, tc.electionTimeoutLimitMillis/1000,
+                tc.name + ': failover (' + failoverElapsedMillis + ' sec) took too long. limit: ' +
+                tc.electionTimeoutLimitMillis/1000 + ' sec');
+        });
     });
 
     jsTestLog("Tests completed in: " + (Date.now() - testStart) / 1000 + " seconds");

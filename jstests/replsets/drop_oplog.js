@@ -6,7 +6,7 @@
 
     var nodes = rt.startSet();
     rt.initiate();
-    var master = rt.getMaster();
+    var master = rt.getPrimary();
     var ml = master.getDB( 'local' );
 
     var threw = false;

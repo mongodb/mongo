@@ -216,7 +216,7 @@ TEST_F(ReplSetDistLockManagerFixture, BasicLockLifeCycle) {
         auto lockStatus = getMgr()->lock(txn(),
                                          lockName,
                                          whyMsg,
-                                         DistLockManager::kDefaultSingleLockAttemptTimeout,
+                                         DistLockManager::kSingleLockAttemptTimeout,
                                          DistLockManager::kDefaultLockRetryInterval);
         ASSERT_OK(lockStatus.getStatus());
 

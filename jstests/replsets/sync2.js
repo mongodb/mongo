@@ -10,7 +10,7 @@ replTest.initiate({"_id": "sync2",
                        {"_id": 4, host: nodes[4]}]
                  });
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 jsTestLog("Replica set test initialized");
 
 // initial sync
@@ -27,7 +27,7 @@ conns[4].disconnect(conns[1]);
 conns[4].disconnect(conns[3]);
 
 assert.soon(function() {
-    master = replTest.getMaster();
+    master = replTest.getPrimary();
     return master === conns[0];
 }, 60 * 1000, "node 0 did not become primary quickly enough");
 

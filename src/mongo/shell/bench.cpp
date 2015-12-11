@@ -636,6 +636,10 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             docBuilder.append(BSON("q" << query << "u" << update << "multi" << multi
                                                        << "upsert" << upsert));
                             docBuilder.done();
+                            auto wcElem = e["writeConcern"];
+                            if (wcElem) {
+                                builder.append("writeConcern", wcElem.Obj());
+                            }
                             conn->runCommand(
                                 nsToDatabaseSubstring(ns).toString(), builder.done(), result);
                         } else {
@@ -677,6 +681,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
 
                         BSONObj insertDoc;
                         if (useWriteCmd) {
+                            // TODO: Replace after SERVER-11774.
                             BSONObjBuilder builder;
                             builder.append("insert", nsToCollectionSubstring(ns));
                             BSONArrayBuilder docBuilder(builder.subarrayStart("documents"));
@@ -690,7 +695,10 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 docBuilder.append(insertDoc);
                             }
                             docBuilder.done();
-                            // TODO: Replace after SERVER-11774.
+                            auto wcElem = e["writeConcern"];
+                            if (wcElem) {
+                                builder.append("writeConcern", wcElem.Obj());
+                            }
                             conn->runCommand(
                                 nsToDatabaseSubstring(ns).toString(), builder.done(), result);
                         } else {
@@ -749,6 +757,10 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             int limit = (multi == true) ? 0 : 1;
                             docBuilder.append(BSON("q" << predicate << "limit" << limit));
                             docBuilder.done();
+                            auto wcElem = e["writeConcern"];
+                            if (wcElem) {
+                                builder.append("writeConcern", wcElem.Obj());
+                            }
                             conn->runCommand(
                                 nsToDatabaseSubstring(ns).toString(), builder.done(), result);
                         } else {

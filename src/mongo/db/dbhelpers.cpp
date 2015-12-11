@@ -429,8 +429,7 @@ long long Helpers::removeRange(OperationContext* txn,
             if (callback)
                 callback->goingToDelete(obj);
 
-            BSONObj deletedId;
-            collection->deleteDocument(txn, rloc, false, false, &deletedId);
+            collection->deleteDocument(txn, rloc);
             wuow.commit();
             numDeleted++;
         }

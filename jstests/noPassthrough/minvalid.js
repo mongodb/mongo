@@ -9,7 +9,7 @@ var host = getHostName();
 var nodes = replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var mdb = master.getDB("foo");
 
 print("1: initial insert");

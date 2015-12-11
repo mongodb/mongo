@@ -387,20 +387,21 @@ const ParsedResource& ParsedPrivilege::getResource() const {
     return _resource;
 }
 
-bool ParsedPrivilege::parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPrivilege,
-                                                 Privilege* result,
-                                                 std::string* errmsg) {
-    if (!parsedPrivilege.isValid(errmsg)) {
-        return false;
+Status ParsedPrivilege::parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPrivilege,
+                                                   Privilege* result,
+                                                   std::vector<std::string>* unrecognizedActions) {
+    std::string errmsg;
+    if (!parsedPrivilege.isValid(&errmsg)) {
+        return Status(ErrorCodes::FailedToParse, errmsg);
     }
 
     // Build actions
     ActionSet actions;
     const vector<std::string>& parsedActions = parsedPrivilege.getActions();
-    Status status = ActionSet::parseActionSetFromStringVector(parsedActions, &actions);
+    Status status =
+        ActionSet::parseActionSetFromStringVector(parsedActions, &actions, unrecognizedActions);
     if (!status.isOK()) {
-        *errmsg = status.reason();
-        return false;
+        return status;
     }
 
     // Build resource
@@ -428,7 +429,7 @@ bool ParsedPrivilege::parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPr
     }
 
     *result = Privilege(resource, actions);
-    return true;
+    return Status::OK();
 }
 
 bool ParsedPrivilege::privilegeToParsedPrivilege(const Privilege& privilege,

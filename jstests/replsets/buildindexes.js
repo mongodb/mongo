@@ -15,7 +15,7 @@
   
   replTest.initiate(config);
 
-  var master = replTest.getMaster().getDB(name);
+  var master = replTest.getPrimary().getDB(name);
   var slaveConns = replTest.liveNodes.slaves;
   var slave = [];
   for (var i in slaveConns) {

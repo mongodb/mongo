@@ -19,13 +19,13 @@
     rs.startSet();
     rs.initiate();
 
-    master = rs.getMaster();
+    master = rs.getPrimary();
     jsTest.log("adding user");
     master.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
                                      {w: 2, wtimeout: 30000});
 
     var safeInsert = function() {
-        master = rs.getMaster();
+        master = rs.getPrimary();
         master.getDB("admin").auth("foo", "bar");
         assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
     };
@@ -44,7 +44,7 @@
     jsTest.log("write stuff to 0&2");
     rs.stop(1);
 
-    master = rs.getMaster();
+    master = rs.getPrimary();
     master.getDB("admin").auth("foo", "bar");
     master.getDB("foo").bar.drop();
     jsTest.log("last op: " +

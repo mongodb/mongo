@@ -34,10 +34,10 @@ var st;
     };
 
     var addSlaveDelay = function(rst) {
-        var conf = rst.getMaster().getDB('local').system.replset.findOne();
+        var conf = rst.getPrimary().getDB('local').system.replset.findOne();
         conf.version++;
         var secondaryIndex = 0;
-        if (conf.members[secondaryIndex].host === rst.getMaster().host) {
+        if (conf.members[secondaryIndex].host === rst.getPrimary().host) {
             secondaryIndex = 1;
         }
         conf.members[secondaryIndex].priority = 0;

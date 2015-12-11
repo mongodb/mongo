@@ -53,7 +53,7 @@
                            {"_id" : 1, "host" : nodenames[1]},
                            {"_id" : 2, "host" : nodenames[2], arbiterOnly: true}]});
 
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     var second = replTest.getSecondary();
 
     var secondId = replTest.getNodeId(second);

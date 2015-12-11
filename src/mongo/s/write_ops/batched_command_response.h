@@ -88,8 +88,6 @@ public:
     //
 
     void setOk(int ok);
-    void unsetOk();
-    bool isOkSet() const;
     int getOk() const;
 
     void setErrCode(int errCode);

@@ -29,7 +29,7 @@
     var replSet1 = shardingTest.rs0;
 
     // Add data to it
-    var testDBReplSet1 = replSet1.getMaster().getDB(testDBName);
+    var testDBReplSet1 = replSet1.getPrimary().getDB(testDBName);
     var bulk = testDBReplSet1.foo.initializeUnorderedBulkOp();
     for (var i = 0; i < numDocs; i++) {
         bulk.insert({ x: i, text: textString });

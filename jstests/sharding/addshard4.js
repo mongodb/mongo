@@ -17,7 +17,7 @@ r.initiate(config);
 //to pre-allocate files on slow systems
 r.awaitReplication();
 
-var master = r.getMaster();
+var master = r.getPrimary();
 
 var members = config.members.map(function(elem) { return elem.host; });
 var shardName = "addshard4/"+members.join(",");
@@ -46,7 +46,7 @@ r.initiate(config);
 // to pre-allocate files on slow systems
 r.awaitReplication();
 
-master = r.getMaster();
+master = r.getPrimary();
 
 print("adding shard addshard42");
 

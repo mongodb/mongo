@@ -723,7 +723,8 @@ bool DistributedLock::lock_try(const OID& lockID,
             }
 
             conn->update(LocksType::ConfigNS,
-                         BSON(LocksType::name(_name)),
+                         BSON(LocksType::name(_name) << LocksType::state()
+                                                     << BSON("$eq" << LocksType::LOCK_PREP)),
                          BSON("$set" << finalLockDetails.obj()));
 
             BSONObj err = conn->getLastErrorDetailed();
@@ -731,10 +732,11 @@ bool DistributedLock::lock_try(const OID& lockID,
 
             currLock = conn->findOne(LocksType::ConfigNS, BSON(LocksType::name(_name)));
 
-            if (!errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1) {
+            if (!errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ||
+                currLock[LocksType::lockID()].OID() != lockID) {
                 warning() << "could not finalize winning lock " << lockName
                           << (!errMsg.empty() ? causedBy(errMsg) : " (did not update lock) ")
-                          << endl;
+                          << ", winning lock: " << currLock;
                 gotLock = false;
             } else {
                 // SUCCESS!

@@ -6,7 +6,7 @@ var nodes = rs.startSet();
 rs.initiate();
 
 // Add user
-var master = rs.getMaster();
+var master = rs.getPrimary();
 master.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"]}, {w: NODE_COUNT});
 
 // Can authenticate replset connection when whole set is up.

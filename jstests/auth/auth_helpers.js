@@ -1,4 +1,7 @@
 // Test the db.auth() shell helper.
+//
+// This test requires users to persist across a restart.
+// @tags: [requires_persistence]
 
 var conn = MongoRunner.runMongod({ smallfiles: ""});
 

@@ -30,7 +30,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_parameters",
         "command_request_response",
         "index_bounds",
-        "query_common",
     ],
 )
 
@@ -48,6 +47,7 @@ env.Library(
     ],
     LIBDEPS=[
         "internal_plans",
+        "query_common",
         "query_planner",
         "query_planner_test_lib",
         "$BUILD_DIR/mongo/db/curop",

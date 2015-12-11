@@ -11,7 +11,7 @@ step();
 var replTest = new ReplSetTest( {name: name, nodes: 1} );
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 
 {
     step("first chunk of data");
@@ -24,7 +24,7 @@ var master = replTest.getMaster();
 {
     step("wait");
     replTest.awaitReplication();
-    var time = replTest.getMaster().getDB("local").getCollection("oplog.rs").find().limit(1).sort({$natural:-1}).next();
+    var time = replTest.getPrimary().getDB("local").getCollection("oplog.rs").find().limit(1).sort({$natural:-1}).next();
     step(time.ts.t);
 }
 

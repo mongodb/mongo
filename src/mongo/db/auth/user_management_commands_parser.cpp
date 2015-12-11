@@ -43,6 +43,7 @@
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/password_digest.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 namespace auth {
@@ -465,8 +466,18 @@ Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
         }
 
         Privilege privilege;
-        if (!ParsedPrivilege::parsedPrivilegeToPrivilege(parsedPrivilege, &privilege, &errmsg)) {
-            return Status(ErrorCodes::FailedToParse, errmsg);
+        std::vector<std::string> unrecognizedActions;
+        Status status = ParsedPrivilege::parsedPrivilegeToPrivilege(
+            parsedPrivilege, &privilege, &unrecognizedActions);
+        if (!status.isOK()) {
+            return status;
+        }
+        if (unrecognizedActions.size()) {
+            std::string unrecognizedActionsString;
+            joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Unrecognized action privilege strings: "
+                                        << unrecognizedActionsString);
         }
 
         parsedPrivileges->push_back(privilege);

@@ -31,7 +31,7 @@ var replTest = new ReplSetTest({name: 'testSet', nodes: 2, oplogSize: 5});
 var nodes = replTest.startSet();
 // This will wait for initiation
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 
 var ret = master.getDB("admin").fsyncLock();
 if (!ret.ok) {
@@ -48,7 +48,7 @@ for(var i=0; i<docNum; i++) {
 waitForAllMembers(master.getDB("foo"));
 replTest.awaitReplication();
 
-// Calling getMaster also makes available the liveNodes structure, which looks like this:
+// Calling getPrimary also makes available the liveNodes structure, which looks like this:
 // liveNodes = {master: masterNode, slaves: [slave1, slave2] }
 var slaves = replTest.liveNodes.slaves;
 slaves[0].setSlaveOk();

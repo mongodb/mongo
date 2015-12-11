@@ -8,7 +8,7 @@
 
     replTest.startSet();
     replTest.initiate();
-    var primary = replTest.getMaster();
+    var primary = replTest.getPrimary();
     var secondary = replTest.liveNodes.slaves[0];
 
     var sourceDBName = 'copydb-repl-test-source';

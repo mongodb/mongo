@@ -7,7 +7,7 @@ numDocs = 1e5;
 replTest = new ReplSetTest( { name:'test', nodes:3 } );
 nodes = replTest.startSet();
 replTest.initiate();
-primary = replTest.getMaster();
+primary = replTest.getPrimary();
 secondary = replTest.getSecondary();
 db = primary.getDB( 'test' );
 db.test.save( { a:0 } );

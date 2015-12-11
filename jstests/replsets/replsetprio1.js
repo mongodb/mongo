@@ -22,7 +22,7 @@
     replTest.waitForState(nodes[1], replTest.PRIMARY, 60000);
     
     // do some writes on 1
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     for (var i=0; i<1000; i++) {
         master.getDB("foo").bar.insert({i:i});
     }
@@ -36,7 +36,7 @@
     replTest.waitForState(nodes[2], replTest.PRIMARY, 60000);
 
     // make sure nothing was rolled back
-    master = replTest.getMaster();
+    master = replTest.getPrimary();
     for (i=0; i<1000; i++) {
         assert(master.getDB("foo").bar.findOne({i:i}) != null, 'checking '+i);
         assert(master.getDB("bar").baz.findOne({i:i}) != null, 'checking '+i);

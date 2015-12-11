@@ -41,7 +41,7 @@ load("jstests/replsets/rslib.js");
 
     // Make sure we have a master and that that master is node A
     replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     var a_conn = conns[0];
     a_conn.setSlaveOk();
     var A = a_conn.getDB("admin");

@@ -5,7 +5,7 @@ var rt = new ReplSetTest( { name : "replset8tests" , nodes: 1 } );
 
 var nodes = rt.startSet();
 rt.initiate();
-var master = rt.getMaster();
+var master = rt.getPrimary();
 var bigstring = "a";
 var md = master.getDB( 'd' );
 var mdc = md[ 'c' ];

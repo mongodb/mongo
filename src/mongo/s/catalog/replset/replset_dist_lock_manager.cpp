@@ -430,4 +430,5 @@ void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _unlockList.push_back(lockSessionID);
 }
-}
+
+}  // namespace mongo

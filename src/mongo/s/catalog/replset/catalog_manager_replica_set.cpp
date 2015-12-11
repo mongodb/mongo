@@ -463,14 +463,13 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
     LOG(1) << "dropCollection " << ns << " started";
 
     // Lock the collection globally so that split/migrate cannot run
-    stdx::chrono::seconds waitFor(2);
+    stdx::chrono::seconds waitFor(DistLockManager::kDefaultLockTimeout);
     MONGO_FAIL_POINT_BLOCK(setDropCollDistLockWait, customWait) {
         const BSONObj& data = customWait.getData();
         waitFor = stdx::chrono::seconds(data["waitForSecs"].numberInt());
     }
-    const stdx::chrono::milliseconds lockTryInterval(500);
-    auto scopedDistLock =
-        getDistLockManager()->lock(txn, ns.ns(), "drop", waitFor, lockTryInterval);
+
+    auto scopedDistLock = getDistLockManager()->lock(txn, ns.ns(), "drop", waitFor);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
@@ -902,21 +901,42 @@ void CatalogManagerReplicaSet::_runBatchWriteCommand(
     const std::string dbname = batchRequest.getNS().db().toString();
     invariant(dbname == "config" || dbname == "admin");
 
+    invariant(batchRequest.sizeWriteOps() == 1);
+
     const BSONObj cmdObj = batchRequest.toBSON();
 
-    auto response =
-        grid.shardRegistry()->runCommandOnConfigWithRetries(txn, dbname, cmdObj, errorsToCheck);
-    if (!response.isOK()) {
-        _toBatchError(response.getStatus(), batchResponse);
+    for (int retry = 1; retry <= kMaxWriteRetry; ++retry) {
+        // runCommandOnConfigWithRetries already does its own retries based on the generic command
+        // errors. If this fails, we know that it has done all the retries that it could do so there
+        // is no need to retry anymore.
+        auto response =
+            grid.shardRegistry()->runCommandOnConfigWithRetries(txn, dbname, cmdObj, errorsToCheck);
+        if (!response.isOK()) {
+            _toBatchError(response.getStatus(), batchResponse);
+            return;
+        }
+
+        string errmsg;
+        if (!batchResponse->parseBSON(response.getValue(), &errmsg)) {
+            _toBatchError(
+                Status(ErrorCodes::FailedToParse,
+                       str::stream() << "Failed to parse config server response: " << errmsg),
+                batchResponse);
+            return;
+        }
+
+        // If one of the write operations failed (which is reported in the error details), see if
+        // this is a retriable error as well.
+        Status status = batchResponse->toStatus();
+        if (errorsToCheck.count(status.code()) && retry < kMaxWriteRetry) {
+            LOG(1) << "Command failed with retriable error and will be retried" << causedBy(status);
+            continue;
+        }
+
         return;
     }
 
-    string errmsg;
-    if (!batchResponse->parseBSON(response.getValue(), &errmsg)) {
-        _toBatchError(Status(ErrorCodes::FailedToParse,
-                             str::stream() << "Failed to parse config server response: " << errmsg),
-                      batchResponse);
-    }
+    MONGO_UNREACHABLE;
 }
 
 Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,

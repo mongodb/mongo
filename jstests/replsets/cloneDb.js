@@ -21,7 +21,7 @@ if (jsTest.options().keyFile) {
     var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
     replTest.startSet();
     replTest.initiate();
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     var secondary = replTest.liveNodes.slaves[0];
     var masterDB = master.getDB(replsetDBName);
     masterDB.dropDatabase();

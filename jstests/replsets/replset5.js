@@ -19,7 +19,7 @@ load("jstests/replsets/rslib.js");
     replTest.initiate(config);
 
     //
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     replTest.awaitSecondaryNodes();
     var testDB = "foo";
 

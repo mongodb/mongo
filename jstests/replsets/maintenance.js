@@ -8,7 +8,7 @@ replTest.initiate(config);
 replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60000);
 
 // Make sure we have a master
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 
 for (i = 0; i < 20; i++) {
     master.getDB("bar").foo.insert({x:1,y:i,abc:123,str:"foo bar baz"});

@@ -171,8 +171,6 @@ public:
 };
 
 TEST_F(AuthorizationManagerTest, testAcquireV2User) {
-    externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-
     OperationContextNoop txn;
 
     ASSERT_OK(
@@ -214,6 +212,9 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     RoleNameIterator roles = v2read->getRoles();
     ASSERT_EQUALS(RoleName("read", "test"), roles.next());
     ASSERT_FALSE(roles.more());
+    auto privilegeMap = v2read->getPrivileges();
+    auto testDBPrivilege = privilegeMap[ResourcePattern::forDatabaseName("test")];
+    ASSERT(testDBPrivilege.getActions().contains(ActionType::find));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
     authzManager->releaseUser(v2read);
 
@@ -225,8 +226,120 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     RoleNameIterator clusterRoles = v2cluster->getRoles();
     ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
     ASSERT_FALSE(clusterRoles.more());
+    privilegeMap = v2cluster->getPrivileges();
+    auto clusterPrivilege = privilegeMap[ResourcePattern::forClusterResource()];
+    ASSERT(clusterPrivilege.getActions().contains(ActionType::serverStatus));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
     authzManager->releaseUser(v2cluster);
+}
+
+/**
+ * An implementation of AuthzManagerExternalStateMock that overrides the getUserDescription method
+ * to return the user document unmodified from how it was inserted.  When using this insert user
+ * documents in the format that would be returned from a usersInfo command run with
+ * showPrivilges:true, rather than the format that would normally be stored in a system.users
+ * collection.  The main difference between using this mock and the normal
+ * AuthzManagerExternalStateMock is that with this one you should specify the 'inheritedPrivileges'
+ * field in any user documents added.
+ */
+class AuthzManagerExternalStateMockWithExplicitUserPrivileges
+    : public AuthzManagerExternalStateMock {
+public:
+    /**
+     * This version of getUserDescription just loads the user doc directly as it was inserted into
+     * the mock's user document catalog, without performing any role resolution.  This way the tests
+     * can control exactly what privileges are returned for the user.
+     */
+    Status getUserDescription(OperationContext* txn,
+                              const UserName& userName,
+                              BSONObj* result) override {
+        return _getUserDocument(txn, userName, result);
+    }
+
+private:
+    Status _getUserDocument(OperationContext* txn, const UserName& userName, BSONObj* userDoc) {
+        Status status =
+            findOne(txn,
+                    AuthorizationManager::usersCollectionNamespace,
+                    BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+                         << userName.getUser() << AuthorizationManager::USER_DB_FIELD_NAME
+                         << userName.getDB()),
+                    userDoc);
+        if (status == ErrorCodes::NoMatchingDocument) {
+            status = Status(ErrorCodes::UserNotFound,
+                            mongoutils::str::stream() << "Could not find user "
+                                                      << userName.getFullName());
+        }
+        return status;
+    }
+};
+
+class AuthorizationManagerWithExplicitUserPrivilegesTest : public ::mongo::unittest::Test {
+public:
+    virtual ~AuthorizationManagerWithExplicitUserPrivilegesTest() {
+        if (authzManager)
+            authzManager->invalidateUserCache();
+    }
+
+    void setUp() {
+        auto localExternalState =
+            stdx::make_unique<AuthzManagerExternalStateMockWithExplicitUserPrivileges>();
+        externalState = localExternalState.get();
+        externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        authzManager = stdx::make_unique<AuthorizationManager>(std::move(localExternalState));
+        externalState->setAuthorizationManager(authzManager.get());
+        authzManager->setAuthEnabled(true);
+    }
+
+    std::unique_ptr<AuthorizationManager> authzManager;
+    AuthzManagerExternalStateMockWithExplicitUserPrivileges* externalState;
+};
+
+// Tests SERVER-21535, unrecognized actions should be ignored rather than causing errors.
+TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
+    OperationContextNoop txn;
+
+    ASSERT_OK(externalState->insertPrivilegeDocument(
+        &txn,
+        BSON("_id"
+             << "admin.myUser"
+             << "user"
+             << "myUser"
+             << "db"
+             << "test"
+             << "credentials" << BSON("MONGODB-CR"
+                                      << "password") << "roles" << BSON_ARRAY(BSON("role"
+                                                                                   << "myRole"
+                                                                                   << "db"
+                                                                                   << "test"))
+             << "inheritedPrivileges" << BSON_ARRAY(BSON("resource" << BSON("db"
+                                                                            << "test"
+                                                                            << "collection"
+                                                                            << "") << "actions"
+                                                                    << BSON_ARRAY("find"
+                                                                                  << "fakeAction"
+                                                                                  << "insert")))),
+        BSONObj()));
+
+    User* myUser;
+    ASSERT_OK(authzManager->acquireUser(&txn, UserName("myUser", "test"), &myUser));
+    ASSERT_EQUALS(UserName("myUser", "test"), myUser->getName());
+    ASSERT(myUser->isValid());
+    ASSERT_EQUALS(1U, myUser->getRefCount());
+    RoleNameIterator roles = myUser->getRoles();
+    ASSERT_EQUALS(RoleName("myRole", "test"), roles.next());
+    ASSERT_FALSE(roles.more());
+    auto privilegeMap = myUser->getPrivileges();
+    auto testDBPrivilege = privilegeMap[ResourcePattern::forDatabaseName("test")];
+    ActionSet actions = testDBPrivilege.getActions();
+    ASSERT(actions.contains(ActionType::find));
+    ASSERT(actions.contains(ActionType::insert));
+    actions.removeAction(ActionType::find);
+    actions.removeAction(ActionType::insert);
+    ASSERT(actions.empty());
+
+    // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+    authzManager->releaseUser(myUser);
 }
 
 }  // namespace

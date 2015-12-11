@@ -172,7 +172,6 @@ bool DBHashCmd::run(OperationContext* txn,
         colls.sort();
     }
 
-    result.appendNumber("numCollections", (long long)colls.size());
     result.append("host", prettyHostName());
 
     md5_state_t globalState;

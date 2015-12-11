@@ -94,6 +94,22 @@
  */
 var ShardingTest = function(params) {
 
+    if (!(this instanceof ShardingTest)) {
+        return new ShardingTest(params);
+    }
+
+    // Capture the 'this' reference
+    var self = this;
+
+    // Used for counting the test duration
+    var _startTime = new Date();
+
+    // Populated with the paths of all shard hosts (config servers + hosts) and is used for
+    // cleaning up the data files on shutdown
+    var _alldbpaths = [];
+
+    // Publicly exposed variables
+
     /**
      * Attempts to open a connection to the specified connection string or throws if unable to
      * connect.
@@ -120,12 +136,34 @@ var ShardingTest = function(params) {
         return tojsononeline(r.min) + " -> " + tojsononeline(r.max);
     }
 
-    // Used for counting the test duration
-    var _startTime = new Date();
+    /**
+     * Checks whether the specified collection is sharded by consulting the config metadata.
+     */
+    function _isSharded(collName) {
+        var collName = "" + collName;
+        var dbName;
 
-    // Populated with the paths of all shard hosts (config servers + hosts) and is used for
-    // cleaning up the data files on shutdown
-    var _alldbpaths = [];
+        if (typeof collName.getCollectionNames == 'function') {
+            dbName = "" + collName;
+            collName = undefined;
+        }
+
+        if (dbName) {
+            var x = self.config.databases.findOne({ _id : dbname });
+            if (x)
+                return x.partitioned;
+            else
+                return false;
+        }
+
+        if (collName) {
+            var x = self.config.collections.findOne({ _id : collName });
+            if (x)
+                return true;
+            else
+                return false;
+        }
+    }
 
     // ShardingTest API
 
@@ -155,7 +193,7 @@ var ShardingTest = function(params) {
             throw Error("couldn't find dbname: " + dbname + " total: " + this.config.databases.count());
         }
 
-        return this.config.shards.find({ _id : { $ne : x.primary } }).map(function(z) { return z._id; })
+        return this.config.shards.find({ _id: { $ne: x.primary } }).map(z => z._id);
     };
 
     this.getConnNames = function() {
@@ -175,12 +213,12 @@ var ShardingTest = function(params) {
 
         var rsName = null;
         if (name.indexOf("/") > 0)
-        rsName = name.substring(0 , name.indexOf("/"));
+        rsName = name.substring(0, name.indexOf("/"));
 
         for (var i=0; i<this._connections.length; i++) {
             var c = this._connections[i];
-            if (connectionURLTheSame(name , c.name) || 
-                 connectionURLTheSame(rsName , c.name))
+            if (connectionURLTheSame(name, c.name) || 
+                 connectionURLTheSame(rsName, c.name))
                 return c;
         }
 
@@ -195,26 +233,32 @@ var ShardingTest = function(params) {
     };
 
     this.getOther = function(one) {
-        if (this._connections.length < 2)
+        if (this._connections.length < 2) {
             throw Error("getOther only works with 2 servers");
-
-        if (one._mongo)
-            one = one._mongo
-        
-        for(var i = 0; i < this._connections.length; i++) {
-            if (this._connections[i] != one) return this._connections[i]
         }
-        
+
+        if (one._mongo) {
+            one = one._mongo;
+        }
+
+        for(var i = 0; i < this._connections.length; i++) {
+            if (this._connections[i] != one) {
+                return this._connections[i];
+            }
+        }
+
         return null;
     };
 
     this.getAnother = function(one) {
-        if (this._connections.length < 2)
+        if (this._connections.length < 2) {
             throw Error("getAnother() only works with multiple servers");
-        
-        if (one._mongo)
-            one = one._mongo
-        
+        }
+
+        if (one._mongo) {
+            one = one._mongo;
+        }
+
         for(var i = 0; i < this._connections.length; i++) {
             if (this._connections[i] == one)
                 return this._connections[(i + 1) % this._connections.length];
@@ -222,10 +266,12 @@ var ShardingTest = function(params) {
     };
 
     this.getFirstOther = function(one) {
-        for (var i=0; i<this._connections.length; i++) {
-            if (this._connections[i] != one)
-            return this._connections[i];
+        for (var i = 0; i < this._connections.length; i++) {
+            if (this._connections[i] != one) {
+                return this._connections[i];
+            }
         }
+
         throw Error("impossible");
     };
 
@@ -257,7 +303,8 @@ var ShardingTest = function(params) {
 
         var timeMillis = new Date().getTime() - _startTime.getTime();
 
-        print('*** ShardingTest ' + this._testName + " completed successfully in " + (timeMillis / 1000) + " seconds ***");
+        print('*** ShardingTest ' + this._testName + " completed successfully in " +
+                (timeMillis / 1000) + " seconds ***");
     };
 
     this.adminCommand = function(cmd) {
@@ -290,17 +337,17 @@ var ShardingTest = function(params) {
     };
 
     this.getChunksString = function(ns) {
-        var q = {}
-        if (ns)
+        var q = {};
+        if (ns) {
             q.ns = ns;
+        }
 
         var s = "";
-        this.config.chunks.find(q).sort({ ns : 1 , min : 1 }).forEach(
-            function(z) {
-                s +=  "  " + z._id + "\t" + z.lastmod.t + "|" + z.lastmod.i + "\t" + tojson(z.min) + " -> " + tojson(z.max) + " " + z.shard + "  " + z.ns + "\n";
-            }
-       );
-        
+        this.config.chunks.find(q).sort({ ns : 1, min : 1 }).forEach(function(z) {
+            s += "  " + z._id + "\t" + z.lastmod.t + "|" + z.lastmod.i + "\t" +
+                 tojson(z.min) + " -> " + tojson(z.max) + " " + z.shard + "  " + z.ns + "\n";
+        });
+
         return s;
     };
 
@@ -312,20 +359,25 @@ var ShardingTest = function(params) {
         printShardingStatus(this.config);
     };
 
-    this.printCollectionInfo = function(ns , msg) {
+    this.printCollectionInfo = function(ns, msg) {
         var out = "";
-        if (msg)
+        if (msg) {
             out += msg + "\n";
+        }
         out += "sharding collection info: " + ns + "\n";
-        for (var i=0; i<this._connections.length; i++) {
+
+        for (var i = 0; i<this._connections.length; i++) {
             var c = this._connections[i];
-            out += "  mongod " + c + " " + tojson(c.getCollection(ns).getShardVersion() , " " , true) + "\n";
+            out += "  mongod " + c + " " +
+                   tojson(c.getCollection(ns).getShardVersion(), " ", true) + "\n";
         }
-        for (var i=0; i<this._mongos.length; i++) {
+
+        for (var i = 0; i < this._mongos.length; i++) {
             var c = this._mongos[i];
-            out += "  mongos " + c + " " + tojson(c.getCollection(ns).getShardVersion() , " " , true) + "\n";
+            out += "  mongos " + c + " " +
+                   tojson(c.getCollection(ns).getShardVersion(), " ", true) + "\n";
         }
-        
+
         out += this.getChunksString(ns);
 
         print("ShardingTest " + out);
@@ -335,49 +387,57 @@ var ShardingTest = function(params) {
         this.adminCommand("connpoolsync");
     };
 
-    this.onNumShards = function(collName , dbName) {
-        this.sync(); // we should sync since we're going directly to mongod here
+    this.onNumShards = function(collName, dbName) {
         dbName = dbName || "test";
-        var num=0;
-        for (var i=0; i<this._connections.length; i++)
-            if (this._connections[i].getDB(dbName).getCollection(collName).count() > 0)
+
+        // We should sync since we're going directly to mongod here
+        this.sync();
+
+        var num = 0;
+        for (var i = 0; i < this._connections.length; i++) {
+            if (this._connections[i].getDB(dbName).getCollection(collName).count() > 0) {
                 num++;
+            }
+        }
+
         return num;
     };
 
-    this.shardCounts = function(collName , dbName) {
-        this.sync(); // we should sync since we're going directly to mongod here
+    this.shardCounts = function(collName, dbName) {
         dbName = dbName || "test";
-        var counts = {}
-        for (var i=0; i<this._connections.length; i++)
+
+        // We should sync since we're going directly to mongod here
+        this.sync();
+
+        var counts = {};
+        for (var i = 0; i < this._connections.length; i++) {
             counts[i] = this._connections[i].getDB(dbName).getCollection(collName).count();
+        }
+
         return counts;
     };
 
-    this.chunkCounts = function(collName , dbName) {
+    this.chunkCounts = function(collName, dbName) {
         dbName = dbName || "test";
-        var x = {}
 
-        this.config.shards.find().forEach(
-            function(z) {
-                x[z._id] = 0;
-            }
-       );
-        
-        this.config.chunks.find({ ns : dbName + "." + collName }).forEach(
-            function(z) {
-                if (x[z.shard])
-                    x[z.shard]++
-                else
-                    x[z.shard] = 1;
-            }
-       );
+        var x = {};
+        this.config.shards.find().forEach(function(z) {
+            x[z._id] = 0;
+        });
+
+        this.config.chunks.find({ ns : dbName + "." + collName }).forEach(function(z) {
+            if (x[z.shard])
+                x[z.shard]++;
+            else
+                x[z.shard] = 1;
+        });
 
         return x;
     };
 
-    this.chunkDiff = function(collName , dbName) {
-        var c = this.chunkCounts(collName , dbName);
+    this.chunkDiff = function(collName, dbName) {
+        var c = this.chunkCounts(collName, dbName);
+
         var min = 100000000;
         var max = 0;
         for (var s in c) {
@@ -386,21 +446,24 @@ var ShardingTest = function(params) {
             if (c[s] > max)
                 max = c[s];
         }
-        print("ShardingTest input: " + tojson(c) + " min: " + min + " max: " + max );
+
+        print("ShardingTest input: " + tojson(c) + " min: " + min + " max: " + max);
         return max - min;
     };
 
-    // Waits up to one minute for the difference in chunks between the most loaded shard and least
-    // loaded shard to be 0 or 1, indicating that the collection is well balanced.
-    // This should only be called after creating a big enough chunk difference to trigger balancing.
-    this.awaitBalance = function(collName , dbName , timeToWait) {
+    /**
+     * Waits up to one minute for the difference in chunks between the most loaded shard and least
+     * loaded shard to be 0 or 1, indicating that the collection is well balanced. This should only
+     * be called after creating a big enough chunk difference to trigger balancing.
+     */
+    this.awaitBalance = function(collName, dbName, timeToWait) {
         timeToWait = timeToWait || 60000;
-        var shardingTest = this;
+
         assert.soon(function() {
-            var x = shardingTest.chunkDiff(collName , dbName);
+            var x = self.chunkDiff(collName, dbName);
             print("chunk diff: " + x);
             return x < 2;
-        } , "no balance happened", 60000);
+        }, "no balance happened", 60000);
     };
 
     this.getShardNames = function() {
@@ -412,20 +475,21 @@ var ShardingTest = function(params) {
     };
 
     this.getShard = function(coll, query, includeEmpty) {
-        var shards = this.getShardsForQuery(coll, query, includeEmpty)
-        assert.eq(shards.length, 1)
-        return shards[0]
+        var shards = this.getShardsForQuery(coll, query, includeEmpty);
+        assert.eq(shards.length, 1);
+        return shards[0];
     };
 
     /**
      * Returns the shards on which documents matching a particular query reside.
      */
     this.getShardsForQuery = function(coll, query, includeEmpty) {
-        if (! coll.getDB)
-            coll = this.s.getCollection(coll)
+        if (!coll.getDB) {
+            coll = this.s.getCollection(coll);
+        }
 
-        var explain = coll.find(query).explain("executionStats")
-        var shards = []
+        var explain = coll.find(query).explain("executionStats");
+        var shards = [];
 
         var execStages = explain.executionStats.executionStages;
         var plannerShards = explain.queryPlanner.winningPlan.shards;
@@ -442,8 +506,8 @@ var ShardingTest = function(params) {
 
         for(var i = 0; i < shards.length; i++) {
             for(var j = 0; j < this._connections.length; j++) {
-                if (connectionURLTheSame( this._connections[j] , shards[i])) {
-                    shards[i] = this._connections[j]
+                if (connectionURLTheSame( this._connections[j], shards[i])) {
+                    shards[i] = this._connections[j];
                     break;
                 }
             }
@@ -452,66 +516,54 @@ var ShardingTest = function(params) {
         return shards;
     };
 
-    this.isSharded = function(collName) {
-        var collName = "" + collName
-        var dbName = undefined
-        
-        if (typeof collName.getCollectionNames == 'function') {
-            dbName = "" + collName
-            collName = undefined
-        }
-
-        if (dbName) {
-            var x = this.config.databases.findOne({ _id : dbname })
-            if (x) return x.partitioned
-            else return false
-        }
-
-        if (collName) {
-            var x = this.config.collections.findOne({ _id : collName })
-            if (x) return true
-            else return false
-        }    
-    };
-
-    this.shardColl = function(collName , key , split , move , dbName, waitForDelete) {
-        split = (split != false ? (split || key) : split)
-        move = (split != false && move != false ? (move || split) : false)
+    this.shardColl = function(collName, key, split, move, dbName, waitForDelete) {
+        split = (split != false ? (split || key) : split);
+        move = (split != false && move != false ? (move || split) : false);
 
         if (collName.getDB)
-            dbName = "" + collName.getDB()
+            dbName = "" + collName.getDB();
         else 
             dbName = dbName || "test";
 
         var c = dbName + "." + collName;
-        if (collName.getDB)
-            c = "" + collName
+        if (collName.getDB) {
+            c = "" + collName;
+        }
 
         var isEmpty = (this.s.getCollection(c).count() == 0);
 
-        if (! this.isSharded(dbName))
-            this.s.adminCommand({ enableSharding : dbName })
-
-        var result = this.s.adminCommand({ shardcollection : c , key : key })
-        if (! result.ok) {
-            printjson(result)
-            assert(false)
+        if (!_isSharded(dbName)) {
+            this.s.adminCommand({ enableSharding : dbName });
         }
 
-        if (split == false) return;
-
-        result = this.s.adminCommand({ split : c , middle : split });
-        if (! result.ok) {
-            printjson(result)
-            assert(false)
+        var result = this.s.adminCommand({ shardcollection : c, key : key });
+        if (!result.ok) {
+            printjson(result);
+            assert(false);
         }
 
-        if (move == false) return;
+        if (split == false) {
+            return;
+        }
 
-        var result = null
+        result = this.s.adminCommand({ split : c, middle : split });
+        if (! result.ok) {
+            printjson(result);
+            assert(false);
+        }
+
+        if (move == false) {
+            return;
+        }
+
+        var result;
         for(var i = 0; i < 5; i++) {
-            result = this.s.adminCommand({ movechunk : c , find : move , to : this.getOther(this.getServer(dbName)).name, _waitForDelete: waitForDelete });
+            result = this.s.adminCommand({ movechunk: c,
+                                           find: move,
+                                           to: this.getOther(this.getServer(dbName)).name,
+                                           _waitForDelete: waitForDelete });
             if (result.ok) break;
+
             sleep(5 * 1000);
         }
 
@@ -520,7 +572,10 @@ var ShardingTest = function(params) {
     };
 
     this.stopBalancer = function(timeout, interval) {
-        if (typeof db == "undefined") db = undefined;
+        if (typeof db == "undefined") {
+            db = undefined;
+        }
+
         var oldDB = db;
         db = this.config;
 
@@ -534,7 +589,10 @@ var ShardingTest = function(params) {
     };
 
     this.startBalancer = function(timeout, interval) {
-        if (typeof db == "undefined") db = undefined;
+        if (typeof db == "undefined") {
+            db = undefined;
+        }
+
         var oldDB = db;
         db = this.config;
 
@@ -594,7 +652,7 @@ var ShardingTest = function(params) {
         } else {
             MongoRunner.stopMongod(this._configServers[n]);
         }
-    }
+    };
 
     /**
      * Stops and restarts a mongos process.
@@ -753,7 +811,6 @@ var ShardingTest = function(params) {
         this["c" + n] = this._configServers[n];
     };
 
-
     /**
      * Helper method for setting primary shard of a database and making sure that it was successful.
      * Note: first mongos needs to be up.
@@ -776,11 +833,13 @@ var ShardingTest = function(params) {
     var numMongos = otherParams.hasOwnProperty('mongos') ? otherParams.mongos : 1;
     var numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : 3;
 
-    // Allow specifying options like :
-    // { mongos : [ { noprealloc : "" } ], config : [ { smallfiles : "" } ], shards : { rs : true, d : true } } 
+    // Allow specifying mixed-type options like this:
+    // { mongos : [ { noprealloc : "" } ],
+    //   config : [ { smallfiles : "" } ],
+    //   shards : { rs : true, d : true } }
     if (Array.isArray(numShards)) {
         for(var i = 0; i < numShards.length; i++) {
-            otherParams[ "d" + i ] = numShards[i];
+            otherParams["d" + i] = numShards[i];
         }
 
         numShards = numShards.length;
@@ -788,7 +847,7 @@ var ShardingTest = function(params) {
     else if (isObject(numShards)) {
         var tempCount = 0;
         for(var i in numShards) {
-            otherParams[ i ] = numShards[i];
+            otherParams[i] = numShards[i];
             tempCount++;
         }
 
@@ -797,7 +856,7 @@ var ShardingTest = function(params) {
 
     if (Array.isArray(numMongos)) {
         for(var i = 0; i < numMongos.length; i++) {
-            otherParams[ "s" + i ] = numMongos[i];
+            otherParams["s" + i] = numMongos[i];
         }
 
         numMongos = numMongos.length;
@@ -805,7 +864,7 @@ var ShardingTest = function(params) {
     else if (isObject(numMongos)) {
         var tempCount = 0;
         for(var i in numMongos) {
-            otherParams[ i ] = numMongos[i];
+            otherParams[i] = numMongos[i];
             tempCount++;
         }
 
@@ -814,15 +873,15 @@ var ShardingTest = function(params) {
 
     if (Array.isArray(numConfigs)) {
         for(var i = 0; i < numConfigs.length; i++) {
-            otherParams[ "c" + i ] = numConfigs[i];
+            otherParams["c" + i] = numConfigs[i];
         }
 
-        numConfigs = numConfigs.length
+        numConfigs = numConfigs.length;
     }
     else if (isObject(numConfigs)) {
         var tempCount = 0;
         for(var i in numConfigs) {
-            otherParams[ i ] = numConfigs[i];
+            otherParams[i] = numConfigs[i];
             tempCount++;
         }
 
@@ -834,26 +893,24 @@ var ShardingTest = function(params) {
         true : otherParams.useHostname;
     otherParams.useBridge = otherParams.useBridge || false;
     otherParams.bridgeOptions = otherParams.bridgeOptions || {};
-    var keyFile = otherParams.keyFile || otherParams.extraOptions.keyFile
+
+    var keyFile = otherParams.keyFile || otherParams.extraOptions.keyFile;
     var hostName = getHostName();
 
-    this._testName = testName
-    this._otherParams = otherParams
-    
+    this._testName = testName;
+    this._otherParams = otherParams;
+
     var pathOpts = { testName: testName };
 
-    var hasRS = false
     for(var k in otherParams) {
         if (k.startsWith("rs") && otherParams[k] != undefined) {
-            hasRS = true
-            break
+            break;
         }
     }
 
-    this._connections = []
-    this._shardServers = this._connections
-    this._rs = []
-    this._rsObjects = []
+    this._connections = [];
+    this._rs = [];
+    this._rsObjects = [];
 
     if (otherParams.useBridge) {
         var unbridgedConnections = [];
@@ -866,25 +923,23 @@ var ShardingTest = function(params) {
         if (otherParams.rs || otherParams["rs" + i]) {
             var setName = testName + "-rs" + i;
 
-            rsDefaults = { useHostname : otherParams.useHostname,
-                           noJournalPrealloc : otherParams.nopreallocj, 
-                           oplogSize : 16,
-                           pathOpts : Object.merge(pathOpts, { shard : i })}
+            var rsDefaults = { useHostname : otherParams.useHostname,
+                               noJournalPrealloc : otherParams.nopreallocj, 
+                               oplogSize : 16,
+                               pathOpts : Object.merge(pathOpts, { shard : i })};
 
-            rsDefaults = Object.merge(rsDefaults, ShardingTest.rsOptions || {})
-            rsDefaults = Object.merge(rsDefaults, otherParams.rs)
-            rsDefaults = Object.merge(rsDefaults, otherParams.rsOptions)
-            rsDefaults = Object.merge(rsDefaults, otherParams["rs" + i])
-            rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas
+            rsDefaults = Object.merge(rsDefaults, otherParams.rs);
+            rsDefaults = Object.merge(rsDefaults, otherParams.rsOptions);
+            rsDefaults = Object.merge(rsDefaults, otherParams["rs" + i]);
+            rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas;
 
             var numReplicas = rsDefaults.nodes || 3;
             delete rsDefaults.nodes;
+
             var protocolVersion = rsDefaults.protocolVersion;
             delete rsDefaults.protocolVersion;
             var initiateTimeout = rsDefaults.initiateTimeout;
             delete rsDefaults.initiateTimeout;
-
-            print("Replica set test!")
 
             var rs = new ReplSetTest({ name : setName,
                                        nodes : numReplicas,
@@ -901,9 +956,9 @@ var ShardingTest = function(params) {
                             url : rs.getURL() };
 
             rs.initiate(null, null, initiateTimeout);
-            this["rs" + i] = rs
 
-            this._rsObjects[i] = rs
+            this["rs" + i] = rs;
+            this._rsObjects[i] = rs;
 
             _alldbpaths.push(null);
             this._connections.push(null);
@@ -923,11 +978,11 @@ var ShardingTest = function(params) {
 
             if (otherParams.shardOptions && otherParams.shardOptions.binVersion) {
                 otherParams.shardOptions.binVersion =
-                    MongoRunner.versionIterator(otherParams.shardOptions.binVersion)
+                    MongoRunner.versionIterator(otherParams.shardOptions.binVersion);
             }
 
-            options = Object.merge(options, otherParams.shardOptions)
-            options = Object.merge(options, otherParams["d" + i])
+            options = Object.merge(options, otherParams.shardOptions);
+            options = Object.merge(options, otherParams["d" + i]);
 
             options.port = options.port || allocatePort();
 
@@ -952,7 +1007,7 @@ var ShardingTest = function(params) {
             if (otherParams.useBridge) {
                 bridge.connectToBridge();
                 this._connections.push(bridge);
-                unbridgedConnections.push(conn)
+                unbridgedConnections.push(conn);
             } else {
                 this._connections.push(conn);
             }
@@ -973,18 +1028,20 @@ var ShardingTest = function(params) {
         }
 
         var rs = this._rs[i].test;
-        
-        rs.getMaster().getDB("admin").foo.save({ x : 1 })
+        rs.getPrimary().getDB("admin").foo.save({ x : 1 });
+
         if (keyFile) {
             authutil.asCluster(rs.nodes, keyFile, function() { rs.awaitReplication(); });
         }
+
         rs.awaitSecondaryNodes();
-        
+
         var rsConn = new Mongo(rs.getURL());
         rsConn.name = rs.getURL();
-        this._connections[i] = rsConn
-        this["shard" + i] = rsConn
-        rsConn.rs = rs
+
+        this._connections[i] = rsConn;
+        this["shard" + i] = rsConn;
+        rsConn.rs = rs;
     }
 
     // Default to using 3-node legacy config servers if jsTestOptions().useLegacyOptions is true
@@ -1014,15 +1071,13 @@ var ShardingTest = function(params) {
                             journal : "",
                             configsvr : "" };
 
-            options = Object.merge(options, ShardingTest.configOptions || {})
-
             if (otherParams.configOptions && otherParams.configOptions.binVersion) {
                 otherParams.configOptions.binVersion =
-                    MongoRunner.versionIterator(otherParams.configOptions.binVersion)
+                    MongoRunner.versionIterator(otherParams.configOptions.binVersion);
             }
 
-            options = Object.merge(options, otherParams.configOptions)
-            options = Object.merge(options, otherParams["c" + i])
+            options = Object.merge(options, otherParams.configOptions);
+            options = Object.merge(options, otherParams["c" + i]);
 
             options.port = options.port || allocatePort();
 
@@ -1079,19 +1134,19 @@ var ShardingTest = function(params) {
                              storageEngine : "wiredTiger",
                            };
 
-        startOptions = Object.merge(startOptions, ShardingTest.configOptions || {})
-
         if (otherParams.configOptions && otherParams.configOptions.binVersion) {
             otherParams.configOptions.binVersion =
-                MongoRunner.versionIterator(otherParams.configOptions.binVersion)
+                MongoRunner.versionIterator(otherParams.configOptions.binVersion);
         }
 
-        startOptions = Object.merge(startOptions, otherParams.configOptions)
+        startOptions = Object.merge(startOptions, otherParams.configOptions);
+
         var nodeOptions = [];
         for (var i = 0; i < numConfigs; ++i) {
             nodeOptions.push(otherParams["c" + i] || {});
         }
-        rstOptions["nodes"] = nodeOptions;
+
+        rstOptions.nodes = nodeOptions;
 
         this.configRS = new ReplSetTest(rstOptions);
         this.configRS.startSet(startOptions);
@@ -1102,7 +1157,7 @@ var ShardingTest = function(params) {
         var initiateTimeout = otherParams.rsOptions && otherParams.rsOptions.initiateTimeout;
         this.configRS.initiate(config, null, initiateTimeout);
 
-        this.configRS.getMaster(); // Wait for master to be elected before starting mongos
+        this.configRS.getPrimary(); // Wait for master to be elected before starting mongos
 
         this._configDB = this.configRS.getURL();
         this._configServers = this.configRS.nodes;
@@ -1115,20 +1170,23 @@ var ShardingTest = function(params) {
 
     printjson("config servers: " + this._configDB);
 
-    this._configConnection = _connectWithRetry(this._configDB);
+    var configConnection = _connectWithRetry(this._configDB);
 
-    print("ShardingTest " + this._testName + " :\n" + tojson({ config : this._configDB, shards : this._connections }));
+    print("ShardingTest " + this._testName + " :\n" +
+          tojson({ config : this._configDB, shards : this._connections }));
 
     if (numMongos == 0 && !otherParams.noChunkSize) {
         if (keyFile) {
             throw Error("Cannot set chunk size without any mongos when using auth");
         } else {
-            this._configConnection.getDB("config").settings.insert(
-                { _id : "chunksize" , value : otherParams.chunksize || otherParams.chunkSize || 50 });
+            configConnection.getDB("config").settings.insert({
+                _id : "chunksize",
+                value : otherParams.chunksize || otherParams.chunkSize || 50
+            });
         }
     }
 
-    this._mongos = []
+    this._mongos = [];
 
     // Start the MongoS servers
     for (var i = 0; i < ((numMongos == 0 ? -1 : numMongos) || 1); i++) {
@@ -1137,23 +1195,21 @@ var ShardingTest = function(params) {
             pathOpts: Object.merge(pathOpts, {mongos: i}),
             configdb: this._configDB,
             verbose: verboseLevel || 0,
-            keyFile: keyFile
+            keyFile: keyFile,
         };
 
         if (!otherParams.noChunkSize) {
             options.chunkSize = otherParams.chunksize || otherParams.chunkSize || 50;
         }
 
-        options = Object.merge(options, ShardingTest.mongosOptions || {})
-
         if (otherParams.mongosOptions && otherParams.mongosOptions.binVersion) {
             otherParams.mongosOptions.binVersion =
                 MongoRunner.versionIterator(otherParams.mongosOptions.binVersion);
         }
 
-        options = Object.merge(options, otherParams.mongosOptions)
-        options = Object.merge(options, otherParams.extraOptions)
-        options = Object.merge(options, otherParams["s" + i])
+        options = Object.merge(options, otherParams.mongosOptions);
+        options = Object.merge(options, otherParams.extraOptions);
+        options = Object.merge(options, otherParams["s" + i]);
 
         options.port = options.port || allocatePort();
 
@@ -1242,7 +1298,7 @@ var ShardingTest = function(params) {
     }
 
     if (jsTestOptions().keyFile) {
-        jsTest.authenticate(this._configConnection);
+        jsTest.authenticate(configConnection);
         jsTest.authenticateNodes(this._configServers);
         jsTest.authenticateNodes(this._mongos);
     }

@@ -30,7 +30,7 @@ replTest.initiate({_id : name, members : [
     {_id : 2, host : host+":"+replTest.ports[2], arbiterOnly : true}
 ]});
 var slaves = replTest.liveNodes.slaves;
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var masterId = replTest.getNodeId(master);
 var slave = slaves[0];
 var slaveId = replTest.getNodeId(slave);
@@ -62,7 +62,7 @@ print("6: start up slave");
 replTest.restart(slaveId);
 
 print("7: writes on former slave")
-master = replTest.getMaster();
+master = replTest.getPrimary();
 mdb1 = master.getDB("foo");
 mdb1.foo.save({a:1002});
 

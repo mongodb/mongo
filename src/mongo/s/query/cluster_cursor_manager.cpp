@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -33,6 +35,7 @@
 #include <set>
 
 #include "mongo/util/clock_source.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -311,6 +314,8 @@ void ClusterCursorManager::killMortalCursorsInactiveSince(Date_t cutoff) {
             CursorEntry& entry = cursorIdEntryPair.second;
             if (entry.getLifetimeType() == CursorLifetime::Mortal &&
                 entry.getLastActive() <= cutoff) {
+                log() << "Marking cursor id " << cursorIdEntryPair.first
+                      << " for deletion, idle since " << entry.getLastActive().toString();
                 entry.setKillPending();
             }
         }
@@ -371,8 +376,15 @@ ClusterCursorManager::Stats ClusterCursorManager::stats() const {
             const CursorEntry& entry = cursorIdEntryPair.second;
 
             if (entry.getKillPending()) {
+                // Killed cursors do not count towards the number of pinned cursors or the number of
+                // open cursors.
                 continue;
             }
+
+            if (!entry.isCursorOwned()) {
+                ++stats.cursorsPinned;
+            }
+
             switch (entry.getCursorType()) {
                 case CursorType::NamespaceNotSharded:
                     ++stats.cursorsNotSharded;

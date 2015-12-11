@@ -18,7 +18,7 @@
                            { "_id": 2, "host": nodes[2], priority: 0 }],
                       });
 
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     master.getDB("foo").bar.save({a: 1});
     replTest.awaitReplication();
     var slaves = replTest.liveNodes.slaves;

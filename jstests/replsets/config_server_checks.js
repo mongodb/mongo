@@ -51,7 +51,7 @@ var conf = rst.getReplSetConfig();
 conf.configsvr = true;
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
-rst.getMaster();
+rst.getPrimary();
 expectState(rst, rst.PRIMARY);
 rst.stopSet();
 })();
@@ -71,10 +71,10 @@ var conf = rst.getReplSetConfig();
 conf.configsvr = true;
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
-rst.getMaster();
+rst.getPrimary();
 expectState(rst, rst.PRIMARY);
 
-var conf = rst.getMaster().getDB('local').system.replset.findOne();
+var conf = rst.getPrimary().getDB('local').system.replset.findOne();
 assert(conf.configsvr, tojson(conf));
 
 rst.stopSet();
@@ -93,7 +93,7 @@ var rst = new ReplSetTest({name: "configrs6",
 rst.startSet();
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: 1}));
 
-rst.getMaster();
+rst.getPrimary();
 expectState(rst, rst.PRIMARY);
 rst.stopSet();
 })();
@@ -111,7 +111,7 @@ rst.startSet();
 var conf = rst.getReplSetConfig();
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
-rst.getMaster();
+rst.getPrimary();
 expectState(rst, rst.PRIMARY);
 assert.throws(function() {
                   rst.restart(0, {configsvr: ""});
@@ -135,7 +135,7 @@ var conf = rst.getReplSetConfig();
 conf.configsvr = true;
 assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
-rst.getMaster();
+rst.getPrimary();
 expectState(rst, rst.PRIMARY);
 
 var node = rst.nodes[0];

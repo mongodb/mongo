@@ -5,6 +5,9 @@
  * NOTE: This test is similar to upgrade_to_x509_ssl_nossl.js in the
  * sslSpecial test suite. This test uses ssl communication
  * and therefore cannot test modes that do not allow ssl.
+ *
+ * This test requires users to persist across a restart.
+ * @tags: [requires_persistence]
  */
 
 function authAllNodes() {
@@ -26,7 +29,7 @@ rst.startSet();
 rst.initiate();
 
 // Connect to master and do some basic operations
-var rstConn1 = rst.getMaster();
+var rstConn1 = rst.getPrimary();
 print("Performing basic operations on master.");
 rstConn1.getDB("admin").createUser({user:"root", pwd:"pwd", roles:["root"]}, {w: NUM_NODES});
 rstConn1.getDB("admin").auth("root", "pwd");
@@ -43,7 +46,7 @@ rst.upgradeSet({sslMode:"preferSSL", sslPEMKeyFile: SERVER_CERT,
                 sslCAFile: CA_CERT}, "root", "pwd");
 // The upgradeSet call restarts the nodes so we need to reauthenticate.
 authAllNodes();
-var rstConn3 = rst.getMaster();
+var rstConn3 = rst.getPrimary();
 rstConn3.getDB("test").a.insert({a:3, str:"TESTTESTTEST"});
 assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");
 rst.awaitReplication();
@@ -57,6 +60,6 @@ rst.upgradeSet({sslMode:"requireSSL", sslPEMKeyFile: SERVER_CERT,
                 clusterAuthMode:"x509", keyFile: KEYFILE,
                 sslCAFile: CA_CERT}, "root", "pwd");
 authAllNodes();
-var rstConn4 = rst.getMaster();
+var rstConn4 = rst.getPrimary();
 rstConn4.getDB("test").a.insert({a:4, str:"TESTTESTTEST"});
 assert.eq(4, rstConn4.getDB("test").a.count(), "Error interacting with replSet");

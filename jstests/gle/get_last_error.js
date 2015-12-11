@@ -5,7 +5,7 @@ var replTest = new ReplSetTest({name: name, oplogSize: 1, nodes: 3,
                                 settings: {chainingAllowed: false}});
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var mdb = master.getDB("test");
 
 // synchronize replication
@@ -49,7 +49,7 @@ assert.eq(gle.wtimeout, null);
 
 // take a node down and GLE for more nodes than are up
 replTest.stop(2);
-master = replTest.getMaster();
+master = replTest.getPrimary();
 mdb = master.getDB("test");
 // do w:2 write so secondary is caught up before calling {gle w:3}.
 assert.writeOK(mdb.foo.insert({_id: "3"}, {writeConcern: {w: 2, wtimeout:30000}}));

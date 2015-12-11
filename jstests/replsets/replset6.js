@@ -6,7 +6,7 @@ baseName = "jstests_replsets_replset6";
 var rt = new ReplSetTest({ name : "replset6tests" , nodes: 2 });
 var nodes = rt.startSet();
 rt.initiate();
-var m = rt.getMaster();
+var m = rt.getPrimary();
 rt.awaitSecondaryNodes();
 var slaves = rt.liveNodes.slaves;
 s = slaves[0];

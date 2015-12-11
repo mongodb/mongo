@@ -52,6 +52,8 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
@@ -70,6 +72,7 @@ using stdx::chrono::milliseconds;
 using unittest::assertGet;
 
 using InsertRetryTest = CatalogManagerReplSetTestFixture;
+using UpdateRetryTest = CatalogManagerReplSetTestFixture;
 
 const NamespaceString kTestNamespace("config.TestColl");
 const HostAndPort kTestHosts[] = {
@@ -237,6 +240,55 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
 
         return vector<BSONObj>{BSON("_id" << 1 << "Value"
                                           << "TestValue has changed")};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
+    configTargeter()->setFindHostReturnValue({kTestHosts[0]});
+
+    BSONObj objToUpdate = BSON("_id" << 1 << "Value"
+                                     << "TestValue");
+    BSONObj updateExpr = BSON("$set" << BSON("Value"
+                                             << "NewTestValue"));
+
+    auto future = launchAsync([&] {
+        auto status = catalogManager()->updateConfigDocument(
+            operationContext(), kTestNamespace.ns(), objToUpdate, updateExpr, false);
+        ASSERT_OK(status);
+    });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        BatchedUpdateRequest actualBatchedUpdate;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setNModified(0);
+
+        auto writeErrDetail = stdx::make_unique<WriteErrorDetail>();
+        writeErrDetail->setIndex(0);
+        writeErrDetail->setErrCode(ErrorCodes::Interrupted);
+        writeErrDetail->setErrMessage("Operation interrupted");
+        response.addToErrDetails(writeErrDetail.release());
+
+        return response.toBSON();
+    });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        BatchedUpdateRequest actualBatchedUpdate;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setNModified(1);
+
+        return response.toBSON();
     });
 
     future.timed_get(kFutureTimeout);

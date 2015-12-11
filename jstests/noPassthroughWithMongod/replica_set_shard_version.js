@@ -21,7 +21,7 @@ coll.findOne()
 var sadmin = shard.getDB( "admin" )
 assert.throws(function() { sadmin.runCommand({ replSetStepDown : 3000, force : true }); });
 
-st.rs0.getMaster();
+st.rs0.getPrimary();
 
 mongosA.getDB("admin").runCommand({ setParameter : 1, traceExceptions : true })
 

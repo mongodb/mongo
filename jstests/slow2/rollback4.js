@@ -19,7 +19,7 @@ var r = replTest.initiate({ "_id": "unicomplex",
 
 replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
 // Make sure we have a master
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 var b_conn = conns[1];
 b_conn.setSlaveOk();
 var B = b_conn.getDB("admin");
@@ -50,7 +50,7 @@ replTest.stop( 0 );
 // after the node reports that it is primary via heartbeats, but before ismaster indicates that the
 // node will accept writes.
 replTest.waitForState(conns[1], replTest.PRIMARY, 5 * 60 * 1000);
-master = replTest.getMaster(5 * 60 * 1000);
+master = replTest.getPrimary(5 * 60 * 1000);
 
 // Save to new master, forcing rollback of old master
 master.getDB( 'db' ).c.save( big );

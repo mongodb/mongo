@@ -36,7 +36,7 @@
 
     var nodes = replTest.startSet();
     replTest.initiate();
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
     var testDB = master.getDB("test");
     var localDB = master.getDB("local");
     var minvalidColl = localDB["replset.minvalid"];

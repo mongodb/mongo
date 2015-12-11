@@ -756,7 +756,7 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt) {
     int exitCode = 0;
     if (port > 0) {
         if (!registry.isPortRegistered(port)) {
-            log() << "No db started on port: " << port << endl;
+            log() << "No db started on port: " << port;
             return 0;
         }
         pid = registry.pidForPort(port);
@@ -766,27 +766,29 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt) {
 
     kill_wrapper(pid, signal, port, opt);
 
-    int i = 0;
-    for (; i < 130; ++i) {
-        if (i == 60) {
+    bool processTerminated = false;
+    bool killSignalSent = (signal == SIGKILL);
+    for (int i = 0; i < 1300; ++i) {
+        if (i == 600) {
             log() << "process on port " << port << ", with pid " << pid
-                  << " not terminated, sending sigkill" << endl;
+                  << " not terminated, sending sigkill";
             kill_wrapper(pid, SIGKILL, port, opt);
+            killSignalSent = true;
         }
-        if (wait_for_pid(pid, false, &exitCode))
+        processTerminated = wait_for_pid(pid, false, &exitCode);
+        if (processTerminated) {
             break;
-        sleepmillis(1000);
+        }
+        sleepmillis(100);
     }
-    if (i == 130) {
-        log() << "failed to terminate process on port " << port << ", with pid " << pid << endl;
-        verify("Failed to terminate process" == 0);
+    if (!processTerminated) {
+        severe() << "failed to terminate process on port " << port << ", with pid " << pid;
+        invariant(false);
     }
 
     registry.deleteProgram(pid);
-    // FIXME I think the intention here is to do an extra sleep only when SIGKILL is sent to the
-    // child process. We may want to change the 4 below to 29, since values of i greater than that
-    // indicate we sent a SIGKILL.
-    if (i > 4 || signal == SIGKILL) {
+
+    if (killSignalSent) {
         sleepmillis(4000);  // allow operating system to reclaim resources
     }
 

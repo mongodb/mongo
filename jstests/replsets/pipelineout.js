@@ -10,7 +10,7 @@ replTest.initiate({"_id" : name,
                          {"_id" : 1, "host" : nodes[1]}
      ]});
 
-var primary = replTest.getMaster().getDB(name);
+var primary = replTest.getPrimary().getDB(name);
 var secondary = replTest.liveNodes.slaves[0].getDB(name);
 
 // populate the collection

@@ -109,7 +109,7 @@ public:
 
     void remove(const RecordId& loc) {
         WriteUnitOfWork wunit(&_txn);
-        _coll->deleteDocument(&_txn, loc, false, false, NULL);
+        _coll->deleteDocument(&_txn, loc);
         wunit.commit();
     }
 

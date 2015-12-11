@@ -418,8 +418,7 @@ Status CatalogManagerCommon::createDatabase(OperationContext* txn, const std::st
     invariant(dbName != "config");
 
     // Lock the database globally to prevent conflicts with simultaneous database creation.
-    auto scopedDistLock =
-        getDistLockManager()->lock(txn, dbName, "createDatabase", Seconds{5}, Milliseconds{500});
+    auto scopedDistLock = getDistLockManager()->lock(txn, dbName, "createDatabase");
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
@@ -536,8 +535,7 @@ Status CatalogManagerCommon::enableSharding(OperationContext* txn, const std::st
 
     // Lock the database globally to prevent conflicts with simultaneous database
     // creation/modification.
-    auto scopedDistLock =
-        getDistLockManager()->lock(txn, dbName, "enableSharding", Seconds{5}, Milliseconds{500});
+    auto scopedDistLock = getDistLockManager()->lock(txn, dbName, "enableSharding");
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }

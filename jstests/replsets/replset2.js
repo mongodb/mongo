@@ -18,9 +18,9 @@ doTest = function (signal) {
 
     var testDB = "repl-test";
 
-    // Call getMaster to return a reference to the node that's been
+    // Call getPrimary to return a reference to the node that's been
     // elected master.
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
 
     // Wait for replication to a single node
     master.getDB(testDB).bar.insert({ n: 1 });

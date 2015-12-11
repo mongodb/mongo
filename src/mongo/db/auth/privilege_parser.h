@@ -143,10 +143,12 @@ public:
 
     /**
      * Takes a parsedPrivilege and turns it into a true Privilege object.
+     * If the parsedPrivilege contains any unrecognized privileges it will add those to
+     * unrecognizedActions.
      */
-    static bool parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPrivilege,
-                                           Privilege* result,
-                                           std::string* errmsg);
+    static Status parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPrivilege,
+                                             Privilege* result,
+                                             std::vector<std::string>* unrecognizedActions);
     /**
      * Takes a Privilege object and turns it into a ParsedPrivilege.
      */

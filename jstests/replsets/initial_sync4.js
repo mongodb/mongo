@@ -8,7 +8,7 @@ replTest = new ReplSetTest( {name: basename, nodes: 1} );
 replTest.startSet();
 replTest.initiate();
 
-m = replTest.getMaster();
+m = replTest.getPrimary();
 md = m.getDB("d");
 mc = m.getDB("d")["c"];
 

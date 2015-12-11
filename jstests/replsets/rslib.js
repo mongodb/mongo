@@ -102,7 +102,7 @@ waitForAllMembers = function(master, timeout) {
 
 reconfig = function(rs, config, force) {
     "use strict";
-    var admin = rs.getMaster().getDB("admin");
+    var admin = rs.getPrimary().getDB("admin");
     var e;
     var master;
     try {
@@ -114,7 +114,7 @@ reconfig = function(rs, config, force) {
         }
     }
 
-    var master = rs.getMaster().getDB("admin");
+    var master = rs.getPrimary().getDB("admin");
     waitForAllMembers(master);
 
     return master;
