@@ -62,7 +62,6 @@ static const int OPLOG_VERSION = 2;
    @param opstr
     "i" insert
     "u" update
-    "d" delete
     "c" db cmd
     "n" no-op
     "db" declares presence of a database (ns is set to the db name + '.')
@@ -70,6 +69,8 @@ static const int OPLOG_VERSION = 2;
    For 'u' records, 'obj' captures the mutation made to the object but not
    the object itself. In that case, we provide also 'fullObj' which is the
    image of the object _after_ the mutation logged here was applied.
+
+   Deletes are logged using logDeleteOp, below.
 
    See _logOp() in oplog.cpp for more details.
 */
@@ -80,6 +81,21 @@ void logOp(OperationContext* txn,
            BSONObj* patt = NULL,
            bool* b = NULL,
            bool fromMigrate = false);
+
+/**
+ * Log a single document delete to the local oplog.
+ *
+ * "ns" is the fully qualified collection name.
+ * "idDoc" is a document containing the primary key (_id) for the deleted document.
+ * "fromMigrate" is as in "logOp".
+ * "isInMigratingChunk" should be set to the value that isInMigratingChunk() would have returned on
+ * the deleted document, before it was deleted.
+ */
+void logDeleteOp(OperationContext* txn,
+                 const char* ns,
+                 const BSONObj& idDoc,
+                 bool fromMigrate,
+                 bool isInMigratingChunk);
 
 // Log an empty no-op operation to the local oplog
 void logKeepalive(OperationContext* txn);

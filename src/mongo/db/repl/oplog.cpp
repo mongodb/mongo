@@ -347,13 +347,14 @@ void logOpInitiate(OperationContext* txn, const BSONObj& obj) {
       d delete / remove
       u update
 */
-void logOp(OperationContext* txn,
-           const char* opstr,
-           const char* ns,
-           const BSONObj& obj,
-           BSONObj* patt,
-           bool* b,
-           bool fromMigrate) {
+static void logOpInternal(OperationContext* txn,
+                          const char* opstr,
+                          const char* ns,
+                          const BSONObj& obj,
+                          BSONObj* patt,
+                          bool* b,
+                          bool fromMigrate,
+                          bool isDeleteInMigratingChunk) {
     if (getGlobalReplicationCoordinator()->isReplEnabled()) {
         _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
     }
@@ -363,11 +364,34 @@ void logOp(OperationContext* txn,
     // rollback-safe logOp listeners
     //
     getGlobalAuthorizationManager()->logOp(txn, opstr, ns, obj, patt, b);
-    logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
+    logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate || !isDeleteInMigratingChunk);
     logOpForDbHash(txn, ns);
     if (strstr(ns, ".system.js")) {
         Scope::storedFuncMod(txn);
     }
+}
+
+void logOp(OperationContext* txn,
+           const char* opstr,
+           const char* ns,
+           const BSONObj& obj,
+           BSONObj* patt,
+           bool* b,
+           bool fromMigrate) {
+    if (MONGO_unlikely(opstr[0] == 'd' && opstr[1] == '\0')) {
+        severe() << "logOp called with opstr == 'd'; use logDeleteOp instead";
+        invariant(*opstr != 'd');
+    }
+    logOpInternal(txn, opstr, ns, obj, patt, b, fromMigrate, false);
+}
+
+void logDeleteOp(OperationContext* txn,
+                 const char* ns,
+                 const BSONObj& idDoc,
+                 bool fromMigrate,
+                 bool isInMigratingChunk) {
+    bool justOne = true;
+    logOpInternal(txn, "d", ns, idDoc, NULL, &justOne, fromMigrate, isInMigratingChunk);
 }
 
 OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
