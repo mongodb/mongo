@@ -1524,15 +1524,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: sharding_csrs_continuous_config_stepdown_WT
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding_continuous_config_stepdown --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
   name: sharding_WT_ese
   commands:
   - func: "do setup"
@@ -3827,7 +3818,6 @@ buildvariants:
   - name: sharding_legacy_op_query_WT
   - name: sharding_op_query_WT
   - name: sharding_legacy_multiversion
-  - name: sharding_csrs_continuous_config_stepdown_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
