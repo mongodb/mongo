@@ -138,8 +138,6 @@ public:
         cloneOptions.slaveOk = cmdObj["slaveOk"].trueValue();
         cloneOptions.useReplAuth = false;
         cloneOptions.snapshot = true;
-        cloneOptions.mayYield = true;
-        cloneOptions.mayBeInterrupted = true;
 
         string todb = cmdObj.getStringField("todb");
         if (fromhost.empty() || todb.empty() || cloneOptions.fromDB.empty()) {

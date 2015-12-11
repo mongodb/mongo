@@ -64,9 +64,7 @@ public:
                         const std::string& ns,
                         const BSONObj& query,
                         std::string& errmsg,
-                        bool mayYield,
-                        bool mayBeInterrupted,
-                        bool copyIndexes = true);
+                        bool copyIndexes);
 
 private:
     void copy(OperationContext* txn,
@@ -76,8 +74,6 @@ private:
               const NamespaceString& to_ns,
               bool masterSameProcess,
               bool slaveOk,
-              bool mayYield,
-              bool mayBeInterrupted,
               Query q);
 
     void copyIndexes(OperationContext* txn,
@@ -86,9 +82,7 @@ private:
                      const BSONObj& from_opts,
                      const NamespaceString& to_ns,
                      bool masterSameProcess,
-                     bool slaveOk,
-                     bool mayYield,
-                     bool mayBeInterrupted);
+                     bool slaveOk);
 
     struct Fun;
     std::unique_ptr<DBClientBase> _conn;
@@ -102,28 +96,15 @@ private:
  *                repairDatabase need not use it.
  */
 struct CloneOptions {
-    CloneOptions() {
-        slaveOk = false;
-        useReplAuth = false;
-        snapshot = true;
-        mayYield = true;
-        mayBeInterrupted = false;
-
-        syncData = true;
-        syncIndexes = true;
-    }
-
     std::string fromDB;
     std::set<std::string> collsToIgnore;
 
-    bool slaveOk;
-    bool useReplAuth;
-    bool snapshot;
-    bool mayYield;
-    bool mayBeInterrupted;
+    bool slaveOk = false;
+    bool useReplAuth = false;
+    bool snapshot = true;
 
-    bool syncData;
-    bool syncIndexes;
+    bool syncData = true;
+    bool syncIndexes = true;
 };
 
 }  // namespace mongo
