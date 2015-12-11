@@ -263,6 +263,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	sourcecfg[1] = fmt.data;
 	WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
 
+	// YSD: In the following call, the file on the disk will be created.
 	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
@@ -555,6 +556,13 @@ err:	__wt_free(session, idxconf);
 /*
  * __create_table --
  *	Create a table.
+ * YSD: Invoked when creatint collections. The main thing done here is to parse the configurations
+ * and then insert the name and the configuration as a k/V pair into the meta table.
+ * So in the future we can get the configuration of the table by its name from this table.
+ * name passed here is in the format like 'table:collection-2--6465299736142874781'.
+ * The prefix of 'table:' will be trimmed so tablename will be 'collection-2--6465299736142874781'.
+ * exclusive -- true: return error if table with the same name exists
+ *				false: return success without doing nothing.
  */
 static int
 __create_table(WT_SESSION_IMPL *session,
@@ -564,6 +572,17 @@ __create_table(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cgkey, cgval, cval;
 	WT_DECL_RET;
 	WT_TABLE *table;
+
+	/* YSD:
+	 * Parse the configuration for this collection, compressor, for example.
+	 * In my testcase, I'm using WiredTiger storage engine, and the compressor is zlib. The configuration 
+	 * passed in when creating a collection is as follows:
+	 * (const char *[4]) $77 = ([0] = "app_metadata=,colgroups=,collator=,columns=,key_format=u,value_format=u", 
+	 * [1] = "type=file,memory_page_max=10m,split_pct=90,leaf_value_max=64MB,checksum=on,block_compressor=zlib,,
+	 * 		  key_format=q,value_format=u,app_metadata=(formatVersion=1)", 
+	 * [2] = 0x0000000000000000, 
+	 * [3] = 0x0000000000000000)
+	 */
 	const char *cfg[4] =
 	    { WT_CONFIG_BASE(session, table_meta), config, NULL, NULL };
 	const char *tablename;
@@ -576,6 +595,7 @@ __create_table(WT_SESSION_IMPL *session,
 	tableconf = NULL;
 
 	tablename = name;
+	// YSD: Trim the prefix of the name('table:').
 	if (!WT_PREFIX_SKIP(tablename, "table:"))
 		return (EINVAL);
 
@@ -588,6 +608,7 @@ __create_table(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_config_gets(session, cfg, "colgroups", &cval));
 	WT_ERR(__wt_config_subinit(session, &conf, &cval));
+	// YSD: Process the configurations.
 	for (ncolgroups = 0;
 	    (ret = __wt_config_next(&conf, &cgkey, &cgval)) == 0;
 	    ncolgroups++)

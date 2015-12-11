@@ -232,10 +232,10 @@ private:
 
     int64_t _numFields;  // How many fields are indexed?
     BSONObj _keyPattern;
-    std::string _indexName;
-    std::string _parentNS;
-    std::string _indexNamespace;
-    bool _isIdIndex;
+    std::string _indexName; // YSD: Name of the index without any field. For example, 'idx'.
+    std::string _parentNS;	// YSD: Name of the collection which this index belongs to. For example: 'mydb.cl'.
+    std::string _indexNamespace; // YSD: Full name of this index beginning with database name. For example, 'mydb.cl.idx'.
+    bool _isIdIndex;	// YSD: Whether it's the _id_ index.
     bool _sparse;
     bool _unique;
     bool _partial;

@@ -40,6 +40,7 @@ class StorageEngineLockFile;
 
 class ServiceContextMongoD final : public ServiceContext {
 public:
+	/* YSD: This map is used to store different storage engines, such as wiredtiger. */
     typedef std::map<std::string, const StorageEngine::Factory*> FactoryMap;
 
     ServiceContextMongoD();
@@ -103,6 +104,10 @@ private:
 
     std::unique_ptr<StorageEngineLockFile> _lockFile;
 
+    /*
+     * YSD: The storage engine currently being used. It is set during system startup in function
+     * ServiceContextMongoD::initializeGlobalStorageEngine
+     */
     // logically owned here, but never deleted by anyone.
     StorageEngine* _storageEngine;
 

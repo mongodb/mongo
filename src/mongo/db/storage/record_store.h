@@ -273,6 +273,9 @@ public:
  * Many methods take an OperationContext parameter. This contains the RecoveryUnit, with
  * all RecordStore specific transaction information, as well as the LockState. Methods that take
  * an OperationContext may throw a WriteConflictException.
+ * YSD: This is the base class for record storage operations. From example, in WiredTiger, class
+ * WiredTigerRecordStore is derived from this class, to support record storage operations when
+ * using WiredTiger storage engine.
  */
 class RecordStore {
     MONGO_DISALLOW_COPYING(RecordStore);

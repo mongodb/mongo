@@ -165,6 +165,10 @@ err:	__wt_scr_free(session, &tmp);
  * __wt_bt_write --
  *	Write a buffer into a block, returning the block's addr/size and
  * checksum.
+ * YSD: buf holds the data to be written. The WT_ITEM structure contains the
+ * memory address of the data as well as its length.
+ * From the code below we know that the header of the data(64 bytes) is not
+ * compressed. So during compress and decompress it should be skipped.
  */
 int
 __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
@@ -246,6 +250,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		 * won't use it.  However, some compression engines (snappy is
 		 * one example), may need more memory because they don't stop
 		 * just because there's no more memory into which to compress.
+		 * YSD:
+		 * Not all the compressors need to implement the pre_size function, zlib
+		 * for example. In the invoke of  pre_size, the len is an output which
+		 * specified the memory size required for the compressor.
 		 */
 		if (btree->compressor->pre_size == NULL)
 			len = src_len;

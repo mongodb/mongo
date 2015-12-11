@@ -113,6 +113,9 @@ zfree(void *cookie, void *p)
 /*
  * zlib_compress --
  *	WiredTiger zlib compression.
+ *	YSD: The dst_len is calculated in __wt_bt_write before invoking this function. It's
+ *	big enough to hold the compressed value of src even in the worst senario. So deflate
+ *	called here will not stop before compressing all the data in src.
  */
 static int
 zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
