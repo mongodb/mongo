@@ -61,7 +61,7 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
  */
 int
 __wt_col_search(WT_SESSION_IMPL *session,
-    uint64_t recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
+    uint64_t search_recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
@@ -71,12 +71,20 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex, *parent_pindex;
 	WT_REF *current, *descent;
+	uint64_t recno;
 	uint32_t base, indx, limit;
 	int depth;
 
 	btree = S2BT(session);
 
 	__cursor_pos_clear(cbt);
+
+	/*
+	 * When appending a new record, the search record number will be an
+	 * out-of-band value, search for the largest key in the table instead.
+	 */
+	if ((recno = search_recno) == WT_RECNO_OOB)
+		recno = UINT64_MAX;
 
 	/*
 	 * We may be searching only a single leaf page, not the full tree. In
@@ -87,6 +95,8 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	 * of a split).
 	 */
 	if (leaf != NULL) {
+		WT_ASSERT(session, search_recno != WT_RECNO_OOB);
+
 		if (leaf->home != NULL) {
 			WT_RET(__check_leaf_key_range(
 			    session, recno, leaf, cbt));
@@ -188,7 +198,17 @@ leaf_only:
 	page = current->page;
 	cbt->ref = current;
 	cbt->recno = recno;
-	cbt->compare = 0;
+
+	/* 
+	 * Don't bother searching if the caller is appending a new record where
+	 * we'll allocate the record number; we're not going to find a match by
+	 * definition, and we figure out the record number and position when we
+	 * do the work.
+	 */
+	if (search_recno == WT_RECNO_OOB) {
+		cbt->compare = -1;
+		return (0);
+	}
 
 	/*
 	 * Set the on-page slot to an impossible value larger than any possible
@@ -210,6 +230,7 @@ leaf_only:
 	 * that's impossibly large for the page. We do have additional setup to
 	 * do in that case, the record may be appended to the page.
 	 */
+	cbt->compare = 0;
 	if (page->type == WT_PAGE_COL_FIX) {
 		if (recno < page->pg_fix_recno) {
 			cbt->compare = 1;
@@ -258,18 +279,10 @@ past_end:
 	 * This is a rarely used path: we normally find exact matches, because
 	 * column-store files are dense, but in this case the caller searched
 	 * past the end of the table.
-	 *
-	 * Don't bother searching if the caller is appending a new record where
-	 * we'll allocate the record number; we're not going to find a match by
-	 * definition, and we figure out the position when we do the work.
 	 */
 	cbt->ins_head = WT_COL_APPEND(page);
-	if (recno == UINT64_MAX)
-		cbt->ins = NULL;
-	else
-		cbt->ins = __col_insert_search(
-		    cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno);
-	if (cbt->ins == NULL)
+	if ((cbt->ins = __col_insert_search(
+	    cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno)) == NULL)
 		cbt->compare = -1;
 	else {
 		cbt->recno = WT_INSERT_RECNO(cbt->ins);
@@ -280,14 +293,5 @@ past_end:
 		else
 			cbt->compare = -1;
 	}
-
-	/*
-	 * Note if the record is past the maximum record in the tree, the cursor
-	 * search functions need to know for fixed-length column-stores because
-	 * appended records implicitly create any skipped records, and cursor
-	 * search functions have to handle that case.
-	 */
-	if (cbt->compare == -1)
-		F_SET(cbt, WT_CBT_MAX_RECORD);
 	return (0);
 }

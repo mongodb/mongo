@@ -91,7 +91,7 @@ __curstat_lsm_init(
 		 * top-level.
 		 */
 		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
-		new->lsm_generation_max = chunk->generation;
+		WT_STAT_WRITE(new, lsm_generation_max, chunk->generation);
 
 		/* Aggregate statistics from each new chunk. */
 		__wt_stat_dsrc_aggregate_single(new, stats);
@@ -115,37 +115,40 @@ __curstat_lsm_init(
 		 * into the top-level.
 		 */
 		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
-		new->bloom_size =
-		    (int64_t)((chunk->count * lsm_tree->bloom_bit_count) / 8);
-		new->bloom_page_evict =
-		    new->cache_eviction_clean + new->cache_eviction_dirty;
-		new->bloom_page_read = new->cache_read;
+		WT_STAT_WRITE(new, bloom_size,
+		    (int64_t)((chunk->count * lsm_tree->bloom_bit_count) / 8));
+		WT_STAT_WRITE(new, bloom_page_evict,
+		    new->cache_eviction_clean + new->cache_eviction_dirty);
+		WT_STAT_WRITE(new, bloom_page_read, new->cache_read);
 
 		__wt_stat_dsrc_aggregate_single(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
 	/* Set statistics that aren't aggregated directly into the cursor */
-	stats->bloom_count = bloom_count;
-	stats->lsm_chunk_count = lsm_tree->nchunks;
+	WT_STAT_WRITE(stats, bloom_count, bloom_count);
+	WT_STAT_WRITE(stats, lsm_chunk_count, lsm_tree->nchunks);
 
 	/* Include, and optionally clear, LSM-level specific information. */
-	stats->bloom_miss = lsm_tree->bloom_miss;
+	WT_STAT_WRITE(stats, bloom_miss, lsm_tree->bloom_miss);
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		lsm_tree->bloom_miss = 0;
-	stats->bloom_hit = lsm_tree->bloom_hit;
+	WT_STAT_WRITE(stats, bloom_hit, lsm_tree->bloom_hit);
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		lsm_tree->bloom_hit = 0;
-	stats->bloom_false_positive = lsm_tree->bloom_false_positive;
+	WT_STAT_WRITE(
+	    stats, bloom_false_positive, lsm_tree->bloom_false_positive);
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		lsm_tree->bloom_false_positive = 0;
-	stats->lsm_lookup_no_bloom = lsm_tree->lsm_lookup_no_bloom;
+	WT_STAT_WRITE(
+	    stats, lsm_lookup_no_bloom, lsm_tree->lsm_lookup_no_bloom);
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		lsm_tree->lsm_lookup_no_bloom = 0;
-	stats->lsm_checkpoint_throttle = lsm_tree->lsm_checkpoint_throttle;
+	WT_STAT_WRITE(
+	    stats, lsm_checkpoint_throttle, lsm_tree->lsm_checkpoint_throttle);
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		lsm_tree->lsm_checkpoint_throttle = 0;
-	stats->lsm_merge_throttle = lsm_tree->lsm_merge_throttle;
+	WT_STAT_WRITE(stats, lsm_merge_throttle, lsm_tree->lsm_merge_throttle);
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		lsm_tree->lsm_merge_throttle = 0;
 
