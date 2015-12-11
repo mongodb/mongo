@@ -130,7 +130,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
 
     # Test that variable-length column-store bulk-load efficiently creates big
     # records.
-    def test_bulk_load_col_delete_big(self):
+    def test_bulk_load_col_big(self):
         if self.keyfmt != 'r' or self.valfmt == '8t':
                 return
 

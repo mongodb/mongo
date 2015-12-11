@@ -18,6 +18,7 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS **cstats;
 	WT_DSRC_STATS **dstats;
+	int64_t v;
 
 	conn = S2C(session);
 
@@ -37,10 +38,10 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	dstats = ((WT_CURSOR_BTREE *)
 	    conn->las_session->las_cursor)->btree->dhandle->stats;
 
-	WT_STAT_SET(session, cstats,
-	    cache_lookaside_insert, WT_STAT_READ(dstats, cursor_insert));
-	WT_STAT_SET(session, cstats,
-	    cache_lookaside_remove, WT_STAT_READ(dstats, cursor_remove));
+	v = WT_STAT_READ(dstats, cursor_insert);
+	WT_STAT_SET(session, cstats, cache_lookaside_insert, v);
+	v = WT_STAT_READ(dstats, cursor_remove);
+	WT_STAT_SET(session, cstats, cache_lookaside_remove, v);
 }
 
 /*
