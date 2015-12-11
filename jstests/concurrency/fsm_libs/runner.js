@@ -396,13 +396,15 @@ var runner = (function() {
         }
     }
 
-    function loadWorkloadContext(workloads, context, executionOptions) {
+    function loadWorkloadContext(workloads, context, executionOptions, applyMultipliers) {
         workloads.forEach(function(workload) {
             load(workload); // for $config
             assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
             context[workload] = { config: parseConfig($config) };
-            context[workload].config.iterations *= executionOptions.iterationMultiplier;
-            context[workload].config.threadCount *= executionOptions.threadMultiplier;
+            if (applyMultipliers) {
+                context[workload].config.iterations *= executionOptions.iterationMultiplier;
+                context[workload].config.threadCount *= executionOptions.threadMultiplier;
+            }
         });
     }
 
@@ -583,12 +585,13 @@ var runner = (function() {
         globalAssertLevel = assertLevel;
 
         var context = {};
-        loadWorkloadContext(workloads, context, executionOptions);
+        loadWorkloadContext(workloads, context, executionOptions, true /* applyMultipliers */);
         var threadMgr = new ThreadManager(clusterOptions, executionMode);
 
         var bgContext = {};
         var bgWorkloads = executionOptions.backgroundWorkloads;
-        loadWorkloadContext(bgWorkloads, bgContext, executionOptions);
+        loadWorkloadContext(bgWorkloads, bgContext, executionOptions,
+                            false /* applyMultipliers */);
         var bgThreadMgr = new ThreadManager(clusterOptions, { composed: false });
 
         var cluster = new Cluster(clusterOptions);
