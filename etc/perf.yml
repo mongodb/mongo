@@ -106,7 +106,11 @@ functions:
           set -o verbose
           virtualenv ./venv
           source ./venv/bin/activate
-          python ../dsi/analysis/compare.py -b stand.json -c node.json -t ${threshold}
+          python -u ../dsi/analysis/compare.py -b stand.json -c node.json
+    - command: "json.send"
+      params:
+        name: "perf"
+        file: "src/perf.json"
   "analyze":
     - command: shell.exec
       params:
@@ -200,27 +204,6 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
         display_name: mongo
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/buildscripts/compare.py
-        remote_file: perf/${version_id}/${revision}/compare.py-${version_id}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/octet-stream}
-        display_name: compare.py
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/etc/override.json
-        remote_file: perf/${version_id}/${revision}/override.json-${version_id}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/octet-stream}
-        display_name: override.json
-
 - name: query
   depends_on:
   - variant: linux-wt-standalone
@@ -336,7 +319,7 @@ tasks:
         compare_task : "singleThreaded"
         variant1 : "linux-wt-standalone"
         variant2 : "linux-wt-repl"
-        threshold : 75
+    - func: "analyze"
 - name: insert-wt-repl-comp
   depends_on:
     - name : compile
@@ -354,7 +337,7 @@ tasks:
         compare_task : "insert"
         variant1 : "linux-wt-standalone"
         variant2 : "linux-wt-repl"
-        threshold : 75
+    - func: "analyze"        
 - name: update-wt-repl-comp
   depends_on:
     - name : compile
@@ -372,7 +355,7 @@ tasks:
         compare_task : "update"
         variant1 : "linux-wt-standalone"
         variant2 : "linux-wt-repl"
-        threshold : 75
+    - func: "analyze"        
 - name: misc-wt-repl-comp
   depends_on:
     - name : compile
@@ -390,7 +373,7 @@ tasks:
         compare_task : "misc"
         variant1 : "linux-wt-standalone"
         variant2 : "linux-wt-repl"
-        threshold : 75
+    - func: "analyze"        
 - name: singleThreaded-wt-mmap-standalone-comp
   depends_on:
     - name : compile
@@ -408,7 +391,7 @@ tasks:
         compare_task : "singleThreaded"
         variant2 : "linux-wt-standalone"
         variant1 : "linux-mmap-standalone"
-        threshold : 85
+    - func: "analyze"        
 - name: query-wt-mmap-standalone-comp
   depends_on:
     - name : compile
@@ -426,7 +409,7 @@ tasks:
         compare_task : "query"
         variant2 : "linux-wt-standalone"
         variant1 : "linux-mmap-standalone"
-        threshold : 85
+    - func: "analyze"        
 - name: where-wt-mmap-standalone-comp
   depends_on:
     - name : compile
@@ -444,7 +427,7 @@ tasks:
         compare_task : "where"
         variant2 : "linux-wt-standalone"
         variant1 : "linux-mmap-standalone"
-        threshold : 85
+    - func: "analyze"        
 - name: geo-wt-mmap-standalone-comp
   depends_on:
     - name : compile
@@ -462,7 +445,7 @@ tasks:
         compare_task : "geo"
         variant2 : "linux-wt-standalone"
         variant1 : "linux-mmap-standalone"
-        threshold : 85
+    - func: "analyze"        
 - name: insert-wt-mmap-standalone-comp
   depends_on:
     - name : compile
@@ -480,7 +463,7 @@ tasks:
         compare_task : "insert"
         variant2 : "linux-wt-standalone"
         variant1 : "linux-mmap-standalone"
-        threshold : 85
+    - func: "analyze"        
 - name: update-wt-mmap-standalone-comp
   depends_on:
     - name : compile
@@ -498,7 +481,7 @@ tasks:
         compare_task : "update"
         variant2 : "linux-wt-standalone"
         variant1 : "linux-mmap-standalone"
-        threshold : 85
+    - func: "analyze"        
 - name: misc-wt-mmap-standalone-comp
   depends_on:
     - name : compile
@@ -516,7 +499,7 @@ tasks:
         compare_task : "misc"
         variant2 : "linux-wt-standalone"
         variant1 : "linux-mmap-standalone"
-        threshold : 85
+    - func: "analyze"        
 - name: singleThreaded-wt-mmap-repl-comp
   depends_on:
     - name : compile
@@ -534,7 +517,7 @@ tasks:
         compare_task : "singleThreaded"
         variant2 : "linux-wt-repl"
         variant1 : "linux-mmap-repl"
-        threshold : 85
+    - func: "analyze"        
 - name: insert-wt-mmap-repl-comp
   depends_on:
     - name : compile
@@ -552,7 +535,7 @@ tasks:
         compare_task : "insert"
         variant2 : "linux-wt-repl"
         variant1 : "linux-mmap-repl"
-        threshold : 85
+    - func: "analyze"        
 - name: update-wt-mmap-repl-comp
   depends_on:
     - name : compile
@@ -570,7 +553,7 @@ tasks:
         compare_task : "update"
         variant2 : "linux-wt-repl"
         variant1 : "linux-mmap-repl"
-        threshold : 85
+    - func: "analyze"        
 - name: misc-wt-mmap-repl-comp
   depends_on:
     - name : compile
@@ -588,7 +571,7 @@ tasks:
         compare_task : "misc"
         variant2 : "linux-wt-repl"
         variant1 : "linux-mmap-repl"
-        threshold : 85
+    - func: "analyze"        
 - name: singleThreaded-mmap-repl-comp
   depends_on:
     - name : compile
@@ -606,7 +589,7 @@ tasks:
         compare_task : "singleThreaded"
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
-        threshold : 75
+    - func: "analyze"        
 - name: insert-mmap-repl-comp
   depends_on:
     - name : compile
@@ -624,7 +607,7 @@ tasks:
         compare_task : "insert"
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
-        threshold : 75
+    - func: "analyze"        
 - name: update-mmap-repl-comp
   depends_on:
     - name : compile
@@ -642,7 +625,7 @@ tasks:
         compare_task : "update"
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
-        threshold : 75
+    - func: "analyze"        
 - name: misc-mmap-repl-comp
   depends_on:
     - name : compile
@@ -660,7 +643,7 @@ tasks:
         compare_task : "misc"
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
-        threshold : 75
+    - func: "analyze"        
 
 buildvariants:
 - name: linux-wt-standalone
