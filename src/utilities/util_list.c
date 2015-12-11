@@ -8,6 +8,7 @@
 
 #include "util.h"
 
+static int list_get_allocsize(WT_SESSION *, const char *, size_t *);
 static int list_print(WT_SESSION *, const char *, bool, bool);
 static int list_print_checkpoint(WT_SESSION *, const char *);
 static int usage(void);
@@ -53,6 +54,47 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 	free(name);
 
 	return (ret);
+}
+
+/*
+ * list_get_allocsize --
+ *	Get the allocation size for this file from the metadata.
+ */
+static int
+list_get_allocsize(WT_SESSION *session, const char *key, size_t *allocsize)
+{
+	WT_CONFIG_ITEM szvalue;
+	WT_CONFIG_PARSER *parser;
+	WT_DECL_RET;
+	WT_EXTENSION_API *wt_api;
+	char *config;
+
+	wt_api = session->connection->get_extension_api(session->connection);
+	if ((ret =
+	    wt_api->metadata_search(wt_api, session, key, &config)) != 0) {
+		fprintf(stderr, "%s: %s: extension_api.metadata_search: %s\n",
+		    progname, key, session->strerror(session, ret));
+		return (ret);
+	}
+	if ((ret = wt_api->config_parser_open(wt_api, session, config,
+	    strlen(config), &parser)) != 0) {
+		fprintf(stderr, "%s: extension_api.config_parser_open: %s\n",
+		    progname, session->strerror(session, ret));
+		return (ret);
+	}
+	if ((ret = parser->get(parser, "allocation_size", &szvalue)) != 0) {
+		fprintf(stderr, "%s: config_parser.get: %s\n",
+		    progname, session->strerror(session, ret));
+		(void)parser->close(parser);
+		return (ret);
+	}
+	if ((ret = parser->close(parser)) != 0) {
+		fprintf(stderr, "%s: config_parser.close: %s\n",
+		    progname, session->strerror(session, ret));
+		return (ret);
+	}
+	*allocsize = szvalue.val;
+	return (0);
 }
 
 /*
@@ -137,11 +179,14 @@ list_print(WT_SESSION *session, const char *name, bool cflag, bool vflag)
 static int
 list_print_checkpoint(WT_SESSION *session, const char *key)
 {
+	WT_BLOCK block;
+	WT_BLOCK_CKPT ci;
 	WT_DECL_RET;
 	WT_CKPT *ckpt, *ckptbase;
 	size_t len;
 	time_t t;
 	uint64_t v;
+	size_t allocsize;
 
 	/*
 	 * We may not find any checkpoints for this file, in which case we don't
@@ -151,6 +196,10 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 	if ((ret = __wt_metadata_get_ckptlist(session, key, &ckptbase)) != 0)
 		return (ret == WT_NOTFOUND ? 0 : ret);
 
+	/* We need the allocation size for decoding the checkpoint addr */
+	if ((ret = list_get_allocsize(session, key, &allocsize)) != 0)
+		return (ret);
+
 	/* Find the longest name, so we can pretty-print. */
 	len = 0;
 	WT_CKPT_FOREACH(ckptbase, ckpt)
@@ -158,7 +207,17 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 			len = strlen(ckpt->name);
 	++len;
 
+	memset(&block, 0, sizeof(block));
+	memset(&ci, 0, sizeof(ci));
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
+		block.allocsize = allocsize;
+		if ((ret = __wt_block_buffer_to_ckpt((WT_SESSION_IMPL *)session,
+		    &block, ckpt->raw.data, &ci)) != 0) {
+			fprintf(stderr, "%s: __wt_block_buffer_to_ckpt: %s\n",
+			    progname, session->strerror(session, ret));
+			/* continue if damaged */
+			ci.root_size = 0;
+		}
 		/*
 		 * Call ctime, not ctime_r; ctime_r has portability problems,
 		 * the Solaris version is different from the POSIX standard.
@@ -179,6 +238,17 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 			printf(" (%" PRIu64 " KB)\n", v / WT_KILOBYTE);
 		else
 			printf(" (%" PRIu64 " B)\n", v);
+		if (ci.root_size != 0) {
+			printf("\t\t" "root offset: %" PRIuMAX
+			    " (0x%" PRIxMAX ")\n",
+			    (intmax_t)ci.root_offset, (intmax_t)ci.root_offset);
+			printf("\t\t" "root size: %" PRIu32
+			    " (0x%" PRIx32 ")\n",
+			    ci.root_size, ci.root_size);
+			printf("\t\t" "root checksum: %" PRIu32
+			    " (0x%" PRIx32 ")\n",
+			    ci.root_cksum, ci.root_cksum);
+		}
 	}
 
 	__wt_metadata_free_ckptlist(session, ckptbase);
