@@ -260,8 +260,7 @@ function startParallelShell( jsCode, port, noConnect ){
 
     // Convert function into call-string
     if (typeof(jsCode) == "function") {
-        var id = Math.floor(Math.random() * 100000);
-        jsCode = "var f" + id + " = " + jsCode.toString() + ";f" + id + "();"; 
+        jsCode = "(" + jsCode.toString() + ")();";
     }
     else if(typeof(jsCode) == "string") {}
         // do nothing
