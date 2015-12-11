@@ -51,8 +51,8 @@
 
     replTest.stop( s1Id );
     replTest.stop( s2Id );
-    replTest.waitForState(s1, replTest.DOWN);
-    replTest.waitForState(s2, replTest.DOWN);
+    replTest.waitForState(s1, ReplSetTest.State.DOWN);
+    replTest.waitForState(s2, ReplSetTest.State.DOWN);
 
     replTest.stop( mId );
 
