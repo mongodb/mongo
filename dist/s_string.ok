@@ -144,6 +144,7 @@ INIT
 INITIALIZER
 INMEM
 INTL
+ISA
 ITEMs
 Inline
 Intra
@@ -719,6 +720,7 @@ lsn
 lsnappy
 lt
 lu
+lwsync
 lz
 lzo
 madvise
@@ -726,6 +728,8 @@ majorp
 malloc
 marshall
 marshalled
+mbll
+mbss
 mem
 memalign
 membar
