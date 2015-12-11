@@ -334,8 +334,10 @@ retry:
 			 */
 			WT_ASSERT(session, txn_global->scan_count > 0);
 			(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
-			if (force)
+			if (force) {
+				__wt_yield();
 				goto retry;
+			}
 		}
 	} else {
 		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
