@@ -93,7 +93,7 @@ list_get_allocsize(WT_SESSION *session, const char *key, size_t *allocsize)
 		    progname, session->strerror(session, ret));
 		return (ret);
 	}
-	*allocsize = szvalue.val;
+	*allocsize = (size_t)szvalue.val;
 	return (0);
 }
 
@@ -208,8 +208,8 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 
 	memset(&ci, 0, sizeof(ci));
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		if ((ret = __wt_block_ckpt_decode((WT_SESSION_IMPL *)session,
-		    ckpt->raw.data, allocsize, &ci)) != 0) {
+		if ((ret = __wt_block_ckpt_decode(
+		    session, allocsize, ckpt->raw.data, &ci)) != 0) {
 			fprintf(stderr, "%s: __wt_block_buffer_to_ckpt: %s\n",
 			    progname, session->strerror(session, ret));
 			/* continue if damaged */
