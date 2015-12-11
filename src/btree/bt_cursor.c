@@ -874,10 +874,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		 */
 		cbt->rand_leaf_skip = (uint32_t)
 		    ((btree->bm->block->fh->size / btree->allocsize) / 100) + 1;
-#if 0
-		printf("Skipping %u leaf pages each random op\n",
-		    cbt->rand_leaf_skip);
-#endif
+
 		/*
 		 * Choose a leaf page from the tree.
 		 */
@@ -915,24 +912,6 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 			ret = __wt_btcur_prev(cbt, false);
 		WT_ERR(ret);
 	}
-
-#if 0
-	if (cbt->ref != NULL) {
-		const uint8_t *addr;
-		size_t addr_size;
-		wt_off_t off;
-		uint32_t sz, ckpt;
-
-		WT_ERR(__wt_ref_info(
-		    session, cbt->ref, &addr, &addr_size, NULL));
-		if (addr != NULL) {
-			WT_ERR(__wt_block_buffer_to_addr(
-			    btree->bm->block, addr, &off, &sz, &ckpt));
-			printf("%d\n",
-			    (int)((100 * off) / btree->bm->block->fh->size));
-		}
-	}
-#endif
 	return (0);
 
 err:	WT_TRET(__cursor_reset(cbt));
