@@ -479,8 +479,6 @@ void ReplSource::resync(OperationContext* txn, const std::string& dbName) {
         cloneOptions.slaveOk = true;
         cloneOptions.useReplAuth = true;
         cloneOptions.snapshot = true;
-        cloneOptions.mayYield = true;
-        cloneOptions.mayBeInterrupted = true;
 
         Cloner cloner;
         Status status = cloner.copyDb(txn, db, hostName.c_str(), cloneOptions, NULL);

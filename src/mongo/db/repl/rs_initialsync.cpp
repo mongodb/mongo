@@ -184,8 +184,6 @@ bool _initialSyncClone(OperationContext* txn,
         options.slaveOk = true;
         options.useReplAuth = true;
         options.snapshot = false;
-        options.mayYield = true;
-        options.mayBeInterrupted = true;
         options.syncData = dataPass;
         options.syncIndexes = !dataPass;
 
