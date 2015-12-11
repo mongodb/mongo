@@ -512,7 +512,7 @@ static void _initAndListen(int listenPort) {
             // the CSRS in the REMOVED state. This is handled by the TopologyCoordinator.
             invariant(replSettings.majorityReadConcernEnabled);
             severe() << "Majority read concern requires a storage engine that supports"
-                     << "snapshots, such as wiredTiger. " << storageGlobalParams.engine
+                     << " snapshots, such as wiredTiger. " << storageGlobalParams.engine
                      << " does not support snapshots.";
             exitCleanly(EXIT_BADOPTIONS);
         }
