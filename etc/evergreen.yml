@@ -295,7 +295,7 @@ functions:
 
           if [ "Windows_NT" != "$OS" ]; then
             curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.7-linux-x64.tar.gz --output node.tar.gz
-            ${decompress} node.tar.gz > /dev/null
+            ${decompress} node.tar.gz
           fi
 
           cp mongodb*/bin/mongod .
