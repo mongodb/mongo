@@ -105,36 +105,51 @@
         cursorId = cmdRes.cursor.id;
         assert.neq(cursorId, NumberLong(0));
 
-        // Pin the cursor during a getMore, and wait to make sure it has been pinned.
-        var numPinnedBefore = db.serverStatus().metrics.cursor.open.pinned;
-        var code = 'db.runCommand({getMore: ' + cursorId.toString() +
-                   ', collection: "' + coll.getName() + '"});'
-        cleanup = startParallelShell(code);
-        assert.soon(function() {
-            // It's possible that the internally issued queries (e.g. syncing from primary to
-            // secondary in a replica set) can cause an additional cursor to be pinned. This is why
-            // we check "> numPinnedBefore" rather than "== numPinnedBefore + 1".
-            return (db.serverStatus().metrics.cursor.open.pinned > numPinnedBefore);
-        }, "Failed to pin cursor. Cursors pinned before running getMore: " + numPinnedBefore);
-
         cmdRes = db.runCommand({isMaster: 1});
         assert.commandWorked(cmdRes);
         var isMongos = (cmdRes.msg === "isdbgrid");
 
-        // Attempt to kill a pinned cursor. Currently pinned cursors that are targeted by a
-        // killCursors operation are kept alive on mongod but are killed on mongos (see
-        // SERVER-21710).
+        // Pin the cursor during a getMore.
+        var code = 'db.runCommand({getMore: ' + cursorId.toString() +
+                   ', collection: "' + coll.getName() + '"});'
+        cleanup = startParallelShell(code);
+
+        // Sleep to make it more likely that the cursor will be pinned.
+        sleep(2000);
+
+        // Attempt to kill the cursor. In order to avoid flakiness, we do not assume that the cursor
+        // is already pinned (although generally it will be).
+        //
+        // Currently, pinned cursors that are targeted by a killCursors operation are kept alive on
+        // mongod but are killed on mongos (see SERVER-21710).
         cmdRes = db.runCommand({
             killCursors: coll.getName(),
             cursors: [NumberLong(123), cursorId]
         });
         assert.commandWorked(cmdRes);
-        assert.eq(cmdRes.cursorsKilled, isMongos ? [cursorId] : []);
         assert.eq(cmdRes.cursorsNotFound, [NumberLong(123)]);
-        assert.eq(cmdRes.cursorsAlive, isMongos ? [] : [cursorId]);
         assert.eq(cmdRes.cursorsUnknown, []);
+
+        if (isMongos) {
+            assert.eq(cmdRes.cursorsKilled, [cursorId]);
+            assert.eq(cmdRes.cursorsAlive, []);
+        }
+        else {
+            // If the cursor has already been pinned it will be left alive; otherwise it will be
+            // killed.
+            if (cmdRes.cursorsAlive.length === 1) {
+                assert.eq(cmdRes.cursorsKilled, []);
+                assert.eq(cmdRes.cursorsAlive, [cursorId]);
+            }
+            else {
+                assert.eq(cmdRes.cursorsKilled, [cursorId]);
+                assert.eq(cmdRes.cursorsAlive, []);
+            }
+        }
     } finally {
         assert.commandWorked(db.adminCommand({configureFailPoint: failpointName, mode: "off"}));
-        cleanup();
+        if (cleanup) {
+            cleanup();
+        }
     }
 })();
