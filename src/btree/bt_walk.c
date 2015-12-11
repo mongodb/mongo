@@ -327,7 +327,7 @@ ascend:	/*
 
 			/*
 			 * Optionally skip leaf pages. If WT_READ_SKIP_LEAF is
-			 * set, we're optionallypassed in a count of leaf pages
+			 * set, we're optionally passed a count of leaf pages
 			 * to skip. If this page is disk-based, crack the cell
 			 * and figure out it's a leaf page without reading it.
 			 * Decrement the count of pages to zero, and then take
