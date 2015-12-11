@@ -1,6 +1,10 @@
 /**
  * Basic testing for minOpTimeRecovery document. Tests that it will be created after a migration
  * only if the config server is a replica set and recovery will not run when disabled.
+ *
+ * This test restarts a shard and the shard will attempt to read a document that was saved before
+ * the restart, so it cannot be run on ephemeral storage engines.
+ * @tags: [requires_persistence]
  */
 (function() {
 "use strict";
