@@ -29,6 +29,21 @@ static int __block_merge(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, wt_off_t, wt_off_t);
 
 /*
+ * __wt_block_ckpt_decode --
+ *	Convert a checkpoint cookie into its components.
+ */
+int
+__wt_block_ckpt_decode(WT_SESSION_IMPL *session, const uint8_t *p,
+    size_t block_allocsize, WT_BLOCK_CKPT *ci)
+{
+	WT_BLOCK block;
+
+	memset(&block, 0, sizeof(block));
+	block.allocsize = block_allocsize;
+	return (__wt_block_buffer_to_ckpt(session, &block, p, ci));
+}
+
+/*
  * __block_off_srch_last --
  *	Return the last element in the list, along with a stack for appending.
  */

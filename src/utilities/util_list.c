@@ -179,7 +179,6 @@ list_print(WT_SESSION *session, const char *name, bool cflag, bool vflag)
 static int
 list_print_checkpoint(WT_SESSION *session, const char *key)
 {
-	WT_BLOCK block;
 	WT_BLOCK_CKPT ci;
 	WT_DECL_RET;
 	WT_CKPT *ckpt, *ckptbase;
@@ -207,12 +206,10 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 			len = strlen(ckpt->name);
 	++len;
 
-	memset(&block, 0, sizeof(block));
 	memset(&ci, 0, sizeof(ci));
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		block.allocsize = allocsize;
-		if ((ret = __wt_block_buffer_to_ckpt((WT_SESSION_IMPL *)session,
-		    &block, ckpt->raw.data, &ci)) != 0) {
+		if ((ret = __wt_block_ckpt_decode((WT_SESSION_IMPL *)session,
+		    ckpt->raw.data, allocsize, &ci)) != 0) {
 			fprintf(stderr, "%s: __wt_block_buffer_to_ckpt: %s\n",
 			    progname, session->strerror(session, ret));
 			/* continue if damaged */
