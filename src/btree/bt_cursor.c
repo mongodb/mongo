@@ -823,11 +823,9 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_PAGE *parent;
-	WT_REF *child, *parent_ref;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	uint64_t leaf;
+	uint64_t skip;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
@@ -842,49 +840,69 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
-	if (cbt->ref != NULL) {
+	/*
+	 * If we do not yet reference a page, pick a roughly random leaf page in
+	 * the tree  and choose a number of leaf pages to skip between samples.
+	 */
+	if (cbt->ref == NULL) {
 		/*
-		 * Number of leaf pages to skip between samples.
-		 * !!! Ideally, this would be prime to avoid restart issues.
+		 * We're compensating for unbalanced trees: in a balanced tree,
+		 * we'd simply descend the tree selecting random slots, but that
+		 * requires a balanced tree with uniform internal and leaf page
+		 * sizes. In some WiredTiger releases, it was possible to have
+		 * unbalanced trees (sometimes, very, very unbalanced trees),
+		 * and in all WiredTiger releases, internal and leaf page sizes
+		 * aren't uniform. So, we skip past 1% of the leaf pages in the
+		 * tree between each random key return to compensate.
+		 *
+		 * Deciding how many leaf pages is roughly 1% of the file is not
+		 * simple. Use the underlying file size divided by its block
+		 * allocation size as our guess of leaf pages in the file (this
+		 * can be entirely wrong, as it depends on how many pages are in
+		 * this particular checkpoint, how large the leaf and internal
+		 * pages really are, and other factors). Then, divide that value
+		 * by 100 to get 1%, and increment the final result to make sure
+		 * tiny files don't leave us with a skip value of 0.
+		 *
+		 * !!!
+		 * Ideally, the number would be prime to avoid restart issues.
 		 */
-		if (cbt->rand_leaf_skip == 0) {
-			cbt->rand_leaf_skip = (uint32_t)
-			    (btree->bm->block->fh->size / btree->allocsize);
-			/* Walk 1% of pages each time, adjust for tiny files. */
-			cbt->rand_leaf_skip /= 100;
-			++cbt->rand_leaf_skip;
-			printf("Skipping %u leaf pages each random op\n",
-			    cbt->rand_leaf_skip);
-		}
-
-		/* Walk through the current parent. */
-		leaf = 0;
-		parent_ref = cbt->ref->home->pg_intl_parent_ref;
-		WT_RET(__wt_page_swap(session, cbt->ref, parent_ref, 0));
-		cbt->ref = parent_ref;
-
-		while (leaf < cbt->rand_leaf_skip) {
-			parent = cbt->ref->page;
-			WT_INTL_FOREACH_BEGIN(session, parent, child) {
-				if (__wt_ref_is_leaf(session, child) &&
-				    ++leaf == cbt->rand_leaf_skip) {
-					WT_RET(__wt_page_swap(
-					    session, cbt->ref, child, 0));
-					cbt->ref = child;
-					goto leaf;
-				}
-			} WT_INTL_FOREACH_END;
-			do {
-				WT_RET(__wt_tree_walk(session,
-				    &cbt->ref, NULL, WT_READ_SKIP_LEAF));
-			} while (cbt->ref == NULL);
-		}
+		cbt->rand_leaf_skip = (uint32_t)
+		    ((btree->bm->block->fh->size / btree->allocsize) / 100) + 1;
+#if 0
+		printf("Skipping %u leaf pages each random op\n",
+		    cbt->rand_leaf_skip);
+#endif
+		/*
+		 * Choose a leaf page from the tree.
+		 */
+		WT_ERR(__cursor_func_init(cbt, true));
+		WT_WITH_PAGE_INDEX(
+		    session, ret = __wt_row_random_descent(session, cbt));
+		WT_ERR(ret);
+	} else {
+		/*
+		 * Read through the tree, skipping leaf pages. Be cautious about
+		 * the skip count: if the last leaf page skipped was also the
+		 * last leaf page in the tree, it may be set to zero on return
+		 * with the end-of-walk condition.
+		 *
+		 * Pages read for data sampling aren't "useful"; don't update
+		 * the read generation of pages already in memory, and if a page
+		 * is read, set its generation to a low value so it is evicted
+		 * quickly.
+		 */
+		for (skip = cbt->rand_leaf_skip; cbt->ref == NULL || skip > 0;)
+			WT_ERR(__wt_tree_walk(session, &cbt->ref, NULL, &skip,
+			    WT_READ_NO_GEN | WT_READ_SKIP_INTL |
+			    WT_READ_SKIP_LEAF | WT_READ_WONT_NEED));
 	}
 
-	WT_RET(__cursor_func_init(cbt, true));
-	WT_ERR(__wt_row_random_descent(session, cbt));
-
-leaf:	WT_ERR(__wt_row_random_leaf(session, cbt));
+	/*
+	 * Select a random entry from the leaf page. If it's not valid, move to
+	 * the next entry, if that doesn't work, move to the previous entry.
+	 */
+	WT_ERR(__wt_row_random_leaf(session, cbt));
 	if (__cursor_valid(cbt, &upd))
 		WT_ERR(__wt_kv_return(session, cbt, upd));
 	else {
@@ -893,6 +911,7 @@ leaf:	WT_ERR(__wt_row_random_leaf(session, cbt));
 		WT_ERR(ret);
 	}
 
+#if 0
 	if (cbt->ref != NULL) {
 		const uint8_t *addr;
 		size_t addr_size;
@@ -901,13 +920,17 @@ leaf:	WT_ERR(__wt_row_random_leaf(session, cbt));
 
 		WT_ERR(__wt_ref_info(
 		    session, cbt->ref, &addr, &addr_size, NULL));
-		WT_ERR(__wt_block_buffer_to_addr(
-		    btree->bm->block, addr, &off, &sz, &ckpt));
-		printf("%d\n", (int)((100 * off) / btree->bm->block->fh->size));
+		if (addr != NULL) {
+			WT_ERR(__wt_block_buffer_to_addr(
+			    btree->bm->block, addr, &off, &sz, &ckpt));
+			printf("%d\n",
+			    (int)((100 * off) / btree->bm->block->fh->size));
+		}
 	}
+#endif
+	return (0);
 
-err:	if (ret != 0)
-		WT_TRET(__cursor_reset(cbt));
+err:	WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
 

@@ -166,7 +166,7 @@ extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_HEADER *dsk, size_t size, bool empty_page_ok);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session, const char *tag, WT_ITEM *buf);
-extern int __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp, uint32_t flags);
+extern int __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp, uint64_t *ignoreleafcntp, uint32_t flags);
 extern int __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint64_t recno, WT_ITEM *value, WT_UPDATE *upd_arg, bool is_remove);
 extern int __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt);
 extern int __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page);

@@ -69,19 +69,40 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 }
 
 /*
+ * __ref_is_leaf --
+ *	Check if a reference is for a leaf page.
+ */
+static inline int
+__ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref, bool *isleafp)
+{
+	size_t addr_size;
+	u_int type;
+	const uint8_t *addr;
+
+	/*
+	 * If the page has a disk address, we can crack it to figure out if
+	 * this page is a leaf page or not. If there's no address, the page
+	 * isn't on disk and we don't know the page type.
+	 */
+	WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, &type));
+	*isleafp = addr == NULL ?
+	    false : (type == WT_CELL_ADDR_LEAF || type == WT_CELL_ADDR_LEAF_NO);
+	return (0);
+}
+
+/*
  * __wt_tree_walk --
  *	Move to the next/previous page in the tree.
  */
 int
 __wt_tree_walk(WT_SESSION_IMPL *session,
-    WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
+    WT_REF **refp, uint64_t *walkcntp, uint64_t *ignoreleafcntp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
-	bool empty_internal, prev, skip;
+	bool empty_internal, isleaf, prev, skip;
 	uint32_t slot;
 
 	btree = S2BT(session);
@@ -304,10 +325,29 @@ ascend:	/*
 					break;
 			}
 
-			/* Optionally skip leaf pages. */
-			if (LF_ISSET(WT_READ_SKIP_LEAF) &&
-			    __wt_ref_is_leaf(session, ref))
-				break;
+			/*
+			 * Optionally skip leaf pages. If WT_READ_SKIP_LEAF is
+			 * set, we're optionallypassed in a count of leaf pages
+			 * to skip. If this page is disk-based, crack the cell
+			 * and figure out it's a leaf page without reading it.
+			 * Decrement the count of pages to zero, and then take
+			 * the next leaf page we can; be cautious around the
+			 * page decrement: if for some reason we end up not
+			 * taking this particular page, we can take the next
+			 * one, and, there are additional tests/decrements when
+			 * we're about to return a leaf page.
+			 */
+			if (LF_ISSET(WT_READ_SKIP_LEAF)) {
+				WT_ERR(__ref_is_leaf(session, ref, &isleaf));
+				if (isleaf) {
+					if (ignoreleafcntp == NULL)
+						break;
+					if (*ignoreleafcntp > 0) {
+						--*ignoreleafcntp;
+						break;
+					}
+				}
+			}
 
 			ret = __wt_page_swap(session, couple, ref, flags);
 
@@ -364,13 +404,28 @@ ascend:	/*
 			 * A new page: configure for traversal of any internal
 			 * page's children, else return the leaf page.
 			 */
-descend:		couple = ref;
-			page = ref->page;
-			if (WT_PAGE_IS_INTERNAL(page)) {
-				WT_INTL_INDEX_GET(session, page, pindex);
+			if (WT_PAGE_IS_INTERNAL(ref->page)) {
+descend:			couple = ref;
+				WT_INTL_INDEX_GET(session, ref->page, pindex);
 				slot = prev ? pindex->entries - 1 : 0;
 				empty_internal = true;
 			} else {
+				/*
+				 * Optionally skip leaf pages, the second half.
+				 * We didn't have an on-page cell to figure out
+				 * if it was a leaf page, we had to acquire the
+				 * hazard pointer and check.
+				 */
+				if (LF_ISSET(WT_READ_SKIP_LEAF)) {
+					couple = ref;
+					if (ignoreleafcntp == NULL)
+						break;
+					if (*ignoreleafcntp > 0) {
+						--*ignoreleafcntp;
+						break;
+					}
+				}
+
 				*refp = ref;
 				goto done;
 			}

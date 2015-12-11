@@ -68,7 +68,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         cursor.close()
         cursor = self.session.open_cursor(uri, None, "next_random=true")
         for i in range(1,5):
-            cursor.next()
+            self.assertEquals(cursor.next(), 0)
             self.assertEquals(cursor.get_key(), 'AAA')
         cursor.close
 
@@ -112,7 +112,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         last = ''
         match = 0
         for i in range(1,10):
-            cursor.next()
+            self.assertEqual(cursor.next(), 0)
             current = cursor.get_key()
             if current == last:
                 match += 1
@@ -176,7 +176,7 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         # return the only possible record.
         s = self.conn.open_session()
         cursor = s.open_cursor(uri, None, "next_random=true")
-        cursor.next()
+        self.assertEquals(cursor.next(), 0)
         self.assertEqual(cursor.get_key(), key_populate(cursor, 1))
 
     def test_cursor_random_invisible_before(self):
@@ -196,7 +196,7 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         # return the only possible record.
         s = self.conn.open_session()
         cursor = s.open_cursor(uri, None, "next_random=true")
-        cursor.next()
+        self.assertEquals(cursor.next(), 0)
         self.assertEqual(cursor.get_key(), key_populate(cursor, 99))
 
 
