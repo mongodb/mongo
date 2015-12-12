@@ -2146,7 +2146,7 @@ const char* ExpressionLog10::getOpName() const {
 /* ------------------------ ExpressionNary ----------------------------- */
 
 /**
- * \brief Optimize a general Nary expression.
+ * Optimize a general Nary expression.
  *
  * The optimization has the following properties:
  *   1) Optimize each of the operators.
@@ -2158,8 +2158,8 @@ const char* ExpressionLog10::getOpName() const {
  *      operators and replacing them by the result. For example: c1 + c2 + n1 + c3 + c4 + n5 =>
  *      c5 = c1 + c2, c6 = c3 + c4 => c5 + n1 + c6 + n5
  *
- * \return The optimized expression. It can be exactly the same expression, a modified version of
- *         the same expression or a completely different expression.
+ * It returns the optimized expression. It can be exactly the same expression, a modified version
+ * of the same expression or a completely different expression.
  */
 intrusive_ptr<Expression> ExpressionNary::optimize() {
     uint32_t constOperandCount = 0;
@@ -2170,21 +2170,34 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             ++constOperandCount;
         }
     }
+    // If all the operands are constant expressions, collapse the expression into one constant
+    // expression.
     if (constOperandCount == vpOperand.size()) {
         Variables emptyVars;
         return intrusive_ptr<Expression>(ExpressionConstant::create(evaluateInternal(&emptyVars)));
     }
 
+    // If the expression is associative, we can collapse all the consecutive constant operands into
+    // one by applying the expression to those consecutive constant operands.
+    // If the expression is also commutative we can reorganize all the operands so that all of the
+    // constant ones are together (arbitrarily at the back) and we can collapse all of them into
+    // one.
     if (isAssociative()) {
         ExpressionVector constExpressions;
         ExpressionVector optimizedOperands;
         for (size_t i = 0; i < vpOperand.size();) {
             intrusive_ptr<Expression> operand = vpOperand[i];
+            // If the operand is a constant one, add it to the current list of consecutive constant
+            // operands.
             if (dynamic_cast<ExpressionConstant*>(operand.get())) {
                 constExpressions.push_back(operand);
                 ++i;
                 continue;
             }
+
+            // If the operand is exactly the same type as the one we are currently optimizing and
+            // is also associative, replace the expression for the operands it has.
+            // E.g: sum(a, b, sum(c, d), e) => sum(a, b, c, d, e)
             ExpressionNary* nary = dynamic_cast<ExpressionNary*>(operand.get());
             if (nary && str::equals(nary->getOpName(), getOpName())) {
                 vpOperand.erase(vpOperand.begin() + i);
@@ -2192,6 +2205,13 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
                     vpOperand.begin() + i, nary->vpOperand.begin(), nary->vpOperand.end());
                 continue;
             }
+
+            // If the operand is not a constant nor a same-type expression and the expression is
+            // not commutative, evaluate an expression of the same type as the one we are
+            // optimizing on the list of consecutive constant operands and use the resulting value
+            // as a constant expression operand.
+            // If the list of consecutive constant operands has less than 2 operands just place
+            // back the operands.
             if (!isCommutative()) {
                 if (constExpressions.size() > 1) {
                     ExpressionVector vpOperandSave = std::move(vpOperand);
@@ -2373,7 +2393,6 @@ Value ExpressionPow::evaluateInternal(Variables* vars) const {
         // Array indices correspond to exponents 0 through 63. The values in each index are the min
         // and max bases, respectively, that can be raised to that exponent without overflowing a
         // 64-bit int. For max bases, this was computed by solving for b in
-        // b = (2^63-1)^(1/exp) for exp = [0, 63] and truncating b. To calculate min bases,
         // b = (2^63-1)^(1/exp) for exp = [0, 63] and truncating b. To calculate min bases, for even
         // exps the equation  used was b = (2^63-1)^(1/exp), and for odd exps the equation used was
         // b = (-2^63)^(1/exp). Since the magnitude of long min is greater than long max, the
