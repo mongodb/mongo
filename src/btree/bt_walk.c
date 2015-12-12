@@ -96,7 +96,7 @@ __ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref, bool *isleafp)
  */
 int
 __wt_tree_walk(WT_SESSION_IMPL *session,
-    WT_REF **refp, uint64_t *walkcntp, uint64_t *ignoreleafcntp, uint32_t flags)
+    WT_REF **refp, uint64_t *walkcntp, uint64_t *skipleafcntp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -326,24 +326,28 @@ ascend:	/*
 			}
 
 			/*
-			 * Optionally skip leaf pages. If WT_READ_SKIP_LEAF is
-			 * set, we're optionally passed a count of leaf pages
-			 * to skip. If this page is disk-based, crack the cell
-			 * and figure out it's a leaf page without reading it.
-			 * Decrement the count of pages to zero, and then take
-			 * the next leaf page we can; be cautious around the
-			 * page decrement: if for some reason we end up not
-			 * taking this particular page, we can take the next
-			 * one, and, there are additional tests/decrements when
-			 * we're about to return a leaf page.
+			 * Optionally skip leaf pages: skip all leaf pages if
+			 * WT_READ_SKIP_LEAF is set, when the skip-leaf-count
+			 * variable is non-zero, skip some count of leaf pages.
+			 * If this page is disk-based, crack the cell to figure
+			 * out it's a leaf page without reading it.
+			 *
+			 * If skipping some number of leaf pages, decrement the
+			 * count of pages to zero, and then take the next leaf
+			 * page we can. Be cautious around the page decrement,
+			 * if for some reason don't take this particular page,
+			 * we can take the next one, and, there are additional
+			 * tests/decrements when we're about to return a leaf
+			 * page.
 			 */
-			if (LF_ISSET(WT_READ_SKIP_LEAF)) {
+			if (skipleafcntp != NULL ||
+			    LF_ISSET(WT_READ_SKIP_LEAF)) {
 				WT_ERR(__ref_is_leaf(session, ref, &isleaf));
 				if (isleaf) {
-					if (ignoreleafcntp == NULL)
+					if (LF_ISSET(WT_READ_SKIP_LEAF))
 						break;
-					if (*ignoreleafcntp > 0) {
-						--*ignoreleafcntp;
+					if (*skipleafcntp > 0) {
+						--*skipleafcntp;
 						break;
 					}
 				}
@@ -414,14 +418,15 @@ descend:			couple = ref;
 				 * Optionally skip leaf pages, the second half.
 				 * We didn't have an on-page cell to figure out
 				 * if it was a leaf page, we had to acquire the
-				 * hazard pointer and check.
+				 * hazard pointer and look at the page.
 				 */
-				if (LF_ISSET(WT_READ_SKIP_LEAF)) {
+				if (skipleafcntp != NULL ||
+				    LF_ISSET(WT_READ_SKIP_LEAF)) {
 					couple = ref;
-					if (ignoreleafcntp == NULL)
+					if (LF_ISSET(WT_READ_SKIP_LEAF))
 						break;
-					if (*ignoreleafcntp > 0) {
-						--*ignoreleafcntp;
+					if (*skipleafcntp > 0) {
+						--*skipleafcntp;
 						break;
 					}
 				}
