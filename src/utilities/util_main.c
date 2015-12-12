@@ -226,7 +226,6 @@ main(int argc, char *argv[])
 	ret = func(session, argc, argv);
 
 	/* Close the database. */
-
 err:	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 

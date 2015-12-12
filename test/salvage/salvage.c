@@ -518,7 +518,7 @@ build(int ikey, int ivalue, int cnt)
 	}
 	CHECK(session->create(session, "file:" LOAD, config) == 0);
 	CHECK(session->open_cursor(
-	    session, "file:" LOAD, NULL, "bulk", &cursor) == 0);
+	    session, "file:" LOAD, NULL, "bulk,append", &cursor) == 0);
 	for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
 		switch (page_type) {			/* Build the key. */
 		case WT_PAGE_COL_FIX:

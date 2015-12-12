@@ -478,7 +478,7 @@ struct __wt_page {
 #define	pg_row_ins	u.row.ins
 #undef	pg_row_upd
 #define	pg_row_upd	u.row.upd
-#define	pg_row_entries	u.row.entries
+#undef	pg_row_entries
 #define	pg_row_entries	u.row.entries
 
 		/* Fixed-length column-store leaf page. */

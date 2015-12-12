@@ -196,15 +196,6 @@ restart_page:	page = current->page;
 
 		WT_INTL_INDEX_GET(session, page, pindex);
 
-		/*
-		 * Fast-path internal pages with one child, a common case for
-		 * the root page in new trees.
-		 */
-		if (pindex->entries == 1) {
-			descent = pindex->index[0];
-			goto descend;
-		}
-
 		/* Fast-path appends. */
 		if (append_check) {
 			descent = pindex->index[pindex->entries - 1];
