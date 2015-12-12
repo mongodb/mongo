@@ -108,8 +108,8 @@ struct __wt_cursor_btree {
 	 * percentage of the total leaf pages to their next value. Note the
 	 * configured value and the calculated number of leaf pages to skip.
 	 */
-	uint32_t next_random_leaf_skip;
-	u_int	 next_random_sample_percent;
+	uint64_t next_random_leaf_skip;
+	u_int	 next_random_sample_size;
 
 	/*
 	 * The search function sets compare to:

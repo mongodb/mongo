@@ -39,8 +39,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         ('table', dict(type='table:random'))
     ]
     config = [
-        ('sample',
-            dict(config='next_random=true,next_random_sample_percent=35')),
+        ('sample', dict(config='next_random=true,next_random_sample_size=35')),
         ('not-sample', dict(config='next_random=true'))
     ]
     scenarios =number_scenarios(multiply_scenarios('.', types, config))
@@ -151,8 +150,7 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         ('table', dict(type='table:random'))
     ]
     config = [
-        ('sample',
-            dict(config='next_random=true,next_random_sample_percent=35')),
+        ('sample', dict(config='next_random=true,next_random_sample_size=35')),
         ('not-sample', dict(config='next_random=true'))
     ]
     scenarios =number_scenarios(multiply_scenarios('.', types, config))

@@ -10,21 +10,19 @@ from the object, most other cursor methods are not supported. For
 example, it's not possible to update using a cursor configured for
 random retrieval.
 
-By default, records are pseudo-randomly selected from the underlying
-Btree as a whole. that can lead to skewed results when the Btree is
-unbalanced or records are not uniformly distributed. In such cases, the
-\c next_random_sample_percent configuration can additionally be
-specified.  Setting \c next_random_sample_percent to a non-zero value
-causes \c next_random cursors to randomly select the first returned
-value from the object as a whole, and on subsequent returns to skip
-forward through the specified percentage of pages in the tree, returning
-a value from the new location.
+By default, each returned record is pseudo-randomly selected from the
+underlying object as a whole. That can lead to skewed results when the
+underlying tree structure is unbalanced or records are not uniformly
+distributed. In such cases, the \c next_random_sample_size configuration
+can also be specified. Setting \c next_random_sample_size configures the
+number of samples the application expects to take using the cursor. A
+cursor configured using \c next_random_sample_size divides the object
+into \c next_random_sample_size pieces, and each subsequent retrieval
+returns a record from the next one of those pieces.
 
 For example, setting \c next_random_sample_percent to \c 10 would cause
-the cursor to skip forward through 10% of the underlying object, and
-each retrieved row would represent a sample from 10% of the object.
-Similarly, setting \c next_random_sample_percent to \c 1 would cause the
-cursor to skip forward through 1% of the underlying object, and each
-retrieved row would represent a sample from 1% of the object.
+the cursor to sequentially return records from each tenth part of the
+object. Setting \c next_random_sample_percent to \c 1000 would cause the
+cursor to sequentially return records from each .1% of the object.
 
  */

@@ -923,14 +923,16 @@ struct __wt_session {
 	 * record from the object when the WT_CURSOR::next method is called;
 	 * valid only for row-store cursors.  See @ref cursor_random for
 	 * details., a boolean flag; default \c false.}
-	 * @config{next_random_sample_percent, cursors configured with \c
-	 * next_random to return pseudo-random records from the object randomly
-	 * select from the entire object\, by default.  Setting \c
-	 * next_random_sample_percent to a non-zero value causes \c next_random
-	 * cursors to randomly select the first returned record from the object
-	 * as a whole\, and on subsequent returns to skip forward through the
-	 * specified percentage of pages in the tree\, returning a record from
-	 * the new location., an integer between 1 and 100; default \c 0.}
+	 * @config{next_random_sample_size, cursors configured by \c next_random
+	 * to return pseudo-random records from the object randomly select from
+	 * the entire object\, by default.  Setting \c next_random_sample_size
+	 * to a non-zero value sets the number of samples the application
+	 * expects to take using the \c next_random cursor.  A cursor configured
+	 * with both \c next_random and \c next_random_sample_size attempts to
+	 * divide the object into \c next_random_sample_size equal-sized
+	 * pieces\, and each retrieval returns a record from one of those
+	 * pieces.  See @ref cursor_random for details., an integer greater than
+	 * or equal to 1; default \c 0.}
 	 * @config{overwrite, configures whether the cursor's insert\, update
 	 * and remove methods check the existing state of the record.  If \c
 	 * overwrite is \c false\, WT_CURSOR::insert fails with

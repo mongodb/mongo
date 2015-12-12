@@ -845,15 +845,17 @@ methods = {
         object when the WT_CURSOR::next method is called; valid only for
         row-store cursors. See @ref cursor_random for details''',
         type='boolean'),
-    Config('next_random_sample_percent', '0', r'''
-        cursors configured with \c next_random to return pseudo-random
+    Config('next_random_sample_size', '0', r'''
+        cursors configured by \c next_random to return pseudo-random
         records from the object randomly select from the entire object,
-        by default. Setting \c next_random_sample_percent to a non-zero
-        value causes \c next_random cursors to randomly select the first
-        returned record from the object as a whole, and on subsequent
-        returns to skip forward through the specified percentage of
-        pages in the tree, returning a record from the new location.''',
-        min='1', max='100'),
+        by default. Setting \c next_random_sample_size to a non-zero
+        value sets the number of samples the application expects to take
+        using the \c next_random cursor. A cursor configured with both
+        \c next_random and \c next_random_sample_size attempts to divide
+        the object into \c next_random_sample_size equal-sized pieces,
+        and each retrieval returns a record from one of those pieces. See
+        @ref cursor_random for details''',
+        min='1'),
     Config('raw', 'false', r'''
         ignore the encodings for the key and value, manage data as if
         the formats were \c "u".  See @ref cursor_raw for details''',

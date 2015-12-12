@@ -470,9 +470,9 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		cursor->reset = __curfile_reset;
 
 		WT_ERR(__wt_config_gets_def(
-		    session, cfg, "next_random_sample_percent", 0, &cval));
+		    session, cfg, "next_random_sample_size", 0, &cval));
 		if (cval.val != 0)
-			cbt->next_random_sample_percent = (u_int)cval.val;
+			cbt->next_random_sample_size = (u_int)cval.val;
 	}
 
 	/* Underlying btree initialization. */

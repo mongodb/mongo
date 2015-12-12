@@ -830,7 +830,6 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	wt_off_t percent;
 	uint64_t skip;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -853,7 +852,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	 * from that location. If the former, it's the same as a first retrieval
 	 * for the latter.
 	 */
-	if (cbt->next_random_sample_percent == 0)
+	if (cbt->next_random_sample_size == 0)
 		goto no_sample;
 
 	/*
@@ -884,10 +883,9 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		 * !!!
 		 * Ideally, the number would be prime to avoid restart issues.
 		 */
-		percent =
-		    ((btree->bm->block->fh->size / btree->allocsize) / 100) + 1;
-		cbt->next_random_leaf_skip =
-		    (uint32_t)(percent * cbt->next_random_sample_percent);
+		cbt->next_random_leaf_skip = (uint64_t)
+		    ((btree->bm->block->fh->size / btree->allocsize) /
+		    cbt->next_random_sample_size) + 1;
 
 no_sample:	/*
 		 * Choose a leaf page from the tree.

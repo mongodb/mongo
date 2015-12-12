@@ -323,9 +323,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
 	    NULL, "choices=[\"hex\",\"json\",\"print\"]",
 	    NULL, 0 },
 	{ "next_random", "boolean", NULL, NULL, NULL, 0 },
-	{ "next_random_sample_percent", "int",
-	    NULL, "min=1,max=100",
-	    NULL, 0 },
+	{ "next_random_sample_size", "int", NULL, "min=1", NULL, 0 },
 	{ "overwrite", "boolean", NULL, NULL, NULL, 0 },
 	{ "raw", "boolean", NULL, NULL, NULL, 0 },
 	{ "readonly", "boolean", NULL, NULL, NULL, 0 },
@@ -924,7 +922,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "WT_SESSION.open_cursor",
 	  "append=0,bulk=0,checkpoint=,dump=,next_random=0,"
-	  "next_random_sample_percent=0,overwrite=,raw=0,readonly=0,"
+	  "next_random_sample_size=0,overwrite=,raw=0,readonly=0,"
 	  "skip_sort_check=0,statistics=,target=",
 	  confchk_WT_SESSION_open_cursor, 12
 	},
