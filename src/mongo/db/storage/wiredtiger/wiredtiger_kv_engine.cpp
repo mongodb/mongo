@@ -158,9 +158,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << ",log_size=2GB),";
     ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getOpenConfig("system");
-#ifdef _WIN32
-    ss << "direct_io=(data),";
-#endif
     ss << extraOpenOptions;
     if (!_durable) {
         // If we started without the journal, but previously used the journal then open with the
