@@ -14,6 +14,7 @@ extern int __wt_block_buffer_to_addr(WT_BLOCK *block, const uint8_t *p, wt_off_t
 extern int __wt_block_addr_invalid(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size, bool live);
 extern int __wt_block_addr_string(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, const uint8_t *addr, size_t addr_size);
 extern int __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *p, WT_BLOCK_CKPT *ci);
+extern int __wt_block_ckpt_decode(WT_SESSION *wt_session, size_t allocsize, const uint8_t *p, WT_BLOCK_CKPT *ci);
 extern int __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t **pp, WT_BLOCK_CKPT *ci);
 extern int __wt_block_ckpt_init( WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci, const char *name);
 extern int __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size, uint8_t *root_addr, size_t *root_addr_sizep, bool checkpoint);
@@ -25,7 +26,6 @@ extern int __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp);
 extern int __wt_block_compact_page_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size, bool *skipp);
-extern int __wt_block_ckpt_decode(WT_SESSION_IMPL *session, const uint8_t *p, size_t block_allocsize, WT_BLOCK_CKPT *ci);
 extern int __wt_block_misplaced(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *tag, wt_off_t offset, uint32_t size, bool live);
 extern int __wt_block_off_remove_overlap(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t off, wt_off_t size);
 extern int __wt_block_alloc( WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_off_t size);
