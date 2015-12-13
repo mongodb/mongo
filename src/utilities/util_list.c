@@ -83,8 +83,9 @@ list_get_allocsize(WT_SESSION *session, const char *key, size_t *allocsize)
 		return (ret);
 	}
 	if ((ret = parser->get(parser, "allocation_size", &szvalue)) != 0) {
-		fprintf(stderr, "%s: config_parser.get: %s\n",
-		    progname, session->strerror(session, ret));
+		if (ret != WT_NOTFOUND)
+			fprintf(stderr, "%s: config_parser.get: %s\n",
+			    progname, session->strerror(session, ret));
 		(void)parser->close(parser);
 		return (ret);
 	}
@@ -195,8 +196,12 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 		return (ret == WT_NOTFOUND ? 0 : ret);
 
 	/* We need the allocation size for decoding the checkpoint addr */
-	if ((ret = list_get_allocsize(session, key, &allocsize)) != 0)
-		return (ret);
+	if ((ret = list_get_allocsize(session, key, &allocsize)) != 0) {
+		if (ret == WT_NOTFOUND)
+			allocsize = 0;
+		else
+			return (ret);
+	}
 
 	/* Find the longest name, so we can pretty-print. */
 	len = 0;
@@ -207,7 +212,7 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 
 	memset(&ci, 0, sizeof(ci));
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		if ((ret = __wt_block_ckpt_decode(
+		if (allocsize != 0 && (ret = __wt_block_ckpt_decode(
 		    session, allocsize, ckpt->raw.data, &ci)) != 0) {
 			fprintf(stderr, "%s: __wt_block_buffer_to_ckpt: %s\n",
 			    progname, session->strerror(session, ret));
