@@ -4538,6 +4538,36 @@ next:			if (src_recno == UINT64_MAX)
 		}
 	}
 
+	/*
+	 * If we split this page, instantiate any remaining records in the page
+	 * name space. (Imagine record 998 is transactionally visible, 999 was
+	 * never created or is not yet not visible, 1000 is visible. Then the
+	 * page split and record 1000 moves to another page. When we reconcile
+	 * the original page, we write record 998, then we don't see record 999
+	 * for whatever reason. If we've moved record 1000, we don't know to
+	 * write a deleted record 999 on the page.)
+	 *
+	 * This loop is really finishing the append list walk: we won't do work
+	 * here unless we split a page, which implies a big append list in the
+	 * first place.
+	 *
+	 * The record number recorded during the split is the record number of
+	 * the first key on the split page, that is, it's greater than the last
+	 * key on this page, that's why we loop to that value minus 1.
+	 */
+	n = page->modify->mod_split_recno;
+	if (n != WT_RECNO_OOB && src_recno < n)
+		if (last_deleted)
+			rle += n - src_recno;
+		else {
+			if (rle != 0)
+				WT_ERR(__rec_col_var_helper(session, r,
+				    salvage, last, last_deleted, 0, rle));
+
+			last_deleted = true;
+			rle = n - src_recno;
+		}
+
 	/* If we were tracking a record, write it. */
 	if (rle != 0)
 		WT_ERR(__rec_col_var_helper(

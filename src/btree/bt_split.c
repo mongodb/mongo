@@ -1748,6 +1748,17 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		child->key.recno = WT_INSERT_RECNO(moved_ins);
 
 	/*
+	 * Allocation operations completed, we're going to split.
+	 *
+	 * Record the split column-store page record, used in reconciliation.
+	 */
+	if (type != WT_PAGE_ROW_LEAF) {
+		WT_ASSERT(session,
+		    page->modify->mod_split_recno == WT_RECNO_OOB);
+		page->modify->mod_split_recno = child->key.recno;
+	}
+
+	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
 	 * updates we installed may be older than that.  Set the first dirty
@@ -1769,8 +1780,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	    page_decr, right_incr, __wt_update_list_memsize(moved_ins->upd));
 
 	/*
-	 * Allocation operations completed, move the last insert list item from
-	 * the original page to the new page.
+	 * Move the last insert list item from the original page to the new
+	 * page.
 	 *
 	 * First, update the item to the new child page. (Just append the entry
 	 * for simplicity, the previous skip list pointers originally allocated
@@ -1877,6 +1888,11 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	/*
 	 * Failure.
 	 *
+	 * Reset the split column-store page record.
+	 */
+	page->modify->mod_split_recno = WT_RECNO_OOB;
+
+	/*
 	 * Clear the allocated page's reference to the moved insert list element
 	 * so it's not freed when we discard the page.
 	 *
