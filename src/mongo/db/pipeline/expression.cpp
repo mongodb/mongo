@@ -2199,7 +2199,7 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             // is also associative, replace the expression for the operands it has.
             // E.g: sum(a, b, sum(c, d), e) => sum(a, b, c, d, e)
             ExpressionNary* nary = dynamic_cast<ExpressionNary*>(operand.get());
-            if (nary && str::equals(nary->getOpName(), getOpName())) {
+            if (nary && str::equals(nary->getOpName(), getOpName()) && nary->isAssociative()) {
                 vpOperand.erase(vpOperand.begin() + i);
                 vpOperand.insert(
                     vpOperand.begin() + i, nary->vpOperand.begin(), nary->vpOperand.end());
