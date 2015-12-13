@@ -50,7 +50,7 @@ load('jstests/aggregation/extras/utils.js');
     // isAssociativeAndCommutative() is called. If all arguments are constant, the optimization
     // will evaluate them all into one, without calling isAssociativeAndCommutative().
     coll.drop();
-    assert.writeOK(coll.insert({"a": 1}));
+    assert.writeOK(coll.insert({"a": 1, "b": 6}));
 
     // These expressions are associative and commutative so inner expression can be combined with
     // outer.
@@ -67,7 +67,7 @@ load('jstests/aggregation/extras/utils.js');
     // If isAssociativeAndCommutative() did not return false when provided a single argument, the
     // single array argument provided to the inner expression would be ignored instead of treated
     // as a list of arguments, and these tests would fail.
-    testOp({$sum: ["$a", 2, 3, {$sum : [[4, 5]]}]}, 15);
-    testOp({$min: ["$a", 2, 3, {$min : [[4, 5]]}]}, 1);
-    testOp({$max: ["$a", 2, 3, {$max: [[4, 5]]}]}, 5);
+    testOp({$sum: ["$a", 2, 3, {$sum : [["$a", 4, 5]]}]}, 16);
+    testOp({$min: ["$b", 2, 3, {$min : [["$a", 4, 5]]}]}, 1);
+    testOp({$max: ["$a", 2, 3, {$max: [["$b",4, 5]]}]}, 6);
 }());
