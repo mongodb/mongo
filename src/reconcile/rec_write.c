@@ -3945,16 +3945,49 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	r->recno += entry;
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_RET(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
-		if (upd == NULL)
-			continue;
+	for (ins =
+	    WT_SKIP_FIRST(WT_COL_APPEND(page));; ins = WT_SKIP_NEXT(ins)) {
+		if (ins == NULL) {
+			/*
+			 * If the page split, instantiate any missing records in
+			 * the page's name space. (Imagine record 98 is
+			 * transactionally visible, 99 wasn't created or is not
+			 * yet visible, 100 is visible. Then the page splits and
+			 * record 100 moves to another page. When we reconcile
+			 * the original page, we write record 98, then we don't
+			 * see record 99 for whatever reason. If we've moved
+			 * record 1000, we don't know to write a deleted record
+			 * 99 on the page.)
+			 *
+			 * The record number recorded during the split is the
+			 * first key on the split page, that is, one larger than
+			 * the last key on this page, we have to decrement it.
+			 */
+			if ((recno =
+			    page->modify->mod_split_recno) == WT_RECNO_OOB)
+				break;
+			recno -= 1;
+
+			/*
+			 * The following loop assumes records to write, and the
+			 * previous key might have been visible.
+			 */
+			if (r->recno > recno)
+				break;
+			upd = NULL;
+		} else {
+			WT_RET(
+			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
+			if (upd == NULL)
+				continue;
+			recno = WT_INSERT_RECNO(ins);
+		}
 		for (;;) {
 			/*
 			 * The application may have inserted records which left
 			 * gaps in the name space.
 			 */
-			for (recno = WT_INSERT_RECNO(ins);
+			for (;
 			    nrecs > 0 && r->recno < recno;
 			    --nrecs, ++entry, ++r->recno)
 				__bit_setv(
@@ -3962,6 +3995,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 			if (nrecs > 0) {
 				__bit_setv(r->first_free, entry, btree->bitcnt,
+				    upd == NULL ? 0 :
 				    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
 				--nrecs;
 				++entry;
@@ -3983,6 +4017,13 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			entry = 0;
 			nrecs = WT_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
 		}
+
+		/*
+		 * Execute this loop once without an insert item to catch any
+		 * missing records due to a split, then quit.
+		 */
+		if (ins == NULL)
+			break;
 	}
 
 	/* Update the counters. */
@@ -4463,11 +4504,36 @@ compare:		/*
 	}
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_ERR(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
-		if (upd == NULL)
-			continue;
-		for (n = WT_INSERT_RECNO(ins); src_recno <= n;) {
+	for (ins =
+	    WT_SKIP_FIRST(WT_COL_APPEND(page));; ins = WT_SKIP_NEXT(ins)) {
+		if (ins == NULL) {
+			/*
+			 * If the page split, instantiate any missing records in
+			 * the page's name space. (Imagine record 98 is
+			 * transactionally visible, 99 wasn't created or is not
+			 * yet visible, 100 is visible. Then the page splits and
+			 * record 100 moves to another page. When we reconcile
+			 * the original page, we write record 98, then we don't
+			 * see record 99 for whatever reason. If we've moved
+			 * record 1000, we don't know to write a deleted record
+			 * 99 on the page.)
+			 *
+			 * The record number recorded during the split is the
+			 * first key on the split page, that is, one larger than
+			 * the last key on this page, we have to decrement it.
+			 */
+			if ((n = page->modify->mod_split_recno) == WT_RECNO_OOB)
+				break;
+			n -= 1;
+			upd = NULL;
+		} else {
+			WT_ERR(
+			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
+			if (upd == NULL)
+				continue;
+			n = WT_INSERT_RECNO(ins);
+		}
+		while (src_recno <= n) {
 			/*
 			 * The application may have inserted records which left
 			 * gaps in the name space, and these gaps can be huge.
@@ -4490,7 +4556,8 @@ compare:		/*
 					src_recno += skip;
 				}
 			} else {
-				deleted = WT_UPDATE_DELETED_ISSET(upd);
+				deleted = upd == NULL ||
+				    WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
 					data = WT_UPDATE_DATA(upd);
 					size = upd->size;
@@ -4536,37 +4603,14 @@ next:			if (src_recno == UINT64_MAX)
 				break;
 			++src_recno;
 		}
+
+		/*
+		 * Execute this loop once without an insert item to catch any
+		 * missing records due to a split, then quit.
+		 */
+		if (ins == NULL)
+			break;
 	}
-
-	/*
-	 * If we split this page, instantiate any remaining records in the page
-	 * name space. (Imagine record 998 is transactionally visible, 999 was
-	 * never created or is not yet not visible, 1000 is visible. Then the
-	 * page split and record 1000 moves to another page. When we reconcile
-	 * the original page, we write record 998, then we don't see record 999
-	 * for whatever reason. If we've moved record 1000, we don't know to
-	 * write a deleted record 999 on the page.)
-	 *
-	 * This loop is really finishing the append list walk: we won't do work
-	 * here unless we split a page, which implies a big append list in the
-	 * first place.
-	 *
-	 * The record number recorded during the split is the record number of
-	 * the first key on the split page, that is, it's greater than the last
-	 * key on this page, that's why we loop to that value minus 1.
-	 */
-	n = page->modify->mod_split_recno;
-	if (n != WT_RECNO_OOB && src_recno < n)
-		if (last_deleted)
-			rle += n - src_recno;
-		else {
-			if (rle != 0)
-				WT_ERR(__rec_col_var_helper(session, r,
-				    salvage, last, last_deleted, 0, rle));
-
-			last_deleted = true;
-			rle = n - src_recno;
-		}
 
 	/* If we were tracking a record, write it. */
 	if (rle != 0)
