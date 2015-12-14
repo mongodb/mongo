@@ -455,14 +455,24 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * random_retrieval
-	 * Random retrieval cursors only support next, reset and close.
+	 * Random retrieval, row-store only.
+	 * Random retrieval cursors support a limited set of methods.
 	 */
 	WT_ERR(__wt_config_gets_def(session, cfg, "next_random", 0, &cval));
 	if (cval.val != 0) {
+		if (WT_CURSOR_RECNO(cursor))
+			WT_ERR_MSG(session, ENOTSUP,
+			    "next_random configuration not supported for "
+			    "column-store objects");
+
 		__wt_cursor_set_notsup(cursor);
 		cursor->next = __curfile_next_random;
 		cursor->reset = __curfile_reset;
+
+		WT_ERR(__wt_config_gets_def(
+		    session, cfg, "next_random_sample_size", 0, &cval));
+		if (cval.val != 0)
+			cbt->next_random_sample_size = (u_int)cval.val;
 	}
 
 	/* Underlying btree initialization. */
