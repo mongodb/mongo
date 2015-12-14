@@ -275,10 +275,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     WT_SESSION* s = _session->getSession();
     if (commit) {
         invariantWTOK(s->commit_transaction(s, NULL));
-        LOG(2) << "WT commit_transaction";
+        LOG(3) << "WT commit_transaction";
     } else {
         invariantWTOK(s->rollback_transaction(s, NULL));
-        LOG(2) << "WT rollback_transaction";
+        LOG(3) << "WT rollback_transaction";
     }
     _active = false;
     _myTransactionCount++;
@@ -351,7 +351,7 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
         invariantWTOK(s->begin_transaction(s, NULL));
     }
 
-    LOG(2) << "WT begin_transaction";
+    LOG(3) << "WT begin_transaction";
     _timer.reset();
     _active = true;
 }

@@ -222,7 +222,7 @@ BSONObj KVCatalog::_findEntry(OperationContext* opCtx, StringData ns, RecordId* 
         dl = it->second.storedLoc;
     }
 
-    LOG(1) << "looking up metadata for: " << ns << " @ " << dl;
+    LOG(3) << "looking up metadata for: " << ns << " @ " << dl;
     RecordData data;
     if (!_rs->findRecord(opCtx, dl, &data)) {
         // since the in memory meta data isn't managed with mvcc
