@@ -2031,6 +2031,7 @@ var authCommandsLib = {
                 {
                     runOnDb: firstDbName,
                     roles: {
+                        backup: 1,
                         dbAdmin: 1,
                         dbAdminAnyDatabase: 1,
                         dbOwner: 1,
@@ -2047,6 +2048,7 @@ var authCommandsLib = {
                 {
                     runOnDb: secondDbName,
                     roles: {
+                        backup: 1,
                         dbAdminAnyDatabase: 1,
                         clusterMonitor: 1,
                         clusterAdmin: 1,
