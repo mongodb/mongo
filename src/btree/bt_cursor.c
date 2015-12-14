@@ -821,7 +821,12 @@ err:	if (ret == WT_RESTART) {
 
 /*
  * __wt_btcur_next_random --
- *	Move to a random record in the tree.
+ *	Move to a random record in the tree. There are two algorithms, one
+ *	where we select a record at random from the whole tree on each
+ *	retrieval and one where we first select a record at random from the
+ *	whole tree, and then subsequently sample forward from that location.
+ *	The sampling approach allows us to select reasonably uniform random
+ *	points from unbalanced trees.
  */
 int
 __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
@@ -846,48 +851,32 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
 	/*
-	 * There are two algorithms, one where we select a record at random from
-	 * the whole tree on each retrieval, one where we first select a record
-	 * at random from the whole tree, and then subsequently sample forward
-	 * from that location. If the former, it's the same as a first retrieval
-	 * for the latter.
+	 * If retrieving random values without sampling, or we don't have a
+	 * page reference, pick a roughly random leaf page in the tree.
 	 */
-	if (cbt->next_random_sample_size == 0)
-		goto no_sample;
-
-	/*
-	 * If we do not yet reference a page, pick a roughly random leaf page in
-	 * the tree  and choose a number of leaf pages to skip between samples.
-	 */
-	if (cbt->ref == NULL) {
+	if (cbt->ref == NULL || cbt->next_random_sample_size == 0) {
 		/*
-		 * We're compensating for unbalanced trees: in a balanced tree,
-		 * we'd simply descend the tree selecting random slots, but that
-		 * requires a balanced tree with uniform internal and leaf page
-		 * sizes. In some WiredTiger releases, it was possible to have
-		 * unbalanced trees (sometimes, very, very unbalanced trees),
-		 * and in all WiredTiger releases, internal and leaf page sizes
-		 * aren't uniform. So, we skip past 1% of the leaf pages in the
-		 * tree between each random key return to compensate.
+		 * Skip past the sample size of the leaf pages in the tree
+		 * between each random key return to compensate for unbalanced
+		 * trees.
 		 *
-		 * Deciding how many leaf pages to skip isn't simple. Use the
-		 * underlying file size divided by its block allocation size as
-		 * our guess of leaf pages in the file (this can be entirely
-		 * wrong, as it depends on how many pages are in this particular
-		 * checkpoint, how large the leaf and internal pages really are,
-		 * and other factors). Then, divide that value by 100 to get 1%
-		 * and increment the final result to make sure tiny files don't
-		 * leave us with a skip value of 0. Finally, the user configured
-		 * the percentage of the object to skip over.
+		 * Use the underlying file size divided by its block allocation
+		 * size as our guess of leaf pages in the file (this can be
+		 * entirely wrong, as it depends on how many pages are in this
+		 * particular checkpoint, how large the leaf and internal pages
+		 * really are, and other factors). Then, divide that value by
+		 * the configured sample size and increment the final result to
+		 * make sure tiny files don't leave us with a skip value of 0.
 		 *
 		 * !!!
 		 * Ideally, the number would be prime to avoid restart issues.
 		 */
-		cbt->next_random_leaf_skip = (uint64_t)
-		    ((btree->bm->block->fh->size / btree->allocsize) /
-		    cbt->next_random_sample_size) + 1;
+		if (cbt->next_random_sample_size != 0)
+			cbt->next_random_leaf_skip = (uint64_t)
+			    ((btree->bm->block->fh->size / btree->allocsize) /
+			    cbt->next_random_sample_size) + 1;
 
-no_sample:	/*
+		/*
 		 * Choose a leaf page from the tree.
 		 */
 		WT_ERR(__cursor_func_init(cbt, true));
