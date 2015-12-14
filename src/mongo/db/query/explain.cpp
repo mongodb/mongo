@@ -314,6 +314,12 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainCommon::EXEC_STATS) {
             bob->appendNumber("keysExamined", spec->keysExamined);
         }
+    } else if (STAGE_ENSURE_SORTED == stats.stageType) {
+        EnsureSortedStats* spec = static_cast<EnsureSortedStats*>(stats.specific.get());
+
+        if (verbosity >= ExplainCommon::EXEC_STATS) {
+            bob->appendNumber("nDropped", spec->nDropped);
+        }
     } else if (STAGE_FETCH == stats.stageType) {
         FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());
         if (verbosity >= ExplainCommon::EXEC_STATS) {

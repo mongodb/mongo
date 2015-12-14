@@ -45,6 +45,7 @@ env.Library(
         "count_scan.cpp",
         "delete.cpp",
         "distinct_scan.cpp",
+        "ensure_sorted.cpp",
         "eof.cpp",
         "fetch.cpp",
         "geo_near.cpp",

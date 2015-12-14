@@ -910,4 +910,36 @@ struct CountNode : public QuerySolutionNode {
     bool endKeyInclusive;
 };
 
+/**
+ * This stage drops results that are out of sorted order.
+ */
+struct EnsureSortedNode : public QuerySolutionNode {
+    EnsureSortedNode() {}
+    virtual ~EnsureSortedNode() {}
+
+    virtual StageType getType() const {
+        return STAGE_ENSURE_SORTED;
+    }
+
+    virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
+
+    bool fetched() const {
+        return children[0]->fetched();
+    }
+    bool hasField(const std::string& field) const {
+        return children[0]->hasField(field);
+    }
+    bool sortedByDiskLoc() const {
+        return children[0]->sortedByDiskLoc();
+    }
+    const BSONObjSet& getSort() const {
+        return children[0]->getSort();
+    }
+
+    QuerySolutionNode* clone() const;
+
+    // The pattern that the results should be sorted by.
+    BSONObj pattern;
+};
+
 }  // namespace mongo

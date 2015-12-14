@@ -575,6 +575,25 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         return solutionMatches(child.Obj(), fn->children[0]);
+    } else if (STAGE_ENSURE_SORTED == trueSoln->getType()) {
+        const EnsureSortedNode* esn = static_cast<const EnsureSortedNode*>(trueSoln);
+
+        BSONElement el = testSoln["ensureSorted"];
+        if (el.eoo() || !el.isABSONObj()) {
+            return false;
+        }
+        BSONObj esObj = el.Obj();
+
+        BSONElement patternEl = esObj["pattern"];
+        if (patternEl.eoo() || !patternEl.isABSONObj()) {
+            return false;
+        }
+        BSONElement child = esObj["node"];
+        if (child.eoo() || !child.isABSONObj()) {
+            return false;
+        }
+
+        return (patternEl.Obj() == esn->pattern) && solutionMatches(child.Obj(), esn->children[0]);
     }
 
     return false;

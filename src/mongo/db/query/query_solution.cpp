@@ -916,4 +916,28 @@ QuerySolutionNode* CountNode::clone() const {
     return copy;
 }
 
+//
+// EnsureSortedNode
+//
+
+void EnsureSortedNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "ENSURE_SORTED\n";
+    addIndent(ss, indent + 1);
+    *ss << "pattern = " << pattern.toString() << '\n';
+    addCommon(ss, indent);
+    addIndent(ss, indent + 1);
+    *ss << "Child:" << '\n';
+    children[0]->appendToString(ss, indent + 2);
+}
+
+QuerySolutionNode* EnsureSortedNode::clone() const {
+    EnsureSortedNode* copy = new EnsureSortedNode();
+    cloneBaseData(copy);
+
+    copy->pattern = this->pattern;
+
+    return copy;
+}
+
 }  // namespace mongo

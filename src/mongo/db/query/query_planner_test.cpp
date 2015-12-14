@@ -3439,11 +3439,12 @@ TEST_F(QueryPlannerTest, NoKeepWithNToReturn) {
     runQuerySortProjSkipLimit(fromjson("{a: 1}"), fromjson("{b: 1}"), BSONObj(), 0, 3);
 
     assertSolutionExists(
+        "{ensureSorted: {pattern: {b: 1}, node: "
         "{or: {nodes: ["
         "{sort: {pattern: {b: 1}, limit: 3, node: {sortKeyGen: {node: "
         "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}, "
         "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}]}}");
+        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}]}}}}");
 }
 
 // Make sure a top-level $or hits the limiting number
@@ -3564,11 +3565,12 @@ TEST_F(QueryPlannerTest, SplitLimitedSort) {
     // Second solution has a blocking sort with a limit: it gets split and
     // joined with an OR stage.
     assertSolutionExists(
+        "{ensureSorted: {pattern: {b: 1}, node: "
         "{or: {nodes: ["
         "{sort: {pattern: {b: 1}, limit: 3, node: {sortKeyGen: {node: "
         "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}, "
         "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
-        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}]}}");
+        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}]}}}}");
 }
 
 // The same query run as a find command with a limit should not require the "split limited sort"
@@ -4117,10 +4119,11 @@ TEST_F(QueryPlannerTest, NToReturnHackWithFindCommand) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
+        "{ensureSorted: {pattern: {a: 1}, node: "
         "{or: {nodes: ["
         "{sort: {limit:3, pattern: {a:1}, node: {sortKeyGen: {node: {cscan: {dir:1}}}}}}, "
         "{sort: {limit:0, pattern: {a:1}, node: {sortKeyGen: {node: {cscan: {dir:1}}}}}}"
-        "]}}");
+        "]}}}}");
 }
 
 TEST_F(QueryPlannerTest, NToReturnHackWithSingleBatch) {

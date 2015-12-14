@@ -57,6 +57,8 @@ enum StageType {
     // Dummy stage used for receiving notifications of deletions during chunk migration.
     STAGE_NOTIFY_DELETE,
 
+    STAGE_ENSURE_SORTED,
+
     STAGE_EOF,
 
     // This is more of an "internal-only" stage where we try to keep docs that were mutated
