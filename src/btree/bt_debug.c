@@ -999,7 +999,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
 		break;
 	}
 
-	__wt_ref_info(session, ref, &addr, &addr_size, NULL);
+	__wt_ref_info(ref, &addr, &addr_size, NULL);
 	__dmsg(ds, " %s\n",
 	    __wt_addr_string(session, addr, addr_size, ds->tmp));
 }

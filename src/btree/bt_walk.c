@@ -73,7 +73,7 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
  *	Check if a reference is for a leaf page.
  */
 static inline bool
-__ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref)
+__ref_is_leaf(WT_REF *ref)
 {
 	size_t addr_size;
 	u_int type;
@@ -84,7 +84,7 @@ __ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * this page is a leaf page or not. If there's no address, the page
 	 * isn't on disk and we don't know the page type.
 	 */
-	__wt_ref_info(session, ref, &addr, &addr_size, &type);
+	__wt_ref_info(ref, &addr, &addr_size, &type);
 	return (addr == NULL ?
 	    false : type == WT_CELL_ADDR_LEAF || type == WT_CELL_ADDR_LEAF_NO);
 }
@@ -340,7 +340,7 @@ ascend:	/*
 			 * page.
 			 */
 			if (skipleafcntp != NULL || LF_ISSET(WT_READ_SKIP_LEAF))
-				if (__ref_is_leaf(session, ref)) {
+				if (__ref_is_leaf(ref)) {
 					if (LF_ISSET(WT_READ_SKIP_LEAF))
 						break;
 					if (*skipleafcntp > 0) {
