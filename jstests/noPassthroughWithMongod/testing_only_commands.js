@@ -3,9 +3,7 @@
  * via the --enableTestCommands flag fail when that flag isn't provided.
  */
 
-var testOnlyCommands = ['_testDistLockWithSkew',
-                        '_skewClockCommand',
-                        'configureFailPoint',
+var testOnlyCommands = ['configureFailPoint',
                         '_hashBSONElement',
                         'replSetTest',
                         'journalLatencyTest',
