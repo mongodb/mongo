@@ -84,23 +84,6 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 				avail_eighty += ext->size;
 		}
 
-	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
-	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
-	    "80%% of the file",
-	    block->name,
-	    (uintmax_t)avail_eighty / WT_MEGABYTE, (uintmax_t)avail_eighty));
-	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
-	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
-	    "90%% of the file",
-	    block->name,
-	    (uintmax_t)avail_ninety / WT_MEGABYTE, (uintmax_t)avail_ninety));
-	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
-	    "%s: require 10%% or %" PRIuMAX "MB (%" PRIuMAX ") in the first "
-	    "90%% of the file to perform compaction, compaction %s",
-	    block->name,
-	    (uintmax_t)(fh->size / 10) / WT_MEGABYTE, (uintmax_t)fh->size / 10,
-	    *skipp ? "skipped" : "proceeding"));
-
 	/*
 	 * Skip files where we can't recover at least 1MB.
 	 *
@@ -122,6 +105,23 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 		*skipp = false;
 		block->compact_pct_tenths = 1;
 	}
+
+	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
+	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
+	    "80%% of the file",
+	    block->name,
+	    (uintmax_t)avail_eighty / WT_MEGABYTE, (uintmax_t)avail_eighty));
+	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
+	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
+	    "90%% of the file",
+	    block->name,
+	    (uintmax_t)avail_ninety / WT_MEGABYTE, (uintmax_t)avail_ninety));
+	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
+	    "%s: require 10%% or %" PRIuMAX "MB (%" PRIuMAX ") in the first "
+	    "90%% of the file to perform compaction, compaction %s",
+	    block->name,
+	    (uintmax_t)(fh->size / 10) / WT_MEGABYTE, (uintmax_t)fh->size / 10,
+	    *skipp ? "skipped" : "proceeding"));
 
 err:	__wt_spin_unlock(session, &block->live_lock);
 
