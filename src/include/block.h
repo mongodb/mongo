@@ -244,7 +244,10 @@ struct __wt_block {
 	bool		ckpt_inprogress;/* Live checkpoint in progress */
 
 				/* Compaction support */
-	int	compact_pct_tenths;	/* Percent to compact */
+	int	 compact_pct_tenths;	/* Percent to compact */
+	uint64_t compact_pages_reviewed;/* Pages reviewed */
+	uint64_t compact_pages_skipped;	/* Pages skipped */
+	uint64_t compact_pages_written;	/* Pages rewritten */
 
 				/* Salvage support */
 	wt_off_t	slvg_off;	/* Salvage file offset */
