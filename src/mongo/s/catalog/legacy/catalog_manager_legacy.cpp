@@ -1298,7 +1298,7 @@ Status CatalogManagerLegacy::_checkConfigServersConsistent(const unsigned tries)
 
     if (up == 0) {
         return {networkError ? ErrorCodes::HostUnreachable : ErrorCodes::UnknownError,
-                str::stream() << "no config servers successfully contacted" << causedBy(&errMsg)};
+                str::stream() << "no config servers successfully contacted" << causedBy(errMsg)};
     } else if (up == 1) {
         warning() << "only 1 config server reachable, continuing";
         return Status::OK();
