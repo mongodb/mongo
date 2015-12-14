@@ -949,8 +949,7 @@ __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip, WT_ITEM *value)
  *	Return the addr/size and type triplet for a reference.
  */
 static inline void
-__wt_ref_info(WT_SESSION_IMPL *session,
-    WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
+__wt_ref_info(WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -1010,7 +1009,7 @@ __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (ref->addr == NULL)
 		return (0);
 
-	__wt_ref_info(session, ref, &addr, &addr_size, NULL);
+	__wt_ref_info(ref, &addr, &addr_size, NULL);
 	WT_RET(__wt_btree_block_free(session, addr, addr_size));
 
 	/* Clear the address (so we don't free it twice). */
