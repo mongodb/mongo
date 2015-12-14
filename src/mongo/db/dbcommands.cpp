@@ -71,6 +71,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
@@ -603,7 +604,11 @@ public:
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             auto statusWithCQ =
-                CanonicalQuery::canonicalize(NamespaceString(ns), query, sort, BSONObj());
+                CanonicalQuery::canonicalize(NamespaceString(ns),
+                                             query,
+                                             sort,
+                                             BSONObj(),
+                                             ExtensionsCallbackDisallowExtensions());
             if (!statusWithCQ.isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return 0;

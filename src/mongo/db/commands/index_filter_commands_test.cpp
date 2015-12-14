@@ -34,6 +34,7 @@
 
 
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
@@ -120,7 +121,8 @@ void addQueryShapeToPlanCache(PlanCache* planCache,
     BSONObj projectionObj = fromjson(projectionStr);
 
     // Create canonical query.
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj, sortObj, projectionObj);
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        nss, queryObj, sortObj, projectionObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -144,7 +146,8 @@ bool planCacheContains(const PlanCache& planCache,
     BSONObj projectionObj = fromjson(projectionStr);
 
     // Create canonical query.
-    auto statusWithInputQuery = CanonicalQuery::canonicalize(nss, queryObj, sortObj, projectionObj);
+    auto statusWithInputQuery = CanonicalQuery::canonicalize(
+        nss, queryObj, sortObj, projectionObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithInputQuery.getStatus());
     unique_ptr<CanonicalQuery> inputQuery = std::move(statusWithInputQuery.getValue());
 
@@ -160,7 +163,11 @@ bool planCacheContains(const PlanCache& planCache,
         // Alternatively, we could add key to PlanCacheEntry but that would be used in one place
         // only.
         auto statusWithCurrentQuery =
-            CanonicalQuery::canonicalize(nss, entry->query, entry->sort, entry->projection);
+            CanonicalQuery::canonicalize(nss,
+                                         entry->query,
+                                         entry->sort,
+                                         entry->projection,
+                                         ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCurrentQuery.getStatus());
         unique_ptr<CanonicalQuery> currentQuery = std::move(statusWithCurrentQuery.getValue());
 

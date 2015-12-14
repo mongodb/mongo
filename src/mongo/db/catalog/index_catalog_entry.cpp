@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
@@ -103,7 +104,8 @@ void IndexCatalogEntry::init(OperationContext* txn, IndexAccessMethod* accessMet
     if (filterElement.type()) {
         invariant(filterElement.isABSONObj());
         BSONObj filter = filterElement.Obj();
-        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(filter);
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(filter, ExtensionsCallbackDisallowExtensions());
         // this should be checked in create, so can blow up here
         invariantOK(statusWithMatcher.getStatus());
         _filterExpression = std::move(statusWithMatcher.getValue());

@@ -36,6 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
@@ -51,7 +52,8 @@ bool filterMatches(const BSONObj& testFilter, const QuerySolutionNode* trueFilte
     if (NULL == trueFilterNode->filter) {
         return false;
     }
-    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(testFilter);
+    StatusWithMatchExpression statusWithMatcher =
+        MatchExpressionParser::parse(testFilter, ExtensionsCallbackDisallowExtensions());
     if (!statusWithMatcher.isOK()) {
         return false;
     }

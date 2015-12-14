@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/platform/decimal128.h"
 
 namespace mongo {
@@ -48,7 +49,8 @@ namespace mongo {
 class ParsedMatchExpression {
 public:
     ParsedMatchExpression(const std::string& str) : _obj(fromjson(str)) {
-        StatusWithMatchExpression result = MatchExpressionParser::parse(_obj);
+        StatusWithMatchExpression result =
+            MatchExpressionParser::parse(_obj, ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(result.getStatus());
         _expr = std::move(result.getValue());
     }
@@ -66,7 +68,9 @@ TEST(ExpressionAlgoIsSubsetOf, NullAndOmittedField) {
     // Verify that ComparisonMatchExpression::init() prohibits creating a match expression with
     // an Undefined type.
     BSONObj undefined = fromjson("{a: undefined}");
-    ASSERT_EQUALS(ErrorCodes::BadValue, MatchExpressionParser::parse(undefined).getStatus());
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  MatchExpressionParser::parse(undefined, ExtensionsCallbackDisallowExtensions())
+                      .getStatus());
 
     ParsedMatchExpression empty("{}");
     ParsedMatchExpression null("{a: null}");

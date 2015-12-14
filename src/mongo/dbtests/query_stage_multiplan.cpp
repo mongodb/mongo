@@ -38,6 +38,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -144,7 +145,8 @@ public:
 
         // Make the filter.
         BSONObj filterObj = BSON("foo" << 7);
-        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(filterObj);
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(filterObj, ExtensionsCallbackDisallowExtensions());
         verify(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> filter = std::move(statusWithMatcher.getValue());
         // Make the stage.
@@ -152,7 +154,8 @@ public:
             new CollectionScan(&_txn, csparams, sharedWs.get(), filter.get()));
 
         // Hand the plans off to the MPS.
-        auto statusWithCQ = CanonicalQuery::canonicalize(nss, BSON("foo" << 7));
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            nss, BSON("foo" << 7), ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());
@@ -209,7 +212,8 @@ public:
         auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                          BSON("a" << 1 << "b" << 1),  // query
                                                          BSON("b" << 1),              // sort
-                                                         BSONObj());                  // proj
+                                                         BSONObj(),                   // proj
+                                                         ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -311,7 +315,8 @@ public:
 
         AutoGetCollectionForRead ctx(&_txn, nss.ns());
 
-        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(nss, BSON("x" << 1)));
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
+            nss, BSON("x" << 1), ExtensionsCallbackDisallowExtensions()));
         unique_ptr<MultiPlanStage> mps =
             make_unique<MultiPlanStage>(&_txn, ctx.getCollection(), cq.get());
 
@@ -385,7 +390,8 @@ public:
 
         // Create the executor (Matching all documents).
         auto queryObj = BSON("foo" << BSON("$gte" << 0));
-        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(nss, queryObj));
+        auto cq = uassertStatusOK(
+            CanonicalQuery::canonicalize(nss, queryObj, ExtensionsCallbackDisallowExtensions()));
         auto exec =
             uassertStatusOK(getExecutor(&_txn, coll, std::move(cq), PlanExecutor::YIELD_MANUAL));
 

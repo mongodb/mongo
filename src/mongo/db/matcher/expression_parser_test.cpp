@@ -36,12 +36,14 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 
 namespace mongo {
 
 TEST(MatchExpressionParserTest, SimpleEQ1) {
     BSONObj query = BSON("x" << 2);
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -50,7 +52,8 @@ TEST(MatchExpressionParserTest, SimpleEQ1) {
 
 TEST(MatchExpressionParserTest, Multiple1) {
     BSONObj query = BSON("x" << 5 << "y" << BSON("$gt" << 5 << "$lt" << 8));
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
     ASSERT_TRUE(result.isOK());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 7)));
@@ -62,15 +65,16 @@ TEST(MatchExpressionParserTest, Multiple1) {
 
 TEST(AtomicMatchExpressionTest, Simple1) {
     BSONObj query = BSON("x" << 5 << "$atomic" << BSON("$gt" << 5 << "$lt" << 8));
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
     ASSERT_TRUE(result.isOK());
 
     query = BSON("x" << 5 << "$isolated" << 1);
-    result = MatchExpressionParser::parse(query);
+    result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
     ASSERT_TRUE(result.isOK());
 
     query = BSON("x" << 5 << "y" << BSON("$isolated" << 1));
-    result = MatchExpressionParser::parse(query);
+    result = MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
     ASSERT_FALSE(result.isOK());
 }
 

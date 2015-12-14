@@ -38,6 +38,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
@@ -60,7 +61,8 @@ static const NamespaceString nss("test.collection");
  * Utility functions to create a CanonicalQuery
  */
 unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj) {
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj);
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(nss, queryObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -76,7 +78,8 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj, sortObj, projObj);
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        nss, queryObj, sortObj, projObj, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -104,8 +107,9 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                                      hintObj,
                                                      minObj,
                                                      maxObj,
-                                                     false,   // snapshot
-                                                     false);  // explain
+                                                     false,  // snapshot
+                                                     false,  // explain
+                                                     ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -126,8 +130,18 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     BSONObj hintObj = fromjson(hintStr);
     BSONObj minObj = fromjson(minStr);
     BSONObj maxObj = fromjson(maxStr);
-    auto statusWithCQ = CanonicalQuery::canonicalize(
-        nss, queryObj, sortObj, projObj, skip, limit, hintObj, minObj, maxObj, snapshot, explain);
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss,
+                                                     queryObj,
+                                                     sortObj,
+                                                     projObj,
+                                                     skip,
+                                                     limit,
+                                                     hintObj,
+                                                     minObj,
+                                                     maxObj,
+                                                     snapshot,
+                                                     explain,
+                                                     ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -136,7 +150,8 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
  * Utility function to create MatchExpression
  */
 unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
-    StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions());
     if (!status.isOK()) {
         str::stream ss;
         ss << "failed to parse query: " << obj.toString()
@@ -506,7 +521,6 @@ protected:
 
         solns.clear();
 
-
         auto statusWithCQ = CanonicalQuery::canonicalize(nss,
                                                          query,
                                                          sort,
@@ -517,7 +531,8 @@ protected:
                                                          minObj,
                                                          maxObj,
                                                          snapshot,
-                                                         false);  // explain
+                                                         false,  // explain
+                                                         ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns);
         ASSERT_OK(s);
@@ -588,7 +603,8 @@ protected:
                                       const BSONObj& sort,
                                       const BSONObj& proj,
                                       const QuerySolution& soln) const {
-        auto statusWithCQ = CanonicalQuery::canonicalize(nss, query, sort, proj);
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            nss, query, sort, proj, ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 

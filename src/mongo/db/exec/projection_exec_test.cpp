@@ -36,6 +36,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -48,7 +49,8 @@ using std::unique_ptr;
  * Utility function to create MatchExpression
  */
 unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
-    StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions());
     ASSERT_TRUE(status.isOK());
     return std::move(status.getValue());
 }
@@ -80,7 +82,7 @@ void testTransform(const char* specStr,
     BSONObj spec = fromjson(specStr);
     BSONObj query = fromjson(queryStr);
     unique_ptr<MatchExpression> queryExpression = parseMatchExpression(query);
-    ProjectionExec exec(spec, queryExpression.get());
+    ProjectionExec exec(spec, queryExpression.get(), ExtensionsCallbackDisallowExtensions());
 
     // Create working set member.
     WorkingSetMember wsm;
@@ -163,7 +165,7 @@ BSONObj transformMetaSortKeyCovered(const BSONObj& sortKey,
     wsm->addComputed(new SortKeyComputedData(sortKey));
     ws.transitionToLocAndIdx(wsid);
 
-    ProjectionExec projExec(fromjson(projSpec), nullptr);
+    ProjectionExec projExec(fromjson(projSpec), nullptr, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(projExec.transform(wsm));
 
     return wsm->obj.value();

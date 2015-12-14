@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/unittest/unittest.h"
@@ -35,7 +36,8 @@ namespace mongo {
 namespace {
 
 std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
-    StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions());
     if (!status.isOK()) {
         FAIL(str::stream() << "failed to parse query: " << obj.toString()
                            << ". Reason: " << status.getStatus().toString());

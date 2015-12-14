@@ -31,6 +31,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
@@ -118,7 +119,7 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
         // Build the matcher around the object we built above. Currently, we do not allow $pull
         // operations to contain $text/$where clauses, so preserving this behaviour.
         StatusWithMatchExpression parseResult =
-            MatchExpressionParser::parse(_exprObj, ExtensionsCallback());
+            MatchExpressionParser::parse(_exprObj, ExtensionsCallbackDisallowExtensions());
         if (!parseResult.isOK()) {
             return parseResult.getStatus();
         }

@@ -41,6 +41,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
@@ -192,7 +193,8 @@ public:
 
         // Make the filter.
         BSONObj filterObj = BSON("foo" << 6);
-        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(filterObj);
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(filterObj, ExtensionsCallbackDisallowExtensions());
         verify(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 

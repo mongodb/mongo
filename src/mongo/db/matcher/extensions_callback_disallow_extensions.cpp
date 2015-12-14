@@ -26,38 +26,19 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_text_base.h"
-#include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 
 namespace mongo {
 
-/**
- * Certain match clauses (the "extension" clauses, namely $text and $where) require context in
- * order to perform parsing. This context is captured inside of an ExtensionsCallback object.
- */
-class ExtensionsCallback {
-public:
-    virtual StatusWithMatchExpression parseText(BSONElement text) const = 0;
+StatusWithMatchExpression ExtensionsCallbackDisallowExtensions::parseWhere(
+    BSONElement where) const {
+    return {Status(ErrorCodes::NoMatchParseContext, "no context for parsing $where")};
+}
 
-    virtual StatusWithMatchExpression parseWhere(BSONElement where) const = 0;
-
-    virtual ~ExtensionsCallback() {}
-
-protected:
-    /**
-     * Helper method which extracts parameters from the given $text element.
-     */
-    static StatusWith<TextMatchExpressionBase::TextParams> extractTextMatchExpressionParams(
-        BSONElement text);
-
-    /**
-     * Helper method which extracts parameters from the given $where element.
-     */
-    static StatusWith<WhereMatchExpressionBase::WhereParams> extractWhereMatchExpressionParams(
-        BSONElement where);
-};
+StatusWithMatchExpression ExtensionsCallbackDisallowExtensions::parseText(BSONElement text) const {
+    return {Status(ErrorCodes::NoMatchParseContext, "no context for parsing $text")};
+}
 
 }  // namespace mongo

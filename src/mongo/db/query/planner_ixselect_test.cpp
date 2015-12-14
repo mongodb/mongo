@@ -35,6 +35,7 @@
 #include <memory>
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/text.h"
@@ -51,7 +52,8 @@ using std::vector;
  * Utility function to create MatchExpression
  */
 unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
-    StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(obj, ExtensionsCallbackDisallowExtensions());
     ASSERT_TRUE(status.isOK());
     return std::move(status.getValue());
 }

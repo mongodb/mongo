@@ -35,6 +35,7 @@
 #include <algorithm>
 
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
@@ -125,7 +126,8 @@ TEST(PlanCacheCommandsTest, planCacheListQueryShapesEmpty) {
 
 TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
     // Create a canonical query
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, fromjson("{a: 1}"));
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -150,7 +152,8 @@ TEST(PlanCacheCommandsTest, planCacheListQueryShapesOneKey) {
 
 TEST(PlanCacheCommandsTest, planCacheClearAllShapes) {
     // Create a canonical query
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, fromjson("{a: 1}"));
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -266,10 +269,12 @@ TEST(PlanCacheCommandsTest, planCacheClearUnknownKey) {
 
 TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
     // Create 2 canonical queries.
-    auto statusWithCQA = CanonicalQuery::canonicalize(nss, fromjson("{a: 1}"));
+    auto statusWithCQA = CanonicalQuery::canonicalize(
+        nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQA.getStatus());
     unique_ptr<CanonicalQuery> cqA = std::move(statusWithCQA.getValue());
-    auto statusWithCQB = CanonicalQuery::canonicalize(nss, fromjson("{b: 1}"));
+    auto statusWithCQB = CanonicalQuery::canonicalize(
+        nss, fromjson("{b: 1}"), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQB.getStatus());
     unique_ptr<CanonicalQuery> cqB = std::move(statusWithCQB.getValue());
 
@@ -388,7 +393,8 @@ TEST(PlanCacheCommandsTest, planCacheListPlansUnknownKey) {
 
 TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionTrue) {
     // Create a canonical query
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, fromjson("{a: 1}"));
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -407,7 +413,8 @@ TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionTrue) {
 
 TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionFalse) {
     // Create a canonical query
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, fromjson("{a: 1}"));
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        nss, fromjson("{a: 1}"), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

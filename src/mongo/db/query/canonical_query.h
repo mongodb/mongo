@@ -47,8 +47,7 @@ public:
      * Used for legacy find through the OP_QUERY message.
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        const QueryMessage& qm,
-        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+        const QueryMessage& qm, const ExtensionsCallback& extensionsCallback);
 
     /**
      * Takes ownership of 'lpq'.
@@ -58,8 +57,8 @@ public:
      *
      * Used for finds using the find command path.
      */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        LiteParsedQuery* lpq, const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(LiteParsedQuery* lpq,
+                                                                    const ExtensionsCallback&);
 
     /**
      * For testing or for internal clients to use.
@@ -75,32 +74,30 @@ public:
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         const CanonicalQuery& baseQuery,
         MatchExpression* root,
-        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback);
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        NamespaceString nss,
-        const BSONObj& query,
-        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+        NamespaceString nss, const BSONObj& query, const ExtensionsCallback& extensionsCallback);
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
         const BSONObj& query,
         bool explain,
-        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback);
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
         const BSONObj& query,
         long long skip,
         long long limit,
-        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback);
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
         const BSONObj& query,
         const BSONObj& sort,
         const BSONObj& proj,
-        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback);
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
@@ -109,7 +106,7 @@ public:
         const BSONObj& proj,
         long long skip,
         long long limit,
-        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback);
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
@@ -119,7 +116,7 @@ public:
         long long skip,
         long long limit,
         const BSONObj& hint,
-        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback);
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
@@ -133,7 +130,7 @@ public:
         const BSONObj& maxObj,
         bool snapshot,
         bool explain,
-        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback);
 
     /**
      * Returns true if "query" describes an exact-match query on _id, possibly with

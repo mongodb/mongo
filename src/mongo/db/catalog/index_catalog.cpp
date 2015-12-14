@@ -55,6 +55,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -540,8 +541,8 @@ Status IndexCatalog::_isSpecOk(const BSONObj& spec) const {
             return Status(ErrorCodes::CannotCreateIndex,
                           "\"partialFilterExpression\" for an index must be a document");
         }
-        StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(filterElement.Obj());
+        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
+            filterElement.Obj(), ExtensionsCallbackDisallowExtensions());
         if (!statusWithMatcher.isOK()) {
             return statusWithMatcher.getStatus();
         }

@@ -28,36 +28,26 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_text_base.h"
-#include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/db/matcher/extensions_callback.h"
 
 namespace mongo {
 
 /**
- * Certain match clauses (the "extension" clauses, namely $text and $where) require context in
- * order to perform parsing. This context is captured inside of an ExtensionsCallback object.
+ * ExtensionsCallbackDisallowExtensions produces an error during parsing if expressions which
+ * require context are present. This implementation of ExtensionsCallback should be used if you wish
+ * to explicitly ban the use of query language "extensions" such as $text and $where.
  */
-class ExtensionsCallback {
+class ExtensionsCallbackDisallowExtensions : public ExtensionsCallback {
 public:
-    virtual StatusWithMatchExpression parseText(BSONElement text) const = 0;
-
-    virtual StatusWithMatchExpression parseWhere(BSONElement where) const = 0;
-
-    virtual ~ExtensionsCallback() {}
-
-protected:
     /**
-     * Helper method which extracts parameters from the given $text element.
+     * Always returns an error status.
      */
-    static StatusWith<TextMatchExpressionBase::TextParams> extractTextMatchExpressionParams(
-        BSONElement text);
+    StatusWithMatchExpression parseText(BSONElement text) const final;
 
     /**
-     * Helper method which extracts parameters from the given $where element.
+     * Always returns an error status.
      */
-    static StatusWith<WhereMatchExpressionBase::WhereParams> extractWhereMatchExpressionParams(
-        BSONElement where);
+    StatusWithMatchExpression parseWhere(BSONElement where) const final;
 };
 
 }  // namespace mongo

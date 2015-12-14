@@ -34,6 +34,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 
@@ -4057,8 +4058,8 @@ TEST(BadInputTest, CacheDataFromTaggedTree) {
     // No relevant index matching the index tag.
     relevantIndices.push_back(IndexEntry(BSON("a" << 1)));
 
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(NamespaceString("test.collection"), BSON("a" << 3));
+    auto statusWithCQ = CanonicalQuery::canonicalize(
+        NamespaceString("test.collection"), BSON("a" << 3), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
     scopedCq->root()->setTag(new IndexTag(1));
@@ -4071,7 +4072,8 @@ TEST(BadInputTest, CacheDataFromTaggedTree) {
 TEST(BadInputTest, TagAccordingToCache) {
     const NamespaceString nss("test.collection");
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, BSON("a" << 3));
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(nss, BSON("a" << 3), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 
@@ -4098,7 +4100,8 @@ TEST(BadInputTest, TagAccordingToCache) {
     ASSERT_OK(s);
 
     // Regenerate canonical query in order to clear tags.
-    statusWithCQ = CanonicalQuery::canonicalize(nss, BSON("a" << 3));
+    statusWithCQ =
+        CanonicalQuery::canonicalize(nss, BSON("a" << 3), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     scopedCq = std::move(statusWithCQ.getValue());
 

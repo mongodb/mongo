@@ -32,6 +32,7 @@
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -85,7 +86,8 @@ protected:
         _exec.reset();
 
         OldClientWriteContext ctx(&_opCtx, nss.ns());
-        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(nss, /*query=*/BSONObj()));
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
+            nss, /*query=*/BSONObj(), ExtensionsCallbackDisallowExtensions()));
         _exec = uassertStatusOK(
             getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));
 

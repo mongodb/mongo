@@ -50,6 +50,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -287,7 +288,8 @@ private:
         const char* keyFieldName = key.firstElement().fieldName();
         BSONObj query =
             BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationTime));
-        auto canonicalQuery = CanonicalQuery::canonicalize(nss, query);
+        auto canonicalQuery =
+            CanonicalQuery::canonicalize(nss, query, ExtensionsCallbackDisallowExtensions());
         invariantOK(canonicalQuery.getStatus());
 
         DeleteStageParams params;

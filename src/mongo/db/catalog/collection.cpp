@@ -48,6 +48,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_driver.h"
@@ -303,7 +304,8 @@ StatusWithMatchExpression Collection::parseValidator(const BSONObj& validator) c
             return status;
     }
 
-    auto statusWithMatcher = MatchExpressionParser::parse(validator);
+    auto statusWithMatcher =
+        MatchExpressionParser::parse(validator, ExtensionsCallbackDisallowExtensions());
     if (!statusWithMatcher.isOK())
         return statusWithMatcher.getStatus();
 

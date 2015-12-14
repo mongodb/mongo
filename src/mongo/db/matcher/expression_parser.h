@@ -48,8 +48,8 @@ public:
      * caller has to maintain ownership obj
      * the tree has views (BSONElement) into obj
      */
-    static StatusWithMatchExpression parse(
-        const BSONObj& obj, const ExtensionsCallback& extensionsCallback = ExtensionsCallback()) {
+    static StatusWithMatchExpression parse(const BSONObj& obj,
+                                           const ExtensionsCallback& extensionsCallback) {
         // The 0 initializes the match expression tree depth.
         return MatchExpressionParser(&extensionsCallback)._parse(obj, 0);
     }

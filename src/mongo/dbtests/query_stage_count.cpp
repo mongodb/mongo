@@ -37,6 +37,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -140,8 +141,8 @@ public:
 
         unique_ptr<WorkingSet> ws(new WorkingSet);
 
-        StatusWithMatchExpression statusWithMatcher =
-            MatchExpressionParser::parse(request.getQuery());
+        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
+            request.getQuery(), ExtensionsCallbackDisallowExtensions());
         ASSERT(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> expression = std::move(statusWithMatcher.getValue());
 

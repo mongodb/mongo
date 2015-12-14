@@ -29,6 +29,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/canonical_query.h"
@@ -75,7 +76,8 @@ protected:
     }
 
     void setupFromQuery(const BSONObj& query) {
-        auto statusWithCQ = CanonicalQuery::canonicalize(nss, query);
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(nss, query, ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         _cq = std::move(statusWithCQ.getValue());
         _oplogws.reset(new WorkingSet());

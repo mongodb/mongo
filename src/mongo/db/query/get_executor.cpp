@@ -53,6 +53,7 @@
 #include "mongo/db/exec/update.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/update_lifecycle.h"
@@ -596,7 +597,8 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
     invariant(!proj.isEmpty());
 
     ParsedProjection* rawParsedProj;
-    Status ppStatus = ParsedProjection::make(proj.getOwned(), cq->root(), &rawParsedProj);
+    Status ppStatus = ParsedProjection::make(
+        proj.getOwned(), cq->root(), &rawParsedProj, ExtensionsCallbackDisallowExtensions());
     if (!ppStatus.isOK()) {
         return ppStatus;
     }

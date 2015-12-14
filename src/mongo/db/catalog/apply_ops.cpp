@@ -38,6 +38,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
@@ -76,9 +77,9 @@ Status applyOps(OperationContext* txn,
             DBDirectClient db(txn);
             BSONObj realres = db.findOne(f["ns"].String(), f["q"].Obj());
 
-            // Apply-ops would never have a $where matcher, so use the default callback,
-            // which will throw an error if $where is found.
-            Matcher m(f["res"].Obj());
+            // Apply-ops would never have a $where/$text matcher. Using the "DisallowExtensions"
+            // callback ensures that parsing will throw an error if $where or $text are found.
+            Matcher m(f["res"].Obj(), ExtensionsCallbackDisallowExtensions());
             if (!m.matches(realres)) {
                 result->append("got", realres);
                 result->append("whatFailed", f);

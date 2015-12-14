@@ -48,7 +48,7 @@ public:
     static Status make(const BSONObj& spec,
                        const MatchExpression* const query,
                        ParsedProjection** out,
-                       const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
+                       const ExtensionsCallback& extensionsCallback);
 
     /**
      * Returns true if the projection requires match details from the query,
