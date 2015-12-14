@@ -51,6 +51,10 @@ Status addSASLSSPIOptions(moe::OptionSection* options) {
                                   "DNS resolution strategy to use for hostname canonicalization. "
                                   "May be one of: {none, forward, forwardAndReverse}")
         .setDefault(moe::Value(std::string("none")));
+    sspiOptions.addOptionChaining("security.sspiRealmOverride",
+                                  "sspiRealmOverride",
+                                  moe::String,
+                                  "Override the detected realm with the provided string").hidden();
     return options->addSection(sspiOptions);
 }
 
@@ -68,6 +72,9 @@ Status storeSASLSSPIOptions(const moe::Environment& params) {
             return Status(ErrorCodes::InvalidOptions,
                           "Unrecognized sspiHostnameCanonicalization option");
         }
+    }
+    if (params.count("security.sspiRealmOverride")) {
+        saslSSPIGlobalParams.realmOverride = params["security.sspiRealmOverride"].as<std::string>();
     }
     return Status::OK();
 }

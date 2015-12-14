@@ -222,6 +222,9 @@ int sspiClientMechNew(void* glob_context,
     }
 
     pcctx->nameToken = toWideString(cparams->service) + L'/' + toWideString(canonName.c_str());
+    if (!saslSSPIGlobalParams.realmOverride.empty()) {
+        pcctx->nameToken += L'@' + toWideString(saslSSPIGlobalParams.realmOverride.c_str());
+    }
 
     *conn_context = pcctx.release();
 

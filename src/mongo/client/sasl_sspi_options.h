@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/util/net/hostname_canonicalization.h"
 
 namespace mongo {
@@ -44,6 +46,9 @@ namespace moe = mongo::optionenvironment;
 struct SASLSSPIGlobalParams {
     // HostnameCanonicalizationMode to use for resolving SASL hostname into the SPN's hostname
     HostnameCanonicalizationMode canonicalization = HostnameCanonicalizationMode::kNone;
+
+    // Override the automatically detected realm
+    std::string realmOverride;
 };
 
 extern SASLSSPIGlobalParams saslSSPIGlobalParams;
