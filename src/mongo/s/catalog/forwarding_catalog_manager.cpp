@@ -328,6 +328,7 @@ void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::Callba
     }
     Client::initThreadIfNotAlready();
     auto txn = cc().makeOperationContext();
+    log() << "Swapping sharding Catalog Manager from mirrored (SCCC) to replica set (CSRS) mode";
 
     stdx::lock_guard<RWLock> oplk(_operationLock);
     stdx::lock_guard<stdx::mutex> oblk(_observerMutex);
