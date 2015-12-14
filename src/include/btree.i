@@ -948,7 +948,7 @@ __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip, WT_ITEM *value)
  * __wt_ref_info --
  *	Return the addr/size and type triplet for a reference.
  */
-static inline int
+static inline void
 __wt_ref_info(WT_SESSION_IMPL *session,
     WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 {
@@ -984,7 +984,9 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 			case WT_ADDR_LEAF_NO:
 				*typep = WT_CELL_ADDR_LEAF_NO;
 				break;
-			WT_ILLEGAL_VALUE(session);
+			default:
+				*typep = 0;
+				break;
 			}
 	} else {
 		__wt_cell_unpack((WT_CELL *)addr, unpack);
@@ -993,7 +995,6 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 		if (typep != NULL)
 			*typep = unpack->type;
 	}
-	return (0);
 }
 
 /*
@@ -1009,7 +1010,7 @@ __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (ref->addr == NULL)
 		return (0);
 
-	WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
+	__wt_ref_info(session, ref, &addr, &addr_size, NULL);
 	WT_RET(__wt_btree_block_free(session, addr, addr_size));
 
 	/* Clear the address (so we don't free it twice). */

@@ -72,8 +72,8 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
  * __ref_is_leaf --
  *	Check if a reference is for a leaf page.
  */
-static inline int
-__ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref, bool *isleafp)
+static inline bool
+__ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	size_t addr_size;
 	u_int type;
@@ -84,10 +84,9 @@ __ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref, bool *isleafp)
 	 * this page is a leaf page or not. If there's no address, the page
 	 * isn't on disk and we don't know the page type.
 	 */
-	WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, &type));
-	*isleafp = addr == NULL ?
-	    false : (type == WT_CELL_ADDR_LEAF || type == WT_CELL_ADDR_LEAF_NO);
-	return (0);
+	__wt_ref_info(session, ref, &addr, &addr_size, &type);
+	return (addr == NULL ?
+	    false : type == WT_CELL_ADDR_LEAF || type == WT_CELL_ADDR_LEAF_NO);
 }
 
 /*
@@ -102,7 +101,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
-	bool empty_internal, isleaf, prev, skip;
+	bool empty_internal, prev, skip;
 	uint32_t slot;
 
 	btree = S2BT(session);
@@ -340,10 +339,8 @@ ascend:	/*
 			 * tests/decrements when we're about to return a leaf
 			 * page.
 			 */
-			if (skipleafcntp != NULL ||
-			    LF_ISSET(WT_READ_SKIP_LEAF)) {
-				WT_ERR(__ref_is_leaf(session, ref, &isleaf));
-				if (isleaf) {
+			if (skipleafcntp != NULL || LF_ISSET(WT_READ_SKIP_LEAF))
+				if (__ref_is_leaf(session, ref)) {
 					if (LF_ISSET(WT_READ_SKIP_LEAF))
 						break;
 					if (*skipleafcntp > 0) {
@@ -351,7 +348,6 @@ ascend:	/*
 						break;
 					}
 				}
-			}
 
 			ret = __wt_page_swap(session, couple, ref, flags);
 
