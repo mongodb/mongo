@@ -110,7 +110,7 @@ void LogFile::readAt(unsigned long long offset, void* _buf, size_t _len) {
 void LogFile::synchronousAppend(const void* _buf, size_t _len) {
     const size_t BlockSize = 8 * 1024 * 1024;
     verify(_fd);
-    verify(_len % g_minOSPageSizeBytes == 0);
+    verify(_len % minDirectIOSizeBytes == 0);
     const char* buf = (const char*)_buf;
     size_t left = _len;
     while (left) {
@@ -159,7 +159,7 @@ LogFile::LogFile(const std::string& name, bool readwrite) : _name(name) {
         ;
 
     _fd = open(name.c_str(), options, S_IRUSR | S_IWUSR);
-    _blkSize = g_minOSPageSizeBytes;
+    _blkSize = minDirectIOSizeBytes;
 
 #if defined(O_DIRECT)
     _direct = true;
@@ -207,7 +207,7 @@ void LogFile::truncate() {
 }
 
 void LogFile::writeAt(unsigned long long offset, const void* buf, size_t len) {
-    verify(((size_t)buf) % g_minOSPageSizeBytes == 0);  // aligned
+    verify(((size_t)buf) % minDirectIOSizeBytes == 0);  // aligned
     ssize_t written = pwrite(_fd, buf, len, offset);
     if (written != (ssize_t)len) {
         log() << "writeAt fails " << errnoWithDescription() << endl;
@@ -220,7 +220,7 @@ void LogFile::writeAt(unsigned long long offset, const void* buf, size_t len) {
 }
 
 void LogFile::readAt(unsigned long long offset, void* _buf, size_t _len) {
-    verify(((size_t)_buf) % g_minOSPageSizeBytes == 0);  // aligned
+    verify(((size_t)_buf) % minDirectIOSizeBytes == 0);  // aligned
     ssize_t rd = pread(_fd, _buf, _len, offset);
     verify(rd != -1);
 }
