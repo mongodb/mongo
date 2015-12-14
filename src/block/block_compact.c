@@ -22,8 +22,6 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* Switch to first-fit allocation. */
 	__wt_block_configure_first_fit(block, true);
 
-	block->compact_pct_tenths = 0;
-
 	return (0);
 }
 
@@ -38,8 +36,6 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	/* Restore the original allocation plan. */
 	__wt_block_configure_first_fit(block, false);
-
-	block->compact_pct_tenths = 0;
 
 	return (0);
 }
