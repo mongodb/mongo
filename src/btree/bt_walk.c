@@ -473,6 +473,5 @@ int
 __wt_tree_walk_skip(WT_SESSION_IMPL *session,
     WT_REF **refp, uint64_t *skipleafcntp, uint32_t flags)
 {
-	return (__tree_walk_internal(
-	    session, refp, NULL, skipleafcntp, flags));
+	return (__tree_walk_internal(session, refp, NULL, skipleafcntp, flags));
 }
