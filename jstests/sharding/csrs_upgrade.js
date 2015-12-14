@@ -219,11 +219,13 @@ var st;
 
         var i;
         for (i = 0; i < csrsStatus.members.length; ++i) {
-            if (TestData.storageEngine != "wiredTiger" && TestData.storageEngine != "") {
-                // NOTE: "" means default storage engine, which is WiredTiger.
-                if (csrsStatus.members[i].name == csrs[0].name &&
-                    csrsStatus.members[i].stateStr != "REMOVED") {
-
+            if (csrsStatus.members[i].name == csrs[0].name) {
+                var supportsCommitted =
+                    csrs[0].getDB("admin").serverStatus().storageEngine.supportsCommittedReads;
+                var stateIsRemoved = csrsStatus.members[i].stateStr == "REMOVED";
+                // If the storage engine supports committed reads, it shouldn't go into REMOVED
+                // state, but if it does not then it should.
+                if (supportsCommitted ? stateIsRemoved : !stateIsRemoved) {
                     return false;
                 }
             }

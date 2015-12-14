@@ -250,7 +250,16 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         // handling for querying config server content with legacy 3-host config servers.
         if (shard->isConfig() && shard->getConnString().type() == ConnectionString::SYNC) {
             invariant(shards.size() == 1U);
-            return runConfigServerQuerySCCC(query, *shard, results);
+            try {
+                return runConfigServerQuerySCCC(query, *shard, results);
+            } catch (const DBException& e) {
+                if (e.getCode() != ErrorCodes::IncompatibleCatalogManager) {
+                    throw;
+                }
+                grid.forwardingCatalogManager()->waitForCatalogManagerChange(txn);
+                // Fall through to normal code path now that the catalog manager mode has been
+                // swapped and the config servers are a normal replica set.
+            }
         }
 
         // Build the find command, and attach shard version if necessary.
