@@ -50,8 +50,8 @@ if not version_parts:
     exit(1)
 
 if version_parts[0]:
-    print "suffix: v3.0-latest"
-    print "src_suffix: v3.0-latest"
+    print "suffix: v3.2-latest"
+    print "src_suffix: v3.2-latest"
 else:
     print "suffix: {0}".format(version_line)
     print "src_suffix: r{0}".format(version_line)
