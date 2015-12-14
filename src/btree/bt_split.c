@@ -1645,11 +1645,12 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
 	/* Find the last item on the page. */
-	ins_head = type == WT_PAGE_ROW_LEAF ?
-	    (page->pg_row_entries == 0 ?
-	    WT_ROW_INSERT_SMALLEST(page) :
-	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
-	    WT_COL_APPEND(page);
+	if (type == WT_PAGE_ROW_LEAF)
+		ins_head = page->pg_row_entries == 0 ?
+		    WT_ROW_INSERT_SMALLEST(page) :
+		    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+	else
+		ins_head = WT_COL_APPEND(page);
 	moved_ins = WT_SKIP_LAST(ins_head);
 
 	/*
