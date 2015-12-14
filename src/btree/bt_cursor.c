@@ -908,7 +908,7 @@ no_sample:	/*
 		 */
 		for (skip =
 		    cbt->next_random_leaf_skip; cbt->ref == NULL || skip > 0;)
-			WT_ERR(__wt_tree_walk(session, &cbt->ref, NULL, &skip,
+			WT_ERR(__wt_tree_walk_skip(session, &cbt->ref, &skip,
 			    WT_READ_NO_GEN |
 			    WT_READ_SKIP_INTL | WT_READ_WONT_NEED));
 	}

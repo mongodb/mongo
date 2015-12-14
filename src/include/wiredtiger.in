@@ -931,8 +931,8 @@ struct __wt_session {
 	 * with both \c next_random and \c next_random_sample_size attempts to
 	 * divide the object into \c next_random_sample_size equal-sized
 	 * pieces\, and each retrieval returns a record from one of those
-	 * pieces.  See @ref cursor_random for details., an integer greater than
-	 * or equal to 1; default \c 0.}
+	 * pieces.  See @ref cursor_random for details., a string; default \c
+	 * 0.}
 	 * @config{overwrite, configures whether the cursor's insert\, update
 	 * and remove methods check the existing state of the record.  If \c
 	 * overwrite is \c false\, WT_CURSOR::insert fails with

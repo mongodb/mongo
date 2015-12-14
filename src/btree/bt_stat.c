@@ -60,7 +60,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 
 	next_walk = NULL;
 	while ((ret = __wt_tree_walk(
-	    session, &next_walk, NULL, NULL, 0)) == 0 && next_walk != NULL) {
+	    session, &next_walk, 0)) == 0 && next_walk != NULL) {
 		WT_WITH_PAGE_INDEX(session,
 		    ret = __stat_page(session, next_walk->page, stats));
 		WT_RET(ret);

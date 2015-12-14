@@ -91,11 +91,11 @@ __ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref, bool *isleafp)
 }
 
 /*
- * __wt_tree_walk --
+ * __tree_walk_internal --
  *	Move to the next/previous page in the tree.
  */
-int
-__wt_tree_walk(WT_SESSION_IMPL *session,
+static inline int
+__tree_walk_internal(WT_SESSION_IMPL *session,
     WT_REF **refp, uint64_t *walkcntp, uint64_t *skipleafcntp, uint32_t flags)
 {
 	WT_BTREE *btree;
@@ -440,4 +440,39 @@ descend:			couple = ref;
 done:
 err:	WT_LEAVE_PAGE_INDEX(session);
 	return (ret);
+}
+
+/*
+ * __wt_tree_walk --
+ *	Move to the next/previous page in the tree.
+ */
+int
+__wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
+{
+	return (__tree_walk_internal(session, refp, NULL, NULL, flags));
+}
+
+/*
+ * __wt_tree_walk_count --
+ *	Move to the next/previous page in the tree, tracking how many
+ *	references were visited to get there.
+ */
+int
+__wt_tree_walk_count(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
+{
+	return (__tree_walk_internal(session, refp, walkcntp, NULL, flags));
+}
+
+/*
+ * __wt_tree_walk_skip --
+ *	Move to the next/previous page in the tree, skipping a certain number
+ *	of leaf pages before returning.
+ */
+int
+__wt_tree_walk_skip(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *skipleafcntp, uint32_t flags)
+{
+	return (__tree_walk_internal(
+	    session, refp, NULL, skipleafcntp, flags));
 }

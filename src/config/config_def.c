@@ -323,7 +323,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
 	    NULL, "choices=[\"hex\",\"json\",\"print\"]",
 	    NULL, 0 },
 	{ "next_random", "boolean", NULL, NULL, NULL, 0 },
-	{ "next_random_sample_size", "int", NULL, "min=1", NULL, 0 },
+	{ "next_random_sample_size", "string", NULL, NULL, NULL, 0 },
 	{ "overwrite", "boolean", NULL, NULL, NULL, 0 },
 	{ "raw", "boolean", NULL, NULL, NULL, 0 },
 	{ "readonly", "boolean", NULL, NULL, NULL, 0 },

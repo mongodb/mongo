@@ -854,8 +854,7 @@ methods = {
         \c next_random and \c next_random_sample_size attempts to divide
         the object into \c next_random_sample_size equal-sized pieces,
         and each retrieval returns a record from one of those pieces. See
-        @ref cursor_random for details''',
-        min='1'),
+        @ref cursor_random for details'''),
     Config('raw', 'false', r'''
         ignore the encodings for the key and value, manage data as if
         the formats were \c "u".  See @ref cursor_raw for details''',
