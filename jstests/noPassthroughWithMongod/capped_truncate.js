@@ -39,10 +39,13 @@
                          "captrunc didn't return an error for a nonexistent collection");
 
     // It is an error to run the captrunc command on a non-capped collection.
-    assert.commandWorked(db.runCommand({ create: "noncapped", capped: false }));
+    var collName = "noncapped";
+    db[collName].drop();
+
+    assert.commandWorked(db.runCommand({ create: collName, capped: false }));
     for (var j = 1; j <= 10; j++) {
-        assert.writeOK(db.noncapped.insert({x:j}));
+        assert.writeOK(db[collName].insert({x:j}));
     }
-    assert.commandFailed(db.runCommand({ captrunc: "noncapped", n: 5 }),
+    assert.commandFailed(db.runCommand({ captrunc: collName, n: 5 }),
                          "captrunc didn't return an error for a non-capped collection");
 })();
