@@ -95,6 +95,7 @@ dbtest = env.Program(
         'query_stage_count_scan.cpp',
         'query_stage_delete.cpp',
         'query_stage_distinct.cpp',
+        'query_stage_ensure_sorted.cpp',
         'query_stage_fetch.cpp',
         'query_stage_ixscan.cpp',
         'query_stage_keep.cpp',

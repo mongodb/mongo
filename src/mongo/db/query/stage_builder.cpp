@@ -38,6 +38,7 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count_scan.h"
 #include "mongo/db/exec/distinct_scan.h"
+#include "mongo/db/exec/ensure_sorted.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/geo_near.h"
 #include "mongo/db/exec/index_scan.h"
@@ -325,6 +326,13 @@ PlanStage* buildStages(OperationContext* txn,
         params.endKeyInclusive = cn->endKeyInclusive;
 
         return new CountScan(txn, params, ws);
+    } else if (STAGE_ENSURE_SORTED == root->getType()) {
+        const EnsureSortedNode* esn = static_cast<const EnsureSortedNode*>(root);
+        PlanStage* childStage = buildStages(txn, collection, qsol, esn->children[0], ws);
+        if (NULL == childStage) {
+            return NULL;
+        }
+        return new EnsureSortedStage(txn, esn->pattern, ws, childStage);
     } else {
         mongoutils::str::stream ss;
         root->appendToString(&ss, 0);

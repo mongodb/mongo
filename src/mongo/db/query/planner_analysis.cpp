@@ -560,6 +560,9 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         // with the topK first. If the client wants a limit, they'll get the efficiency
         // of topK. If they want a batchSize, the other OR branch will deliver the missing
         // results. The OR stage handles deduping.
+        //
+        // We must also add an ENSURE_SORTED node above the OR to ensure that the final results are
+        // in correct sorted order, which may not be true if the data is concurrently modified.
         if (lpq.wantMore() && params.options & QueryPlannerParams::SPLIT_LIMITED_SORT &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT) &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO) &&
@@ -574,7 +577,12 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
             SortNode* sortClone = static_cast<SortNode*>(sort->clone());
             sortClone->limit = 0;
             orn->children.push_back(sortClone);
-            solnRoot = orn;
+
+            // Add ENSURE_SORTED above the OR.
+            EnsureSortedNode* esn = new EnsureSortedNode();
+            esn->pattern = sort->pattern;
+            esn->children.push_back(orn);
+            solnRoot = esn;
         }
     } else {
         sort->limit = 0;
