@@ -9,6 +9,53 @@
 #include "wt_internal.h"
 
 /*
+ * __check_leaf_key_range --
+ *	Check the search key is in the leaf page's key range.
+ */
+static inline int
+__check_leaf_key_range(WT_SESSION_IMPL *session,
+    uint64_t recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
+{
+	WT_PAGE_INDEX *pindex;
+	uint32_t indx;
+
+	/*
+	 * Check if the search key is less than the parent's starting key for
+	 * this page.
+	 */
+	if (recno < leaf->key.recno) {
+		cbt->compare = 1;		/* page keys > search key */
+		return (0);
+	}
+
+	/*
+	 * Check if the search key is greater than or equal to the starting key
+	 * for the parent's next page.
+	 *
+	 * !!!
+	 * Check that "indx + 1" is a valid page-index entry first, because it
+	 * also checks that "indx" is a valid page-index entry, and we have to
+	 * do that latter check before looking at the indx slot of the array
+	 * for a match to leaf (in other words, our page hint might be wrong).
+	 */
+	WT_INTL_INDEX_GET(session, leaf->home, pindex);
+	indx = leaf->pindex_hint;
+	if (indx + 1 < pindex->entries && pindex->index[indx] == leaf)
+		if (recno >= pindex->index[indx + 1]->key.recno) {
+			cbt->compare = -1;	/* page keys < search key */
+			return (0);
+		}
+
+	/*
+	 * We may not have been able to check if the next page's key is greater
+	 * than the search key; there's a reasonable chance, continue with the
+	 * leaf-page search.
+	 */
+	cbt->compare = 0;
+	return (0);
+}
+
+/*
  * __wt_col_search --
  *	Search a column-store tree for a specific record-based key.
  */
@@ -39,9 +86,31 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	if ((recno = search_recno) == WT_RECNO_OOB)
 		recno = UINT64_MAX;
 
-	/* We may only be searching a single leaf page, not the full tree. */
+	/*
+	 * We may be searching only a single leaf page, not the full tree. In
+	 * the normal case where the page links to a parent, check the page's
+	 * parent keys before doing the full search, it's faster when the
+	 * cursor is being re-positioned. (One case where the page doesn't
+	 * have a parent is if it is being re-instantiated in memory as part
+	 * of a split).
+	 */
 	if (leaf != NULL) {
 		WT_ASSERT(session, search_recno != WT_RECNO_OOB);
+
+		if (leaf->home != NULL) {
+			WT_RET(__check_leaf_key_range(
+			    session, recno, leaf, cbt));
+			if (cbt->compare != 0) {
+				/*
+				 * !!!
+				 * WT_CURSOR.search_near uses the slot value to
+				 * decide if there was an on-page match.
+				 */
+				cbt->slot = 0;
+				return (0);
+			}
+		}
+
 		current = leaf;
 		goto leaf_only;
 	}

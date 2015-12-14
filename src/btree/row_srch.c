@@ -132,6 +132,67 @@ __wt_search_insert(
 }
 
 /*
+ * __check_leaf_key_range --
+ *	Check the search key is in the leaf page's key range.
+ */
+static inline int
+__check_leaf_key_range(WT_SESSION_IMPL *session,
+    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
+{
+	WT_BTREE *btree;
+	WT_COLLATOR *collator;
+	WT_ITEM *item;
+	WT_PAGE_INDEX *pindex;
+	uint32_t indx;
+	int cmp;
+
+	btree = S2BT(session);
+	collator = btree->collator;
+	item = cbt->tmp;
+
+	/*
+	 * Check if the search key is less than the parent's starting key for
+	 * this page.
+	 */
+	__wt_ref_key(leaf->home, leaf, &item->data, &item->size);
+	WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
+	if (cmp < 0) {
+		cbt->compare = 1;		/* page keys > search key */
+		return (0);
+	}
+
+	/*
+	 * Check if the search key is greater than or equal to the starting key
+	 * for the parent's next page.
+	 *
+	 * !!!
+	 * Check that "indx + 1" is a valid page-index entry first, because it
+	 * also checks that "indx" is a valid page-index entry, and we have to
+	 * do that latter check before looking at the indx slot of the array
+	 * for a match to leaf (in other words, our page hint might be wrong).
+	 */
+	WT_INTL_INDEX_GET(session, leaf->home, pindex);
+	indx = leaf->pindex_hint;
+	if (indx + 1 < pindex->entries && pindex->index[indx] == leaf) {
+		__wt_ref_key(leaf->home,
+		    pindex->index[indx + 1], &item->data, &item->size);
+		WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
+		if (cmp >= 0) {
+			cbt->compare = -1;	/* page keys < search key */
+			return (0);
+		}
+	}
+
+	/*
+	 * We may not have been able to check if the next page's key is greater
+	 * than the search key; there's a reasonable chance, continue with the
+	 * leaf-page search.
+	 */
+	cbt->compare = 0;
+	return (0);
+}
+
+/*
  * __wt_row_search --
  *	Search a row-store tree for a specific key.
  */
@@ -179,8 +240,29 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	append_check = insert && cbt->append_tree;
 	descend_right = true;
 
-	/* We may only be searching a single leaf page, not the full tree. */
+	/*
+	 * We may be searching only a single leaf page, not the full tree. In
+	 * the normal case where the page links to a parent, check the page's
+	 * parent keys before doing the full search, it's faster when the
+	 * cursor is being re-positioned. (One case where the page doesn't
+	 * have a parent is if it is being re-instantiated in memory as part
+	 * of a split).
+	 */
 	if (leaf != NULL) {
+		if (leaf->home != NULL) {
+			WT_RET(__check_leaf_key_range(
+			    session, srch_key, leaf, cbt));
+			if (cbt->compare != 0) {
+				/*
+				 * !!!
+				 * WT_CURSOR.search_near uses the slot value to
+				 * decide if there was an on-page match.
+				 */
+				cbt->slot = 0;
+				return (0);
+			}
+		}
+
 		current = leaf;
 		goto leaf_only;
 	}
