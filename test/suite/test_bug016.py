@@ -52,18 +52,17 @@ class test_bug016(wttest.WiredTigerTestCase):
     # Test flow is as follows.
     #
     # 1. Populate a single table with the data, alternating record size.
-    # 2. Checkpint and get stats on the table to confirm the size.
+    # 2. Checkpoint and get stats on the table to confirm the size.
     # 3. Delete the half of the records with the larger record size.
     # 4. Get stats on table.
     # 5. Call compact.
     # 6. Get stats on compacted table.
     #
     nrecords = 22000
-    bigvalue = "abcdefghi" * 1074       # 9*1074 == 9666
+    bigvalue = "abcdefghi" * 1074          # 9*1074 == 9666
     smallvalue = "ihgfedcba" * 303         # 9*303 == 2727
 
-    fullsize = nrecords / 2 * len(bigvalue) +               \
-        nrecords / 2 * len(smallvalue)
+    fullsize = nrecords / 2 * len(bigvalue) + nrecords / 2 * len(smallvalue)
 
     def setUpConnectionOpen(self, dir):
         self.home = dir
@@ -120,6 +119,7 @@ class test_bug016(wttest.WiredTigerTestCase):
             'statistics:' + self.uri, None, 'statistics=(size)')
         sz = cstat[stat.dsrc.block_size][2]
         cstat.close()
+
         # After compact, the file size should be less than half the full size.
         self.assertLess(sz, self.fullsize / 2)
         self.pr('After compact ' + str(sz))
