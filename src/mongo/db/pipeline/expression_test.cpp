@@ -365,7 +365,7 @@ TEST_F(ExpressionNaryTest, GroupingOptimizationOnAssociativeOnlyNotExecuteOnSing
     assertContents(_associativeOnly, BSON_ARRAY("$path" << 55));
 }
 
-TEST_F(ExpressionNaryTest, GroupingOptimizationOnCommutatievAndAssociative) {
+TEST_F(ExpressionNaryTest, GroupingOptimizationOnCommutativeAndAssociative) {
     BSONArray spec = BSON_ARRAY(55 << 66 << "$path");
     addOperandArrayToExpr(_associativeAndCommutative, spec);
     assertContents(_associativeAndCommutative, spec);
@@ -374,44 +374,46 @@ TEST_F(ExpressionNaryTest, GroupingOptimizationOnCommutatievAndAssociative) {
     assertContents(_associativeAndCommutative, BSON_ARRAY("$path" << BSON_ARRAY(55 << 66)));
 }
 
+// Test that if there is an expression of the same type in a non-commutative nor associative
+// expression, the inner expression is not expanded.
+// {"$testable" : [ { "$testable" : [ 100, "$path1"] }, 99, "$path2"] } is optimized to:
+// {"$testable" : [ { "$testable" : [ 100, "$path1"] }, 99, "$path2"] }
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnNotCommutativeNorAssociative) {
-    BSONArray baseSpec =
-        BSON_ARRAY(55 << "$path" << BSON("$add" << BSON_ARRAY(5 << 6 << "$q")) << 66);
-    list<BSONElement> baseSpecList;
-    baseSpec.elems(baseSpecList);
-    BSONArrayBuilder arrBuilder;
-    arrBuilder.append(baseSpecList);
+    BSONArrayBuilder specBuilder;
 
     intrusive_ptr<Testable> innerOperand = Testable::create(false, false);
-    addOperandArrayToExpr(innerOperand, BSON_ARRAY(99 << 100 << "$another_path"));
-    arrBuilder.append(expressionToBson(innerOperand));
-
-    BSONArray spec = arrBuilder.arr();
-
-    addOperandArrayToExpr(_notAssociativeNorCommutative, baseSpec);
+    addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
+    specBuilder.append(expressionToBson(innerOperand));
     _notAssociativeNorCommutative->addOperand(innerOperand);
 
+    addOperandArrayToExpr(_notAssociativeNorCommutative, BSON_ARRAY(99 << "$path2"));
+    specBuilder << 99 << "$path2";
+
+    BSONArray spec = specBuilder.arr();
     assertContents(_notAssociativeNorCommutative, spec);
     intrusive_ptr<Expression> optimized = _notAssociativeNorCommutative->optimize();
     ASSERT(_notAssociativeNorCommutative == optimized);
 
-    BSONArray expectedContent = BSON_ARRAY(55 << "$path" << BSON("$add" << BSON_ARRAY("$q" << 11))
-                                              << 66 << expressionToBson(innerOperand));
-    assertContents(_notAssociativeNorCommutative, expectedContent);
+    assertContents(_associativeOnly, spec);
 }
 
+// Test that if there is an expression of the same type as the first operand
+// in a non-commutative but associative expression, the inner expression is expanded.
+// Also, there shouldn't be any grouping of the operands.
+// {"$testable" : [ { "$testable" : [ 100, "$path1"] }, 99, "$path2"] } is optimized to:
+// {"$testable" : [ 100, "$path1", 99, "$path2"] }
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyFrontOperandNoGroup) {
-    BSONArrayBuilder arrBuilder;
+    BSONArrayBuilder specBuilder;
 
     intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
-    arrBuilder.append(expressionToBson(innerOperand));
+    specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(99 << "$path2"));
-    arrBuilder << 99 << "$path2";
+    specBuilder << 99 << "$path2";
 
-    BSONArray spec = arrBuilder.arr();
+    BSONArray spec = specBuilder.arr();
     assertContents(_associativeOnly, spec);
     intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
     ASSERT(_associativeOnly == optimized);
@@ -420,18 +422,23 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyFron
     assertContents(_associativeOnly, expectedContent);
 }
 
+// Test that if there is an expression of the same type as the first operand
+// in a non-commutative but associative expression, the inner expression is expanded.
+// Partial collapsing optimization should be applied to the operands.
+// {"$testable" : [ { "$testable" : [ 100, "$path1", 101] }, 99, "$path2"] } is optimized to:
+// {"$testable" : [ 100, "$path1", [101, 99], "$path2"] }
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyFrontOperandAndGroup) {
-    BSONArrayBuilder arrBuilder;
+    BSONArrayBuilder specBuilder;
 
     intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
-    arrBuilder.append(expressionToBson(innerOperand));
+    specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(99 << "$path2"));
-    arrBuilder << 99 << "$path2";
+    specBuilder << 99 << "$path2";
 
-    BSONArray spec = arrBuilder.arr();
+    BSONArray spec = specBuilder.arr();
     assertContents(_associativeOnly, spec);
     intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
     ASSERT(_associativeOnly == optimized);
@@ -440,21 +447,26 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyFron
     assertContents(_associativeOnly, expectedContent);
 }
 
+// Test that if there is an expression of the same type in the middle of the operands
+// in a non-commutative but associative expression, the inner expression is expanded.
+// Partial collapsing optimization should not be applied to the operands.
+// {"$testable" : [ 200, "$path3", { "$testable" : [ 100, "$path1"] }, 99, "$path2"] } is
+// optimized to: {"$testable" : [ 200, "$path3", 100, "$path1", 99, "$path2"] }
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyMiddleOperandNoGroup) {
-    BSONArrayBuilder arrBuilder;
+    BSONArrayBuilder specBuilder;
 
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(200 << "$path3"));
-    arrBuilder << 200 << "$path3";
+    specBuilder << 200 << "$path3";
 
     intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
-    arrBuilder.append(expressionToBson(innerOperand));
+    specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(99 << "$path2"));
-    arrBuilder << 99 << "$path2";
+    specBuilder << 99 << "$path2";
 
-    BSONArray spec = arrBuilder.arr();
+    BSONArray spec = specBuilder.arr();
     assertContents(_associativeOnly, spec);
     intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
     ASSERT(_associativeOnly == optimized);
@@ -463,21 +475,26 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyMidd
     assertContents(_associativeOnly, expectedContent);
 }
 
+// Test that if there is an expression of the same type in the middle of the operands
+// in a non-commutative but associative expression, the inner expression is expanded.
+// Partial collapsing optimization should be applied to the operands.
+// {"$testable" : [ 200, "$path3", 201 { "$testable" : [ 100, "$path1", 101] }, 99, "$path2"] } is
+// optimized to: {"$testable" : [ 200, "$path3", [201, 100], "$path1", [101, 99], "$path2"] }
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyMiddleOperandAndGroup) {
-    BSONArrayBuilder arrBuilder;
+    BSONArrayBuilder specBuilder;
 
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(200 << "$path3" << 201));
-    arrBuilder << 200 << "$path3" << 201;
+    specBuilder << 200 << "$path3" << 201;
 
     intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
-    arrBuilder.append(expressionToBson(innerOperand));
+    specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(99 << "$path2"));
-    arrBuilder << 99 << "$path2";
+    specBuilder << 99 << "$path2";
 
-    BSONArray spec = arrBuilder.arr();
+    BSONArray spec = specBuilder.arr();
     assertContents(_associativeOnly, spec);
     intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
     ASSERT(_associativeOnly == optimized);
@@ -487,18 +504,23 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyMidd
     assertContents(_associativeOnly, expectedContent);
 }
 
+// Test that if there is an expression of the same type in the back of the operands in a
+// non-commutative but associative expression, the inner expression is expanded.
+// Partial collapsing optimization should not be applied to the operands.
+// {"$testable" : [ 200, "$path3", { "$testable" : [ 100, "$path1"] }] } is
+// optimized to: {"$testable" : [ 200, "$path3", 100, "$path1"] }
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyBackOperandNoGroup) {
-    BSONArrayBuilder arrBuilder;
+    BSONArrayBuilder specBuilder;
 
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(200 << "$path3"));
-    arrBuilder << 200 << "$path3";
+    specBuilder << 200 << "$path3";
 
     intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
-    arrBuilder.append(expressionToBson(innerOperand));
+    specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
-    BSONArray spec = arrBuilder.arr();
+    BSONArray spec = specBuilder.arr();
     assertContents(_associativeOnly, spec);
     intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
     ASSERT(_associativeOnly == optimized);
@@ -507,18 +529,23 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyBack
     assertContents(_associativeOnly, expectedContent);
 }
 
+// Test that if there is an expression of the same type in the back of the operands in a
+// non-commutative but associative expression, the inner expression is expanded.
+// Partial collapsing optimization should be applied to the operands.
+// {"$testable" : [ 200, "$path3", 201, { "$testable" : [ 100, "$path1", 101] }] } is
+// optimized to: {"$testable" : [ 200, "$path3", [201, 100], "$path1", 101] }
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyBackOperandAndGroup) {
-    BSONArrayBuilder arrBuilder;
+    BSONArrayBuilder specBuilder;
 
     addOperandArrayToExpr(_associativeOnly, BSON_ARRAY(200 << "$path3" << 201));
-    arrBuilder << 200 << "$path3" << 201;
+    specBuilder << 200 << "$path3" << 201;
 
     intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
-    arrBuilder.append(expressionToBson(innerOperand));
+    specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
-    BSONArray spec = arrBuilder.arr();
+    BSONArray spec = specBuilder.arr();
     assertContents(_associativeOnly, spec);
     intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
     ASSERT(_associativeOnly == optimized);
@@ -528,20 +555,25 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyBack
     assertContents(_associativeOnly, expectedContent);
 }
 
+// Test that if there are two consecutive inner expressions of the same type in a non-commutative
+// but associative expression, both expressions are correctly flattened.
+// Partial collapsing optimization should not be applied to the operands.
+// {"$testable" : [ { "$testable" : [ 100, "$path1"] }, { "$testable" : [ 200, "$path2"] }] } is
+// optimized to: {"$testable" : [ 100, "$path1", 200, "$path2"] }
 TEST_F(ExpressionNaryTest, FlattenConsecutiveInnerOperandsOptimizationOnAssociativeOnlyNoGroup) {
-    BSONArrayBuilder arrBuilder;
+    BSONArrayBuilder specBuilder;
 
     intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1"));
-    arrBuilder.append(expressionToBson(innerOperand));
+    specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
     intrusive_ptr<Testable> innerOperand2 = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand2, BSON_ARRAY(200 << "$path2"));
-    arrBuilder.append(expressionToBson(innerOperand2));
+    specBuilder.append(expressionToBson(innerOperand2));
     _associativeOnly->addOperand(innerOperand2);
 
-    BSONArray spec = arrBuilder.arr();
+    BSONArray spec = specBuilder.arr();
     assertContents(_associativeOnly, spec);
     intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
     ASSERT(_associativeOnly == optimized);
@@ -550,20 +582,25 @@ TEST_F(ExpressionNaryTest, FlattenConsecutiveInnerOperandsOptimizationOnAssociat
     assertContents(_associativeOnly, expectedContent);
 }
 
-TEST_F(ExpressionNaryTest, FlattenConsecutiveInnerOperandsOptimizationOnAssociativeAndNoGroup) {
-    BSONArrayBuilder arrBuilder;
+// Test that if there are two consecutive inner expressions of the same type in a non-commutative
+// but associative expression, both expressions are correctly flattened.
+// Partial collapsing optimization should be applied to the operands.
+// {"$testable" : [ { "$testable" : [ 100, "$path1", 101] }, { "$testable" : [ 200, "$path2"] }] }
+// is optimized to: {"$testable" : [ 100, "$path1", [ 101, 200], "$path2"] }
+TEST_F(ExpressionNaryTest, FlattenConsecutiveInnerOperandsOptimizationOnAssociativeAndGroup) {
+    BSONArrayBuilder specBuilder;
 
     intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
-    arrBuilder.append(expressionToBson(innerOperand));
+    specBuilder.append(expressionToBson(innerOperand));
     _associativeOnly->addOperand(innerOperand);
 
     intrusive_ptr<Testable> innerOperand2 = Testable::create(true, false);
     addOperandArrayToExpr(innerOperand2, BSON_ARRAY(200 << "$path2"));
-    arrBuilder.append(expressionToBson(innerOperand2));
+    specBuilder.append(expressionToBson(innerOperand2));
     _associativeOnly->addOperand(innerOperand2);
 
-    BSONArray spec = arrBuilder.arr();
+    BSONArray spec = specBuilder.arr();
     assertContents(_associativeOnly, spec);
     intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
     ASSERT(_associativeOnly == optimized);
@@ -572,30 +609,31 @@ TEST_F(ExpressionNaryTest, FlattenConsecutiveInnerOperandsOptimizationOnAssociat
     assertContents(_associativeOnly, expectedContent);
 }
 
+// Test that inner expressions are correctly flattened and constant operands re-arranged and
+// collapsed when using a commutative and associative expression.
+// {"$testable" : [ 200, "$path3", 201 { "$testable" : [ 100, "$path1", 101] }, 99, "$path2"] } is
+// optimized to: {"$testable" : [ "$path3", "$path1", "$path2", [200, 201, 100, 101, 99] ] }
 TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnCommutativeAndAssociative) {
-    BSONArray baseSpec =
-        BSON_ARRAY(55 << "$path" << BSON("$add" << BSON_ARRAY(5 << 6 << "$q")) << 66);
-    list<BSONElement> baseSpecList;
-    baseSpec.elems(baseSpecList);
-    BSONArrayBuilder arrBuilder;
-    arrBuilder.append(baseSpecList);
+    BSONArrayBuilder specBuilder;
 
-    intrusive_ptr<Testable> innerOperand = Testable::create(true, true);
-    addOperandArrayToExpr(innerOperand, BSON_ARRAY(99 << 100 << "$another_path"));
-    arrBuilder.append(expressionToBson(innerOperand));
+    addOperandArrayToExpr(_associativeAndCommutative, BSON_ARRAY(200 << "$path3" << 201));
+    specBuilder << 200 << "$path3" << 201;
 
-    BSONArray spec = arrBuilder.arr();
-
-    addOperandArrayToExpr(_associativeAndCommutative, baseSpec);
+    intrusive_ptr<Testable> innerOperand = Testable::create(true, false);
+    addOperandArrayToExpr(innerOperand, BSON_ARRAY(100 << "$path1" << 101));
+    specBuilder.append(expressionToBson(innerOperand));
     _associativeAndCommutative->addOperand(innerOperand);
 
+    addOperandArrayToExpr(_associativeAndCommutative, BSON_ARRAY(99 << "$path2"));
+    specBuilder << 99 << "$path2";
+
+    BSONArray spec = specBuilder.arr();
     assertContents(_associativeAndCommutative, spec);
     intrusive_ptr<Expression> optimized = _associativeAndCommutative->optimize();
     ASSERT(_associativeAndCommutative == optimized);
 
-    BSONArray expectedContent =
-        BSON_ARRAY("$path" << BSON("$add" << BSON_ARRAY("$q" << 11)) << "$another_path"
-                           << BSON_ARRAY(55 << 66 << BSON_ARRAY(99 << 100)));
+    BSONArray expectedContent = BSON_ARRAY(200 << "$path3" << BSON_ARRAY(201 << 100) << "$path1"
+                                               << BSON_ARRAY(101 << 99) << "$path2");
     assertContents(_associativeAndCommutative, expectedContent);
 }
 
