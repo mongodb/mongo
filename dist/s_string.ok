@@ -807,6 +807,7 @@ os
 ovfl
 ownp
 packv
+pagesize
 parens
 pareto
 parserp
