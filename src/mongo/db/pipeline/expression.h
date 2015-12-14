@@ -456,11 +456,6 @@ public:
     }
 
     bool isCommutative() const final {
-        // Return false if a single argument is given to avoid a single array argument being treated
-        // as an array instead of as a list of arguments.
-        if (this->vpOperand.size() == 1) {
-            return false;
-        }
         return Accumulator().isCommutative();
     }
 
