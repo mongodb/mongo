@@ -473,7 +473,6 @@ def skipTest(path):
         authTestsToSkip = [("jstests", "drop2.js"), # SERVER-8589,
                            ("jstests", "killop.js"), # SERVER-10128
                            ("sharding", "sync3.js"), # SERVER-6388 for this and those below
-                           ("sharding", "sync6.js"),
                            ("sharding", "parallel.js"),
                            ("sharding", "copydb_from_mongos.js"), # SERVER-13080
                            ("jstests", "bench_test1.js"),

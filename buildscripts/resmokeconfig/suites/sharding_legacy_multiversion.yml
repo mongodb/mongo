@@ -49,7 +49,6 @@ selector:
     - jstests/sharding/implicit_db_creation.js # SERVER-17723, fixed in v3.1.2
 
     # The following tests fail because of known bugs:
-    - jstests/sharding/sync_cluster_config/sync6.js # SERVER-21660
     - jstests/sharding/move_primary_basic.js # SERVER-21851
     - jstests/sharding/enable_sharding_basic.js # SERVER-21853
 
