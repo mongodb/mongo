@@ -442,6 +442,10 @@ void addBackupPrivileges(PrivilegeVector* privileges) {
 
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
+        Privilege(ResourcePattern::forCollectionName("system.profile"), ActionType::find));
+
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
         Privilege(
             ResourcePattern::forExactNamespace(AuthorizationManager::usersAltCollectionNamespace),
             ActionType::find));
