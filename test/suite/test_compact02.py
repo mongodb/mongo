@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_bug016.py
+# test_compact02.py
 #   Test that compact reduces the file size.
 #
 
@@ -36,10 +36,10 @@ from wiredtiger import stat
 from wtscenario import multiply_scenarios, number_scenarios
 
 # Test basic compression
-class test_bug016(wttest.WiredTigerTestCase):
+class test_compact02(wttest.WiredTigerTestCase):
 
     types = [
-        ('file', dict(uri='file:test_bug016')),
+        ('file', dict(uri='file:test_compact02')),
     ]
     scenarios = number_scenarios(multiply_scenarios('.', types))
 
@@ -76,7 +76,7 @@ class test_bug016(wttest.WiredTigerTestCase):
         return conn
 
     # Create a table, add keys with both big and small values.
-    def test_bug016(self):
+    def test_compact02(self):
         params = 'key_format=i,value_format=S'
 
         self.session.create(self.uri, params)
