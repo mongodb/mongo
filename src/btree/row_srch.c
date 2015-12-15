@@ -151,46 +151,31 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 	item = cbt->tmp;
 
 	/*
-	 * There are reasons we can't do the fast checks, and we continue with
-	 * the leaf page search in those cases, only skipping the complete leaf
-	 * page search if we know it's not going to work.
-	 */
-	cbt->compare = 0;
-
-	/*
-	 * First, confirm we have the right parent page-index slot, and quit if
-	 * we don't. We don't search for the correct slot, that would make this
-	 * cheap test expensive.
-	 */
-	WT_INTL_INDEX_GET(session, leaf->home, pindex);
-	indx = leaf->pindex_hint;
-	if (indx > pindex->entries || pindex->index[indx] != leaf)
-		return (0);
-
-	/*
-	 * Check if the search key is smaller than the parent's starting key for
+	 * Check if the search key is less than the parent's starting key for
 	 * this page.
-	 *
-	 * We can't compare against slot 0 on a row-store internal page because
-	 * reconciliation doesn't build it, it may not be a valid key.
 	 */
-	if (indx != 0) {
-		__wt_ref_key(leaf->home, leaf, &item->data, &item->size);
-		WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
-		if (cmp < 0) {
-			cbt->compare = 1;	/* page keys > search key */
-			return (0);
-		}
+	__wt_ref_key(leaf->home, leaf, &item->data, &item->size);
+	WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
+	if (cmp < 0) {
+		cbt->compare = 1;		/* page keys > search key */
+		return (0);
 	}
 
 	/*
 	 * Check if the search key is greater than or equal to the starting key
 	 * for the parent's next page.
+	 *
+	 * !!!
+	 * Check that "indx + 1" is a valid page-index entry first, because it
+	 * also checks that "indx" is a valid page-index entry, and we have to
+	 * do that latter check before looking at the indx slot of the array
+	 * for a match to leaf (in other words, our page hint might be wrong).
 	 */
-	++indx;
-	if (indx < pindex->entries) {
-		__wt_ref_key(
-		    leaf->home, pindex->index[indx], &item->data, &item->size);
+	WT_INTL_INDEX_GET(session, leaf->home, pindex);
+	indx = leaf->pindex_hint;
+	if (indx + 1 < pindex->entries && pindex->index[indx] == leaf) {
+		__wt_ref_key(leaf->home,
+		    pindex->index[indx + 1], &item->data, &item->size);
 		WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
 		if (cmp >= 0) {
 			cbt->compare = -1;	/* page keys < search key */
@@ -198,6 +183,12 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 		}
 	}
 
+	/*
+	 * We may not have been able to check if the next page's key is greater
+	 * than the search key; there's a reasonable chance, continue with the
+	 * leaf-page search.
+	 */
+	cbt->compare = 0;
 	return (0);
 }
 
