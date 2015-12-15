@@ -591,7 +591,12 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 		return (ret);
 	}
 
-	/* Append the current line to our copy of the config. */
+	/*
+	 * Append the current line to our copy of the config. The config is
+	 * stored in the order it is processed, so added options will be after
+	 * any parsed from the original config.
+	 */
+
 	if ((string_copy = calloc(len + 1, 1)) == NULL) {
 		return (enomem(cfg));
 	}
