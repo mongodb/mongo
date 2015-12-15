@@ -108,7 +108,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         self.pr('Removed total ' + str(count))
         self.session.checkpoint()
         cstat = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(size)')
+	    'statistics:' + self.uri, None, 'statistics=(size)')
         szm = cstat[stat.dsrc.block_size][2]
         cstat.close()
         self.pr('After remove ' + str(sz))
@@ -116,7 +116,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         # Call compact.
         self.session.compact(self.uri, None)
         cstat = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(size)')
+	    'statistics:' + self.uri, None, 'statistics=(size)')
         sz = cstat[stat.dsrc.block_size][2]
         cstat.close()
 
