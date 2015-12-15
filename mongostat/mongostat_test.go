@@ -12,8 +12,11 @@ func TestStatLine(t *testing.T) {
 
 	faultsOld := int64(10)
 	faultsNew := int64(15)
+	timeOld, _ := time.Parse("2006 Jan 02 15:04:05", "2015 Nov 30 4:25:30")
+	timeNew1, _ := time.Parse("2006 Jan 02 15:04:05", "2015 Nov 30 4:25:31")
+	timeNew3, _ := time.Parse("2006 Jan 02 15:04:05", "2015 Nov 30 4:25:33")
 	serverStatusOld := ServerStatus{
-		SampleTime:     time.Now(),
+		SampleTime:     timeOld,
 		Host:           "localhost",
 		Version:        "test-version",
 		Process:        "mongod",
@@ -100,7 +103,7 @@ func TestStatLine(t *testing.T) {
 	}
 
 	serverStatusNew := ServerStatus{
-		SampleTime:     time.Now(),
+		SampleTime:     timeNew1,
 		Host:           "localhost",
 		Version:        "test-version",
 		Process:        "mongod",
@@ -187,7 +190,7 @@ func TestStatLine(t *testing.T) {
 	}
 
 	Convey("StatsLine should accurately calculate opcounter diffs", t, func() {
-		statsLine := NewStatLine(serverStatusOld, serverStatusNew, "", false, 1)
+		statsLine := NewStatLine(serverStatusOld, serverStatusNew, "", false)
 		So(statsLine.Insert, ShouldEqual, 10)
 		So(statsLine.Query, ShouldEqual, 5)
 		So(statsLine.Update, ShouldEqual, 7)
@@ -207,8 +210,9 @@ func TestStatLine(t *testing.T) {
 		So(statsLine.NumConnections, ShouldEqual, 5)
 	})
 
+	serverStatusNew.SampleTime = timeNew3
 	Convey("StatsLine with non-default interval should calculate average diffs", t, func() {
-		statsLine := NewStatLine(serverStatusOld, serverStatusNew, "", false, 3)
+		statsLine := NewStatLine(serverStatusOld, serverStatusNew, "", false)
 		// Opcounters and faults are averaged over sample period
 		So(statsLine.Insert, ShouldEqual, 3)
 		So(statsLine.Query, ShouldEqual, 1)

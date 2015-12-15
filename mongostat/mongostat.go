@@ -240,7 +240,7 @@ func NewNodeMonitor(opts options.ToolOptions, fullHost string, all bool) (*NodeM
 
 // Report collects the stat info for a single node, and sends the result on
 // the "out" channel. If it fails, the error is stored in the NodeMonitor Err field.
-func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool, sampleSecs int64) *StatLine {
+func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool) *StatLine {
 	result := &ServerStatus{}
 	log.Logf(log.DebugHigh, "getting session on server: %v", node.host)
 	s, err := node.sessionProvider.GetSession()
@@ -280,7 +280,7 @@ func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool, 
 
 	var statLine *StatLine
 	if node.LastStatus != nil && result != nil {
-		statLine = NewStatLine(*node.LastStatus, *result, node.host, all, sampleSecs)
+		statLine = NewStatLine(*node.LastStatus, *result, node.host, all)
 	}
 
 	if result.Repl != nil && discover != nil {
@@ -314,9 +314,9 @@ func (node *NodeMonitor) Watch(sleep time.Duration, discover chan string, cluste
 	go func() {
 		cycle := uint64(0)
 		for {
-			sampleDiff := int64(sleep / time.Second)
 			log.Logf(log.DebugHigh, "polling server: %v", node.host)
-			statLine := node.Poll(discover, node.All, cycle%10 == 1, sampleDiff)
+			statLine := node.Poll(discover, node.All, cycle%10 == 1)
+
 			if statLine != nil {
 				log.Logf(log.DebugHigh, "successfully got statline from host: %v", node.host)
 				cluster.Update(*statLine)
