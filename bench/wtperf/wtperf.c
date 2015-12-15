@@ -2311,9 +2311,8 @@ main(int argc, char *argv[])
 	if ((ret = config_sanity(cfg)) != 0)
 		goto err;
 
-	/* Save a copy of the config. */
-	if (cfg->verbose > 0)
-		config_to_file(cfg);
+	/* Write a copy of the config. */
+	config_to_file(cfg);
 
 	/* Display the configuration. */
 	if (cfg->verbose > 1)

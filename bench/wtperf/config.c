@@ -106,8 +106,16 @@ config_assign(CONFIG *dest, const CONFIG *src)
 void
 config_free(CONFIG *cfg)
 {
+	CONFIG_QUEUE_ENTRY *config_line;
 	size_t i;
 	char **pstr;
+
+	while (!TAILQ_EMPTY(&cfg->config_head)) {
+		config_line = TAILQ_FIRST(&cfg->config_head);
+		TAILQ_REMOVE(&cfg->config_head, config_line, c);
+		free(config_line->string);
+		free(config_line);
+	}
 
 	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
 		if (config_opts[i].type == STRING_TYPE ||
@@ -684,7 +692,7 @@ config_to_file(CONFIG *cfg)
 		return;
 	}
 
-	snprintf(path, req_len + 14, "%s/CONFIGBACKUP", cfg->home);
+	snprintf(path, req_len + 14, "%s/CONFIG.wtperf", cfg->home);
 	if ((fp = fopen(path, "w")) == NULL) {
 		lprintf(cfg, errno, 0, "%s", path);
 		return;
@@ -695,8 +703,6 @@ config_to_file(CONFIG *cfg)
 		config_line = TAILQ_FIRST(&cfg->config_head);
 		TAILQ_REMOVE(&cfg->config_head, config_line, c);
 		fprintf(fp, "%s\n", config_line->string);
-		free(config_line->string);
-		free(config_line);
 	}
 	free(path);
 	fclose(fp);
