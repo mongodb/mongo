@@ -220,6 +220,48 @@ TEST(SimpleReplace, FromDottedElement) {
     ASSERT_EQUALS(logDoc, logObj);
 }
 
+TEST(SimpleReplace, RenameToExistingFieldDoesNotReorderFields) {
+    Document doc(fromjson("{a: 1, b: 2, c: 3}"));
+    Mod setMod(fromjson("{$rename: {a: 'b'}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "b");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(doc, fromjson("{b: 1, c: 3}"));
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    BSONObj logObj = fromjson("{$set: {b: 1}, $unset: {a: true}}");
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(logDoc, logObj);
+}
+
+TEST(SimpleReplace, RenameToExistingNestedFieldDoesNotReorderFields) {
+    Document doc(fromjson("{a: {b: {c: 1, d: 2}}, b: 3, c: {d: 4}}"));
+    Mod setMod(fromjson("{$rename: {'c.d': 'a.b.c'}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "c.d");
+    ASSERT_EQUALS(execInfo.fieldRef[1]->dottedField(), "a.b.c");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(setMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(doc, fromjson("{a: {b: {c: 4, d: 2}}, b: 3, c: {}}"));
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    BSONObj logObj = fromjson("{$set: {'a.b.c': 4}, $unset: {'c.d': true}}");
+    ASSERT_OK(setMod.log(&logBuilder));
+    ASSERT_EQUALS(logDoc, logObj);
+}
+
 TEST(DottedTo, MissingCompleteTo) {
     Document doc(fromjson("{a: 2, b: 1, c: {}}"));
     Mod setMod(fromjson("{$rename: {'a':'c.r.d'}}"));
