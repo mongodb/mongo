@@ -30,7 +30,6 @@
 #   Test that compact reduces the file size.
 #
 
-import os, run
 import wiredtiger, wttest
 from wiredtiger import stat
 from wtscenario import multiply_scenarios, number_scenarios
@@ -51,12 +50,13 @@ class test_compact02(wttest.WiredTigerTestCase):
     #
     # Test flow is as follows.
     #
-    # 1. Populate a single table with the data, alternating record size.
+    # 1. Create a table with the data, alternating record size.
     # 2. Checkpoint and get stats on the table to confirm the size.
     # 3. Delete the half of the records with the larger record size.
-    # 4. Get stats on table.
-    # 5. Call compact.
-    # 6. Get stats on compacted table.
+    # 4. Reopen the connection to force the file to disk.
+    # 5. Get stats on table.
+    # 6. Call compact.
+    # 7. Get stats on compacted table.
     #
     nrecords = 22000
     bigvalue = "abcdefghi" * 1074          # 9*1074 == 9666
@@ -75,12 +75,21 @@ class test_compact02(wttest.WiredTigerTestCase):
             print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
         return conn
 
+    # Return the size of the file
+    def get_size(self):
+        cstat = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(size)')
+        sz = cstat[stat.dsrc.block_size][2]
+        cstat.close()
+        return sz
+
     # Create a table, add keys with both big and small values.
     def test_compact02(self):
+        mb = 1024 * 1024
         params = 'key_format=i,value_format=S'
 
+        # 1. Create a table with the data, alternating record size.
         self.session.create(self.uri, params)
-        # Populate the table, alternating value sizes.
         c = self.session.open_cursor(self.uri, None)
         for i in range(self.nrecords):
             if i % 2 == 0:
@@ -88,15 +97,14 @@ class test_compact02(wttest.WiredTigerTestCase):
             else:
                 c[i] = str(i) + self.smallvalue
         c.close()
+
+        # 2. Checkpoint and get stats on the table to confirm the size.
         self.session.checkpoint()
-        cstat = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(size)')
-        sz = cstat[stat.dsrc.block_size][2]
-        cstat.close()
-        self.pr('After populate ' + str(sz))
+        sz = self.get_size()
+        self.pr('After populate ' + str(sz / mb) + 'MB')
         self.assertGreater(sz, self.fullsize)
 
-        # Remove the half of the records that are big.
+        # 3. Delete the half of the records with the larger record size.
         c = self.session.open_cursor(self.uri, None)
         count = 0
         for i in range(self.nrecords):
@@ -105,24 +113,28 @@ class test_compact02(wttest.WiredTigerTestCase):
                 c.set_key(i)
                 c.remove()
         c.close()
-        self.pr('Removed total ' + str(count))
-        self.session.checkpoint()
-        cstat = self.session.open_cursor(
-	    'statistics:' + self.uri, None, 'statistics=(size)')
-        szm = cstat[stat.dsrc.block_size][2]
-        cstat.close()
-        self.pr('After remove ' + str(sz))
+        self.pr('Removed total ' + str((count * 9666) / mb) + 'MB')
 
-        # Call compact.
+        # 4. Reopen the connection to force the file to disk (if we leave dirty
+        # blocks in the cache, it can affect how compact works depending on how
+        # and when those blocks are written, because they're being written best
+        # fit, not first-fit, as compaction does.
+        self.reopen_conn()
+
+        # 5. Get stats on table.
+        sz = self.get_size()
+        self.pr('After remove ' + str(sz / mb) + 'MB')
+
+        # 6. Call compact.
         self.session.compact(self.uri, None)
-        cstat = self.session.open_cursor(
-	    'statistics:' + self.uri, None, 'statistics=(size)')
-        sz = cstat[stat.dsrc.block_size][2]
-        cstat.close()
+
+        # 7. Get stats on compacted table.
+        sz = self.get_size()
+        self.pr('After compact ' + str(sz / mb) + 'MB')
 
         # After compact, the file size should be less than half the full size.
         self.assertLess(sz, self.fullsize / 2)
-        self.pr('After compact ' + str(sz))
+
 
 if __name__ == '__main__':
     wttest.run()
