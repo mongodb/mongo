@@ -20,14 +20,7 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 	uint32_t indx;
 
 	/*
-	 * There are reasons we can't do the fast checks, and we continue with
-	 * the leaf page search in those cases, only skipping the complete leaf
-	 * page search if we know it's not going to work.
-	 */
-	cbt->compare = 0;
-
-	/*
-	 * Check if the search key is smaller than the parent's starting key for
+	 * Check if the search key is less than the parent's starting key for
 	 * this page.
 	 */
 	if (recno < leaf->key.recno) {
@@ -53,6 +46,12 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 			return (0);
 		}
 
+	/*
+	 * We may not have been able to check if the next page's key is greater
+	 * than the search key; there's a reasonable chance, continue with the
+	 * leaf-page search.
+	 */
+	cbt->compare = 0;
 	return (0);
 }
 
