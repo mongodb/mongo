@@ -164,7 +164,7 @@ __check_leaf_key_range(WT_SESSION_IMPL *session,
 	 */
 	WT_INTL_INDEX_GET(session, leaf->home, pindex);
 	indx = leaf->pindex_hint;
-	if (indx > pindex->entries || pindex->index[indx] != leaf)
+	if (indx >= pindex->entries || pindex->index[indx] != leaf)
 		return (0);
 
 	/*
