@@ -11,7 +11,6 @@ benchArgs = { ops : [ { ns : t.getFullName() ,
                         update : { $inc : { x : 1 } } } ] ,
               parallel : 2 ,
               seconds : 1 ,
-              totals : true ,
               host : db.getMongo().host }
 
 if (jsTest.options().auth) {

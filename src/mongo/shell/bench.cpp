@@ -80,6 +80,18 @@ using std::cout;
 using std::endl;
 using std::map;
 
+const std::map<OpType, std::string> opTypeName{{OpType::NONE, "none"},
+                                               {OpType::NOP, "nop"},
+                                               {OpType::FINDONE, "findOne"},
+                                               {OpType::COMMAND, "command"},
+                                               {OpType::FIND, "find"},
+                                               {OpType::UPDATE, "update"},
+                                               {OpType::INSERT, "insert"},
+                                               {OpType::REMOVE, "remove"},
+                                               {OpType::CREATEINDEX, "createIndex"},
+                                               {OpType::DROPINDEX, "dropIndex"},
+                                               {OpType::LET, "let"}};
+
 BenchRunEventCounter::BenchRunEventCounter() {
     reset();
 }
@@ -154,8 +166,6 @@ void BenchRunConfig::initializeToDefaults() {
     watchPattern.reset();
     noWatchPattern.reset();
 
-    ops = BSONObj();
-
     throwGLE = false;
     breakOnTrap = true;
     randomSeed = 1314159265358979323;
@@ -167,66 +177,308 @@ BenchRunConfig* BenchRunConfig::createFromBson(const BSONObj& args) {
     return config;
 }
 
+BenchRunOp opFromBson(const BSONObj& op) {
+    BenchRunOp myOp;
+    myOp.myBsonOp = op.getOwned();  // save an owned copy of the BSON obj
+    auto opType = myOp.myBsonOp["op"].valueStringData();
+    for (auto arg : myOp.myBsonOp) {
+        auto name = arg.fieldNameStringData();
+        if (name == "batchSize") {
+            uassert(34377,
+                    str::stream() << "Field 'batchSize' should be a number, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            uassert(34378,
+                    str::stream() << "Field 'batchSize' only valid for find op types. Type is "
+                                  << opType,
+                    (opType == "find") || (opType == "query"));
+            myOp.batchSize = arg.numberInt();
+        } else if (name == "check") {
+            // check function gets thrown into a scoped function. Leaving that parsing in main loop.
+            myOp.useCheck = true;
+            myOp.check = arg;
+            uassert(
+                34403,
+                str::stream()
+                    << "Check field requires type CodeWScoe, Code, or String, instead its type is: "
+                    << typeName(myOp.check.type()),
+                (myOp.check.type() == CodeWScope || myOp.check.type() == Code ||
+                 myOp.check.type() == String));
+
+        } else if (name == "command") {
+            // type needs to be command
+            uassert(34398,
+                    str::stream() << "Field 'command' only valid for command op type. Type is "
+                                  << opType,
+                    opType == "command");
+            myOp.command = arg.Obj();
+        } else if (name == "context") {
+            myOp.context = arg.Obj();
+        } else if (name == "delay") {
+            uassert(34379,
+                    str::stream() << "Field 'delay' should be a number, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            myOp.delay = arg.numberInt();
+        } else if (name == "doc") {
+            uassert(34399,
+                    str::stream() << "Field 'doc' only valid for insert op type. Type is "
+                                  << opType,
+                    (opType == "insert"));
+            myOp.isDocAnArray = arg.type() == Array;
+            myOp.doc = arg.Obj();
+        } else if (name == "expected") {
+            uassert(34380,
+                    str::stream() << "Field 'Expected' should be a number, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            uassert(34400,
+                    str::stream() << "Field 'Expected' only valid for find op type. Type is "
+                                  << opType,
+                    (opType == "find") || (opType == "query"));
+            myOp.expected = arg.numberInt();
+        } else if (name == "filter") {
+            uassert(
+                34401,
+                str::stream()
+                    << "Field 'Filter' (projection) only valid for find/findOne op type. Type is "
+                    << opType,
+                (opType == "find") || (opType == "query") || (opType == "findOne"));
+            myOp.projection = arg.Obj();  // the name should be switched to projection
+                                          // also, but that will break things
+        } else if (name == "handleError") {
+            myOp.handleError = arg.trueValue();
+        } else if (name == "key") {
+            uassert(34402,
+                    str::stream()
+                        << "Field 'key' only valid for create or drop index op types. Type is "
+                        << opType,
+                    (opType == "createIndex") || (opType == "dropIndex"));
+            myOp.key = arg.Obj();
+        } else if (name == "limit") {
+            uassert(34381,
+                    str::stream() << "Field 'limit' is only valid for find op types. Type is "
+                                  << opType,
+                    (opType == "find") || (opType == "query"));
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field 'limit' should be a number, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            myOp.limit = arg.numberInt();
+        } else if (name == "multi") {
+            uassert(34383,
+                    str::stream()
+                        << "Field 'multi' is only valid for update/remove/delete types. Type is "
+                        << opType,
+                    (opType == "update") || (opType == "remove") || (opType == "delete"));
+            myOp.multi = arg.trueValue();
+        } else if (name == "ns") {
+            uassert(34385,
+                    str::stream() << "Field 'ns' should be a string, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.type() == String);
+            myOp.ns = arg.String();
+        } else if (name == "op") {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field 'op' is not a string, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.type() == String);
+            auto type = arg.valueStringData();
+            if (type == "nop") {
+                myOp.op = OpType::NOP;
+            } else if (type == "findOne") {
+                myOp.op = OpType::FINDONE;
+            } else if (type == "command") {
+                myOp.op = OpType::COMMAND;
+            } else if (type == "find" || type == "query") {
+                myOp.op = OpType::FIND;
+            } else if (type == "update") {
+                myOp.op = OpType::UPDATE;
+            } else if (type == "insert") {
+                myOp.op = OpType::INSERT;
+            } else if (type == "delete" || type == "remove") {
+                myOp.op = OpType::REMOVE;
+            } else if (type == "createIndex") {
+                myOp.op = OpType::CREATEINDEX;
+            } else if (type == "dropIndex") {
+                myOp.op = OpType::DROPINDEX;
+            } else if (type == "let") {
+                myOp.op = OpType::LET;
+            } else {
+                uassert(34387,
+                        str::stream() << "benchRun passed an unsupported op type: " << type,
+                        false);
+            }
+        } else if (name == "options") {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field 'options' should be a number, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            uassert(34388,
+                    str::stream() << "Field 'options' but not a command or find type. Type is "
+                                  << opType,
+                    (opType == "command") || (opType == "query") || (opType == "find"));
+            myOp.options = arg.numberInt();
+        } else if (name == "query") {
+            uassert(34389,
+                    str::stream() << "Field 'query' is only valid for findOne, find, update, and "
+                                     "remove types. Type is " << opType,
+                    (opType == "findOne") || (opType == "query") ||
+                        (opType == "find" || (opType == "update") || (opType == "delete") ||
+                         (opType == "remove")));
+            myOp.query = arg.Obj();
+        } else if (name == "safe") {
+            myOp.safe = arg.trueValue();
+        } else if (name == "skip") {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field 'skip' should be a number, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            uassert(34390,
+                    str::stream() << "Field 'skip' is only valid for find/query op types. Type is "
+                                  << opType,
+                    (opType == "find") || (opType == "query"));
+            myOp.skip = arg.numberInt();
+        } else if (name == "showError") {
+            myOp.showError = arg.trueValue();
+        } else if (name == "showResult") {
+            myOp.showResult = arg.trueValue();
+        } else if (name == "target") {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field 'target' should be a string. It's type: "
+                                  << typeName(arg.type()),
+                    arg.type() == String);
+            myOp.target = arg.String();
+        } else if (name == "throwGLE") {
+            myOp.throwGLE = arg.trueValue();
+        } else if (name == "update") {
+            uassert(34391,
+                    str::stream() << "Field 'update' is only valid for update op type. Op type is "
+                                  << opType,
+                    (opType == "update"));
+            myOp.update = arg.Obj();
+        } else if (name == "upsert") {
+            uassert(34392,
+                    str::stream() << "Field 'upsert' is only valid for update op type. Op type is "
+                                  << opType,
+                    (opType == "update"));
+            myOp.upsert = arg.trueValue();
+        } else if (name == "readCmd") {
+            myOp.useReadCmd = arg.trueValue();
+        } else if (name == "writeCmd") {
+            myOp.useWriteCmd = arg.trueValue();
+        } else if (name == "writeConcern") {
+            // Mongo-perf wants to pass the write concern into all calls. It is only used for
+            // update, insert, delete
+            myOp.writeConcern = arg.Obj();
+        } else if (name == "value") {
+            uassert(34403,
+                    str::stream() << "Field 'value' is only valid for let op type. Op type is "
+                                  << opType,
+                    opType == "let");
+            BSONObjBuilder valBuilder;
+            valBuilder.append(arg);
+            myOp.value = valBuilder.done();
+        } else {
+            uassert(34394, str::stream() << "Benchrun op has unsupported field: " << name, false);
+        }
+    }
+
+    uassert(34395, "Benchrun op has an zero length ns", !myOp.ns.empty());
+    uassert(34396, "Benchrun op doesn't have an optype set", myOp.op != OpType::NONE);
+    return myOp;
+}
+
 void BenchRunConfig::initializeFromBson(const BSONObj& args) {
     initializeToDefaults();
 
-    if (args["host"].type() == String)
-        this->host = args["host"].String();
-    if (args["db"].type() == String)
-        this->db = args["db"].String();
-    if (args["username"].type() == String)
-        this->username = args["username"].String();
-    if (args["password"].type() == String)
-        this->password = args["password"].String();
-
-    if (args["parallel"].isNumber())
-        this->parallel = args["parallel"].numberInt();
-    if (args["randomSeed"].isNumber())
-        this->randomSeed = args["randomSeed"].numberInt();
-    if (args["seconds"].isNumber())
-        this->seconds = args["seconds"].number();
-    if (!args["hideResults"].eoo())
-        this->hideResults = args["hideResults"].trueValue();
-    if (!args["handleErrors"].eoo())
-        this->handleErrors = args["handleErrors"].trueValue();
-    if (!args["hideErrors"].eoo())
-        this->hideErrors = args["hideErrors"].trueValue();
-    if (!args["throwGLE"].eoo())
-        this->throwGLE = args["throwGLE"].trueValue();
-    if (!args["breakOnTrap"].eoo())
-        this->breakOnTrap = args["breakOnTrap"].trueValue();
-
-    uassert(16164, "loopCommands config not supported", args["loopCommands"].eoo());
-
-    if (!args["trapPattern"].eoo()) {
-        const char* regex = args["trapPattern"].regex();
-        const char* flags = args["trapPattern"].regexFlags();
-        this->trapPattern =
-            std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+    for (auto arg : args) {
+        auto name = arg.fieldNameStringData();
+        if (name == "host") {
+            uassert(34404,
+                    str::stream() << "Field '" << name << "' should be a string. . Type is "
+                                  << typeName(arg.type()),
+                    arg.type() == String);
+            host = arg.String();
+        } else if (name == "db") {
+            uassert(34405,
+                    str::stream() << "Field '" << name << "' should be a string. . Type is "
+                                  << typeName(arg.type()),
+                    arg.type() == String);
+            db = arg.String();
+        } else if (name == "username") {
+            uassert(34406,
+                    str::stream() << "Field '" << name << "' should be a string. . Type is "
+                                  << typeName(arg.type()),
+                    arg.type() == String);
+            username = arg.String();
+        } else if (name == "password") {
+            uassert(34407,
+                    str::stream() << "Field '" << name << "' should be a string. . Type is "
+                                  << typeName(arg.type()),
+                    arg.type() == String);
+            password = arg.String();
+        } else if (name == "parallel") {
+            uassert(34409,
+                    str::stream() << "Field '" << name << "' should be a number. . Type is "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            parallel = arg.numberInt();
+        } else if (name == "randomSeed") {
+            uassert(34365,
+                    str::stream() << "Field '" << name << "' should be a number. . Type is "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            randomSeed = arg.numberInt();
+        } else if (name == "seconds") {
+            uassert(34408,
+                    str::stream() << "Field '" << name << "' should be a number. . Type is "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            seconds = arg.number();
+        } else if (name == "hideResults") {
+            hideResults = arg.trueValue();
+        } else if (name == "handleErrors") {
+            handleErrors = arg.trueValue();
+        } else if (name == "hideErrors") {
+            hideErrors = arg.trueValue();
+        } else if (name == "throwGLE") {
+            throwGLE = arg.trueValue();
+        } else if (name == "breakOnTrap") {
+            breakOnTrap = arg.trueValue();
+        } else if (name == "trapPattern") {
+            const char* regex = arg.regex();
+            const char* flags = arg.regexFlags();
+            trapPattern =
+                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+        } else if (name == "noTrapPattern") {
+            const char* regex = arg.regex();
+            const char* flags = arg.regexFlags();
+            noTrapPattern =
+                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+        } else if (name == "watchPattern") {
+            const char* regex = arg.regex();
+            const char* flags = arg.regexFlags();
+            watchPattern =
+                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+        } else if (name == "noWatchPattern") {
+            const char* regex = arg.regex();
+            const char* flags = arg.regexFlags();
+            noWatchPattern =
+                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+        } else if (name == "ops") {
+            // iterate through the objects in ops
+            // create an BenchRunOp per
+            // put in ops vector.
+            BSONObjIterator i(arg.Obj());
+            while (i.more()) {
+                ops.push_back(opFromBson(i.next().Obj()));
+            }
+        } else {
+            log() << "benchRun passed an unsupported field: " << name;
+            uassert(34376, "benchRun passed an unsupported configuration field", false);
+        }
     }
-
-    if (!args["noTrapPattern"].eoo()) {
-        const char* regex = args["noTrapPattern"].regex();
-        const char* flags = args["noTrapPattern"].regexFlags();
-        this->noTrapPattern =
-            std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
-    }
-
-    if (!args["watchPattern"].eoo()) {
-        const char* regex = args["watchPattern"].regex();
-        const char* flags = args["watchPattern"].regexFlags();
-        this->watchPattern =
-            std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
-    }
-
-    if (!args["noWatchPattern"].eoo()) {
-        const char* regex = args["noWatchPattern"].regex();
-        const char* flags = args["noWatchPattern"].regexFlags();
-        this->noWatchPattern =
-            std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
-    }
-
-    this->ops = args["ops"].Obj().getOwned();
 }
 
 DBClientBase* BenchRunConfig::createConnection() const {
@@ -362,7 +614,7 @@ bool BenchRunWorker::shouldCollectStats() const {
 void doNothing(const BSONObj&) {}
 
 /**
- * Issues the query 'lpq' against 'conn' using read commands.  Returns the size of the result set
+ * Issues the query 'lpq' against 'conn' using read commands. Returns the size of the result set
  * returned by the query.
  *
  * If 'lpq' has the 'wantMore' flag set to false and the 'limit' option set to 1LL, then the caller
@@ -429,259 +681,61 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
     }
 
     while (!shouldStop()) {
-        BSONObjIterator i(_config->ops);
-        while (i.more()) {
+        for (auto op : _config->ops) {
             if (shouldStop())
                 break;
             auto& stats = shouldCollectStats() ? _stats : _statsBlackHole;
-            BSONElement e = i.next();
-
-            string ns = e["ns"].String();
-            string op = e["op"].String();
-
-            int delay = e["delay"].eoo() ? 0 : e["delay"].Int();
-
-            bool useWriteCmd = false;  // By default, don't use write commands.
-            if (e["writeCmd"]) {
-                useWriteCmd = e["writeCmd"].Bool();
-            }
-            bool useReadCmd = false;  // By default, don't use read commands.
-            if (e["readCmd"]) {
-                useReadCmd = e["readCmd"].Bool();
-            }
-
-            BSONObj context = e["context"].eoo() ? BSONObj() : e["context"].Obj();
 
             unique_ptr<Scope> scope;
             ScriptingFunction scopeFunc = 0;
             BSONObj scopeObj;
+            if (op.useCheck) {
+                auto check = op.check;
+                scope = globalScriptEngine->getPooledScope(NULL, op.ns, "benchrun");
+                verify(scope.get());
 
-            bool check = !e["check"].eoo();
-            if (check) {
-                if (e["check"].type() == CodeWScope || e["check"].type() == Code ||
-                    e["check"].type() == String) {
-                    scope = globalScriptEngine->getPooledScope(NULL, ns, "benchrun");
-                    verify(scope.get());
-
-                    if (e.type() == CodeWScope) {
-                        scopeFunc = scope->createFunction(e["check"].codeWScopeCode());
-                        scopeObj = BSONObj(e.codeWScopeScopeDataUnsafe());
-                    } else {
-                        scopeFunc = scope->createFunction(e["check"].valuestr());
-                    }
-
-                    scope->init(&scopeObj);
-                    invariant(scopeFunc);
+                if (check.type() == CodeWScope) {
+                    scopeFunc = scope->createFunction(check.codeWScopeCode());
+                    scopeObj = BSONObj(check.codeWScopeScopeDataUnsafe());
                 } else {
-                    warning() << "Invalid check type detected in benchRun op : " << e << endl;
-                    check = false;
+                    scopeFunc = scope->createFunction(check.valuestr());
                 }
+
+                scope->init(&scopeObj);
+                invariant(scopeFunc);
             }
 
             try {
-                if (op == "nop") {
-                    // do nothing
-                } else if (op == "findOne") {
-                    BSONObj fixedQuery = fixQuery(e["query"].Obj(), bsonTemplateEvaluator);
-                    BSONObj result;
-                    if (useReadCmd) {
-                        unique_ptr<LiteParsedQuery> lpq =
-                            LiteParsedQuery::makeAsFindCmd(NamespaceString(ns),
-                                                           fixedQuery,
-                                                           BSONObj(),    // projection
-                                                           BSONObj(),    // sort
-                                                           BSONObj(),    // hint
-                                                           BSONObj(),    // readConcern
-                                                           boost::none,  // skip
-                                                           1LL,          // limit
-                                                           boost::none,  // batchSize
-                                                           boost::none,  // ntoreturn
-                                                           false);       // wantMore
-                        BenchRunEventTrace _bret(&stats.findOneCounter);
-                        runQueryWithReadCommands(conn, std::move(lpq), &result);
-                    } else {
-                        BenchRunEventTrace _bret(&stats.findOneCounter);
-                        result = conn->findOne(ns, fixedQuery);
-                    }
-
-                    if (check) {
-                        int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
-                        if (err) {
-                            log() << "Error checking in benchRun thread [findOne]"
-                                  << causedBy(scope->getError()) << endl;
-
-                            stats.errCount++;
-
-                            return;
-                        }
-                    }
-
-                    if (!_config->hideResults || e["showResult"].trueValue())
-                        log() << "Result from benchRun thread [findOne] : " << result << endl;
-
-                } else if (op == "command") {
-                    bool ok;
-                    BSONObj result;
-                    {
-                        BenchRunEventTrace _bret(&stats.commandCounter);
-                        ok = conn->runCommand(ns,
-                                              fixQuery(e["command"].Obj(), bsonTemplateEvaluator),
-                                              result,
-                                              e["options"].numberInt());
-                    }
-                    if (!ok) {
-                        stats.errCount++;
-                    }
-
-                    if (!result["cursor"].eoo()) {
-                        // The command returned a cursor, so iterate all results.
-                        auto cursorResponse =
-                            uassertStatusOK(CursorResponse::parseFromBSON(result));
-                        int count = cursorResponse.getBatch().size();
-                        while (cursorResponse.getCursorId() != 0) {
-                            GetMoreRequest getMoreRequest(cursorResponse.getNSS(),
-                                                          cursorResponse.getCursorId(),
-                                                          boost::none,   // batchSize
-                                                          boost::none,   // maxTimeMS
-                                                          boost::none,   // term
-                                                          boost::none);  // lastKnownCommittedOpTime
-                            BSONObj getMoreCommandResult;
-                            ok =
-                                conn->runCommand(ns, getMoreRequest.toBSON(), getMoreCommandResult);
-                            uassert(ErrorCodes::CommandFailed,
-                                    str::stream() << "getMore command failed; reply was: "
-                                                  << getMoreCommandResult,
-                                    ok);
-                            cursorResponse = uassertStatusOK(
-                                CursorResponse::parseFromBSON(getMoreCommandResult));
-                            count += cursorResponse.getBatch().size();
-                        }
-                        // Just give the count to the check function.
-                        result = BSON("count" << count << "context" << context);
-                    }
-
-                    if (check) {
-                        int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
-                        if (err) {
-                            log() << "Error checking in benchRun thread [command]"
-                                  << causedBy(scope->getError()) << endl;
-
-                            stats.errCount++;
-                            return;
-                        }
-                    }
-
-                    if (!_config->hideResults || e["showResult"].trueValue())
-                        log() << "Result from benchRun thread [command] : " << result << endl;
-
-                } else if (op == "find" || op == "query") {
-                    int limit = e["limit"].eoo() ? 0 : e["limit"].numberInt();
-                    int skip = e["skip"].eoo() ? 0 : e["skip"].Int();
-                    int options = e["options"].eoo() ? 0 : e["options"].Int();
-                    int batchSize = e["batchSize"].eoo() ? 0 : e["batchSize"].Int();
-                    int expected = e["expected"].eoo() ? -1 : e["expected"].Int();
-
-                    // TODO: The following option should be named "projection".  The work to rename
-                    // it is being tracked at SERVER-21013.
-                    BSONObj projection = e["filter"].eoo() ? BSONObj() : e["filter"].Obj();
-
-                    int count;
-
-                    BSONObj fixedQuery = fixQuery(e["query"].Obj(), bsonTemplateEvaluator);
-
-                    if (useReadCmd) {
-                        uassert(28824,
-                                "cannot use 'options' in combination with read commands",
-                                !options);
-                        unique_ptr<LiteParsedQuery> lpq = LiteParsedQuery::makeAsFindCmd(
-                            NamespaceString(ns),
-                            fixedQuery,
-                            projection,
-                            BSONObj(),  // sort
-                            BSONObj(),  // hint
-                            BSONObj(),  // readConcern
-                            skip ? boost::optional<long long>(skip) : boost::none,
-                            limit ? boost::optional<long long>(limit) : boost::none,
-                            batchSize ? boost::optional<long long>(batchSize) : boost::none);
-                        BenchRunEventTrace _bret(&stats.queryCounter);
-                        count = runQueryWithReadCommands(conn, std::move(lpq));
-                    } else {
-                        // Use special query function for exhaust query option.
-                        if (options & QueryOption_Exhaust) {
-                            BenchRunEventTrace _bret(&stats.queryCounter);
-                            stdx::function<void(const BSONObj&)> castedDoNothing(doNothing);
-                            count =
-                                conn->query(castedDoNothing, ns, fixedQuery, &projection, options);
+                switch (op.op) {
+                    case OpType::NOP:
+                        break;
+                    case OpType::FINDONE: {
+                        BSONObj fixedQuery = fixQuery(op.query, bsonTemplateEvaluator);
+                        BSONObj result;
+                        if (op.useReadCmd) {
+                            unique_ptr<LiteParsedQuery> lpq =
+                                LiteParsedQuery::makeAsFindCmd(NamespaceString(op.ns),
+                                                               fixedQuery,
+                                                               op.projection,  // projection
+                                                               BSONObj(),      // sort
+                                                               BSONObj(),      // hint
+                                                               BSONObj(),      // readConcern
+                                                               boost::none,    // skip
+                                                               1LL,            // limit
+                                                               boost::none,    // batchSize
+                                                               boost::none,    // ntoreturn
+                                                               false);         // wantMore
+                            BenchRunEventTrace _bret(&stats.findOneCounter);
+                            runQueryWithReadCommands(conn, std::move(lpq), &result);
                         } else {
-                            BenchRunEventTrace _bret(&stats.queryCounter);
-                            unique_ptr<DBClientCursor> cursor;
-                            cursor = conn->query(
-                                ns, fixedQuery, limit, skip, &projection, options, batchSize);
-                            count = cursor->itcount();
+                            BenchRunEventTrace _bret(&stats.findOneCounter);
+                            result = conn->findOne(op.ns, fixedQuery);
                         }
-                    }
 
-                    if (expected >= 0 && count != expected) {
-                        cout << "bench query on: " << ns << " expected: " << expected
-                             << " got: " << count << endl;
-                        verify(false);
-                    }
-
-                    if (check) {
-                        BSONObj thisValue = BSON("count" << count << "context" << context);
-                        int err = scope->invoke(scopeFunc, 0, &thisValue, 1000 * 60, false);
-                        if (err) {
-                            log() << "Error checking in benchRun thread [find]"
-                                  << causedBy(scope->getError()) << endl;
-
-                            stats.errCount++;
-
-                            return;
-                        }
-                    }
-
-                    if (!_config->hideResults || e["showResult"].trueValue())
-                        log() << "Result from benchRun thread [query] : " << count << endl;
-
-                } else if (op == "update") {
-                    bool multi = e["multi"].trueValue();
-                    bool upsert = e["upsert"].trueValue();
-                    BSONObj queryOrginal = e["query"].eoo() ? BSONObj() : e["query"].Obj();
-                    BSONObj updateOriginal = e["update"].Obj();
-                    BSONObj result;
-                    bool safe = e["safe"].trueValue();
-
-                    {
-                        BenchRunEventTrace _bret(&stats.updateCounter);
-                        BSONObj query = fixQuery(queryOrginal, bsonTemplateEvaluator);
-                        BSONObj update = fixQuery(updateOriginal, bsonTemplateEvaluator);
-
-                        if (useWriteCmd) {
-                            // TODO: Replace after SERVER-11774.
-                            BSONObjBuilder builder;
-                            builder.append("update", nsToCollectionSubstring(ns));
-                            BSONArrayBuilder docBuilder(builder.subarrayStart("updates"));
-                            docBuilder.append(BSON("q" << query << "u" << update << "multi" << multi
-                                                       << "upsert" << upsert));
-                            docBuilder.done();
-                            auto wcElem = e["writeConcern"];
-                            if (wcElem) {
-                                builder.append("writeConcern", wcElem.Obj());
-                            }
-                            conn->runCommand(
-                                nsToDatabaseSubstring(ns).toString(), builder.done(), result);
-                        } else {
-                            conn->update(ns, query, update, upsert, multi);
-                            if (safe)
-                                result = conn->getLastErrorDetailed();
-                        }
-                    }
-
-                    if (safe) {
-                        if (check) {
+                        if (op.useCheck) {
                             int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
                             if (err) {
-                                log() << "Error checking in benchRun thread [update]"
+                                log() << "Error checking in benchRun thread [findOne]"
                                       << causedBy(scope->getError()) << endl;
 
                                 stats.errCount++;
@@ -690,159 +744,321 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             }
                         }
 
-                        if (!_config->hideResults || e["showResult"].trueValue())
-                            log() << "Result from benchRun thread [safe update] : " << result
-                                  << endl;
+                        if (!_config->hideResults || op.showResult)
+                            log() << "Result from benchRun thread [findOne] : " << result << endl;
+                    } break;
+                    case OpType::COMMAND: {
+                        bool ok;
+                        BSONObj result;
+                        {
+                            BenchRunEventTrace _bret(&stats.commandCounter);
+                            ok = conn->runCommand(op.ns,
+                                                  fixQuery(op.command, bsonTemplateEvaluator),
+                                                  result,
+                                                  op.options);
+                        }
+                        if (!ok) {
+                            stats.errCount++;
+                        }
 
-                        if (!result["err"].eoo() && result["err"].type() == String &&
-                            (_config->throwGLE || e["throwGLE"].trueValue()))
-                            throw DBException((string) "From benchRun GLE" +
-                                                  causedBy(result["err"].String()),
-                                              result["code"].eoo() ? 0 : result["code"].Int());
-                    }
-                } else if (op == "insert") {
-                    bool safe = e["safe"].trueValue();
-                    BSONObj result;
+                        if (!result["cursor"].eoo()) {
+                            // The command returned a cursor, so iterate all results.
+                            auto cursorResponse =
+                                uassertStatusOK(CursorResponse::parseFromBSON(result));
+                            int count = cursorResponse.getBatch().size();
+                            while (cursorResponse.getCursorId() != 0) {
+                                GetMoreRequest getMoreRequest(
+                                    cursorResponse.getNSS(),
+                                    cursorResponse.getCursorId(),
+                                    boost::none,   // batchSize
+                                    boost::none,   // maxTimeMS
+                                    boost::none,   // term
+                                    boost::none);  // lastKnownCommittedOpTime
+                                BSONObj getMoreCommandResult;
+                                ok = conn->runCommand(
+                                    op.ns, getMoreRequest.toBSON(), getMoreCommandResult);
+                                uassert(ErrorCodes::CommandFailed,
+                                        str::stream() << "getMore command failed; reply was: "
+                                                      << getMoreCommandResult,
+                                        ok);
+                                cursorResponse = uassertStatusOK(
+                                    CursorResponse::parseFromBSON(getMoreCommandResult));
+                                count += cursorResponse.getBatch().size();
+                            }
+                            // Just give the count to the check function.
+                            result = BSON("count" << count << "context" << op.context);
+                        }
 
-                    {
-                        BenchRunEventTrace _bret(&stats.insertCounter);
+                        if (op.useCheck) {
+                            int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
+                            if (err) {
+                                log() << "Error checking in benchRun thread [command]"
+                                      << causedBy(scope->getError()) << endl;
+                                int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
+                                if (err) {
+                                    log() << "Error checking in benchRun thread [command]"
+                                          << causedBy(scope->getError()) << endl;
 
-                        BSONObj insertDoc;
-                        if (useWriteCmd) {
-                            // TODO: Replace after SERVER-11774.
-                            BSONObjBuilder builder;
-                            builder.append("insert", nsToCollectionSubstring(ns));
-                            BSONArrayBuilder docBuilder(builder.subarrayStart("documents"));
-                            if (e["doc"].type() == Array) {
-                                for (auto& element : e["doc"].Array()) {
-                                    insertDoc = fixQuery(element.Obj(), bsonTemplateEvaluator);
+                                    stats.errCount++;
+
+                                    return;
+                                }
+                            }
+
+                            if (!_config->hideResults || op.showResult)
+                                log() << "Result from benchRun thread [command] : " << result
+                                      << endl;
+                        }
+                    } break;
+                    case OpType::FIND: {
+                        int count;
+
+                        BSONObj fixedQuery = fixQuery(op.query, bsonTemplateEvaluator);
+
+                        if (op.useReadCmd) {
+                            uassert(28824,
+                                    "cannot use 'options' in combination with read commands",
+                                    !op.options);
+                            unique_ptr<LiteParsedQuery> lpq = LiteParsedQuery::makeAsFindCmd(
+                                NamespaceString(op.ns),
+                                fixedQuery,
+                                op.projection,
+                                BSONObj(),  // sort
+                                BSONObj(),  // hint
+                                BSONObj(),  // readConcern
+                                op.skip ? boost::optional<long long>(op.skip) : boost::none,
+                                op.limit ? boost::optional<long long>(op.limit) : boost::none,
+                                op.batchSize ? boost::optional<long long>(op.batchSize)
+                                             : boost::none);
+                            BenchRunEventTrace _bret(&stats.queryCounter);
+                            count = runQueryWithReadCommands(conn, std::move(lpq));
+                        } else {
+                            // Use special query function for exhaust query option.
+                            if (op.options & QueryOption_Exhaust) {
+                                BenchRunEventTrace _bret(&stats.queryCounter);
+                                stdx::function<void(const BSONObj&)> castedDoNothing(doNothing);
+                                count = conn->query(
+                                    castedDoNothing, op.ns, fixedQuery, &op.projection, op.options);
+                            } else {
+                                BenchRunEventTrace _bret(&stats.queryCounter);
+                                unique_ptr<DBClientCursor> cursor;
+                                cursor = conn->query(op.ns,
+                                                     fixedQuery,
+                                                     op.limit,
+                                                     op.skip,
+                                                     &op.projection,
+                                                     op.options,
+                                                     op.batchSize);
+                                count = cursor->itcount();
+                            }
+                        }
+
+                        if (op.expected >= 0 && count != op.expected) {
+                            cout << "bench query on: " << op.ns << " expected: " << op.expected
+                                 << " got: " << count << endl;
+                            verify(false);
+                        }
+
+                        if (op.useCheck) {
+                            BSONObj thisValue = BSON("count" << count << "context" << op.context);
+                            int err = scope->invoke(scopeFunc, 0, &thisValue, 1000 * 60, false);
+                            if (err) {
+                                log() << "Error checking in benchRun thread [find]"
+                                      << causedBy(scope->getError()) << endl;
+
+                                stats.errCount++;
+
+                                return;
+                            }
+                        }
+
+                        if (!_config->hideResults || op.showResult)
+                            log() << "Result from benchRun thread [query] : " << count << endl;
+                    } break;
+                    case OpType::UPDATE: {
+                        BSONObj result;
+                        {
+                            BenchRunEventTrace _bret(&stats.updateCounter);
+                            BSONObj query = fixQuery(op.query, bsonTemplateEvaluator);
+                            BSONObj update = fixQuery(op.update, bsonTemplateEvaluator);
+
+                            if (op.useWriteCmd) {
+                                // TODO: Replace after SERVER-11774.
+                                BSONObjBuilder builder;
+                                builder.append("update", nsToCollectionSubstring(op.ns));
+                                BSONArrayBuilder docBuilder(builder.subarrayStart("updates"));
+                                docBuilder.append(BSON("q" << query << "u" << update << "multi"
+                                                           << op.multi << "upsert" << op.upsert));
+                                docBuilder.done();
+                                builder.append("writeConcern", op.writeConcern);
+                                conn->runCommand(nsToDatabaseSubstring(op.ns).toString(),
+                                                 builder.done(),
+                                                 result);
+                            } else {
+                                conn->update(op.ns, query, update, op.upsert, op.multi);
+                                if (op.safe)
+                                    result = conn->getLastErrorDetailed();
+                            }
+                        }
+
+                        if (op.safe) {
+                            if (op.useCheck) {
+                                int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
+                                if (err) {
+                                    log() << "Error checking in benchRun thread [update]"
+                                          << causedBy(scope->getError()) << endl;
+
+                                    stats.errCount++;
+
+                                    return;
+                                }
+                            }
+
+                            if (!_config->hideResults || op.showResult)
+                                log() << "Result from benchRun thread [safe update] : " << result
+                                      << endl;
+
+                            if (!result["err"].eoo() && result["err"].type() == String &&
+                                (_config->throwGLE || op.throwGLE))
+                                throw DBException((string) "From benchRun GLE" +
+                                                      causedBy(result["err"].String()),
+                                                  result["code"].eoo() ? 0 : result["code"].Int());
+                        }
+                    } break;
+                    case OpType::INSERT: {
+                        BSONObj result;
+
+                        {
+                            BenchRunEventTrace _bret(&stats.insertCounter);
+
+                            BSONObj insertDoc;
+                            if (op.useWriteCmd) {
+                                // TODO: Replace after SERVER-11774.
+                                BSONObjBuilder builder;
+                                builder.append("insert", nsToCollectionSubstring(op.ns));
+                                BSONArrayBuilder docBuilder(builder.subarrayStart("documents"));
+                                if (op.isDocAnArray) {
+                                    for (const auto& element : op.doc) {
+                                        insertDoc = fixQuery(element.Obj(), bsonTemplateEvaluator);
+                                        docBuilder.append(insertDoc);
+                                    }
+                                } else {
+                                    insertDoc = fixQuery(op.doc, bsonTemplateEvaluator);
                                     docBuilder.append(insertDoc);
                                 }
+                                docBuilder.done();
+                                builder.append("writeConcern", op.writeConcern);
+                                conn->runCommand(nsToDatabaseSubstring(op.ns).toString(),
+                                                 builder.done(),
+                                                 result);
                             } else {
-                                insertDoc = fixQuery(e["doc"].Obj(), bsonTemplateEvaluator);
-                                docBuilder.append(insertDoc);
-                            }
-                            docBuilder.done();
-                            auto wcElem = e["writeConcern"];
-                            if (wcElem) {
-                                builder.append("writeConcern", wcElem.Obj());
-                            }
-                            conn->runCommand(
-                                nsToDatabaseSubstring(ns).toString(), builder.done(), result);
-                        } else {
-                            if (e["doc"].type() == Array) {
-                                std::vector<BSONObj> insertArray;
-                                for (auto& element : e["doc"].Array()) {
-                                    BSONObj e = fixQuery(element.Obj(), bsonTemplateEvaluator);
-                                    insertArray.push_back(e);
+                                if (op.isDocAnArray) {
+                                    std::vector<BSONObj> insertArray;
+                                    for (const auto& element : op.doc) {
+                                        BSONObj e = fixQuery(element.Obj(), bsonTemplateEvaluator);
+                                        insertArray.push_back(e);
+                                    }
+                                    conn->insert(op.ns, insertArray);
+                                } else {
+                                    insertDoc = fixQuery(op.doc, bsonTemplateEvaluator);
+                                    conn->insert(op.ns, insertDoc);
                                 }
-                                conn->insert(ns, insertArray);
+                                if (op.safe)
+                                    result = conn->getLastErrorDetailed();
+                            }
+                        }
+
+                        if (op.safe) {
+                            if (op.useCheck) {
+                                int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
+                                if (err) {
+                                    log() << "Error checking in benchRun thread [insert]"
+                                          << causedBy(scope->getError()) << endl;
+
+                                    stats.errCount++;
+
+                                    return;
+                                }
+                            }
+
+                            if (!_config->hideResults || op.showResult)
+                                log() << "Result from benchRun thread [safe insert] : " << result
+                                      << endl;
+
+                            if (!result["err"].eoo() && result["err"].type() == String &&
+                                (_config->throwGLE || op.throwGLE))
+                                throw DBException((string) "From benchRun GLE" +
+                                                      causedBy(result["err"].String()),
+                                                  result["code"].eoo() ? 0 : result["code"].Int());
+                        }
+                    } break;
+                    case OpType::REMOVE: {
+                        BSONObj result;
+                        {
+                            BenchRunEventTrace _bret(&stats.deleteCounter);
+                            BSONObj predicate = fixQuery(op.query, bsonTemplateEvaluator);
+                            if (op.useWriteCmd) {
+                                // TODO: Replace after SERVER-11774.
+                                BSONObjBuilder builder;
+                                builder.append("delete", nsToCollectionSubstring(op.ns));
+                                BSONArrayBuilder docBuilder(builder.subarrayStart("deletes"));
+                                int limit = (op.multi == true) ? 0 : 1;
+                                docBuilder.append(BSON("q" << predicate << "limit" << limit));
+                                docBuilder.done();
+                                builder.append("writeConcern", op.writeConcern);
+                                conn->runCommand(nsToDatabaseSubstring(op.ns).toString(),
+                                                 builder.done(),
+                                                 result);
                             } else {
-                                insertDoc = fixQuery(e["doc"].Obj(), bsonTemplateEvaluator);
-                                conn->insert(ns, insertDoc);
-                            }
-                            if (safe)
-                                result = conn->getLastErrorDetailed();
-                        }
-                    }
-
-                    if (safe) {
-                        if (check) {
-                            int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
-                            if (err) {
-                                log() << "Error checking in benchRun thread [insert]"
-                                      << causedBy(scope->getError()) << endl;
-
-                                stats.errCount++;
-
-                                return;
+                                conn->remove(op.ns, predicate, !op.multi);
+                                if (op.safe)
+                                    result = conn->getLastErrorDetailed();
                             }
                         }
 
-                        if (!_config->hideResults || e["showResult"].trueValue())
-                            log() << "Result from benchRun thread [safe insert] : " << result
-                                  << endl;
+                        if (op.safe) {
+                            if (op.useCheck) {
+                                int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
+                                if (err) {
+                                    log() << "Error checking in benchRun thread [delete]"
+                                          << causedBy(scope->getError()) << endl;
 
-                        if (!result["err"].eoo() && result["err"].type() == String &&
-                            (_config->throwGLE || e["throwGLE"].trueValue()))
-                            throw DBException((string) "From benchRun GLE" +
-                                                  causedBy(result["err"].String()),
-                                              result["code"].eoo() ? 0 : result["code"].Int());
-                    }
-                } else if (op == "delete" || op == "remove") {
-                    bool multi = e["multi"].eoo() ? true : e["multi"].trueValue();
-                    BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
-                    bool safe = e["safe"].trueValue();
-                    BSONObj result;
-                    {
-                        BenchRunEventTrace _bret(&stats.deleteCounter);
-                        BSONObj predicate = fixQuery(query, bsonTemplateEvaluator);
-                        if (useWriteCmd) {
-                            // TODO: Replace after SERVER-11774.
-                            BSONObjBuilder builder;
-                            builder.append("delete", nsToCollectionSubstring(ns));
-                            BSONArrayBuilder docBuilder(builder.subarrayStart("deletes"));
-                            int limit = (multi == true) ? 0 : 1;
-                            docBuilder.append(BSON("q" << predicate << "limit" << limit));
-                            docBuilder.done();
-                            auto wcElem = e["writeConcern"];
-                            if (wcElem) {
-                                builder.append("writeConcern", wcElem.Obj());
+                                    stats.errCount++;
+
+                                    return;
+                                }
                             }
-                            conn->runCommand(
-                                nsToDatabaseSubstring(ns).toString(), builder.done(), result);
-                        } else {
-                            conn->remove(ns, predicate, !multi);
-                            if (safe)
-                                result = conn->getLastErrorDetailed();
+
+                            if (!_config->hideResults || op.showResult)
+                                log() << "Result from benchRun thread [safe remove] : " << result
+                                      << endl;
+
+                            if (!result["err"].eoo() && result["err"].type() == String &&
+                                (_config->throwGLE || op.throwGLE))
+                                throw DBException((string) "From benchRun GLE " +
+                                                      causedBy(result["err"].String()),
+                                                  result["code"].eoo() ? 0 : result["code"].Int());
                         }
-                    }
-
-                    if (safe) {
-                        if (check) {
-                            int err = scope->invoke(scopeFunc, 0, &result, 1000 * 60, false);
-                            if (err) {
-                                log() << "Error checking in benchRun thread [delete]"
-                                      << causedBy(scope->getError()) << endl;
-
-                                stats.errCount++;
-
-                                return;
-                            }
-                        }
-
-                        if (!_config->hideResults || e["showResult"].trueValue())
-                            log() << "Result from benchRun thread [safe remove] : " << result
-                                  << endl;
-
-                        if (!result["err"].eoo() && result["err"].type() == String &&
-                            (_config->throwGLE || e["throwGLE"].trueValue()))
-                            throw DBException((string) "From benchRun GLE " +
-                                                  causedBy(result["err"].String()),
-                                              result["code"].eoo() ? 0 : result["code"].Int());
-                    }
-                } else if (op == "createIndex") {
-                    conn->ensureIndex(ns, e["key"].Obj(), false, "", false);
-                } else if (op == "dropIndex") {
-                    conn->dropIndex(ns, e["key"].Obj());
-                } else if (op == "let") {
-                    string target = e["target"].eoo() ? string() : e["target"].String();
-                    BSONElement value = e["value"].eoo() ? BSONElement() : e["value"];
-                    BSONObjBuilder valBuilder;
-                    BSONObjBuilder templateBuilder;
-                    valBuilder.append(value);
-                    bsonTemplateEvaluator.evaluate(valBuilder.done(), templateBuilder);
-                    bsonTemplateEvaluator.setVariable(target,
-                                                      templateBuilder.done().firstElement());
-                } else {
-                    log() << "don't understand op: " << op << endl;
-                    stats.error = true;
-                    return;
+                    } break;
+                    case OpType::CREATEINDEX:
+                        conn->ensureIndex(op.ns, op.key, false, "", false);
+                        break;
+                    case OpType::DROPINDEX:
+                        conn->dropIndex(op.ns, op.key);
+                        break;
+                    case OpType::LET: {
+                        BSONObjBuilder templateBuilder;
+                        bsonTemplateEvaluator.evaluate(op.value, templateBuilder);
+                        bsonTemplateEvaluator.setVariable(op.target,
+                                                          templateBuilder.done().firstElement());
+                    } break;
+                    default:
+                        uassert(34397, "In benchRun loop and got unknown op type", false);
                 }
                 // Count 1 for total ops. Successfully got through the try phrase
                 stats.opCount++;
             } catch (DBException& ex) {
-                if (!_config->hideErrors || e["showError"].trueValue()) {
+                if (!_config->hideErrors || op.showError) {
                     bool yesWatch =
                         (_config->watchPattern && _config->watchPattern->FullMatch(ex.what()));
                     bool noWatch =
@@ -853,7 +1069,8 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                         (!_config->noWatchPattern && _config->watchPattern &&
                          yesWatch) ||  // If we're just watching things
                         (_config->watchPattern && _config->noWatchPattern && yesWatch && !noWatch))
-                        log() << "Error in benchRun thread for op " << e << causedBy(ex) << endl;
+                        log() << "Error in benchRun thread for op "
+                              << opTypeName.find(op.op)->second << causedBy(ex) << endl;
                 }
 
                 bool yesTrap = (_config->trapPattern && _config->trapPattern->FullMatch(ex.what()));
@@ -864,32 +1081,33 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                     (!_config->noTrapPattern && _config->trapPattern && yesTrap) ||
                     (_config->trapPattern && _config->noTrapPattern && yesTrap && !noTrap)) {
                     {
-                        stats.trappedErrors.push_back(
-                            BSON("error" << ex.what() << "op" << e << "count" << count));
+                        stats.trappedErrors.push_back(BSON("error" << ex.what() << "op"
+                                                                   << opTypeName.find(op.op)->second
+                                                                   << "count" << count));
                     }
                     if (_config->breakOnTrap)
                         return;
                 }
-                if (!_config->handleErrors && !e["handleError"].trueValue())
+                if (!_config->handleErrors && !op.handleError)
                     return;
 
                 stats.errCount++;
             } catch (...) {
-                if (!_config->hideErrors || e["showError"].trueValue())
-                    log() << "Error in benchRun thread caused by unknown error for op " << e
-                          << endl;
-                if (!_config->handleErrors && !e["handleError"].trueValue())
+                if (!_config->hideErrors || op.showError)
+                    log() << "Error in benchRun thread caused by unknown error for op "
+                          << opTypeName.find(op.op)->second << endl;
+                if (!_config->handleErrors && !op.handleError)
                     return;
 
                 stats.errCount++;
             }
 
-            if (++count % 100 == 0 && !useWriteCmd) {
+            if (++count % 100 == 0 && !op.useWriteCmd) {
                 conn->getLastError();
             }
 
-            if (delay > 0)
-                sleepmillis(delay);
+            if (op.delay > 0)
+                sleepmillis(op.delay);
         }
     }
 
