@@ -689,13 +689,13 @@ config_to_file(CONFIG *cfg)
 	req_len = strlen(cfg->home) + 100;
 	if ((path = calloc(req_len, 1)) == NULL) {
 		(void)enomem(cfg);
-		return;
+		goto err;
 	}
 
 	snprintf(path, req_len + 14, "%s/CONFIG.wtperf", cfg->home);
 	if ((fp = fopen(path, "w")) == NULL) {
 		lprintf(cfg, errno, 0, "%s", path);
-		return;
+		goto err;
 	}
 
 	/* Print the config dump */
@@ -704,8 +704,10 @@ config_to_file(CONFIG *cfg)
 		TAILQ_REMOVE(&cfg->config_head, config_line, c);
 		fprintf(fp, "%s\n", config_line->string);
 	}
+err:
 	free(path);
-	fclose(fp);
+	if (fp)
+		fclose(fp);
 }
 
 /*
