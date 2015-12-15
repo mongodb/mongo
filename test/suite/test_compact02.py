@@ -118,7 +118,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         # 4. Reopen the connection to force the file to disk (if we leave dirty
         # blocks in the cache, it can affect how compact works depending on how
         # and when those blocks are written, because they're being written best
-        # fit, not first-fit, as compaction does.
+        # fit, not first-fit, as compaction does).
         self.reopen_conn()
 
         # 5. Get stats on table.
