@@ -43,6 +43,60 @@ class RE;
 
 namespace mongo {
 
+enum class OpType {
+    NONE,
+    NOP,
+    FINDONE,
+    COMMAND,
+    FIND,
+    UPDATE,
+    INSERT,
+    REMOVE,
+    CREATEINDEX,
+    DROPINDEX,
+    LET
+};
+
+/**
+ * Object representing one operation passed to benchRun
+ */
+ struct BenchRunOp {
+ public:
+     int batchSize = 0;
+     BSONElement check;
+     BSONObj command;
+     BSONObj context;
+     int delay = 0;
+     BSONObj doc;
+     bool isDocAnArray = false;
+     int expected = -1;
+     bool handleError = false;
+     BSONObj key;
+     int limit = 0;
+     bool multi = false;
+     std::string ns;
+     OpType op = OpType::NONE;
+     int options = 0;
+     BSONObj projection;
+     BSONObj query;
+     bool safe = false;
+     int skip = 0;
+     bool showError = false;
+     bool showResult = false;
+     std::string target;
+     bool throwGLE = false;
+     BSONObj update;
+     bool upsert = false;
+     bool useCheck = false;
+     bool useReadCmd = false;
+     bool useWriteCmd = false;
+     BSONObj writeConcern;
+     BSONObj value;
+
+     // This is an owned copy of the raw operation. All unowned members point into this. 
+     BSONObj myBsonOp;
+};
+
 /**
  * Configuration object describing a bench run activity.
  */
@@ -112,17 +166,15 @@ public:
     std::shared_ptr<pcrecpp::RE> noWatchPattern;
 
     /**
-     * Operation description.  A BSON array of objects, each describing a single
+     * Operation description. A list of BenchRunOps, each describing a single
      * operation.
      *
      * Every thread in a benchRun job will perform these operations in sequence, restarting at
      * the beginning when the end is reached, until the job is stopped.
      *
-     * TODO: Document the operation objects.
-     *
      * TODO: Introduce support for performing each operation exactly N times.
      */
-    BSONObj ops;
+    std::vector<BenchRunOp> ops;
 
     bool throwGLE;
     bool breakOnTrap;
@@ -135,7 +187,7 @@ private:
 /**
  * An event counter for events that have an associated duration.
  *
- * Not thread safe.  Expected use is one instance per thread during parallel execution.
+ * Not thread safe. Expected use is one instance per thread during parallel execution.
  */
 class BenchRunEventCounter {
     MONGO_DISALLOW_COPYING(BenchRunEventCounter);
@@ -151,7 +203,7 @@ public:
     void reset();
 
     /**
-     * Conceptually the equivalent of "+=".  Adds "other" into this.
+     * Conceptually the equivalent of "+=". Adds "other" into this.
      */
     void updateFrom(const BenchRunEventCounter& other);
 
@@ -190,7 +242,7 @@ private:
  *
  * This type can be used to separately count failures and successes by passing two event
  * counters to the BenchRunEventCounter constructor, and calling "succeed()" on the object at
- * the end of a successful event.  If an exception is thrown, the fail counter will receive the
+ * the end of a successful event. If an exception is thrown, the fail counter will receive the
  * event, and otherwise, the succes counter will.
  *
  * In all cases, the counter objects must outlive the trace object.
@@ -291,12 +343,12 @@ public:
     void waitForState(State awaitedState);
 
     /**
-     * Notify the worker threads to wrap up.  Does not block.
+     * Notify the worker threads to wrap up. Does not block.
      */
     void tellWorkersToFinish();
 
     /**
-     * Notify the worker threads to collect statistics.  Does not block.
+     * Notify the worker threads to collect statistics. Does not block.
      */
     void tellWorkersToCollectStats();
 
@@ -351,7 +403,7 @@ class BenchRunWorker {
 public:
     /**
      * Create a new worker, performing one thread's worth of the activity described in
-     * "config", and part of the larger activity with state "brState".  Both "config"
+     * "config", and part of the larger activity with state "brState". Both "config"
      * and "brState" must exist for the life of this object.
      *
      * "id" is a positive integer which should uniquely identify the worker.
@@ -438,12 +490,12 @@ public:
     ~BenchRunner();
 
     /**
-     * Start the activity.  Only call once per instance of BenchRunner.
+     * Start the activity. Only call once per instance of BenchRunner.
      */
     void start();
 
     /**
-     * Stop the activity.  Block until the activitiy has stopped.
+     * Stop the activity. Block until the activitiy has stopped.
      */
     void stop();
 
