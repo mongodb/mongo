@@ -685,6 +685,8 @@ config_to_file(CONFIG *cfg)
 	size_t req_len;
 	char *path;
 
+	fp = NULL;
+
 	/* Backup the config */
 	req_len = strlen(cfg->home) + 100;
 	if ((path = calloc(req_len, 1)) == NULL) {
@@ -706,8 +708,8 @@ config_to_file(CONFIG *cfg)
 	}
 err:
 	free(path);
-	if (fp)
-		fclose(fp);
+	if (fp != NULL)
+		(void)fclose(fp);
 }
 
 /*
