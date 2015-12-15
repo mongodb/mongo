@@ -10,6 +10,7 @@ import (
 	"hash"
 	"hash/crc64"
 	"io"
+	"sync/atomic"
 )
 
 // DemuxOut is a Demultiplexer output consumer
@@ -203,7 +204,7 @@ func (receiver *RegularCollectionReceiver) Read(r []byte) (int, error) {
 		} else {
 			receiver.partialReadBuf = receiver.partialReadBuf[copyLen:]
 		}
-		receiver.pos += int64(copyLen)
+		atomic.AddInt64(&receiver.pos, int64(copyLen))
 		return copyLen, nil
 	}
 	// Since we're the "reader" here, not the "writer" we need to start with a read, in case the chan is closed
@@ -227,19 +228,19 @@ func (receiver *RegularCollectionReceiver) Read(r []byte) (int, error) {
 		}
 		copy(r, receiver.partialReadBuf)
 		receiver.partialReadBuf = receiver.partialReadBuf[rLen:]
-		receiver.pos += int64(rLen)
+		atomic.AddInt64(&receiver.pos, int64(rLen))
 		return rLen, nil
 	}
 	// Send the read buff to the BodyBSON ParserConsumer to fill
 	receiver.readBufChan <- r
 	// Receiver the wLen of data written
 	wLen = <-receiver.readLenChan
-	receiver.pos += int64(wLen)
+	atomic.AddInt64(&receiver.pos, int64(wLen))
 	return wLen, nil
 }
 
 func (receiver *RegularCollectionReceiver) Pos() int64 {
-	return receiver.pos
+	return atomic.LoadInt64(&receiver.pos)
 }
 
 // Close is part of the intents.file interface. It currently does nothing. We can't close the
@@ -328,12 +329,12 @@ func (cache *SpecialCollectionCache) Close() error {
 
 func (cache *SpecialCollectionCache) Read(p []byte) (int, error) {
 	n, err := cache.Buffer.Read(p)
-	cache.pos += int64(n)
+	atomic.AddInt64(&cache.pos, int64(n))
 	return n, err
 }
 
 func (cache *SpecialCollectionCache) Pos() int64 {
-	return cache.pos
+	return atomic.LoadInt64(&cache.pos)
 }
 
 // MutedCollection implements both DemuxOut as well as intents.file. It serves as a way to

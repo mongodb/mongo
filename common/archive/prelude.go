@@ -9,6 +9,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"path/filepath"
+	"sync/atomic"
 )
 
 //MetadataFile implements intents.file
@@ -27,12 +28,12 @@ func (md *MetadataFile) Close() error {
 
 func (md *MetadataFile) Read(p []byte) (int, error) {
 	n, err := md.Buffer.Read(p)
-	md.pos += int64(n)
+	atomic.AddInt64(&md.pos, int64(n))
 	return n, err
 }
 
 func (md *MetadataFile) Pos() int64 {
-	return md.pos
+	return atomic.LoadInt64(&md.pos)
 }
 
 // DirLike represents the group of methods done on directories and files in dump directories,
@@ -374,10 +375,10 @@ func (mpf *MetadataPreludeFile) Close() error {
 
 func (mpf *MetadataPreludeFile) Read(p []byte) (int, error) {
 	n, err := mpf.Buffer.Read(p)
-	mpf.pos += int64(n)
+	atomic.AddInt64(&mpf.pos, int64(n))
 	return n, err
 }
 
 func (mpf *MetadataPreludeFile) Pos() int64 {
-	return mpf.pos
+	return atomic.LoadInt64(&mpf.pos)
 }

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 )
 
 // FileType describes the various types of restore documents.
@@ -44,12 +45,12 @@ type posTrackingReader struct {
 
 func (f *posTrackingReader) Read(p []byte) (int, error) {
 	n, err := f.ReadCloser.Read(p)
-	f.pos += int64(n)
+	atomic.AddInt64(&f.pos, int64(n))
 	return n, err
 }
 
 func (f *posTrackingReader) Pos() int64 {
-	return f.pos
+	return atomic.LoadInt64(&f.pos)
 }
 
 // mixedPosTrackingReader is a type for reading from one file but getting the position of a
@@ -156,12 +157,12 @@ func (f *realMetadataFile) Open() (err error) {
 
 func (f *realMetadataFile) Read(p []byte) (int, error) {
 	n, err := f.ReadCloser.Read(p)
-	f.pos += int64(n)
+	atomic.AddInt64(&f.pos, int64(n))
 	return n, err
 }
 
 func (f *realMetadataFile) Pos() int64 {
-	return f.pos
+	return atomic.LoadInt64(&f.pos)
 }
 
 // stdinFile implements the intents.file interface. They allow intents to read single collections
@@ -180,12 +181,12 @@ func (f *stdinFile) Open() error {
 
 func (f *stdinFile) Read(p []byte) (int, error) {
 	n, err := f.Reader.Read(p)
-	f.pos += int64(n)
+	atomic.AddInt64(&f.pos, int64(n))
 	return n, err
 }
 
 func (f *stdinFile) Pos() int64 {
-	return f.pos
+	return atomic.LoadInt64(&f.pos)
 }
 
 // Close is part of the intents.file interface. After Close is called, Read will fail.
