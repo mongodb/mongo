@@ -364,9 +364,9 @@ class CheckReplDBHash(CustomBehavior):
 
             # 'sb' already describes which collections are missing where.
             for coll_name in missing_on_primary:
-                CheckReplDBHash._dump_all_documents(primary_db, coll_name, sb)
-            for coll_name in missing_on_secondary:
                 CheckReplDBHash._dump_all_documents(secondary_db, coll_name, sb)
+            for coll_name in missing_on_secondary:
+                CheckReplDBHash._dump_all_documents(primary_db, coll_name, sb)
             return
 
         for coll_name in primary_coll_names & secondary_coll_names:
