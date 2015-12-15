@@ -24,7 +24,8 @@ assert.eq(2, TestColl.count({}));
 assert.commandWorked(st.s.adminCommand({ split: 'TestDB.TestColl', find: { Key: 0 } }));
 assert.commandWorked(st.s.adminCommand({ moveChunk: 'TestDB.TestColl',
                                          find: { Key: 0 },
-                                         to: 'shard0001' }));
+                                         to: 'shard0001',
+                                         _waitForDelete: true }));
 
 // Ensure documents are found
 assert.eq(2, TestColl.count({}));
