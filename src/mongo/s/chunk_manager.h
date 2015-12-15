@@ -161,10 +161,10 @@ public:
     //
 
     // Creates new chunks based on info in chunk manager
-    void createFirstChunks(OperationContext* txn,
-                           const ShardId& primaryShardId,
-                           const std::vector<BSONObj>* initPoints,
-                           const std::set<ShardId>* initShardIds);
+    Status createFirstChunks(OperationContext* txn,
+                             const ShardId& primaryShardId,
+                             const std::vector<BSONObj>* initPoints,
+                             const std::set<ShardId>* initShardIds);
 
     // Loads existing ranges based on info in chunk manager
     void loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager);

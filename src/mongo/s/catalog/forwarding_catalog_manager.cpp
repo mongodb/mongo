@@ -70,8 +70,7 @@ std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
                                                    const HostAndPort& thisHost) {
     switch (configCS.type()) {
         case ConnectionString::SET: {
-            auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(
-                shardRegistry, ReplSetDistLockManager::kDistLockWriteConcernTimeout);
+            auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
 
             std::unique_ptr<SecureRandom> rng(SecureRandom::create());
             std::string distLockProcessId = str::stream()
