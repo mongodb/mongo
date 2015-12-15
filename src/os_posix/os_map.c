@@ -79,7 +79,7 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
 	 */
 	size &= ~(size_t)(conn->page_size - 1);
 
-	if (size > conn->page_size &&
+	if (size > (size_t)conn->page_size &&
 	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
 		WT_RET_MSG(session, ret, "posix_madvise will need");
 #else
