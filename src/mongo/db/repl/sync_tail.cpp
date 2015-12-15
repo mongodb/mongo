@@ -523,9 +523,11 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
             raws.emplace_back(op.raw);
         }
         lastOpTime = writeOpsToOplog(txn, raws);
-        if (inShutdown()) {
-            return OpTime();
-        }
+    }
+
+    if (inShutdownStrict()) {
+        log() << "Cannot apply operations due to shutdown in progress";
+        return OpTime();
     }
     // We have now written all database writes and updated the oplog to match.
     return lastOpTime;
@@ -743,8 +745,16 @@ void SyncTail::oplogApplication() {
         setMinValid(&txn, {start, end});
 
         lastWriteOpTime = multiApply(&txn, ops);
-        setNewTimestamp(lastWriteOpTime.getTimestamp());
+        if (lastWriteOpTime.isNull()) {
+            // fassert if oplog application failed for any reasons other than shutdown.
+            error() << "Failed to apply " << ops.getDeque().size()
+                    << " operations - batch start:" << start << " end:" << end;
+            fassert(34360, inShutdownStrict());
+            // Return without setting minvalid in the case of shutdown.
+            return;
+        }
 
+        setNewTimestamp(lastWriteOpTime.getTimestamp());
         setMinValid(&txn, end, DurableRequirement::None);
         minValidBoundaries.start = {};
         minValidBoundaries.end = end;
