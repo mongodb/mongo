@@ -1907,6 +1907,30 @@ Status Element::setValueSafeNum(const SafeNum value) {
     }
 }
 
+Status Element::setValueElement(ConstElement setFrom) {
+    verify(ok());
+
+    // Can't set to your own root element, since this would create a circular document.
+    if (_doc->root() == setFrom) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "Attempt to set an element to its own document's root");
+    }
+
+    // Setting to self is a no-op.
+    //
+    // Setting the root is always an error so we want to fall through to the error handling in this
+    // case.
+    if (*this == setFrom && _repIdx != kRootRepIdx) {
+        return Status::OK();
+    }
+
+    Document::Impl& impl = getDocument().getImpl();
+    ElementRep thisRep = impl.getElementRep(_repIdx);
+    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    Element newValue = getDocument().makeElementWithNewFieldName(fieldName, setFrom);
+    return setValue(newValue._repIdx);
+}
+
 BSONType Element::getType() const {
     verify(ok());
     const Document::Impl& impl = getDocument().getImpl();
