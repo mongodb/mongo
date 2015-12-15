@@ -940,7 +940,7 @@ tasks:
         silent: true
         script: |
           set -o errexit
-          echo "${signing_auth_token}" > signing_auth_token
+          echo "${signing_auth_token_26}" > signing_auth_token
     - command: shell.exec
       params:
         working_dir: src
