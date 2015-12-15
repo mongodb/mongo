@@ -1566,6 +1566,14 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
+        if (!grid.shardRegistry()) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::CommandNotSupported,
+                       str::stream() << "Can not execute mapReduce with output database "
+                                     << dbname));
+        }
+
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(txn);
