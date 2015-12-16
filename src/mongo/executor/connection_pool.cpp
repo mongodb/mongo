@@ -368,6 +368,12 @@ void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk
 
                             stdx::unique_lock<stdx::mutex> lk(_parent->_mutex);
 
+                            if (!_readyPool.count(connPtr)) {
+                                // We've already been checked out. We don't need to refresh
+                                // ourselves.
+                                return;
+                            }
+
                             conn = takeFromPool(_readyPool, connPtr);
 
                             // If we're in shutdown, we don't need to refresh connections
