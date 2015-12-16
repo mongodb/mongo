@@ -111,7 +111,7 @@ protected:
         ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
         ChunkManager manager(_collName, shardKeyPattern, false);
 
-        manager.createFirstChunks(&_txn, _shardId, &splitKeys, NULL);
+        uassertStatusOK(manager.createFirstChunks(&_txn, _shardId, &splitKeys, NULL));
     }
 };
 

@@ -646,7 +646,7 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countLogLinesContaining(
-                      "killCursors command task failed: CallbackCanceled Callback canceled"));
+                      "killCursors command task failed: CallbackCanceled: Callback canceled"));
 }
 
 void setNextActionToNoAction(const StatusWith<Fetcher::QueryResponse>& fetchResult,
@@ -780,7 +780,7 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
     ASSERT_EQUALS(
         1,
         countLogLinesContaining(
-            "failed to schedule killCursors command: ShutdownInProgress Shutdown in progress"));
+            "failed to schedule killCursors command: ShutdownInProgress: Shutdown in progress"));
 
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(fetcher->isActive());
