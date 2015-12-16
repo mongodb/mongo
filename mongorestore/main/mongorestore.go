@@ -56,6 +56,8 @@ func main() {
 		log.Logf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
 	}
+	provider.SetBypassDocumentValidation(outputOpts.BypassDocumentValidation)
+
 	// disable TCP timeouts for restore jobs
 	provider.SetFlags(db.DisableSocketTimeout)
 	restore := mongorestore.MongoRestore{

@@ -53,6 +53,7 @@ func main() {
 		log.Logf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
 	}
+	sessionProvider.SetBypassDocumentValidation(ingestOpts.BypassDocumentValidation)
 
 	m := mongoimport.MongoImport{
 		ToolOptions:     opts,

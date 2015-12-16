@@ -57,6 +57,9 @@ type IngestOptions struct {
 
 	// Sets write concern level for write operations.
 	WriteConcern string `long:"writeConcern" default:"majority" value-name:"<write-concern-specifier>" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`
+
+	// Indicates that the server should bypass document validation on import.
+	BypassDocumentValidation bool `long:"bypassDocumentValidation" description:"bypass document validation"`
 }
 
 // Name returns a description of the IngestOptions struct.

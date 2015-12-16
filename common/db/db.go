@@ -64,9 +64,10 @@ type SessionProvider struct {
 	masterSession *mgo.Session
 
 	// flags for generating the master session
-	flags          sessionFlag
-	readPreference mgo.Mode
-	tags           bson.D
+	bypassDocumentValidation bool
+	flags                    sessionFlag
+	readPreference           mgo.Mode
+	tags                     bson.D
 }
 
 // ApplyOpsResponse represents the response from an 'applyOps' command.
@@ -115,8 +116,12 @@ func (self *SessionProvider) GetSession() (*mgo.Session, error) {
 // session provider flags passed in with SetFlags.
 // This helper assumes a lock is already taken.
 func (self *SessionProvider) refresh() {
+	// handle bypassDocumentValidation
+	self.masterSession.SetBypassValidation(self.bypassDocumentValidation)
+
 	// handle readPreference
 	self.masterSession.SetMode(self.readPreference, true)
+
 	// disable timeouts
 	if (self.flags & DisableSocketTimeout) > 0 {
 		self.masterSession.SetSocketTimeout(0)
@@ -152,6 +157,19 @@ func (self *SessionProvider) SetReadPreference(pref mgo.Mode) {
 	}
 }
 
+// SetBypassDocumentValidation sets whether to bypass document validation in the SessionProvider
+// and eventually in the masterSession
+func (self *SessionProvider) SetBypassDocumentValidation(bypassDocumentValidation bool) {
+	self.masterSessionLock.Lock()
+	defer self.masterSessionLock.Unlock()
+
+	self.bypassDocumentValidation = bypassDocumentValidation
+
+	if self.masterSession != nil {
+		self.refresh()
+	}
+}
+
 // SetTags sets the server selection tags in the SessionProvider
 // and eventually in the masterSession
 func (self *SessionProvider) SetTags(tags bson.D) {
@@ -170,7 +188,8 @@ func (self *SessionProvider) SetTags(tags bson.D) {
 func NewSessionProvider(opts options.ToolOptions) (*SessionProvider, error) {
 	// create the provider
 	provider := &SessionProvider{
-		readPreference: mgo.Primary,
+		readPreference:           mgo.Primary,
+		bypassDocumentValidation: false,
 	}
 
 	// finalize auth options, filling in missing passwords
