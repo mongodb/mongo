@@ -17,9 +17,11 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
 	WT_BM *bm;
 	WT_DECL_RET;
+	WT_MULTI *multi;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	size_t addr_size;
+	uint32_t i;
 	const uint8_t *addr;
 
 	*skipp = true;					/* Default skip. */
@@ -41,29 +43,44 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 
 	/*
 	 * If the page is clean, test the original addresses.
-	 * If the page is a 1-to-1 replacement, test the replacement addresses.
+	 * If the page is a replacement, test the replacement addresses.
 	 * Ignore empty pages, they get merged into the parent.
 	 */
 	if (mod == NULL || mod->rec_result == 0) {
 		__wt_ref_info(ref, &addr, &addr_size, NULL);
 		if (addr == NULL)
 			return (0);
-		WT_RET(
+		return (
 		    bm->compact_page_skip(bm, session, addr, addr_size, skipp));
-	} else if (mod->rec_result == WT_PM_REC_REPLACE) {
-		/*
-		 * The page's modification information can change underfoot if
-		 * the page is being reconciled, serialize with reconciliation.
-		 */
+	}
+
+	/*
+	 * The page's modification information can change underfoot if the page
+	 * is being reconciled, serialize with reconciliation.
+	 */
+	if (mod->rec_result == WT_PM_REC_REPLACE ||
+	    mod->rec_result == WT_PM_REC_MULTIBLOCK)
 		WT_RET(__wt_fair_lock(session, &page->page_lock));
 
+	if (mod->rec_result == WT_PM_REC_REPLACE)
 		ret = bm->compact_page_skip(bm, session,
 		    mod->mod_replace.addr, mod->mod_replace.size, skipp);
 
+	if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
+		for (multi = mod->mod_multi,
+		    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
+			if ((ret = bm->compact_page_skip(bm, session,
+			    multi->addr.addr, multi->addr.size, skipp)) != 0)
+				break;
+			if (!*skipp)
+				break;
+		}
+
+	if (mod->rec_result == WT_PM_REC_REPLACE ||
+	    mod->rec_result == WT_PM_REC_MULTIBLOCK)
 		WT_TRET(__wt_fair_unlock(session, &page->page_lock));
-		WT_RET(ret);
-	}
-	return (0);
+
+	return (ret);
 }
 
 /*
