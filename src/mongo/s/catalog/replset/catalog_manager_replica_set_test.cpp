@@ -2080,7 +2080,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
                 multi: false,
                 upsert: true
             }],
-            writeConcern: { w: "majority", wtimeout: 15000 },
+            writeConcern: { w: "majority" },
             maxTimeMS: 30000
         })"));
 
@@ -2178,7 +2178,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExists) {
                 multi: false,
                 upsert: true
             }],
-            writeConcern: { w: "majority", wtimeout: 15000 },
+            writeConcern: { w: "majority" },
             maxTimeMS: 30000
         })"));
 

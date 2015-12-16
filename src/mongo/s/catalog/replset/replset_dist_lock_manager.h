@@ -48,12 +48,9 @@ class ServiceContext;
 
 class ReplSetDistLockManager final : public DistLockManager {
 public:
-    // How frequently should the dist lock pinger thread run and write liveness information about
-    // this instance of the dist lock manager
-    static const Seconds kDistLockPingInterval;
-
-    // How long should the lease on a distributed lock last
-    static const Minutes kDistLockExpirationTime;
+    static const stdx::chrono::seconds kDistLockWriteConcernTimeout;
+    static const stdx::chrono::seconds kDistLockPingInterval;
+    static const stdx::chrono::minutes kDistLockExpirationTime;
 
     ReplSetDistLockManager(ServiceContext* globalContext,
                            StringData processID,

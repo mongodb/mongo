@@ -397,10 +397,10 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
     }
 }
 
-Status ChunkManager::createFirstChunks(OperationContext* txn,
-                                       const ShardId& primaryShardId,
-                                       const vector<BSONObj>* initPoints,
-                                       const set<ShardId>* initShardIds) {
+void ChunkManager::createFirstChunks(OperationContext* txn,
+                                     const ShardId& primaryShardId,
+                                     const vector<BSONObj>* initPoints,
+                                     const set<ShardId>* initShardIds) {
     // TODO distlock?
     // TODO: Race condition if we shard the collection and insert data while we split across
     // the non-primary shard.
@@ -408,6 +408,7 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
     vector<BSONObj> splitPoints;
     vector<ShardId> shardIds;
     calcInitSplitsAndShards(txn, primaryShardId, initPoints, initShardIds, &splitPoints, &shardIds);
+
 
     // this is the first chunk; start the versioning from scratch
     ChunkVersion version(1, 0, OID::gen());
@@ -428,21 +429,19 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
         chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
 
-        Status status = grid.catalogManager(txn)
+        Status result = grid.catalogManager(txn)
                             ->insertConfigDocument(txn, ChunkType::ConfigNS, chunk.toBSON());
-        if (!status.isOK()) {
-            const string errMsg = str::stream()
-                << "Creating first chunks failed: " << status.reason();
-            error() << errMsg;
-            return Status(status.code(), errMsg);
+        if (!result.isOK()) {
+            string ss = str::stream()
+                << "creating first chunks failed. result: " << result.reason();
+            error() << ss;
+            msgasserted(15903, ss);
         }
 
         version.incMinor();
     }
 
     _version = ChunkVersion(0, 0, version.epoch());
-
-    return Status::OK();
 }
 
 ChunkPtr ChunkManager::findIntersectingChunk(OperationContext* txn, const BSONObj& shardKey) const {

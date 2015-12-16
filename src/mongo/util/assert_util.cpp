@@ -218,6 +218,7 @@ void msgasserted(int msgid, const string& msg) {
 NOINLINE_DECL void msgasserted(int msgid, const char* msg) {
     assertionCount.condrollover(++assertionCount.warning);
     log() << "Assertion: " << msgid << ":" << msg << endl;
+    // breakpoint();
     logContext();
     throw MsgAssertionException(msgid, msg);
 }

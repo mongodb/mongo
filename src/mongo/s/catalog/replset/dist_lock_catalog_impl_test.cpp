@@ -66,6 +66,7 @@ using repl::ReadConcernArgs;
 namespace {
 
 const HostAndPort dummyHost("dummy", 123);
+const Milliseconds kWTimeout(100);
 static const stdx::chrono::seconds kFutureTimeout{5};
 
 /**
@@ -133,7 +134,7 @@ private:
                                              configCS);
         _shardRegistry->startup();
 
-        _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(_shardRegistry.get());
+        _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(_shardRegistry.get(), kWTimeout);
 
         targeter()->setFindHostReturnValue(dummyHost);
     }
@@ -179,7 +180,7 @@ TEST_F(DistLockCatalogFixture, BasicPing) {
                     }
                 },
                 upsert: true,
-                writeConcern: { w: "majority", wtimeout: 15000 },
+                writeConcern: { w: "majority", wtimeout: 100 },
                 maxTimeMS: 30000
             })"));
 
@@ -333,7 +334,7 @@ TEST_F(DistLockCatalogFixture, GrabLockNoOp) {
                 },
                 upsert: true,
                 new: true,
-                writeConcern: { w: "majority", wtimeout: 15000 },
+                writeConcern: { w: "majority", wtimeout: 100 },
                 maxTimeMS: 30000
             })"));
 
@@ -381,7 +382,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWithNewDoc) {
                 },
                 upsert: true,
                 new: true,
-                writeConcern: { w: "majority", wtimeout: 15000 },
+                writeConcern: { w: "majority", wtimeout: 100 },
                 maxTimeMS: 30000
             })"));
 
@@ -645,7 +646,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockNoOp) {
                     }
                 },
                 new: true,
-                writeConcern: { w: "majority", wtimeout: 15000 },
+                writeConcern: { w: "majority", wtimeout: 100 },
                 maxTimeMS: 30000
             })"));
 
@@ -698,7 +699,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWithNewDoc) {
                     }
                 },
                 new: true,
-                writeConcern: { w: "majority", wtimeout: 15000 },
+                writeConcern: { w: "majority", wtimeout: 100 },
                 maxTimeMS: 30000
             })"));
 
@@ -887,7 +888,7 @@ TEST_F(DistLockCatalogFixture, BasicUnlock) {
                 findAndModify: "locks",
                 query: { ts: ObjectId("555f99712c99a78c5b083358") },
                 update: { $set: { state: 0 }},
-                writeConcern: { w: "majority", wtimeout: 15000 },
+                writeConcern: { w: "majority", wtimeout: 100 },
                 maxTimeMS: 30000
             })"));
 
@@ -920,7 +921,7 @@ TEST_F(DistLockCatalogFixture, UnlockWithNoNewDoc) {
                 findAndModify: "locks",
                 query: { ts: ObjectId("555f99712c99a78c5b083358") },
                 update: { $set: { state: 0 }},
-                writeConcern: { w: "majority", wtimeout: 15000 },
+                writeConcern: { w: "majority", wtimeout: 100 },
                 maxTimeMS: 30000
             })"));
 
@@ -1199,7 +1200,7 @@ TEST_F(DistLockCatalogFixture, BasicStopPing) {
                 findAndModify: "lockpings",
                 query: { _id: "test" },
                 remove: true,
-                writeConcern: { w: "majority", wtimeout: 15000 },
+                writeConcern: { w: "majority", wtimeout: 100 },
                 maxTimeMS: 30000
             })"));
 

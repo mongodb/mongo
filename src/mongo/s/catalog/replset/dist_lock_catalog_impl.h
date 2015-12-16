@@ -47,7 +47,7 @@ struct ReadPreferenceSetting;
 
 class DistLockCatalogImpl final : public DistLockCatalog {
 public:
-    DistLockCatalogImpl(ShardRegistry* shardRegistry);
+    DistLockCatalogImpl(ShardRegistry* shardRegistry, Milliseconds writeConcernTimeout);
 
     virtual ~DistLockCatalogImpl();
 
@@ -94,8 +94,8 @@ private:
     ShardRegistry* _client;
 
     // These are not static to avoid initialization order fiasco.
+    const WriteConcernOptions _writeConcern;
     const NamespaceString _lockPingNS;
     const NamespaceString _locksNS;
 };
-
-}  // namespace mongo
+}

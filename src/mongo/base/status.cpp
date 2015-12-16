@@ -81,7 +81,7 @@ std::string Status::toString() const {
     std::ostringstream ss;
     ss << codeString();
     if (!isOK())
-        ss << ": " << reason();
+        ss << " " << reason();
     if (location() != 0)
         ss << " @ " << location();
     return ss.str();

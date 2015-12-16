@@ -92,12 +92,6 @@ namespace {
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting NONE here,
-                                                // kMajority implies JOURNAL if journaling is
-                                                // supported by mongod.
-                                                WriteConcernOptions::NONE,
-                                                Seconds(15));
 
 const int kMaxConfigVersionInitRetry = 3;
 const int kMaxReadRetry = 3;
@@ -194,11 +188,7 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
     }
 
     shared_ptr<ChunkManager> manager(new ChunkManager(ns, fieldsAndOrder, unique));
-    Status createFirstChunksStatus =
-        manager->createFirstChunks(txn, dbPrimaryShardId, &initPoints, &initShardIds);
-    if (!createFirstChunksStatus.isOK()) {
-        return createFirstChunksStatus;
-    }
+    manager->createFirstChunks(txn, dbPrimaryShardId, &initPoints, &initShardIds);
     manager->loadExistingRanges(txn, nullptr);
 
     CollectionInfo collInfo;
@@ -972,7 +962,7 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
 
     BatchedCommandRequest request(insert.release());
     request.setNS(nss);
-    request.setWriteConcern(kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(WriteConcernOptions::Majority);
 
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         BatchedCommandResponse response;
@@ -1049,7 +1039,7 @@ StatusWith<bool> CatalogManagerReplicaSet::updateConfigDocument(OperationContext
 
     BatchedCommandRequest request(updateRequest.release());
     request.setNS(nss);
-    request.setWriteConcern(kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(WriteConcernOptions::Majority);
 
     BatchedCommandResponse response;
     _runBatchWriteCommand(txn, request, &response, ShardRegistry::kAllRetriableErrors);
@@ -1079,7 +1069,7 @@ Status CatalogManagerReplicaSet::removeConfigDocuments(OperationContext* txn,
 
     BatchedCommandRequest request(deleteRequest.release());
     request.setNS(nss);
-    request.setWriteConcern(kMajorityWriteConcern.toBSON());
+    request.setWriteConcern(WriteConcernOptions::Majority);
 
     BatchedCommandResponse response;
     _runBatchWriteCommand(txn, request, &response, ShardRegistry::kAllRetriableErrors);
