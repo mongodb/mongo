@@ -823,24 +823,15 @@ function appendSetParameterArgs(argArray) {
                     argArray.push.apply(argArray, ['--storageEngine', jsTest.options().storageEngine]);
                 }
             }
-
-            var wtEngingeConfig = jsTest.options().wiredTigerEngineConfigString;
-            if (wtEngingeConfig && argArray.indexOf('--wiredTigerEngineConfigString') < 0) {
-                argArray.push.apply(argArray,
-                                    [ '--wiredTigerEngineConfigString', wtEngingeConfig ]);
+            if (jsTest.options().wiredTigerEngineConfigString) {
+                argArray.push.apply(argArray, ['--wiredTigerEngineConfigString', jsTest.options().wiredTigerEngineConfigString]);
             }
-
-            var wtCollConfig = jsTest.options().wiredTigerCollectionConfigString;
-            if (wtCollConfig && argArray.indexOf('--wiredTigerCollectionConfigString') < 0) {
-                argArray.push.apply(argArray,
-                                    ['--wiredTigerCollectionConfigString', wtCollConfig]);
+            if (jsTest.options().wiredTigerCollectionConfigString) {
+                argArray.push.apply(argArray, ['--wiredTigerCollectionConfigString', jsTest.options().wiredTigerCollectionConfigString]);
             }
-
-            var wtIndexConfig = jsTest.options().wiredTigerIndexConfigString;
-            if (wtIndexConfig && argArray.indexOf('--wiredTigerIndexConfigString') < 0) {
-                argArray.push.apply(argArray, ['--wiredTigerIndexConfigString', wtIndexConfig]);
+            if (jsTest.options().wiredTigerIndexConfigString) {
+                argArray.push.apply(argArray, ['--wiredTigerIndexConfigString', jsTest.options().wiredTigerIndexConfigString]);
             }
-
             // apply setParameters for mongod
             if (jsTest.options().setParameters) {
                 var params = jsTest.options().setParameters.split(",");

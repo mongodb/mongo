@@ -48,7 +48,7 @@ var runTest = function(withRecovery) {
         assert.eq(null, doc);
     }
 
-    var restartCmdLineOptions = Object.merge(st.d0.commandLine, {
+    var restartCmdLineOptions = Object.merge(st.d0.fullOptions, {
         setParameter: 'recoverShardingState=' + (withRecovery? 'true' : 'false'),
         restart: true
     });
