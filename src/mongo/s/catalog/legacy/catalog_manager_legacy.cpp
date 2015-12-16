@@ -331,7 +331,11 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     logChange(txn, "shardCollection.start", ns, collectionDetail.obj());
 
     shared_ptr<ChunkManager> manager(new ChunkManager(ns, fieldsAndOrder, unique));
-    manager->createFirstChunks(txn, dbPrimaryShardId, &initPoints, &initShardIds);
+    Status createFirstChunksStatus =
+        manager->createFirstChunks(txn, dbPrimaryShardId, &initPoints, &initShardIds);
+    if (!createFirstChunksStatus.isOK()) {
+        return createFirstChunksStatus;
+    }
     manager->loadExistingRanges(txn, nullptr);
 
     CollectionInfo collInfo;
