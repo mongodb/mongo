@@ -678,7 +678,7 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	 * subsequently constrain the range to the entries between the selected
 	 * entry and it's neighbour from a level up the list.
 	 */
-	while (entries > 1 && level > 0) {
+	while (level > 0) {
 		/*
 		 * Select a random number from the calculated entry range and
 		 * convert that to a new start/stop pair. If there are only two
