@@ -45,7 +45,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         ('1mb', dict(cacheSize='cache_size=1MB')),
         ('10gb', dict(cacheSize='cache_size=10GB')),
     ]
-    
+
     # There's a balance between the pages we create and the size of the records
     # being stored: compaction doesn't work on tables with many overflow items
     # because we don't rewrite them. Experimentally, 8KB is as small as the test
