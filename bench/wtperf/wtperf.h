@@ -281,6 +281,7 @@ int	 config_opt_file(CONFIG *, const char *);
 int	 config_opt_line(CONFIG *, const char *);
 int	 config_opt_str(CONFIG *, const char *, const char *);
 void	 config_to_file(CONFIG *);
+void	 config_queue_dedupe(CONFIG *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
 void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);

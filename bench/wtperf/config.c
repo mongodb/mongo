@@ -600,8 +600,8 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 	if ((string_copy = calloc(len + 1, 1)) == NULL) {
 		return (enomem(cfg));
 	}
-	config_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
 	strncpy(string_copy, optstr, len);
+	config_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
 	config_line->string = string_copy;
 	TAILQ_INSERT_TAIL(&cfg->config_head, config_line, c);
 
@@ -678,6 +678,30 @@ config_sanity(CONFIG *cfg)
 	return (0);
 }
 
+void
+config_queue_dedupe(CONFIG *cfg)
+{
+	CONFIG_QUEUE_ENTRY *conf_line, *test_line, *tmp;
+	char *string_key;
+
+	conf_line = TAILQ_FIRST(&cfg->config_head);
+	while (conf_line != NULL) {
+		string_key = strchr(conf_line->string, '=');
+		tmp = test_line = TAILQ_NEXT(conf_line, c);
+		while (test_line != NULL) {
+			if (strncmp(conf_line->string, test_line->string,
+			    string_key - conf_line->string + 1) == 0) {
+				TAILQ_REMOVE(&cfg->config_head, conf_line, c);
+				free(conf_line->string);
+				free(conf_line);
+				break;
+			}
+			test_line = TAILQ_NEXT(test_line, c);
+		}
+		conf_line = tmp;
+	}
+}
+
 /*
  * config_to_file --
  *	Write the final config used in this execution to a file.
@@ -708,10 +732,11 @@ config_to_file(CONFIG *cfg)
 	/* Print the config dump */
 	fprintf(fp, "# Warning. This config can include defaults.\n");
 	fprintf(fp, "# This make cause differences in behaviour.\n");
-	while (!TAILQ_EMPTY(&cfg->config_head)) {
-		config_line = TAILQ_FIRST(&cfg->config_head);
-		TAILQ_REMOVE(&cfg->config_head, config_line, c);
+	config_queue_dedupe(cfg);
+	config_line = TAILQ_FIRST(&cfg->config_head);
+	while (config_line != NULL) {
 		fprintf(fp, "%s\n", config_line->string);
+		config_line = TAILQ_NEXT(config_line, c);
 	}
 err:
 	free(path);
