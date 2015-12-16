@@ -536,19 +536,66 @@ err:	/*
 }
 
 /*
- * __wt_row_random --
- *	Return a random key from a row-store tree.
+ * __wt_row_random_leaf --
+ *	Return a random key from a row-store leaf page.
  */
 int
-__wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+	WT_INSERT *p, *t;
+	WT_PAGE *page;
+	uint32_t cnt;
+
+	page = cbt->ref->page;
+
+	if (page->pg_row_entries != 0) {
+		cbt->compare = 0;
+		cbt->slot = __wt_random(&session->rnd) % page->pg_row_entries;
+
+		/*
+		 * The real row-store search function builds the key, so we
+		 * have to as well.
+		 */
+		return (__wt_row_leaf_key(session,
+		    page, page->pg_row_d + cbt->slot, cbt->tmp, false));
+	}
+
+	/*
+	 * If the tree is new (and not empty), it might have a large insert
+	 * list. Count how many records are in the list.
+	 */
+	F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
+	if ((cbt->ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
+		return (WT_NOTFOUND);
+	for (cnt = 1, p = WT_SKIP_FIRST(cbt->ins_head);; ++cnt)
+		if ((p = WT_SKIP_NEXT(p)) == NULL)
+			break;
+
+	/*
+	 * Select a random number from 0 to (N - 1), return that record.
+	 */
+	cnt = __wt_random(&session->rnd) % cnt;
+	for (p = t = WT_SKIP_FIRST(cbt->ins_head);; t = p)
+		if (cnt-- == 0 || (p = WT_SKIP_NEXT(p)) == NULL)
+			break;
+	cbt->compare = 0;
+	cbt->ins = t;
+
+	return (0);
+}
+
+/*
+ * __wt_row_random_descent --
+ *	Find a random leaf page in a row-store tree.
+ */
+int
+__wt_row_random_descent(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_INSERT *p, *t;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *current, *descent;
-	uint32_t cnt;
 
 	btree = S2BT(session);
 
@@ -585,43 +632,6 @@ restart_root:
 		return (ret);
 	}
 
-	if (page->pg_row_entries != 0) {
-		cbt->ref = current;
-		cbt->compare = 0;
-		cbt->slot = __wt_random(&session->rnd) % page->pg_row_entries;
-
-		/*
-		 * The real row-store search function builds the key, so we
-		 * have to as well.
-		 */
-		return (__wt_row_leaf_key(session,
-		    page, page->pg_row_d + cbt->slot, cbt->tmp, false));
-	}
-
-	/*
-	 * If the tree is new (and not empty), it might have a large insert
-	 * list. Count how many records are in the list.
-	 */
-	F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
-	if ((cbt->ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
-		WT_ERR(WT_NOTFOUND);
-	for (cnt = 1, p = WT_SKIP_FIRST(cbt->ins_head);; ++cnt)
-		if ((p = WT_SKIP_NEXT(p)) == NULL)
-			break;
-
-	/*
-	 * Select a random number from 0 to (N - 1), return that record.
-	 */
-	cnt = __wt_random(&session->rnd) % cnt;
-	for (p = t = WT_SKIP_FIRST(cbt->ins_head);; t = p)
-		if (cnt-- == 0 || (p = WT_SKIP_NEXT(p)) == NULL)
-			break;
 	cbt->ref = current;
-	cbt->compare = 0;
-	cbt->ins = t;
-
 	return (0);
-
-err:	WT_TRET(__wt_page_release(session, current, 0));
-	return (ret);
 }

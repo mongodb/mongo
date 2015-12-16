@@ -69,16 +69,36 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 }
 
 /*
- * __wt_tree_walk --
+ * __ref_is_leaf --
+ *	Check if a reference is for a leaf page.
+ */
+static inline bool
+__ref_is_leaf(WT_REF *ref)
+{
+	size_t addr_size;
+	u_int type;
+	const uint8_t *addr;
+
+	/*
+	 * If the page has a disk address, we can crack it to figure out if
+	 * this page is a leaf page or not. If there's no address, the page
+	 * isn't on disk and we don't know the page type.
+	 */
+	__wt_ref_info(ref, &addr, &addr_size, &type);
+	return (addr == NULL ?
+	    false : type == WT_CELL_ADDR_LEAF || type == WT_CELL_ADDR_LEAF_NO);
+}
+
+/*
+ * __tree_walk_internal --
  *	Move to the next/previous page in the tree.
  */
-int
-__wt_tree_walk(WT_SESSION_IMPL *session,
-    WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
+static inline int
+__tree_walk_internal(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *walkcntp, uint64_t *skipleafcntp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
 	bool empty_internal, prev, skip;
@@ -304,6 +324,31 @@ ascend:	/*
 					break;
 			}
 
+			/*
+			 * Optionally skip leaf pages: skip all leaf pages if
+			 * WT_READ_SKIP_LEAF is set, when the skip-leaf-count
+			 * variable is non-zero, skip some count of leaf pages.
+			 * If this page is disk-based, crack the cell to figure
+			 * out it's a leaf page without reading it.
+			 *
+			 * If skipping some number of leaf pages, decrement the
+			 * count of pages to zero, and then take the next leaf
+			 * page we can. Be cautious around the page decrement,
+			 * if for some reason don't take this particular page,
+			 * we can take the next one, and, there are additional
+			 * tests/decrements when we're about to return a leaf
+			 * page.
+			 */
+			if (skipleafcntp != NULL || LF_ISSET(WT_READ_SKIP_LEAF))
+				if (__ref_is_leaf(ref)) {
+					if (LF_ISSET(WT_READ_SKIP_LEAF))
+						break;
+					if (*skipleafcntp > 0) {
+						--*skipleafcntp;
+						break;
+					}
+				}
+
 			ret = __wt_page_swap(session, couple, ref, flags);
 
 			/*
@@ -359,13 +404,29 @@ ascend:	/*
 			 * A new page: configure for traversal of any internal
 			 * page's children, else return the leaf page.
 			 */
-descend:		couple = ref;
-			page = ref->page;
-			if (WT_PAGE_IS_INTERNAL(page)) {
-				WT_INTL_INDEX_GET(session, page, pindex);
+			if (WT_PAGE_IS_INTERNAL(ref->page)) {
+descend:			couple = ref;
+				WT_INTL_INDEX_GET(session, ref->page, pindex);
 				slot = prev ? pindex->entries - 1 : 0;
 				empty_internal = true;
 			} else {
+				/*
+				 * Optionally skip leaf pages, the second half.
+				 * We didn't have an on-page cell to figure out
+				 * if it was a leaf page, we had to acquire the
+				 * hazard pointer and look at the page.
+				 */
+				if (skipleafcntp != NULL ||
+				    LF_ISSET(WT_READ_SKIP_LEAF)) {
+					couple = ref;
+					if (LF_ISSET(WT_READ_SKIP_LEAF))
+						break;
+					if (*skipleafcntp > 0) {
+						--*skipleafcntp;
+						break;
+					}
+				}
+
 				*refp = ref;
 				goto done;
 			}
@@ -375,4 +436,38 @@ descend:		couple = ref;
 done:
 err:	WT_LEAVE_PAGE_INDEX(session);
 	return (ret);
+}
+
+/*
+ * __wt_tree_walk --
+ *	Move to the next/previous page in the tree.
+ */
+int
+__wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
+{
+	return (__tree_walk_internal(session, refp, NULL, NULL, flags));
+}
+
+/*
+ * __wt_tree_walk_count --
+ *	Move to the next/previous page in the tree, tracking how many
+ *	references were visited to get there.
+ */
+int
+__wt_tree_walk_count(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
+{
+	return (__tree_walk_internal(session, refp, walkcntp, NULL, flags));
+}
+
+/*
+ * __wt_tree_walk_skip --
+ *	Move to the next/previous page in the tree, skipping a certain number
+ *	of leaf pages before returning.
+ */
+int
+__wt_tree_walk_skip(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *skipleafcntp, uint32_t flags)
+{
+	return (__tree_walk_internal(session, refp, NULL, skipleafcntp, flags));
 }
