@@ -189,15 +189,25 @@ func IsObjectIdHex(s string) bool {
 
 // objectIdCounter is atomically incremented when generating a new ObjectId
 // using NewObjectId() function. It's used as a counter part of an id.
-var objectIdCounter uint32 = 0
+var objectIdCounter uint32 = readRandomUint32()
+
+// readRandomUint32 returns a random objectIdCounter.
+func readRandomUint32() uint32 {
+	var b [4]byte
+	_, err := io.ReadFull(rand.Reader, b[:])
+	if err != nil {
+		panic(fmt.Errorf("cannot read random object id: %v", err))
+	}
+	return uint32((uint32(b[0]) << 0) | (uint32(b[1]) << 8) | (uint32(b[2]) << 16) | (uint32(b[3]) << 24))
+}
+
 
 // machineId stores machine id generated once and used in subsequent calls
 // to NewObjectId function.
 var machineId = readMachineId()
 
-// readMachineId generates machine id and puts it into the machineId global
-// variable. If this function fails to get the hostname, it will cause
-// a runtime error.
+// readMachineId generates and returns a machine id.
+// If this function fails to get the hostname it will cause a runtime error.
 func readMachineId() []byte {
 	var sum [3]byte
 	id := sum[:]
@@ -421,7 +431,8 @@ func handleErr(err *error) {
 }
 
 // Marshal serializes the in value, which may be a map or a struct value.
-// In the case of struct values, only exported fields will be serialized.
+// In the case of struct values, only exported fields will be serialized,
+// and the order of serialized fields will match that of the struct itself.
 // The lowercased field name is used as the key for each exported field,
 // but this behavior may be changed using the respective field tag.
 // The tag may also contain flags to tweak the marshalling behavior for

@@ -692,7 +692,7 @@ func (file *GridFile) Seek(offset int64, whence int) (pos int64, err error) {
 // Read reads into b the next available data from the file and
 // returns the number of bytes written and an error in case
 // something wrong happened.  At the end of the file, n will
-// be zero and err will be set to os.EOF.
+// be zero and err will be set to io.EOF.
 //
 // The parameters and behavior of this function turn the file
 // into an io.Reader.

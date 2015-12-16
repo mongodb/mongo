@@ -30,7 +30,6 @@ import (
 	"flag"
 	"fmt"
 	"math"
-	"reflect"
 	"runtime"
 	"sort"
 	"strconv"
@@ -287,10 +286,7 @@ func (s *S) TestDatabaseAndCollectionNames(c *C) {
 
 	names, err := session.DatabaseNames()
 	c.Assert(err, IsNil)
-	if !reflect.DeepEqual(names, []string{"db1", "db2"}) {
-		// 2.4+ has "local" as well.
-		c.Assert(names, DeepEquals, []string{"db1", "db2", "local"})
-	}
+	c.Assert(filterDBs(names), DeepEquals, []string{"db1", "db2"})
 
 	// Try to exercise cursor logic. 2.8.0-rc3 still ignores this.
 	session.SetBatch(2)
@@ -698,20 +694,30 @@ func (s *S) TestDropDatabase(c *C) {
 
 	names, err := session.DatabaseNames()
 	c.Assert(err, IsNil)
-	if !reflect.DeepEqual(names, []string{"db2"}) {
-		// 2.4+ has "local" as well.
-		c.Assert(names, DeepEquals, []string{"db2", "local"})
-	}
+	c.Assert(filterDBs(names), DeepEquals, []string{"db2"})
 
 	err = db2.DropDatabase()
 	c.Assert(err, IsNil)
 
 	names, err = session.DatabaseNames()
 	c.Assert(err, IsNil)
-	if !reflect.DeepEqual(names, []string(nil)) {
-		// 2.4+ has "local" as well.
-		c.Assert(names, DeepEquals, []string{"local"})
+	c.Assert(filterDBs(names), DeepEquals, []string{})
+}
+
+func filterDBs(dbs []string) []string {
+	var i int
+	for _, name := range dbs {
+		switch name {
+		case "admin", "local":
+		default:
+			dbs[i] = name
+			i++
+		}
 	}
+	if len(dbs) == 0 {
+		return []string{}
+	}
+	return dbs[:i]
 }
 
 func (s *S) TestDropCollection(c *C) {
@@ -1196,7 +1202,13 @@ func (s *S) TestQueryComment(c *C) {
 	err = query.One(nil)
 	c.Assert(err, IsNil)
 
-	n, err := session.DB("mydb").C("system.profile").Find(bson.M{"query.$query.n": 41, "query.$comment": "some comment"}).Count()
+	commentField := "query.$comment"
+	nField := "query.$query.n"
+	if s.versionAtLeast(3, 2) {
+		commentField = "query.comment"
+		nField = "query.filter.n"
+	}
+	n, err := session.DB("mydb").C("system.profile").Find(bson.M{nField: 41, commentField: "some comment"}).Count()
 	c.Assert(err, IsNil)
 	c.Assert(n, Equals, 1)
 }
@@ -1652,7 +1664,7 @@ func (s *S) TestFindTailTimeoutWithSleep(c *C) {
 
 	mgo.ResetStats()
 
-	timeout := 3 * time.Second
+	timeout := 5 * time.Second
 
 	query := coll.Find(M{"n": M{"$gte": 42}}).Sort("$natural").Prefetch(0).Batch(2)
 	iter := query.Tail(timeout)
@@ -1674,38 +1686,34 @@ func (s *S) TestFindTailTimeoutWithSleep(c *C) {
 	mgo.ResetStats()
 
 	// The following call to Next will block.
+	done := make(chan bool)
+	defer func() { <-done }()
 	go func() {
 		// The internal AwaitData timing of MongoDB is around 2 seconds,
 		// so this should force mgo to sleep at least once by itself to
 		// respect the requested timeout.
-		time.Sleep(timeout + 5e8*time.Nanosecond)
+		c.Logf("[GOROUTINE] Starting and sleeping...")
+		time.Sleep(timeout - 2*time.Second)
+		c.Logf("[GOROUTINE] Woke up...")
 		session := session.New()
-		defer session.Close()
-		coll := session.DB("mydb").C("mycoll")
-		coll.Insert(M{"n": 47})
+		c.Logf("[GOROUTINE] Session created and will insert...")
+		err := coll.Insert(M{"n": 47})
+		c.Logf("[GOROUTINE] Insert attempted, err=%v...", err)
+		session.Close()
+		c.Logf("[GOROUTINE] Session closed.")
+		c.Check(err, IsNil)
+		done <- true
 	}()
 
 	c.Log("Will wait for Next with N=47...")
 	ok := iter.Next(&result)
+	c.Log("Next unblocked...")
 	c.Assert(ok, Equals, true)
+
 	c.Assert(iter.Err(), IsNil)
 	c.Assert(iter.Timeout(), Equals, false)
 	c.Assert(result.N, Equals, 47)
 	c.Log("Got Next with N=47!")
-
-	// The following may break because it depends a bit on the internal
-	// timing used by MongoDB's AwaitData logic.  If it does, the problem
-	// will be observed as more GET_MORE_OPs than predicted:
-	// 1*QUERY for nonce + 1*GET_MORE_OP on Next + 1*GET_MORE_OP on Next after sleep +
-	// 1*INSERT_OP + 1*QUERY_OP for getLastError on insert of 47
-	stats := mgo.GetStats()
-	if s.versionAtLeast(3, 0) { // TODO Will be 2.6 when write commands are enabled for it.
-		c.Assert(stats.SentOps, Equals, 4)
-	} else {
-		c.Assert(stats.SentOps, Equals, 5)
-	}
-	c.Assert(stats.ReceivedOps, Equals, 4)  // REPLY_OPs for 1*QUERY_OP for nonce + 2*GET_MORE_OPs + 1*QUERY_OP
-	c.Assert(stats.ReceivedDocs, Equals, 3) // nonce + N=47 result + getLastError response
 
 	c.Log("Will wait for a result which will never come...")
 
@@ -1796,7 +1804,7 @@ func (s *S) TestFindTailTimeoutNoSleep(c *C) {
 	// 1*QUERY_OP for nonce + 1*GET_MORE_OP on Next +
 	// 1*INSERT_OP + 1*QUERY_OP for getLastError on insert of 47
 	stats := mgo.GetStats()
-	if s.versionAtLeast(3, 0) { // TODO Will be 2.6 when write commands are enabled for it.
+	if s.versionAtLeast(2, 6) {
 		c.Assert(stats.SentOps, Equals, 3)
 	} else {
 		c.Assert(stats.SentOps, Equals, 4)
@@ -1885,20 +1893,6 @@ func (s *S) TestFindTailNoTimeout(c *C) {
 	c.Assert(iter.Timeout(), Equals, false)
 	c.Assert(result.N, Equals, 47)
 	c.Log("Got Next with N=47!")
-
-	// The following may break because it depends a bit on the internal
-	// timing used by MongoDB's AwaitData logic.  If it does, the problem
-	// will be observed as more GET_MORE_OPs than predicted:
-	// 1*QUERY_OP for nonce + 1*GET_MORE_OP on Next +
-	// 1*INSERT_OP + 1*QUERY_OP for getLastError on insert of 47
-	stats := mgo.GetStats()
-	if s.versionAtLeast(3, 0) { // TODO Will be 2.6 when write commands are enabled for it.
-		c.Assert(stats.SentOps, Equals, 3)
-	} else {
-		c.Assert(stats.SentOps, Equals, 4)
-	}
-	c.Assert(stats.ReceivedOps, Equals, 3)  // REPLY_OPs for 1*QUERY_OP for nonce + 1*GET_MORE_OPs and 1*QUERY_OP
-	c.Assert(stats.ReceivedDocs, Equals, 3) // nonce + N=47 result + getLastError response
 
 	c.Log("Will wait for a result which will never come...")
 
@@ -2179,6 +2173,10 @@ func (s *S) TestFindForResetsResult(c *C) {
 }
 
 func (s *S) TestFindIterSnapshot(c *C) {
+	if s.versionAtLeast(3, 2) {
+		c.Skip("Broken in 3.2: https://jira.mongodb.org/browse/SERVER-21403")
+	}
+
 	session, err := mgo.Dial("localhost:40001")
 	c.Assert(err, IsNil)
 	defer session.Close()
@@ -2283,6 +2281,10 @@ func (s *S) TestSortScoreText(c *C) {
 	err = coll.EnsureIndex(mgo.Index{
 		Key: []string{"$text:a", "$text:b"},
 	})
+	msg := "text search not enabled"
+	if err != nil && strings.Contains(err.Error(), msg) {
+		c.Skip(msg)
+	}
 	c.Assert(err, IsNil)
 
 	err = coll.Insert(M{
@@ -2517,8 +2519,7 @@ func (s *S) TestSafeInsert(c *C) {
 	// It must have sent two operations (INSERT_OP + getLastError QUERY_OP)
 	stats := mgo.GetStats()
 
-	// TODO Will be 2.6 when write commands are enabled for it.
-	if s.versionAtLeast(3, 0) {
+	if s.versionAtLeast(2, 6) {
 		c.Assert(stats.SentOps, Equals, 1)
 	} else {
 		c.Assert(stats.SentOps, Equals, 2)
@@ -2647,8 +2648,8 @@ var indexTests = []struct {
 		"name": "loc_old_2d",
 		"key":  M{"loc_old": "2d"},
 		"ns":   "mydb.mycoll",
-		"min":  -500,
-		"max":  500,
+		"min":  -500.0,
+		"max":  500.0,
 		"bits": 32,
 	},
 }, {
@@ -2662,8 +2663,25 @@ var indexTests = []struct {
 		"name": "loc_2d",
 		"key":  M{"loc": "2d"},
 		"ns":   "mydb.mycoll",
-		"min":  -500,
-		"max":  500,
+		"min":  -500.0,
+		"max":  500.0,
+		"bits": 32,
+	},
+}, {
+	mgo.Index{
+		Key:  []string{"$2d:loc"},
+		Minf: -500.1,
+		Maxf: 500.1,
+		Min:  1, // Should be ignored
+		Max:  2,
+		Bits: 32,
+	},
+	M{
+		"name": "loc_2d",
+		"key":  M{"loc": "2d"},
+		"ns":   "mydb.mycoll",
+		"min":  -500.1,
+		"max":  500.1,
 		"bits": 32,
 	},
 }, {
@@ -2719,6 +2737,16 @@ var indexTests = []struct {
 		"language_override": "language",
 		"textIndexVersion":  2,
 	},
+}, {
+	mgo.Index{
+		Key:  []string{"cn"},
+		Name: "CustomName",
+	},
+	M{
+		"name": "CustomName",
+		"key":  M{"cn": 1},
+		"ns":   "mydb.mycoll",
+	},
 }}
 
 func (s *S) TestEnsureIndex(c *C) {
@@ -2730,16 +2758,20 @@ func (s *S) TestEnsureIndex(c *C) {
 	idxs := session.DB("mydb").C("system.indexes")
 
 	for _, test := range indexTests {
-		if !s.versionAtLeast(2, 4) && test.expected["weights"] != nil {
-			// No text indexes until 2.4.
+		err = coll.EnsureIndex(test.index)
+		msg := "text search not enabled"
+		if err != nil && strings.Contains(err.Error(), msg) {
 			continue
 		}
-
-		err = coll.EnsureIndex(test.index)
 		c.Assert(err, IsNil)
 
+		expectedName := test.index.Name
+		if expectedName == "" {
+			expectedName, _ = test.expected["name"].(string)
+		}
+
 		obtained := M{}
-		err = idxs.Find(M{"name": test.expected["name"]}).One(obtained)
+		err = idxs.Find(M{"name": expectedName}).One(obtained)
 		c.Assert(err, IsNil)
 
 		delete(obtained, "v")
@@ -2747,12 +2779,60 @@ func (s *S) TestEnsureIndex(c *C) {
 		if s.versionAtLeast(2, 7) {
 			// Was deprecated in 2.6, and not being reported by 2.7+.
 			delete(test.expected, "dropDups")
+			test.index.DropDups = false
+		}
+		if s.versionAtLeast(3, 2) && test.expected["textIndexVersion"] != nil {
+			test.expected["textIndexVersion"] = 3
 		}
 
 		c.Assert(obtained, DeepEquals, test.expected)
 
-		err = coll.DropIndex(test.index.Key...)
+		// The result of Indexes must match closely what was used to create the index.
+		indexes, err := coll.Indexes()
 		c.Assert(err, IsNil)
+		c.Assert(indexes, HasLen, 2)
+		gotIndex := indexes[0]
+		if gotIndex.Name == "_id_" {
+			gotIndex = indexes[1]
+		}
+		wantIndex := test.index
+		if wantIndex.Name == "" {
+			wantIndex.Name = gotIndex.Name
+		}
+		if strings.HasPrefix(wantIndex.Key[0], "@") {
+			wantIndex.Key[0] = "$2d:" + wantIndex.Key[0][1:]
+		}
+		if wantIndex.Minf == 0 && wantIndex.Maxf == 0 {
+			wantIndex.Minf = float64(wantIndex.Min)
+			wantIndex.Maxf = float64(wantIndex.Max)
+		} else {
+			wantIndex.Min = gotIndex.Min
+			wantIndex.Max = gotIndex.Max
+		}
+		if wantIndex.DefaultLanguage == "" {
+			wantIndex.DefaultLanguage = gotIndex.DefaultLanguage
+		}
+		if wantIndex.LanguageOverride == "" {
+			wantIndex.LanguageOverride = gotIndex.LanguageOverride
+		}
+		for name, _ := range gotIndex.Weights {
+			if _, ok := wantIndex.Weights[name]; !ok {
+				if wantIndex.Weights == nil {
+					wantIndex.Weights = make(map[string]int)
+				}
+				wantIndex.Weights[name] = 1
+			}
+		}
+		c.Assert(gotIndex, DeepEquals, wantIndex)
+
+		// Drop created index by key or by name if a custom name was used.
+		if test.index.Name == "" {
+			err = coll.DropIndex(test.index.Key...)
+			c.Assert(err, IsNil)
+		} else {
+			err = coll.DropIndexName(test.index.Name)
+			c.Assert(err, IsNil)
+		}
 	}
 }
 
@@ -2852,21 +2932,54 @@ func (s *S) TestEnsureIndexDropIndex(c *C) {
 	c.Assert(err, IsNil)
 
 	sysidx := session.DB("mydb").C("system.indexes")
-	dummy := &struct{}{}
 
-	err = sysidx.Find(M{"name": "a_1"}).One(dummy)
+	err = sysidx.Find(M{"name": "a_1"}).One(nil)
 	c.Assert(err, IsNil)
 
-	err = sysidx.Find(M{"name": "b_1"}).One(dummy)
+	err = sysidx.Find(M{"name": "b_1"}).One(nil)
 	c.Assert(err, Equals, mgo.ErrNotFound)
 
 	err = coll.DropIndex("a")
 	c.Assert(err, IsNil)
 
-	err = sysidx.Find(M{"name": "a_1"}).One(dummy)
+	err = sysidx.Find(M{"name": "a_1"}).One(nil)
 	c.Assert(err, Equals, mgo.ErrNotFound)
 
 	err = coll.DropIndex("a")
+	c.Assert(err, ErrorMatches, "index not found.*")
+}
+
+func (s *S) TestEnsureIndexDropIndexName(c *C) {
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	coll := session.DB("mydb").C("mycoll")
+
+	err = coll.EnsureIndexKey("a")
+	c.Assert(err, IsNil)
+
+	err = coll.EnsureIndex(mgo.Index{Key: []string{"b"}, Name: "a"})
+	c.Assert(err, IsNil)
+
+	err = coll.DropIndexName("a")
+	c.Assert(err, IsNil)
+
+	sysidx := session.DB("mydb").C("system.indexes")
+
+	err = sysidx.Find(M{"name": "a_1"}).One(nil)
+	c.Assert(err, IsNil)
+
+	err = sysidx.Find(M{"name": "a"}).One(nil)
+	c.Assert(err, Equals, mgo.ErrNotFound)
+
+	err = coll.DropIndexName("a_1")
+	c.Assert(err, IsNil)
+
+	err = sysidx.Find(M{"name": "a_1"}).One(nil)
+	c.Assert(err, Equals, mgo.ErrNotFound)
+
+	err = coll.DropIndexName("a_1")
 	c.Assert(err, ErrorMatches, "index not found.*")
 }
 
@@ -2946,6 +3059,50 @@ func (s *S) TestEnsureIndexGetIndexes(c *C) {
 	c.Assert(indexes[3].Key, DeepEquals, []string{"$2d:c"})
 	c.Assert(indexes[4].Name, Equals, "d_2d")
 	c.Assert(indexes[4].Key, DeepEquals, []string{"$2d:d"})
+}
+
+func (s *S) TestEnsureIndexNameCaching(c *C) {
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	coll := session.DB("mydb").C("mycoll")
+
+	err = coll.EnsureIndex(mgo.Index{Key: []string{"a"}, Name: "custom"})
+	c.Assert(err, IsNil)
+
+	mgo.ResetStats()
+
+	// Second EnsureIndex should be cached and do nothing.
+	err = coll.EnsureIndexKey("a")
+	c.Assert(err, IsNil)
+
+	err = coll.EnsureIndex(mgo.Index{Key: []string{"a"}, Name: "custom"})
+	c.Assert(err, IsNil)
+
+	stats := mgo.GetStats()
+	c.Assert(stats.SentOps, Equals, 0)
+
+	// Resetting the cache should make it contact the server again.
+	session.ResetIndexCache()
+
+	err = coll.EnsureIndex(mgo.Index{Key: []string{"a"}, Name: "custom"})
+	c.Assert(err, IsNil)
+
+	stats = mgo.GetStats()
+	c.Assert(stats.SentOps > 0, Equals, true)
+
+	// Dropping the index should also drop the cached index key.
+	err = coll.DropIndexName("custom")
+	c.Assert(err, IsNil)
+
+	mgo.ResetStats()
+
+	err = coll.EnsureIndex(mgo.Index{Key: []string{"a"}, Name: "custom"})
+	c.Assert(err, IsNil)
+
+	stats = mgo.GetStats()
+	c.Assert(stats.SentOps > 0, Equals, true)
 }
 
 func (s *S) TestEnsureIndexEvalGetIndexes(c *C) {
@@ -3312,7 +3469,13 @@ func (s *S) TestBuildInfo(c *C) {
 
 	c.Assert(info.VersionArray, DeepEquals, v)
 	c.Assert(info.GitVersion, Matches, "[a-z0-9]+")
-	c.Assert(info.SysInfo, Matches, ".*[0-9:]+.*")
+
+	if s.versionAtLeast(3, 2) {
+		// It was deprecated in 3.2.
+		c.Assert(info.SysInfo, Equals, "")
+	} else {
+		c.Assert(info.SysInfo, Matches, ".*[0-9:]+.*")
+	}
 	if info.Bits != 32 && info.Bits != 64 {
 		c.Fatalf("info.Bits is %d", info.Bits)
 	}
@@ -3676,6 +3839,53 @@ func (s *S) TestNewIterNoServerPresetErr(c *C) {
 	c.Assert(ok, Equals, false)
 
 	c.Assert(iter.Err(), ErrorMatches, "my error")
+}
+
+func (s *S) TestBypassValidation(c *C) {
+	if !s.versionAtLeast(3, 2) {
+		c.Skip("validation supported on 3.2+")
+	}
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	coll := session.DB("mydb").C("mycoll")
+	err = coll.Insert(M{"n": 1})
+	c.Assert(err, IsNil)
+
+	err = coll.Database.Run(bson.D{
+		{"collMod", "mycoll"},
+		{"validator", M{"s": M{"$type": "string"}}},
+	}, nil)
+	c.Assert(err, IsNil)
+
+	err = coll.Insert(M{"n": 2})
+	c.Assert(err, ErrorMatches, "Document failed validation")
+
+	err = coll.Update(M{"n": 1}, M{"n": 10})
+	c.Assert(err, ErrorMatches, "Document failed validation")
+
+	session.SetBypassValidation(true)
+
+	err = coll.Insert(M{"n": 3})
+	c.Assert(err, IsNil)
+
+	err = coll.Update(M{"n": 3}, M{"n": 4})
+	c.Assert(err, IsNil)
+
+	// Ensure this still works. Shouldn't be affected.
+	err = coll.Remove(M{"n": 1})
+	c.Assert(err, IsNil)
+
+	var result struct{ N int }
+	var ns []int
+	iter := coll.Find(nil).Iter()
+	for iter.Next(&result) {
+		ns = append(ns, result.N)
+	}
+	c.Assert(iter.Err(), IsNil)
+	sort.Ints(ns)
+	c.Assert(ns, DeepEquals, []int{4})
 }
 
 // --------------------------------------------------------------------------

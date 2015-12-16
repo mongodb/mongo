@@ -60,7 +60,7 @@ for (var i in ports) {
 }
 
 function notMaster(result) {
-        return typeof result.errmsg != "undefined" && result.errmsg.indexOf("not master") >= 0
+        return typeof result.errmsg != "undefined" && (result.errmsg.indexOf("not master") >= 0 || result.errmsg.indexOf("no master found"))
 }
 
 // vim:ts=4:sw=4:et

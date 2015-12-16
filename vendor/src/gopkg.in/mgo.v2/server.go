@@ -84,9 +84,8 @@ func newServer(addr string, tcpaddr *net.TCPAddr, sync chan bool, dial dialer) *
 		sync:         sync,
 		dial:         dial,
 		info:         &defaultServerInfo,
+		pingValue:    time.Hour, // Push it back before an actual ping.
 	}
-	// Once so the server gets a ping value, then loop in background.
-	server.pinger(false)
 	go server.pinger(true)
 	return server
 }
@@ -274,7 +273,7 @@ NextTagSet:
 	return false
 }
 
-var pingDelay = 5 * time.Second
+var pingDelay = 15 * time.Second
 
 func (server *mongoServer) pinger(loop bool) {
 	var delay time.Duration
@@ -297,7 +296,7 @@ func (server *mongoServer) pinger(loop bool) {
 			time.Sleep(delay)
 		}
 		op := op
-		socket, _, err := server.AcquireSocket(0, 3*delay)
+		socket, _, err := server.AcquireSocket(0, delay)
 		if err == nil {
 			start := time.Now()
 			_, _ = socket.SimpleQuery(&op)
