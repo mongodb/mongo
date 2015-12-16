@@ -141,16 +141,15 @@ public:
      *
      * @param conn address of config(s) server(s)
      * @param name identifier for the lock
+     * @param processId this process's distributed lock process ID
      * @param lockTimeout how long can the log go "unpinged" before a new attempt to lock steals it
      *                   (in minutes).
-     * @param lockPing how long to wait between lock pings
-     * @param legacy use legacy logic
      *
      */
     DistributedLock(const ConnectionString& conn,
                     const std::string& name,
-                    unsigned long long lockTimeout = 0,
-                    bool asProcess = false);
+                    const std::string& processId,
+                    unsigned long long lockTimeout = 0);
     ~DistributedLock(){};
 
     /**
@@ -185,6 +184,8 @@ public:
 
     const std::string& getProcessId() const;
 
+    const std::string& getDistLockId() const;
+
     const ConnectionString& getRemoteConnection() const;
 
     /**
@@ -215,6 +216,7 @@ public:
     const ConnectionString _conn;
     const std::string _name;
     const std::string _processId;
+    const std::string _lockId;
 
     // Timeout for lock, usually LOCK_TIMEOUT
     const unsigned long long _lockTimeout;

@@ -49,8 +49,12 @@ const stdx::chrono::seconds kDefaultSocketTimeout(30);
 const milliseconds kDefaultPingInterval(30 * 1000);
 }  // unnamed namespace
 
-LegacyDistLockManager::LegacyDistLockManager(ConnectionString configServer)
-    : _configServer(std::move(configServer)), _isStopped(false), _pingerEnabled(true) {}
+LegacyDistLockManager::LegacyDistLockManager(ConnectionString configServer,
+                                             const std::string& processId)
+    : _configServer(std::move(configServer)),
+      _processId(processId),
+      _isStopped(false),
+      _pingerEnabled(true) {}
 
 void LegacyDistLockManager::startUp() {
     stdx::lock_guard<stdx::mutex> sl(_mutex);
@@ -77,7 +81,7 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
     StringData whyMessage,
     milliseconds waitFor,
     milliseconds lockTryInterval) {
-    auto distLock = stdx::make_unique<DistributedLock>(_configServer, name.toString());
+    auto distLock = stdx::make_unique<DistributedLock>(_configServer, name.toString(), _processId);
 
     {
         stdx::lock_guard<stdx::mutex> sl(_mutex);

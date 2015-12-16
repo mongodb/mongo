@@ -45,7 +45,7 @@ class DistributedLock;
 
 class LegacyDistLockManager : public DistLockManager {
 public:
-    explicit LegacyDistLockManager(ConnectionString configServer);
+    explicit LegacyDistLockManager(ConnectionString configServer, const std::string& processId);
 
     virtual ~LegacyDistLockManager() = default;
 
@@ -70,6 +70,9 @@ protected:
 
 private:
     const ConnectionString _configServer;
+
+    // Identifier of this process for determining ownership of distributed locks.
+    std::string _processId;
 
     stdx::mutex _mutex;
     stdx::condition_variable _noLocksCV;
