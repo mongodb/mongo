@@ -53,7 +53,7 @@ class test_compact02(wttest.WiredTigerTestCase):
     # 1. Create a table with the data, alternating record size.
     # 2. Checkpoint and get stats on the table to confirm the size.
     # 3. Delete the half of the records with the larger record size.
-    # 4. Reopen the connection to force the file to disk.
+    # 4. Checkpoint to make the deleted records available for reuse.
     # 5. Get stats on table.
     # 6. Call compact.
     # 7. Get stats on compacted table.
@@ -115,11 +115,9 @@ class test_compact02(wttest.WiredTigerTestCase):
         c.close()
         self.pr('Removed total ' + str((count * 9666) / mb) + 'MB')
 
-        # 4. Reopen the connection to force the file to disk (if we leave dirty
-        # blocks in the cache, it can affect how compact works depending on how
-        # and when those blocks are written, because they're being written best
-        # fit, not first-fit, as compaction does).
-        self.reopen_conn()
+        # 4. Checkpoint to make the deleted records available for reuse, so
+        # compaction can be successful.
+        self.session.checkpoint()
 
         # 5. Get stats on table.
         sz = self.get_size()
