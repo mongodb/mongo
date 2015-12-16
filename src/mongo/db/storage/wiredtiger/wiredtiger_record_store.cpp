@@ -383,11 +383,15 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
           << " approximately " << estRecordsPerStone << " records totaling to " << estBytesPerStone
           << " bytes";
 
+    // Inform the random cursor of the number of samples we intend to take. This allows it to
+    // account for skew in the tree shape.
+    const std::string extraConfig = str::stream() << "next_random_sample_size=" << numSamples;
+
     // Divide the oplog into 'wholeStones' logical sections, with each section containing
     // approximately 'estRecordsPerStone'. Do so by oversampling the oplog, sorting the samples in
     // order of their RecordId, and then choosing the samples expected to be near the right edge of
     // each logical section.
-    auto cursor = _rs->getRandomCursor(txn);
+    auto cursor = _rs->getRandomCursorWithOptions(txn, extraConfig);
     std::vector<RecordId> oplogEstimates;
     for (int i = 0; i < numSamples; ++i) {
         auto record = cursor->next();
@@ -636,8 +640,8 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
 
 class WiredTigerRecordStore::RandomCursor final : public RecordCursor {
 public:
-    RandomCursor(OperationContext* txn, const WiredTigerRecordStore& rs)
-        : _cursor(nullptr), _rs(&rs), _txn(txn) {
+    RandomCursor(OperationContext* txn, const WiredTigerRecordStore& rs, StringData config)
+        : _cursor(nullptr), _rs(&rs), _txn(txn), _config(config.toString() + ",next_random") {
         restore();
     }
 
@@ -678,8 +682,8 @@ public:
         WT_SESSION* session = WiredTigerRecoveryUnit::get(_txn)->getSession(_txn)->getSession();
 
         if (!_cursor) {
-            invariantWTOK(
-                session->open_cursor(session, _rs->_uri.c_str(), NULL, "next_random", &_cursor));
+            invariantWTOK(session->open_cursor(
+                session, _rs->_uri.c_str(), nullptr, _config.c_str(), &_cursor));
             invariant(_cursor);
         }
         return true;
@@ -699,6 +703,7 @@ private:
     WT_CURSOR* _cursor;
     const WiredTigerRecordStore* _rs;
     OperationContext* _txn;
+    const std::string _config;
 };
 
 
@@ -1415,7 +1420,13 @@ std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::getCursor(Operation
 }
 
 std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(OperationContext* txn) const {
-    return stdx::make_unique<RandomCursor>(txn, *this);
+    const char* extraConfig = "";
+    return getRandomCursorWithOptions(txn, extraConfig);
+}
+
+std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursorWithOptions(
+    OperationContext* txn, StringData extraConfig) const {
+    return stdx::make_unique<RandomCursor>(txn, *this, extraConfig);
 }
 
 std::vector<std::unique_ptr<RecordCursor>> WiredTigerRecordStore::getManyCursors(

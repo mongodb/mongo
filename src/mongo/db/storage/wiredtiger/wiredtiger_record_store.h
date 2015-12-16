@@ -150,6 +150,9 @@ public:
                                                     bool forward) const final;
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* txn) const final;
 
+    std::unique_ptr<RecordCursor> getRandomCursorWithOptions(OperationContext* txn,
+                                                             StringData extraConfig) const;
+
     std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;
 
     virtual Status truncate(OperationContext* txn);
