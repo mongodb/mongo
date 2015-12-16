@@ -662,24 +662,34 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		if ((ins = ins_head->head[level]) != NULL && ins->next != NULL)
 			break;
 
-	/* Count the number of entries at this level, set the start location. */
+	/*
+	 * Use all entries at this first level as the range for random
+	 * selection. Do that by counting the entries and setting the start
+	 * point as the first entry.
+	 */
 	for (entries = 0,
 	    ins = ins_head->head[level]; ins != NULL; ins = ins->next[level])
 		++entries;
 	start = &ins_head->head[level];
-	while (level > 0) {
+
+	/*
+	 * Keep stepping down the skip list selecting a random entry at each
+	 * level. Use all entries as the range the first time through,
+	 * subsequently constrain the range to the entries between the selected
+	 * entry and it's neighbour from a level up the list.
+	 */
+	while (entries > 1 && level > 0) {
 		/*
-		 * Select a random number from the total entries (initially, the
-		 * number of entries in the starting level, subsequently, the
-		 * entries between the start and stop positions), and convert
-		 * that to a new start/stop pair. If less than 3 entries, the
-		 * start/stop pair must be slots 0 and 1, otherwise, use the
-		 * random number as the start position. The calculation uses
-		 * "entries - 1" to ensure we never chose the last node in the
-		 * list as our new start point.
+		 * Select a random number from the calculated entry range and
+		 * convert that to a new start/stop pair. If there are only two
+		 * entries, the start/stop pair must be slots 0 and 1,
+		 * otherwise, use the random number as the start position. The
+		 * calculation uses "entries - 1" to ensure we never chose the
+		 * last node in the list as our new start point.
 		 */
 		entries = entries < 3 ?
 		    0 : __wt_random(&session->rnd) % (entries - 1);
+		/* Move forward to the randomly selected start entry. */
 		for (; entries > 0; --entries)
 			start = &(*start)->next[level];
 		stop = &(*start)->next[level];
@@ -696,12 +706,11 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	}
 
 	/*
-	 * When we reach the bottom level, select a random entry from the total
-	 * entries, and return it.
+	 * When we reach the bottom level, select a random entry from the entry
+	 * range and return it.
 	 *
-	 * Reassert there are entries in the list: it should be impossible for
-	 * the entries count to be 0 at this point, but the test quiets static
-	 * testing tools.
+	 * It should be impossible for the entries count to be 0 at this point,
+	 * but check for it out of paranoia and to quiet static testing tools.
 	 */
 	entries = entries < 1 ? 0 : __wt_random(&session->rnd) % entries;
 	for (ins = *start; entries > 0; --entries)
