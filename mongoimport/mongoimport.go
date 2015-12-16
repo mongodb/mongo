@@ -394,6 +394,7 @@ func (imp *MongoImport) ingestDocuments(readDocs chan bson.D) (retErr error) {
 //
 // 1. Sets the session to not timeout
 // 2. Sets the write concern on the session
+// 3. Sets the session safety
 //
 // returns an error if it's unable to set the write concern
 func (imp *MongoImport) configureSession(session *mgo.Session) error {
@@ -404,6 +405,7 @@ func (imp *MongoImport) configureSession(session *mgo.Session) error {
 		return fmt.Errorf("write concern error: %v", err)
 	}
 	session.SetSafe(sessionSafety)
+
 	return nil
 }
 
