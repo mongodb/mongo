@@ -706,6 +706,8 @@ config_to_file(CONFIG *cfg)
 	}
 
 	/* Print the config dump */
+	fprintf(fp, "# Warning. This config can include defaults.\n");
+	fprintf(fp, "# This make cause differences in behaviour.\n");
 	while (!TAILQ_EMPTY(&cfg->config_head)) {
 		config_line = TAILQ_FIRST(&cfg->config_head);
 		TAILQ_REMOVE(&cfg->config_head, config_line, c);
