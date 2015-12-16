@@ -473,6 +473,15 @@ __evict_update_work(WT_SESSION_IMPL *session)
 		return (false);
 
 	/*
+	 * Setup the number of refs to consider in each handle, depending
+	 * on how many handles are open. We want to consider less candidates
+	 * from each file as more files are open. Handle the case where there
+	 * are no files open by adding 1.
+	 */
+	cache->evict_max_refs_per_file =
+	    WT_MAX(100, WT_MILLION / (conn->open_file_count + 1));
+
+	/*
 	 * Page eviction overrides the dirty target and other types of eviction,
 	 * that is, we don't care where we are with respect to the dirty target
 	 * if page eviction is configured.
@@ -1214,9 +1223,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	 */
 	for (evict = start, pages_walked = 0;
 	    evict < end && !enough && (ret == 0 || ret == WT_NOTFOUND);
-	    ret = __wt_tree_walk(
+	    ret = __wt_tree_walk_count(
 	    session, &btree->evict_ref, &pages_walked, walk_flags)) {
-		enough = pages_walked > WT_EVICT_MAX_PER_FILE;
+		enough = pages_walked > cache->evict_max_refs_per_file;
 		if ((ref = btree->evict_ref) == NULL) {
 			if (++restarts == 2 || enough)
 				break;
@@ -1321,8 +1330,9 @@ fast:		/* If the page can't be evicted, give up. */
 		if (__wt_ref_is_root(ref))
 			WT_RET(__evict_clear_walk(session));
 		else if (ref->page->read_gen == WT_READGEN_OLDEST)
-			WT_RET_NOTFOUND_OK(__wt_tree_walk(session,
-			    &btree->evict_ref, &pages_walked, walk_flags));
+			WT_RET_NOTFOUND_OK(__wt_tree_walk_count(
+			    session, &btree->evict_ref,
+			    &pages_walked, walk_flags));
 	}
 
 	WT_STAT_FAST_CONN_INCRV(session, cache_eviction_walk, pages_walked);
@@ -1602,7 +1612,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 
 		next_walk = NULL;
 		session->dhandle = dhandle;
-		while (__wt_tree_walk(session, &next_walk, NULL,
+		while (__wt_tree_walk(session, &next_walk,
 		    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_WAIT) == 0 &&
 		    next_walk != NULL) {
 			page = next_walk->page;

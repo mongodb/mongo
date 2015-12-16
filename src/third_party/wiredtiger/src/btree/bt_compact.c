@@ -45,7 +45,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	 * Ignore empty pages, they get merged into the parent.
 	 */
 	if (mod == NULL || mod->rec_result == 0) {
-		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
+		__wt_ref_info(ref, &addr, &addr_size, NULL);
 		if (addr == NULL)
 			return (0);
 		WT_RET(
@@ -130,7 +130,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		 * read, set its generation to a low value so it is evicted
 		 * quickly.
 		 */
-		WT_ERR(__wt_tree_walk(session, &ref, NULL,
+		WT_ERR(__wt_tree_walk(session, &ref,
 		    WT_READ_COMPACT | WT_READ_NO_GEN | WT_READ_WONT_NEED));
 		if (ref == NULL)
 			break;
@@ -182,7 +182,7 @@ __wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	 * address, the page isn't on disk, but we have to read internal pages
 	 * to walk the tree regardless; throw up our hands and read it.
 	 */
-	WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, &type));
+	__wt_ref_info(ref, &addr, &addr_size, &type);
 	if (addr == NULL)
 		return (0);
 

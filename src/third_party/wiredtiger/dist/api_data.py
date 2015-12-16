@@ -814,21 +814,19 @@ methods = {
 
 'WT_SESSION.open_cursor' : Method(cursor_runtime_config + [
     Config('bulk', 'false', r'''
-        configure the cursor for bulk-loading, a fast, initial load
-        path (see @ref tune_bulk_load for more information).  Bulk-load
-        may only be used for newly created objects and cursors
-        configured for bulk-load only support the WT_CURSOR::insert
-        and WT_CURSOR::close methods.  When bulk-loading row-store
-        objects, keys must be loaded in sorted order.  The value is
-        usually a true/false flag; when bulk-loading fixed-length
-        column store objects, the special value \c bitmap allows
-        chunks of a memory resident bitmap to be loaded directly into
-        a file by passing a \c WT_ITEM to WT_CURSOR::set_value where
-        the \c size field indicates the number of records in the
-        bitmap (as specified by the object's \c value_format
-        configuration). Bulk-loaded bitmap values must end on a byte
-        boundary relative to the bit count (except for the last set
-        of values loaded)'''),
+        configure the cursor for bulk-loading, a fast, initial load path
+        (see @ref tune_bulk_load for more information).  Bulk-load may
+        only be used for newly created objects and applications should
+        use the WT_CURSOR::insert method to insert rows.  When
+        bulk-loading, rows must be loaded in sorted order.  The value
+        is usually a true/false flag; when bulk-loading fixed-length
+        column store objects, the special value \c bitmap allows chunks
+        of a memory resident bitmap to be loaded directly into a file
+        by passing a \c WT_ITEM to WT_CURSOR::set_value where the \c
+        size field indicates the number of records in the bitmap (as
+        specified by the object's \c value_format configuration).
+        Bulk-loaded bitmap values must end on a byte boundary relative
+        to the bit count (except for the last set of values loaded)'''),
     Config('checkpoint', '', r'''
         the name of a checkpoint to open (the reserved name
         "WiredTigerCheckpoint" opens the most recent internal
@@ -843,12 +841,20 @@ methods = {
         with the @ref util_dump and @ref util_load commands''',
         choices=['hex', 'json', 'print']),
     Config('next_random', 'false', r'''
-        configure the cursor to return a pseudo-random record from
-        the object; valid only for row-store cursors.  Cursors
-        configured with \c next_random=true only support the
-        WT_CURSOR::next and WT_CURSOR::close methods.  See @ref
-        cursor_random for details''',
+        configure the cursor to return a pseudo-random record from the
+        object when the WT_CURSOR::next method is called; valid only for
+        row-store cursors. See @ref cursor_random for details''',
         type='boolean'),
+    Config('next_random_sample_size', '0', r'''
+        cursors configured by \c next_random to return pseudo-random
+        records from the object randomly select from the entire object,
+        by default. Setting \c next_random_sample_size to a non-zero
+        value sets the number of samples the application expects to take
+        using the \c next_random cursor. A cursor configured with both
+        \c next_random and \c next_random_sample_size attempts to divide
+        the object into \c next_random_sample_size equal-sized pieces,
+        and each retrieval returns a record from one of those pieces. See
+        @ref cursor_random for details'''),
     Config('raw', 'false', r'''
         ignore the encodings for the key and value, manage data as if
         the formats were \c "u".  See @ref cursor_raw for details''',
