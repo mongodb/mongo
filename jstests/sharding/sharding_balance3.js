@@ -54,10 +54,14 @@ print("* B");
 print( diff1() )
 
 var currDiff = diff1();
-assert.repeat( function(){
-    var d = diff1();
-    return d != currDiff;
-} , "balance with stopped flag should not have happened" , 1000 * 60 , 5000 );
+var waitTime = 0;
+var startTime = Date.now();
+while ( waitTime < ( 1000 * 60 ) ) {
+    // Wait for 60 seconds to ensure balancer did not run
+    assert.eq( currDiff, diff1(), "balance with stopped flag should not have happened" );
+    sleep( 5000 );
+    waitTime = Date.now() - startTime;
+}
 
 s.stop();
 

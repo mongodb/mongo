@@ -145,30 +145,6 @@ assert.contains = function(o, arr, msg){
     if(! wasIn) doassert(tojson(o) + " was not in " + tojson(arr) + " : " + msg)
 }
 
-assert.repeat = function(f, msg, timeout, interval) {
-    if (assert._debug && msg) print("in assert for: " + msg);
-
-    var start = new Date();
-    timeout = timeout || 30000;
-    interval = interval || 200;
-    var last;
-    while(1) {
-
-        if (typeof(f) == "string"){
-            if (eval(f))
-                return;
-        }
-        else {
-            if (f())
-                return;
-        }
-
-        if ((new Date()).getTime() - start.getTime() > timeout)
-            break;
-        sleep(interval);
-    }
-}
-
 assert.soon = function(f, msg, timeout /*ms*/, interval) {
     if (assert._debug && msg) print("in assert for: " + msg);
 
