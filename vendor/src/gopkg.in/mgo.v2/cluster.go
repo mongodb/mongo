@@ -30,12 +30,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"gopkg.in/mgo.v2/bson"
-	"strconv"
-	"strings"
 )
 
 // ---------------------------------------------------------------------------
@@ -425,14 +425,44 @@ func resolveAddr(addr string) (*net.TCPAddr, error) {
 		}
 	}
 
-	// This unfortunate hack allows having a timeout on address resolution.
-	conn, err := net.DialTimeout("udp4", addr, 10*time.Second)
-	if err != nil {
+	// Attempt to resolve IPv4 and v6 concurrently.
+	addrChan := make(chan *net.TCPAddr, 2)
+	for _, network := range []string{"udp4", "udp6"} {
+		network := network
+		go func() {
+			// The unfortunate UDP dialing hack allows having a timeout on address resolution.
+			conn, err := net.DialTimeout(network, addr, 10*time.Second)
+			if err != nil {
+				addrChan <- nil
+			} else {
+				addrChan <- (*net.TCPAddr)(conn.RemoteAddr().(*net.UDPAddr))
+				conn.Close()
+			}
+		}()
+	}
+
+	// Wait for the result of IPv4 and v6 resolution. Use IPv4 if available.
+	tcpaddr := <-addrChan
+	if tcpaddr == nil || len(tcpaddr.IP) != 4 {
+		var timeout <-chan time.Time
+		if tcpaddr != nil {
+			// Don't wait too long if an IPv6 address is known.
+			timeout = time.After(50 * time.Millisecond)
+		}
+		select {
+		case <-timeout:
+		case tcpaddr2 := <-addrChan:
+			if tcpaddr == nil || tcpaddr2 != nil {
+				// It's an IPv4 address or the only known address. Use it.
+				tcpaddr = tcpaddr2
+			}
+		}
+	}
+
+	if tcpaddr == nil {
 		log("SYNC Failed to resolve server address: ", addr)
 		return nil, errors.New("failed to resolve server address: " + addr)
 	}
-	tcpaddr := (*net.TCPAddr)(conn.RemoteAddr().(*net.UDPAddr))
-	conn.Close()
 	if tcpaddr.String() != addr {
 		debug("SYNC Address ", addr, " resolved as ", tcpaddr.String())
 	}

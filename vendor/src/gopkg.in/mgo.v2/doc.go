@@ -20,7 +20,7 @@
 //
 // New sessions are typically created by calling session.Copy on the
 // initial session obtained at dial time. These new sessions will share
-// the same cluster information and connection cache, and may be easily
+// the same cluster information and connection pool, and may be easily
 // handed into other methods and functions for organizing logic.
 // Every session created must have its Close method called at the end
 // of its life time, so its resources may be put back in the pool or

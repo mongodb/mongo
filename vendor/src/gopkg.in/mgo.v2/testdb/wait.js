@@ -32,20 +32,27 @@ for (var i = 0; i != 60; i++) {
 function countHealthy(rs) {
     var status = rs.runCommand({replSetGetStatus: 1})
     var count = 0
+    var primary = 0
     if (typeof status.members != "undefined") {
         for (var i = 0; i != status.members.length; i++) {
             var m = status.members[i]
             if (m.health == 1 && (m.state == 1 || m.state == 2)) {
                 count += 1
+                if (m.state == 1) {
+                    primary = 1
+                }
             }
         }
+    }
+    if (primary == 0) {
+	    count = 0
     }
     return count
 }
 
 var totalRSMembers = rs1cfg.members.length + rs2cfg.members.length + rs3cfg.members.length
 
-for (var i = 0; i != 60; i++) {
+for (var i = 0; i != 90; i++) {
     var count = countHealthy(rs1a) + countHealthy(rs2a) + countHealthy(rs3a)
     print("Replica sets have", count, "healthy nodes.")
     if (count == totalRSMembers) {
@@ -56,3 +63,5 @@ for (var i = 0; i != 60; i++) {
 
 print("Replica sets didn't sync up properly.")
 quit(12)
+
+// vim:ts=4:sw=4:et

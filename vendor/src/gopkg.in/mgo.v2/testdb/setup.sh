@@ -15,7 +15,7 @@ start() {
     echo "Running supervisord..."
     supervisord || ( echo "Supervisord failed executing ($?)" && exit 1 )
     echo "Supervisord is up, starting $COUNT processes..."
-    for i in $(seq 10); do
+    for i in $(seq 30); do
         RUNNING=$(supervisorctl status | grep RUNNING | wc -l | tr -d ' ')
         echo "$RUNNING processes running..."
         if [ x$COUNT = x$RUNNING ]; then
