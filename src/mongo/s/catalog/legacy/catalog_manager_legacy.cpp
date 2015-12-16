@@ -125,7 +125,8 @@ CatalogManagerLegacy::CatalogManagerLegacy() = default;
 
 CatalogManagerLegacy::~CatalogManagerLegacy() = default;
 
-Status CatalogManagerLegacy::init(const ConnectionString& configDBCS) {
+Status CatalogManagerLegacy::init(const ConnectionString& configDBCS,
+                                  const std::string& distLockProcessId) {
     // Initialization should not happen more than once
     invariant(!_configServerConnectionString.isValid());
     invariant(_configServers.empty());
@@ -203,7 +204,8 @@ Status CatalogManagerLegacy::init(const ConnectionString& configDBCS) {
         _configServers.push_back(_configServerConnectionString);
     }
 
-    _distLockManager = stdx::make_unique<LegacyDistLockManager>(_configServerConnectionString);
+    _distLockManager =
+        stdx::make_unique<LegacyDistLockManager>(_configServerConnectionString, distLockProcessId);
     _distLockManager->startUp();
 
     {

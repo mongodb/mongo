@@ -31,13 +31,10 @@
 
 #include "mongo/s/catalog/legacy/distlock.h"
 
-#include "mongo/db/server_options.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/connpool.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_lockpings.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -57,48 +54,6 @@ using std::vector;
 LabeledLevel DistributedLock::logLvl(1);
 DistributedLock::LastPings DistributedLock::lastPings;
 
-ThreadLocalValue<string> distLockIds("");
-
-/* ==================
- * Module initialization
- */
-
-static SimpleMutex _cachedProcessMutex;
-static string* _cachedProcessString = NULL;
-
-static void initModule() {
-    stdx::lock_guard<SimpleMutex> lk(_cachedProcessMutex);
-    if (_cachedProcessString) {
-        // someone got the lock before us
-        return;
-    }
-
-    // cache process string
-    stringstream ss;
-    ss << getHostName() << ":" << serverGlobalParams.port << ":" << time(0) << ":" << rand();
-    _cachedProcessString = new string(ss.str());
-}
-
-/* =================== */
-
-string getDistLockProcess() {
-    if (!_cachedProcessString)
-        initModule();
-    verify(_cachedProcessString);
-    return *_cachedProcessString;
-}
-
-string getDistLockId() {
-    string s = distLockIds.get();
-    if (s.empty()) {
-        stringstream ss;
-        ss << getDistLockProcess() << ":" << getThreadName() << ":" << rand();
-        s = ss.str();
-        distLockIds.set(s);
-    }
-    return s;
-}
-
 LockException::LockException(StringData msg, int code) : LockException(msg, code, OID()) {}
 
 LockException::LockException(StringData msg, int code, DistLockHandle lockID)
@@ -114,18 +69,19 @@ DistLockHandle LockException::getMustUnlockID() const {
  */
 DistributedLock::DistributedLock(const ConnectionString& conn,
                                  const string& name,
-                                 unsigned long long lockTimeout,
-                                 bool asProcess)
+                                 const std::string& processId,
+                                 unsigned long long lockTimeout)
     : _conn(conn),
       _name(name),
-      _processId(asProcess ? getDistLockId() : getDistLockProcess()),
+      _processId(processId),
+      _lockId(str::stream() << _processId << ":" << getThreadName() << ":" << rand()),
       _lockTimeout(lockTimeout == 0 ? LOCK_TIMEOUT : lockTimeout),
       _maxClockSkew(_lockTimeout / LOCK_SKEW_FACTOR),
       _maxNetSkew(_maxClockSkew),
       _lockPing(_maxClockSkew) {
     LOG(logLvl) << "created new distributed lock for " << name << " on " << conn
                 << " ( lock timeout : " << _lockTimeout << ", ping interval : " << _lockPing
-                << ", process : " << asProcess << " )" << endl;
+                << ", processId: " << _processId << ", lockId: " << _lockId << " )";
 }
 
 DistLockPingInfo DistributedLock::LastPings::getLastPing(const ConnectionString& conn,
@@ -151,6 +107,10 @@ const ConnectionString& DistributedLock::getRemoteConnection() const {
 
 const string& DistributedLock::getProcessId() const {
     return _processId;
+}
+
+const string& DistributedLock::getDistLockId() const {
+    return _lockId;
 }
 
 /**

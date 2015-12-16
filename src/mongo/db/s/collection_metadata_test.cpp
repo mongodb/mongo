@@ -90,7 +90,8 @@ protected:
         ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
         ASSERT(configLoc.isValid());
         CatalogManagerLegacy catalogManager;
-        catalogManager.init(configLoc);
+        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
+        catalogManager.init(configLoc, lockProcessId);
 
         MetadataLoader loader;
         Status status = loader.makeCollectionMetadata(
@@ -475,7 +476,8 @@ protected:
         ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
         ASSERT(configLoc.isValid());
         CatalogManagerLegacy catalogManager;
-        catalogManager.init(configLoc);
+        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
+        catalogManager.init(configLoc, lockProcessId);
 
         MetadataLoader loader;
         Status status = loader.makeCollectionMetadata(
@@ -790,7 +792,8 @@ protected:
         ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
         ASSERT(configLoc.isValid());
         CatalogManagerLegacy catalogManager;
-        catalogManager.init(configLoc);
+        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
+        catalogManager.init(configLoc, lockProcessId);
 
         MetadataLoader loader;
         Status status = loader.makeCollectionMetadata(
@@ -865,7 +868,8 @@ protected:
         ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
         ASSERT(configLoc.isValid());
         CatalogManagerLegacy catalogManager;
-        catalogManager.init(configLoc);
+        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
+        catalogManager.init(configLoc, lockProcessId);
 
         MetadataLoader loader;
         Status status = loader.makeCollectionMetadata(
@@ -1135,7 +1139,8 @@ protected:
         ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
         ASSERT(configLoc.isValid());
         CatalogManagerLegacy catalogManager;
-        catalogManager.init(configLoc);
+        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
+        catalogManager.init(configLoc, lockProcessId);
 
         MetadataLoader loader;
         Status status = loader.makeCollectionMetadata(

@@ -64,7 +64,8 @@ public:
     void setUp() {
         ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
         ASSERT(configLoc.isValid());
-        ASSERT_OK(_catalogManager.init(configLoc));
+        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
+        ASSERT_OK(_catalogManager.init(configLoc, lockProcessId));
     }
 
 protected:

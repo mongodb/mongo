@@ -68,15 +68,15 @@ std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
                                                    const ConnectionString& configCS,
                                                    ShardRegistry* shardRegistry,
                                                    const HostAndPort& thisHost) {
+    std::unique_ptr<SecureRandom> rng(SecureRandom::create());
+    std::string distLockProcessId = str::stream()
+        << thisHost.toString() << ':'
+        << durationCount<Seconds>(service->getClockSource()->now().toDurationSinceEpoch()) << ':'
+        << static_cast<int32_t>(rng->nextInt64());
+
     switch (configCS.type()) {
         case ConnectionString::SET: {
             auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
-
-            std::unique_ptr<SecureRandom> rng(SecureRandom::create());
-            std::string distLockProcessId = str::stream()
-                << thisHost.toString() << ':'
-                << durationCount<Seconds>(service->getClockSource()->now().toDurationSinceEpoch())
-                << ':' << static_cast<int32_t>(rng->nextInt64());
             auto distLockManager = stdx::make_unique<ReplSetDistLockManager>(
                 service,
                 distLockProcessId,
@@ -90,7 +90,7 @@ std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
         case ConnectionString::MASTER:
         case ConnectionString::CUSTOM: {
             auto catalogManagerLegacy = stdx::make_unique<CatalogManagerLegacy>();
-            uassertStatusOK(catalogManagerLegacy->init(configCS));
+            uassertStatusOK(catalogManagerLegacy->init(configCS, distLockProcessId));
             return std::move(catalogManagerLegacy);
         }
         default:
