@@ -323,6 +323,7 @@ env.Library(
         'task_executor_pool.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/util/processinfo',
         'task_executor_interface',
     ],
