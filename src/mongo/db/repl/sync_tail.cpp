@@ -131,6 +131,39 @@ bool isCrudOpType(const char* field) {
     }
     return false;
 }
+
+void handleSlaveDelay(const Timestamp& ts) {
+    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+    int slaveDelaySecs = durationCount<Seconds>(replCoord->getSlaveDelaySecs());
+
+    // ignore slaveDelay if the box is still initializing. once
+    // it becomes secondary we can worry about it.
+    if (slaveDelaySecs > 0 && replCoord->getMemberState().secondary()) {
+        long long a = ts.getSecs();
+        long long b = time(0);
+        long long lag = b - a;
+        long long sleeptime = slaveDelaySecs - lag;
+        if (sleeptime > 0) {
+            uassert(12000,
+                    "rs slaveDelay differential too big check clocks and systems",
+                    sleeptime < 0x40000000);
+            if (sleeptime < 60) {
+                sleepsecs((int)sleeptime);
+            } else {
+                warning() << "slavedelay causing a long sleep of " << sleeptime << " seconds";
+                // sleep(hours) would prevent reconfigs from taking effect & such!
+                long long waitUntil = b + sleeptime;
+                while (time(0) < waitUntil) {
+                    sleepsecs(6);
+
+                    // Handle reconfigs that changed the slave delay
+                    if (durationCount<Seconds>(replCoord->getSlaveDelaySecs()) != slaveDelaySecs)
+                        break;
+                }
+            }
+        }
+    }  // endif slaveDelay
+}
 }
 
 namespace {
@@ -717,7 +750,18 @@ void SyncTail::oplogApplication() {
             continue;  // This wasn't a real op. Don't try to apply it.
         }
 
-        handleSlaveDelay(lastOp);
+        const auto lastOpTime = fassertStatusOK(28773, OpTime::parseFromOplogEntry(lastOp));
+        if (lastWriteOpTime >= lastOpTime) {
+            // Error for the oplog to go back in time.
+            fassert(34361,
+                    Status(ErrorCodes::OplogOutOfOrder,
+                           str::stream() << "Attempted to apply an earlier oplog entry (ts: "
+                                         << lastOpTime.getTimestamp().toStringPretty()
+                                         << ") when our lastWrittenOptime was "
+                                         << lastWriteOpTime.toString()));
+        }
+
+        handleSlaveDelay(lastOpTime.getTimestamp());
 
         // Set minValid to the last OpTime that needs to be applied, in this batch or from the
         // (last) failed batch, whichever is larger.
@@ -725,8 +769,8 @@ void SyncTail::oplogApplication() {
         // if we should crash and restart before updating finishing.
         const OpTime start(getLastSetTimestamp(), OpTime::kUninitializedTerm);
 
+
         // Take the max of the first endOptime (if we recovered) and the end of our batch.
-        const auto lastOpTime = fassertStatusOK(28773, OpTime::parseFromOplogEntry(lastOp));
 
         // Setting end to the max of originalEndOpTime and lastOpTime (the end of the batch)
         // ensures that we keep pushing out the point where we can become consistent
@@ -841,40 +885,6 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn, SyncTail::OpQueue* op
 
     // Go back for more ops
     return false;
-}
-
-void SyncTail::handleSlaveDelay(const BSONObj& lastOp) {
-    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-    int slaveDelaySecs = durationCount<Seconds>(replCoord->getSlaveDelaySecs());
-
-    // ignore slaveDelay if the box is still initializing. once
-    // it becomes secondary we can worry about it.
-    if (slaveDelaySecs > 0 && replCoord->getMemberState().secondary()) {
-        const Timestamp ts = lastOp["ts"].timestamp();
-        long long a = ts.getSecs();
-        long long b = time(0);
-        long long lag = b - a;
-        long long sleeptime = slaveDelaySecs - lag;
-        if (sleeptime > 0) {
-            uassert(12000,
-                    "rs slaveDelay differential too big check clocks and systems",
-                    sleeptime < 0x40000000);
-            if (sleeptime < 60) {
-                sleepsecs((int)sleeptime);
-            } else {
-                warning() << "slavedelay causing a long sleep of " << sleeptime << " seconds";
-                // sleep(hours) would prevent reconfigs from taking effect & such!
-                long long waitUntil = b + sleeptime;
-                while (time(0) < waitUntil) {
-                    sleepsecs(6);
-
-                    // Handle reconfigs that changed the slave delay
-                    if (durationCount<Seconds>(replCoord->getSlaveDelaySecs()) != slaveDelaySecs)
-                        break;
-                }
-            }
-        }
-    }  // endif slaveDelay
 }
 
 void SyncTail::setHostname(const std::string& hostname) {
