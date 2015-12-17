@@ -130,7 +130,7 @@ __rebalance_internal(WT_SESSION_IMPL *session, WT_RSTUFF *rs)
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF **refp;
-	uint64_t i;
+	uint32_t i, leaf_next;
 
 	btree = S2BT(session);
 
@@ -144,16 +144,17 @@ __rebalance_internal(WT_SESSION_IMPL *session, WT_RSTUFF *rs)
 		    "too many leaf pages to rebalance, %" PRIu64 " pages "
 		    "exceeds the maximum of %" PRIu32,
 		    rs->leaf_next, UINT32_MAX);
+	leaf_next = (uint32_t)rs->leaf_next;
 
 	/* Allocate a row-store root (internal) page and fill it in. */
 	WT_RET(__wt_page_alloc(session, rs->type,
-	    rs->type == WT_PAGE_COL_INT ? 1 : 0, rs->leaf_next, false, &page));
+	    rs->type == WT_PAGE_COL_INT ? 1 : 0, leaf_next, false, &page));
 	page->pg_intl_parent_ref = &btree->root;
 	WT_ERR(__wt_page_modify_init(session, page));
 	__wt_page_modify_set(session, page);
 
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
-	for (refp = pindex->index, i = 0; i < rs->leaf_next; ++i) {
+	for (refp = pindex->index, i = 0; i < leaf_next; ++i) {
 		rs->leaf[i]->home = page;
 		*refp++ = rs->leaf[i];
 		rs->leaf[i] = NULL;
