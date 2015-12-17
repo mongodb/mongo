@@ -204,7 +204,11 @@ void printStackTrace(std::ostream& os) {
         const uintptr_t fileOffset = uintptr_t(addresses[i]) - uintptr_t(dlinfo.dli_fbase);
         if (i)
             os << ',';
-        os << "{\"b\":\"" << uintptr_t(dlinfo.dli_fbase) << "\",\"o\":\"" << fileOffset << "\"}";
+        os << "{\"b\":\"" << uintptr_t(dlinfo.dli_fbase) << "\",\"o\":\"" << fileOffset;
+        if (dlinfo.dli_sname) {
+            os << "\",\"s\":\"" << dlinfo.dli_sname;
+        }
+        os << "\"}";
     }
     os << ']';
 
