@@ -101,7 +101,7 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *buf)
 		return (buf->data);
 	}
 
-	(void)__wt_ref_info(session, ref, &addr, &addr_size, NULL);
+	__wt_ref_info(ref, &addr, &addr_size, NULL);
 	return (__wt_addr_string(session, addr, addr_size, buf));
 }
 

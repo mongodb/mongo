@@ -8,7 +8,7 @@
 
 #include "wt_internal.h"
 
-static int __block_dump_avail(WT_SESSION_IMPL *, WT_BLOCK *);
+static int __block_dump_avail(WT_SESSION_IMPL *, WT_BLOCK *, bool);
 
 /*
  * __wt_block_compact_start --
@@ -22,8 +22,6 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* Switch to first-fit allocation. */
 	__wt_block_configure_first_fit(block, true);
 
-	block->compact_pct_tenths = 0;
-
 	return (0);
 }
 
@@ -34,14 +32,21 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
+	WT_DECL_RET;
+
 	WT_UNUSED(session);
 
 	/* Restore the original allocation plan. */
 	__wt_block_configure_first_fit(block, false);
 
-	block->compact_pct_tenths = 0;
+	/* Dump the results of the compaction pass. */
+	if (WT_VERBOSE_ISSET(session, WT_VERB_COMPACT)) {
+		__wt_spin_lock(session, &block->live_lock);
+		ret = __block_dump_avail(session, block, false);
+		__wt_spin_unlock(session, &block->live_lock);
+	}
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -70,12 +75,23 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 	if (fh->size <= WT_MEGABYTE)
 		return (0);
 
+	/*
+	 * Reset the compaction state information. This is done here, not in the
+	 * compaction "start" routine, because this function is called first to
+	 * determine if compaction is useful.
+	 */
+	block->compact_pct_tenths = 0;
+	block->compact_pages_reviewed = 0;
+	block->compact_pages_skipped = 0;
+	block->compact_pages_written = 0;
+
 	__wt_spin_lock(session, &block->live_lock);
 
+	/* Dump the current state of the file. */
 	if (WT_VERBOSE_ISSET(session, WT_VERB_COMPACT))
-		WT_ERR(__block_dump_avail(session, block));
+		WT_ERR(__block_dump_avail(session, block, true));
 
-	/* Sum the available bytes in the first 80% and 90% of the file. */
+	/* Sum the available bytes in the initial 80% and 90% of the file. */
 	avail_eighty = avail_ninety = 0;
 	ninety = fh->size - fh->size / 10;
 	eighty = fh->size - ((fh->size / 10) * 2);
@@ -87,23 +103,6 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 			if (ext->off < eighty)
 				avail_eighty += ext->size;
 		}
-
-	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
-	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
-	    "80%% of the file",
-	    block->name,
-	    (uintmax_t)avail_eighty / WT_MEGABYTE, (uintmax_t)avail_eighty));
-	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
-	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
-	    "90%% of the file",
-	    block->name,
-	    (uintmax_t)avail_ninety / WT_MEGABYTE, (uintmax_t)avail_ninety));
-	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
-	    "%s: require 10%% or %" PRIuMAX "MB (%" PRIuMAX ") in the first "
-	    "90%% of the file to perform compaction, compaction %s",
-	    block->name,
-	    (uintmax_t)(fh->size / 10) / WT_MEGABYTE, (uintmax_t)fh->size / 10,
-	    *skipp ? "skipped" : "proceeding"));
 
 	/*
 	 * Skip files where we can't recover at least 1MB.
@@ -126,6 +125,23 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 		*skipp = false;
 		block->compact_pct_tenths = 1;
 	}
+
+	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
+	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
+	    "80%% of the file",
+	    block->name,
+	    (uintmax_t)avail_eighty / WT_MEGABYTE, (uintmax_t)avail_eighty));
+	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
+	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
+	    "90%% of the file",
+	    block->name,
+	    (uintmax_t)avail_ninety / WT_MEGABYTE, (uintmax_t)avail_ninety));
+	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
+	    "%s: require 10%% or %" PRIuMAX "MB (%" PRIuMAX ") in the first "
+	    "90%% of the file to perform compaction, compaction %s",
+	    block->name,
+	    (uintmax_t)(fh->size / 10) / WT_MEGABYTE, (uintmax_t)fh->size / 10,
+	    *skipp ? "skipped" : "proceeding"));
 
 err:	__wt_spin_unlock(session, &block->live_lock);
 
@@ -177,6 +193,14 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	}
 	__wt_spin_unlock(session, &block->live_lock);
 
+	if (WT_VERBOSE_ISSET(session, WT_VERB_COMPACT)) {
+		++block->compact_pages_reviewed;
+		if (*skipp)
+			++block->compact_pages_skipped;
+		else
+			++block->compact_pages_written;
+	}
+
 	return (ret);
 }
 
@@ -185,7 +209,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
  *	Dump out the avail list so we can see what compaction will look like.
  */
 static int
-__block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
 {
 	WT_EXTLIST *el;
 	WT_EXT *ext;
@@ -194,6 +218,20 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	el = &block->live.avail;
 	size = block->fh->size;
+
+	WT_RET(__wt_verbose(session, WT_VERB_COMPACT,
+	    "============ %s",
+	    start ? "testing for compaction" : "ending compaction pass"));
+
+	if (!start) {
+		WT_RET(__wt_verbose(session, WT_VERB_COMPACT,
+		    "pages reviewed: %" PRIuMAX,
+		    block->compact_pages_reviewed));
+		WT_RET(__wt_verbose(session, WT_VERB_COMPACT,
+		    "pages skipped: %" PRIuMAX, block->compact_pages_skipped));
+		WT_RET(__wt_verbose(session, WT_VERB_COMPACT,
+		    "pages written: %" PRIuMAX, block->compact_pages_written));
+	}
 
 	WT_RET(__wt_verbose(session, WT_VERB_COMPACT,
 	    "file size %" PRIuMAX "MB (%" PRIuMAX ") with %" PRIuMAX
@@ -219,6 +257,10 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		}
 
 #ifdef __VERBOSE_OUTPUT_PERCENTILE
+	/*
+	 * The verbose output always displays 10% buckets, running this code
+	 * as well also displays 1% buckets.
+	 */
 	for (i = 0; i < WT_ELEMENTS(percentile); ++i) {
 		v = percentile[i] * 512;
 		WT_RET(__wt_verbose(session, WT_VERB_COMPACT,

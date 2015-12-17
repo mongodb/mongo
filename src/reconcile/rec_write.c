@@ -3265,7 +3265,14 @@ supd_check_complete:
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
 		bnd->cksum = __wt_cksum(buf->data, buf->size);
 
-		if (mod->rec_result == WT_PM_REC_MULTIBLOCK &&
+		/*
+		 * One last check: don't reuse blocks if compacting, the reason
+		 * for compaction is to move blocks to different locations. We
+		 * do this check after calculating the checksums, hopefully the
+		 * next write can be skipped.
+		 */
+		if (session->compact_state == WT_COMPACT_NONE &&
+		    mod->rec_result == WT_PM_REC_MULTIBLOCK &&
 		    mod->mod_multi_entries > bnd_slot) {
 			multi = &mod->mod_multi[bnd_slot];
 			if (multi->size == bnd->size &&
