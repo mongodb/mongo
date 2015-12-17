@@ -5286,3 +5286,19 @@ buildvariants:
   - name: push
     distros:
     - rhel55-test
+
+- name: enterprise-ubuntu-dynamic-1404-64-bit
+  display_name: ~ Shared Library Enterprise Ubuntu 1404
+  modules:
+  - enterprise
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --link-model=dynamic
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1404-build
