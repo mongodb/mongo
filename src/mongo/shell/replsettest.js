@@ -389,7 +389,7 @@ var ReplSetTest = function(opts) {
 
         assert.soon(function() {
             // Reload who the current slaves are
-            self.getPrimary();
+            self.getPrimary(timeout);
 
             var slaves = self.liveNodes.slaves;
             var len = slaves.length;
