@@ -132,12 +132,16 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
 	int ret;
-	char config[4096], *end, *p;
+	char *config, *end, *p;
 
 	*connp = NULL;
 
-	p = config;
-	end = config + sizeof(config);
+#define	WIREDTIGER_OPEN_CONFIG_LEN	(4 * 1024)
+	if ((g.wiredtiger_open_config =
+	    calloc(WIREDTIGER_OPEN_CONFIG_LEN, sizeof(char))) == NULL)
+		die(ENOMEM, "calloc");
+	config = p = g.wiredtiger_open_config;
+	end = config + WIREDTIGER_OPEN_CONFIG_LEN;
 
 	p += snprintf(p, REMAIN(p, end),
 	    "create,checkpoint_sync=false,cache_size=%" PRIu32 "MB",
@@ -270,6 +274,20 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 			   HELIUM_PATH, config);
 	}
 	*connp = conn;
+}
+
+/*
+ * wts_reopen --
+ *	Re-open a connection to a WiredTiger database.
+ */
+void
+wts_reopen(void)
+{
+	int ret;
+
+	if ((ret = wiredtiger_open(g.home,
+	    &event_handler, g.wiredtiger_open_config, &g.wts_conn)) != 0)
+		die(ret, "wiredtiger_open: %s", g.home);
 }
 
 /*
@@ -452,6 +470,8 @@ wts_close(void)
 
 	if ((ret = conn->close(conn, config)) != 0)
 		die(ret, "connection.close");
+	g.wts_conn = NULL;
+	g.wt_api = NULL;
 }
 
 void

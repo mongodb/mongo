@@ -1329,6 +1329,19 @@ struct __wt_session {
 	int __F(log_printf)(WT_SESSION *session, const char *fmt, ...);
 
 	/*!
+	 * Rebalance a table
+	 *
+	 * @snippet ex_all.c Rebalance a table
+	 *
+	 * @param session the session handle
+	 * @param uri the current URI of the object, such as \c "table:mytable"
+	 * @configempty{WT_SESSION.rebalance, see dist/api_data.py}
+	 * @ebusy_errors
+	 */
+	int __F(rebalance)(
+	    WT_SESSION *session, const char *uri, const char *config);
+
+	/*!
 	 * Rename an object.
 	 *
 	 * @snippet ex_all.c Rename a table
@@ -1920,9 +1933,10 @@ struct __wt_connection {
 	 * "block"\, \c "checkpoint"\, \c "compact"\, \c "evict"\, \c
 	 * "evictserver"\, \c "fileops"\, \c "log"\, \c "lsm"\, \c
 	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
-	 * "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
-	 * "shared_cache"\, \c "split"\, \c "temporary"\, \c "transaction"\, \c
-	 * "verify"\, \c "version"\, \c "write"; default empty.}
+	 * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
+	 * "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c
+	 * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default
+	 * empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -2405,9 +2419,9 @@ struct __wt_connection {
  * values chosen from the following options: \c "api"\, \c "block"\, \c
  * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\,
  * \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c
- * "overflow"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
- * "shared_cache"\, \c "split"\, \c "temporary"\, \c "transaction"\, \c
- * "verify"\, \c "version"\, \c "write"; default empty.}
+ * "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
+ * "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c
+ * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to
  * files.  Ignored on non-Windows systems.  Options are given as a list\, such
  * as <code>"write_through=[data]"</code>. Configuring \c write_through requires

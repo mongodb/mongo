@@ -238,6 +238,11 @@ main(int argc, char *argv[])
 		wts_close();
 
 		/*
+		 * Rebalance testing.
+		 */
+		wts_rebalance();
+
+		/*
 		 * If single-threaded, we can dump and compare the WiredTiger
 		 * and Berkeley DB data sets.
 		 */

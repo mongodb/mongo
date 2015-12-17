@@ -1037,12 +1037,13 @@ nockpt:			F_SET(btree, WT_BTREE_SKIP_CKPT);
 					    "for a bulk-loaded file");
 			fake_ckpt = true;
 			goto fake;
+		case WT_BTREE_REBALANCE:
 		case WT_BTREE_SALVAGE:
 		case WT_BTREE_UPGRADE:
 		case WT_BTREE_VERIFY:
 			WT_ERR_MSG(session, EINVAL,
-			    "checkpoints are blocked during salvage, upgrade "
-			    "or verify operations");
+			    "checkpoints are blocked during rebalance, "
+			    "salvage, upgrade or verify operations");
 		}
 
 	/*

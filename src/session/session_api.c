@@ -554,6 +554,32 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_rebalance --
+ *	WT_SESSION->rebalance method.
+ */
+static int
+__session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, rebalance, config, cfg);
+
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_ERR(ENOTSUP);
+
+	/* Block out checkpoints to avoid spurious EBUSY errors. */
+	WT_WITH_CHECKPOINT_LOCK(session,
+	    WT_WITH_SCHEMA_LOCK(session, ret =
+		__wt_schema_worker(session, uri, __wt_bt_rebalance,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_REBALANCE)));
+
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
  * __session_rename --
  *	WT_SESSION->rename method.
  */
@@ -1287,6 +1313,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_join,
 		__session_log_flush,
 		__session_log_printf,
+		__session_rebalance,
 		__session_rename,
 		__session_reset,
 		__session_salvage,

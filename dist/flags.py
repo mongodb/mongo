@@ -70,6 +70,7 @@ flags = {
         'VERB_MUTEX',
         'VERB_OVERFLOW',
         'VERB_READ',
+        'VERB_REBALANCE',
         'VERB_RECONCILE',
         'VERB_RECOVERY',
         'VERB_SALVAGE',
