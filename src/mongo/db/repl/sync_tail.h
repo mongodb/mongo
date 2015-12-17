@@ -187,8 +187,6 @@ private:
     // Function to use during applyOps
     MultiSyncApplyFunc _applyFunc;
 
-    void handleSlaveDelay(const BSONObj& op);
-
     // persistent pool of worker threads for writing ops to the databases
     OldThreadPool _writerPool;
     // persistent pool of worker threads for prefetching
