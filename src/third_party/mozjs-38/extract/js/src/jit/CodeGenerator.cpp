@@ -3464,12 +3464,12 @@ CodeGenerator::visitCallDirectEvalV(LCallDirectEvalV* lir)
     callVM(DirectEvalValueInfo, lir);
 }
 
-// Registers safe for use before generatePrologue().
-static const uint32_t EntryTempMask = Registers::TempMask & ~(1 << OsrFrameReg.code());
-
 void
 CodeGenerator::generateArgumentsChecks(bool bailout)
 {
+    // Registers safe for use before generatePrologue().
+    static const uint32_t EntryTempMask = Registers::TempMask & ~(1 << OsrFrameReg.code());
+
     // This function can be used the normal way to check the argument types,
     // before entering the function and bailout when arguments don't match.
     // For debug purpose, this is can also be used to force/check that the
