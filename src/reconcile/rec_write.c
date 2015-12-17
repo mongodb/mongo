@@ -5374,11 +5374,10 @@ __rec_split_dump_keys(WT_SESSION_IMPL *session, WT_PAGE *page, WT_RECONCILE *r)
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			WT_ERR(__wt_buf_set_printable(
-			    session, tkey, bnd->key.data, bnd->key.size));
 			WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-			    "starting key %.*s",
-			    (int)tkey->size, (const char *)tkey->data));
+			    "starting key %s",
+			    __wt_buf_set_printable(
+			    session, bnd->key.data, bnd->key.size, tkey)));
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:
