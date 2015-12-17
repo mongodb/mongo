@@ -10,14 +10,17 @@ post:
         file_location: src/report.json
     - command: shell.cleanup
     - command: shell.exec
+      # destroy the cluster
       params:
         working_dir: dsi
         script: |
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}
-          # clean all file to be safe
-          rm -rf *
+          # call terraform destroy twice to avoid AWS timeout
+          yes yes | ./terraform destroy
+          yes yes | ./terraform destroy
+          echo "Cluster DESTROYED."
 
 functions:
   "prepare environment":
@@ -30,7 +33,7 @@ functions:
       # checkout and setup DSI environment
       params:
         script: |
-          set -e 
+          set -e
           set -v
           git clone git@github.com:10gen/dsi.git
           cd dsi
@@ -57,7 +60,7 @@ functions:
         silent: true
         script: |
           # to create a mongod EC2 cluster
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}
           ./setup-cluster.sh
@@ -69,13 +72,13 @@ functions:
       params:
         working_dir: dsi
         script: |
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}
           # configure mongodb cluster with wiredTiger
           USE_CSRS=${use_csrs} ../../bin/config-${setup}.sh mongodb ${storageEngine} ${numShard}
           echo "${cluster} MongoDB Cluster STARTED."
-          
+
   "run test":
     - command: shell.exec
       params:
@@ -110,7 +113,7 @@ functions:
       params:
         working_dir: dsi
         script: |
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}
           # destroy the EC2 cluster
@@ -129,7 +132,7 @@ functions:
       params:
         working_dir: dsi
         script: |
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}/reports
           # move additional file here
@@ -221,7 +224,7 @@ tasks:
 - name: shard_cluster_test
   depends_on:
     - name: compile
-  exec_timeout_secs: 216000 
+  exec_timeout_secs: 216000
   commands:
     - func: "prepare environment"
     - func: "bring up 3 shard cluster"
@@ -235,8 +238,8 @@ tasks:
     - func: "upload log file"
       vars:
         test: "ycsb"
-    - func: "analyze"
     - func: "destroy cluster"
+    - func: "analyze"
 
 - name: shard_cluster_CSRS_test
   depends_on:
@@ -255,8 +258,8 @@ tasks:
     - func: "upload log file"
       vars:
         test: "ycsb"
-    - func: "analyze"
     - func: "destroy cluster"
+    - func: "analyze"
 
 - name: shard_cluster_MMAPv1_test
   depends_on:
@@ -275,13 +278,13 @@ tasks:
     - func: "upload log file"
       vars:
         test: "ycsb"
-    - func: "analyze"
     - func: "destroy cluster"
+    - func: "analyze"
 
 buildvariants:
 - name: linux-wt-shard
   display_name: Linux WT Shard
-  batchtime: 10080 # 1 week
+  batchtime: 40320 # 4 weeks
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: shard
@@ -299,7 +302,7 @@ buildvariants:
 
 - name: linux-wt-shard-csrs
   display_name: Linux WT Shard CSRS
-  batchtime: 10080 # 1 week
+  batchtime: 20160 # 2 weeks
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: shard
@@ -314,17 +317,17 @@ buildvariants:
       distros:
       - rhel55
     - name: shard_cluster_CSRS_test
-    
+
 
 - name: linux-mmapv1-shard
   display_name: Linux MMAPv1 Shard
-  batchtime: 10080 # 1 week
+  batchtime: 40320 # 4 week
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: shard
     cluster: longevity
     numShard: 3
-    storageEngine: mmapv1 
+    storageEngine: mmapv1
 
   run_on:
     - "linux-64-amzn-perf-longevity"
