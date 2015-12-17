@@ -166,27 +166,12 @@ void Lock::CollectionLock::relockWithMode(LockMode mode, Lock::DBLock& dbLock) {
     }
 }
 
-namespace {
-boost::mutex oplogSerialization;  // for OplogIntentWriteLock
-}  // namespace
-
-Lock::OplogIntentWriteLock::OplogIntentWriteLock(Locker* lockState)
-    : _lockState(lockState), _serialized(false) {
+Lock::OplogIntentWriteLock::OplogIntentWriteLock(Locker* lockState) : _lockState(lockState) {
     _lockState->lock(resourceIdOplog, MODE_IX);
 }
 
 Lock::OplogIntentWriteLock::~OplogIntentWriteLock() {
-    if (_serialized) {
-        oplogSerialization.unlock();
-    }
     _lockState->unlock(resourceIdOplog);
-}
-
-void Lock::OplogIntentWriteLock::serializeIfNeeded() {
-    if (!supportsDocLocking() && !_serialized) {
-        oplogSerialization.lock();
-        _serialized = true;
-    }
 }
 
 Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)

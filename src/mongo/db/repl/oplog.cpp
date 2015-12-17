@@ -37,6 +37,8 @@
 #include <deque>
 #include <vector>
 
+#include <boost/thread/recursive_mutex.hpp>
+
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -182,6 +184,42 @@ private:
     BSONObj _oField;
 };
 
+namespace {
+boost::recursive_mutex oplogSerialization;  // for OplogIntentWriteLock
+
+/**
+ *  This implements a critical section that extends until commit/rollback.
+ *  Used to avoid the condvar overhead of using a MODE_X lock on this critical path.
+ */
+class OplogSerialization : public RecoveryUnit::Change {
+public:
+    OplogSerialization() {
+        oplogSerialization.lock();
+        _locked = true;
+    }
+
+    ~OplogSerialization() {
+        invariant(!_locked);
+    }
+
+    virtual void commit() {
+        // use explicit unlock here rather than using a lock_guard, as we want to unlock ASAP
+        oplogSerialization.unlock();
+        _locked = false;
+    }
+
+    virtual void rollback() {
+        oplogSerialization.unlock();
+        _locked = false;
+        log() << "rolling back insert into oplog, as transaction aborted";
+    }
+
+private:
+    bool _locked;
+};
+}  // namespace
+
+
 /* we write to local.oplog.rs:
      { ts : ..., h: ..., v: ..., op: ..., etc }
    ts: an OpTime timestamp
@@ -234,7 +272,12 @@ void _logOpRS(OperationContext* txn,
         fassertFailed(17405);
     }
 
-    oplogLk.serializeIfNeeded();
+
+    // Need to be in a critical section until commit or rollback on non-doc-locking engines
+    if (!supportsDocLocking()) {
+        txn->recoveryUnit()->registerChange(new OplogSerialization);
+    }
+
     std::pair<OpTime, long long> slot =
         getNextOpTime(txn, localOplogRSCollection, ns, replCoord, opstr);
 

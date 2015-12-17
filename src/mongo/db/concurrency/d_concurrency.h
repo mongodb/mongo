@@ -238,10 +238,9 @@ public:
     };
 
     /**
-     * Like the CollectionLock, but optimized for the local oplog. Always locks in MODE_IX,
-     * must call serializeIfNeeded() before doing any concurrent operations in order to
-     * support storage engines without document level locking. It is an error, checked with a
-     * dassert(), to not have a suitable database lock when taking this lock.
+     * Like the CollectionLock, but optimized for the local oplog. Always locks in MODE_IX.
+     * This means that on storage engines without document level locking, an extra critical section
+     * is needed to ensure serialization until the unit of work is committed or rolled back.
      */
     class OplogIntentWriteLock {
         MONGO_DISALLOW_COPYING(OplogIntentWriteLock);
@@ -249,11 +248,9 @@ public:
     public:
         explicit OplogIntentWriteLock(Locker* lockState);
         ~OplogIntentWriteLock();
-        void serializeIfNeeded();
 
     private:
         Locker* const _lockState;
-        bool _serialized;
     };
 
 
