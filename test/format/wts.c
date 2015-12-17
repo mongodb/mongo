@@ -132,7 +132,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
 	int ret;
-	char *config, *end, *p;
+	char *config, *end, *p, helium_config[1024];
 
 	*connp = NULL;
 
@@ -261,17 +261,17 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (DATASOURCE("helium")) {
 		if (g.helium_mount == NULL)
 			die(EINVAL, "no Helium mount point specified");
-		(void)snprintf(config, sizeof(config),
+		(void)snprintf(helium_config, sizeof(helium_config),
 		    "entry=wiredtiger_extension_init,config=["
 		    "helium_verbose=0,"
 		    "dev1=[helium_devices=\"he://./%s\","
 		    "helium_o_volume_truncate=1]]",
 		    g.helium_mount);
-		if ((ret =
-		    conn->load_extension(conn, HELIUM_PATH, config)) != 0)
+		if ((ret = conn->load_extension(
+		    conn, HELIUM_PATH, helium_config)) != 0)
 			die(ret,
 			   "WT_CONNECTION.load_extension: %s:%s",
-			   HELIUM_PATH, config);
+			   HELIUM_PATH, helium_config);
 	}
 	*connp = conn;
 }
