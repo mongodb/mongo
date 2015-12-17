@@ -41,6 +41,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 
@@ -126,6 +127,7 @@ env.Library(
         'legacy_reply_builder.cpp'
     ],
     LIBDEPS=[
+        'command_reply',
         'document_range',
         'metadata',
         '$BUILD_DIR/mongo/util/net/network',

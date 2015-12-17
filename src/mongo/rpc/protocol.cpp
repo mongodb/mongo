@@ -38,7 +38,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

@@ -70,6 +70,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/fail_point",
         "lite_parsed_query",
     ],
 )
