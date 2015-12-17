@@ -174,7 +174,7 @@ private:
                           OpTime lastOpTimeFetched,
                           long long lastFetchedHash,
                           Milliseconds fetcherMaxTimeMS,
-                          Status* returnStatus);
+                          Status* remoteOplogStartStatus);
 
     /**
      * Executes a rollback.
