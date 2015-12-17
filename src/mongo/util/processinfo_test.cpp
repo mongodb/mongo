@@ -48,25 +48,4 @@ TEST(ProcessInfo, NonZeroPageSize) {
         ASSERT_GREATER_THAN(ProcessInfo::getPageSize(), 0u);
     }
 }
-
-const size_t PAGES = 10;
-
-TEST(ProcessInfo, BlockInMemoryDoesNotThrowIfSupported) {
-    if (ProcessInfo::blockCheckSupported()) {
-        static char ptr[4096 * PAGES] = "This needs data to not be in .bss";
-        ProcessInfo::blockInMemory(ptr + ProcessInfo::getPageSize() * 2);
-    }
-}
-
-TEST(ProcessInfo, PagesInMemoryIsSensible) {
-    if (ProcessInfo::blockCheckSupported()) {
-        static char ptr[4096 * PAGES] = "This needs data to not be in .bss";
-        ptr[(ProcessInfo::getPageSize() * 0) + 1] = 'a';
-        ptr[(ProcessInfo::getPageSize() * 8) + 1] = 'a';
-        std::vector<char> result;
-        ASSERT_TRUE(ProcessInfo::pagesInMemory(const_cast<char*>(ptr), PAGES, &result));
-        ASSERT_TRUE(result[0]);
-        ASSERT_TRUE(result[8]);
-    }
-}
 }
