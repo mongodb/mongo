@@ -855,15 +855,6 @@ static int mongoDbMain(int argc, char* argv[], char** envp) {
 
     srand(static_cast<unsigned>(curTimeMicros64()));
 
-    {
-        unsigned x = 0x12345678;
-        unsigned char& b = (unsigned char&)x;
-        if (b != 0x78) {
-            mongo::log(LogComponent::kControl) << "big endian cpus not yet supported" << endl;
-            return 33;
-        }
-    }
-
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
         severe(LogComponent::kControl) << "Failed global initialization: " << status;
