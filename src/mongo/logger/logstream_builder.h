@@ -115,6 +115,11 @@ public:
         return *this;
     }
 
+    LogstreamBuilder& setIsTruncatable(bool isTruncatable) {
+        _isTruncatable = isTruncatable;
+        return *this;
+    }
+
     std::ostream& stream() {
         if (!_os)
             makeStream();
@@ -230,6 +235,7 @@ private:
     std::string _baseMessage;
     std::unique_ptr<std::ostringstream> _os;
     Tee* _tee;
+    bool _isTruncatable = true;
 };
 
 

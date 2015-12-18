@@ -67,9 +67,9 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
     }
 
     StringData msg = event.getMessage();
-    if (msg.size() > maxLogLine) {
-        os << "warning: log line attempted (" << msg.size() / 1024 << "k) over max size ("
-           << maxLogLine / 1024 << "k), printing beginning and end ... ";
+    if (event.isTruncatable() && msg.size() > maxLogLine) {
+        os << "warning: log line attempted (" << msg.size() / 1024 << "kB) over max size ("
+           << maxLogLine / 1024 << "kB), printing beginning and end ... ";
         os << msg.substr(0, maxLogLine / 3);
         os << " .......... ";
         os << msg.substr(msg.size() - (maxLogLine / 3));
