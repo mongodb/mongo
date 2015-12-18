@@ -89,33 +89,6 @@ private:
 };
 
 /**
- * RAII-style class, which acquires a locks on the specified database and collection in the
- * requested mode and obtains references to both.
- *
- * It is guaranteed that locks will be released when this object goes out of scope, therefore
- * the database and the collection references returned by this class should not be retained.
- */
-class AutoGetCollection {
-    MONGO_DISALLOW_COPYING(AutoGetCollection);
-
-public:
-    AutoGetCollection(OperationContext* txn, const NamespaceString& nss, LockMode mode);
-
-    Database* getDb() const {
-        return _autoDb.getDb();
-    }
-
-    Collection* getCollection() const {
-        return _coll;
-    }
-
-private:
-    const AutoGetDb _autoDb;
-    const Lock::CollectionLock _collLock;
-    Collection* const _coll;
-};
-
-/**
  * RAII-style class, which acquires a lock on the specified database in the requested mode and
  * obtains a reference to the database, creating it was non-existing. Used as a shortcut for
  * calls to dbHolder().openDb(), taking care of locking details. The requested mode must be
