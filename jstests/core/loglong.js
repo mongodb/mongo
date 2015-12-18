@@ -23,10 +23,10 @@ log = db.adminCommand( { getLog : "global" } ).log
 
 found = false
 for ( i=log.length - 1; i>= 0; i-- ) {
-    if ( log[i].indexOf( "warning: log line attempted (16k)" ) >= 0 ) {
+    if ( log[i].indexOf( "warning: log line attempted (16kB)" ) >= 0 ) {
         found = true;
         break;
     }
 }
 
-assert( found )
+assert(found, tojson(log));

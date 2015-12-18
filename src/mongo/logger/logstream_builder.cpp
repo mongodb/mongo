@@ -102,7 +102,8 @@ LogstreamBuilder::LogstreamBuilder(LogstreamBuilder&& other)
       _component(std::move(other._component)),
       _baseMessage(std::move(other._baseMessage)),
       _os(std::move(other._os)),
-      _tee(std::move(other._tee)) {}
+      _tee(std::move(other._tee)),
+      _isTruncatable(other._isTruncatable) {}
 
 LogstreamBuilder& LogstreamBuilder::operator=(LogstreamBuilder&& other) {
     _domain = std::move(other._domain);
@@ -112,6 +113,7 @@ LogstreamBuilder& LogstreamBuilder::operator=(LogstreamBuilder&& other) {
     _baseMessage = std::move(other._baseMessage);
     _os = std::move(other._os);
     _tee = std::move(other._tee);
+    _isTruncatable = std::move(other._isTruncatable);
     return *this;
 }
 
@@ -123,6 +125,7 @@ LogstreamBuilder::~LogstreamBuilder() {
         _baseMessage += _os->str();
         MessageEventEphemeral message(
             Date_t::now(), _severity, _component, _contextName, _baseMessage);
+        message.setIsTruncatable(_isTruncatable);
         _domain->append(message);
         if (_tee) {
             _os->str("");

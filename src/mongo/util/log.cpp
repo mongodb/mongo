@@ -131,7 +131,9 @@ void logContext(const char* errmsg) {
     if (errmsg) {
         log() << errmsg << endl;
     }
-    printStackTrace(log().stream());
+    // NOTE: We disable long-line truncation for the stack trace, because the JSON representation of
+    // the stack trace can sometimes exceed the long line limit.
+    printStackTrace(log().setIsTruncatable(false).stream());
 }
 
 Tee* const warnings = RamLog::get("warnings");  // Things put here go in serverStatus
