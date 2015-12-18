@@ -36,7 +36,7 @@
 // figure out if we're on a 64 or 32 bit system
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_WIN64) || defined(__aarch64__) || \
-    defined(__powerpc64__)
+    defined(__powerpc64__) || defined(__s390x__)
 #define MONGO_PLATFORM_64
 #elif defined(__i386__) || defined(_WIN32) || defined(__arm__)
 #define MONGO_PLATFORM_32
