@@ -203,6 +203,14 @@ __wt_atomic_cas_ptr(void *vp, void *old, void *new)
 	__asm__ volatile ("dsb st" ::: "memory");			\
 } while (0)
 
+#elif defined(__s390x__)
+#define	WT_PAUSE()	__asm__ volatile("lr 0,0" ::: "memory")
+#define	WT_FULL_BARRIER() do {						\
+	__asm__ volatile ("bcr 15,0\n" ::: "memory");                   \
+    } while (0)
+#define	WT_READ_BARRIER()	WT_FULL_BARRIER()
+#define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
+
 #else
 #error "No write barrier implementation for this hardware"
 #endif
