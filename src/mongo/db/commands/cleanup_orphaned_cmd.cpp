@@ -218,6 +218,11 @@ public:
             return false;
         }
 
+        if (!NamespaceString(ns).isValid()) {
+            errmsg = "invalid namespace";
+            return false;
+        }
+
         BSONObj startingFromKey;
         if (!FieldParser::extract(cmdObj, startingFromKeyField, &startingFromKey, &errmsg)) {
             return false;
