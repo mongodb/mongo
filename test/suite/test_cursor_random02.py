@@ -38,34 +38,48 @@ class test_cursor_random02(wttest.WiredTigerTestCase):
     config = [
         ('not-sample', dict(config='next_random=true'))
     ]
-    scenarios = number_scenarios(config)
+    records = [
+        ('1', dict(records=1)),
+        ('250', dict(records=250)),
+        ('500', dict(records=500)),
+        ('5000', dict(records=5000)),
+        ('10000', dict(records=10000)),
+        ('50000', dict(records=50000)),
+        ('100000', dict(records=100000)),
+    ]
+    scenarios = number_scenarios(multiply_scenarios('.', config, records))
 
     # Check that next_random works in the presence of a larger set of values,
     # where the values are in an insert list.
     def test_cursor_random_reasonable_distribution(self):
         uri = self.type
-        num_entries = 5000
-        simple_populate(self, uri, 'key_format=S', num_entries)
+        num_entries = self.records
+
+        # Set the leaf-page-max value, otherwise the page might split.
+        simple_populate(self, uri,
+            'leaf_page_max=100MB,key_format=S', num_entries)
         # Setup an array to track which keys are seen
-        visitedKeys = [0] * num_entries
+        visitedKeys = [0] * (num_entries + 1)
 
         cursor = self.session.open_cursor(uri, None, 'next_random=true')
-        for i in range(1,num_entries):
+        for i in range(0, num_entries):
             self.assertEqual(cursor.next(), 0)
             current = cursor.get_key()
             current = int(current)
             visitedKeys[current] = visitedKeys[current] + 1
 
-            if i % 8 == 0:
-                cursor.close()
-                cursor = self.session.open_cursor(uri, None, 'next_random=true')
-
         differentKeys = sum(x > 0 for x in visitedKeys)
+
         #print visitedKeys
         #print differentKeys
+        '''
+        self.tty('differentKeys: ' + str(differentKeys) + ' of ' + \
+            str(num_entries) + ', ' + \
+            str((int)((differentKeys * 100) / num_entries)) + '%')
+        '''
+
         self.assertGreater(differentKeys, num_entries / 4,
             'next_random random distribution not adequate')
 
 if __name__ == '__main__':
     wttest.run()
-
