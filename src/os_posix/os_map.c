@@ -48,8 +48,6 @@ __wt_mmap(WT_SESSION_IMPL *session,
 	return (0);
 }
 
-#define	WT_VM_PAGESIZE	4096
-
 /*
  * __wt_mmap_preload --
  *	Cause a section of a memory map to be faulted in.
@@ -59,9 +57,10 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
 	/* Linux requires the address be aligned to a 4KB boundary. */
+	WT_CONNECTION_IMPL *conn = S2C(session);
 	WT_BM *bm = S2BT(session)->bm;
 	WT_DECL_RET;
-	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(WT_VM_PAGESIZE - 1));
+	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
 	size += WT_PTRDIFF(p, blk);
 
 	/* XXX proxy for "am I doing a scan?" -- manual read-ahead */
@@ -78,9 +77,9 @@ __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
 	 * Manual pages aren't clear on whether alignment is required for the
 	 * size, so we will be conservative.
 	 */
-	size &= ~(size_t)(WT_VM_PAGESIZE - 1);
+	size &= ~(size_t)(conn->page_size - 1);
 
-	if (size > WT_VM_PAGESIZE &&
+	if (size > (size_t)conn->page_size &&
 	    (ret = posix_madvise(blk, size, POSIX_MADV_WILLNEED)) != 0)
 		WT_RET_MSG(session, ret, "posix_madvise will need");
 #else
@@ -101,8 +100,9 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
 	/* Linux requires the address be aligned to a 4KB boundary. */
+	WT_CONNECTION_IMPL *conn = S2C(session);
 	WT_DECL_RET;
-	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(WT_VM_PAGESIZE - 1));
+	void *blk = (void *)((uintptr_t)p & ~(uintptr_t)(conn->page_size - 1));
 	size += WT_PTRDIFF(p, blk);
 
 	if ((ret = posix_madvise(blk, size, POSIX_MADV_DONTNEED)) != 0)

@@ -121,6 +121,7 @@ src/os_win/os_map.c
 src/os_win/os_mtx_cond.c
 src/os_win/os_once.c
 src/os_win/os_open.c
+src/os_win/os_pagesize.c
 src/os_win/os_path.c
 src/os_win/os_priv.c
 src/os_win/os_remove.c

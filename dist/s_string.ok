@@ -809,6 +809,7 @@ os
 ovfl
 ownp
 packv
+pagesize
 parens
 pareto
 parserp
@@ -1029,6 +1030,7 @@ variable's
 vectorized
 versa
 vfprintf
+vm
 vpack
 vprintf
 vrfy

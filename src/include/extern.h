@@ -514,6 +514,7 @@ extern int __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp);
 extern int __wt_once(void (*init_routine)(void));
 extern int __wt_open(WT_SESSION_IMPL *session, const char *name, bool ok_create, bool exclusive, int dio_type, WT_FH **fhp);
 extern int __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp);
+extern int __wt_get_vm_pagesize(void);
 extern bool __wt_absolute_path(const char *path);
 extern const char *__wt_path_separator(void);
 extern bool __wt_has_priv(void);
