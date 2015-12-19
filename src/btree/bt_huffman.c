@@ -332,7 +332,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	for (tp = table, lineno = 1; (ret =
 	    fscanf(fp, "%" SCNi64 " %" SCNi64, &symbol, &frequency)) != EOF;
 	    ++tp, ++lineno) {
-		if (lineno > entries)
+		if (lineno - 1 > entries)
 			WT_ERR_MSG(session, EINVAL,
 			    "Huffman table file %.*s is corrupted, "
 			    "more than %" PRIu32 " entries",
