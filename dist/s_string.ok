@@ -373,6 +373,7 @@ automake
 bInheritHandle
 basecfg
 basho
+bcr
 bdb
 beginthreadex
 bigram
@@ -713,6 +714,7 @@ lookaside
 lookup
 lookups
 lossy
+lr
 lrt
 lru
 lseek
