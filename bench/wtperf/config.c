@@ -577,9 +577,9 @@ err:	if (fd != -1)
 int
 config_opt_line(CONFIG *cfg, const char *optstr)
 {
+	CONFIG_QUEUE_ENTRY *config_line;
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_PARSER *scan;
-	CONFIG_QUEUE_ENTRY *config_line;
 	int ret, t_ret;
 	char *string_copy;
 	size_t len;
@@ -594,12 +594,13 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 	/*
 	 * Append the current line to our copy of the config. The config is
 	 * stored in the order it is processed, so added options will be after
-	 * any parsed from the original config.
+	 * any parsed from the original config. We allocate len +1 to allow for
+	 * a null byte to be added.
 	 */
 
-	if ((string_copy = calloc(len + 1, 1)) == NULL) {
+	if ((string_copy = calloc(len + 1, 1)) == NULL)
 		return (enomem(cfg));
-	}
+
 	strncpy(string_copy, optstr, len);
 	config_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
 	config_line->string = string_copy;
@@ -679,16 +680,26 @@ config_sanity(CONFIG *cfg)
 }
 
 void
-config_queue_dedupe(CONFIG *cfg)
+config_consolidate(CONFIG *cfg)
 {
 	CONFIG_QUEUE_ENTRY *conf_line, *test_line, *tmp;
 	char *string_key;
 
+	/* 
+	 * This loop iterates over the config queue and for entry checks if an
+	 * entry later in the queue has the same key. If a match is found then
+	 * the current queue entry is removed and we continue.
+	 */
 	conf_line = TAILQ_FIRST(&cfg->config_head);
 	while (conf_line != NULL) {
 		string_key = strchr(conf_line->string, '=');
 		tmp = test_line = TAILQ_NEXT(conf_line, c);
 		while (test_line != NULL) {
+		/*
+		 * The +1 here forces the = sign to be matched ensuring we don't
+		 * match keys that have a common prefix such as "table_count"
+		 * and "table_count_idle" as being the same key.
+		 */
 			if (strncmp(conf_line->string, test_line->string,
 			    string_key - conf_line->string + 1) == 0) {
 				TAILQ_REMOVE(&cfg->config_head, conf_line, c);
@@ -730,9 +741,10 @@ config_to_file(CONFIG *cfg)
 	}
 
 	/* Print the config dump */
-	fprintf(fp, "# Warning. This config can include defaults.\n");
-	fprintf(fp, "# This make cause differences in behaviour.\n");
-	config_queue_dedupe(cfg);
+	fprintf(fp,"# Warning. This config includes "
+	    "unwritten, implicit configuration defaults.\n"
+	    "# Changes to those values may cause differences in behavior.\n");
+	config_consolidate(cfg);
 	config_line = TAILQ_FIRST(&cfg->config_head);
 	while (config_line != NULL) {
 		fprintf(fp, "%s\n", config_line->string);
