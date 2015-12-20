@@ -1049,7 +1049,7 @@ struct __wt_insert_head {
 	uint64_t __prev_split_gen = (session)->split_gen;		\
 	if (__prev_split_gen == 0)					\
 		do {                                                    \
-			WT_PUBLISH((session)->split_gen,                \
+			WT_PUBLISH((session)->split_gen,		\
 			    S2C(session)->split_gen);                   \
 		} while ((session)->split_gen != S2C(session)->split_gen)
 

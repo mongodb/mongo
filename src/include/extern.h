@@ -468,7 +468,7 @@ extern int __wt_meta_track_init(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_destroy(WT_SESSION_IMPL *session);
 extern int __wt_turtle_init(WT_SESSION_IMPL *session);
 extern int __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep);
-extern int __wt_turtle_update( WT_SESSION_IMPL *session, const char *key, const char *value);
+extern int __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value);
 extern void __wt_abort(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 extern int __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp);
 extern int __wt_realloc(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp);
