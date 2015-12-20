@@ -418,16 +418,24 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 
 /*
  * __wt_block_manager_size --
- *	Set the size statistic for a file.
+ *	Return the size of a live block handle.
  */
 int
-__wt_block_manager_size(
-    WT_SESSION_IMPL *session, const char *filename, WT_DSRC_STATS *stats)
+__wt_block_manager_size(WT_BM *bm, WT_SESSION_IMPL *session, wt_off_t *sizep)
 {
-	wt_off_t filesize;
+	WT_UNUSED(session);
 
-	WT_RET(__wt_filesize_name(session, filename, false, &filesize));
-	stats->block_size = filesize;
-
+	*sizep = bm->block->fh == NULL ? 0 : bm->block->fh->size;
 	return (0);
+}
+
+/*
+ * __wt_block_manager_named_size --
+ *	Return the size of a named file.
+ */
+int
+__wt_block_manager_named_size(
+    WT_SESSION_IMPL *session, const char *name, wt_off_t *sizep)
+{
+	return (__wt_filesize_name(session, name, false, sizep));
 }
