@@ -85,7 +85,8 @@ for (i = 1; i < hashes.length; i++) {
         continue;
     }
     
-    assert.eq(hashes[0].collections.length , hashes[i].collections.length ,
+    assert.eq(Object.keys(hashes[0].collections).length ,
+              Object.keys(hashes[i].collections).length ,
               "number of collections do not match:\n" +
               tojson(hashes[0].collections) + '\n' +
               tojson(hashes[i].collections));
