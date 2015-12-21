@@ -212,6 +212,7 @@ public:
         const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
         const OpTime& myLastOpApplied);
     virtual bool voteForMyself(Date_t now);
+    virtual void setElectionInfo(OID electionId, Timestamp electionOpTime);
     virtual void processWinElection(OID electionId, Timestamp electionOpTime);
     virtual void processLoseElection();
     virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) const;

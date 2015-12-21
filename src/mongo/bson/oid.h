@@ -93,13 +93,6 @@ public:
         std::memcpy(_data, arr, sizeof(arr));
     }
 
-    static_assert(sizeof(int64_t) == kInstanceUniqueSize + kIncrementSize,
-                  "size of term must be size of instance unique + increment");
-    /** init with a 8 byte term id. used for ElectionID */
-    explicit OID(int64_t term) {
-        init(term);
-    }
-
     /** initialize to 'null' */
     void clear() {
         std::memset(_data, 0, kOIDSize);
@@ -118,6 +111,16 @@ public:
         OID o((no_initialize_tag()));
         o.init();
         return o;
+    }
+
+    static_assert(sizeof(int64_t) == kInstanceUniqueSize + kIncrementSize,
+                  "size of term must be size of instance unique + increment");
+
+    // Return OID initialized with a 8 byte term id and max Timestamp. Used for ElectionID.
+    static OID fromTerm(int64_t term) {
+        OID result;
+        result.initFromTermNumber(term);
+        return result;
     }
 
     // Caller must ensure that the buffer is valid for kOIDSize bytes.
@@ -144,8 +147,11 @@ public:
     /** Set to the min/max OID that could be generated at given timestamp. */
     void init(Date_t date, bool max = false);
 
-    /** Sets the contents to contain the time followed by an big endian 8 byte term id */
-    void init(int64_t term);
+    /**
+     * Sets the contents to contain the leading max Timestamp (0x7FFFFFFF)
+     * followed by an big endian 8 byte term id
+     */
+    void initFromTermNumber(int64_t term);
 
     time_t asTimeT() const;
     Date_t asDateT() const {
