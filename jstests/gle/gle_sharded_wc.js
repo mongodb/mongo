@@ -6,6 +6,7 @@
 // @tags: [SERVER-21420]
 
 (function() {
+'use strict';
 
 // Options for a cluster with two replica set shards, the first with two nodes the second with one
 // This lets us try a number of GLE scenarios
@@ -15,8 +16,7 @@ var options = { rs : true,
                 rs0 : { nodes : 3 },
                 rs1 : { nodes : 3 } };
 
-var st = new ShardingTest({ shards : 2, mongos : 1, other : options, verbose: 4});
-st.stopBalancer();
+var st = new ShardingTest({ shards: 2, other : options });
 
 var mongos = st.s0;
 var admin = mongos.getDB( "admin" );
@@ -128,8 +128,6 @@ printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
 assert(gle.ok);
 assert(gle.err);
 assert.eq(coll.count({ _id : 1 }), 1);
-
-jsTest.log( "DONE!" );
 
 st.stop();
 

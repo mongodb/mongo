@@ -12,8 +12,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
 "use strict";
 
 var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
-var st = new ShardingTest({shards: 2, mongos: 1, 
-                          other: {separateConfig: true, shardOptions: {verbose: 0}}});
+var st = new ShardingTest({ shards: 2, other: { separateConfig: true } });
 
 var mongos = st.s0,
     admin = mongos.getDB('admin'),
@@ -125,7 +124,6 @@ assert.eq(0, donorColl.count());
 assert.eq(1, recipColl.count());
 assert.eq(1, coll.count());
 
-jsTest.log('DONE!');
 st.stop();
 
 })()

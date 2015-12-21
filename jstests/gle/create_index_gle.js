@@ -7,7 +7,6 @@ var st = new ShardingTest({
         rs0: {
             nodes: { n0: {}, n1: { rsConfig: { priority: 0 } } },
             oplogSize: 10,
-            verbose: 1,
         }
     },
 });

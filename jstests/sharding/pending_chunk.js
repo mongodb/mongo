@@ -5,8 +5,7 @@
 (function() { 
 "use strict";
 
-var st = new ShardingTest({shards: 2, mongos: 2, 
-                          other: {separateConfig: true, shardOptions: {verbose: 2}}});
+var st = new ShardingTest({ shards: 2, mongos: 2, other: { separateConfig: true } });
 
 var mongos = st.s0;
 var admin = mongos.getDB('admin');
@@ -84,8 +83,6 @@ assert.eq(metadata.chunks[0][0]._id, 1);
 assert.eq(metadata.chunks[0][1]._id, MaxKey);
 
 st.printShardingStatus();
-
-jsTest.log('DONE!');
 
 st.stop();
 

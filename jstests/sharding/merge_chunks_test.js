@@ -1,11 +1,10 @@
 //
 // Tests that merging chunks via mongos works/doesn't work with different chunk configurations
 //
+(function() {
+'use strict';
 
-var options = { shardOptions : { verbose : 0 } };
-
-var st = new ShardingTest({ shards : 2, mongos : 2, other : options });
-st.stopBalancer();
+var st = new ShardingTest({ shards : 2, mongos : 2 });
 
 var mongos = st.s0;
 var staleMongos = st.s1;
@@ -120,3 +119,4 @@ st.printShardingStatus();
 
 st.stop();
 
+})();

@@ -362,9 +362,7 @@ BSONObj DBClientCursor::next() {
 BSONObj DBClientCursor::nextSafe() {
     BSONObj o = next();
     if (this->wasError && strcmp(o.firstElementFieldName(), "$err") == 0) {
-        std::string s = "nextSafe(): " + o.toString();
-        LOG(5) << s;
-        uasserted(13106, s);
+        uasserted(13106, str::stream() << "nextSafe(): " << o.toString());
     }
     return o;
 }
