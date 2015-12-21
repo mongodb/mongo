@@ -182,7 +182,6 @@ private:
 /// Storage class used by both Document and MutableDocument
 class DocumentStorage : public RefCountable {
 public:
-    // Note: default constructor should zero-init to support emptyDoc()
     DocumentStorage()
         : _buffer(NULL),
           _bufferEnd(NULL),
@@ -190,7 +189,9 @@ public:
           _numFields(0),
           _hashTabMask(0),
           _metaFields(),
-          _textScore(0) {}
+          _textScore(0),
+          _randVal(0) {}
+
     ~DocumentStorage();
 
     enum MetaType : char {
@@ -201,8 +202,7 @@ public:
     };
 
     static const DocumentStorage& emptyDoc() {
-        static const char emptyBytes[sizeof(DocumentStorage)] = {0};
-        return *reinterpret_cast<const DocumentStorage*>(emptyBytes);
+        return kEmptyDoc;
     }
 
     size_t size() const {
@@ -387,5 +387,8 @@ private:
     double _textScore;
     double _randVal;
     // When adding a field, make sure to update clone() method
+
+    // Defined in document.cpp
+    static const DocumentStorage kEmptyDoc;
 };
 }
