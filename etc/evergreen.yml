@@ -2307,11 +2307,25 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: concurrency
+    # Some concurrency workloads require a lot of memory, so we use machines
+    # with more RAM for these suites.
+    distros:
+    - rhel55
   - name: concurrency_WT
+    distros:
+    - rhel55
   - name: concurrency_replication
+    distros:
+    - rhel55
   - name: concurrency_replication_WT
+    distros:
+    - rhel55
   - name: concurrency_sharded
+    distros:
+    - rhel55
   - name: concurrency_sharded_WT
+    distros:
+    - rhel55
   - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
@@ -3149,11 +3163,25 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: concurrency
+    # Some concurrency workloads require a lot of memory, so we use machines
+    # with more RAM for these suites.
+    distros:
+    - windows-64-vs2013-compile
   - name: concurrency_WT
+    distros:
+    - windows-64-vs2013-compile
   - name: concurrency_replication
+    distros:
+    - windows-64-vs2013-compile
   - name: concurrency_replication_WT
+    distros:
+    - windows-64-vs2013-compile
   - name: concurrency_sharded
+    distros:
+    - windows-64-vs2013-compile
   - name: concurrency_sharded_WT
+    distros:
+    - windows-64-vs2013-compile
   - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
