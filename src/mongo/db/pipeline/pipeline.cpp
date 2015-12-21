@@ -61,7 +61,6 @@ const char Pipeline::mongosPipelineName[] = "mongosPipeline";
 Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx)
     : explain(false), pCtx(pTheCtx) {}
 
-
 /* this structure is used to make a lookup table of operators */
 struct StageDesc {
     const char* pName;
@@ -417,6 +416,17 @@ void Pipeline::Optimizations::Sharded::limitFieldsSentFromShardsToMerger(Pipelin
         BSON("$project" << mergeDeps.toProjection()).firstElement(), shardPipe->pCtx));
 }
 
+bool Pipeline::hasOutStage() const {
+    if (sources.empty()) {
+        return false;
+    }
+
+    // The $out stage must be the last one in the pipeline, so check if the last
+    // stage is $out.
+    return dynamic_cast<DocumentSourceOut*>(sources.back().get());
+}
+
+
 BSONObj Pipeline::getInitialQuery() const {
     if (sources.empty())
         return BSONObj();
@@ -512,7 +522,7 @@ bool Pipeline::canRunInMongos() const {
     if (explain)
         return false;
 
-    if (!sources.empty() && dynamic_cast<DocumentSourceNeedsMongod*>(sources.back().get()))
+    if (hasOutStage())
         return false;
 
     return true;

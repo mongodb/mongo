@@ -89,6 +89,11 @@ public:
     BSONObj getInitialQuery() const;
 
     /**
+     * Returns true if the pipeline has an $out stage, and false otherwise.
+     */
+    bool hasOutStage() const;
+
+    /**
       Write the Pipeline as a BSONObj command.  This should be the
       inverse of parseCommand().
 
