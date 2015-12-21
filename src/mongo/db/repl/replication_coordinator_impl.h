@@ -1132,7 +1132,8 @@ private:
      * Reset the term of last vote to 0 to prevent any node from voting for term 0.
      * Blocking until last vote write finishes. Must be called without holding _mutex.
      */
-    void _resetElectionInfoOnProtocolVersionUpgrade(const ReplicaSetConfig& newConfig);
+    void _resetElectionInfoOnProtocolVersionUpgrade(const ReplicaSetConfig& oldConfig,
+                                                    const ReplicaSetConfig& newConfig);
 
     /**
      * Schedules work and returns handle to callback.

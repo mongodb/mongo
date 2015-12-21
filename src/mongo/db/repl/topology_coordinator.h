@@ -345,9 +345,14 @@ public:
     virtual bool voteForMyself(Date_t now) = 0;
 
     /**
-     * Set lastVote to be for ourself in this term.
+     * Sets lastVote to be for ourself in this term.
      */
     virtual void voteForMyselfV1() = 0;
+
+    /**
+     * Sets election id and election optime.
+     */
+    virtual void setElectionInfo(OID electionId, Timestamp electionOpTime) = 0;
 
     /**
      * Performs state updates associated with winning an election.

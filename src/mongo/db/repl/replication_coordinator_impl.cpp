@@ -2085,10 +2085,11 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigReconfiguring);
     invariant(_rsConfig.isInitialized());
+    const ReplicaSetConfig oldConfig = _rsConfig;
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
     lk.unlock();
-    _resetElectionInfoOnProtocolVersionUpgrade(newConfig);
+    _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
 }
 
@@ -2207,10 +2208,11 @@ void ReplicationCoordinatorImpl::_finishReplSetInitiate(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigInitiating);
     invariant(!_rsConfig.isInitialized());
+    const ReplicaSetConfig oldConfig = _rsConfig;
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
     lk.unlock();
-    _resetElectionInfoOnProtocolVersionUpgrade(newConfig);
+    _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
 }
 
@@ -2338,7 +2340,12 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             break;
         case kActionWinElection: {
             stdx::unique_lock<stdx::mutex> lk(_mutex);
-            _electionId = OID(_topCoord->getTerm());
+            if (isV1ElectionProtocol()) {
+                invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
+                _electionId = OID::fromTerm(_topCoord->getTerm());
+            } else {
+                _electionId = OID::gen();
+            }
             _topCoord->processWinElection(_electionId, getNextGlobalTimestamp());
             _isWaitingForDrainToComplete = true;
             _externalState->signalApplierToCancelFetcher();
@@ -2448,6 +2455,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
     OpTime myOptime = _getMyLastOptime_inlock();
     _topCoord->updateConfig(newConfig, myIndex, _replExecutor.now(), myOptime);
     _cachedTerm = _topCoord->getTerm();
+    const ReplicaSetConfig oldConfig = _rsConfig;
     _rsConfig = newConfig;
     _protVersion.store(_rsConfig.getProtocolVersion());
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
@@ -2470,6 +2478,23 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
         _startHeartbeats_inlock(cbData);
     }
     _updateLastCommittedOpTime_inlock();
+
+    // Set election id if we're primary.
+    if (oldConfig.isInitialized() && _memberState.primary()) {
+        if (oldConfig.getProtocolVersion() > newConfig.getProtocolVersion()) {
+            // Downgrade
+            invariant(newConfig.getProtocolVersion() == 0);
+            _electionId = OID::gen();
+            _topCoord->setElectionInfo(_electionId, getNextGlobalTimestamp());
+        } else if (oldConfig.getProtocolVersion() < newConfig.getProtocolVersion()) {
+            // Upgrade
+            invariant(newConfig.getProtocolVersion() == 1);
+            invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
+            _electionId = OID::fromTerm(_topCoord->getTerm());
+            _topCoord->setElectionInfo(_electionId, getNextGlobalTimestamp());
+        }
+    }
+
     _wakeReadyWaiters_inlock();
     return action;
 }
@@ -3266,14 +3291,16 @@ void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
 }
 
 void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
-    const ReplicaSetConfig& newConfig) {
+    const ReplicaSetConfig& oldConfig, const ReplicaSetConfig& newConfig) {
     // On protocol version upgrade, reset last vote as if I just learned the term 0 from other
     // nodes.
-    if (!_rsConfig.isInitialized() ||
-        _rsConfig.getProtocolVersion() >= newConfig.getProtocolVersion()) {
+    if (!oldConfig.isInitialized() ||
+        oldConfig.getProtocolVersion() >= newConfig.getProtocolVersion()) {
         return;
     }
+    invariant(newConfig.getProtocolVersion() == 1);
 
+    // Write last vote
     auto cbStatus = _replExecutor.scheduleDBWork([this](const CallbackArgs& cbData) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;

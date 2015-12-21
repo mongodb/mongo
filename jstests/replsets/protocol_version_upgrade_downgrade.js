@@ -61,6 +61,11 @@ res = primary.adminCommand({replSetGetStatus: 1});
 assert.commandWorked(res);
 assert.eq(res.members[0].optime.t, NumberLong(0));
 
+// Check last vote.
+var lastVote = primary.getDB("local")['replset.election'].findOne();
+assert.eq(lastVote.term, NumberLong(0));
+assert.eq(lastVote.candidateIndex, NumberLong(-1));
+
 //
 // Downgrade protocol version
 //
