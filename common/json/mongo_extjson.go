@@ -103,7 +103,7 @@ func stateBeginExtendedValue(s *scanner, c int) int {
 	switch c {
 	case 'u': // beginning of undefined
 		s.step = stateU
-	case 'B': // beginning of BinData
+	case 'B': // beginning of BinData or Boolean
 		s.step = stateB
 	case 'D': // beginning of Date
 		s.step = stateD
@@ -126,6 +126,19 @@ func stateBeginExtendedValue(s *scanner, c int) int {
 	}
 
 	return scanBeginLiteral
+}
+
+// stateB is the state after reading `B`.
+func stateB(s *scanner, c int) int {
+	if c == 'i' {
+		s.step = stateBi
+		return scanContinue
+	}
+	if c == 'o' {
+		s.step = stateBo
+		return scanContinue
+	}
+	return s.error(c, "in literal BinData or Boolean (expecting 'i' or 'o')")
 }
 
 // stateUpperN is the state after reading `N`.
@@ -209,14 +222,18 @@ func (d *decodeState) storeExtendedLiteral(item []byte, v reflect.Value, fromQuo
 			d.error(fmt.Errorf("cannot store %v value into %v type", undefinedType, kind))
 		}
 
-	case 'B': // BinData
-		d.storeBinData(v)
-
+	case 'B': // BinData or Boolean
+		switch item[1] {
+		case 'i': // BinData
+			d.storeBinData(v)
+		case 'o': // Boolean
+			d.storeBoolean(v)
+		}
 	case 'D': // Date, DBRef, DBPointer, Dbpointer,or Dbref
 		switch item[1] {
 		case 'a': // Date
 			d.storeDate(v)
-		case 'b': //Dbref
+		case 'b': // Dbref
 			d.storeDBRef(v)
 		case 'B': // DBRef or DBPointer
 			switch item[2] {
@@ -300,8 +317,13 @@ func (d *decodeState) getExtendedLiteral(item []byte) (interface{}, bool) {
 	case 'u': // undefined
 		return Undefined{}, true
 
-	case 'B': // BinData
-		return d.getBinData(), true
+	case 'B': // BinData or Boolean
+		switch item[1] {
+		case 'i': // BinData
+			return d.getBinData(), true
+		case 'o': // Boolean
+			return d.getBoolean(), true
+		}
 
 	case 'D': // Date, DBRef, or Dbref
 		switch item[1] {

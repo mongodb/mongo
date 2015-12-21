@@ -11,6 +11,7 @@
     var testDoc = {
       _id : ObjectId(),
       a : BinData(0,"e8MEnzZoFyMmD7WSHdNrFJyEk8M="),
+      b : Boolean(1),
       d : "this is a string",
       e : ["this is an ", 2, 23.5, "array with various types in it"],
       f : {"this is": "an embedded doc"},
@@ -39,20 +40,20 @@
 
     docKeys = Object.keys(testDoc)
     for(var i=0;i<docKeys.length;i++){
-      jsTest.log("checking field", docKeys[i])
+      jsTest.log("checking field " + docKeys[i])
       assert.eq(testDoc[docKeys[i]], postImportDoc[docKeys[i]], "imported field " + docKeys[i] + " does not match original")
 
     }
 
-    // DBPointer should turn into a DBRef with a $ref field and hte $id field being an ObjectId. It will not convert back to a DBPointer. 
-    
+    // DBPointer should turn into a DBRef with a $ref field and hte $id field being an ObjectId. It will not convert back to a DBPointer.
+
     var oid = ObjectId()
     var irregularObjects = {
       _id : ObjectId(),
       a : DBPointer('namespace', oid),
       b : NumberInt("5"),
       c : NumberLong("5000"),
-      d : 5, 
+      d : 5,
       e : 9223372036854775
 
     }

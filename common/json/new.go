@@ -33,7 +33,7 @@ func stateBeginObjectValue(s *scanner, c int) int {
 		return scanSkipSpace
 	}
 	switch c {
-	case 'B': // beginning of BinData
+	case 'B': // beginning of BinData or Boolean
 		s.step = stateB
 	case 'D': // beginning of Date
 		s.step = stateD

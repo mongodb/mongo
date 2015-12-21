@@ -90,6 +90,21 @@ func TestSingleQuotedValues(t *testing.T) {
 			So(jsonValue.Base64, ShouldEqual, "xyz")
 		})
 
+		Convey("can be used within Boolean constructor", func() {
+			var jsonMap map[string]interface{}
+
+			key := "boolean"
+			value := "Boolean('xyz')"
+			data := fmt.Sprintf(`{"%v":%v}`, key, value)
+
+			err := Unmarshal([]byte(data), &jsonMap)
+			So(err, ShouldBeNil)
+
+			jsonValue, ok := jsonMap[key].(bool)
+			So(ok, ShouldBeTrue)
+			So(jsonValue, ShouldEqual, true)
+		})
+
 		Convey("can be used within DBRef constructor", func() {
 			var jsonMap map[string]interface{}
 

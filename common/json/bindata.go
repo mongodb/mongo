@@ -8,13 +8,13 @@ import (
 // Transition functions for recognizing BinData.
 // Adapted from encoding/json/scanner.go.
 
-// stateB is the state after reading `B`.
-func stateB(s *scanner, c int) int {
-	if c == 'i' {
-		s.step = generateState("BinData", []byte("nData"), stateConstructor)
+// stateBi is the state after reading `Bi`.
+func stateBi(s *scanner, c int) int {
+	if c == 'n' {
+		s.step = generateState("BinData", []byte("Data"), stateConstructor)
 		return scanContinue
 	}
-	return s.error(c, "in literal BinData (expecting 'i')")
+	return s.error(c, "in literal BinData (expecting 'n')")
 }
 
 // Decodes a BinData literal stored in the underlying byte data into v.

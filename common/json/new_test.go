@@ -25,6 +25,32 @@ func TestNewKeyword(t *testing.T) {
 			So(jsonValue, ShouldResemble, BinData{1, "xyz"})
 		})
 
+		Convey("can be used with BinData constructor", func() {
+			var jsonMap map[string]interface{}
+
+			key := "key"
+			value := `new Boolean(1)`
+			data := fmt.Sprintf(`{"%v":%v}`, key, value)
+
+			err := Unmarshal([]byte(data), &jsonMap)
+			So(err, ShouldBeNil)
+
+			jsonValue, ok := jsonMap[key].(bool)
+			So(ok, ShouldBeTrue)
+			So(jsonValue, ShouldResemble, true)
+
+			key = "key"
+			value = `new Boolean(0)`
+			data = fmt.Sprintf(`{"%v":%v}`, key, value)
+
+			err = Unmarshal([]byte(data), &jsonMap)
+			So(err, ShouldBeNil)
+
+			jsonValue, ok = jsonMap[key].(bool)
+			So(ok, ShouldBeTrue)
+			So(jsonValue, ShouldResemble, false)
+		})
+
 		Convey("can be used with Date constructor", func() {
 			var jsonMap map[string]interface{}
 
