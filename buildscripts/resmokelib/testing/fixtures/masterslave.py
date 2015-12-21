@@ -53,11 +53,13 @@ class MasterSlaveFixture(interface.ReplFixture):
         self.slave = None
 
     def setup(self):
-        self.master = self._new_mongod_master()
+        if self.master is None:
+            self.master = self._new_mongod_master()
         self.master.setup()
         self.port = self.master.port
 
-        self.slave = self._new_mongod_slave()
+        if self.slave is None:
+            self.slave = self._new_mongod_slave()
         self.slave.setup()
 
     def await_ready(self):
