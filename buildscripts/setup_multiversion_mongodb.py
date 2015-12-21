@@ -5,6 +5,7 @@ import sys
 import os
 import tempfile
 import urllib2
+import urlparse
 import subprocess
 import tarfile
 import signal
@@ -12,8 +13,10 @@ import threading
 import traceback
 import shutil
 import errno
+from contextlib import closing
 # To ensure it exists on the system
 import gzip
+import zipfile
 
 #
 # Useful script for installing multiple versions of MongoDB on a machine
@@ -73,6 +76,7 @@ class MultiVersionDownloader :
         return self._links
 
     def download_links(self):
+        # This href is for community builds; enterprise builds are not browseable.
         href = "http://dl.mongodb.org/dl/%s/%s" \
                % (self.platform.lower(), self.arch)
 
@@ -90,7 +94,7 @@ class MultiVersionDownloader :
 
         links = {}
         for line in html.split():
-            match = re.compile("http:\/\/downloads\.mongodb\.org\/%s/mongodb-%s-%s-([^\"]*)\.tgz" \
+            match = re.compile("http:.*/%s/mongodb-%s-%s-([^\"]*)\.(tgz|zip)" \
                 % (self.platform.lower(), self.platform.lower(), self.arch)).search(line)
 
             if match == None: continue
@@ -129,6 +133,7 @@ class MultiVersionDownloader :
         full_version = urls[-1][0]
         url = urls[-1][1]
         extract_dir = url.split("/")[-1][:-4]
+        file_suffix = os.path.splitext(urlparse.urlparse(url).path)[1]
 
         # only download if we don't already have the directory
         already_downloaded = os.path.isdir(os.path.join( self.install_dir, extract_dir))
@@ -137,26 +142,27 @@ class MultiVersionDownloader :
                 % (version, full_version, extract_dir)
         else:
             temp_dir = tempfile.mkdtemp()
-            temp_file = tempfile.mktemp(suffix=".tgz")
+            temp_file = tempfile.mktemp(suffix=file_suffix)
     
             data = urllib2.urlopen(url)
     
             print "Downloading data for version %s (%s)..." % (version, full_version)
+            print "Download url is %s" % url
     
             with open(temp_file, 'wb') as f:
                 f.write(data.read())
                 print "Uncompressing data for version %s (%s)..." % (version, full_version)
     
-            # Can't use cool with syntax b/c of python 2.6
-            tf = tarfile.open(temp_file, 'r:gz')
-    
-            try:
-                tf.extractall(path=temp_dir)
-            except:
-                tf.close()
-                raise
-    
-            tf.close()
+            if file_suffix == ".zip":
+                # Support .zip downloads, used for Windows binaries.
+                with zipfile.ZipFile(temp_file) as zf:
+                    zf.extractall(temp_dir)
+            elif file_suffix == ".tgz":
+                # Support .tgz downloads, used for Linux binaries.
+                with closing(tarfile.open(temp_file, 'r:gz')) as tf:
+                    tf.extractall(path=temp_dir)
+            else:
+                raise Exception("Unsupported file extension %s" % file_suffix)
     
             temp_install_dir = os.path.join(temp_dir, extract_dir)
     
@@ -179,11 +185,24 @@ class MultiVersionDownloader :
 
         for executable in os.listdir(os.path.join(installed_dir, "bin")):
 
-            link_name = "%s-%s" % (executable, version)
+            executable_name, executable_extension = os.path.splitext(executable)
+            link_name = "%s-%s%s" % (executable_name, version, executable_extension)
 
             try:
-                os.symlink(os.path.join(installed_dir, "bin", executable),\
-                           os.path.join(self.link_dir, link_name))
+                executable = os.path.join(installed_dir, "bin", executable)
+                executable_link = os.path.join(self.link_dir, link_name)
+                if os.name == "nt":
+                    # os.symlink is not supported on Windows, use a direct method instead.
+                    def symlink_ms(source, link_name):
+                        import ctypes
+                        csl = ctypes.windll.kernel32.CreateSymbolicLinkW
+                        csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
+                        csl.restype = ctypes.c_ubyte
+                        flags = 1 if os.path.isdir(source) else 0
+                        if csl(link_name, source.replace('/', '\\'), flags) == 0:
+                            raise ctypes.WinError()
+                    os.symlink = symlink_ms
+                os.symlink(executable, executable_link)
             except OSError as exc:
                 if exc.errno == errno.EEXIST:
                     pass
@@ -192,8 +211,9 @@ class MultiVersionDownloader :
 
 CL_HELP_MESSAGE = \
 """
-Downloads and installs particular mongodb versions (each binary is renamed to include its version) 
-into an install directory and symlinks the binaries with versions to another directory.
+Downloads and installs particular mongodb versions (each binary is renamed to include its version)
+into an install directory and symlinks the binaries with versions to another directory. This script
+only supports community builds, not enterprise builds.
 
 Usage: setup_multiversion_mongodb.py INSTALL_DIR LINK_DIR PLATFORM_AND_ARCH VERSION1 [VERSION2 VERSION3 ...]
 
