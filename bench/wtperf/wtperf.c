@@ -371,6 +371,54 @@ err:		cfg->error = cfg->stop = 1;
 	return (NULL);
 }
 
+static int
+do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
+{
+	size_t r, r1;
+	uint64_t next_val, prev_val;
+	uint64_t vals[READ_RANGE_OPS];
+	int ret;
+	char *range_key_buf;
+	char buf[512];
+
+	ret = 0;
+	memset(&buf[0], 0, 512 * sizeof(char));
+	range_key_buf = &buf[0];
+	cursor->get_key(cursor, &range_key_buf);
+	extract_key(range_key_buf, &next_val);
+	for (r = 0; r < READ_RANGE_OPS; ++r) {
+		prev_val = next_val;
+		vals[r] = prev_val;
+		ret = cursor->next(cursor);
+		/*
+		 * We could be walking near the end.  If we get to the end that
+		 * is okay.
+		 */
+		if (ret != 0)
+			break;
+
+		/* Retrieve and decode the key */
+		cursor->get_key(cursor, &range_key_buf);
+		extract_key(range_key_buf, &next_val);
+#if 0
+		lprintf(cfg, 0, 0,
+		    "%d: range_key_buf %s prev %" PRIu64 " next %" PRIu64,
+		    (int)r, range_key_buf, prev_val, next_val);
+#endif
+		if (next_val < prev_val) {
+			for (r1 = 0; r1 <= r; ++r1)
+				lprintf(cfg, 0, 0,
+				    "Key[%d]: %" PRIu64, (int)r1, vals[r1]);
+			lprintf(cfg, EINVAL, WT_PANIC,
+			    "Out of order keys %" PRIu64
+			    " came before %" PRIu64,
+			    prev_val, next_val);
+			break;
+		}
+	}
+	return (ret);
+}
+
 static void *
 worker(void *arg)
 {
@@ -381,10 +429,9 @@ worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
+	size_t i;
 	int64_t ops, ops_per_txn, throttle_ops;
-	size_t i, r, r1;
-	uint64_t next_val, prev_val, usecs;
-	uint64_t vals[READ_RANGE_OPS];
+	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret, truncated;
 	char *value_buf, *key_buf, *value;
@@ -527,9 +574,6 @@ worker(void *arg)
 			 * a random range as a "read".
 			 */
 			ret = cursor->search(cursor);
-			lprintf(cfg, 0, 0,
-			    "Read: search ret: %d key_buf %s next_val %" PRIu64,
-			    ret, key_buf, next_val);
 			if (ret == 0) {
 				if ((ret = cursor->get_value(
 				    cursor, &value)) != 0) {
@@ -543,36 +587,9 @@ worker(void *arg)
 			 * several operations, confirming that the next key
 			 * is in the correct order.
 			 */
-			if (ret == 0 && cfg->read_range) {
-				for (r = 0; r < READ_RANGE_OPS; ++r) {
-					prev_val = next_val;
-					vals[r] = prev_val;
-					ret = cursor->next(cursor);
-					/*
-					 * We could be walking near the end.
-					 * If we get to the end that is okay.
-					 */
-					if (ret != 0)
-						break;
-					cursor->get_key(cursor, &key_buf);
-					extract_key(key_buf, &next_val);
-					lprintf(cfg, 0, 0,
-					    "%d: key_buf %s prev %"
-					    PRIu64 " next %" PRIu64,
-					    r, key_buf, prev_val, next_val);
-					if (next_val < prev_val) {
-						for (r1 = 0; r1 <= r; ++r1)
-							lprintf(cfg, 0, 0,
-							    "Key[%d]: %" PRIu64,
-							    r1, vals[r1]);
-						lprintf(cfg, EINVAL, WT_PANIC,
-						    "Out of order keys %" PRIu64
-						    " came before %" PRIu64,
-						    prev_val, next_val);
-						goto err;
-					}
-				}
-			}
+			if (ret == 0 && cfg->read_range)
+				ret = do_range_reads(cfg, cursor);
+
 			if (ret == 0 || ret == WT_NOTFOUND)
 				break;
 			goto op_err;
