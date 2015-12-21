@@ -1,10 +1,15 @@
 # -*- mode: python -*-
 
 Import("env")
+Import("endian")
+
+env = env.Clone()
 
 if env.ToolchainIs('clang', 'GCC'):
-    env = env.Clone()
     env.Append(CCFLAGS=['-Wno-sign-compare', '-Wno-unused-function'])
+
+if endian == "big":
+    env.Append(CPPDEFINES=['WORDS_BIGENDIAN'])
 
 env.Library(
     target='snappy',
