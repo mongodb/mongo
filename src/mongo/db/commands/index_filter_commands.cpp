@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include <string>
@@ -44,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/util/log.h"
 
 
 namespace {
@@ -279,6 +282,9 @@ Status ClearFilters::clear(OperationContext* txn,
 
         // Remove entry from plan cache
         planCache->remove(*cq);
+
+        LOG(0) << "Removed index filter on " << ns << " " << cq->toStringShort();
+
         return Status::OK();
     }
 
@@ -323,6 +329,8 @@ Status ClearFilters::clear(OperationContext* txn,
         // Remove plan cache entry.
         planCache->remove(*cq);
     }
+
+    LOG(0) << "Removed all index filters for collection: " << ns;
 
     return Status::OK();
 }
@@ -394,6 +402,8 @@ Status SetFilter::set(OperationContext* txn,
 
     // Remove entry from plan cache.
     planCache->remove(*cq);
+
+    LOG(0) << "Index filter set on " << ns << " " << cq->toStringShort() << " " << indexesElt;
 
     return Status::OK();
 }
