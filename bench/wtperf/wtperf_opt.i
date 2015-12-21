@@ -140,6 +140,7 @@ DEF_OPT_AS_UINT32(random_range, 0,
     "if non zero choose a value from within this range as the key for "
     "insert operations")
 DEF_OPT_AS_BOOL(random_value, 0, "generate random content for the value")
+DEF_OPT_AS_BOOL(read_range, 0, "read a range of keys")
 DEF_OPT_AS_BOOL(reopen_connection, 1,
     "close and reopen the connection between populate and workload phases")
 DEF_OPT_AS_UINT32(report_interval, 2,

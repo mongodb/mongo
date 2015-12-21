@@ -382,8 +382,8 @@ worker(void *arg)
 	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
-	size_t i;
-	uint64_t next_val, usecs;
+	size_t i, r;
+	uint64_t next_val, prev_val, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret, truncated;
 	char *value_buf, *key_buf, *value;
@@ -532,6 +532,32 @@ worker(void *arg)
 					lprintf(cfg, ret, 0,
 					    "get_value in read.");
 					goto err;
+				}
+			}
+			/*
+			 * If we want to read a range, then call next for
+			 * several operations, confirming that the next key
+			 * is in the correct order.
+			 */
+			if (cfg->read_range) {
+				for (r = 0; r < READ_RANGE_OPS; ++r) {
+					prev_val = next_val;
+					ret = cursor->next(cursor);
+					/*
+					 * We could be walking near the end.
+					 * If we get to the end that is okay.
+					 */
+					if (ret != 0)
+						break;
+					cursor->get_key(cursor, &key_buf);
+					extract_key(key_buf, &next_val);
+					if (next_val < prev_val) {
+						lprintf(cfg, EINVAL, WT_PANIC,
+						    "Out of order keys %" PRIu64
+						    " came before %" PRIu64,
+						    prev_val, next_val);
+						goto err;
+					}
 				}
 			}
 			if (ret == 0 || ret == WT_NOTFOUND)

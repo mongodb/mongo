@@ -206,6 +206,8 @@ if non zero choose a value from within this range as the key for
 insert operations
 @par random_value (boolean, default=false)
 generate random content for the value
+@par read_range (boolean, default=false)
+read a range of keys
 @par reopen_connection (boolean, default=true)
 close and reopen the connection between populate and workload phases
 @par report_interval (unsigned int, default=2)
