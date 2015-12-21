@@ -555,9 +555,10 @@ worker(void *arg)
 					if (ret != 0)
 						break;
 					cursor->get_key(cursor, &key_buf);
-	 				extract_key(key_buf, &next_val);
+					extract_key(key_buf, &next_val);
 					lprintf(cfg, 0, 0,
-					    "%d: key_buf %s prev %" PRIu64 " next %" PRIu64,
+					    "%d: key_buf %s prev %"
+					    PRIu64 " next %" PRIu64,
 					    r, key_buf, prev_val, next_val);
 					if (next_val < prev_val) {
 						for (r1 = 0; r1 <= r; ++r1)
