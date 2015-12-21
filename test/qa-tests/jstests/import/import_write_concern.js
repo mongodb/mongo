@@ -15,7 +15,10 @@
   var commonToolArgs = getCommonToolArguments();
   var fileTarget = "wc.csv"
   rs.startSet({});
-  rs.initiate();
+  var cfg = rs.getReplSetConfig();
+  cfg.settings = {};
+  cfg.settings.chainingAllowed = false;
+  rs.initiate(cfg);
   rs.awaitReplication();
   toolTest.port = rs.getMaster().port;
 
