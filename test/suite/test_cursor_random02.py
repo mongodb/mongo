@@ -45,7 +45,6 @@ class test_cursor_random02(wttest.WiredTigerTestCase):
         ('5000', dict(records=5000)),
         ('10000', dict(records=10000)),
         ('50000', dict(records=50000)),
-        ('100000', dict(records=100000)),
     ]
     scenarios = number_scenarios(multiply_scenarios('.', config, records))
 
