@@ -17,6 +17,8 @@ var shard0 = shards[0]._id;
 var shard1 = shards[1]._id;
 
 assert.commandWorked(mongos.adminCommand({enableSharding : kDbName}));
+st.ensurePrimaryShard(kDbName, shard0);
+assert.eq(shard0, mongos.getDB('config').databases.findOne({_id: kDbName}).primary);
 
 // Can run only on mongos.
 assert.commandFailedWithCode(st.d0.getDB('admin').runCommand({movePrimary : kDbName, to: shard0}),
