@@ -60,6 +60,8 @@ Status getStatusFromCommandResult(const BSONObj& result) {
         errmsg = errmsgElement.String();
     } else if (!errmsgElement.eoo()) {
         errmsg = errmsgElement.toString();
+    } else if (!dollarErrElement.eoo()) {
+        errmsg = dollarErrElement.toString();
     }
 
     // we can't use startsWith(errmsg, "no such")

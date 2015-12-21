@@ -361,9 +361,13 @@ BSONObj DBClientCursor::next() {
 
 BSONObj DBClientCursor::nextSafe() {
     BSONObj o = next();
-    if (this->wasError && strcmp(o.firstElementFieldName(), "$err") == 0) {
-        uasserted(13106, str::stream() << "nextSafe(): " << o.toString());
+
+    // Only convert legacy errors ($err) to exceptions. Otherwise, just return the response and the
+    // caller will interpret it as a command error.
+    if (wasError && strcmp(o.firstElementFieldName(), "$err") == 0) {
+        uassertStatusOK(getStatusFromCommandResult(o));
     }
+
     return o;
 }
 
