@@ -382,8 +382,9 @@ worker(void *arg)
 	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
-	size_t i, r;
+	size_t i, r, r1;
 	uint64_t next_val, prev_val, usecs;
+	uint64_t vals[READ_RANGE_OPS];
 	uint8_t *op, *op_end;
 	int measure_latency, ret, truncated;
 	char *value_buf, *key_buf, *value;
@@ -526,6 +527,9 @@ worker(void *arg)
 			 * a random range as a "read".
 			 */
 			ret = cursor->search(cursor);
+			lprintf(cfg, 0, 0,
+			    "Read: search ret: %d key_buf %s next_val %" PRIu64,
+			    ret, key_buf, next_val);
 			if (ret == 0) {
 				if ((ret = cursor->get_value(
 				    cursor, &value)) != 0) {
@@ -539,9 +543,10 @@ worker(void *arg)
 			 * several operations, confirming that the next key
 			 * is in the correct order.
 			 */
-			if (cfg->read_range) {
+			if (ret == 0 && cfg->read_range) {
 				for (r = 0; r < READ_RANGE_OPS; ++r) {
 					prev_val = next_val;
+					vals[r] = prev_val;
 					ret = cursor->next(cursor);
 					/*
 					 * We could be walking near the end.
@@ -550,8 +555,15 @@ worker(void *arg)
 					if (ret != 0)
 						break;
 					cursor->get_key(cursor, &key_buf);
-					extract_key(key_buf, &next_val);
+	 				extract_key(key_buf, &next_val);
+					lprintf(cfg, 0, 0,
+					    "%d: key_buf %s prev %" PRIu64 " next %" PRIu64,
+					    r, key_buf, prev_val, next_val);
 					if (next_val < prev_val) {
+						for (r1 = 0; r1 <= r; ++r1)
+							lprintf(cfg, 0, 0,
+							    "Key[%d]: %" PRIu64,
+							    r1, vals[r1]);
 						lprintf(cfg, EINVAL, WT_PANIC,
 						    "Out of order keys %" PRIu64
 						    " came before %" PRIu64,
