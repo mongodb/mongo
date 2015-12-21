@@ -35,6 +35,14 @@ function makeCapped($config, $super) {
                 // failures due to collection truncation
                 globalAssertLevel = AssertLevel.ALWAYS;
                 $super.states.find.apply(this, arguments);
+            } catch (e) {
+                if (e.message.indexOf('CappedPositionLost') >= 0) {
+                    // Ignore errors when a cursor's position in the capped collection is deleted.
+                    // Reads from the beginning of a capped collection are not guaranteed to succeed
+                    // when there are concurrent inserts that cause a truncation.
+                    return;
+                }
+                throw e;
             } finally {
                 globalAssertLevel = oldAssertLevel;
             }
