@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include <string>
 #include <sstream>
 
@@ -39,6 +41,7 @@
 #include "mongo/db/commands/index_filter_commands.h"
 #include "mongo/db/commands/plan_cache_commands.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/util/log.h"
 
 namespace {
 
@@ -257,6 +260,9 @@ namespace mongo {
 
             // Remove entry from plan cache
             planCache->remove(*cq);
+
+            LOG(0) << "Removed index filter on " << ns << " " << cq->toStringShort();
+
             return Status::OK();
         }
 
@@ -300,6 +306,8 @@ namespace mongo {
             // Remove plan cache entry.
             planCache->remove(*cq);
         }
+
+        LOG(0) << "Removed all index filters for collection: " << ns;
 
         return Status::OK();
     }
@@ -362,6 +370,8 @@ namespace mongo {
 
         // Remove entry from plan cache.
         planCache->remove(*cq);
+
+        LOG(0) << "Index filter set on " << ns << " " << cq->toStringShort() << " " << indexesElt;
 
         return Status::OK();
     }
