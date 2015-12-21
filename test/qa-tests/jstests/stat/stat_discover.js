@@ -4,18 +4,15 @@ load("jstests/libs/mongostat.js");
 
 baseName = "tool_discover";
 
-replSetPorts = allocatePorts(4);
-
-port = allocatePorts(1,replSetPorts[3]+1);
-
-m = startMongod("--port", port[0], "--dbpath", MongoRunner.dataPath + baseName + port[0], "--nohttpinterface", "--bind_ip", "127.0.0.1");
+port = allocatePort();
+m = startMongod("--port", port, "--dbpath", MongoRunner.dataPath + baseName + port, "--nohttpinterface", "--bind_ip", "127.0.0.1");
 
 rs = new ReplSetTest({
     name: "rpls",
     nodes: 4,
-    startPort: replSetPorts[0],
     useHostName: true
 });
+replSetPorts = [port + 1, port + 2, port + 3, port + 4];
 
 rs.startSet();
 
@@ -35,7 +32,7 @@ assert(discoverTest(replSetPorts, rs.liveNodes.slaves[0].host), "--discover agai
 
 assert(statOutputPortCheck([ rs.liveNodes.master.port, rs.liveNodes.slaves[0].port, rs.liveNodes.slaves[1].port ], [ "mongostat", "--host", "rpls/" + rs.liveNodes.master.host + "," + rs.liveNodes.slaves[0].host + "," + rs.liveNodes.slaves[1].host, "--rowcount", 1 ]), "replicata set specifiers are correctly used");
 
-assert(discoverTest([ port[0] ], m.host), "--discover against a stand alone-sees just the stand-alone");
+assert(discoverTest([ port ], m.host), "--discover against a stand alone-sees just the stand-alone");
 
 clearRawMongoProgramOutput();
 
