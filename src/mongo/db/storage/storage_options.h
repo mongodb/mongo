@@ -50,39 +50,25 @@ struct StorageGlobalParams {
     // a sharded cluster.
     static const char* kDefaultConfigDbPath;
 
-    StorageGlobalParams()
-        : engine("wiredTiger"),
-          engineSetByUser(false),
-          dbpath(kDefaultDbPath),
-          upgrade(false),
-          repair(false),
-          noTableScan(false),
-          directoryperdb(false),
-          syncdelay(60.0) {
-        dur = false;
-        if (sizeof(void*) == 8)
-            dur = true;
-    }
-
     // --storageEngine
     // storage engine for this instance of mongod.
-    std::string engine;
+    std::string engine = "wiredTiger";
 
     // True if --storageEngine was passed on the command line, and false otherwise.
-    bool engineSetByUser;
+    bool engineSetByUser = false;
 
     // The directory where the mongod instance stores its data.
-    std::string dbpath;
+    std::string dbpath = kDefaultDbPath;
 
     // --upgrade
     // Upgrades the on-disk data format of the files specified by the --dbpath to the
     // latest version, if needed.
-    bool upgrade;
+    bool upgrade = false;
 
     // --repair
     // Runs a repair routine on all databases. This is equivalent to shutting down and
     // running the repairDatabase database command on all databases.
-    bool repair;
+    bool repair = false;
 
     // --repairpath
     // Specifies the root directory containing MongoDB data files to use for the --repair
@@ -90,7 +76,8 @@ struct StorageGlobalParams {
     // Default: A _tmp directory within the path specified by the dbPath option.
     std::string repairpath;
 
-    bool dur;  // --dur durability (now --journal)
+    // The intention here is to enable the journal by default if we are running on a 64 bit system.
+    bool dur = (sizeof(void*) == 8);  // --dur durability (now --journal)
 
     // --journalCommitInterval
     static const int kMaxJournalCommitIntervalMs;
@@ -98,20 +85,20 @@ struct StorageGlobalParams {
 
     // --notablescan
     // no table scans allowed
-    std::atomic<bool> noTableScan;  // NOLINT
+    std::atomic<bool> noTableScan{false};  // NOLINT
 
     // --directoryperdb
     // Stores each database’s files in its own folder in the data directory.
     // When applied to an existing system, the directoryPerDB option alters
     // the storage pattern of the data directory.
-    bool directoryperdb;
+    bool directoryperdb = false;
 
     // --syncdelay
     // Controls how much time can pass before MongoDB flushes data to the data files
     // via an fsync operation.
     // Do not set this value on production systems.
     // In almost every situation, you should use the default setting.
-    AtomicDouble syncdelay;  // seconds between fsyncs
+    AtomicDouble syncdelay{60.0};  // seconds between fsyncs
 };
 
 extern StorageGlobalParams storageGlobalParams;
