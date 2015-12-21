@@ -4,9 +4,11 @@
 //
 // Note that mongos does not time out commands or query ops (which remains responsibility of mongod,
 // pending development of an interrupt framework for mongos).
+(function() {
+'use strict';
 
 var st = new ShardingTest({shards: 2});
-st.stopBalancer();
+
 var mongos = st.s0;
 var shards = [st.shard0, st.shard1];
 var coll = mongos.getCollection("foo.bar");
@@ -51,7 +53,7 @@ assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(),
 // Insert 100 documents into sharded collection, such that each shard owns 50.
 //
 var bulk = coll.initializeUnorderedBulkOp();
-for (i=-50; i<50; i++) {
+for (var i = -50; i < 50; i++) {
     bulk.insert({ _id: i });
 }
 assert.writeOK(bulk.execute());
@@ -211,3 +213,5 @@ assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(),
 // TODO Test additional commmands.
 
 st.stop();
+
+})();

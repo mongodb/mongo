@@ -180,10 +180,16 @@ var ShardingTest = function(params) {
 
     this.getServerName = function(dbname) {
         var x = this.config.databases.findOne({ _id : "" + dbname });
-        if (x)
+        if (x) {
             return x.primary;
-        this.config.databases.find().forEach(printjson);
-        throw Error("couldn't find dbname: " + dbname + " total: " + this.config.databases.count());
+        }
+
+        var countDBsFound = 0;
+        this.config.databases.find().forEach(function(db) {
+            countDBsFound++;
+            printjson(db);
+        });
+        throw Error("couldn't find dbname: " + dbname + " total: " + countDBsFound);
     };
 
     this.getNonPrimaries = function(dbname) {
