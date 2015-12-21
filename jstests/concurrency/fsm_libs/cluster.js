@@ -471,8 +471,8 @@ var Cluster = function(options) {
 
                 hashes.slaves.forEach(function(slaveHashes) {
                     assert.commandWorked(slaveHashes);
-                    assert.eq(masterHashes.collections.length,
-                              slaveHashes.collections.length,
+                    assert.eq(Object.keys(masterHashes.collections).length,
+                              Object.keys(slaveHashes.collections).length,
                               message + ' dbHash number of collections in db ' +
                                 dbInfo.name + ' ' + tojson(hashes));
 
