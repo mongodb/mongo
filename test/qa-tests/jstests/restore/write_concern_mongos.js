@@ -11,6 +11,10 @@
     },
   }});
   var rs = st.rs0;
+  var cfg = rs.getConfigFromPrimary();
+  cfg.settings.chainingAllowed = false;
+  cfg.version += 1;
+  assert.commandWorked(rs.getPrimary().adminCommand({replSetReconfig: cfg}));
   rs.awaitReplication();
   toolTest.port = st.s.port;
   var commonToolArgs = getCommonToolArguments();
@@ -60,7 +64,7 @@
   // load and run the write concern suite
   load('jstests/libs/wc_framework.js');
   runWCTest("mongorestore", rs, toolTest, writeConcernTestFunc, noConnectTest);
-  
+
   dbOne.dropDatabase();
   rs.stopSet();
   toolTest.stop();

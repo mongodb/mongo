@@ -14,10 +14,13 @@
     },
   }});
   var rs = st.rs0;
+  var cfg = rs.getConfigFromPrimary();
+  cfg.settings.chainingAllowed = false;
+  cfg.version += 1;
+  assert.commandWorked(rs.getPrimary().adminCommand({replSetReconfig: cfg}));
   rs.awaitReplication();
   toolTest.port = st.s.port;
   var dbOne = st.s.getDB('dbOne');
-
   function writeConcernTestFunc(exitCode, writeConcern, name) {
     jsTest.log(name);
     ret = toolTest.runTool.apply(

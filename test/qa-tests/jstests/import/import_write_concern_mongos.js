@@ -14,6 +14,10 @@
     },
   }});
   var rs = st.rs0;
+  var cfg = rs.getConfigFromPrimary();
+  cfg.settings.chainingAllowed = false;
+  cfg.version += 1;
+  assert.commandWorked(rs.getPrimary().adminCommand({replSetReconfig: cfg}));
   rs.awaitReplication();
   toolTest.port = st.s.port;
 

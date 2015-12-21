@@ -573,9 +573,6 @@ func TestMongoDumpMetaData(t *testing.T) {
 			So(fileDirExists(dumpDir), ShouldBeTrue)
 			So(fileDirExists(dumpDBDir), ShouldBeTrue)
 
-			systemIndexesBSON := util.ToUniversalPath(filepath.Join(dumpDBDir, "system.indexes.bson"))
-			So(fileDirExists(systemIndexesBSON), ShouldBeTrue)
-
 			Convey("having one metadata file per collection", func() {
 				c1, err := countNonIndexBSONFiles(dumpDBDir)
 				So(err, ShouldBeNil)

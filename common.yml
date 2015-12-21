@@ -14,40 +14,47 @@ mongo_tools_variables:
     osx_108: &mongo_url_osx108
       mongo_os: "osx"
       mongo_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-latest.tgz"
+      mongo32_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-3.2.0.tgz"
       mongo30_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-3.0.7.tgz"
       mongo26_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.5.tgz"
       mongo24_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.4.12.tgz"
     solaris: &mongo_url_solaris
       mongo_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-latest.tgz"
+      mongo32_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-3.2.0.tgz"
       mongo30_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-3.0.7.tgz"
       mongo26_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.5.tgz"
       mongo24_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.4.12.tgz"
     linux_64_bit: &mongo_url_ubuntu1204
       mongo_os: "ubuntu1204"
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
+      mongo32_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-3.2.0.tgz"
       mongo30_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-3.0.7.tgz"
       mongo26_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-2.6.5.tgz"
       mongo24_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-subscription-ubuntu1204-2.4.12.tgz"
     linux_64_bit_enterprise: &mongo_url_ubuntu1204_enterprise
       mongo_os: "ubuntu1204"
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
+      mongo32_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-3.2.0.tgz"
       mongo30_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-3.0.7.tgz"
       mongo26_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-2.6.5.tgz"
       mongo24_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-subscription-ubuntu1204-2.4.12.tgz"
     windows_32_bit: &mongo_url_windows32
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-latest.zip"
+      mongo32_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-3.2.0.zip"
       mongo30_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-3.0.7.zip"
       mongo26_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-2.6.5.zip"
       mongo24_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-2.4.12.zip"
     windows_64_bit: &mongo_url_windows64
       mongo_os: "windows-64"
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-latest.zip"
+      mongo32_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-3.2.0.zip"
       mongo30_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-3.0.7.zip"
       mongo26_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.6.5.zip"
       mongo24_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.4.12.zip"
     windows_64_bit_enterprise: &mongo_url_windows64_enterprise
       mongo_os: "windows-64"
       mongo_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-latest.zip"
+      mongo32_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-3.2.0.zip"
       mongo30_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-3.0.7.zip"
       mongo26_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-2.6.5.zip"
 
@@ -202,6 +209,9 @@ mongo_tools_variables:
       mongod_args: &mongod_default_startup_args_string "--port 33333"
     ssl: &mongod_ssl_startup_args
       mongod_args: "--port 33333 --sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem"
+    # Set storage engine as mmapv1 for 32 bit variants because WiredTiger requires 64 bit support.
+    win32: &mongod_win32_startup_args
+      mongod_args: "--port 33333 --storageEngine=mmapv1"
 
   mongo_arguments:
     default: &mongo_default_startup_args
@@ -293,11 +303,11 @@ functions:
       script: |
         set -o verbose
         if [ "${coverage}" = "true" ]; then
-          mv ${package}/coverage.out . 
+          mv ${package}/coverage.out .
         fi
 
   "run unit test":
-    command: shell.exec 
+    command: shell.exec
     type: test
     params:
       working_dir: src
@@ -312,7 +322,7 @@ functions:
         export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
         export basedir=`pwd`
         cd ${package}
-        go test ${coverage_args} ${args} ${build_tags} -test.v > unit.suite 
+        go test ${coverage_args} ${args} ${build_tags} -test.v > unit.suite
         export exitcode=$?
         cat unit.suite
         cp unit.suite $basedir/.
@@ -546,7 +556,7 @@ post:
         ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py} >/dev/null 2>&1
         exit 0
   - command: gotest.parse_files
-    params: 
+    params:
       files: ["src/*.suite"]
 
 tasks:
@@ -586,7 +596,7 @@ tasks:
             value: *mongo_default_startup_args_string
     - func: "download mongod"
       vars:
-        mongo_url: "${mongo30_url}"
+        mongo_url: "${mongo32_url}"
     - func: "start mongod"
     - func: "wait for mongod to be ready"
     - func: "setup integration test"
@@ -686,7 +696,7 @@ tasks:
             value: "-test.types=${integration_test_args}"
     - func: "download mongod"
       vars:
-        mongo_url: "${mongo30_url}"
+        mongo_url: "${mongo32_url}"
     - func: "start mongod"
     - func: "wait for mongod to be ready"
     - func: "run tool integration tests"
@@ -715,7 +725,7 @@ tasks:
             value: "db.createUser({ user: '${auth_username}', pwd: '${auth_password}', roles: [{ role: '__system', db: 'admin' }] });"
     - func: "download mongod"
       vars:
-        mongo_url: "${mongo30_url}"
+        mongo_url: "${mongo32_url}"
     - func: "start mongod"
     - func: "wait for mongod to be ready"
     - func: "run tool integration tests"
@@ -1065,7 +1075,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_url: "${mongo30_url}"
+        mongo_url: "${mongo32_url}"
     - func: "fetch tool"
       vars:
         tool: mongoimport
@@ -1124,7 +1134,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_url: "${mongo30_url}"
+        mongo_url: "${mongo32_url}"
     - func: "fetch tool"
       vars:
         tool: mongodump
@@ -1161,7 +1171,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_url: "${mongo30_url}"
+        mongo_url: "${mongo32_url}"
     - func: "fetch tool"
       vars:
         tool: mongoimport
@@ -1408,7 +1418,7 @@ buildvariants:
   - windows-32
   expansions:
     <<: *mongo_url_windows32
-    <<: *mongod_default_startup_args
+    <<: *mongod_win32_startup_args
     <<: *mongo_default_startup_args
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
