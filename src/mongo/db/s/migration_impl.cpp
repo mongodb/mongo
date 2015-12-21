@@ -466,7 +466,6 @@ Status ChunkMoveOperationState::commitMigration() {
                                   shardingState->getConfigServer(_txn).toString());
         }
     } catch (const DBException& ex) {
-        warning() << ex << migrateLog;
         applyOpsStatus = ex.toStatus();
     }
 
@@ -503,7 +502,8 @@ Status ChunkMoveOperationState::commitMigration() {
         // If the commit did not make it, currently the only way to fix this state is to
         // bounce the mongod so that the old state (before migrating) is brought in.
 
-        warning() << "moveChunk commit outcome ongoing" << migrateLog;
+        warning() << "moveChunk commit failed and metadata will be revalidated"
+                  << causedBy(applyOpsStatus) << migrateLog;
         sleepsecs(10);
 
         // Look for the chunk in this shard whose version got bumped. We assume that if that

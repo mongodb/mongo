@@ -5,7 +5,9 @@
  * Note that some of the replica start up parameters are not passed here,
  * but to the #startSet method.
  * 
- * @param {Object} opts
+ * @param {Object|string} opts If this value is a string, it specifies the connection string for
+ *      a MongoD host to be used for recreating a ReplSetTest from. Otherwise, if it is an object,
+ *      it must have the following contents:
  * 
  *   {
  *     name {string}: name of this replica set. Default: 'testReplSet'
@@ -60,8 +62,7 @@
  *   }
  * 
  * Member variables:
- * numNodes {number} - number of nodes
- * nodes {Array.<Mongo>} - connection to replica set members
+ *  nodes {Array.<Mongo>} - connection to replica set members
  */
 var ReplSetTest = function(opts) {
     'use strict';
@@ -92,6 +93,13 @@ var ReplSetTest = function(opts) {
      */
     function _clearLiveNodes() {
         self.liveNodes = { master: null, slaves: [] };
+    }
+    
+    /**
+     * Returns the config document reported from the specified connection.
+     */
+    function _replSetGetConfig(conn) {
+        return assert.commandWorked(conn.adminCommand({ replSetGetConfig: 1 })).config;
     }
 
     /**
@@ -410,22 +418,15 @@ var ReplSetTest = function(opts) {
      * if primary is available will return a connection to it. Otherwise throws an exception.
      */
     this.getPrimary = function(timeout) {
-        var tmo = timeout || 60000;
-        var master = null;
+        timeout = timeout || 60000;
+        var primary = null;
 
-        try {
-            assert.soon(function() {
-                master = _callIsMaster();
-                return master;
-            }, "Finding master", tmo);
-        }
-        catch (err) {
-            print("ReplSetTest getPrimary failed: " + tojson(err));
-            printStackTrace();
-            throw err;
-        }
+        assert.soon(function() {
+            primary = _callIsMaster();
+            return primary;
+        }, "Finding primary", timeout);
 
-        return master;
+        return primary;
     };
 
     this.awaitNoPrimary = function(msg, timeout) {
@@ -522,12 +523,9 @@ var ReplSetTest = function(opts) {
      * throws if any error occurs on the command.
      */
     this.getConfigFromPrimary = function() {
-        var primary = this.getPrimary(90 * 1000 /* 90 sec timeout */);
-        return assert.commandWorked(primary.adminCommand("replSetGetConfig")).config;
+        // Use 90 seconds timeout
+        return _replSetGetConfig(this.getPrimary(90 * 1000));
     };
-
-    // Aliases to match rs.conf* behavior in the shell.
-    this.conf = this.getConfigFromPrimary;
 
     this.reInitiate = function() {
         var config = this.getReplSetConfig();
@@ -629,13 +627,13 @@ var ReplSetTest = function(opts) {
 
         try {
             master = this.getPrimary();
-            configVersion = this.conf().version;
+            configVersion = this.getConfigFromPrimary().version;
             masterOpTime = _getLastOpTime(master);
             masterName = master.toString().substr(14); // strip "connection to "
         }
         catch (e) {
             master = this.getPrimary();
-            configVersion = this.conf().version;
+            configVersion = this.getConfigFromPrimary().version;
             masterOpTime = _getLastOpTime(master);
             masterName = master.toString().substr(14); // strip "connection to "
         }
@@ -1064,63 +1062,89 @@ var ReplSetTest = function(opts) {
     };
 
     //
-    // ReplSetTest initialization
+    // ReplSetTest constructors
     //
 
-    this.name  = opts.name || "testReplSet";
-    this.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
-    this.host  = this.useHostName ? (opts.host || getHostName()) : 'localhost';
-    this.oplogSize = opts.oplogSize || 40;
-    this.useSeedList = opts.useSeedList || false;
-    this.keyFile = opts.keyFile;
-    this.shardSvr = opts.shardSvr || false;
-    this.protocolVersion = opts.protocolVersion;
+    /**
+     * Constructor, which initializes the ReplSetTest object by starting new instances.
+     */
+    function _constructStartNewInstances(opts) {
+        self.name  = opts.name || "testReplSet";
+        print('Starting new replica set ' + self.name);
 
-    _useBridge = opts.useBridge || false;
-    _bridgeOptions = opts.bridgeOptions || {};
+        self.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
+        self.host  = self.useHostName ? (opts.host || getHostName()) : 'localhost';
+        self.oplogSize = opts.oplogSize || 40;
+        self.useSeedList = opts.useSeedList || false;
+        self.keyFile = opts.keyFile;
+        self.shardSvr = opts.shardSvr || false;
+        self.protocolVersion = opts.protocolVersion;
 
-    _configSettings = opts.settings || false;
+        _useBridge = opts.useBridge || false;
+        _bridgeOptions = opts.bridgeOptions || {};
 
-    this.nodeOptions = {};
+        _configSettings = opts.settings || false;
 
-    if (isObject(opts.nodes)) {
-        var len = 0;
-        for(var i in opts.nodes) {
-            var options = this.nodeOptions["n" + len] = Object.merge(opts.nodeOptions,
-                                                                       opts.nodes[i]);
-            if (i.startsWith("a")) {
-                options.arbiter = true;
+        self.nodeOptions = {};
+
+        var numNodes;
+
+        if (isObject(opts.nodes)) {
+            var len = 0;
+            for(var i in opts.nodes) {
+                var options = self.nodeOptions["n" + len] = Object.merge(opts.nodeOptions,
+                                                                           opts.nodes[i]);
+                if (i.startsWith("a")) {
+                    options.arbiter = true;
+                }
+
+                len++;
             }
 
-            len++;
+            numNodes = len;
+        }
+        else if (Array.isArray(opts.nodes)) {
+            for(var i = 0; i < opts.nodes.length; i++) {
+                self.nodeOptions["n" + i] = Object.merge(opts.nodeOptions, opts.nodes[i]);
+            }
+
+            numNodes = opts.nodes.length;
+        }
+        else {
+            for (var i = 0; i < opts.nodes; i++) {
+                self.nodeOptions["n" + i] = opts.nodeOptions;
+            }
+
+            numNodes = opts.nodes;
         }
 
-        this.numNodes = len;
+        self.ports = allocatePorts(numNodes);
+        self.nodes = [];
+
+        if (_useBridge) {
+            _unbridgedPorts = allocatePorts(numNodes);
+            _unbridgedNodes = [];
+        }
     }
-    else if (Array.isArray(opts.nodes)) {
-        for(var i = 0; i < opts.nodes.length; i++) {
-            this.nodeOptions["n" + i] = Object.merge(opts.nodeOptions, opts.nodes[i]);
-        }
 
-        this.numNodes = opts.nodes.length;
+    /**
+     * Constructor, which instantiates the ReplSetTest object from an existing set.
+     */
+    function _constructFromExistingSeedNode(seedNode) {
+        var conf = _replSetGetConfig(new Mongo(seedNode));
+        print('Recreating replica set from config ' + tojson(conf));
+
+        var existingNodes = conf.members.map(member => member.host);
+        self.ports = existingNodes.map(node => node.split(':')[1]);
+        self.nodes = existingNodes.map(node => new Mongo(node));
+    }
+
+    if (typeof opts === 'string' || opts instanceof String) {
+        _constructFromExistingSeedNode(opts);
     }
     else {
-        for (var i = 0; i < opts.nodes; i++) {
-            this.nodeOptions["n" + i] = opts.nodeOptions;
-        }
-
-        this.numNodes = opts.nodes;
+        _constructStartNewInstances(opts);
     }
-
-    this.ports = allocatePorts(this.numNodes);
-    this.nodes = [];
-
-    if (_useBridge) {
-        _unbridgedPorts = allocatePorts(this.numNodes);
-        _unbridgedNodes = [];
-    }
-
-    _clearLiveNodes();
 };
 
 /**

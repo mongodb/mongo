@@ -1,10 +1,9 @@
 // Tests "stacking" multiple migration cleanup threads and their behavior when the collection changes
+(function() {
+'use strict';
 
 // start up a new sharded cluster
 var st = new ShardingTest({ shards : 2, mongos : 1 });
-
-// stop balancer since we want manual control for this
-st.stopBalancer();
 
 var mongos = st.s;
 var admin = mongos.getDB("admin");
@@ -12,15 +11,15 @@ var shards = mongos.getDB("config").shards.find().toArray();
 var coll = mongos.getCollection("foo.bar");
 
 // Enable sharding of the collection
-printjson(mongos.adminCommand({ enablesharding : coll.getDB() + "" }));
-printjson(mongos.adminCommand({ movePrimary : coll.getDB() + "", to : shards[0]._id }));
-printjson(mongos.adminCommand({ shardcollection : coll + "", key: { _id : 1 } }));
+assert.commandWorked(mongos.adminCommand({ enablesharding : coll.getDB() + "" }));
+st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
+assert.commandWorked(mongos.adminCommand({ shardcollection : coll + "", key: { _id : 1 } }));
 
 var numChunks = 30;
 
 // Create a bunch of chunks
 for (var i = 0; i < numChunks; i++) {
-    printjson(mongos.adminCommand({ split : coll + "", middle : { _id : i } }))
+    assert.commandWorked(mongos.adminCommand({ split : coll + "", middle : { _id : i } }));
 }
 
 jsTest.log("Inserting a lot of small documents...")
@@ -47,7 +46,8 @@ for (var i = 0; i < numChunks; i++) {
 
 jsTest.log("Dropping and re-creating collection...")
 
-coll.drop()
+coll.drop();
+
 bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < numChunks; i++) {
     bulk.insert({ _id : i });
@@ -62,8 +62,6 @@ for (var i = 0; i < numChunks; i++) {
     assert.neq(null, coll.findOne({ _id : i }))   
 }
 
-jsTest.log("DONE!")
-
 st.stop();
 
-
+})();

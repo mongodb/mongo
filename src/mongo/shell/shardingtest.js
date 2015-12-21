@@ -463,7 +463,7 @@ var ShardingTest = function(params) {
             var x = self.chunkDiff(collName, dbName);
             print("chunk diff: " + x);
             return x < 2;
-        }, "no balance happened", 60000);
+        }, "no balance happened", timeToWait);
     };
 
     this.getShardNames = function() {

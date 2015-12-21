@@ -23,8 +23,6 @@ for(var i = 0; i < 300; i++) {
 }
 assert.writeOK(bulk.execute());
 
-st.printShardingStatus();
-
 // Wait for client to update itself and replication to finish
 rst.awaitReplication();
 

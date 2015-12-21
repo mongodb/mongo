@@ -39,4 +39,7 @@
 
      jsTestLog("Test error with limit of " + failLimit + " on mongos");
      assert.throws( function() {mongosCol.find().sort({x:1}).limit(failLimit).itcount(); } );
+
+     st.stop();
+
  })();
