@@ -577,8 +577,7 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	 */
 	for (ins_head = cbt->ins_head,
 	    level = WT_SKIP_MAXDEPTH - 1; level > 0; --level)
-		if (ins_head->head[level] != NULL &&
-		    ins_head->head[level]->next[level] != NULL)
+		if ((ins = ins_head->head[level]) != NULL && ins->next != NULL)
 			break;
 
 	/*
