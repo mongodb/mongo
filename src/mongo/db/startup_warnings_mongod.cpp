@@ -283,18 +283,39 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
     }
 #endif  // __linux__
 
-#if defined(RLIMIT_NPROC) && defined(RLIMIT_NOFILE)
-    // Check that # of files rlmit > 1000 , and # of processes > # of files/2
+#ifndef _WIN32
+    // Check that # of files rlmit >= 1000
     const unsigned int minNumFiles = 1000;
-    const double filesToProcsRatio = 2.0;
-    struct rlimit rlnproc;
     struct rlimit rlnofile;
 
-    if (!getrlimit(RLIMIT_NPROC, &rlnproc) && !getrlimit(RLIMIT_NOFILE, &rlnofile)) {
+    if (!getrlimit(RLIMIT_NOFILE, &rlnofile)) {
         if (rlnofile.rlim_cur < minNumFiles) {
             log() << startupWarningsLog;
             log() << "** WARNING: soft rlimits too low. Number of files is " << rlnofile.rlim_cur
                   << ", should be at least " << minNumFiles << startupWarningsLog;
+        }
+    } else {
+        const auto errmsg = errnoWithDescription();
+        log() << startupWarningsLog;
+        log() << "** WARNING: getrlimit failed. " << errmsg << startupWarningsLog;
+    }
+
+// Solaris does not have RLIMIT_NPROC & RLIMIT_MEMLOCK, these are exposed via getrctl(2) instead
+#ifndef __sun
+    // Check # of processes >= # of files/2
+    // Check we can lock at least 16 pages for the SecureAllocator
+    const double filesToProcsRatio = 2.0;
+    const unsigned int minLockedPages = 16;
+
+    struct rlimit rlmemlock;
+    struct rlimit rlnproc;
+
+    if (!getrlimit(RLIMIT_NPROC, &rlnproc) && !getrlimit(RLIMIT_MEMLOCK, &rlmemlock)) {
+        if ((rlmemlock.rlim_cur / ProcessInfo::getPageSize()) < minLockedPages) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: soft rlimits too low. The locked memory size is "
+                  << rlmemlock.rlim_cur << " bytes, it should be at least "
+                  << minLockedPages * ProcessInfo::getPageSize() << " bytes" << startupWarningsLog;
         }
 
         if (false) {
@@ -315,9 +336,11 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                   << " times number of files." << startupWarningsLog;
         }
     } else {
+        const auto errmsg = errnoWithDescription();
         log() << startupWarningsLog;
-        log() << "** WARNING: getrlimit failed. " << errnoWithDescription() << startupWarningsLog;
+        log() << "** WARNING: getrlimit failed. " << errmsg << startupWarningsLog;
     }
+#endif
 #endif
 
 #ifdef _WIN32
