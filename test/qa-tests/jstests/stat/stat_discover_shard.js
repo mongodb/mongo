@@ -8,7 +8,7 @@ st = new ShardingTest({name:"shard1", shards:2});
 
 stdb = st.getDB("test");
 
-shardPorts = [ st._mongos[0].port, st._shardServers[0].port, st._shardServers[1].port ];
+shardPorts = [ st._mongos[0].port, st._connections[0].port, st._connections[1].port ];
 
 clearRawMongoProgramOutput();
 

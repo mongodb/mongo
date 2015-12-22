@@ -98,7 +98,7 @@ var waitForAllMembers = function(master, timeout) {
 };
 
 var reconfig = function(rs, config) {
-    var admin = rs.getMaster().getDB("admin");
+    var admin = rs.getPrimary().getDB("admin");
     
     try {
         var ok = admin.runCommand({replSetReconfig : config});
@@ -108,7 +108,7 @@ var reconfig = function(rs, config) {
         print(e);
     }
 
-    master = rs.getMaster().getDB("admin");
+    master = rs.getPrimary().getDB("admin");
     waitForAllMembers(master);
 
     return master;

@@ -20,7 +20,7 @@ rs.initiate();
 
 rs.awaitReplication();
 
-rsFoo = rs.getMaster().getDB("foo");
+rsFoo = rs.getPrimary().getDB("foo");
 
 rsFoo.bar.insert({
     a: 1

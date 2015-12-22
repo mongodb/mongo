@@ -10,7 +10,7 @@
     var conn = st.s;
 
     var db = conn.getDB("test");
-    var replDB = replTest.getMaster().getDB("test");
+    var replDB = replTest.getPrimary().getDB("test");
 
     db.a.insert({a:1});
     db.a.insert({a:2});

@@ -14,7 +14,7 @@ var getToolTest;
 
     var nodes = replTest.startSet();
     replTest.initiate();
-    var master = replTest.getMaster();
+    var master = replTest.getPrimary();
 
     toolTest.m = master;
     toolTest.db = master.getDB(name);

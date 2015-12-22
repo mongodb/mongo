@@ -16,7 +16,7 @@
     replTest.awaitSecondaryNodes();
 
     // cache the primary
-    var primary = replTest.getMaster();
+    var primary = replTest.getPrimary();
 
     // the export target
     var exportTarget = 'slave_ok_export.json';

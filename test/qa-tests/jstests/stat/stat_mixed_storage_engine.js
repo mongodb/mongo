@@ -35,7 +35,7 @@ st = new ShardingTest({shards:[wt_options,mmap_options],options:{nopreallocj:tru
 
 stdb = st.getDB("test");
 
-shardPorts = [ st._mongos[0].port, st._shardServers[0].port, st._shardServers[1].port ];
+shardPorts = [ st._mongos[0].port, st._connections[0].port, st._connections[1].port ];
 
 clearRawMongoProgramOutput();
 
