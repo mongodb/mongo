@@ -106,8 +106,16 @@ config_assign(CONFIG *dest, const CONFIG *src)
 void
 config_free(CONFIG *cfg)
 {
+	CONFIG_QUEUE_ENTRY *config_line;
 	size_t i;
 	char **pstr;
+
+	while (!TAILQ_EMPTY(&cfg->config_head)) {
+		config_line = TAILQ_FIRST(&cfg->config_head);
+		TAILQ_REMOVE(&cfg->config_head, config_line, c);
+		free(config_line->string);
+		free(config_line);
+	}
 
 	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
 		if (config_opts[i].type == STRING_TYPE ||
@@ -569,15 +577,33 @@ err:	if (fd != -1)
 int
 config_opt_line(CONFIG *cfg, const char *optstr)
 {
+	CONFIG_QUEUE_ENTRY *config_line;
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_PARSER *scan;
+	size_t len;
 	int ret, t_ret;
+	char *string_copy;
 
+	len = strlen(optstr);
 	if ((ret = wiredtiger_config_parser_open(
-	    NULL, optstr, strlen(optstr), &scan)) != 0) {
+	    NULL, optstr, len, &scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_begin");
 		return (ret);
 	}
+
+	/*
+	 * Append the current line to our copy of the config. The config is
+	 * stored in the order it is processed, so added options will be after
+	 * any parsed from the original config. We allocate len + 1 to allow for
+	 * a null byte to be added.
+	 */
+	if ((string_copy = calloc(len + 1, 1)) == NULL)
+		return (enomem(cfg));
+
+	strncpy(string_copy, optstr, len);
+	config_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
+	config_line->string = string_copy;
+	TAILQ_INSERT_TAIL(&cfg->config_head, config_line, c);
 
 	while (ret == 0) {
 		if ((ret = scan->next(scan, &k, &v)) != 0) {
@@ -650,6 +676,89 @@ config_sanity(CONFIG *cfg)
 		return (EINVAL);
 	}
 	return (0);
+}
+
+/*
+ * config_consolidate --
+ *	Consolidate repeated configuration settings so that it only appears
+ *	once in the configuration output file.
+ */
+void
+config_consolidate(CONFIG *cfg)
+{
+	CONFIG_QUEUE_ENTRY *conf_line, *test_line, *tmp;
+	char *string_key;
+
+	/* 
+	 * This loop iterates over the config queue and for entry checks if an
+	 * entry later in the queue has the same key. If a match is found then
+	 * the current queue entry is removed and we continue.
+	 */
+	conf_line = TAILQ_FIRST(&cfg->config_head);
+	while (conf_line != NULL) {
+		string_key = strchr(conf_line->string, '=');
+		tmp = test_line = TAILQ_NEXT(conf_line, c);
+		while (test_line != NULL) {
+			/*
+			 * The + 1 here forces the '=' sign to be matched
+			 * ensuring we don't match keys that have a common
+			 * prefix such as "table_count" and "table_count_idle"
+			 * as being the same key.
+			 */
+			if (strncmp(conf_line->string, test_line->string,
+			    string_key - conf_line->string + 1) == 0) {
+				TAILQ_REMOVE(&cfg->config_head, conf_line, c);
+				free(conf_line->string);
+				free(conf_line);
+				break;
+			}
+			test_line = TAILQ_NEXT(test_line, c);
+		}
+		conf_line = tmp;
+	}
+}
+
+/*
+ * config_to_file --
+ *	Write the final config used in this execution to a file.
+ */
+void
+config_to_file(CONFIG *cfg)
+{
+	CONFIG_QUEUE_ENTRY *config_line;
+	FILE *fp;
+	size_t req_len;
+	char *path;
+
+	fp = NULL;
+
+	/* Backup the config */
+	req_len = strlen(cfg->home) + 100;
+	if ((path = calloc(req_len, 1)) == NULL) {
+		(void)enomem(cfg);
+		goto err;
+	}
+
+	snprintf(path, req_len + 14, "%s/CONFIG.wtperf", cfg->home);
+	if ((fp = fopen(path, "w")) == NULL) {
+		lprintf(cfg, errno, 0, "%s", path);
+		goto err;
+	}
+
+	/* Print the config dump */
+	fprintf(fp,"# Warning. This config includes "
+	    "unwritten, implicit configuration defaults.\n"
+	    "# Changes to those values may cause differences in behavior.\n");
+	config_consolidate(cfg);
+	config_line = TAILQ_FIRST(&cfg->config_head);
+	while (config_line != NULL) {
+		fprintf(fp, "%s\n", config_line->string);
+		config_line = TAILQ_NEXT(config_line, c);
+	}
+
+err:	free(path);
+	if (fp != NULL)
+		(void)fclose(fp);
 }
 
 /*

@@ -60,6 +60,7 @@ static const CONFIG default_cfg = {
 	0,				/* total seconds running */
 	0,				/* has truncate */
 	{NULL, NULL},			/* the truncate queue */
+	{NULL, NULL},                   /* the config queue */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -2178,6 +2179,8 @@ main(int argc, char *argv[])
 	if (config_assign(cfg, &default_cfg))
 		goto err;
 
+	TAILQ_INIT(&cfg->config_head);
+
 	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = __wt_getopt("wtperf", argc, argv, opts)) != EOF)
 		switch (ch) {
@@ -2382,6 +2385,9 @@ main(int argc, char *argv[])
 	/* Sanity-check the configuration. */
 	if ((ret = config_sanity(cfg)) != 0)
 		goto err;
+
+	/* Write a copy of the config. */
+	config_to_file(cfg);
 
 	/* Display the configuration. */
 	if (cfg->verbose > 1)
