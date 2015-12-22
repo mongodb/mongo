@@ -42,15 +42,23 @@ var st;
     };
 
     /**
-     * Runs a config.version read, then splits the data collection and expects both operations to
-     * succeed.
+     * Runs several basic operations against a given mongos, including a config.version read,
+     * spliting the data collection, and doing basic crud ops against the data collection, and
+     * expects all operations to succeed.
      */
-    var assertCanSplit = function (snode, msg) {
+    var assertOpsWork = function (snode, msg) {
         if (msg) {
-            jsTest.log("Confirming that " + snode.name + " CAN run a split " + msg);
+            jsTest.log("Confirming that " + snode.name + " CAN run basic sharding ops " + msg);
         }
         assert(snode.getCollection("config.version").findOne());
         assert.commandWorked(runNextSplit(snode));
+
+        // Check that basic crud ops work.
+        var dataColl = snode.getCollection(dataCollectionName);
+        assert.eq(40, dataColl.find().itcount());
+        assert.writeOK(dataColl.insert({_id: 100, x: 1}));
+        assert.writeOK(dataColl.update({_id: 100}, {$inc: {x: 1}}));
+        assert.writeOK(dataColl.remove({x:2}));
     };
 
     var waitUntilMaster = function (dnode) {
@@ -129,7 +137,7 @@ var st;
         shardcollection: dataCollectionName,
         key: { _id: 1 }
     }));
-    assertCanSplit(st.s0);
+    assert.commandWorked(runNextSplit(st.s0));
     assert.commandWorked(st.s0.adminCommand({
         moveChunk: dataCollectionName,
         find: { _id: 0 },
@@ -164,7 +172,7 @@ var st;
     csrs.push(MongoRunner.runMongod(csrs0Opts));
     waitUntilMaster(csrs[0]);
 
-    assertCanSplit(st.s0, "using SCCC protocol when first config server is a 1-node replica set");
+    assertOpsWork(st.s0, "using SCCC protocol when first config server is a 1-node replica set");
 
     jsTest.log("Starting new CSRS nodes");
     for (var i = 1; i < numCsrsMembers; ++i) {
@@ -181,7 +189,7 @@ var st;
 
     jsTest.log("Splitting a chunk to confirm that the SCCC protocol works w/ 1 rs " +
                "node with secondaries");
-    assertCanSplit(st.s0, "using SCCC protocol when first config server is primary of " +
+    assertOpsWork(st.s0, "using SCCC protocol when first config server is primary of " +
                   csrs.length + "-node replica set");
 
     waitUntilAllCaughtUp(csrs);
@@ -241,11 +249,11 @@ var st;
     var sconfig = Object.extend({}, st.s0.fullOptions, /* deep */ true);
     delete sconfig.port;
     sconfig.configdb = csrsName + "/" + csrs[0].name;
-    assertCanSplit(MongoRunner.runMongos(sconfig),
-                   "when mongos started with --configdb=" + sconfig.configdb);
+    assertOpsWork(MongoRunner.runMongos(sconfig),
+                  "when mongos started with --configdb=" + sconfig.configdb);
     sconfig.configdb = st.s0.fullOptions.configdb;
-    assertCanSplit(MongoRunner.runMongos(sconfig),
-                   "when mongos started with --configdb=" + sconfig.configdb);
-    assertCanSplit(st.s0, "on mongos that drove the upgrade");
-    assertCanSplit(st.s1, "on mongos that was previously unaware of the upgrade");
+    assertOpsWork(MongoRunner.runMongos(sconfig),
+                  "when mongos started with --configdb=" + sconfig.configdb);
+    assertOpsWork(st.s0, "on mongos that drove the upgrade");
+    assertOpsWork(st.s1, "on mongos that was previously unaware of the upgrade");
 }());
