@@ -25,6 +25,10 @@ var seedList = rst.name + "/" + rst.nodes[1].host; // node 1 is guaranteed to no
     MongoRunner.stopMongos(mongos);
 }
 
+// Wait for replication to all config server replica set members to ensure that mongos
+// doesn't read from a stale config server when trying to verify if the initial cluster metadata
+// has been properly written.
+rst.awaitReplication();
 // Now take down the one electable node
 rst.stop(0);
 rst.awaitNoPrimary();
