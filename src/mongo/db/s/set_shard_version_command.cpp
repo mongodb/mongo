@@ -363,6 +363,18 @@ private:
                 return true;
             }
 
+            if (givenConnStr.type() == ConnectionString::SET &&
+                storedConnStr.type() == ConnectionString::SYNC) {
+                log() << "Detected upgrade from mirrored (SCCC) config servers to "
+                         "replica set (CSRS) config servers.  setShardVersion was given: "
+                      << givenConnStr
+                      << " for the config server connection string, but has stored: "
+                      << storedConnStr;
+                storedConnStr = givenConnStr;
+
+                return true;
+            }
+
             const auto& storedRawConfigString = storedConnStr.toString();
             if (storedRawConfigString == configdb) {
                 return true;
