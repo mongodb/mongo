@@ -96,6 +96,7 @@ config_assign(CONFIG *dest, const CONFIG *src)
 		}
 
 	TAILQ_INIT(&dest->stone_head);
+	TAILQ_INIT(&dest->config_head);
 	return (0);
 }
 
