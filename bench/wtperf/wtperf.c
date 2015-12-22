@@ -376,17 +376,32 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 {
 	size_t r, r1;
 	uint64_t next_val, prev_val;
-	uint64_t vals[READ_RANGE_OPS];
+	uint64_t *vals;
 	int ret;
 	char *range_key_buf;
 	char buf[512];
 
 	ret = 0;
+
+	if (cfg->read_range == 0)
+		return (0);
+
 	memset(&buf[0], 0, 512 * sizeof(char));
 	range_key_buf = &buf[0];
 	cursor->get_key(cursor, &range_key_buf);
 	extract_key(range_key_buf, &next_val);
-	for (r = 0; r < READ_RANGE_OPS; ++r) {
+	/*
+	 * TODO: This is inefficient, if we keep range operations and want
+	 * to maintain the ability to track the returned values should allocate
+	 * this buffer just once.
+	 */
+	vals = (uint64_t *)calloc(cfg->read_range, sizeof(uint64_t));
+	if (vals == NULL) {
+		lprintf(cfg, ENOMEM, 0,
+		    "worker: couldn't allocate value tracking array");
+		return (ENOMEM);
+	}
+	for (r = 0; r < cfg->read_range; ++r) {
 		prev_val = next_val;
 		vals[r] = prev_val;
 		ret = cursor->next(cursor);
@@ -400,11 +415,6 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 		/* Retrieve and decode the key */
 		cursor->get_key(cursor, &range_key_buf);
 		extract_key(range_key_buf, &next_val);
-#if 0
-		lprintf(cfg, 0, 0,
-		    "%d: range_key_buf %s prev %" PRIu64 " next %" PRIu64,
-		    (int)r, range_key_buf, prev_val, next_val);
-#endif
 		if (next_val < prev_val) {
 			for (r1 = 0; r1 <= r; ++r1)
 				lprintf(cfg, 0, 0,
@@ -416,6 +426,7 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 			break;
 		}
 	}
+	free(vals);
 	return (ret);
 }
 
@@ -581,14 +592,13 @@ worker(void *arg)
 					    "get_value in read.");
 					goto err;
 				}
-			}
-			/*
-			 * If we want to read a range, then call next for
-			 * several operations, confirming that the next key
-			 * is in the correct order.
-			 */
-			if (ret == 0 && cfg->read_range)
+				/*
+				 * If we want to read a range, then call next
+				 * for several operations, confirming that the
+				 * next key is in the correct order.
+				 */
 				ret = do_range_reads(cfg, cursor);
+			}
 
 			if (ret == 0 || ret == WT_NOTFOUND)
 				break;
