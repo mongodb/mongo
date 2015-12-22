@@ -498,7 +498,13 @@ void ProgramRunner::launchProcess(int child_stdout) {
     _pid = ProcessId::fromNative(nativePid);
     // Async signal unsafe functions should not be called in the child process.
 
-    verify(nativePid != -1);
+    if (nativePid == -1) {
+        // Fork failed so it is time for the process to exit
+        const auto errordesc = errnoWithDescription();
+        cout << "ProgramRunner is unable to fork child process: " << errordesc << endl;
+        fassert(34363, false);
+    }
+
     if (nativePid == 0) {
         // DON'T ASSERT IN THIS BLOCK - very bad things will happen
         //
