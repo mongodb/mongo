@@ -44,7 +44,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -491,7 +491,9 @@ TEST_F(ArrayDoc, NonNumericPathInArray) {
 //
 
 static MatchExpression* makeExpr(const BSONObj& exprBSON) {
-    return MatchExpressionParser::parse(exprBSON, ExtensionsCallbackNoop()).getValue().release();
+    return MatchExpressionParser::parse(exprBSON, ExtensionsCallbackDisallowExtensions())
+        .getValue()
+        .release();
 }
 
 static void assertContains(const EqualityMatches& equalities, const BSONObj& wrapped) {
