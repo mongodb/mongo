@@ -20,7 +20,7 @@
   cfg.settings.chainingAllowed = false;
   rs.initiate(cfg);
   rs.awaitReplication();
-  toolTest.port = rs.getMaster().port;
+  toolTest.port = rs.getPrimary().port;
 
   function writeConcernTestFunc(exitCode,writeConcern,name) {
     jsTest.log(name);
@@ -36,13 +36,13 @@
 
   function noConnectTest() {
     return startMongoProgramNoConnect.apply(null,
-        ['mongoimport','--writeConcern={w:3}','--host',rs.getMaster().host,'--file',fileTarget].
+        ['mongoimport','--writeConcern={w:3}','--host',rs.getPrimary().host,'--file',fileTarget].
         concat(commonToolArgs)
         );
   }
 
   // create a test collection
-  var db = rs.getMaster().getDB(dbName);
+  var db = rs.getPrimary().getDB(dbName);
   var col = db.getCollection(colName);
   for(var i=0;i<=100;i++){
     col.insert({_id:i, x:i*i});

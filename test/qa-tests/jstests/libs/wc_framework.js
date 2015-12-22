@@ -12,7 +12,7 @@ var runWCTest = function runWCTest(progName, rs, toolTest, testWriteConcern, tes
   }
 
   // grab the two secondary nodes
-  var masterPort = rs.getMaster().port
+  var masterPort = rs.getPrimary().port
   var members = [];
   var ports = [];
   for (var i = 0; i < rs.nodes.length; i++) {

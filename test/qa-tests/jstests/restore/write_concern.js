@@ -18,8 +18,8 @@
   cfg.settings.chainingAllowed = false;
   rs.initiate(cfg);
   rs.awaitReplication();
-  toolTest.port = rs.getMaster().port;
-  var dbOne = rs.getMaster().getDB("dbOne");
+  toolTest.port = rs.getPrimary().port;
+  var dbOne = rs.getPrimary().getDB("dbOne");
 
   function writeConcernTestFunc(exitCode, writeConcern, name) {
     jsTest.log(name);
@@ -36,7 +36,7 @@
 
   function noConnectTest() {
     return startMongoProgramNoConnect.apply(null,
-        ['mongorestore','--writeConcern={w:3}','--host',rs.getMaster().host].
+        ['mongorestore','--writeConcern={w:3}','--host',rs.getPrimary().host].
         concat(getRestoreTarget(dumpTarget)).
         concat(commonToolArgs)
         );

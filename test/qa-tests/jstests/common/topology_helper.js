@@ -83,7 +83,7 @@ var replicaSetTopology = {
     return this;
   },
   connection: function() {
-    return this.replTest.getMaster();
+    return this.replTest.getPrimary();
   },
   stop: function() {
     this.replTest.stopSet();

@@ -22,7 +22,7 @@ print("starting the replica set")
 var replTest = new ReplSetTest({ name: 'tool_replset', nodes: 2, oplogSize: 5 });
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getMaster();
+var master = replTest.getPrimary();
 for (var i = 0; i < 100; i++) {
     master.getDB("foo").bar.insert({ a: i });
 }
