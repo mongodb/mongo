@@ -542,15 +542,12 @@ err:	/*
 int
 __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
-	WT_INSERT *ins, **start, **stop;
-	WT_INSERT_HEAD *ins_head;
+	WT_INSERT *p, *t;
 	WT_PAGE *page;
-	uint32_t entries;
-	int level;
+	uint32_t cnt;
 
 	page = cbt->ref->page;
 
-	/* If the page has disk-based entries, select from them. */
 	if (page->pg_row_entries != 0) {
 		cbt->compare = 0;
 		cbt->slot = __wt_random(&session->rnd) % page->pg_row_entries;
@@ -565,77 +562,24 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	/*
 	 * If the tree is new (and not empty), it might have a large insert
-	 * list.
+	 * list. Count how many records are in the list.
 	 */
 	F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
 	if ((cbt->ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
 		return (WT_NOTFOUND);
-
-	/*
-	 * Walk down the list until we find a level with at least two entries,
-	 * that's where we'll start rolling random numbers.
-	 */
-	for (ins_head = cbt->ins_head,
-	    level = WT_SKIP_MAXDEPTH - 1; level > 0; --level)
-		if ((ins = ins_head->head[level]) != NULL && ins->next != NULL)
+	for (cnt = 1, p = WT_SKIP_FIRST(cbt->ins_head);; ++cnt)
+		if ((p = WT_SKIP_NEXT(p)) == NULL)
 			break;
 
 	/*
-	 * Use all entries at this first level as the range for random
-	 * selection. Do that by counting the entries and setting the start
-	 * point as the first entry.
+	 * Select a random number from 0 to (N - 1), return that record.
 	 */
-	for (entries = 0,
-	    ins = ins_head->head[level]; ins != NULL; ins = ins->next[level])
-		++entries;
-	start = &ins_head->head[level];
-
-	/*
-	 * Keep stepping down the skip list selecting a random entry at each
-	 * level. Use all entries as the range the first time through,
-	 * subsequently constrain the range to the entries between the selected
-	 * entry and it's neighbour from a level up the list.
-	 */
-	while (level > 0) {
-		/*
-		 * Select a random number from the calculated entry range and
-		 * convert that to a new start/stop pair. If there are only two
-		 * entries, the start/stop pair must be slots 0 and 1,
-		 * otherwise, use the random number as the start position. The
-		 * calculation uses "entries - 1" to ensure we never chose the
-		 * last node in the list as our new start point.
-		 */
-		entries = entries < 3 ?
-		    0 : __wt_random(&session->rnd) % (entries - 1);
-		/* Move forward to the randomly selected start entry. */
-		for (; entries > 0; --entries)
-			start = &(*start)->next[level];
-		stop = &(*start)->next[level];
-
-		/* Drop down a level. */
-		--start;
-		--stop;
-		--level;
-
-		/* Count the entries between the new start/stop pair. */
-		for (entries = 0, ins = *start;
-		    ins != *stop; ++entries, ins = ins->next[level])
-			;
-	}
-
-	/*
-	 * When we reach the bottom level, select a random entry from the entry
-	 * range and return it.
-	 *
-	 * It should be impossible for the entries count to be 0 at this point,
-	 * but check for it out of paranoia and to quiet static testing tools.
-	 */
-	entries = entries < 1 ? 0 : __wt_random(&session->rnd) % entries;
-	for (ins = *start; entries > 0; --entries)
-		ins = ins->next[0];
-
-	cbt->ins = ins;
+	cnt = __wt_random(&session->rnd) % cnt;
+	for (p = t = WT_SKIP_FIRST(cbt->ins_head);; t = p)
+		if (cnt-- == 0 || (p = WT_SKIP_NEXT(p)) == NULL)
+			break;
 	cbt->compare = 0;
+	cbt->ins = t;
 
 	return (0);
 }
