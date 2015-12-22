@@ -706,7 +706,8 @@ config_consolidate(CONFIG *cfg)
 			 * as being the same key.
 			 */
 			if (strncmp(conf_line->string, test_line->string,
-			    string_key - conf_line->string + 1) == 0) {
+			    (size_t)(string_key - conf_line->string + 1))
+			    == 0) {
 				TAILQ_REMOVE(&cfg->config_head, conf_line, c);
 				free(conf_line->string);
 				free(conf_line);
