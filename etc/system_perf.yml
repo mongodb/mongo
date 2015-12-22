@@ -5,10 +5,6 @@ pre:
     - command: shell.track
 
 post:
-    - command: "json.send"
-      params:
-        name: "perf"
-        file: "src/perf.json"
     - command: attach.results
       params:
         file_location: src/report.json
@@ -18,7 +14,7 @@ post:
       params:
         working_dir: dsi
         script: |
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}
           if [ ! -f "test.success" ]; then yes yes | ./terraform destroy; fi
@@ -104,7 +100,7 @@ functions:
       params:
         working_dir: dsi
         script: |
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}
           # configure mongodb cluster with wiredTiger
@@ -153,7 +149,7 @@ functions:
       params:
         working_dir: dsi
         script: |
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}
           # destroy the EC2 cluster
@@ -169,7 +165,7 @@ functions:
       params:
         working_dir: dsi
         script: |
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}/reports
           # move additional file here
@@ -223,7 +219,7 @@ functions:
 
   "compare":
     - command: shell.exec
-      params: 
+      params:
         script: |
           set -o verbose
           rm -rf ./src
@@ -232,7 +228,7 @@ functions:
       # checkout dsi code
       params:
         script: |
-          set -e 
+          set -e
           set -v
           rm -rf ./dsi
           git clone git@github.com:10gen/dsi.git
@@ -256,7 +252,10 @@ functions:
           set -o errexit
           set -o verbose
           python -u ../dsi/analysis/compare.py -b standalone.json -c oplog.json
-
+    - command: "json.send"
+      params:
+        name: "perf"
+        file: "src/perf.json"
 
 #######################################
 #               Tasks                 #
@@ -377,7 +376,7 @@ tasks:
     - func: "upload log file"
       vars:
         test: "core_workloads_MMAPv1"
-    - func: "destroy cluster"      
+    - func: "destroy cluster"
     - func: "analyze"
 
 - name: industry_benchmarks_WT_oplog_comp
@@ -413,7 +412,7 @@ tasks:
         variant1: "linux-standalone"
         variant2: "linux-1-node-replSet"
     - func: "analyze"
-    
+
 - name: core_workloads_WT_oplog_comp
   depends_on:
     - name: industry_benchmarks_WT_oplog_comp
@@ -431,7 +430,7 @@ tasks:
         variant1: "linux-standalone"
         variant2: "linux-1-node-replSet"
     - func: "analyze"
-    
+
 - name: core_workloads_MMAPv1_oplog_comp
   depends_on:
     - name: industry_benchmarks_MMAPv1_oplog_comp
