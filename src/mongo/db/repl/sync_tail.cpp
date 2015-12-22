@@ -751,7 +751,8 @@ void SyncTail::oplogApplication() {
         }
 
         const auto lastOpTime = fassertStatusOK(28773, OpTime::parseFromOplogEntry(lastOp));
-        if (lastWriteOpTime >= lastOpTime) {
+        // TODO: Make ">=" once SERVER-21988 is fixed.
+        if (lastWriteOpTime > lastOpTime) {
             // Error for the oplog to go back in time.
             fassert(34361,
                     Status(ErrorCodes::OplogOutOfOrder,
