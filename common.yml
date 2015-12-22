@@ -590,10 +590,6 @@ tasks:
             value: "common/db"
           - key: "args"
             value: "-test.types=db"
-          - key: "mongod_args"
-            value: *mongod_default_startup_args_string
-          - key: "mongo_args"
-            value: *mongo_default_startup_args_string
     - func: "download mongod"
       vars:
         mongo_url: "${mongo32_url}"
