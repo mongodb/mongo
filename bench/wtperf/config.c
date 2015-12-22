@@ -580,9 +580,9 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 	CONFIG_QUEUE_ENTRY *config_line;
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_PARSER *scan;
+	size_t len;
 	int ret, t_ret;
 	char *string_copy;
-	size_t len;
 
 	len = strlen(optstr);
 	if ((ret = wiredtiger_config_parser_open(
@@ -594,10 +594,9 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 	/*
 	 * Append the current line to our copy of the config. The config is
 	 * stored in the order it is processed, so added options will be after
-	 * any parsed from the original config. We allocate len +1 to allow for
+	 * any parsed from the original config. We allocate len + 1 to allow for
 	 * a null byte to be added.
 	 */
-
 	if ((string_copy = calloc(len + 1, 1)) == NULL)
 		return (enomem(cfg));
 
@@ -679,6 +678,11 @@ config_sanity(CONFIG *cfg)
 	return (0);
 }
 
+/*
+ * config_consolidate --
+ *	Consolidate repeated configuration settings so that it only appears
+ *	once in the configuration output file.
+ */
 void
 config_consolidate(CONFIG *cfg)
 {
@@ -695,11 +699,12 @@ config_consolidate(CONFIG *cfg)
 		string_key = strchr(conf_line->string, '=');
 		tmp = test_line = TAILQ_NEXT(conf_line, c);
 		while (test_line != NULL) {
-		/*
-		 * The +1 here forces the = sign to be matched ensuring we don't
-		 * match keys that have a common prefix such as "table_count"
-		 * and "table_count_idle" as being the same key.
-		 */
+			/*
+			 * The + 1 here forces the '=' sign to be matched
+			 * ensuring we don't match keys that have a common
+			 * prefix such as "table_count" and "table_count_idle"
+			 * as being the same key.
+			 */
 			if (strncmp(conf_line->string, test_line->string,
 			    string_key - conf_line->string + 1) == 0) {
 				TAILQ_REMOVE(&cfg->config_head, conf_line, c);
@@ -750,8 +755,8 @@ config_to_file(CONFIG *cfg)
 		fprintf(fp, "%s\n", config_line->string);
 		config_line = TAILQ_NEXT(config_line, c);
 	}
-err:
-	free(path);
+
+err:	free(path);
 	if (fp != NULL)
 		(void)fclose(fp);
 }
