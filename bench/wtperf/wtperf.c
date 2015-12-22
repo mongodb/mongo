@@ -391,8 +391,8 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 	cursor->get_key(cursor, &range_key_buf);
 	extract_key(range_key_buf, &next_val);
 	/*
-	 * TODO: This is inefficient, if we keep range operations and want
-	 * to maintain the ability to track the returned values should allocate
+	 * TODO: This is inefficient, if we keep range operations and want to
+	 * maintain the ability to track the returned values should allocate
 	 * this buffer just once.
 	 */
 	vals = (uint64_t *)calloc(cfg->read_range, sizeof(uint64_t));
@@ -406,7 +406,7 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 		vals[r] = prev_val;
 		ret = cursor->next(cursor);
 		/*
-		 * We could be walking near the end.  If we get to the end that
+		 * We could be walking near the end. If we get to the end that
 		 * is okay.
 		 */
 		if (ret != 0)
