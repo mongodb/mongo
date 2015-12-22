@@ -437,8 +437,13 @@ TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSource) {
     getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
     ASSERT_EQUALS(HostAndPort("h5"), getTopoCoord().getSyncSourceAddress());
 
-    // h5 goes down; should not choose h3 since it can't vote
+    // h5 goes down; should choose h3
     receiveDownHeartbeat(HostAndPort("h5"), "rs0", OpTime());
+    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
+    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+
+    // h3 goes down; no sync source candidates remain
+    receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime());
     getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }

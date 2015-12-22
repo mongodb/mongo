@@ -218,10 +218,14 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
 
     int closestIndex = -1;
 
-    // Make two attempts.  The first attempt, we ignore those nodes with
-    // slave delay higher than our own, hidden nodes, and nodes that are excessively lagged.
-    // The second attempt includes such nodes, in case those are the only ones we can reach.
-    // This loop attempts to set 'closestIndex'.
+    // Make two attempts, with less restrictive rules the second time.
+    //
+    // During the first attempt, we ignore those nodes that have a larger slave
+    // delay, hidden nodes or non-voting, and nodes that are excessively behind.
+    //
+    // For the second attempt include those nodes, in case those are the only ones we can reach.
+    //
+    // This loop attempts to set 'closestIndex', to select a viable candidate.
     for (int attempts = 0; attempts < 2; ++attempts) {
         for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin();
              it != _hbdata.end();
@@ -242,46 +246,45 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
 
             const MemberConfig& itMemberConfig(_rsConfig.getMemberAt(itIndex));
 
-            // Candidate must be a voter if we are a voter
-            if (_selfConfig().isVoter() && !itMemberConfig.isVoter()) {
-                continue;
+            // Things to skip on the first attempt.
+            if (attempts == 0) {
+                // Candidate must be a voter if we are a voter.
+                if (_selfConfig().isVoter() && !itMemberConfig.isVoter()) {
+                    continue;
+                }
+                // Candidates must not be hidden.
+                if (itMemberConfig.isHidden()) {
+                    continue;
+                }
+                // Candidates cannot be excessively behind.
+                if (it->getOpTime() < oldestSyncOpTime) {
+                    continue;
+                }
+                // Candidate must not have a configured delay larger than ours.
+                if (_selfConfig().getSlaveDelay() < itMemberConfig.getSlaveDelay()) {
+                    continue;
+                }
             }
-
             // Candidate must build indexes if we build indexes, to be considered.
             if (_selfConfig().shouldBuildIndexes()) {
                 if (!itMemberConfig.shouldBuildIndexes()) {
                     continue;
                 }
             }
-
             // only consider candidates that are ahead of where we are
             if (it->getOpTime().getTimestamp() <= lastTimestampApplied) {
                 continue;
             }
-
-            // omit candidates that are excessively behind, on the first attempt at least.
-            if (attempts == 0 && it->getOpTime() < oldestSyncOpTime) {
-                continue;
-            }
-
-            // omit nodes that are more latent than anything we've already considered
+            // Candidate cannot be more latent than anything we've already considered.
             if ((closestIndex != -1) &&
                 (_getPing(itMemberConfig.getHostAndPort()) >
                  _getPing(_rsConfig.getMemberAt(closestIndex).getHostAndPort()))) {
                 continue;
             }
-
-            if (attempts == 0) {
-                if (_selfConfig().getSlaveDelay() < itMemberConfig.getSlaveDelay() ||
-                    itMemberConfig.isHidden()) {
-                    continue;  // skip this one in the first attempt
-                }
-            }
-
+            // Candidate cannot be blacklisted.
             if (_memberIsBlacklisted(itMemberConfig, now)) {
                 continue;
             }
-
             // This candidate has passed all tests; set 'closestIndex'
             closestIndex = itIndex;
         }
