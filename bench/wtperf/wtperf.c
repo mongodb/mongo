@@ -371,6 +371,11 @@ err:		cfg->error = cfg->stop = 1;
 	return (NULL);
 }
 
+/*
+ * do_range_reads --
+ *	If configured to execute a sequence of next operations after each
+ *	search do them. Ensuring the keys we see are always in order.
+ */
 static int
 do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 {
@@ -388,8 +393,11 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 
 	memset(&buf[0], 0, 512 * sizeof(char));
 	range_key_buf = &buf[0];
+
+	/* Save where the first key is for comparisons. */
 	cursor->get_key(cursor, &range_key_buf);
 	extract_key(range_key_buf, &next_val);
+
 	/*
 	 * TODO: This is inefficient, if we keep range operations and want to
 	 * maintain the ability to track the returned values should allocate
@@ -401,6 +409,7 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 		    "worker: couldn't allocate value tracking array");
 		return (ENOMEM);
 	}
+
 	for (r = 0; r < cfg->read_range; ++r) {
 		prev_val = next_val;
 		vals[r] = prev_val;
