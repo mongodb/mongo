@@ -58,6 +58,7 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -220,8 +221,15 @@ public:
                        str::stream() << "Cursor not found, cursor id: " << request.cursorid));
         }
 
-        // If the fail point is enabled, busy wait until it is disabled.
+        // If the fail point is enabled, busy wait until it is disabled. We unlock and re-acquire
+        // the locks periodically in order to avoid deadlock (see SERVER-21997 for details).
         while (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
+            invariant(ctx);
+            invariant(!unpinDBLock);
+            invariant(!unpinCollLock);
+            sleepFor(Milliseconds(10));
+            ctx.reset();
+            ctx = stdx::make_unique<AutoGetCollectionForRead>(txn, request.nss);
         }
 
         if (request.nss.ns() != cursor->ns()) {
