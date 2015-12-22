@@ -428,7 +428,7 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 			for (r1 = 0; r1 <= r; ++r1)
 				lprintf(cfg, 0, 0,
 				    "Key[%d]: %" PRIu64, (int)r1, vals[r1]);
-			lprintf(cfg, EINVAL, WT_PANIC,
+			lprintf(cfg, EINVAL, 0,
 			    "Out of order keys %" PRIu64
 			    " came before %" PRIu64,
 			    prev_val, next_val);
