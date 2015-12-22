@@ -189,6 +189,7 @@ struct __config {			/* Configuration structure */
 
 #define	ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
+#define	READ_RANGE_OPS	10
 #define	THROTTLE_OPS	100
 
 #define	THOUSAND	(1000ULL)
@@ -303,6 +304,12 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 	 * Don't change to snprintf, sprintf is faster in some tests.
 	 */
 	sprintf(key_buf, "%0*" PRIu64, cfg->key_sz - 1, keyno);
+}
+
+static inline void
+extract_key(char *key_buf, uint64_t *keynop)
+{
+	sscanf(key_buf, "%" SCNu64, keynop);
 }
 
 #endif
