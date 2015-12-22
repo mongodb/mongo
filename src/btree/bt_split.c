@@ -603,7 +603,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 		 * threads may be underneath us right now changing the structure
 		 * state.)  However, if the WT_REF structures reference on-page
 		 * information, we have to fix that, because the disk image for
-		 * the page that has an page index entry for the WT_REF is about
+		 * the page that has a page index entry for the WT_REF is about
 		 * to change.
 		 */
 		child_pindex = WT_INTL_INDEX_GET_SAFE(child);
