@@ -5,7 +5,7 @@
 (function () {
     "use strict";
     var numNodes = 5;
-    var maxQueueSizeExpected = 7;
+    var maxQueueSizeExpected = 11;
     var replTest = new ReplSetTest({ name: 'testSet', nodes: numNodes });
     var nodes = replTest.startSet();
     replTest.initiate();
