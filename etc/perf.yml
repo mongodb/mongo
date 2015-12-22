@@ -11,10 +11,6 @@ pre:
           exit 0
 
 post:
-    - command: "json.send"
-      params:
-        name: "perf"
-        file: "src/perf.json"
     - command: attach.results
       params:
         file_location: src/report.json
