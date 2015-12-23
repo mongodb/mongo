@@ -380,12 +380,11 @@ err:		cfg->error = cfg->stop = 1;
 static int
 do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 {
-	size_t r, r1;
+	size_t range;
 	uint64_t next_val, prev_val;
-	uint64_t *vals;
-	int ret;
 	char *range_key_buf;
 	char buf[512];
+	int ret;
 
 	ret = 0;
 
@@ -399,26 +398,10 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 	cursor->get_key(cursor, &range_key_buf);
 	extract_key(range_key_buf, &next_val);
 
-	/*
-	 * TODO: This is inefficient, if we keep range operations and want to
-	 * maintain the ability to track the returned values should allocate
-	 * this buffer just once.
-	 */
-	vals = (uint64_t *)calloc(cfg->read_range, sizeof(uint64_t));
-	if (vals == NULL) {
-		lprintf(cfg, ENOMEM, 0,
-		    "worker: couldn't allocate value tracking array");
-		return (ENOMEM);
-	}
-
-	for (r = 0; r < cfg->read_range; ++r) {
+	for (range = 0; range < cfg->read_range; ++range) {
 		prev_val = next_val;
-		vals[r] = prev_val;
 		ret = cursor->next(cursor);
-		/*
-		 * We could be walking near the end. If we get to the end that
-		 * is okay.
-		 */
+		/* We are done if we reach the end. */
 		if (ret != 0)
 			break;
 
@@ -426,18 +409,14 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 		cursor->get_key(cursor, &range_key_buf);
 		extract_key(range_key_buf, &next_val);
 		if (next_val < prev_val) {
-			for (r1 = 0; r1 <= r; ++r1)
-				lprintf(cfg, 0, 0,
-				    "Key[%d]: %" PRIu64, (int)r1, vals[r1]);
 			lprintf(cfg, EINVAL, 0,
 			    "Out of order keys %" PRIu64
 			    " came before %" PRIu64,
 			    prev_val, next_val);
-			break;
+			return (EINVAL);
 		}
 	}
-	free(vals);
-	return (ret);
+	return (0);
 }
 
 static void *
