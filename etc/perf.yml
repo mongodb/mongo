@@ -40,14 +40,14 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${version_id}/${revision}/mongod-${version_id}
+        remote_file: perf-3.2/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         local_file: src/mongod
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${version_id}/${revision}/mongo-${version_id}
+        remote_file: perf-3.2/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         local_file: src/mongo
     - command: shell.exec
@@ -58,8 +58,8 @@ functions:
           set -v
           chmod +x mongod
           chmod +x mongo
-          git clone https://github.com/mongodb/mongo-perf perf
-          cd perf
+          git clone https://github.com/mongodb/mongo-perf perf-3.2
+          cd perf-3.2
           git checkout r20150814
     - command: shell.exec
       params:
@@ -154,14 +154,14 @@ functions:
           set -e
           set -v
           source ./venv/bin/activate
-          cd perf
+          cd perf-3.2
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
           ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
     - command: "json.send"
       params:
         name: "perf"
-        file: "src/perf/perf.json"
+        file: "src/perf-3.2/perf.json"
 
 tasks:
 - name: compile
@@ -185,7 +185,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongod
-        remote_file: perf/${version_id}/${revision}/mongod-${version_id}
+        remote_file: perf-3.2/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -195,7 +195,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongo
-        remote_file: perf/${version_id}/${revision}/mongo-${version_id}
+        remote_file: perf-3.2/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
