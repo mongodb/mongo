@@ -234,8 +234,8 @@ void MigrationSourceManager::logOp(OperationContext* txn,
         // won't be transferred to the recipient shard. Also ignore ops from
         // _migrateClone and _transferMods since it is impossible to move a chunk
         // to self.
-        // Also ignore out of range deletes when migrating (notInActiveChunk is set in
-        // OpObserver::onDelete)
+        // Also ignore out of range deletes when migrating a chunk (is set
+        // in OpObserver::onDelete)
         return;
     }
 

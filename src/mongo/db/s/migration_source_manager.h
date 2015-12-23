@@ -71,6 +71,10 @@ public:
                BSONObj* patt,
                bool notInActiveChunk);
 
+    /**
+     * Determines whether the given document 'doc' in namespace 'ns' is within the range
+     * of a currently migrating chunk.
+     */
     bool isInMigratingChunk(const NamespaceString& ns, const BSONObj& doc);
 
     /**

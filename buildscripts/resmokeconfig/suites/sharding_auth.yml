@@ -24,6 +24,7 @@ selector:
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js         # SERVER-21713
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js  # SERVER-21713
     - jstests/sharding/migration_with_source_deletes.js                 # SERVER-21713
+    - jstests/sharding/migration_sets_fromMigrate_flag.js               # SERVER-21713
 
 executor:
   js_test:
