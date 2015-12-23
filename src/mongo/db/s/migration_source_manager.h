@@ -146,7 +146,7 @@ private:
 
     /**
      * Insert items from docIdList to a new array with the given fieldName in the given builder. If
-     * explode is true, the inserted object will be the full version of the document. Note that the
+     * explode is true, the inserted object will be the full version of the document. Note that
      * whenever an item from the docList is inserted to the array, it will also be removed from
      * docList.
      *

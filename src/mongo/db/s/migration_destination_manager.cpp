@@ -161,7 +161,7 @@ bool opReplicatedEnough(OperationContext* txn,
     return majorityStatus.isOK() && userStatus.isOK();
 }
 
-MONGO_FP_DECLARE(failMigrationReceivedOutOfRangeDelete);
+MONGO_FP_DECLARE(failMigrationReceivedOutOfRangeOperation);
 
 }  // namespace
 
@@ -816,18 +816,18 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* txn,
         Lock::DBLock dlk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
         Helpers::RemoveSaver rs("moveChunk", ns, "removedDuring");
 
-        BSONObjIterator i(xfer["deleted"].Obj());
+        BSONObjIterator i(xfer["deleted"].Obj());  // deleted documents
         while (i.more()) {
             Lock::CollectionLock clk(txn->lockState(), ns, MODE_X);
             OldClientContext ctx(txn, ns);
 
             BSONObj id = i.next().Obj();
 
-            // do not apply deletes if they do not belong to the chunk being migrated
+            // do not apply delete if doc does not belong to the chunk being migrated
             BSONObj fullObj;
             if (Helpers::findById(txn, ctx.db(), ns.c_str(), id, fullObj)) {
                 if (!isInRange(fullObj, min, max, shardKeyPattern)) {
-                    if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeDelete)) {
+                    if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
                         invariant(0);
                     }
                     continue;
@@ -852,12 +852,20 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* txn,
         }
     }
 
-    if (xfer["reload"].isABSONObj()) {
+    if (xfer["reload"].isABSONObj()) {  // modified documents (insert/update)
         BSONObjIterator i(xfer["reload"].Obj());
         while (i.more()) {
             OldClientWriteContext cx(txn, ns);
 
             BSONObj updatedDoc = i.next().Obj();
+
+            // do not apply insert/update if doc does not belong to the chunk being migrated
+            if (!isInRange(updatedDoc, min, max, shardKeyPattern)) {
+                if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
+                    invariant(0);
+                }
+                continue;
+            }
 
             BSONObj localDoc;
             if (willOverrideLocalId(

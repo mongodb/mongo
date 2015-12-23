@@ -21,7 +21,7 @@ selector:
     # Skip the testcases that do not have auth bypass when running ops in parallel.
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js         # SERVER-21713
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js  # SERVER-21713
-    - jstests/sharding/migration_with_source_deletes.js                 # SERVER-21713
+    - jstests/sharding/migration_with_source_ops.js                     # SERVER-21713
     - jstests/sharding/migration_sets_fromMigrate_flag.js               # SERVER-21713
 
 executor:
