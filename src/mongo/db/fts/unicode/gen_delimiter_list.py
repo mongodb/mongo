@@ -21,7 +21,7 @@ def generate(unicode_proplist_file, target):
 
     delim_codepoints = set()
 
-    proplist_file = open(unicode_proplist_file, 'r')
+    proplist_file = open(unicode_proplist_file, 'rU')
 
     delim_properties = ["White_Space", 
                         "Dash", 
