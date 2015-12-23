@@ -243,8 +243,20 @@ public:
      */
     std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const;
 
+    /**
+     * Deletes the document with the given RecordId from the collection.
+     *
+     * 'fromMigrate' indicates whether the delete was induced by a chunk migration, and
+     * so should be ignored by the user as an internal maintenance operation and not a
+     * real delete.
+     * 'loc' key to uniquely identify a record in a collection.
+     * 'cappedOK' if true, allows deletes on capped collections (Cloner::copyDB uses this).
+     * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
+     * will not be logged.
+     */
     void deleteDocument(OperationContext* txn,
                         const RecordId& loc,
+                        bool fromMigrate = false,
                         bool cappedOK = false,
                         bool noWarn = false);
 
