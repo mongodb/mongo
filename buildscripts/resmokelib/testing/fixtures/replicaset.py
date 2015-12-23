@@ -81,6 +81,9 @@ class ReplicaSetFixture(interface.ReplFixture):
             member_info = {"_id": i, "host": node.get_connection_string()}
             if i > 0:
                 member_info["priority"] = 0
+            if i >= 7:
+                # Only 7 nodes in a replica set can vote, so the other members must be non-voting.
+                member_info["votes"] = 0
             members.append(member_info)
         initiate_cmd_obj = {"replSetInitiate": {"_id": self.replset_name, "members": members}}
 
