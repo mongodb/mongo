@@ -54,6 +54,7 @@ static void config_opt_usage(void);
 int
 config_assign(CONFIG *dest, const CONFIG *src)
 {
+	CONFIG_QUEUE_ENTRY *conf_line, *tmp_line;
 	size_t i, len;
 	char *newstr, **pstr;
 
@@ -96,6 +97,18 @@ config_assign(CONFIG *dest, const CONFIG *src)
 		}
 
 	TAILQ_INIT(&dest->stone_head);
+	TAILQ_INIT(&dest->config_head);
+
+	/* Clone the config string information into the new cfg object */
+	TAILQ_FOREACH(conf_line, &src->config_head, c) {
+		len = strlen(conf_line->string);
+		if ((tmp_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1)) == NULL)
+			return (enomem(src));
+		if ((tmp_line->string = calloc(len + 1, 1)) == NULL)
+			return (enomem(src));
+		strncpy(tmp_line->string, conf_line->string, len);
+		TAILQ_INSERT_TAIL(&dest->config_head, tmp_line, c);
+	}
 	return (0);
 }
 
