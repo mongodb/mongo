@@ -1373,6 +1373,17 @@ TEST(TypeMatchExpression, MatchesElementNumber) {
     ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
 }
 
+TEST(TypeMatchExpression, ElementNumberToBSONIsFormattedCorrectly) {
+    TypeMatchExpression type;
+    ASSERT_OK(type.initAsMatchingAllNumbers("a"));
+    ASSERT_EQ("a", type.path());
+
+    BSONObjBuilder objBuilder;
+    type.toBSON(&objBuilder);
+    ASSERT_EQ(objBuilder.obj(),
+              BSON("a" << BSON("$type" << TypeMatchExpression::kMatchesAllNumbersAlias)));
+}
+
 TEST(TypeMatchExpression, InvalidTypeMatchExpressionerand) {
     // If the provided type number is not a valid BSONType, it is not a parse error.  The
     // operator will simply not match anything.

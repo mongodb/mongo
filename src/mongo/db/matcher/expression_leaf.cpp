@@ -474,7 +474,13 @@ bool TypeMatchExpression::matches(const MatchableDocument* doc, MatchDetails* de
 
 void TypeMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
-    debug << _path << " type: " << _type;
+    debug << _path << " type: ";
+    if (matchesAllNumbers()) {
+        debug << kMatchesAllNumbersAlias;
+    } else {
+        debug << _type;
+    }
+
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
         debug << " ";
@@ -484,7 +490,11 @@ void TypeMatchExpression::debugString(StringBuilder& debug, int level) const {
 }
 
 void TypeMatchExpression::toBSON(BSONObjBuilder* out) const {
-    out->append(path(), BSON("$type" << _type));
+    if (matchesAllNumbers()) {
+        out->append(path(), BSON("$type" << kMatchesAllNumbersAlias));
+    } else {
+        out->append(path(), BSON("$type" << _type));
+    }
 }
 
 bool TypeMatchExpression::equivalent(const MatchExpression* other) const {
