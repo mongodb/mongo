@@ -100,14 +100,14 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	TAILQ_INIT(&dest->config_head);
 
 	/* Clone the config string information into the new cfg object */
-	conf_line = TAILQ_FIRST(&src->config_head);
-	while (conf_line != NULL) {
+	TAILQ_FOREACH(conf_line, &src->config_head, c) {
 		len = strlen(conf_line->string);
-		tmp_line = calloc(sizeof(CONFIG_QUEUE_ENTRY),1);
-		tmp_line->string = calloc(len + 1, 1);
+		if ((tmp_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1)) == NULL)
+			return (enomem(src));
+		if ((tmp_line->string = calloc(len + 1, 1)) == NULL)
+			return (enomem(src));
 		strncpy(tmp_line->string, conf_line->string, len);
 		TAILQ_INSERT_TAIL(&dest->config_head, tmp_line, c);
-		conf_line = TAILQ_NEXT(conf_line, c);
 	}
 	return (0);
 }
