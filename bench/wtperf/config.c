@@ -601,7 +601,9 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 		return (enomem(cfg));
 
 	strncpy(string_copy, optstr, len);
-	config_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
+	if ((config_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1)) == NULL)
+		return (enomem(cfg));
+
 	config_line->string = string_copy;
 	TAILQ_INSERT_TAIL(&cfg->config_head, config_line, c);
 
@@ -734,13 +736,13 @@ config_to_file(CONFIG *cfg)
 	fp = NULL;
 
 	/* Backup the config */
-	req_len = strlen(cfg->home) + 100;
-	if ((path = calloc(req_len, 1)) == NULL) {
+	req_len = strlen(cfg->home) + 14;
+	if ((path = calloc(req_len + 1, 1)) == NULL) {
 		(void)enomem(cfg);
 		goto err;
 	}
 
-	snprintf(path, req_len + 14, "%s/CONFIG.wtperf", cfg->home);
+	snprintf(path, req_len, "%s/CONFIG.wtperf", cfg->home);
 	if ((fp = fopen(path, "w")) == NULL) {
 		lprintf(cfg, errno, 0, "%s", path);
 		goto err;
