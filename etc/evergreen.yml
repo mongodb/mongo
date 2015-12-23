@@ -3857,7 +3857,6 @@ buildvariants:
   - name: sharding_legacy_op_query_WT
   - name: sharding_op_query_WT
   - name: sharding_legacy_multiversion
-  - name: sharding_csrs_continuous_config_stepdown_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
