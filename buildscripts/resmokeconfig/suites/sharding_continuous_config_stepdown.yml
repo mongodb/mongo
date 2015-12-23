@@ -67,8 +67,9 @@ selector:
     - jstests/sharding/tag_range.js
     - jstests/sharding/top_chunk_autosplit.js
     - jstests/sharding/count_config_servers.js
-    # Awaits replication directly against the config server primary
+    # Calls the config server primary directly (not through mongos)
     - jstests/sharding/moveprimary_ignore_sharded.js
+    - jstests/sharding/min_optime_recovery.js
     # Runs setShardVersion/getShardVersion against the config server and we don't support retries
     # for this command
     - jstests/sharding/major_version_check.js

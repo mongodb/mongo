@@ -59,8 +59,11 @@ ReplSetTest = function ReplSetTestWithContinuousPrimaryStepdown() {
 
                 // Wait for primary to get elected and allow the test to make some progress before
                 // attempting another stepdown.
-                primary = replSet.getPrimary();
-                sleep(7000);
+                if (stopCounter.getCount() > 0)
+                    primary = replSet.getPrimary();
+
+                if (stopCounter.getCount() > 0)
+                    sleep(8000);
             }
 
             print('*** Continuous stepdown thread completed successfully');
