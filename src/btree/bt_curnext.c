@@ -431,6 +431,62 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt)
 }
 
 /*
+ * __wt_set_last_op --
+ *	Set the last operation.
+ */
+void
+__wt_set_last_op(WT_CURSOR_BTREE *cbt, int v)
+{
+	int i;
+
+	for (i = 20; --i > 0;)
+		cbt->last_op[i] = cbt->last_op[i - 1];
+	cbt->last_op[0] = v;
+}
+
+/*
+ * __key_order_check --
+ *	Check key ordering for cursor movements.
+ */
+static int
+__key_order_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+	WT_BTREE *btree;
+	WT_ITEM *key;
+	WT_DECL_RET;
+	int cmp;
+
+	btree = S2BT(session);
+	key = &cbt->iface.key;
+
+	if ((ret = __wt_compare(
+	    session, btree->collator, cbt->lastkey, key, &cmp)) != 0)
+		WT_RET_MSG(session, ret,
+		    "WT-2307: comparison function failed");
+	if (cmp < 0)
+		return (0);
+
+	/* Flag an error and keep going */
+	__wt_errx(session, "encountered out of order key");
+
+	/*
+	 * The cursor next hit a bug due to a race in splits, move the cursor
+	 * back to the last known good position and retry the next.
+	 */
+	key->data = cbt->lastkey->data;
+	key->size = cbt->lastkey->size;
+	if ((ret = __wt_btcur_search(cbt)) != 0)
+		WT_RET_MSG(session, ret,
+		    "WT-2307: searching for the previous key failed");
+
+	/* Set last op as a next, in case we need to loop retrying */
+	cbt->last_op[0] = WT_LASTOP_NEXT;
+
+	/* Return a duplicate key error to tell next it needs to retry. */
+	return (WT_DUPLICATE_KEY);
+}
+
+/*
  * __wt_btcur_next --
  *	Move to the next record in the tree.
  */
@@ -452,7 +508,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 	if (truncating)
 		LF_SET(WT_READ_TRUNCATE);
 
-	WT_RET(__cursor_func_init(cbt, false));
+retry:	WT_RET(__cursor_func_init(cbt, false));
 
 	/*
 	 * If we aren't already iterating in the right direction, there's
@@ -530,6 +586,25 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
 	}
+
+	/*
+	 * WT-2307 check that the previous key returned sorts less than
+	 * the current key being returned. If it didn't we've searched back
+	 * to the previous key, retry the next operation.
+	 */
+	if (ret == 0 && page->type == WT_PAGE_ROW_LEAF) {
+		if (cbt->last_op[0] == WT_LASTOP_NEXT &&
+		    cbt->lastkey != NULL && cbt->lastkey->size != 0) {
+			ret = __key_order_check(session, cbt);
+			if (ret == WT_DUPLICATE_KEY)
+				goto retry;
+			WT_ERR(ret);
+		}
+
+		WT_ERR(__wt_buf_set(session,
+		    cbt->lastkey, cbt->iface.key.data, cbt->iface.key.size));
+	}
+	__wt_set_last_op(cbt, WT_LASTOP_NEXT);
 
 err:	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));

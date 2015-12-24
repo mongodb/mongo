@@ -192,6 +192,22 @@ struct __wt_cursor_btree {
 	WT_UPDATE *modify_update;
 
 	/*
+	 * WT-2307 tracking for a bug where cursor next jumps backwards.
+	 */
+	WT_ITEM *lastkey, _lastkey;
+
+#define	WT_LASTOP_NEXT		1
+#define	WT_LASTOP_PREV		2
+#define	WT_LASTOP_RESET		3
+#define	WT_LASTOP_SEARCH	4
+#define	WT_LASTOP_SEARCH_NEAR	5
+#define	WT_LASTOP_INSERT	6
+#define	WT_LASTOP_TRUNCATE	7
+#define	WT_LASTOP_UPDATE	8
+#define	WT_LASTOP_REMOVE	9
+	uint8_t last_op[20];		/* Last 20 operations */
+
+	/*
 	 * Fixed-length column-store items are a single byte, and it's simpler
 	 * and cheaper to allocate the space for it now than keep checking to
 	 * see if we need to grow the buffer.

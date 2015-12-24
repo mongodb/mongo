@@ -532,6 +532,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 	bool newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	__wt_set_last_op(cbt, WT_LASTOP_PREV);
 
 	WT_STAT_FAST_CONN_INCR(session, cursor_prev);
 	WT_STAT_FAST_DATA_INCR(session, cursor_prev);
