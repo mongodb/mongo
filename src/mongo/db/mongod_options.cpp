@@ -165,6 +165,12 @@ Status addMongodOptions(moe::OptionSection* options) {
                         "cpu", "cpu", moe::Switch, "periodically show cpu and iowait utilization")
         .setSources(moe::SourceAllLegacy);
 
+    general_options.addOptionChaining("maxReplicationThreads",
+                                      "maxReplicationThreads",
+                                      moe::Int,
+                                      "how many threads should initial sync use for initial replication")
+            .setDefault(moe::Value(0));
+
     general_options.addOptionChaining("sysinfo",
                                       "sysinfo",
                                       moe::Switch,
@@ -1003,6 +1009,9 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     }
     if (params.count("cpu")) {
         serverGlobalParams.cpu = params["cpu"].as<bool>();
+    }
+    if (params.count("maxReplicationThreads")) {
+        serverGlobalParams.maxReplicationThreads = params["maxReplicationThreads"].as<int>();
     }
     if (params.count("security.authorization") &&
         params["security.authorization"].as<std::string>() == "disabled") {

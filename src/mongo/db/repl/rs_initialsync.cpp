@@ -54,6 +54,8 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
+#include <boost/thread/thread.hpp>
+
 namespace mongo {
 namespace repl {
 namespace {
@@ -160,51 +162,131 @@ void checkAdminDatabasePostClone(OperationContext* txn, Database* adminDb) {
     }
 }
 
-bool _initialSyncClone(OperationContext* txn,
-                       Cloner& cloner,
-                       const std::string& host,
-                       const list<string>& dbs,
-                       bool dataPass) {
-    for (list<string>::const_iterator i = dbs.begin(); i != dbs.end(); i++) {
+/**
+ * Clones a single database
+ */
+bool _cloneDb(OperationContext* txn, Cloner& cloner, const string db, const std::string& host, bool dataPass) {
+	if (dataPass)
+		log() << "initial sync cloning db: " << db;
+	else
+		log() << "initial sync cloning indexes for : " << db;
+
+	string err;
+	int errCode;
+	CloneOptions options;
+	options.fromDB = db;
+	options.logForRepl = false;
+	options.slaveOk = true;
+	options.useReplAuth = true;
+	options.snapshot = false;
+	options.mayYield = true;
+	options.mayBeInterrupted = false;
+	options.syncData = dataPass;
+	options.syncIndexes = !dataPass;
+
+	// Make database stable
+	ScopedTransaction transaction(txn, MODE_IX);
+	Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
+
+	if (!cloner.go(txn, db, host, options, NULL, err, &errCode)) {
+		log() << "initial sync: error while " << (dataPass ? "cloning " : "indexing ") << db
+			  << ".  " << (err.empty() ? "" : err + ".  ");
+		return false;
+	}
+
+	if (db == "admin") {
+		checkAdminDatabasePostClone(txn, dbHolder().get(txn, db));
+	}
+
+	return true;
+}
+
+/**
+ * This is a Thread function that clones multiple dbs, using the 'nextFreeDb' as an atomic index into the 'dbs' list
+ * "admin" db is skipped
+ * Each thread creates a new Client (connection + OperationContext) and a Cloner
+ */
+void _threadCloneDb(int thread_id, 
+					std::atomic_int& nextFreeDb, 
+					std::atomic_bool& stop, 
+					const list<string>& dbs,
+                    const std::string& host, 
+					bool dataPass) {
+    string thread_name = str::stream() << "rsSync-" << thread_id;
+    Client::initThread(thread_name.c_str());
+    Client& client = cc();
+    OperationContextImpl txn;
+    Cloner cloner;
+
+    log() << "start cloning dbs";
+
+    int totalCloned = 0;
+    int idx = 0;
+    int targetIdx = -1;
+
+    for (list<string>::const_iterator i = dbs.begin(); !stop && i != dbs.end(); i++, idx++) {
+        if (targetIdx == -1)
+            targetIdx = nextFreeDb++;
+
+        // skip dbs handled by other threads
+        if (targetIdx != idx)
+            continue;
+        // else, this is our db to handle, lets reset the targetIdx so next time we'll fetch a new index
+        targetIdx = -1;
+
         const string db = *i;
-        if (db == "local")
+        if (db == "local" || db == "admin")
             continue;
 
-        if (dataPass)
-            log() << "initial sync cloning db: " << db;
-        else
-            log() << "initial sync cloning indexes for : " << db;
-
-        string err;
-        int errCode;
-        CloneOptions options;
-        options.fromDB = db;
-        options.logForRepl = false;
-        options.slaveOk = true;
-        options.useReplAuth = true;
-        options.snapshot = false;
-        options.mayYield = true;
-        options.mayBeInterrupted = false;
-        options.syncData = dataPass;
-        options.syncIndexes = !dataPass;
-
-        // Make database stable
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
-
-        if (!cloner.go(txn, db, host, options, NULL, err, &errCode)) {
-            log() << "initial sync: error while " << (dataPass ? "cloning " : "indexing ") << db
-                  << ".  " << (err.empty() ? "" : err + ".  ");
-            return false;
-        }
-
-        if (db == "admin") {
-            checkAdminDatabasePostClone(txn, dbHolder().get(txn, db));
+        totalCloned++;
+        log() << "calling _cloneDb on " << db;
+        if (!_cloneDb(&txn, cloner, db, host, dataPass)) {
+            stop = true;
+            break;
         }
     }
 
+    client.shutdown();
+    log() << "finished. cloned total of " << totalCloned << " dbs";
+}
+
+
+bool _initialSyncClone(OperationContext* txn, const std::string& host, const list<string>& dbs, bool dataPass) {
+    // clone "admin" db first, it should be the first one but we'll search for it anyway
+    for (list<string>::const_iterator i = dbs.begin(); i != dbs.end(); i++) {
+       const string db = *i;
+       if (db == "admin") {
+           Cloner cloner;
+           _cloneDb(txn, cloner, db, host, dataPass);
+           break;
+       }
+    }
+
+    boost::thread_group threads;
+    int nthreads = serverGlobalParams.maxReplicationThreads;
+    if (nthreads <= 0) {
+        nthreads = 1 + boost::thread::hardware_concurrency();
+    }
+
+    log() << "initial sync cloning using " << nthreads << " threads";
+    std::atomic_int nextFreeDb(0);
+    std::atomic_bool stopCloning(false);
+    for (int tid = 0; tid < nthreads; ++tid) {
+        threads.create_thread(std::bind(_threadCloneDb,
+                                        tid,
+                                        std::ref(nextFreeDb),
+                                        std::ref(stopCloning),
+                                        std::cref(dbs),
+                                        std::cref(host),
+                                        dataPass));
+    }
+
+    log() << "initial sync waiting for threads to complete";
+    threads.join_all();
+    log() << "initial sync threads finished";
     return true;
 }
+
 
 /**
  * Replays the sync target's oplog from lastOp to the latest op on the sync target.
@@ -408,8 +490,7 @@ Status _initialSync() {
         }
     }
 
-    Cloner cloner;
-    if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, true)) {
+    if (!_initialSyncClone(&txn, r.conn()->getServerAddress(), dbs, true)) {
         return Status(ErrorCodes::InitialSyncFailure, "initial sync failed data cloning");
     }
 
@@ -441,7 +522,7 @@ Status _initialSync() {
 
     msg = "initial sync building indexes";
     log() << msg;
-    if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, false)) {
+    if (!_initialSyncClone(&txn, r.conn()->getServerAddress(), dbs, false)) {
         return Status(ErrorCodes::InitialSyncFailure,
                       str::stream() << "initial sync failed: " << msg);
     }

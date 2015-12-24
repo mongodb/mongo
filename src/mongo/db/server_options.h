@@ -57,7 +57,8 @@ struct ServerGlobalParams {
           logAppend(false),
           logRenameOnRotate(true),
           logWithSyslog(false),
-          isHttpInterfaceEnabled(false) {
+          isHttpInterfaceEnabled(false),
+          maxReplicationThreads(0){
         started = time(0);
     }
 
@@ -106,7 +107,8 @@ struct ServerGlobalParams {
     bool logWithSyslog;      // True if logging to syslog; must not be set if logpath is set.
     int syslogFacility;      // Facility used when appending messages to the syslog.
 
-    bool isHttpInterfaceEnabled;  // True if the dbwebserver should be enabled.
+    bool isHttpInterfaceEnabled; // True if the dbwebserver should be enabled.
+    int maxReplicationThreads;   // maximal number of threads used during replication, 0 will default to number of cores in the system
 
 #ifndef _WIN32
     ProcessId parentProc;  // --fork pid of initial process
