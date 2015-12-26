@@ -279,6 +279,8 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
 {
 	WT_DECL_RET;
 
+	__wt_set_last_op(cbt, WT_LASTOP_RESET);
+
 	/*
 	 * The cursor is leaving the API, and no longer holds any position,
 	 * generally called to clean up the cursor after an error.

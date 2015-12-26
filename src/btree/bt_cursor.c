@@ -288,7 +288,6 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	__wt_set_last_op(cbt, WT_LASTOP_RESET);
 	WT_STAT_FAST_CONN_INCR(session, cursor_reset);
 	WT_STAT_FAST_DATA_INCR(session, cursor_reset);
 
