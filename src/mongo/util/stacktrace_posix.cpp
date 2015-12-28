@@ -455,6 +455,15 @@ uint32_t lcType(const char* lcCurr) {
     return cmd->cmd;
 }
 
+template <typename SegmentCommandType>
+bool maybeAppendLoadAddr(BSONObjBuilder* soInfo, const SegmentCommandType* segmentCommand) {
+    if (StringData(SEG_TEXT) != segmentCommand->segname) {
+        return false;
+    }
+    *soInfo << "vmaddr" << integerToHex(segmentCommand->vmaddr);
+    return true;
+}
+
 void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
     const uint32_t numImages = _dyld_image_count();
     BSONArrayBuilder soList(soMap->subarrayStart("somap"));
@@ -479,16 +488,34 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
         const char* const loadCommandsBegin = reinterpret_cast<const char*>(header) + headerSize;
         const char* const loadCommandsEnd = loadCommandsBegin + header->sizeofcmds;
 
-        // Search the "load command" data in the Mach object for the entry
-        // encoding the UUID of the object.
+        // Search the "load command" data in the Mach object for the entry encoding the UUID of the
+        // object, and for the __TEXT segment. Adding the "vmaddr" field of the __TEXT segment load
+        // command of an executable or dylib to an offset in that library provides an address
+        // suitable to passing to atos or llvm-symbolizer for symbolization.
+        //
+        // See, for example, http://lldb.llvm.org/symbolication.html.
+        bool foundTextSegment = false;
         for (const char* lcCurr = loadCommandsBegin; lcCurr < loadCommandsEnd;
              lcCurr = lcNext(lcCurr)) {
-            if (LC_UUID != lcType(lcCurr))
-                continue;
-
-            const uuid_command* uuidCmd = reinterpret_cast<const uuid_command*>(lcCurr);
-            soInfo << "buildId" << toHex(uuidCmd->uuid, 16);
-            break;
+            switch (lcType(lcCurr)) {
+                case LC_UUID: {
+                    const auto uuidCmd = reinterpret_cast<const uuid_command*>(lcCurr);
+                    soInfo << "buildId" << toHex(uuidCmd->uuid, 16);
+                    break;
+                }
+                case LC_SEGMENT_64:
+                    if (!foundTextSegment) {
+                        foundTextSegment = maybeAppendLoadAddr(
+                            &soInfo, reinterpret_cast<const segment_command_64*>(lcCurr));
+                    }
+                    break;
+                case LC_SEGMENT:
+                    if (!foundTextSegment) {
+                        foundTextSegment = maybeAppendLoadAddr(
+                            &soInfo, reinterpret_cast<const segment_command*>(lcCurr));
+                    }
+                    break;
+            }
         }
     }
 }
