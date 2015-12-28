@@ -1155,18 +1155,6 @@ if "uname" in dir(os):
     if hacks is not None:
         hacks.insert( env , { "linux64" : linux64 } )
 
-if has_option( "ssl" ):
-    env.Append( CPPDEFINES=["MONGO_SSL"] )
-    env.Append( MONGO_CRYPTO=["openssl"] )
-    if windows:
-        env.Append( LIBS=["libeay32"] )
-        env.Append( LIBS=["ssleay32"] )
-    else:
-        env.Append( LIBS=["ssl"] )
-        env.Append( LIBS=["crypto"] )
-else:
-    env.Append( MONGO_CRYPTO=["tom"] )
-
 wiredtiger = (get_option('wiredtiger') == 'on')
 
 try:
@@ -2163,6 +2151,73 @@ def doConfigure(myenv):
     conf = Configure(myenv)
     libdeps.setup_conftests(conf)
 
+    if has_option( "ssl" ):
+        sslLibName = "ssl"
+        cryptoLibName = "crypto"
+        if windows:
+            sslLibName = "ssleay32"
+            cryptoLibName = "libeay32"
+
+        if not conf.CheckLibWithHeader(
+                sslLibName,
+                ["openssl/ssl.h"],
+                "C",
+                "SSL_version(NULL);",
+                autoadd=True):
+            conf.env.ConfError("Couldn't find OpenSSL ssl.h header and library")
+
+        if not conf.CheckLibWithHeader(
+                cryptoLibName,
+                ["openssl/crypto.h"],
+                "C",
+                "SSLeay_version(0);",
+                autoadd=True):
+            conf.env.ConfError("Couldn't find OpenSSL crypto.h header and library")
+
+        def CheckLinkSSL(context):
+            test_body = """
+            #include <openssl/err.h>
+            #include <openssl/ssl.h>
+            #include <stdlib.h>
+
+            int main() {
+                SSL_library_init();
+                SSL_load_error_strings();
+                ERR_load_crypto_strings();
+
+                OpenSSL_add_all_algorithms();
+                ERR_free_strings();
+
+                return EXIT_SUCCESS;
+            }
+            """
+            context.Message("Checking that linking to OpenSSL works...")
+            ret = context.TryLink(textwrap.dedent(test_body), ".c")
+            context.Result(ret)
+            return ret
+
+        conf.AddTest("CheckLinkSSL", CheckLinkSSL)
+
+        if not conf.CheckLinkSSL():
+            conf.env.ConfError("SSL is enabled, but is unavailable")
+
+        conf.env.Append(
+            MONGO_CRYPTO=["openssl"],
+            CPPDEFINES=["MONGO_SSL"]
+        )
+
+        if conf.CheckDeclaration(
+            "FIPS_mode_set",
+            includes="""
+                #include <openssl/crypto.h>
+                #include <openssl/evp.h>
+            """):
+ 
+            conf.env.Append(CPPDEFINES=["MONGO_HAVE_FIPS_MODE_SET"])
+
+    else:
+        env.Append( MONGO_CRYPTO=["tom"] )
+
     if use_system_version_of_library("pcre"):
         conf.FindSysLibDep("pcre", ["pcre"])
         conf.FindSysLibDep("pcrecpp", ["pcrecpp"])
@@ -2282,41 +2337,6 @@ def doConfigure(myenv):
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
-
-    def CheckLinkSSL(context):
-        test_body = """
-        #include <openssl/err.h>
-        #include <openssl/ssl.h>
-        #include <stdlib.h>
-
-        int main() {
-            SSL_library_init();
-            SSL_load_error_strings();
-            ERR_load_crypto_strings();
-
-            OpenSSL_add_all_algorithms();
-            ERR_free_strings();
-            return EXIT_SUCCESS;
-        }
-        """
-        context.Message("Checking if OpenSSL is available...")
-        ret = context.TryLink(textwrap.dedent(test_body), ".c")
-        context.Result(ret)
-        return ret
-    conf.AddTest("CheckLinkSSL", CheckLinkSSL)
-
-    if has_option("ssl"):
-        if not conf.CheckLinkSSL():
-            print "SSL is enabled, but is unavailable"
-            Exit(1)
-
-        if conf.CheckDeclaration(
-            "FIPS_mode_set",
-            includes="""
-                #include <openssl/crypto.h>
-                #include <openssl/evp.h>
-            """):
-            conf.env.Append(CPPDEFINES=['MONGO_HAVE_FIPS_MODE_SET'])
 
     return conf.Finish()
 
