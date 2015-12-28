@@ -55,7 +55,7 @@ struct Checksum {
         }
         unsigned long long c = 0;
         for (unsigned i = n * 2 * 8; i < len; i++) {  // 0-7 bytes left
-            c = (c << 8) | ((const char*)buf)[i];
+            c = (c << 8) | ((const signed char*)buf)[i];
         }
         words[0] = a ^ len;
         words[1] = b ^ c;
