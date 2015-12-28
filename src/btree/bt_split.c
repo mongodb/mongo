@@ -529,7 +529,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	 * ignore most errors because the split is complete and correct, callers
 	 * have to proceed accordingly.
 	 */
-	enum { WT_SPLIT_NONE, WT_SPLIT_PANIC, WT_SPLIT_IGNORE } complete;
+	enum { ERR_RETURN, ERR_PANIC, ERR_IGNORE } complete;
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_deepen);
@@ -539,7 +539,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	btree = S2BT(session);
 	alloc_index = NULL;
 	root_decr = root_incr = 0;
-	complete = WT_SPLIT_NONE;
+	complete = ERR_RETURN;
 
 	/* The root page will be marked dirty, make sure that will succeed. */
 	WT_RET(__wt_page_modify_init(session, root));
@@ -641,7 +641,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	    root_refp - pindex->index == (ptrdiff_t)pindex->entries);
 
 	/* Start making real changes to the tree, errors are fatal. */
-	complete = WT_SPLIT_PANIC;
+	complete = ERR_PANIC;
 
 	/* Prepare the WT_REFs for the move. */
 	__split_ref_step1(session, alloc_index, false);
@@ -661,7 +661,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_ERR(__split_ref_step2(session, alloc_index, false));
 
 	/* The split is complete and correct, ignore benign errors. */
-	complete = WT_SPLIT_IGNORE;
+	complete = ERR_IGNORE;
 
 	/* We've installed the allocated page-index, ensure error handling. */
 	alloc_index = NULL;
@@ -687,15 +687,15 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	__wt_page_modify_set(session, root);
 
 err:	switch (complete) {
-	case WT_SPLIT_NONE:
+	case ERR_RETURN:
 		__wt_free_ref_index(session, root, alloc_index, true);
 		break;
-	case WT_SPLIT_PANIC:
+	case ERR_PANIC:
 		__wt_err(session, ret,
 		    "fatal error during root page split to deepen the tree");
 		ret = WT_PANIC;
 		break;
-	case WT_SPLIT_IGNORE:
+	case ERR_IGNORE:
 		if (ret != 0 && ret != WT_PANIC) {
 			__wt_err(session, ret,
 			    "ignoring not-fatal error during root page split "
@@ -1009,7 +1009,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * ignore most errors because the split is complete and correct, callers
 	 * have to proceed accordingly.
 	 */
-	enum { WT_SPLIT_NONE, WT_SPLIT_PANIC, WT_SPLIT_IGNORE } complete;
+	enum { ERR_RETURN, ERR_PANIC, ERR_IGNORE } complete;
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_internal);
@@ -1021,7 +1021,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	alloc_index = replace_index = NULL;
 	page_ref = page->pg_intl_parent_ref;
 	page_decr = page_incr = parent_incr = 0;
-	complete = WT_SPLIT_NONE;
+	complete = ERR_RETURN;
 
 	/*
 	 * Our caller is holding the page locked to single-thread splits, which
@@ -1142,7 +1142,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	    page_refp - pindex->index == (ptrdiff_t)pindex->entries);
 
 	/* Start making real changes to the tree, errors are fatal. */
-	complete = WT_SPLIT_PANIC;
+	complete = ERR_PANIC;
 
 	/* Prepare the WT_REFs for the move. */
 	__split_ref_step1(session, alloc_index, true);
@@ -1166,7 +1166,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_ERR(__split_ref_step2(session, alloc_index, true));
 
 	/* The split is complete and correct, ignore benign errors. */
-	complete = WT_SPLIT_IGNORE;
+	complete = ERR_IGNORE;
 
 	/*
 	 * Push out the changes: not required for correctness, but no reason
@@ -1202,16 +1202,16 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	__wt_page_modify_set(session, page);
 
 err:	switch (complete) {
-	case WT_SPLIT_NONE:
+	case ERR_RETURN:
 		__wt_free_ref_index(session, page, alloc_index, true);
 		__wt_free_ref_index(session, page, replace_index, false);
 		break;
-	case WT_SPLIT_PANIC:
+	case ERR_PANIC:
 		__wt_err(session, ret,
 		    "fatal error during internal page split");
 		ret = WT_PANIC;
 		break;
-	case WT_SPLIT_IGNORE:
+	case ERR_IGNORE:
 		if (ret != 0 && ret != WT_PANIC) {
 			__wt_err(session, ret,
 			    "ignoring not-fatal error during internal page "
