@@ -1062,18 +1062,3 @@ struct __wt_insert_head {
 	WT_ENTER_PAGE_INDEX(session);					\
 	(e);								\
 	WT_LEAVE_PAGE_INDEX(session)
-
-/*
- * Some split functions need special error handling.  Failures that occur
- * during the WT_ERR_IGNORE phase will ignore most errors because the split
- * is complete and correct.  Errors during the WT_ERR_PANIC phase are
- * catastrophic.  The split is a partial update to the tree and requires a
- * panic.  Errors during the WT_ERR_RETURN phase will discard resources
- * and return the error.
- */
-typedef enum __wt_split_error_phase {
-	WT_ERR_IGNORE,
-	WT_ERR_PANIC,
-	WT_ERR_RETURN
-} WT_SPLIT_ERROR_PHASE;
-

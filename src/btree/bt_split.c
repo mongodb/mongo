@@ -15,6 +15,23 @@
 } while (0)
 
 /*
+ * A note on error handling: this function first allocates/initializes
+ * new structures; failures during that period are handled by discarding
+ * the memory and returning an error code, our caller knows the split
+ * didn't happen and proceeds accordingly. Second, this function updates
+ * the tree, and a failure in that period is catastrophic, any partial
+ * update to the tree requires a panic, we can't recover. Third, once
+ * the split is complete and the tree has been fully updated, we have to
+ * ignore most errors because the split is complete and correct, callers
+ * have to proceed accordingly.
+ */
+typedef enum __wt_split_error_phase {
+	WT_ERR_IGNORE,
+	WT_ERR_PANIC,
+	WT_ERR_RETURN
+} WT_SPLIT_ERROR_PHASE;
+
+/*
  * __split_oldest_gen --
  *	Calculate the oldest active split generation.
  */
@@ -519,18 +536,6 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	uint32_t slots;
 	void *p;
 
-	/*
-	 * A note on error handling: this function first allocates/initializes
-	 * new structures; failures during that period are handled by discarding
-	 * the memory and returning an error code, our caller knows the split
-	 * didn't happen and proceeds accordingly. Second, this function updates
-	 * the tree, and a failure in that period is catastrophic, any partial
-	 * update to the tree requires a panic, we can't recover. Third, once
-	 * the split is complete and the tree has been fully updated, we have to
-	 * ignore most errors because the split is complete and correct, callers
-	 * have to proceed accordingly.
-	 */
-
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_deepen);
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
@@ -721,19 +726,21 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_REF **alloc_refp, *next_ref;
+	WT_SPLIT_ERROR_PHASE complete;
 	size_t parent_decr, size;
 	uint64_t split_gen;
 	uint32_t hint, i, j;
 	uint32_t deleted_entries, parent_entries, result_entries;
 	uint32_t *deleted_refs;
-	bool complete, empty_parent;
+	bool empty_parent;
 
 	parent = ref->home;
 
 	alloc_index = pindex = NULL;
 	parent_decr = 0;
 	parent_entries = 0;
-	complete = empty_parent = false;
+	empty_parent = false;
+	complete = WT_ERR_RETURN;
 
 	/* The parent page will be marked dirty, make sure that will succeed. */
 	WT_RET(__wt_page_modify_init(session, parent));
@@ -751,7 +758,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * array anyway.  Switch them to the special split state, so that any
 	 * reading thread will restart.
 	 */
-	WT_RET(__wt_scr_alloc(session, 10 * sizeof(uint32_t), &scr));
+	WT_ERR(__wt_scr_alloc(session, 10 * sizeof(uint32_t), &scr));
 	for (deleted_entries = 0, i = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
@@ -827,6 +834,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * makes the split visible to threads descending the tree.
 	 */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
+	complete = WT_ERR_PANIC;
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	alloc_index = NULL;
 
@@ -862,16 +870,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 */
 	WT_FULL_BARRIER();
 
-	/*
-	 * A note on error handling: failures before we swapped the new page
-	 * index into the parent can be resolved by freeing allocated memory
-	 * because the original page is unchanged, we can continue to use it
-	 * and we have not yet modified the parent.  Failures after we swap
-	 * the new page index into the parent are also relatively benign, the
-	 * split is OK and complete. For those reasons, we ignore errors past
-	 * this point unless there's a panic.
-	 */
-	complete = true;
+	complete = WT_ERR_IGNORE;
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %s %s" "split into parent %p, %" PRIu32 " -> %" PRIu32
@@ -955,7 +954,8 @@ err:	__wt_scr_free(session, &scr);
 	 * nothing really bad can have happened, and our caller has to proceed
 	 * with the split.
 	 */
-	if (!complete) {
+	switch (complete) {
+	case WT_ERR_RETURN:
 		for (i = 0; i < parent_entries; ++i) {
 			next_ref = pindex->index[i];
 			if (next_ref->state == WT_REF_SPLIT)
@@ -963,20 +963,29 @@ err:	__wt_scr_free(session, &scr);
 		}
 
 		__wt_free_ref_index(session, NULL, alloc_index, false);
-
 		/*
 		 * The split couldn't proceed because the parent would be empty,
 		 * return EBUSY so our caller knows to unlock the WT_REF that's
 		 * being deleted, but don't be noisy, there's nothing wrong.
 		 */
 		if (empty_parent)
-			return (EBUSY);
-	}
-
-	if (ret != 0 && ret != WT_PANIC)
+			ret = EBUSY;
+		break;
+	case WT_ERR_PANIC:
 		__wt_err(session, ret,
-		    "ignoring not-fatal error during parent page split");
-	return (ret == WT_PANIC || !complete ? ret : 0);
+		    "fatal error during root page split to deepen the tree");
+		ret = WT_PANIC;
+		break;
+	case WT_ERR_IGNORE:
+		if (ret != 0 && ret != WT_PANIC) {
+			__wt_err(session, ret,
+			    "ignoring not-fatal error during parent page "
+			    "split");
+			ret = 0;
+		}
+		break;
+	}
+	return (ret);
 }
 
 /*
@@ -998,18 +1007,6 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	uint32_t children, chunk, i, j, remain;
 	uint32_t slots;
 	void *p;
-
-	/*
-	 * A note on error handling: this function first allocates/initializes
-	 * new structures; failures during that period are handled by discarding
-	 * the memory and returning an error code, our caller knows the split
-	 * didn't happen and proceeds accordingly. Second, this function updates
-	 * the tree, and a failure in that period is catastrophic, any partial
-	 * update to the tree requires a panic, we can't recover. Third, once
-	 * the split is complete and the tree has been fully updated, we have to
-	 * ignore most errors because the split is complete and correct, callers
-	 * have to proceed accordingly.
-	 */
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_internal);
