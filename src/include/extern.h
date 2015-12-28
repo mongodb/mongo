@@ -91,7 +91,7 @@ extern int __wt_bloom_drop(WT_BLOOM *bloom, const char *config);
 extern int __wt_compact(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt);
-extern void __wt_set_last_op(WT_CURSOR_BTREE *cbt, int v);
+extern int __wt_cursor_key_order_check( WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, bool next);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating);
 extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating);
 extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);

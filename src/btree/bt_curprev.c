@@ -532,7 +532,6 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 	bool newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	__wt_set_last_op(cbt, WT_LASTOP_PREV);
 
 	WT_STAT_FAST_CONN_INCR(session, cursor_prev);
 	WT_STAT_FAST_DATA_INCR(session, cursor_prev);
@@ -619,6 +618,10 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
 	}
+#ifdef HAVE_DIAGNOSTIC
+	if (ret == 0)
+		WT_ERR(__wt_cursor_key_order_check(session, cbt, false));
+#endif
 
 err:	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));

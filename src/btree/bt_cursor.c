@@ -313,7 +313,6 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	upd = NULL;					/* -Wuninitialized */
 
-	__wt_set_last_op(cbt, WT_LASTOP_SEARCH);
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
 
@@ -381,7 +380,6 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	upd = NULL;					/* -Wuninitialized */
 	exact = 0;
 
-	__wt_set_last_op(cbt, WT_LASTOP_SEARCH_NEAR);
 	WT_STAT_FAST_CONN_INCR(session, cursor_search_near);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search_near);
 
@@ -489,7 +487,6 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	__wt_set_last_op(cbt, WT_LASTOP_INSERT);
 	WT_STAT_FAST_CONN_INCR(session, cursor_insert);
 	WT_STAT_FAST_DATA_INCR(session, cursor_insert);
 	WT_STAT_FAST_DATA_INCRV(session,
@@ -658,7 +655,6 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	__wt_set_last_op(cbt, WT_LASTOP_REMOVE);
 	WT_STAT_FAST_CONN_INCR(session, cursor_remove);
 	WT_STAT_FAST_DATA_INCR(session, cursor_remove);
 	WT_STAT_FAST_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
@@ -744,7 +740,6 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	__wt_set_last_op(cbt, WT_LASTOP_UPDATE);
 	WT_STAT_FAST_CONN_INCR(session, cursor_update);
 	WT_STAT_FAST_DATA_INCR(session, cursor_update);
 	WT_STAT_FAST_DATA_INCRV(
@@ -1164,8 +1159,6 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 	cbt = (start != NULL) ? start : stop;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
-
-	__wt_set_last_op(cbt, WT_LASTOP_TRUNCATE);
 	WT_STAT_FAST_DATA_INCR(session, cursor_truncate);
 
 	/*
@@ -1241,7 +1234,10 @@ __wt_btcur_open(WT_CURSOR_BTREE *cbt)
 	cbt->row_key = &cbt->_row_key;
 	cbt->tmp = &cbt->_tmp;
 
+#ifdef HAVE_DIAGNOSTIC
 	cbt->lastkey = &cbt->_lastkey;
+	cbt->lastrecno = WT_RECNO_OOB;
+#endif
 }
 
 /*
@@ -1267,7 +1263,9 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, bool lowlevel)
 
 	__wt_buf_free(session, &cbt->_row_key);
 	__wt_buf_free(session, &cbt->_tmp);
+#ifdef HAVE_DIAGNOSTIC
 	__wt_buf_free(session, &cbt->_lastkey);
+#endif
 
 	return (ret);
 }
