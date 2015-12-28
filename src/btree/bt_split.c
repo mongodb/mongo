@@ -15,20 +15,19 @@
 } while (0)
 
 /*
- * A note on error handling: this function first allocates/initializes
- * new structures; failures during that period are handled by discarding
- * the memory and returning an error code, our caller knows the split
- * didn't happen and proceeds accordingly. Second, this function updates
- * the tree, and a failure in that period is catastrophic, any partial
- * update to the tree requires a panic, we can't recover. Third, once
- * the split is complete and the tree has been fully updated, we have to
- * ignore most errors because the split is complete and correct, callers
- * have to proceed accordingly.
+ * A note on error handling: main split functions first allocate/initialize new
+ * structures; failures during that period are handled by discarding the memory
+ * and returning an error code, the caller knows the split didn't happen and
+ * proceeds accordingly. Second, split functions update the tree, and a failure
+ * in that period is catastrophic, any partial update to the tree requires a
+ * panic, we can't recover. Third, once the split is complete and the tree has
+ * been fully updated, we have to ignore most errors, the split is complete and
+ * correct, callers have to proceed accordingly.
  */
-typedef enum __wt_split_error_phase {
-	WT_ERR_IGNORE,
-	WT_ERR_PANIC,
-	WT_ERR_RETURN
+typedef enum {
+	WT_ERR_IGNORE,				/* Ignore minor errors */
+	WT_ERR_PANIC,				/* Panic on all errors */
+	WT_ERR_RETURN				/* Clean up and return error */
 } WT_SPLIT_ERROR_PHASE;
 
 /*
@@ -829,12 +828,14 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_ASSERT(session,
 	    alloc_refp - alloc_index->index == (ptrdiff_t)result_entries);
 
+	/* Start making real changes to the tree, errors are fatal. */
+	complete = WT_ERR_PANIC;
+
 	/*
 	 * Confirm the parent page's index hasn't moved then update it, which
 	 * makes the split visible to threads descending the tree.
 	 */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
-	complete = WT_ERR_PANIC;
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	alloc_index = NULL;
 
@@ -870,6 +871,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 */
 	WT_FULL_BARRIER();
 
+	/* The split is complete and correct, ignore benign errors. */
 	complete = WT_ERR_IGNORE;
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
@@ -972,8 +974,7 @@ err:	__wt_scr_free(session, &scr);
 			ret = EBUSY;
 		break;
 	case WT_ERR_PANIC:
-		__wt_err(session, ret,
-		    "fatal error during root page split to deepen the tree");
+		__wt_err(session, ret, "fatal error during parent page split");
 		ret = WT_PANIC;
 		break;
 	case WT_ERR_IGNORE:
