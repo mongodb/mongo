@@ -459,7 +459,7 @@ __cursor_key_order_check_col(
 	}
 
 	if (cbt->lastrecno == WT_RECNO_OOB ||
-	    next && cmp < 0 || !next && cmp > 0) {
+	    (next && cmp < 0) || (!next && cmp > 0)) {
 		cbt->lastrecno = cbt->recno;
 		return (0);
 	}
@@ -493,7 +493,7 @@ __cursor_key_order_check_row(
 		WT_RET(__wt_compare(
 		    session, btree->collator, cbt->lastkey, key, &cmp));
 
-	if (cbt->lastkey->size == 0 || next && cmp < 0 || !next && cmp > 0)
+	if (cbt->lastkey->size == 0 || (next && cmp < 0) || (!next && cmp > 0))
 		return (__wt_buf_set(session, cbt->lastkey,
 		    cbt->iface.key.data, cbt->iface.key.size));
 
