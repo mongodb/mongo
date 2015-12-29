@@ -756,10 +756,10 @@ void SyncTail::oplogApplication() {
             // Error for the oplog to go back in time.
             fassert(34361,
                     Status(ErrorCodes::OplogOutOfOrder,
-                           str::stream() << "Attempted to apply an earlier oplog entry (ts: "
-                                         << lastOpTime.getTimestamp().toStringPretty()
-                                         << ") when our lastWrittenOptime was "
-                                         << lastWriteOpTime.toString()));
+                           str::stream() << "Attempted to apply an oplog entry ("
+                                         << lastOpTime.toString()
+                                         << ") which is not greater than our lastWrittenOptime ("
+                                         << lastWriteOpTime.toString() << ")."));
         }
 
         handleSlaveDelay(lastOpTime.getTimestamp());
