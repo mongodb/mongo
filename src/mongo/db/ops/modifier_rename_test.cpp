@@ -154,6 +154,12 @@ TEST(MoveOnSamePath, MoveDown) {
         mod.init(fromjson("{'b':'b.a'}").firstElement(), ModifierInterface::Options::normal()));
 }
 
+TEST(MoveOnSamePath, MoveToSelf) {
+    ModifierRename mod;
+    ASSERT_NOT_OK(
+        mod.init(fromjson("{'b.a':'b.a'}").firstElement(), ModifierInterface::Options::normal()));
+}
+
 TEST(MissingTo, SimpleNumberAtRoot) {
     Document doc(fromjson("{a: 2}"));
     Mod setMod(fromjson("{$rename: {'a':'b'}}"));
