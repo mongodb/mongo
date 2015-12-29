@@ -1233,6 +1233,11 @@ __wt_btcur_open(WT_CURSOR_BTREE *cbt)
 {
 	cbt->row_key = &cbt->_row_key;
 	cbt->tmp = &cbt->_tmp;
+
+#ifdef HAVE_DIAGNOSTIC
+	cbt->lastkey = &cbt->_lastkey;
+	cbt->lastrecno = WT_RECNO_OOB;
+#endif
 }
 
 /*
@@ -1258,6 +1263,9 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, bool lowlevel)
 
 	__wt_buf_free(session, &cbt->_row_key);
 	__wt_buf_free(session, &cbt->_tmp);
+#ifdef HAVE_DIAGNOSTIC
+	__wt_buf_free(session, &cbt->_lastkey);
+#endif
 
 	return (ret);
 }
