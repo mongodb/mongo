@@ -284,7 +284,7 @@ public:
      * Kills all operations that have a Client that is associated with an incoming user
      * connection, except for the one associated with txn.
      */
-    virtual void killAllUserOperations(const OperationContext* txn) = 0;
+    virtual void killAllUserOperations(const OperationContext* txn, ErrorCodes::Error killCode) = 0;
 
     /**
      * Registers a listener to be notified each time an op is killed.
