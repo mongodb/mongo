@@ -430,25 +430,31 @@ public:
 
 }  // namespace
 
-/**
- * If sharding is enabled, logs the operation for an active migration in the transfer mods log.
- *
- * 'ns' name of the collection in which the operation will occur.
- * 'notInActiveChunk' a true value indicates that either:
- *      1) the delete is coming from a donor shard in a current chunk migration,
- *         and so does not need to be entered in this shard's outgoing transfer log.
- *      2) the document is not within this shard's outgoing chunk migration range,
- *         and so does not need to be forwarded to the migration recipient via the transfer log.
- */
-void logOpForSharding(OperationContext* txn,
-                      const char* opstr,
-                      const char* ns,
-                      const BSONObj& obj,
-                      BSONObj* patt,
-                      bool notInActiveChunk) {
+void logInsertOpForSharding(OperationContext* txn,
+                            const char* ns,
+                            const BSONObj& obj,
+                            bool notInActiveChunk) {
     ShardingState* shardingState = ShardingState::get(txn);
     if (shardingState->enabled())
-        shardingState->migrationSourceManager()->logOp(txn, opstr, ns, obj, patt, notInActiveChunk);
+        shardingState->migrationSourceManager()->logInsertOp(txn, ns, obj, notInActiveChunk);
+}
+
+void logUpdateOpForSharding(OperationContext* txn,
+                            const char* ns,
+                            const BSONObj& pattern,
+                            bool notInActiveChunk) {
+    ShardingState* shardingState = ShardingState::get(txn);
+    if (shardingState->enabled())
+        shardingState->migrationSourceManager()->logUpdateOp(txn, ns, pattern, notInActiveChunk);
+}
+
+void logDeleteOpForSharding(OperationContext* txn,
+                            const char* ns,
+                            const BSONObj& obj,
+                            bool notInActiveChunk) {
+    ShardingState* shardingState = ShardingState::get(txn);
+    if (shardingState->enabled())
+        shardingState->migrationSourceManager()->logDeleteOp(txn, ns, obj, notInActiveChunk);
 }
 
 bool isInMigratingChunk(OperationContext* txn, const NamespaceString& ns, const BSONObj& doc) {

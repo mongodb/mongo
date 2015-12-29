@@ -60,16 +60,51 @@ bool haveLocalShardingInfo(Client* client, const std::string& ns);
 void ensureShardVersionOKOrThrow(OperationContext* txn, const std::string& ns);
 
 /**
- * If a migration for the chunk in 'ns' where 'obj' lives is occurring, save this log entry
- * if it's relevant. The entries saved here are later transferred to the receiving side of
- * the migration. A relevant entry is an insertion, a deletion, or an update.
+ * If sharding is enabled, pass the insert along to MigrationSourceManager::logInsertOp
+ * to determine whether the insert should be logged to the migration transfer mods log.
+ *
+ * 'ns' name of the collection in which the operation will occur.
+ * 'obj' document being inserted.
+ * 'notInActiveChunk' if true indicates that the insert is coming from a donor shard
+ * in a current chunk migration, and so does not need to be entered in this shard's
+ * outgoing transfer log.
  */
-void logOpForSharding(OperationContext* txn,
-                      const char* opstr,
-                      const char* ns,
-                      const BSONObj& obj,
-                      BSONObj* patt,
-                      bool forMigrateCleanup);
+void logInsertOpForSharding(OperationContext* txn,
+                            const char* ns,
+                            const BSONObj& obj,
+                            bool notInActiveChunk);
+
+/**
+ * If sharding is enabled, pass the update along to MigrationSourceManager::logUpdateOp
+ * to determine whether the update should be logged to the migration transfer mods log.
+ *
+ * 'ns' name of the collection in which the operation will occur.
+ * 'pattern' contains the _id value of the doc being updated.
+ * 'notInActiveChunk' if true indicates that the update is coming from a donor shard
+ * in a current chunk migration, and so does not need to be entered in this shard's
+ * outgoing transfer log.
+ */
+void logUpdateOpForSharding(OperationContext* txn,
+                            const char* ns,
+                            const BSONObj& pattern,
+                            bool notInActiveChunk);
+
+/**
+ * If sharding is enabled, pass the delete along to MigrationSourceManager::logDeleteOp
+ * to determine whether the delete should be logged to the migration transfer mods log.
+ *
+ * 'ns' name of the collection in which the operation will occur.
+ * 'obj' contains the _id value of the doc being deleted.
+ * 'notInActiveChunk' a true value indicates that either:
+ *      1) the delete is coming from a donor shard in a current chunk migration,
+ *         and so does not need to be entered in this shard's outgoing transfer log.
+ *      2) the document is not within this shard's outgoing chunk migration range,
+ *         and so does not need to be forwarded to the migration recipient via the transfer log.
+ */
+void logDeleteOpForSharding(OperationContext* txn,
+                            const char* ns,
+                            const BSONObj& obj,
+                            bool notInActiveChunk);
 
 /**
  * Checks if 'doc' in 'ns' belongs to a currently migrating chunk.

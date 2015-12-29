@@ -64,12 +64,35 @@ public:
 
     void done(OperationContext* txn);
 
-    void logOp(OperationContext* txn,
-               const char* opstr,
-               const char* ns,
-               const BSONObj& obj,
-               BSONObj* patt,
-               bool notInActiveChunk);
+    /**
+     * If a migration for the chunk in 'ns' containing 'obj' is in progress, saves this insert
+     * to the transfer mods log. The entries saved here are later transferred to the receiving
+     * side of the migration.
+     */
+    void logInsertOp(OperationContext* txn,
+                     const char* ns,
+                     const BSONObj& obj,
+                     bool notInActiveChunk);
+
+    /**
+     * If a migration for the chunk in 'ns' containing the document with the _id in 'pattern' is
+     * in progress, saves this update to the transfer mods log. The entries saved here are later
+     * transferred to the receiving side of the migration.
+     */
+    void logUpdateOp(OperationContext* txn,
+                     const char* ns,
+                     const BSONObj& pattern,
+                     bool notInActiveChunk);
+
+    /**
+     * If a migration for the chunk in 'ns' containing 'obj' is in progress, saves this delete
+     * to the transfer mods log. The entries saved here are later transferred to the receiving
+     * side of the migration.
+     */
+    void logDeleteOp(OperationContext* txn,
+                     const char* ns,
+                     const BSONObj& obj,
+                     bool notInActiveChunk);
 
     /**
      * Determines whether the given document 'doc' in namespace 'ns' is within the range

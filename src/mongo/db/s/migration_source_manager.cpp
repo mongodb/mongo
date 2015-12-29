@@ -219,73 +219,91 @@ void MigrationSourceManager::done(OperationContext* txn) {
     _cloneLocs.clear();
 }
 
-void MigrationSourceManager::logOp(OperationContext* txn,
-                                   const char* opstr,
-                                   const char* ns,
-                                   const BSONObj& obj,
-                                   BSONObj* patt,
-                                   bool notInActiveChunk) {
+void MigrationSourceManager::logInsertOp(OperationContext* txn,
+                                         const char* ns,
+                                         const BSONObj& obj,
+                                         bool notInActiveChunk) {
     ensureShardVersionOKOrThrow(txn, ns);
 
-    const char op = opstr[0];
-
-    if (notInActiveChunk) {
-        // Ignore writes that came from the migration process like cleanup so they
-        // won't be transferred to the recipient shard. Also ignore ops from
-        // _migrateClone and _transferMods since it is impossible to move a chunk
-        // to self.
-        // Also ignore out of range deletes when migrating a chunk (is set
-        // in OpObserver::onDelete)
+    if (notInActiveChunk)
         return;
-    }
 
     dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
 
-    if (!_active)
+    if (!_active || (_nss != ns))
         return;
 
-    if (_nss != ns)
-        return;
-
-    // no need to log if this is not an insertion, an update, or an actual deletion
-    // note: opstr 'db' isn't a deletion but a mention that a database exists
-    // (for replication machinery mostly).
-    if (op == 'n' || op == 'c' || (op == 'd' && opstr[1] == 'b'))
-        return;
-
-    BSONElement ide;
-    if (patt)
-        ide = patt->getField("_id");
-    else
-        ide = obj["_id"];
-
+    BSONElement ide = obj["_id"];
     if (ide.eoo()) {
-        warning() << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << migrateLog;
+        warning() << "logInsertOp got mod with no _id, ignoring  obj: " << obj << migrateLog;
         return;
     }
 
-    if (op == 'i' && (!isInRange(obj, _min, _max, _shardKeyPattern))) {
+    if (!isInRange(obj, _min, _max, _shardKeyPattern)) {
         return;
     }
 
     BSONObj idObj(ide.wrap());
 
-    if (op == 'u') {
-        BSONObj fullDoc;
-        OldClientContext ctx(txn, _nss.ns(), false);
-        if (!Helpers::findById(txn, ctx.db(), _nss.ns().c_str(), idObj, fullDoc)) {
-            warning() << "logOpForSharding couldn't find: " << idObj << " even though should have"
-                      << migrateLog;
-            dassert(false);  // TODO: Abort the migration.
-            return;
-        }
+    txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, 'i'));
+}
 
-        if (!isInRange(fullDoc, _min, _max, _shardKeyPattern)) {
-            return;
-        }
+void MigrationSourceManager::logUpdateOp(OperationContext* txn,
+                                         const char* ns,
+                                         const BSONObj& pattern,
+                                         bool notInActiveChunk) {
+    ensureShardVersionOKOrThrow(txn, ns);
+
+    if (notInActiveChunk)
+        return;
+
+    dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
+
+    if (!_active || (_nss != ns))
+        return;
+
+    BSONElement ide = pattern.getField("_id");
+    if (ide.eoo()) {
+        warning() << "logUpdateOp got mod with no _id, ignoring  obj: " << pattern << migrateLog;
+        return;
+    }
+    BSONObj idObj(ide.wrap());
+
+    BSONObj fullDoc;
+    OldClientContext ctx(txn, _nss.ns(), false);
+    if (!Helpers::findById(txn, ctx.db(), _nss.ns().c_str(), idObj, fullDoc)) {
+        warning() << "logUpdateOp couldn't find: " << idObj << " even though should have"
+                  << migrateLog;
+        dassert(false);  // TODO: Abort the migration.
+        return;
     }
 
-    txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, op));
+    if (!isInRange(fullDoc, _min, _max, _shardKeyPattern)) {
+        return;
+    }
+
+    txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, 'u'));
+}
+
+void MigrationSourceManager::logDeleteOp(OperationContext* txn,
+                                         const char* ns,
+                                         const BSONObj& obj,
+                                         bool notInActiveChunk) {
+    ensureShardVersionOKOrThrow(txn, ns);
+
+    if (notInActiveChunk)
+        return;
+
+    dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
+
+    BSONElement ide = obj["_id"];
+    if (ide.eoo()) {
+        warning() << "logDeleteOp got mod with no _id, ignoring  obj: " << obj << migrateLog;
+        return;
+    }
+    BSONObj idObj(ide.wrap());
+
+    txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, 'd'));
 }
 
 bool MigrationSourceManager::isInMigratingChunk(const NamespaceString& ns, const BSONObj& doc) {

@@ -51,9 +51,9 @@ void OpObserver::onCreateIndex(OperationContext* txn,
                                BSONObj indexDoc,
                                bool fromMigrate) {
     repl::logOp(txn, "i", ns.c_str(), indexDoc, nullptr, fromMigrate);
-
-    getGlobalAuthorizationManager()->logOp(txn, "i", ns.c_str(), indexDoc, nullptr);
-    logOpForSharding(txn, "i", ns.c_str(), indexDoc, nullptr, fromMigrate);
+    AuthorizationManager::get(txn->getServiceContext())
+        ->logOp(txn, "i", ns.c_str(), indexDoc, nullptr);
+    logInsertOpForSharding(txn, ns.c_str(), indexDoc, fromMigrate);
     logOpForDbHash(txn, ns.c_str());
 }
 
@@ -66,8 +66,8 @@ void OpObserver::onInserts(OperationContext* txn,
 
     const char* ns = nss.ns().c_str();
     for (auto it = begin; it != end; it++) {
-        getGlobalAuthorizationManager()->logOp(txn, "i", ns, *it, nullptr);
-        logOpForSharding(txn, "i", ns, *it, nullptr, fromMigrate);
+        AuthorizationManager::get(txn->getServiceContext())->logOp(txn, "i", ns, *it, nullptr);
+        logInsertOpForSharding(txn, ns, *it, fromMigrate);
     }
 
     logOpForDbHash(txn, ns);
@@ -83,9 +83,9 @@ void OpObserver::onUpdate(OperationContext* txn, oplogUpdateEntryArgs args) {
     }
 
     repl::logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria, args.fromMigrate);
-
-    getGlobalAuthorizationManager()->logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria);
-    logOpForSharding(txn, "u", args.ns.c_str(), args.update, &args.criteria, args.fromMigrate);
+    AuthorizationManager::get(txn->getServiceContext())
+        ->logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria);
+    logUpdateOpForSharding(txn, args.ns.c_str(), args.criteria, args.fromMigrate);
     logOpForDbHash(txn, args.ns.c_str());
     if (strstr(args.ns.c_str(), ".system.js")) {
         Scope::storedFuncMod(txn);
@@ -112,15 +112,10 @@ void OpObserver::onDelete(OperationContext* txn,
         return;
 
     repl::logOp(txn, "d", ns.ns().c_str(), deleteState.idDoc, nullptr, fromMigrate);
-
     AuthorizationManager::get(txn->getServiceContext())
         ->logOp(txn, "d", ns.ns().c_str(), deleteState.idDoc, nullptr);
-    logOpForSharding(txn,
-                     "d",
-                     ns.ns().c_str(),
-                     deleteState.idDoc,
-                     nullptr,
-                     fromMigrate || !deleteState.isMigrating);
+    logDeleteOpForSharding(
+        txn, ns.ns().c_str(), deleteState.idDoc, fromMigrate || !deleteState.isMigrating);
     logOpForDbHash(txn, ns.ns().c_str());
     if (ns.coll() == "system.js") {
         Scope::storedFuncMod(txn);
