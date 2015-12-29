@@ -34,7 +34,6 @@
 
 #include <memory.h>
 
-
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -67,10 +66,7 @@ public:
 
     virtual void abandonSnapshot();
 
-    // un-used API
-    virtual void* writingPtr(void* data, size_t len) {
-        invariant(!"don't call writingPtr");
-    }
+    virtual void* writingPtr(void* data, size_t len);
 
     virtual void setRollbackWritesDisabled() {}
 

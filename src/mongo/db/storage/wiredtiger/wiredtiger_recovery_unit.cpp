@@ -198,12 +198,16 @@ void WiredTigerRecoveryUnit::abandonSnapshot() {
     _areWriteUnitOfWorksBanned = false;
 }
 
+void* WiredTigerRecoveryUnit::writingPtr(void* data, size_t len) {
+    // This API should not be used for anything other than the MMAP V1 storage engine
+    MONGO_UNREACHABLE;
+}
+
 void WiredTigerRecoveryUnit::setOplogReadTill(const RecordId& id) {
     _oplogReadTill = id;
 }
 
 namespace {
-
 
 class TicketServerParameter : public ServerParameter {
     MONGO_DISALLOW_COPYING(TicketServerParameter);
@@ -249,7 +253,8 @@ TicketServerParameter openWriteTransactionParam(&openWriteTransaction,
 TicketHolder openReadTransaction(128);
 TicketServerParameter openReadTransactionParam(&openReadTransaction,
                                                "wiredTigerConcurrentReadTransactions");
-}
+
+}  // namespace
 
 void WiredTigerRecoveryUnit::appendGlobalStats(BSONObjBuilder& b) {
     BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));

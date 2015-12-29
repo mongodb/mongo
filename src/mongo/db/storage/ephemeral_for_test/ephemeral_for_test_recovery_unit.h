@@ -56,7 +56,7 @@ public:
     }
 
     virtual void* writingPtr(void* data, size_t len) {
-        invariant(!"don't call writingPtr");
+        MONGO_UNREACHABLE;
     }
 
     virtual void setRollbackWritesDisabled() {}
