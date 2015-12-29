@@ -90,6 +90,48 @@ __ref_is_leaf(WT_REF *ref)
 }
 
 /*
+ * __page_ascend --
+ *	Ascend the tree one level.
+ */
+static void
+__page_ascend(WT_SESSION_IMPL *session,
+    WT_REF **refp, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
+{
+	WT_REF *parent_ref, *ref;
+
+	/*
+	 * Ref points to the first/last slot on an internal page from which we
+	 * are ascending the tree, moving to the parent page. This is tricky
+	 * because the internal page we're on may be splitting into its parent.
+	 * Find a stable configuration where the page we start from and the
+	 * page we're moving to are connected. The tree eventually stabilizes
+	 * into that configuration, keep trying until we succeed.
+	 */
+	for (ref = *refp;;) {
+		/*
+		 * Find our parent slot on the next higher internal page, the
+		 * slot from which we move to a next/prev slot, checking that
+		 * we haven't reached the root.
+		 */
+		parent_ref = ref->home->pg_intl_parent_ref;
+		if (__wt_ref_is_root(parent_ref))
+			break;
+		__page_refp(session, parent_ref, pindexp, slotp);
+
+		/*
+		 * When internal pages split, the WT_REF structures being moved
+		 * are updated first. If the WT_REF we started with references
+		 * the same page as we found on our search of the parent, there
+		 * is a consistent view.
+		 */
+		if (ref->home == parent_ref->page)
+			break;
+	}
+
+	*refp = parent_ref;
+}
+
+/*
  * __tree_walk_internal --
  *	Move to the next/previous page in the tree.
  */
@@ -173,7 +215,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 		goto descend;
 	}
 
-ascend:	/*
+	/*
 	 * If the active page was the root, we've reached the walk's end.
 	 * Release any hazard-pointer we're holding.
 	 */
@@ -187,13 +229,14 @@ ascend:	/*
 
 	for (;;) {
 		/*
-		 * If we're at the last/first slot on the page, return this page
-		 * in post-order traversal.  Otherwise we move to the next/prev
-		 * slot and left/right-most element in its subtree.
+		 * If we're at the last/first slot on the internal page, return
+		 * it in post-order traversal. Otherwise move to the next/prev
+		 * slot and left/right-most element in that subtree.
 		 */
-		if ((prev && slot == 0) ||
+		while ((prev && slot == 0) ||
 		    (!prev && slot == pindex->entries - 1)) {
-			ref = ref->home->pg_intl_parent_ref;
+			/* Ascend to the parent. */
+			__page_ascend(session, &ref, &pindex, &slot);
 
 			/*
 			 * If we got all the way through an internal page and
@@ -205,40 +248,37 @@ ascend:	/*
 				empty_internal = false;
 			}
 
-			/* Optionally skip internal pages. */
-			if (LF_ISSET(WT_READ_SKIP_INTL))
-				goto ascend;
-
 			/*
-			 * We've ascended the tree and are returning an internal
-			 * page.  If it's the root, discard our hazard pointer,
-			 * otherwise, swap our hazard pointer for the page we'll
-			 * return.
+			 * If at the root and returning internal pages, return
+			 * the root page, otherwise we're done. Regardless, no
+			 * hazard pointer is required, release the one we hold.
 			 */
-			if (__wt_ref_is_root(ref))
+			if (__wt_ref_is_root(ref)) {
 				WT_ERR(__wt_page_release(
 				    session, couple, flags));
-			else {
-				/*
-				 * Locate the reference to our parent page then
-				 * swap our child hazard pointer for the parent.
-				 * We don't handle restart or not-found returns.
-				 * It would require additional complexity and is
-				 * not a possible return: we're moving to the
-				 * parent of the current child page, our parent
-				 * reference can't have split or been evicted.
-				 */
-				__page_refp(session, ref, &pindex, &slot);
+				if (!LF_ISSET(WT_READ_SKIP_INTL))
+					*refp = ref;
+				goto done;
+			}
+
+			/*
+			 * Optionally return internal pages. Swap our previous
+			 * hazard pointer for the page we'll return. We don't
+			 * handle restart or not-found returns, it would require
+			 * additional complexity and is not a possible return:
+			 * we're moving to the parent of the current child page,
+			 * the parent can't have been evicted.
+			 */
+			if (!LF_ISSET(WT_READ_SKIP_INTL)) {
 				if ((ret = __wt_page_swap(
 				    session, couple, ref, flags)) != 0) {
 					WT_TRET(__wt_page_release(
 					    session, couple, flags));
 					WT_ERR(ret);
 				}
+				*refp = ref;
+				goto done;
 			}
-
-			*refp = ref;
-			goto done;
 		}
 
 		if (prev)
