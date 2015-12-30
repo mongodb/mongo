@@ -2,6 +2,8 @@
 //
 // This test requires the fsync command to force a secondary to be stale.
 // @tags: [requires_fsync]
+(function() {
+'use strict';
 
 var replTest = new ReplSetTest({ name: 'testSet', nodes: 2 });
 var nodes = replTest.startSet();
@@ -37,8 +39,8 @@ print("getlasterror; should assert or return an error, depending on timing");
 var gleFunction = function() {
     var result = master.getDB("test").runCommand({getLastError : 1, w: 2 , wtimeout :30000 });
     if (result.errmsg === "not master" ||
-            result.code == 10107 ||
-            result.code == 11601 /*interrupted*/ ) {
+        result.code == ErrorCodes.NotMaster ||
+        result.code == ErrorCodes.InterruptedDueToReplStateChange) {
         throw new Error("satisfy assert.throws()");
     }
     print("failed to throw exception; GLE returned: ");
@@ -54,3 +56,5 @@ assert.neq(0, exitCode, "expected replSetStepDown to close the shell's connectio
 // unlock and shut down
 printjson(locked.getDB("admin").fsyncUnlock());
 replTest.stopSet();
+
+})();

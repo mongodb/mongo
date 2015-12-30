@@ -77,7 +77,6 @@ public:
      */
     virtual RecoveryUnit* recoveryUnit() const = 0;
 
-
     /**
      * Returns the RecoveryUnit (same return value as recoveryUnit()) but the caller takes
      * ownership of the returned RecoveryUnit, and the OperationContext instance relinquishes
@@ -183,23 +182,33 @@ public:
     virtual bool writesAreReplicated() const = 0;
 
     /**
-     * Marks this operation as killed.
+     * Marks this operation as killed so that subsequent calls to checkForInterrupt and
+     * checkForInterruptNoAssert by the thread executing the operation will start returning the
+     * specified error code.
      *
-     * Subsequent calls to checkForInterrupt and checkForInterruptNoAssert by the thread
-     * executing the operation will indicate that the operation has been killed.
+     * If multiple threads kill the same operation with different codes, only the first code will
+     * be preserved.
      *
-     * May be called by any thread that has locked the Client owning this operation context,
-     * or by the thread executing on behalf of this operation context.
+     * May be called by any thread that has locked the Client owning this operation context.
      */
-    void markKilled();
+    void markKilled(ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
     /**
-     * Returns true if markKilled has been called on this operation context.
+     * Returns the code passed to markKilled if this operation context has been killed previously
+     * or ErrorCodes::OK otherwise.
      *
-     * May be called by any thread that has locked the Client owning this operation context,
-     * or by the thread executing on behalf of this operation context.
+     * May be called by any thread that has locked the Client owning this operation context, or
+     * without lock by the thread executing on behalf of this operation context.
      */
-    bool isKillPending() const;
+    ErrorCodes::Error getKillStatus() const;
+
+    /**
+     * Shortcut method, which checks whether getKillStatus returns a non-OK value. Has the same
+     * concurrency rules as getKillStatus.
+     */
+    bool isKillPending() const {
+        return getKillStatus() != ErrorCodes::OK;
+    }
 
 protected:
     OperationContext(Client* client, unsigned int opId, Locker* locker);
@@ -211,11 +220,14 @@ private:
     Client* const _client;
     const unsigned int _opId;
 
-    // The lifetime of locker is managed by subclasses of OperationContext, so it is not
-    // safe to access _locker in the destructor of OperationContext.
+    // Not owned.
     Locker* const _locker;
 
-    AtomicInt32 _killPending{0};
+    // Follows the values of ErrorCodes::Error. The default value is 0 (OK), which means the
+    // operation is not killed. If killed, it will contain a specific code. This value changes only
+    // once from OK to some kill code.
+    AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
+
     WriteConcernOptions _writeConcern;
 };
 
