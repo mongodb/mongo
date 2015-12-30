@@ -147,12 +147,14 @@ __conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
 int
 __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	bool marked_dead, no_schema_lock;
 
 	btree = S2BT(session);
+	bm = btree->bm;
 	dhandle = session->dhandle;
 	marked_dead = false;
 
@@ -191,7 +193,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	 */
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
-		if (force && (btree->bm == NULL || btree->bm->map == NULL))  {
+		if (force && (bm == NULL || !bm->is_mapped(bm, session))) {
 			WT_ERR(__conn_dhandle_mark_dead(session));
 			marked_dead = true;
 		}

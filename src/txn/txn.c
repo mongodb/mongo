@@ -334,13 +334,14 @@ retry:
 			 */
 			WT_ASSERT(session, txn_global->scan_count > 0);
 			(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
-			if (force)
+			if (force) {
+				__wt_yield();
 				goto retry;
+			}
 		}
 	} else {
 		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
-		    current_id - oldest_id > 10000 && last_running_moved &&
-		    oldest_session != NULL) {
+		    current_id - oldest_id > 10000 && oldest_session != NULL) {
 			(void)__wt_verbose(session, WT_VERB_TRANSACTION,
 			    "old snapshot %" PRIu64
 			    " pinned in session %d [%s]"

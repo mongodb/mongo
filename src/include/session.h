@@ -74,7 +74,10 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
 
 	WT_CURSOR_BACKUP *bkp_cursor;	/* Hot backup cursor */
-	WT_COMPACT	 *compact;	/* Compact state */
+
+	WT_COMPACT	 *compact;	/* Compaction information */
+	enum { WT_COMPACT_NONE=0,
+	    WT_COMPACT_RUNNING, WT_COMPACT_SUCCESS } compact_state;
 
 	/*
 	 * Lookaside table cursor, sweep and eviction worker threads only.
@@ -133,8 +136,6 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 
 	void	*reconcile;		/* Reconciliation support */
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
-
-	bool compaction;		/* Compaction did some work */
 
 	uint32_t flags;
 

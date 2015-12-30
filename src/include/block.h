@@ -173,6 +173,7 @@ struct __wt_bm {
 	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, bool *);
 	int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
 	int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
+	bool (*is_mapped)(WT_BM *, WT_SESSION_IMPL *);
 	int (*preload)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
 	int (*read)
 	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, size_t);
@@ -182,6 +183,7 @@ struct __wt_bm {
 	int (*salvage_start)(WT_BM *, WT_SESSION_IMPL *);
 	int (*salvage_valid)
 	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t, bool);
+	int (*size)(WT_BM *, WT_SESSION_IMPL *, wt_off_t *);
 	int (*stat)(WT_BM *, WT_SESSION_IMPL *, WT_DSRC_STATS *stats);
 	int (*sync)(WT_BM *, WT_SESSION_IMPL *, bool);
 	int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
@@ -244,7 +246,10 @@ struct __wt_block {
 	bool		ckpt_inprogress;/* Live checkpoint in progress */
 
 				/* Compaction support */
-	int	compact_pct_tenths;	/* Percent to compact */
+	int	 compact_pct_tenths;	/* Percent to compact */
+	uint64_t compact_pages_reviewed;/* Pages reviewed */
+	uint64_t compact_pages_skipped;	/* Pages skipped */
+	uint64_t compact_pages_written;	/* Pages rewritten */
 
 				/* Salvage support */
 	wt_off_t	slvg_off;	/* Salvage file offset */

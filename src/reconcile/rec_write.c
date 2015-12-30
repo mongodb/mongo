@@ -1276,6 +1276,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		for (upd = upd_list; upd->next != NULL; upd = upd->next)
 			;
 		upd->next = append;
+		__wt_cache_page_inmem_incr(
+		    session, page, WT_UPDATE_MEMSIZE(append));
 	}
 
 	/*
@@ -1756,7 +1758,7 @@ __rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
  *	Figure out the maximum leaf page size for the reconciliation.
  */
 static inline uint32_t
-__rec_leaf_page_max(WT_SESSION_IMPL *session,  WT_RECONCILE *r)
+__rec_leaf_page_max(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
@@ -3263,7 +3265,14 @@ supd_check_complete:
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
 		bnd->cksum = __wt_cksum(buf->data, buf->size);
 
-		if (mod->rec_result == WT_PM_REC_MULTIBLOCK &&
+		/*
+		 * One last check: don't reuse blocks if compacting, the reason
+		 * for compaction is to move blocks to different locations. We
+		 * do this check after calculating the checksums, hopefully the
+		 * next write can be skipped.
+		 */
+		if (session->compact_state == WT_COMPACT_NONE &&
+		    mod->rec_result == WT_PM_REC_MULTIBLOCK &&
 		    mod->mod_multi_entries > bnd_slot) {
 			multi = &mod->mod_multi[bnd_slot];
 			if (multi->size == bnd->size &&
@@ -4465,7 +4474,7 @@ compare:		/*
 		WT_ERR(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
 		if (upd == NULL)
 			continue;
-		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
+		for (n = WT_INSERT_RECNO(ins); src_recno <= n;) {
 			/*
 			 * The application may have inserted records which left
 			 * gaps in the name space, and these gaps can be huge.
@@ -4505,7 +4514,7 @@ compare:		/*
 				    last->size == size &&
 				    memcmp(last->data, data, size) == 0)) {
 					++rle;
-					continue;
+					goto next;
 				}
 				WT_ERR(__rec_col_var_helper(session, r,
 				    salvage, last, last_deleted, 0, rle));
@@ -4524,6 +4533,15 @@ compare:		/*
 			}
 			last_deleted = deleted;
 			rle = 1;
+
+			/*
+			 * Move to the next record. It's not a simple increment
+			 * because if it's the maximum record, incrementing it
+			 * wraps to 0 and this turns into an infinite loop.
+			 */
+next:			if (src_recno == UINT64_MAX)
+				break;
+			++src_recno;
 		}
 	}
 

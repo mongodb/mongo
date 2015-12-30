@@ -221,6 +221,18 @@ __bm_free(WT_BM *bm,
 }
 
 /*
+ * __bm_is_mapped --
+ *	Return if the file is mapped into memory.
+ */
+static bool
+__bm_is_mapped(WT_BM *bm, WT_SESSION_IMPL *session)
+{
+	WT_UNUSED(session);
+
+	return (bm->map == NULL ? false : true);
+}
+
+/*
  * __bm_stat --
  *	Block-manager statistics.
  */
@@ -357,6 +369,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->free = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, const uint8_t *, size_t))__bm_readonly;
+		bm->is_mapped = __bm_is_mapped;
 		bm->preload = __wt_bm_preload;
 		bm->read = __wt_bm_read;
 		bm->salvage_end = (int (*)
@@ -367,6 +380,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
 		    (WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->salvage_valid = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, uint8_t *, size_t, bool))__bm_readonly;
+		bm->size = __wt_block_manager_size;
 		bm->stat = __bm_stat;
 		bm->sync =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *, bool))__bm_readonly;
@@ -391,12 +405,14 @@ __bm_method_set(WT_BM *bm, bool readonly)
 		bm->compact_skip = __bm_compact_skip;
 		bm->compact_start = __bm_compact_start;
 		bm->free = __bm_free;
+		bm->is_mapped = __bm_is_mapped;
 		bm->preload = __wt_bm_preload;
 		bm->read = __wt_bm_read;
 		bm->salvage_end = __bm_salvage_end;
 		bm->salvage_next = __bm_salvage_next;
 		bm->salvage_start = __bm_salvage_start;
 		bm->salvage_valid = __bm_salvage_valid;
+		bm->size = __wt_block_manager_size;
 		bm->stat = __bm_stat;
 		bm->sync = __bm_sync;
 		bm->verify_addr = __bm_verify_addr;

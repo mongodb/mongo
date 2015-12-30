@@ -172,12 +172,12 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	for (i = 0; i < 100; ++i) {
 		WT_ERR(__wt_txn_checkpoint(session, checkpoint_cfg));
 
-		session->compaction = false;
+		session->compact_state = WT_COMPACT_RUNNING;
 		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_schema_worker(
 		    session, uri, __wt_compact, NULL, cfg, 0));
 		WT_ERR(ret);
-		if (!session->compaction)
+		if (session->compact_state != WT_COMPACT_SUCCESS)
 			break;
 
 		WT_ERR(__wt_txn_checkpoint(session, checkpoint_cfg));
@@ -185,7 +185,9 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		WT_ERR(__session_compact_check_timeout(session, start_time));
 	}
 
-err:	__wt_scr_free(session, &t);
+err:	session->compact_state = WT_COMPACT_NONE;
+
+	__wt_scr_free(session, &t);
 	return (ret);
 }
 
