@@ -154,11 +154,16 @@ public:
 
     virtual void SSL_free(SSLConnection* conn) = 0;
 
+    enum class ConnectionDirection { kIncoming, kOutgoing };
+
     /**
      * Initializes an OpenSSL context according to the provided settings. Only settings which are
-     * acceptable on non-blocking connections are set.
+     * acceptable on non-blocking connections are set. "direction" specifies whether the SSL_CTX
+     * will be used to make outgoing connections or accept incoming connections.
      */
-    virtual Status initSSLContext(SSL_CTX* context, const SSLParams& params) = 0;
+    virtual Status initSSLContext(SSL_CTX* context,
+                                  const SSLParams& params,
+                                  ConnectionDirection direction) = 0;
 
     /**
      * Fetches a peer certificate and validates it if it exists. If validation fails, but weak
