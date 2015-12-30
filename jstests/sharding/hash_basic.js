@@ -1,6 +1,3 @@
-/**
- * @tags : [ hashed ] 
- */
 var st = new ShardingTest({ shards: 2, chunkSize: 1 });
 
 var testDB = st.s.getDB('test');

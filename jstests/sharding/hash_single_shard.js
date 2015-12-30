@@ -1,5 +1,4 @@
 // Test hashed presplit with 1 shard.
-// @tags : [ hashed ]
 
 var st = new ShardingTest({ shards: 1 });
 var testDB = st.getDB('test');

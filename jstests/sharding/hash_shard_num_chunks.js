@@ -1,5 +1,4 @@
 // Hash sharding with initial chunk count set.
-// @tags: [ hashed ]
 
 (function() {
 
