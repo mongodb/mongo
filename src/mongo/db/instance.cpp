@@ -371,29 +371,20 @@ void assembleResponse(OperationContext* txn,
     debug.op = op;
 
     long long logThreshold = serverGlobalParams.slowMS;
-    LogComponent responseComponent(LogComponent::kQuery);
-    if (op == dbInsert || op == dbDelete || op == dbUpdate) {
-        responseComponent = LogComponent::kWrite;
-    } else if (isCommand) {
-        responseComponent = LogComponent::kCommand;
-    }
-
-    bool shouldLog =
-        logger::globalLogDomain()->shouldLog(responseComponent, logger::LogSeverity::Debug(1));
+    bool shouldLogOpDebug = shouldLog(logger::LogSeverity::Debug(1));
 
     if (op == dbQuery) {
         receivedQuery(txn, c, dbresponse, m);
     } else if (op == dbGetMore) {
         if (!receivedGetMore(txn, dbresponse, m, currentOp))
-            shouldLog = true;
+            shouldLogOpDebug = true;
     } else if (op == dbMsg) {
         // deprecated - replaced by commands
         const char* p = dbmsg.getns();
 
         int len = strlen(p);
         if (len > 400)
-            log(LogComponent::kQuery) << curTimeMillis64() % 10000
-                                      << " long msg received, len:" << len << endl;
+            log() << curTimeMillis64() % 10000 << " long msg received, len:" << len << endl;
 
         Message* resp = new Message();
         if (strcmp("end", p) == 0)
@@ -413,9 +404,9 @@ void assembleResponse(OperationContext* txn,
                 logThreshold = 10;
                 receivedKillCursors(txn, m);
             } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
-                log(LogComponent::kQuery) << "    operation isn't supported: " << op << endl;
+                log() << "    operation isn't supported: " << op << endl;
                 currentOp.done();
-                shouldLog = true;
+                shouldLogOpDebug = true;
             } else {
                 const char* ns = dbmsg.getns();
                 const NamespaceString nsString(ns);
@@ -443,15 +434,15 @@ void assembleResponse(OperationContext* txn,
             }
         } catch (const UserException& ue) {
             setLastError(ue.getCode(), ue.getInfo().msg.c_str());
-            MONGO_LOG_COMPONENT(3, responseComponent) << " Caught Assertion in " << opToString(op)
-                                                      << ", continuing " << ue.toString() << endl;
+            LOG(3) << " Caught Assertion in " << opToString(op) << ", continuing " << ue.toString()
+                   << endl;
             debug.exceptionInfo = ue.getInfo();
         } catch (const AssertionException& e) {
             setLastError(e.getCode(), e.getInfo().msg.c_str());
-            MONGO_LOG_COMPONENT(3, responseComponent) << " Caught Assertion in " << opToString(op)
-                                                      << ", continuing " << e.toString() << endl;
+            LOG(3) << " Caught Assertion in " << opToString(op) << ", continuing " << e.toString()
+                   << endl;
             debug.exceptionInfo = e.getInfo();
-            shouldLog = true;
+            shouldLogOpDebug = true;
         }
     }
     currentOp.ensureStarted();
@@ -460,21 +451,19 @@ void assembleResponse(OperationContext* txn,
 
     logThreshold += currentOp.getExpectedLatencyMs();
 
-    if (shouldLog || debug.executionTime > logThreshold) {
+    if (shouldLogOpDebug || debug.executionTime > logThreshold) {
         Locker::LockerInfo lockerInfo;
         txn->lockState()->getLockerInfo(&lockerInfo);
 
-        MONGO_LOG_COMPONENT(0, responseComponent) << debug.report(currentOp, lockerInfo.stats);
+        log() << debug.report(currentOp, lockerInfo.stats);
     }
 
     if (currentOp.shouldDBProfile(debug.executionTime)) {
         // Performance profiling is on
         if (txn->lockState()->isReadLocked()) {
-            MONGO_LOG_COMPONENT(1, responseComponent)
-                << "note: not profiling because recursive read lock";
+            LOG(1) << "note: not profiling because recursive read lock";
         } else if (lockedForWriting()) {
-            MONGO_LOG_COMPONENT(1, responseComponent)
-                << "note: not profiling because doing fsync+lock";
+            LOG(1) << "note: not profiling because doing fsync+lock";
         } else {
             profile(txn, op);
         }
