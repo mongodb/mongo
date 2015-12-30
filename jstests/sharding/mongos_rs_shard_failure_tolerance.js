@@ -10,10 +10,11 @@
 // sequence), idle (connection is connected but not used before a shard change), and new
 // (connection connected after shard change).
 //
-(function() {
-'use strict';
 
-var st = new ShardingTest({ shards: 3, mongos: 1, other: { rs: true, rsOptions: { nodes: 2 } } });
+var options = {rs : true, rsOptions : { nodes : 2 }};
+
+var st = new ShardingTest({shards : 3, mongos : 1, other : options});
+st.stopBalancer();
 
 var mongos = st.s0;
 var admin = mongos.getDB( "admin" );
@@ -411,6 +412,6 @@ assert.writeError(mongosConnNew.getCollection( collUnsharded.toString() ).insert
 
 gc(); // Clean up new connections
 
+jsTest.log("DONE!");
 st.stop();
 
-})();

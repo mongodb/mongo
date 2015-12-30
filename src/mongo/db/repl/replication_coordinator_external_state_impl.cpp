@@ -350,8 +350,8 @@ void ReplicationCoordinatorExternalStateImpl::closeConnections() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* txn) {
-    ServiceContext* environment = txn->getServiceContext();
-    environment->killAllUserOperations(txn, ErrorCodes::InterruptedDueToReplStateChange);
+    ServiceContext* environment = getGlobalServiceContext();
+    environment->killAllUserOperations(txn);
 }
 
 void ReplicationCoordinatorExternalStateImpl::clearShardingState() {

@@ -51,6 +51,15 @@ namespace {
 // Maximum number of retries for network and replication notMaster errors (per host).
 const int kMaxNumFailedHostRetryAttempts = 3;
 
+/**
+ * Returns whether a particular error code returned from the initial cursor establishment should
+ * be retried.
+ */
+bool isPerShardRetriableError(ErrorCodes::Error err) {
+    return (ShardRegistry::kAllRetriableErrors.count(err) ||
+            err == ErrorCodes::NotMasterOrSecondary);
+}
+
 }  // namespace
 
 AsyncResultsMerger::AsyncResultsMerger(executor::TaskExecutor* executor,
@@ -429,7 +438,8 @@ void AsyncResultsMerger::handleBatchResponse(
     if (!cursorResponseStatus.isOK()) {
         // Notify the shard registry of the failure.
         if (remote.shardId) {
-            auto shard = grid.shardRegistry()->getShardNoReload(*remote.shardId);
+            // TODO: Pass down an OperationContext* to use here.
+            auto shard = grid.shardRegistry()->getShard(nullptr, *remote.shardId);
             if (!shard) {
                 remote.status = Status(cursorResponseStatus.getStatus().code(),
                                        str::stream() << "Could not find shard " << *remote.shardId
@@ -443,10 +453,7 @@ void AsyncResultsMerger::handleBatchResponse(
 
         // If the error is retriable, schedule another request.
         if (!remote.cursorId && remote.retryCount < kMaxNumFailedHostRetryAttempts &&
-            ShardRegistry::kAllRetriableErrors.count(cursorResponseStatus.getStatus().code())) {
-            LOG(1) << "Initial cursor establishment failed with retriable error and will be retried"
-                   << causedBy(cursorResponseStatus.getStatus());
-
+            isPerShardRetriableError(cursorResponseStatus.getStatus().code())) {
             ++remote.retryCount;
 
             // Since we potentially updated the targeter that the last host it chose might be
@@ -634,13 +641,13 @@ Status AsyncResultsMerger::RemoteCursorData::resolveShardIdToHostAndPort(
     invariant(shardId);
     invariant(!cursorId);
 
-    const auto shard = grid.shardRegistry()->getShardNoReload(*shardId);
+    // TODO: Pass down an OperationContext* to use here.
+    const auto shard = grid.shardRegistry()->getShard(nullptr, *shardId);
     if (!shard) {
         return Status(ErrorCodes::ShardNotFound,
                       str::stream() << "Could not find shard " << *shardId);
     }
 
-    // TODO: Pass down an OperationContext* to use here.
     auto findHostStatus = shard->getTargeter()->findHost(
         readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(nullptr));
     if (!findHostStatus.isOK()) {

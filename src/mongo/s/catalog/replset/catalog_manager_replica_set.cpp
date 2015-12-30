@@ -389,6 +389,8 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::_fetchDatabaseMet
 
 StatusWith<OpTimePair<CollectionType>> CatalogManagerReplicaSet::getCollection(
     OperationContext* txn, const std::string& collNs) {
+    auto configShard = grid.shardRegistry()->getShard(txn, "config");
+
     auto statusFind = _exhaustiveFindOnConfig(txn,
                                               kConfigReadSelector,
                                               NamespaceString(CollectionType::ConfigNS),

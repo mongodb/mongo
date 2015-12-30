@@ -46,13 +46,12 @@ Client* OperationContext::getClient() const {
     return _client;
 }
 
-void OperationContext::markKilled(ErrorCodes::Error killCode) {
-    invariant(killCode != ErrorCodes::OK);
-    _killCode.compareAndSwap(ErrorCodes::OK, killCode);
+void OperationContext::markKilled() {
+    _killPending.store(1);
 }
 
-ErrorCodes::Error OperationContext::getKillStatus() const {
-    return _killCode.loadRelaxed();
+bool OperationContext::isKillPending() const {
+    return _killPending.loadRelaxed();
 }
 
 }  // namespace mongo

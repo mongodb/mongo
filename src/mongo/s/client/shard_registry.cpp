@@ -126,7 +126,6 @@ const ShardRegistry::ErrorCodesSet ShardRegistry::kNotMasterErrors{ErrorCodes::N
 const ShardRegistry::ErrorCodesSet ShardRegistry::kAllRetriableErrors{
     ErrorCodes::NotMaster,
     ErrorCodes::NotMasterNoSlaveOk,
-    ErrorCodes::NotMasterOrSecondary,
     // If write concern failed to be satisfied on the remote server, this most probably means that
     // some of the secondary nodes were unreachable or otherwise unresponsive, so the call is safe
     // to be retried if idempotency can be guaranteed.
@@ -134,7 +133,10 @@ const ShardRegistry::ErrorCodesSet ShardRegistry::kAllRetriableErrors{
     ErrorCodes::HostUnreachable,
     ErrorCodes::HostNotFound,
     ErrorCodes::NetworkTimeout,
-    ErrorCodes::InterruptedDueToReplStateChange};
+    // This set includes interrupted because replica set step down kills all server operations
+    // before it closes connections so it may happen that the caller actually receives the
+    // interruption.
+    ErrorCodes::Interrupted};
 
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                              std::unique_ptr<executor::TaskExecutorPool> executorPool,
@@ -780,8 +782,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
 void ShardRegistry::updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter,
                                          const HostAndPort& remoteHost,
                                          const Status& remoteCommandStatus) {
-    if (ErrorCodes::isNotMasterError(remoteCommandStatus.code()) ||
-        (remoteCommandStatus == ErrorCodes::InterruptedDueToReplStateChange)) {
+    if (ErrorCodes::isNotMasterError(remoteCommandStatus.code())) {
         targeter->markHostNotMaster(remoteHost);
     } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
         targeter->markHostUnreachable(remoteHost);

@@ -49,7 +49,7 @@ public:
 
     bool killOperation(unsigned int opId) override;
 
-    void killAllUserOperations(const OperationContext* txn, ErrorCodes::Error killCode) override;
+    void killAllUserOperations(const OperationContext* txn) override;
 
     void setKillAllOperations() override;
 
