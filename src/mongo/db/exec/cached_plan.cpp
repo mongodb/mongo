@@ -230,7 +230,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
 
         PlanStage* newRoot;
         // Only one possible plan. Build the stages from the solution.
-        verify(StageBuilder::build(getOpCtx(), _collection, *solutions[0], _ws, &newRoot));
+        verify(StageBuilder::build(
+            getOpCtx(), _collection, *_canonicalQuery, *solutions[0], _ws, &newRoot));
         _children.emplace_back(newRoot);
         _replannedQs.reset(solutions.popAndReleaseBack());
         return Status::OK();
@@ -250,7 +251,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
         }
 
         PlanStage* nextPlanRoot;
-        verify(StageBuilder::build(getOpCtx(), _collection, *solutions[ix], _ws, &nextPlanRoot));
+        verify(StageBuilder::build(
+            getOpCtx(), _collection, *_canonicalQuery, *solutions[ix], _ws, &nextPlanRoot));
 
         // Takes ownership of 'solutions[ix]' and 'nextPlanRoot'.
         multiPlanStage->addPlan(solutions.releaseAt(ix), nextPlanRoot, _ws);

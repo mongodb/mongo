@@ -345,9 +345,16 @@ PlanStage* buildStages(OperationContext* txn,
 // static (this one is used for Cached and MultiPlanStage)
 bool StageBuilder::build(OperationContext* txn,
                          Collection* collection,
+                         const CanonicalQuery& cq,
                          const QuerySolution& solution,
                          WorkingSet* wsIn,
                          PlanStage** rootOut) {
+    // Only QuerySolutions derived from queries parsed with context, or QuerySolutions derived from
+    // queries that disallow extensions, can be properly executed. If the query does not have
+    // $text/$where context (and $text/$where are allowed), then no attempt should be made to
+    // execute the query.
+    invariant(!cq.hasNoopExtensions());
+
     if (NULL == wsIn || NULL == rootOut) {
         return false;
     }

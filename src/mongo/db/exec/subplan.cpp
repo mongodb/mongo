@@ -327,8 +327,12 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             // Dump all the solutions into the MPS.
             for (size_t ix = 0; ix < branchResult->solutions.size(); ++ix) {
                 PlanStage* nextPlanRoot;
-                invariant(StageBuilder::build(
-                    getOpCtx(), _collection, *branchResult->solutions[ix], _ws, &nextPlanRoot));
+                invariant(StageBuilder::build(getOpCtx(),
+                                              _collection,
+                                              *branchResult->canonicalQuery,
+                                              *branchResult->solutions[ix],
+                                              _ws,
+                                              &nextPlanRoot));
 
                 // Takes ownership of solution with index 'ix' and 'nextPlanRoot'.
                 multiPlanStage.addPlan(branchResult->solutions.releaseAt(ix), nextPlanRoot, _ws);
@@ -407,7 +411,8 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     // and set that solution as our child stage.
     _ws->clear();
     PlanStage* root;
-    invariant(StageBuilder::build(getOpCtx(), _collection, *_compositeSolution.get(), _ws, &root));
+    invariant(StageBuilder::build(
+        getOpCtx(), _collection, *_query, *_compositeSolution.get(), _ws, &root));
     invariant(_children.empty());
     _children.emplace_back(root);
 
@@ -440,7 +445,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     if (1 == solutions.size()) {
         PlanStage* root;
         // Only one possible plan.  Run it.  Build the stages from the solution.
-        verify(StageBuilder::build(getOpCtx(), _collection, *solutions[0], _ws, &root));
+        verify(StageBuilder::build(getOpCtx(), _collection, *_query, *solutions[0], _ws, &root));
         invariant(_children.empty());
         _children.emplace_back(root);
 
@@ -462,8 +467,8 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
 
             // version of StageBuild::build when WorkingSet is shared
             PlanStage* nextPlanRoot;
-            verify(
-                StageBuilder::build(getOpCtx(), _collection, *solutions[ix], _ws, &nextPlanRoot));
+            verify(StageBuilder::build(
+                getOpCtx(), _collection, *_query, *solutions[ix], _ws, &nextPlanRoot));
 
             // Takes ownership of 'solutions[ix]' and 'nextPlanRoot'.
             multiPlanStage->addPlan(solutions.releaseAt(ix), nextPlanRoot, _ws);

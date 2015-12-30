@@ -314,6 +314,8 @@ Status CanonicalQuery::init(LiteParsedQuery* lpq,
                             MatchExpression* root) {
     _pq.reset(lpq);
 
+    _hasNoopExtensions = extensionsCallback.hasNoopExtensions();
+
     // Normalize, sort and validate tree.
     root = normalizeTree(root);
 

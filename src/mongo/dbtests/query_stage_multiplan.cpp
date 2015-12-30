@@ -243,7 +243,7 @@ public:
         // Put each solution from the planner into the MPR.
         for (size_t i = 0; i < solutions.size(); ++i) {
             PlanStage* root;
-            ASSERT(StageBuilder::build(&_txn, collection, *solutions[i], ws.get(), &root));
+            ASSERT(StageBuilder::build(&_txn, collection, *cq, *solutions[i], ws.get(), &root));
             // Takes ownership of 'solutions[i]' and 'root'.
             mps->addPlan(solutions[i], root, ws.get());
         }

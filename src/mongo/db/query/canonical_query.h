@@ -194,6 +194,17 @@ public:
      */
     static size_t countNodes(const MatchExpression* root, MatchExpression::MatchType type);
 
+    /**
+     * Returns true if this canonical query converted extensions such as $where and $text into
+     * no-ops during parsing.
+     *
+     * Queries with a no-op extension context are special because they can be parsed and planned,
+     * but they cannot be executed.
+     */
+    bool hasNoopExtensions() const {
+        return _hasNoopExtensions;
+    }
+
 private:
     // You must go through canonicalize to create a CanonicalQuery.
     CanonicalQuery() {}
@@ -211,6 +222,8 @@ private:
     std::unique_ptr<MatchExpression> _root;
 
     std::unique_ptr<ParsedProjection> _proj;
+
+    bool _hasNoopExtensions = false;
 };
 
 }  // namespace mongo

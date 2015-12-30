@@ -40,11 +40,21 @@ namespace mongo {
  */
 class ExtensionsCallback {
 public:
+    virtual ~ExtensionsCallback() {}
+
     virtual StatusWithMatchExpression parseText(BSONElement text) const = 0;
 
     virtual StatusWithMatchExpression parseWhere(BSONElement where) const = 0;
 
-    virtual ~ExtensionsCallback() {}
+    /**
+     * Returns true if extensions (e.g. $text and $where) are allowed but are converted into no-ops.
+     *
+     * Queries with a no-op extension context are special because they can be parsed and planned,
+     * but they cannot be executed.
+     */
+    virtual bool hasNoopExtensions() const {
+        return false;
+    }
 
 protected:
     /**

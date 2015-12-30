@@ -44,6 +44,8 @@ public:
     /**
      * Turns 'solution' into an executable tree of PlanStage(s).
      *
+     * 'cq' must be the CanonicalQuery from which 'solution' is derived.
+     *
      * Returns true if the PlanStage tree was built successfully.  The root of the tree is in
      * *rootOut and the WorkingSet that the tree uses is in wsIn.
      *
@@ -51,6 +53,7 @@ public:
      */
     static bool build(OperationContext* txn,
                       Collection* collection,
+                      const CanonicalQuery& cq,
                       const QuerySolution& solution,
                       WorkingSet* wsIn,
                       PlanStage** rootOut);

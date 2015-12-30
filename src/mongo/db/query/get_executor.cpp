@@ -315,7 +315,7 @@ Status prepareExecution(OperationContext* opCtx,
         Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs, &qs);
 
         if (status.isOK()) {
-            verify(StageBuilder::build(opCtx, collection, *qs, ws, rootOut));
+            verify(StageBuilder::build(opCtx, collection, *canonicalQuery, *qs, ws, rootOut));
             if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) &&
                 turnIxscanIntoCount(qs)) {
                 LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
@@ -371,7 +371,8 @@ Status prepareExecution(OperationContext* opCtx,
                 }
 
                 // We're not going to cache anything that's fast count.
-                verify(StageBuilder::build(opCtx, collection, *solutions[i], ws, rootOut));
+                verify(StageBuilder::build(
+                    opCtx, collection, *canonicalQuery, *solutions[i], ws, rootOut));
 
                 LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
                        << ", planSummary: " << Explain::getPlanSummary(*rootOut);
@@ -384,7 +385,7 @@ Status prepareExecution(OperationContext* opCtx,
 
     if (1 == solutions.size()) {
         // Only one possible plan.  Run it.  Build the stages from the solution.
-        verify(StageBuilder::build(opCtx, collection, *solutions[0], ws, rootOut));
+        verify(StageBuilder::build(opCtx, collection, *canonicalQuery, *solutions[0], ws, rootOut));
 
         LOG(2) << "Only one plan is available; it will be run but will not be cached. "
                << canonicalQuery->toStringShort()
@@ -404,7 +405,8 @@ Status prepareExecution(OperationContext* opCtx,
 
             // version of StageBuild::build when WorkingSet is shared
             PlanStage* nextPlanRoot;
-            verify(StageBuilder::build(opCtx, collection, *solutions[ix], ws, &nextPlanRoot));
+            verify(StageBuilder::build(
+                opCtx, collection, *canonicalQuery, *solutions[ix], ws, &nextPlanRoot));
 
             // Owns none of the arguments
             multiPlanStage->addPlan(solutions[ix], nextPlanRoot, ws);
@@ -1378,7 +1380,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         PlanStage* rawRoot;
-        verify(StageBuilder::build(txn, collection, *soln, ws.get(), &rawRoot));
+        verify(StageBuilder::build(txn, collection, *cq, *soln, ws.get(), &rawRoot));
         unique_ptr<PlanStage> root(rawRoot);
 
         LOG(2) << "Using fast distinct: " << cq->toStringShort()
@@ -1414,7 +1416,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
             unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
             unique_ptr<QuerySolution> currentSolution(solutions[i]);
             PlanStage* rawRoot;
-            verify(StageBuilder::build(txn, collection, *currentSolution, ws.get(), &rawRoot));
+            verify(StageBuilder::build(txn, collection, *cq, *currentSolution, ws.get(), &rawRoot));
             unique_ptr<PlanStage> root(rawRoot);
 
             LOG(2) << "Using fast distinct: " << cq->toStringShort()
