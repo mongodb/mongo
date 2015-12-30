@@ -180,7 +180,9 @@ public:
      * Initializes an OpenSSL context according to the provided settings. Only settings which are
      * acceptable on non-blocking connections are set.
      */
-    Status initSSLContext(SSL_CTX* context, const SSLParams& params) final;
+    Status initSSLContext(SSL_CTX* context,
+                          const SSLParams& params,
+                          ConnectionDirection direction) final;
 
     virtual SSLConnection* connect(Socket* socket);
 
@@ -237,7 +239,9 @@ private:
      * Init the SSL context using parameters provided in params. This SSL context will
      * be configured for blocking send/receive.
      */
-    bool _initSynchronousSSLContext(UniqueSSLContext* context, const SSLParams& params);
+    bool _initSynchronousSSLContext(UniqueSSLContext* context,
+                                    const SSLParams& params,
+                                    ConnectionDirection direction);
 
     /*
      * Converts time from OpenSSL return value to unsigned long long
@@ -463,7 +467,7 @@ SSLManager::SSLManager(const SSLParams& params, bool isServer)
       _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
-    if (!_initSynchronousSSLContext(&_clientContext, params)) {
+    if (!_initSynchronousSSLContext(&_clientContext, params, ConnectionDirection::kOutgoing)) {
         uasserted(16768, "ssl initialization problem");
     }
 
@@ -485,7 +489,7 @@ SSLManager::SSLManager(const SSLParams& params, bool isServer)
     }
     // SSL server specific initialization
     if (isServer) {
-        if (!_initSynchronousSSLContext(&_serverContext, params)) {
+        if (!_initSynchronousSSLContext(&_serverContext, params, ConnectionDirection::kIncoming)) {
             uasserted(16562, "ssl initialization problem");
         }
 
@@ -562,7 +566,13 @@ void SSLManager::SSL_free(SSLConnection* conn) {
     return ::SSL_free(conn->ssl);
 }
 
-Status SSLManager::initSSLContext(SSL_CTX* context, const SSLParams& params) {
+Status SSLManager::initSSLContext(SSL_CTX* context,
+                                  const SSLParams& params,
+                                  ConnectionDirection direction) {
+    if (direction == ConnectionDirection::kIncoming) {
+        fassert(34364, context == _serverContext.get());
+    }
+
     // SSL_OP_ALL - Activate all bug workaround options, to support buggy client SSL's.
     // SSL_OP_NO_SSLv2 - Disable SSL v2 support
     // SSL_OP_NO_SSLv3 - Disable SSL v3 support
@@ -608,7 +618,7 @@ Status SSLManager::initSSLContext(SSL_CTX* context, const SSLParams& params) {
                                     << getSSLErrorMessage(ERR_get_error()));
     }
 
-    if (!params.sslClusterFile.empty()) {
+    if (direction == ConnectionDirection::kOutgoing && !params.sslClusterFile.empty()) {
         ::EVP_set_pw_prompt("Enter cluster certificate passphrase");
         if (!_setupPEM(context, params.sslClusterFile, params.sslClusterPassword)) {
             return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up ssl clusterFile.");
@@ -637,16 +647,17 @@ Status SSLManager::initSSLContext(SSL_CTX* context, const SSLParams& params) {
     return Status::OK();
 }
 
-bool SSLManager::_initSynchronousSSLContext(UniqueSSLContext* contextPtr, const SSLParams& params) {
-    UniqueSSLContext context(SSL_CTX_new(SSLv23_method()), _free_ssl_context);
+bool SSLManager::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
+                                            const SSLParams& params,
+                                            ConnectionDirection direction) {
+    *contextPtr = UniqueSSLContext(SSL_CTX_new(SSLv23_method()), _free_ssl_context);
 
-    uassertStatusOK(initSSLContext(context.get(), params));
+    uassertStatusOK(initSSLContext(contextPtr->get(), params, direction));
 
     // If renegotiation is needed, don't return from recv() or send() until it's successful.
     // Note: this is for blocking sockets only.
-    SSL_CTX_set_mode(context.get(), SSL_MODE_AUTO_RETRY);
+    SSL_CTX_set_mode(contextPtr->get(), SSL_MODE_AUTO_RETRY);
 
-    *contextPtr = std::move(context);
     return true;
 }
 
