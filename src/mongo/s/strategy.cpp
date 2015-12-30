@@ -336,56 +336,6 @@ void Strategy::commandOp(OperationContext* txn,
     }
 }
 
-Status Strategy::commandOpUnsharded(OperationContext* txn,
-                                    const std::string& db,
-                                    const BSONObj& command,
-                                    int options,
-                                    const std::string& versionedNS,
-                                    CommandResult* cmdResult) {
-    // Note that this implementation will not handle targeting retries and fails when the
-    // sharding metadata is too stale
-    auto status = grid.catalogCache()->getDatabase(txn, db);
-    if (!status.isOK()) {
-        mongoutils::str::stream ss;
-        ss << "Passthrough command failed: " << command.toString() << " on ns " << versionedNS
-           << ". Caused by " << causedBy(status.getStatus());
-        return Status(ErrorCodes::IllegalOperation, ss);
-    }
-
-    shared_ptr<DBConfig> conf = status.getValue();
-    if (conf->isSharded(versionedNS)) {
-        mongoutils::str::stream ss;
-        ss << "Passthrough command failed: " << command.toString() << " on ns " << versionedNS
-           << ". Cannot run on sharded namespace.";
-        return Status(ErrorCodes::IllegalOperation, ss);
-    }
-
-    const auto primaryShard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
-
-    BSONObj shardResult;
-    try {
-        ShardConnection conn(primaryShard->getConnString(), "");
-
-        // TODO: this can throw a stale config when mongos is not up-to-date -- fix.
-        if (!conn->runCommand(db, command, shardResult, options)) {
-            conn.done();
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "Passthrough command failed: " << command << " on ns "
-                                        << versionedNS << "; result: " << shardResult);
-        }
-        conn.done();
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-
-    // Fill out the command result.
-    cmdResult->shardTargetId = conf->getPrimaryId();
-    cmdResult->result = shardResult;
-    cmdResult->target = primaryShard->getConnString();
-
-    return Status::OK();
-}
-
 void Strategy::getMore(OperationContext* txn, Request& request) {
     const char* ns = request.getns();
     const int ntoreturn = request.d().pullInt();

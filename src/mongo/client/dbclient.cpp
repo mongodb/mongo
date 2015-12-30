@@ -1182,21 +1182,17 @@ unsigned long long DBClientConnection::query(stdx::function<void(DBClientCursorB
 }
 
 void DBClientBase::insert(const string& ns, BSONObj obj, int flags) {
-    Message toSend;
-
     BufBuilder b;
 
     int reservedFlags = 0;
     if (flags & InsertOption_ContinueOnError)
         reservedFlags |= Reserved_InsertOption_ContinueOnError;
 
-    if (flags & WriteOption_FromWriteback)
-        reservedFlags |= Reserved_FromWriteback;
-
     b.appendNum(reservedFlags);
     b.appendStr(ns);
     obj.appendSelfToBufBuilder(b);
 
+    Message toSend;
     toSend.setData(dbInsert, b.buf(), b.len());
 
     say(toSend);
@@ -1204,52 +1200,34 @@ void DBClientBase::insert(const string& ns, BSONObj obj, int flags) {
 
 // TODO: Merge with other insert implementation?
 void DBClientBase::insert(const string& ns, const vector<BSONObj>& v, int flags) {
-    Message toSend;
-
     BufBuilder b;
 
     int reservedFlags = 0;
     if (flags & InsertOption_ContinueOnError)
         reservedFlags |= Reserved_InsertOption_ContinueOnError;
 
-    if (flags & WriteOption_FromWriteback) {
-        reservedFlags |= Reserved_FromWriteback;
-        flags ^= WriteOption_FromWriteback;
-    }
-
     b.appendNum(reservedFlags);
     b.appendStr(ns);
     for (vector<BSONObj>::const_iterator i = v.begin(); i != v.end(); ++i)
         i->appendSelfToBufBuilder(b);
 
+    Message toSend;
     toSend.setData(dbInsert, b.buf(), b.len());
 
     say(toSend);
 }
 
-void DBClientBase::remove(const string& ns, Query obj, bool justOne) {
-    int flags = 0;
-    if (justOne)
-        flags |= RemoveOption_JustOne;
-    remove(ns, obj, flags);
-}
-
 void DBClientBase::remove(const string& ns, Query obj, int flags) {
-    Message toSend;
-
     BufBuilder b;
-    int reservedFlags = 0;
-    if (flags & WriteOption_FromWriteback) {
-        reservedFlags |= WriteOption_FromWriteback;
-        flags ^= WriteOption_FromWriteback;
-    }
 
+    const int reservedFlags = 0;
     b.appendNum(reservedFlags);
     b.appendStr(ns);
     b.appendNum(flags);
 
     obj.obj.appendSelfToBufBuilder(b);
 
+    Message toSend;
     toSend.setData(dbDelete, b.buf(), b.len());
 
     say(toSend);
@@ -1267,13 +1245,8 @@ void DBClientBase::update(const string& ns, Query query, BSONObj obj, bool upser
 void DBClientBase::update(const string& ns, Query query, BSONObj obj, int flags) {
     BufBuilder b;
 
-    int reservedFlags = 0;
-    if (flags & WriteOption_FromWriteback) {
-        reservedFlags |= Reserved_FromWriteback;
-        flags ^= WriteOption_FromWriteback;
-    }
-
-    b.appendNum(reservedFlags);  // reserved
+    const int reservedFlags = 0;
+    b.appendNum(reservedFlags);
     b.appendStr(ns);
     b.appendNum(flags);
 
@@ -1511,7 +1484,6 @@ bool DBClientConnection::call(Message& toSend,
                 uasserted(10278,
                           str::stream() << "dbclient error communicating with server: "
                                         << getServerAddress());
-
             return false;
         }
     } catch (SocketException&) {

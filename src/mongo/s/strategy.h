@@ -96,22 +96,6 @@ public:
                           std::vector<CommandResult>* results);
 
     /**
-     * Some commands can only be run in a sharded configuration against a namespace that has
-     * not been sharded. Use this method to execute such commands.
-     *
-     * Does *not* retry or retarget if the metadata is stale.
-     *
-     * On success, fills in 'shardResult' with output from the namespace's primary shard. This
-     * output may itself indicate an error status on the shard.
-     */
-    static Status commandOpUnsharded(OperationContext* txn,
-                                     const std::string& db,
-                                     const BSONObj& command,
-                                     int options,
-                                     const std::string& versionedNS,
-                                     CommandResult* shardResult);
-
-    /**
      * Executes a command represented in the Request on the sharded cluster.
      *
      * DEPRECATED: should not be used by new code.

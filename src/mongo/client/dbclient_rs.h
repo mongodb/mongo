@@ -196,13 +196,7 @@ public:
     int getMaxWireVersion() final;
     // ---- low level ------
 
-    virtual bool call(Message& toSend,
-                      Message& response,
-                      bool assertOk = true,
-                      std::string* actualServer = 0);
-    virtual bool callRead(Message& toSend, Message& response) {
-        return checkMaster()->callRead(toSend, response);
-    }
+    virtual bool call(Message& toSend, Message& response, bool assertOk, std::string* actualServer);
 
     /**
      * Returns whether a query or command can be sent to secondaries based on the query object
@@ -270,7 +264,7 @@ private:
      */
     void invalidateLastSlaveOkCache();
 
-    void _auth(DBClientConnection* conn);
+    void _authConnection(DBClientConnection* conn);
 
     /**
      * Calls logout on the connection for all known database this DBClientRS instance has
