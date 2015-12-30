@@ -133,6 +133,8 @@ __wt_metadata_cursor_release(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	 * and reset it, otherwise, discard the cursor.
 	 */
 	if (F_ISSET(cursor, WT_CURSTD_META_INUSE)) {
+		WT_ASSERT(session, cursor == session->meta_cursor);
+
 		F_CLR(cursor, WT_CURSTD_META_INUSE);
 		return (cursor->reset(cursor));
 	}
