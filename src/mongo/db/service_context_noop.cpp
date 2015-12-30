@@ -79,7 +79,8 @@ bool ServiceContextNoop::killOperation(unsigned int opId) {
     return false;
 }
 
-void ServiceContextNoop::killAllUserOperations(const OperationContext* txn) {}
+void ServiceContextNoop::killAllUserOperations(const OperationContext* txn,
+                                               ErrorCodes::Error killCode) {}
 
 void ServiceContextNoop::registerKillOpListener(KillOpListenerInterface* listener) {}
 

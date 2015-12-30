@@ -220,21 +220,9 @@ bool ServiceContextMongoD::getKillAllOperations() {
     return _globalKill;
 }
 
-bool ServiceContextMongoD::_killOperationsAssociatedWithClientAndOpId_inlock(Client* client,
-                                                                             unsigned int opId) {
-    OperationContext* opCtx = client->getOperationContext();
-    if (!opCtx) {
-        return false;
-    }
-    if (opCtx->getOpID() != opId) {
-        return false;
-    }
-    _killOperation_inlock(opCtx);
-    return true;
-}
-
-void ServiceContextMongoD::_killOperation_inlock(OperationContext* opCtx) {
-    opCtx->markKilled();
+void ServiceContextMongoD::_killOperation_inlock(OperationContext* opCtx,
+                                                 ErrorCodes::Error killCode) {
+    opCtx->markKilled(killCode);
 
     for (const auto listener : _killOpListeners) {
         try {
@@ -248,8 +236,10 @@ void ServiceContextMongoD::_killOperation_inlock(OperationContext* opCtx) {
 bool ServiceContextMongoD::killOperation(unsigned int opId) {
     for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
         stdx::lock_guard<Client> lk(*client);
-        bool found = _killOperationsAssociatedWithClientAndOpId_inlock(client, opId);
-        if (found) {
+
+        OperationContext* opCtx = client->getOperationContext();
+        if (opCtx && opCtx->getOpID() == opId) {
+            _killOperation_inlock(opCtx, ErrorCodes::Interrupted);
             return true;
         }
     }
@@ -257,7 +247,8 @@ bool ServiceContextMongoD::killOperation(unsigned int opId) {
     return false;
 }
 
-void ServiceContextMongoD::killAllUserOperations(const OperationContext* txn) {
+void ServiceContextMongoD::killAllUserOperations(const OperationContext* txn,
+                                                 ErrorCodes::Error killCode) {
     for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
         if (!client->isFromUserConnection()) {
             // Don't kill system operations.
@@ -266,16 +257,11 @@ void ServiceContextMongoD::killAllUserOperations(const OperationContext* txn) {
 
         stdx::lock_guard<Client> lk(*client);
         OperationContext* toKill = client->getOperationContext();
-        if (!toKill) {
-            continue;
-        }
 
-        if (toKill->getOpID() == txn->getOpID()) {
-            // Don't kill ourself.
-            continue;
+        // Don't kill ourself.
+        if (toKill && toKill->getOpID() != txn->getOpID()) {
+            _killOperation_inlock(toKill, killCode);
         }
-
-        _killOperation_inlock(toKill);
     }
 }
 

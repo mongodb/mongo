@@ -29,8 +29,9 @@ s.startBalancer();
 
 // insert 10k small documents into the sharded collection
 var bulk = dbForTest.foo.initializeUnorderedBulkOp();
-for (i = 0; i < numDocs; i++)
+for (var i = 0; i < numDocs; i++) {
     bulk.insert({ _id: i });
+}
 assert.writeOK(bulk.execute());
 
 var x = dbForTest.foo.stats();
@@ -53,12 +54,10 @@ assert(!x.sharded, "XXX3: " + tojson(x));
 // fork shell and start querying the data
 var start = new Date();
 
-// TODO:  Still potential problem when our sampling of current ops misses when $where is active -
-// solution is to increase sleep time
-var whereKillSleepTime = 10000;
+var whereKillSleepTime = 1000;
 var parallelCommand =
     "db.foo.find(function() { " +
-    "    sleep( " + whereKillSleepTime + " ); " +
+    "    sleep(" + whereKillSleepTime + "); " +
     "    return false; " +
     "}).itcount(); ";
 
@@ -68,17 +67,22 @@ var awaitShell = startParallelShell(parallelCommand, s.s.port);
 print("done forking shell at: " + Date());
 
 // Get all current $where operations
-function getMine(printInprog) {
+function getInProgWhereOps() {
     var inprog = dbForTest.currentOp().inprog;
-    if (printInprog)
-        printjson(inprog);
 
     // Find all the where queries
     var myProcs = [];
-    for (var x = 0; x < inprog.length; x++) {
-        if (inprog[x].query && inprog[x].query.filter && inprog[x].query.filter.$where) {
-            myProcs.push(inprog[x]);
+    inprog.forEach(function(op) {
+        if (op.query && op.query.filter && op.query.filter.$where) {
+            myProcs.push(op);
         }
+    });
+
+    if (myProcs.length == 0) {
+        print('No $where operations found: ' + tojson(inprog));
+    }
+    else {
+        print('Found ' + myProcs.length + ' $where operations: ' + tojson(myProcs));
     }
 
     return myProcs;
@@ -86,16 +90,11 @@ function getMine(printInprog) {
 
 var curOpState = 0; // 0 = not found, 1 = killed
 var killTime = null;
-var i = 0;
 var mine;
 
 assert.soon(function() {
     // Get all the current operations
-    mine = getMine(true);  // SERVER-8794: print all operations
-
-    // get curren tops, but only print out operations before we see a $where op has started
-    // mine = getMine(curOpState == 0 && i > 20);
-    i++;
+    mine = getInProgWhereOps();
 
     // Wait for the queries to start (one per shard, so 2 total)
     if (curOpState == 0 && mine.length == 2) {

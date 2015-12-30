@@ -160,6 +160,7 @@ error_code("CannotGrowDocumentInCappedNamespace", 10003)
 error_code("DuplicateKey", 11000)
 error_code("InterruptedAtShutdown", 11600)
 error_code("Interrupted", 11601)
+error_code("InterruptedDueToReplStateChange", 11602)
 error_code("OutOfDiskSpace", 14031 )
 error_code("KeyTooLong", 17280);
 error_code("BackgroundOperationInProgressForDatabase", 12586);
@@ -173,7 +174,10 @@ error_code("PrepareConfigsFailed", 13104);
 
 # SERVER-21428 explains the extra changes needed if error_class components change.
 error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout"])
-error_class("Interruption", ["Interrupted", "InterruptedAtShutdown", "ExceededTimeLimit"])
+error_class("Interruption", ["Interrupted",
+                             "InterruptedAtShutdown",
+                             "InterruptedDueToReplStateChange",
+                             "ExceededTimeLimit"])
 error_class("NotMasterError", ["NotMaster", "NotMasterNoSlaveOk"])
 error_class("StaleShardingError",
             ["RecvStaleConfig", "SendStaleConfig", "StaleShardVersion", "StaleEpoch"])
