@@ -220,11 +220,6 @@ void SyncClusterConnection::_connect(const std::string& hostStr) {
     _conns.push_back(c);
 }
 
-bool SyncClusterConnection::callRead(Message& toSend, Message& response) {
-    // TODO: need to save state of which one to go back to somehow...
-    return _conns[0]->callRead(toSend, response);
-}
-
 bool SyncClusterConnection::runCommand(const std::string& dbname,
                                        const BSONObj& cmd,
                                        BSONObj& info,
@@ -580,7 +575,7 @@ bool SyncClusterConnection::call(Message& toSend,
 
     for (size_t i = 0; i < _conns.size(); i++) {
         try {
-            bool ok = _conns[i]->call(toSend, response, assertOk);
+            bool ok = _conns[i]->call(toSend, response, assertOk, nullptr);
             if (ok) {
                 if (actualServer)
                     *actualServer = _connAddresses[i];

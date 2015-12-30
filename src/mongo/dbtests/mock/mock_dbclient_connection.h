@@ -88,8 +88,6 @@ public:
 
     virtual void insert(const std::string& ns, const std::vector<BSONObj>& objList, int flags = 0);
 
-    virtual void remove(const std::string& ns, Query query, bool justOne = false);
-
     virtual void remove(const std::string& ns, Query query, int flags = 0);
 
     //
@@ -122,11 +120,10 @@ public:
     //
 
     void killCursor(long long cursorID);
-    bool callRead(mongo::Message& toSend, mongo::Message& response);
     bool call(mongo::Message& toSend,
               mongo::Message& response,
-              bool assertOk = true,
-              std::string* actualServer = 0);
+              bool assertOk,
+              std::string* actualServer);
     void say(mongo::Message& toSend, bool isRetry = false, std::string* actualServer = 0);
     bool lazySupported() const;
 

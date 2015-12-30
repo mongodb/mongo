@@ -324,7 +324,7 @@ DBClientConnection* DBClientReplicaSet::checkMaster() {
     _master->setRequestMetadataWriter(getRequestMetadataWriter());
     _master->setReplyMetadataReader(getReplyMetadataReader());
 
-    _auth(_master.get());
+    _authConnection(_master.get());
     return _master.get();
 }
 
@@ -348,7 +348,7 @@ bool DBClientReplicaSet::checkLastHost(const ReadPreferenceSetting* readPref) {
     return true;
 }
 
-void DBClientReplicaSet::_auth(DBClientConnection* conn) {
+void DBClientReplicaSet::_authConnection(DBClientConnection* conn) {
     for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
         try {
             conn->auth(i->second);
@@ -712,7 +712,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     _lastSlaveOkConn->setReplyMetadataReader(getReplyMetadataReader());
 
     if (_authPooledSecondaryConn) {
-        _auth(_lastSlaveOkConn.get());
+        _authConnection(_lastSlaveOkConn.get());
     } else {
         // Mongos pooled connections are authenticated through
         // ShardingConnectionHook::onCreate().
@@ -973,7 +973,7 @@ bool DBClientReplicaSet::call(Message& toSend,
                         *actualServer = conn->getServerAddress();
                     }
 
-                    return conn->call(toSend, response, assertOk);
+                    return conn->call(toSend, response, assertOk, nullptr);
                 } catch (const DBException& dbExcep) {
                     LOG(1) << "can't call replica set node " << _lastSlaveOkHost << ": "
                            << causedBy(dbExcep) << endl;
@@ -996,7 +996,7 @@ bool DBClientReplicaSet::call(Message& toSend,
     if (actualServer)
         *actualServer = m->getServerAddress();
 
-    if (!m->call(toSend, response, assertOk))
+    if (!m->call(toSend, response, assertOk, nullptr))
         return false;
 
     if (ns) {
@@ -1062,4 +1062,5 @@ void DBClientReplicaSet::resetSlaveOkConn() {
 
     _lastSlaveOkHost = HostAndPort();
 }
-}
+
+}  // namespace mongo

@@ -148,8 +148,6 @@ public:
                                          int w = 0,
                                          int wtimeout = 0);
 
-    virtual bool callRead(Message& toSend, Message& response);
-
     virtual ConnectionString::ConnectionType type() const {
         return ConnectionString::SYNC;
     }

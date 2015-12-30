@@ -97,7 +97,7 @@ StatusWith<RemoteCommandResponse> runDownconvertedCommand(DBClientConnection* co
     Message responseMsg;
 
     try {
-        conn->call(requestMsg, responseMsg);
+        conn->call(requestMsg, responseMsg, true, nullptr);
     } catch (...) {
         return exceptionToStatus();
     }

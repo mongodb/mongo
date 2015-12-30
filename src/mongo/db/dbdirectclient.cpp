@@ -100,10 +100,6 @@ int DBDirectClient::getMaxWireVersion() {
     return WireSpec::instance().maxWireVersionIncoming;
 }
 
-bool DBDirectClient::callRead(Message& toSend, Message& response) {
-    return call(toSend, response);
-}
-
 ConnectionString::ConnectionType DBDirectClient::type() const {
     return ConnectionString::MASTER;
 }

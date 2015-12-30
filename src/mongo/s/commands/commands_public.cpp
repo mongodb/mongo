@@ -1,32 +1,30 @@
-// s/commands_public.cpp
-
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects
-*    for all of the code used other than as permitted herein. If you modify
-*    file(s) with this exception, you may extend this exception to your
-*    version of the file(s), but you are not obligated to do so. If you do not
-*    wish to do so, delete this exception statement from your version. If you
-*    delete this exception statement from all source files in the program,
-*    then also delete it in the license file.
-*/
+ *    Copyright (C) 2008-2015 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
@@ -65,7 +63,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
 using std::unique_ptr;
 using std::shared_ptr;
 using std::list;
@@ -77,9 +74,8 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-namespace dbgrid_pub_cmds {
-
 namespace {
+
 bool cursorCommandPassthrough(OperationContext* txn,
                               shared_ptr<DBConfig> conf,
                               const BSONObj& cmdObj,
@@ -123,7 +119,6 @@ bool cursorCommandPassthrough(OperationContext* txn,
 
     return true;
 }
-}  // namespace
 
 class PublicGridCommand : public Command {
 public:
@@ -215,7 +210,6 @@ public:
     }
 };
 
-
 class NotAllowedOnShardedCollectionCmd : public PublicGridCommand {
 public:
     NotAllowedOnShardedCollectionCmd(const char* n) : PublicGridCommand(n) {}
@@ -240,7 +234,7 @@ public:
     }
 };
 
-// ----
+// MongoS commands implementation
 
 class DropIndexesCmd : public AllShardsCollectionCommand {
 public:
@@ -868,7 +862,6 @@ public:
 
 } convertToCappedCmd;
 
-
 class GroupCmd : public NotAllowedOnShardedCollectionCmd {
 public:
     GroupCmd() : NotAllowedOnShardedCollectionCmd("group") {}
@@ -894,30 +887,65 @@ public:
                    ExplainCommon::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const {
-        const string fullns = parseNs(dbname, cmdObj);
-
-        BSONObjBuilder explainCmdBob;
-        int options = 0;
-        ClusterExplain::wrapAsExplain(
-            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
-
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
 
-        Strategy::CommandResult singleResult;
-        Status commandStat = Strategy::commandOpUnsharded(
-            txn, dbname, explainCmdBob.obj(), options, fullns, &singleResult);
-        if (!commandStat.isOK()) {
-            return commandStat;
+        BSONObj command;
+        int options = 0;
+
+        {
+            BSONObjBuilder explainCmdBob;
+            ClusterExplain::wrapAsExplain(
+                cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
+            command = explainCmdBob.obj();
         }
 
-        long long millisElapsed = timer.millis();
+        const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        vector<Strategy::CommandResult> shardResults;
-        shardResults.push_back(singleResult);
+        // Note that this implementation will not handle targeting retries and fails when the
+        // sharding metadata is too stale
+        auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
+        if (!status.isOK()) {
+            return Status(status.getStatus().code(),
+                          stream() << "Passthrough command failed: " << command.toString()
+                                   << " on ns " << nss.ns() << ". Caused by "
+                                   << causedBy(status.getStatus()));
+        }
+
+        shared_ptr<DBConfig> conf = status.getValue();
+        if (conf->isSharded(nss.ns())) {
+            return Status(ErrorCodes::IllegalOperation,
+                          stream() << "Passthrough command failed: " << command.toString()
+                                   << " on ns " << nss.ns()
+                                   << ". Cannot run on sharded namespace.");
+        }
+
+        const auto primaryShard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
+
+        BSONObj shardResult;
+        try {
+            ShardConnection conn(primaryShard->getConnString(), "");
+
+            // TODO: this can throw a stale config when mongos is not up-to-date -- fix.
+            if (!conn->runCommand(nss.db().toString(), command, shardResult, options)) {
+                conn.done();
+                return Status(ErrorCodes::OperationFailed,
+                              stream() << "Passthrough command failed: " << command << " on ns "
+                                       << nss.ns() << "; result: " << shardResult);
+            }
+            conn.done();
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+        // Fill out the command result.
+        Strategy::CommandResult cmdResult;
+        cmdResult.shardTargetId = conf->getPrimaryId();
+        cmdResult.result = shardResult;
+        cmdResult.target = primaryShard->getConnString();
 
         return ClusterExplain::buildExplainResult(
-            txn, shardResults, ClusterExplain::kSingleShard, millisElapsed, out);
+            txn, {cmdResult}, ClusterExplain::kSingleShard, timer.millis(), out);
     }
 
 } groupCmd;
@@ -1360,7 +1388,6 @@ public:
     }
 } applyOpsCmd;
 
-
 class CompactCmd : public PublicGridCommand {
 public:
     CompactCmd() : PublicGridCommand("compact") {}
@@ -1507,7 +1534,6 @@ public:
         return Status::OK();
     }
 
-
     virtual bool run(OperationContext* txn,
                      const string& dbname,
                      BSONObj& cmdObj,
@@ -1517,8 +1543,8 @@ public:
         result << "options" << QueryOption_AllSupportedForSharding;
         return true;
     }
+
 } availableQueryOptionsCmd;
 
-}  // namespace pub_grid_cmds
-
+}  // namespace
 }  // namespace mongo
