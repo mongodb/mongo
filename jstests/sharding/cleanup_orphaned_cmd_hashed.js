@@ -1,6 +1,5 @@
 //
 // Tests cleanup of orphaned data in hashed sharded coll via the orphaned data cleanup command
-// @tags : [ hashed ]
 //
 
 (function() { 
