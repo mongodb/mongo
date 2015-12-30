@@ -47,6 +47,13 @@ __wt_metadata_cursor_open(
 	    session, WT_METAFILE_URI, NULL, open_cursor_cfg, cursorp));
 	WT_RET(ret);
 
+	/*
+	 * Retrieve the btree from the cursor, rather than the session because
+	 * we don't always switch the metadata handle in to the session before
+	 * entering this function.
+	 */
+	btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
+
 	/* 
 	 * Set special flags for the metadata file: eviction (the metadata file
 	 * is in-memory and never evicted), logging (the metadata file is always
@@ -56,7 +63,6 @@ __wt_metadata_cursor_open(
 	 * opens (the first update is safe because it's single-threaded from
 	 * wiredtiger_open).
 	 */
-	btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
 	if (!F_ISSET(btree, WT_BTREE_IN_MEMORY))
 		F_SET(btree, WT_BTREE_IN_MEMORY);
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
@@ -197,6 +203,9 @@ __wt_metadata_update(
 		WT_RET(__wt_meta_track_update(session, key));
 
 	WT_RET(__wt_metadata_cursor(session, &cursor));
+	/* This cursor needs to have overwrite semantics. */
+	WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_OVERWRITE));
+
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_ERR(cursor->insert(cursor));

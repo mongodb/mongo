@@ -156,6 +156,13 @@ __wt_las_cursor_open(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	WT_RET(ret);
 
 	/*
+	 * Retrieve the btree from the cursor, rather than the session because
+	 * we don't always switch the LAS handle in to the session before
+	 * entering this function.
+	 */
+	btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
+
+	/*
 	 * Set special flags for the lookaside table: the lookaside flag (used,
 	 * for example, to avoid writing records during reconciliation), also
 	 * turn off checkpoints and logging.
@@ -164,7 +171,6 @@ __wt_las_cursor_open(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	 * opens (the first update is safe because it's single-threaded from
 	 * wiredtiger_open).
 	 */
-	btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
 	if (!F_ISSET(btree, WT_BTREE_LOOKASIDE))
 		F_SET(btree, WT_BTREE_LOOKASIDE);
 	if (!F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
