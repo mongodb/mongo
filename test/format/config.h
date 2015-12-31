@@ -54,7 +54,7 @@ typedef struct {
 	uint32_t	maxrand;	/* Maximum value randomly chosen */
 	uint32_t	maxset;		/* Maximum value explicitly set */
 	uint32_t	*v;		/* Value for this run */
-	char		**vstr;		/* Value for string options */
+	const char	**vstr;		/* Value for string options */
 } CONFIG;
 
 #define	COMPRESSION_LIST						\
