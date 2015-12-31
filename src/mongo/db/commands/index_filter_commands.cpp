@@ -167,8 +167,8 @@ namespace mongo {
         // This is a read lock. The query settings is owned by the collection.
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
-        QuerySettings* querySettings;
-        PlanCache* unused;
+        QuerySettings* querySettings = NULL;
+        PlanCache* unused = NULL;
         Status status = getQuerySettingsAndPlanCache(ctx.db(), ns, &querySettings, &unused);
         if (!status.isOK()) {
             // No collection - return empty array of filters.
@@ -226,8 +226,8 @@ namespace mongo {
         // This is a read lock. The query settings is owned by the collection.
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
-        QuerySettings* querySettings;
-        PlanCache* planCache;
+        QuerySettings* querySettings = NULL;
+        PlanCache* planCache = NULL;
         Status status = getQuerySettingsAndPlanCache(ctx.db(), ns, &querySettings, &planCache);
         if (!status.isOK()) {
             // No collection - do nothing.
@@ -311,8 +311,8 @@ namespace mongo {
         // This is a read lock. The query settings is owned by the collection.
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
-        QuerySettings* querySettings;
-        PlanCache* planCache;
+        QuerySettings* querySettings = NULL;
+        PlanCache* planCache = NULL;
         Status status = getQuerySettingsAndPlanCache(ctx.db(), ns, &querySettings, &planCache);
         if (!status.isOK()) {
             return status;
