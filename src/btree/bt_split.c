@@ -530,7 +530,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_REF **child_refp, *ref, **root_refp;
 	WT_SPLIT_ERROR_PHASE complete;
 	size_t child_incr, root_decr, root_incr, size;
-	uint64_t split_gen;
+	uint64_t recno, split_gen;
 	uint32_t children, chunk, i, j, remain;
 	uint32_t slots;
 	void *p;
@@ -593,8 +593,11 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	for (root_refp = pindex->index,
 	    alloc_refp = alloc_index->index, i = 0; i < children; ++i) {
 		slots = i == children - 1 ? remain : chunk;
+
+		recno = root->type == WT_PAGE_COL_INT ?
+		    (*root_refp)->key.recno : WT_RECNO_OOB;
 		WT_ERR(__wt_page_alloc(
-		    session, root->type, 0, slots, false, &child));
+		    session, root->type, recno, slots, false, &child));
 
 		/*
 		 * Initialize the page's child reference; we need a copy of the
@@ -609,12 +612,10 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 			WT_ERR(__wt_row_ikey(session, 0, p, size, ref));
 			root_incr += sizeof(WT_IKEY) + size;
 		} else
-			ref->key.recno = (*root_refp)->key.recno;
+			ref->key.recno = recno;
 		ref->state = WT_REF_MEM;
 
 		/* Initialize the child page. */
-		if (root->type == WT_PAGE_COL_INT)
-			child->pg_intl_recno = (*root_refp)->key.recno;
 		child->pg_intl_parent_ref = ref;
 
 		/* Mark it dirty. */
@@ -1004,7 +1005,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_REF **child_refp, *page_ref, **page_refp, *ref;
 	WT_SPLIT_ERROR_PHASE complete;
 	size_t child_incr, page_decr, page_incr, parent_incr, size;
-	uint64_t split_gen;
+	uint64_t recno, split_gen;
 	uint32_t children, chunk, i, j, remain;
 	uint32_t slots;
 	void *p;
@@ -1088,8 +1089,11 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_ASSERT(session, page_refp == pindex->index + chunk);
 	for (alloc_refp = alloc_index->index + 1, i = 1; i < children; ++i) {
 		slots = i == children - 1 ? remain : chunk;
+
+		recno = page->type == WT_PAGE_COL_INT ?
+		    (*page_refp)->key.recno : WT_RECNO_OOB;
 		WT_ERR(__wt_page_alloc(
-		    session, page->type, 0, slots, false, &child));
+		    session, page->type, recno, slots, false, &child));
 
 		/*
 		 * Initialize the page's child reference; we need a copy of the
@@ -1104,12 +1108,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 			WT_ERR(__wt_row_ikey(session, 0, p, size, ref));
 			parent_incr += sizeof(WT_IKEY) + size;
 		} else
-			ref->key.recno = (*page_refp)->key.recno;
+			ref->key.recno = recno;
 		ref->state = WT_REF_MEM;
 
 		/* Initialize the child page. */
-		if (page->type == WT_PAGE_COL_INT)
-			child->pg_intl_recno = (*page_refp)->key.recno;
 		child->pg_intl_parent_ref = ref;
 
 		/* Mark it dirty. */
