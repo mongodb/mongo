@@ -427,7 +427,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
 	WT_ERR(__recovery_setup_file(&r, WT_METAFILE_URI, config));
-	WT_ERR(__wt_metadata_cursor(session, NULL, &metac));
+	WT_ERR(__wt_metadata_cursor_open(session, NULL, &metac));
 	metafile = &r.files[WT_METAFILE_ID];
 	metafile->c = metac;
 

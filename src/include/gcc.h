@@ -203,6 +203,33 @@ __wt_atomic_cas_ptr(void *vp, void *old, void *new)
 	__asm__ volatile ("dsb st" ::: "memory");			\
 } while (0)
 
+#elif defined(__s390x__)
+#define	WT_PAUSE()	__asm__ volatile("lr 0,0" ::: "memory")
+#define	WT_FULL_BARRIER() do {						\
+	__asm__ volatile ("bcr 15,0\n" ::: "memory");			\
+} while (0)
+#define	WT_READ_BARRIER()	WT_FULL_BARRIER()
+#define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
+
+#elif defined(__sparc__)
+#define	WT_PAUSE()	__asm__ volatile("rd %%ccr, %%g0" ::: "memory")
+
+#define	WT_FULL_BARRIER() do {						\
+	__asm__ volatile ("membar #StoreLoad" ::: "memory");		\
+} while (0)
+
+/*
+ * On UltraSparc machines, TSO is used, and so there is no need for membar.
+ * READ_BARRIER = #LoadLoad, and WRITE_BARRIER = #StoreStore are noop.
+ */
+#define	WT_READ_BARRIER() do {						\
+	__asm__ volatile ("" ::: "memory");				\
+} while (0)
+
+#define	WT_WRITE_BARRIER() do {						\
+	__asm__ volatile ("" ::: "memory");				\
+} while (0)
+
 #else
 #error "No write barrier implementation for this hardware"
 #endif

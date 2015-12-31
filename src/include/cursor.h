@@ -104,6 +104,14 @@ struct __wt_cursor_btree {
 	uint64_t recno;			/* Record number */
 
 	/*
+	 * Next-random cursors can optionally be configured to step through a
+	 * percentage of the total leaf pages to their next value. Note the
+	 * configured value and the calculated number of leaf pages to skip.
+	 */
+	uint64_t next_random_leaf_skip;
+	u_int	 next_random_sample_size;
+
+	/*
 	 * The search function sets compare to:
 	 *	< 1 if the found key is less than the specified key
 	 *	  0 if the found key matches the specified key
@@ -191,6 +199,12 @@ struct __wt_cursor_btree {
 	uint8_t v;			/* Fixed-length return value */
 
 	uint8_t	append_tree;		/* Cursor appended to the tree */
+
+#ifdef HAVE_DIAGNOSTIC
+	/* Check that cursor next/prev never returns keys out-of-order. */
+	WT_ITEM *lastkey, _lastkey;
+	uint64_t lastrecno;
+#endif
 
 #define	WT_CBT_ACTIVE		0x01	/* Active in the tree */
 #define	WT_CBT_ITERATE_APPEND	0x02	/* Col-store: iterating append list */

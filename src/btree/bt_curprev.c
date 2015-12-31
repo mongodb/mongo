@@ -615,9 +615,13 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 			__wt_page_evict_soon(page);
 		cbt->page_deleted_count = 0;
 
-		WT_ERR(__wt_tree_walk(session, &cbt->ref, NULL, flags));
+		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
 	}
+#ifdef HAVE_DIAGNOSTIC
+	if (ret == 0)
+		WT_ERR(__wt_cursor_key_order_check(session, cbt, false));
+#endif
 
 err:	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));

@@ -99,6 +99,12 @@ static uint32_t UNALIGNED_LOAD32(const char *p) {
 #define	bswap_32(x) OSSwapInt32(x)
 #define	bswap_64(x) OSSwapInt64(x)
 
+#elif defined(__sun)
+
+#include <sys/byteorder.h>
+#define	bswap_32 BSWAP_32
+#define	bswap_64 BSWAP_64
+
 #else
 #include <byteswap.h>
 #endif
