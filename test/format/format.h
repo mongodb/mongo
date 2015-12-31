@@ -178,7 +178,7 @@ typedef struct {
 	uint32_t c_checkpoints;
 	char	*c_checksum;
 	uint32_t c_chunk_size;
-	char	*c_compression;
+	const char *c_compression;
 	char	*c_encryption;
 	char	*c_config_open;
 	uint32_t c_data_extend;
