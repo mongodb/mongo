@@ -630,12 +630,12 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, false, &next));
+		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT,
+		    1, mod->mod_multi_entries, false, &next));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, false, &next));
+		WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT,
+		    WT_RECNO_OOB, mod->mod_multi_entries, false, &next));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
