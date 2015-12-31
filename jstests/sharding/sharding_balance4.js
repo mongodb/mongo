@@ -48,6 +48,7 @@ function doUpdate( bulk, includeString, optionalId ){
     return myid;
 }
 
+Random.setRandomSeed();
 // Initially update all documents from 1 to N, otherwise later checks can fail because no document
 // previously existed
 var bulk = db.foo.initializeUnorderedBulkOp();

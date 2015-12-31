@@ -42,6 +42,8 @@
 	}
     };
 
+    Random.setRandomSeed();
+
     var numDocs = 200;
     var bulk = db.source.initializeUnorderedBulkOp();
     var i;

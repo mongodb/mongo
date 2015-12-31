@@ -25,6 +25,7 @@ coll.ensureIndex( { loc : '2d' } )
 status( "Inserting points..." )
 
 var numPoints = 10
+Random.setRandomSeed();
 for ( i = 0; i < numPoints; i++ ) {
     coll.insert( { _id : i, loc : [ Random.rand() * 180, Random.rand() * 180 ], i : i % 2 } );
 }

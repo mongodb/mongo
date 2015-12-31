@@ -10,6 +10,8 @@
 'use strict';
 load('jstests/libs/parallelTester.js');
 
+Random.setRandomSeed();
+
 var awaitTimeout = 2*60*1000;
 // used to parse RAM log file
 var contains = function(logLines, func) {

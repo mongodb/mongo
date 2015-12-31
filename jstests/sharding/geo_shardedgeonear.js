@@ -22,6 +22,7 @@ function test(db, sharded, indexType) {
         assert.eq(config.chunks.count({'ns': shardedDB[coll].getFullName()}), 10);
     }
 
+    Random.setRandomSeed();
     var numPts = 10*1000;
     for (var i=0; i < numPts; i++) {
         var lat = 90 - Random.rand() * 180;

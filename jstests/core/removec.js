@@ -21,6 +21,7 @@ for( i = 0; i < 1100; i += 11 ) {
 // Remove and then reinsert random documents in the background.
 s = startParallelShell(
                        't = db.jstests_removec;' +
+                       'Random.setRandomSeed();' +
                        'for( j = 0; j < 1000; ++j ) {' +
                        '    o = t.findOne( { a:Random.randInt( 1100 ) } );' +
                        '    t.remove( { _id:o._id } );' +

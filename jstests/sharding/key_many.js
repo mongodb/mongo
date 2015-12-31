@@ -75,6 +75,8 @@ function getKey(o) {
     return o;
 }
 
+Random.setRandomSeed();
+
 for (var i = 0; i < types.length; i++) {
     curT = types[i];
 

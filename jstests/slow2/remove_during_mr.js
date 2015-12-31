@@ -4,6 +4,7 @@
 load('jstests/libs/parallelTester.js');
 
 function client1() {
+    Random.setRandomSeed();
     for(var i = 0; i < 1000; i++) {
         db.remove_during_mr.remove({rand: {$gte: Random.rand()}}, {justOne: true});
     }
@@ -32,6 +33,7 @@ function client2() {
 // prepare some basic data for the collection
 db.remove_during_mr.drop();
 
+Random.setRandomSeed();
 var bulk = db.remove_during_mr.initializeUnorderedBulkOp();
 for (var i = 0; i < 3000; i++) {
     bulk.insert({i: i, key: Random.randInt(), rand: Random.rand()});

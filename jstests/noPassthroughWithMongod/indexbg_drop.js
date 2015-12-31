@@ -42,6 +42,7 @@ var dc = {dropIndexes: collection, index: "i_1"};
 // set up collections
 masterDB.dropDatabase();
 jsTest.log("creating test data " + size + " documents");
+Random.setRandomSeed();
 var bulk = masterDB.getCollection(collection).initializeUnorderedBulkOp();
 for( i = 0; i < size; ++i ) {
     bulk.insert({ i: Random.rand() });

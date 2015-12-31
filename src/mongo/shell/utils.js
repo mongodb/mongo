@@ -232,12 +232,6 @@ jsTest.dir = function(){
     return jsTest.path().replace( /\/[^\/]+$/, "/" )
 }
 
-jsTest.randomize = function( seed ) {
-    if( seed == undefined ) seed = new Date().getTime()
-    Random.srand( seed )
-    print( "Random seed for test : " + seed ) 
-}
-
 jsTest.authenticate = function(conn) {
     if (!jsTest.options().auth && !jsTest.options().keyFile) {
         conn.authenticated = true;
@@ -812,52 +806,85 @@ Math.sigFig = function( x , N ){
     return Math.round(x*p)/p;
 }
 
-Random = function() {}
+var Random = (function() {
+    var initialized = false;
+    var errorMsg = "The random number generator hasn't been seeded yet; " +
+                   "call Random.setRandomSeed()";
 
-// set random seed
-Random.srand = function( s ) { return _srand( s ); }
+    // Set the random generator seed.
+    function srand(s) {
+        initialized = true;
+        return _srand(s);
+    }
 
-// random number 0 <= r < 1
-Random.rand = function() { return _rand(); }
+    // Set the random generator seed & print the result.
+    function setRandomSeed(s) {
+        var seed = srand(s);
+        print("setting random seed: " + seed);
+    }
 
-// random integer 0 <= r < n
-Random.randInt = function( n ) { return Math.floor( Random.rand() * n ); }
+    // Generate a random number 0 <= r < 1.
+    function rand() {
+        if (!initialized) {
+            throw new Error(errorMsg);
+        }
+        return _rand();
+    }
 
-Random.setRandomSeed = function( s ) {
-    var seed = Random.srand( s );
-    print("setting random seed: " + seed);
-}
+    // Generate a random integer 0 <= r < n.
+    function randInt(n) {
+        if (!initialized) {
+            throw new Error(errorMsg);
+        }
+        return Math.floor(rand() * n);
+    }
 
-// generate a random value from the exponential distribution with the specified mean
-Random.genExp = function( mean ) {
-    var r = Random.rand();
-    if ( r == 0 ) {
-        r = Random.rand();
-        if ( r == 0 ) {
-            r = 0.000001;
+    // Generate a random value from the exponential distribution with the specified mean.
+    function genExp(mean) {
+        if (!initialized) {
+            throw new Error(errorMsg);
+        }
+        var r = rand();
+        if (r == 0) {
+            r = rand();
+            if (r == 0) {
+                r = 0.000001;
+            }
+        }
+        return -Math.log(r) * mean;
+    }
+
+    /**
+     * Generate a random value from the normal distribution with specified 'mean' and
+     * 'standardDeviation'.
+     */
+    function genNormal(mean, standardDeviation) {
+        if (!initialized) {
+            throw new Error(errorMsg);
+        }
+        // See http://en.wikipedia.org/wiki/Marsaglia_polar_method
+        while ( true ) {
+            var x = (2 * rand()) - 1;
+            var y = (2 * rand()) - 1;
+            var s = (x * x) + (y * y);
+
+            if (s > 0 && s < 1) {
+                var standardNormal = x * Math.sqrt(-2 * Math.log(s) / s);
+                return mean + (standardDeviation * standardNormal);
+            }
         }
     }
-    return -Math.log( r ) * mean;
-}
 
-/**
- * Generate a random value from the normal distribution with specified 'mean' and
- * 'standardDeviation'.
- */
-Random.genNormal = function( mean, standardDeviation ) {    
+    return {
+        genExp: genExp,
+        genNormal: genNormal,
+        rand: rand,
+        randInt: randInt,
+        setRandomSeed: setRandomSeed,
+        srand: srand,
+    };
 
-    // See http://en.wikipedia.org/wiki/Marsaglia_polar_method
-    while ( true ) {
-        var x = ( 2 * Random.rand() ) - 1;
-        var y = ( 2 * Random.rand() ) - 1;
-        var s = ( x * x ) + ( y * y );
-
-        if ( s > 0 && s < 1 ) {
-            var standardNormal = x * Math.sqrt( -2 * Math.log( s ) / s );
-            return mean + ( standardDeviation * standardNormal );
-        }
-    }
-}
+})();
 
 Geo = {};
 Geo.distance = function( a , b ){

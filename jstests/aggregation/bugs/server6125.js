@@ -74,6 +74,8 @@ function setupArray(){
 //***
 //Begin testing for SERVER-6125
 //***
+Random.setRandomSeed();
+
 //problem 1, does aggregate $sort work with all types
 runSort( { a : 1 }, false, "p1" );
  

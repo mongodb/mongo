@@ -6,6 +6,8 @@ t.drop();
 var numObjs = 10;
 var numLocs = 100;
 
+Random.setRandomSeed();
+
 // Test the semantics of near / nearSphere / etc. queries with multiple keys per object
 
 for( var i = -1; i < 2; i++ ){

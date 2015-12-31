@@ -8,7 +8,7 @@ load('jstests/libs/parallelTester.js');
 
 // Seed random numbers and print the seed. To reproduce a failed test, look for the seed towards
 // the beginning of the output, and give it as an argument to randomize.
-jsTest.randomize();
+Random.setRandomSeed();
 
 /*
  * Namespace for all random operation helpers. Actual tests start below
@@ -541,6 +541,7 @@ function startCmds(randomOps, host) {
     ];
     var m = new Mongo(host);
     var numOps = 200;
+    Random.setRandomSeed();
     randomOps.doRandomWork(m, numOps, ops);
     return true;
 }
@@ -551,6 +552,7 @@ function startCmds(randomOps, host) {
 function startCRUD(randomOps, host) {
     var m = new Mongo(host);
     var numOps = 500;
+    Random.setRandomSeed();
     randomOps.doRandomWork(m, numOps, ["insert", "update", "remove"]);
     return true;
 }
@@ -617,6 +619,8 @@ function doMultiThreadedWork(primary, numThreads) {
     // Ensure all are synced.
     replTest.awaitSecondaryNodes(120000);
     var primary = replTest.getPrimary();
+
+    Random.setRandomSeed();
 
     // Keep track of the indices of different types of primaries.
     // We'll rotate to get a primary of each type.
