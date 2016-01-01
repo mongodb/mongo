@@ -40,8 +40,9 @@ class test_bug011(wttest.WiredTigerTestCase):
     ntables = 50
     nrows = 10000
     nops = 10000
-    conn_config = lambda self, dir: \
-                  'cache_size=10MB,hazard_max=' + str(self.ntables / 2)
+    # Add connection configuration for this test.
+    def conn_config(self, dir):
+        return 'cache_size=10MB,hazard_max=' + str(self.ntables / 2)
 
     def test_eviction(self):
         cursors = []

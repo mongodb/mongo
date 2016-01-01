@@ -41,9 +41,10 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_txn08'
     uri = 'table:' + tablename
 
-    conn_config = lambda self, dir: \
-                'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
-                'transaction_sync="(method=dsync,enabled)"'
+    # Turn on logging for this test.
+    def conn_config(self, dir):
+        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+            'transaction_sync="(method=dsync,enabled)"'
 
     def test_printlog_unicode(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)

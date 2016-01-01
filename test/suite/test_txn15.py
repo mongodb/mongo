@@ -40,8 +40,9 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_txn15_1'
     create_params = 'key_format=i,value_format=i'
     entries = 100
-    conn_config = lambda self, dir: \
-            'statistics=(fast),' + \
+    # Turn on logging for this test.
+    def conn_config(self, dir):
+        return 'statistics=(fast),' + \
             'log=(archive=false,enabled,file_max=100K),' + \
             'use_environment=false,' + \
             'transaction_sync=(enabled=%s),' % self.conn_enable + \

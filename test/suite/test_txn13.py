@@ -49,9 +49,10 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
         ('4gb', dict(expect_err=True, valuesize=4194304))
     ])
 
-    conn_config = lambda self, dir: \
-                  'log=(archive=false,enabled,file_max=%s)' % self.logmax + \
-                  ',cache_size=8G'
+    # Turn on logging for this test.
+    def conn_config(self, dir):
+        return 'log=(archive=false,enabled,file_max=%s)' % self.logmax + \
+            ',cache_size=8G'
 
     @wttest.longtest('txn tests with huge values')
     def test_large_values(self):

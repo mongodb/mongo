@@ -48,9 +48,10 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
         ('regular', dict(reopen=False)),
         ('reopen', dict(reopen=True))
     ])
-    conn_config = lambda self, dir: \
-                'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
-                'transaction_sync="(method=dsync,enabled)"'
+    # Enable logging for this test.
+    def conn_config(self, dir):
+        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+            'transaction_sync="(method=dsync,enabled)"'
 
     def test_log_cursor(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)

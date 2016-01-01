@@ -129,9 +129,10 @@ class test_async02(wttest.WiredTigerTestCase, suite_subprocess):
         ('table-row', dict(tablekind='row',uri='table')),
     ])
 
-    conn_config = lambda self, dir: \
-                'async=(enabled=true,ops_max=%s,' % self.async_ops + \
-                'threads=%s)' % self.async_threads
+    # Enable async for this test.
+    def conn_config(self, dir):
+        return 'async=(enabled=true,ops_max=%s,' % self.async_ops + \
+            'threads=%s)' % self.async_threads
 
     def genkey(self, i):
         if self.tablekind == 'row':

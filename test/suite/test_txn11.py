@@ -43,8 +43,9 @@ class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
     source_uri = 'table:' + tablename + "_src"
     uri = 'table:' + tablename
 
-    conn_config = lambda self, dir: \
-            'log=(archive=%s,' % self.archive + \
+    # Turn on logging for this test.
+    def conn_config(self, dir):
+        return 'log=(archive=%s,' % self.archive + \
             'enabled,file_max=%s,prealloc=false),' % self.logmax + \
             'transaction_sync=(enabled=false),'
 

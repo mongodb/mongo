@@ -54,11 +54,12 @@ class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
         ('none', dict(compress='none')),
     ])
     scenarios = number_scenarios(multiply_scenarios('.', reopens, compress))
-    conn_config = lambda self, dir: \
-                'log=(archive=false,enabled,file_max=%s,' % self.logmax + \
-                'compressor=%s),' % self.compress + \
-                'transaction_sync="(method=dsync,enabled)",' + \
-                self.extensionArg(self.compress)
+    # Load the compression extension, and enable it for logging.
+    def conn_config(self, dir):
+        return 'log=(archive=false,enabled,file_max=%s,' % self.logmax + \
+            'compressor=%s),' % self.compress + \
+            'transaction_sync="(method=dsync,enabled)",' + \
+            self.extensionArg(self.compress)
 
     # Return the wiredtiger_open extension argument for a shared library.
     def extensionArg(self, name):
