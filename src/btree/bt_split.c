@@ -1757,7 +1757,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * The second page in the split is a new WT_REF/page pair.
 	 */
 	if (type == WT_PAGE_ROW_LEAF)
-		WT_ERR(__wt_page_alloc(session, type, 0, 0, false, &right));
+		WT_ERR(__wt_page_alloc(session,
+		    type, WT_RECNO_OOB, 0, false, &right));
 	else
 		WT_ERR(__wt_page_alloc(session,
 		    type, WT_INSERT_RECNO(moved_ins), 0, false, &right));
