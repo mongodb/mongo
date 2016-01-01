@@ -50,7 +50,7 @@ dmalloc(size_t len)
  * dstrdup --
  *	Call strdup, dying on failure.
  */
-static char *
+void *
 dstrdup(const char *str)
 {
 	char *p;

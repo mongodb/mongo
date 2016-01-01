@@ -328,7 +328,7 @@ config_in_memory(void)
 	if (!config_is_perm("checkpoints"))
 		g.c_checkpoints = 0;
 	if (!config_is_perm("compression")) {
-		g.c_compression = "none";
+		g.c_compression = dstrdup("none");
 		g.c_compression_flag = COMPRESS_NONE;
 	}
 	if (!config_is_perm("logging"))
