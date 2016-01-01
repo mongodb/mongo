@@ -181,6 +181,7 @@ LevelDB
 Levyx
 Llqr
 Llqrt
+LoadLoad
 LockFile
 Lookaside
 Lookup
@@ -286,10 +287,13 @@ Spinlock
 Spinlocks
 Split's
 Stoica
+StoreLoad
+StoreStore
 TAILQ
 TCMalloc
 TODO
 TORTIOUS
+TSO
 TXN
 TXNC
 Timespec
@@ -304,6 +308,7 @@ ULINE
 URI
 URIs
 UTF
+UltraSparc
 Unbuffered
 UnixLib
 Unmap
@@ -374,6 +379,7 @@ automake
 bInheritHandle
 basecfg
 basho
+bcr
 bdb
 beginthreadex
 bigram
@@ -415,6 +421,7 @@ bzip
 calloc
 cas
 catfmt
+ccr
 cd
 centric
 cfg
@@ -426,6 +433,7 @@ checkpointer
 checkpointing
 checksum
 checksums
+children's
 chk
 chongo
 cip
@@ -714,6 +722,7 @@ lookaside
 lookup
 lookups
 lossy
+lr
 lrt
 lru
 lseek
@@ -808,6 +817,7 @@ os
 ovfl
 ownp
 packv
+pagesize
 parens
 pareto
 parserp
@@ -1029,6 +1039,7 @@ variable's
 vectorized
 versa
 vfprintf
+vm
 vpack
 vprintf
 vrfy

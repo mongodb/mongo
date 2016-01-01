@@ -384,6 +384,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	wt_off_t size;
 	const char *filename;
 
 	/*
@@ -395,8 +396,8 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 		if (!WT_PREFIX_SKIP(filename, "file:"))
 			return (EINVAL);
 		__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
-		WT_RET(__wt_block_manager_size(
-		    session, filename, &cst->u.dsrc_stats));
+		WT_RET(__wt_block_manager_named_size(session, filename, &size));
+		cst->u.dsrc_stats.block_size = size;
 		__wt_curstat_dsrc_final(cst);
 		return (0);
 	}
@@ -662,7 +663,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	/*
 	 * We return the statistics field's offset as the key, and a string
-	 * description, a string value,  and a uint64_t value as the value
+	 * description, a string value, and a uint64_t value as the value
 	 * columns.
 	 */
 	cursor->key_format = "i";

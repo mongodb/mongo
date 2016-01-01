@@ -60,6 +60,7 @@ static const CONFIG default_cfg = {
 	0,				/* total seconds running */
 	0,				/* has truncate */
 	{NULL, NULL},			/* the truncate queue */
+	{NULL, NULL},                   /* the config queue */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -371,6 +372,53 @@ err:		cfg->error = cfg->stop = 1;
 	return (NULL);
 }
 
+/*
+ * do_range_reads --
+ *	If configured to execute a sequence of next operations after each
+ *	search do them. Ensuring the keys we see are always in order.
+ */
+static int
+do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
+{
+	size_t range;
+	uint64_t next_val, prev_val;
+	char *range_key_buf;
+	char buf[512];
+	int ret;
+
+	ret = 0;
+
+	if (cfg->read_range == 0)
+		return (0);
+
+	memset(&buf[0], 0, 512 * sizeof(char));
+	range_key_buf = &buf[0];
+
+	/* Save where the first key is for comparisons. */
+	cursor->get_key(cursor, &range_key_buf);
+	extract_key(range_key_buf, &next_val);
+
+	for (range = 0; range < cfg->read_range; ++range) {
+		prev_val = next_val;
+		ret = cursor->next(cursor);
+		/* We are done if we reach the end. */
+		if (ret != 0)
+			break;
+
+		/* Retrieve and decode the key */
+		cursor->get_key(cursor, &range_key_buf);
+		extract_key(range_key_buf, &next_val);
+		if (next_val < prev_val) {
+			lprintf(cfg, EINVAL, 0,
+			    "Out of order keys %" PRIu64
+			    " came before %" PRIu64,
+			    prev_val, next_val);
+			return (EINVAL);
+		}
+	}
+	return (0);
+}
+
 static void *
 worker(void *arg)
 {
@@ -381,8 +429,8 @@ worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
-	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i;
+	int64_t ops, ops_per_txn, throttle_ops;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret, truncated;
@@ -533,7 +581,14 @@ worker(void *arg)
 					    "get_value in read.");
 					goto err;
 				}
+				/*
+				 * If we want to read a range, then call next
+				 * for several operations, confirming that the
+				 * next key is in the correct order.
+				 */
+				ret = do_range_reads(cfg, cursor);
 			}
+
 			if (ret == 0 || ret == WT_NOTFOUND)
 				break;
 			goto op_err;
@@ -2103,6 +2158,8 @@ main(int argc, char *argv[])
 	if (config_assign(cfg, &default_cfg))
 		goto err;
 
+	TAILQ_INIT(&cfg->config_head);
+
 	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = __wt_getopt("wtperf", argc, argv, opts)) != EOF)
 		switch (ch) {
@@ -2307,6 +2364,9 @@ main(int argc, char *argv[])
 	/* Sanity-check the configuration. */
 	if ((ret = config_sanity(cfg)) != 0)
 		goto err;
+
+	/* Write a copy of the config. */
+	config_to_file(cfg);
 
 	/* Display the configuration. */
 	if (cfg->verbose > 1)

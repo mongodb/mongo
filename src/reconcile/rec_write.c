@@ -1758,7 +1758,7 @@ __rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
  *	Figure out the maximum leaf page size for the reconciliation.
  */
 static inline uint32_t
-__rec_leaf_page_max(WT_SESSION_IMPL *session,  WT_RECONCILE *r)
+__rec_leaf_page_max(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;

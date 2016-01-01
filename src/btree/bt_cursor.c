@@ -835,6 +835,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	wt_off_t size;
 	uint64_t skip;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -871,10 +872,12 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		 * !!!
 		 * Ideally, the number would be prime to avoid restart issues.
 		 */
-		if (cbt->next_random_sample_size != 0)
+		if (cbt->next_random_sample_size != 0) {
+			WT_ERR(btree->bm->size(btree->bm, session, &size));
 			cbt->next_random_leaf_skip = (uint64_t)
-			    ((btree->bm->block->fh->size / btree->allocsize) /
+			    ((size / btree->allocsize) /
 			    cbt->next_random_sample_size) + 1;
+		}
 
 		/*
 		 * Choose a leaf page from the tree.
@@ -1230,6 +1233,11 @@ __wt_btcur_open(WT_CURSOR_BTREE *cbt)
 {
 	cbt->row_key = &cbt->_row_key;
 	cbt->tmp = &cbt->_tmp;
+
+#ifdef HAVE_DIAGNOSTIC
+	cbt->lastkey = &cbt->_lastkey;
+	cbt->lastrecno = WT_RECNO_OOB;
+#endif
 }
 
 /*
@@ -1255,6 +1263,9 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, bool lowlevel)
 
 	__wt_buf_free(session, &cbt->_row_key);
 	__wt_buf_free(session, &cbt->_tmp);
+#ifdef HAVE_DIAGNOSTIC
+	__wt_buf_free(session, &cbt->_lastkey);
+#endif
 
 	return (ret);
 }

@@ -185,9 +185,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	if (id == WT_TXN_ABORTED)
 		return (false);
 
-	/*
-	 * Read-uncommitted transactions see all other changes.
-	 */
+	/* Read-uncommitted transactions see all other changes. */
 	if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
 		return (true);
 

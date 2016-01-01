@@ -627,10 +627,13 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_INSERT *ins, **start, **stop;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
-	uint32_t entries;
+	uint32_t choice, entries, i;
 	int level;
 
 	page = cbt->ref->page;
+
+	start = stop = NULL;		/* [-Wconditional-uninitialized] */
+	entries = 0;			/* [-Wconditional-uninitialized] */
 
 	/* If the page has disk-based entries, select from them. */
 	if (page->pg_row_entries != 0) {
@@ -654,66 +657,103 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		return (WT_NOTFOUND);
 
 	/*
-	 * Walk down the list until we find a level with at least two entries,
-	 * that's where we'll start rolling random numbers.
+	 * Walk down the list until we find a level with at least 50 entries,
+	 * that's where we'll start rolling random numbers. The value 50 is
+	 * used to ignore levels with only a few entries, that is, levels which
+	 * are potentially badly skewed.
 	 */
 	for (ins_head = cbt->ins_head,
-	    level = WT_SKIP_MAXDEPTH - 1; level > 0; --level)
-		if (ins_head->head[level] != NULL &&
-		    ins_head->head[level]->next[level] != NULL)
+	    level = WT_SKIP_MAXDEPTH - 1; level >= 0; --level) {
+		start = &ins_head->head[level];
+		for (entries = 0, stop = start;
+		    *stop != NULL; stop = &(*stop)->next[level])
+			++entries;
+
+		if (entries > 50)
 			break;
-
-	/*
-	 * Use all entries at this first level as the range for random
-	 * selection. Do that by counting the entries and setting the start
-	 * point as the first entry.
-	 */
-	for (entries = 0,
-	    ins = ins_head->head[level]; ins != NULL; ins = ins->next[level])
-		++entries;
-	start = &ins_head->head[level];
-
-	/*
-	 * Keep stepping down the skip list selecting a random entry at each
-	 * level. Use all entries as the range the first time through,
-	 * subsequently constrain the range to the entries between the selected
-	 * entry and it's neighbour from a level up the list.
-	 */
-	while (level > 0) {
-		/*
-		 * Select a random number from the calculated entry range and
-		 * convert that to a new start/stop pair. If there are only two
-		 * entries, the start/stop pair must be slots 0 and 1,
-		 * otherwise, use the random number as the start position. The
-		 * calculation uses "entries - 1" to ensure we never chose the
-		 * last node in the list as our new start point.
-		 */
-		entries = entries < 3 ?
-		    0 : __wt_random(&session->rnd) % (entries - 1);
-		/* Move forward to the randomly selected start entry. */
-		for (; entries > 0; --entries)
-			start = &(*start)->next[level];
-		stop = &(*start)->next[level];
-
-		/* Drop down a level. */
-		--start;
-		--stop;
-		--level;
-
-		/* Count the entries between the new start/stop pair. */
-		for (entries = 0, ins = *start;
-		    ins != *stop; ++entries, ins = ins->next[level])
-			;
 	}
 
 	/*
-	 * When we reach the bottom level, select a random entry from the entry
-	 * range and return it.
+	 * If it's a tiny list and we went all the way to level 0, correct the
+	 * level; entries is correctly set.
+	 */
+	if (level < 0)
+		level = 0;
+
+	/*
+	 * Step down the skip list levels, selecting a random chunk of the name
+	 * space at each level.
+	 */
+	while (level > 0) {
+		/*
+		 * There are (entries) or (entries + 1) chunks of the name space
+		 * considered at each level. They are: between start and the 1st
+		 * element, between the 1st and 2nd elements, and so on to the
+		 * last chunk which is the name space after the stop element on
+		 * the current level. This last chunk of name space may or may
+		 * not be there: as we descend the levels of the skip list, this
+		 * chunk may appear, depending if the next level down has
+		 * entries logically after the stop point in the current level.
+		 * We can't ignore those entries: because of the algorithm used
+		 * to determine the depth of a skiplist, there may be a large
+		 * number of entries "revealed" by descending a level.
+		 *
+		 * If the next level down has more items after the current stop
+		 * point, there are (entries + 1) chunks to consider, else there
+		 * are (entries) chunks.
+		 */
+		if (*(stop - 1) == NULL)
+			choice = __wt_random(&session->rnd) % entries;
+		else
+			choice = __wt_random(&session->rnd) % (entries + 1);
+
+		if (choice == entries) {
+			/*
+			 * We selected the name space after the stop element on
+			 * this level. Set the start point to the current stop
+			 * point, descend a level and move the stop element to
+			 * the end of the list, that is, the end of the newly
+			 * discovered name space, counting entries as we go.
+			 */
+			start = stop;
+			--start;
+			--level;
+			for (entries = 0, stop = start;
+			    *stop != NULL; stop = &(*stop)->next[level])
+				++entries;
+		} else {
+			/*
+			 * We selected another name space on the level. Move the
+			 * start pointer the selected number of entries forward
+			 * to the start of the selected chunk (if the selected
+			 * number is 0, start won't move). Set the stop pointer
+			 * to the next element in the list and drop both start
+			 * and stop down a level.
+			 */
+			for (i = 0; i < choice; ++i)
+				start = &(*start)->next[level];
+			stop = &(*start)->next[level];
+
+			--start;
+			--stop;
+			--level;
+
+			/* Count the entries in the selected name space. */
+			for (entries = 0,
+			    ins = *start; ins != *stop; ins = ins->next[level])
+				++entries;
+		}
+	}
+
+	/*
+	 * When we reach the bottom level, entries will already be set. Select
+	 * a random entry from the name space and return it.
 	 *
 	 * It should be impossible for the entries count to be 0 at this point,
 	 * but check for it out of paranoia and to quiet static testing tools.
 	 */
-	entries = entries < 1 ? 0 : __wt_random(&session->rnd) % entries;
+	if (entries > 0)
+		entries = __wt_random(&session->rnd) % entries;
 	for (ins = *start; entries > 0; --entries)
 		ins = ins->next[0];
 

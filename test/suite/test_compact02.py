@@ -49,11 +49,12 @@ class test_compact02(wttest.WiredTigerTestCase):
     # There's a balance between the pages we create and the size of the records
     # being stored: compaction doesn't work on tables with many overflow items
     # because we don't rewrite them. Experimentally, 8KB is as small as the test
-    # can go.
+    # can go. Additionally, we can't set the maximum page size too large because
+    # there won't be enough pages to rewrite. Experimentally, 32KB (the default)
+    # is as large as the test can go.
     fileConfig = [
         ('default', dict(fileConfig='')),
         ('8KB', dict(fileConfig='leaf_page_max=8kb')),
-        ('128KB', dict(fileConfig='leaf_page_max=128kb')),
     ]
     scenarios = \
         number_scenarios(multiply_scenarios('.', types, cacheSize, fileConfig))

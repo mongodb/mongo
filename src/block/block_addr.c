@@ -14,7 +14,7 @@
  * caller's buffer reference so it can be called repeatedly to load a buffer.
  */
 static int
-__block_buffer_to_addr(WT_BLOCK *block,
+__block_buffer_to_addr(uint32_t allocsize,
     const uint8_t **pp, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
 {
 	uint64_t o, s, c;
@@ -39,8 +39,8 @@ __block_buffer_to_addr(WT_BLOCK *block,
 		*offsetp = 0;
 		*sizep = *cksump = 0;
 	} else {
-		*offsetp = (wt_off_t)(o + 1) * block->allocsize;
-		*sizep = (uint32_t)s * block->allocsize;
+		*offsetp = (wt_off_t)(o + 1) * allocsize;
+		*sizep = (uint32_t)s * allocsize;
 		*cksump = (uint32_t)c;
 	}
 	return (0);
@@ -80,7 +80,8 @@ int
 __wt_block_buffer_to_addr(WT_BLOCK *block,
     const uint8_t *p, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
 {
-	return (__block_buffer_to_addr(block, &p, offsetp, sizep, cksump));
+	return (__block_buffer_to_addr(
+	    block->allocsize, &p, offsetp, sizep, cksump));
 }
 
 /*
@@ -139,12 +140,12 @@ __wt_block_addr_string(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_block_buffer_to_ckpt --
+ * __block_buffer_to_ckpt --
  *	Convert a checkpoint cookie into its components.
  */
-int
-__wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *p, WT_BLOCK_CKPT *ci)
+static int
+__block_buffer_to_ckpt(WT_SESSION_IMPL *session,
+    uint32_t allocsize, const uint8_t *p, WT_BLOCK_CKPT *ci)
 {
 	uint64_t a;
 	const uint8_t **pp;
@@ -154,13 +155,13 @@ __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, WT_ERROR, "unsupported checkpoint version");
 
 	pp = &p;
-	WT_RET(__block_buffer_to_addr(block, pp,
+	WT_RET(__block_buffer_to_addr(allocsize, pp,
 	    &ci->root_offset, &ci->root_size, &ci->root_cksum));
-	WT_RET(__block_buffer_to_addr(block, pp,
+	WT_RET(__block_buffer_to_addr(allocsize, pp,
 	    &ci->alloc.offset, &ci->alloc.size, &ci->alloc.cksum));
-	WT_RET(__block_buffer_to_addr(block, pp,
+	WT_RET(__block_buffer_to_addr(allocsize, pp,
 	    &ci->avail.offset, &ci->avail.size, &ci->avail.cksum));
-	WT_RET(__block_buffer_to_addr(block, pp,
+	WT_RET(__block_buffer_to_addr(allocsize, pp,
 	    &ci->discard.offset, &ci->discard.size, &ci->discard.cksum));
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
 	ci->file_size = (wt_off_t)a;
@@ -168,6 +169,32 @@ __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
 	ci->ckpt_size = a;
 
 	return (0);
+}
+
+/*
+ * __wt_block_buffer_to_ckpt --
+ *	Convert a checkpoint cookie into its components, block manager version.
+ */
+int
+__wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, const uint8_t *p, WT_BLOCK_CKPT *ci)
+{
+	return (__block_buffer_to_ckpt(session, block->allocsize, p, ci));
+}
+
+/*
+ * __wt_block_ckpt_decode --
+ *	Convert a checkpoint cookie into its components, external utility
+ * version.
+ */
+int
+__wt_block_ckpt_decode(WT_SESSION *wt_session,
+    size_t allocsize, const uint8_t *p, WT_BLOCK_CKPT *ci)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	return (__block_buffer_to_ckpt(session, (uint32_t)allocsize, p, ci));
 }
 
 /*

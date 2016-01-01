@@ -415,6 +415,7 @@ struct __wt_connection_impl {
 	uint32_t direct_io;
 	uint32_t write_through;		/* FILE_FLAG_WRITE_THROUGH type flags */
 	bool	 mmap;			/* mmap configuration */
+	int page_size;			/* OS page size for mmap alignment */
 	uint32_t verbose;
 
 	uint32_t flags;
