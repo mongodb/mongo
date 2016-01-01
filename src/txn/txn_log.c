@@ -8,6 +8,12 @@
 
 #include "wt_internal.h"
 
+/* Cookie passed to __txn_printlog. */
+typedef struct {
+	FILE *out;
+	uint32_t flags;
+} WT_TXN_PRINTLOG_ARGS;
+
 /*
  * __txn_op_log --
  *	Log an operation for the current transaction.
@@ -64,7 +70,8 @@ err:	__wt_buf_free(session, &key);
  */
 static int
 __txn_commit_printlog(
-    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out,
+    uint32_t flags)
 {
 	bool firstrecord;
 
@@ -79,7 +86,7 @@ __txn_commit_printlog(
 
 		firstrecord = false;
 
-		WT_RET(__wt_txn_op_printlog(session, pp, end, out));
+		WT_RET(__wt_txn_op_printlog(session, pp, end, out, flags));
 		WT_RET(__wt_fprintf(out, "\n      }"));
 	}
 
@@ -459,6 +466,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
 	FILE *out;
 	WT_LOG_RECORD *logrec;
 	WT_LSN ckpt_lsn;
+	WT_TXN_PRINTLOG_ARGS *args;
 	const uint8_t *end, *p;
 	const char *msg;
 	uint64_t txnid;
@@ -467,7 +475,8 @@ __txn_printlog(WT_SESSION_IMPL *session,
 	bool compressed;
 
 	WT_UNUSED(next_lsnp);
-	out = cookie;
+	args = cookie;
+	out = args->out;
 
 	p = WT_LOG_SKIP_HEADER(rawrec->data);
 	end = (const uint8_t *)rawrec->data + rawrec->size;
@@ -506,7 +515,8 @@ __txn_printlog(WT_SESSION_IMPL *session,
 		WT_RET(__wt_fprintf(out, "    \"type\" : \"commit\",\n"));
 		WT_RET(__wt_fprintf(out,
 		    "    \"txnid\" : %" PRIu64 ",\n", txnid));
-		WT_RET(__txn_commit_printlog(session, &p, end, out));
+		WT_RET(__txn_commit_printlog(session, &p, end, out,
+		    args->flags));
 		break;
 
 	case WT_LOGREC_FILE_SYNC:
@@ -537,15 +547,18 @@ __txn_printlog(WT_SESSION_IMPL *session,
  *	Print the log in a human-readable format.
  */
 int
-__wt_txn_printlog(WT_SESSION *wt_session, FILE *out)
+__wt_txn_printlog(WT_SESSION *wt_session, FILE *out, uint32_t flags)
 {
 	WT_SESSION_IMPL *session;
+	WT_TXN_PRINTLOG_ARGS args;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	args.out = out;
+	args.flags = flags;
 
 	WT_RET(__wt_fprintf(out, "[\n"));
 	WT_RET(__wt_log_scan(
-	    session, NULL, WT_LOGSCAN_FIRST, __txn_printlog, out));
+	    session, NULL, WT_LOGSCAN_FIRST, __txn_printlog, &args));
 	WT_RET(__wt_fprintf(out, "\n]\n"));
 
 	return (0);

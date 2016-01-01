@@ -43,7 +43,7 @@ static int  __debug_page_col_var(WT_DBG *, WT_PAGE *);
 static int  __debug_page_metadata(WT_DBG *, WT_PAGE *);
 static int  __debug_page_row_int(WT_DBG *, WT_PAGE *, uint32_t);
 static int  __debug_page_row_leaf(WT_DBG *, WT_PAGE *);
-static int  __debug_ref(WT_DBG *, WT_REF *);
+static void __debug_ref(WT_DBG *, WT_REF *);
 static void __debug_row_skip(WT_DBG *, WT_INSERT_HEAD *);
 static int  __debug_tree(
 	WT_SESSION_IMPL *, WT_BTREE *, WT_PAGE *, const char *, uint32_t);
@@ -74,9 +74,7 @@ __wt_debug_set_verbose(WT_SESSION_IMPL *session, const char *v)
 static inline void
 __debug_hex_byte(WT_DBG *ds, uint8_t v)
 {
-	static const char hex[] = "0123456789abcdef";
-
-	__dmsg(ds, "#%c%c", hex[(v & 0xf0) >> 4], hex[v & 0x0f]);
+	__dmsg(ds, "#%c%c", __wt_hex[(v & 0xf0) >> 4], __wt_hex[v & 0x0f]);
 }
 
 /*
@@ -769,7 +767,7 @@ __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 
 	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		__dmsg(ds, "\trecno %" PRIu64 "\n", ref->key.recno);
-		WT_RET(__debug_ref(ds, ref));
+		__debug_ref(ds, ref);
 	} WT_INTL_FOREACH_END;
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
@@ -843,7 +841,7 @@ __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		__wt_ref_key(page, ref, &p, &len);
 		__debug_item(ds, "K", p, len);
-		WT_RET(__debug_ref(ds, ref));
+		__debug_ref(ds, ref);
 	} WT_INTL_FOREACH_END;
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
@@ -965,7 +963,7 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
  * __debug_ref --
  *	Dump a WT_REF structure.
  */
-static int
+static void
 __debug_ref(WT_DBG *ds, WT_REF *ref)
 {
 	WT_SESSION_IMPL *session;
@@ -994,14 +992,14 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
 	case WT_REF_SPLIT:
 		__dmsg(ds, "split");
 		break;
-	WT_ILLEGAL_VALUE(session);
+	default:
+		__dmsg(ds, "INVALID");
+		break;
 	}
 
-	WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
+	__wt_ref_info(ref, &addr, &addr_size, NULL);
 	__dmsg(ds, " %s\n",
 	    __wt_addr_string(session, addr, addr_size, ds->tmp));
-
-	return (0);
 }
 
 /*

@@ -62,8 +62,18 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 static inline int
 __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 {
-	return (btree->type == BTREE_COL_FIX &&
-	    !F_ISSET(cbt, WT_CBT_MAX_RECORD));
+	/*
+	 * When there's no exact match, column-store search returns the key
+	 * nearest the searched-for key (continuing past keys smaller than the
+	 * searched-for key to return the next-largest key). Therefore, if the
+	 * returned comparison is -1, the searched-for key was larger than any
+	 * row on the page's standard information or column-store insert list.
+	 *
+	 * If the returned comparison is NOT -1, there was a row equal to or
+	 * larger than the searched-for key, and we implicitly create missing
+	 * rows.
+	 */
+	return (btree->type == BTREE_COL_FIX && cbt->compare != -1);
 }
 
 /*
@@ -502,18 +512,13 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 	case BTREE_COL_VAR:
 		/*
 		 * If WT_CURSTD_APPEND is set, insert a new record (ignoring
-		 * the application's record number).  First we search for the
-		 * maximum possible record number so the search ends on the
-		 * last page.  The real record number is assigned by the
-		 * serialized append operation.
+		 * the application's record number). The real record number
+		 * is assigned by the serialized append operation.
 		 */
 		if (F_ISSET(cursor, WT_CURSTD_APPEND))
-			cbt->iface.recno = UINT64_MAX;
+			cbt->iface.recno = WT_RECNO_OOB;
 
 		WT_ERR(__cursor_col_search(session, cbt, NULL));
-
-		if (F_ISSET(cursor, WT_CURSTD_APPEND))
-			cbt->iface.recno = WT_RECNO_OOB;
 
 		/*
 		 * If not overwriting, fail if the key exists.  Creating a
@@ -816,7 +821,12 @@ err:	if (ret == WT_RESTART) {
 
 /*
  * __wt_btcur_next_random --
- *	Move to a random record in the tree.
+ *	Move to a random record in the tree. There are two algorithms, one
+ *	where we select a record at random from the whole tree on each
+ *	retrieval and one where we first select a record at random from the
+ *	whole tree, and then subsequently sample forward from that location.
+ *	The sampling approach allows us to select reasonably uniform random
+ *	points from unbalanced trees.
  */
 int
 __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
@@ -825,6 +835,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	wt_off_t size;
+	uint64_t skip;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
@@ -839,11 +851,65 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
-	WT_RET(__cursor_func_init(cbt, true));
+	/*
+	 * If retrieving random values without sampling, or we don't have a
+	 * page reference, pick a roughly random leaf page in the tree.
+	 */
+	if (cbt->ref == NULL || cbt->next_random_sample_size == 0) {
+		/*
+		 * Skip past the sample size of the leaf pages in the tree
+		 * between each random key return to compensate for unbalanced
+		 * trees.
+		 *
+		 * Use the underlying file size divided by its block allocation
+		 * size as our guess of leaf pages in the file (this can be
+		 * entirely wrong, as it depends on how many pages are in this
+		 * particular checkpoint, how large the leaf and internal pages
+		 * really are, and other factors). Then, divide that value by
+		 * the configured sample size and increment the final result to
+		 * make sure tiny files don't leave us with a skip value of 0.
+		 *
+		 * !!!
+		 * Ideally, the number would be prime to avoid restart issues.
+		 */
+		if (cbt->next_random_sample_size != 0) {
+			WT_ERR(btree->bm->size(btree->bm, session, &size));
+			cbt->next_random_leaf_skip = (uint64_t)
+			    ((size / btree->allocsize) /
+			    cbt->next_random_sample_size) + 1;
+		}
 
-	WT_WITH_PAGE_INDEX(session,
-	    ret = __wt_row_random(session, cbt));
-	WT_ERR(ret);
+		/*
+		 * Choose a leaf page from the tree.
+		 */
+		WT_ERR(__cursor_func_init(cbt, true));
+		WT_WITH_PAGE_INDEX(
+		    session, ret = __wt_row_random_descent(session, cbt));
+		WT_ERR(ret);
+	} else {
+		/*
+		 * Read through the tree, skipping leaf pages. Be cautious about
+		 * the skip count: if the last leaf page skipped was also the
+		 * last leaf page in the tree, it may be set to zero on return
+		 * with the end-of-walk condition.
+		 *
+		 * Pages read for data sampling aren't "useful"; don't update
+		 * the read generation of pages already in memory, and if a page
+		 * is read, set its generation to a low value so it is evicted
+		 * quickly.
+		 */
+		for (skip =
+		    cbt->next_random_leaf_skip; cbt->ref == NULL || skip > 0;)
+			WT_ERR(__wt_tree_walk_skip(session, &cbt->ref, &skip,
+			    WT_READ_NO_GEN |
+			    WT_READ_SKIP_INTL | WT_READ_WONT_NEED));
+	}
+
+	/*
+	 * Select a random entry from the leaf page. If it's not valid, move to
+	 * the next entry, if that doesn't work, move to the previous entry.
+	 */
+	WT_ERR(__wt_row_random_leaf(session, cbt));
 	if (__cursor_valid(cbt, &upd))
 		WT_ERR(__wt_kv_return(session, cbt, upd));
 	else {
@@ -851,9 +917,9 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 			ret = __wt_btcur_prev(cbt, false);
 		WT_ERR(ret);
 	}
+	return (0);
 
-err:	if (ret != 0)
-		WT_TRET(__cursor_reset(cbt));
+err:	WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
 
@@ -1167,6 +1233,11 @@ __wt_btcur_open(WT_CURSOR_BTREE *cbt)
 {
 	cbt->row_key = &cbt->_row_key;
 	cbt->tmp = &cbt->_tmp;
+
+#ifdef HAVE_DIAGNOSTIC
+	cbt->lastkey = &cbt->_lastkey;
+	cbt->lastrecno = WT_RECNO_OOB;
+#endif
 }
 
 /*
@@ -1192,6 +1263,9 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, bool lowlevel)
 
 	__wt_buf_free(session, &cbt->_row_key);
 	__wt_buf_free(session, &cbt->_tmp);
+#ifdef HAVE_DIAGNOSTIC
+	__wt_buf_free(session, &cbt->_lastkey);
+#endif
 
 	return (ret);
 }

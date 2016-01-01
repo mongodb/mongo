@@ -119,6 +119,7 @@ src/os_posix/os_mtx_cond.c
 src/os_posix/os_mtx_rw.c
 src/os_posix/os_once.c
 src/os_posix/os_open.c
+src/os_posix/os_pagesize.c
 src/os_posix/os_path.c
 src/os_posix/os_priv.c
 src/os_posix/os_remove.c

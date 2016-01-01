@@ -62,6 +62,7 @@ win_filelist()
 	    -e 's;os_posix/os_mtx_cond.c;os_win/os_mtx_cond.c;' \
 	    -e 's;os_posix/os_once.c;os_win/os_once.c;' \
 	    -e 's;os_posix/os_open.c;os_win/os_open.c;' \
+	    -e 's;os_posix/os_pagesize.c;os_win/os_pagesize.c;' \
 	    -e 's;os_posix/os_path.c;os_win/os_path.c;' \
 	    -e 's;os_posix/os_priv.c;os_win/os_priv.c;' \
 	    -e 's;os_posix/os_remove.c;os_win/os_remove.c;' \

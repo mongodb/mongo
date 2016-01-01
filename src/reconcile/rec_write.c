@@ -985,23 +985,6 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, bool destroy)
 }
 
 /*
- * __rec_block_free --
- *	Helper function to free a block.
- */
-static int
-__rec_block_free(
-    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
-{
-	WT_BM *bm;
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-	bm = btree->bm;
-
-	return (bm->free(bm, session, addr, addr_size));
-}
-
-/*
  * __rec_update_save --
  *	Save a WT_UPDATE list for later restoration.
  */
@@ -1293,6 +1276,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		for (upd = upd_list; upd->next != NULL; upd = upd->next)
 			;
 		upd->next = append;
+		__wt_cache_page_inmem_incr(
+		    session, page, WT_UPDATE_MEMSIZE(append));
 	}
 
 	/*
@@ -1343,8 +1328,6 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_REF *ref, WT_CHILD_STATE *statep)
 {
 	WT_PAGE_DELETED *page_del;
-	size_t addr_size;
-	const uint8_t *addr;
 
 	page_del = ref->page_del;
 
@@ -1392,16 +1375,8 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 */
 	if (ref->addr != NULL &&
 	    (page_del == NULL ||
-	    __wt_txn_visible_all(session, page_del->txnid))) {
-		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
-		WT_RET(__rec_block_free(session, addr, addr_size));
-
-		if (__wt_off_page(ref->home, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
-		ref->addr = NULL;
-	}
+	    __wt_txn_visible_all(session, page_del->txnid)))
+		WT_RET(__wt_ref_block_free(session, ref));
 
 	/*
 	 * If the original page is gone, we can skip the slot on the internal
@@ -1783,7 +1758,7 @@ __rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
  *	Figure out the maximum leaf page size for the reconciliation.
  */
 static inline uint32_t
-__rec_leaf_page_max(WT_SESSION_IMPL *session,  WT_RECONCILE *r)
+__rec_leaf_page_max(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
@@ -3290,7 +3265,14 @@ supd_check_complete:
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
 		bnd->cksum = __wt_cksum(buf->data, buf->size);
 
-		if (mod->rec_result == WT_PM_REC_MULTIBLOCK &&
+		/*
+		 * One last check: don't reuse blocks if compacting, the reason
+		 * for compaction is to move blocks to different locations. We
+		 * do this check after calculating the checksums, hopefully the
+		 * next write can be skipped.
+		 */
+		if (session->compact_state == WT_COMPACT_NONE &&
+		    mod->rec_result == WT_PM_REC_MULTIBLOCK &&
 		    mod->mod_multi_entries > bnd_slot) {
 			multi = &mod->mod_multi[bnd_slot];
 			if (multi->size == bnd->size &&
@@ -3529,7 +3511,7 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 		break;
 	case BTREE_COL_VAR:
 		if (cbulk->rle != 0)
-			WT_RET(__wt_bulk_insert_var(session, cbulk));
+			WT_RET(__wt_bulk_insert_var(session, cbulk, false));
 		break;
 	case BTREE_ROW:
 		break;
@@ -3652,7 +3634,32 @@ __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
  *	Fixed-length column-store bulk insert.
  */
 int
-__wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
+__wt_bulk_insert_fix(
+    WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool deleted)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_RECONCILE *r;
+
+	r = cbulk->reconcile;
+	btree = S2BT(session);
+	cursor = &cbulk->cbt.iface;
+
+	WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
+	__bit_setv(r->first_free, cbulk->entry,
+	    btree->bitcnt, deleted ? 0 : ((uint8_t *)cursor->value.data)[0]);
+	++cbulk->entry;
+	++r->recno;
+
+	return (0);
+}
+
+/*
+ * __wt_bulk_insert_fix_bitmap --
+ *	Fixed-length column-store bulk insert.
+ */
+int
+__wt_bulk_insert_fix_bitmap(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
@@ -3664,34 +3671,22 @@ __wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	btree = S2BT(session);
 	cursor = &cbulk->cbt.iface;
 
-	if (cbulk->bitmap) {
-		if (((r->recno - 1) * btree->bitcnt) & 0x7)
-			WT_RET_MSG(session, EINVAL,
-			    "Bulk bitmap load not aligned on a byte boundary");
-		for (data = cursor->value.data,
-		    entries = (uint32_t)cursor->value.size;
-		    entries > 0;
-		    entries -= page_entries, data += page_size) {
-			WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
+	if (((r->recno - 1) * btree->bitcnt) & 0x7)
+		WT_RET_MSG(session, EINVAL,
+		    "Bulk bitmap load not aligned on a byte boundary");
+	for (data = cursor->value.data,
+	    entries = (uint32_t)cursor->value.size;
+	    entries > 0;
+	    entries -= page_entries, data += page_size) {
+		WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
 
-			page_entries =
-			    WT_MIN(entries, cbulk->nrecs - cbulk->entry);
-			page_size = __bitstr_size(page_entries * btree->bitcnt);
-			offset = __bitstr_size(cbulk->entry * btree->bitcnt);
-			memcpy(r->first_free + offset, data, page_size);
-			cbulk->entry += page_entries;
-			r->recno += page_entries;
-		}
-		return (0);
+		page_entries = WT_MIN(entries, cbulk->nrecs - cbulk->entry);
+		page_size = __bitstr_size(page_entries * btree->bitcnt);
+		offset = __bitstr_size(cbulk->entry * btree->bitcnt);
+		memcpy(r->first_free + offset, data, page_size);
+		cbulk->entry += page_entries;
+		r->recno += page_entries;
 	}
-
-	WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
-
-	__bit_setv(r->first_free,
-	    cbulk->entry, btree->bitcnt, ((uint8_t *)cursor->value.data)[0]);
-	++cbulk->entry;
-	++r->recno;
-
 	return (0);
 }
 
@@ -3700,7 +3695,8 @@ __wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
  *	Variable-length column-store bulk insert.
  */
 int
-__wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
+__wt_bulk_insert_var(
+    WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool deleted)
 {
 	WT_BTREE *btree;
 	WT_KV *val;
@@ -3709,14 +3705,20 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	r = cbulk->reconcile;
 	btree = S2BT(session);
 
-	/*
-	 * Store the bulk cursor's last buffer, not the current value, we're
-	 * creating a duplicate count, which means we want the previous value
-	 * seen, not the current value.
-	 */
 	val = &r->v;
-	WT_RET(__rec_cell_build_val(
-	    session, r, cbulk->last.data, cbulk->last.size, cbulk->rle));
+	if (deleted) {
+		val->cell_len = __wt_cell_pack_del(&val->cell, cbulk->rle);
+		val->buf.data = NULL;
+		val->buf.size = 0;
+		val->len = val->cell_len;
+	} else
+		/*
+		 * Store the bulk cursor's last buffer, not the current value,
+		 * we're tracking duplicates, which means we want the previous
+		 * value seen, not the current value.
+		 */
+		WT_RET(__rec_cell_build_val(session,
+		    r, cbulk->last.data, cbulk->last.size, cbulk->rle));
 
 	/* Boundary: split or write the page. */
 	if (val->len > r->space_avail)
@@ -4472,7 +4474,7 @@ compare:		/*
 		WT_ERR(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
 		if (upd == NULL)
 			continue;
-		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
+		for (n = WT_INSERT_RECNO(ins); src_recno <= n;) {
 			/*
 			 * The application may have inserted records which left
 			 * gaps in the name space, and these gaps can be huge.
@@ -4512,7 +4514,7 @@ compare:		/*
 				    last->size == size &&
 				    memcmp(last->data, data, size) == 0)) {
 					++rle;
-					continue;
+					goto next;
 				}
 				WT_ERR(__rec_col_var_helper(session, r,
 				    salvage, last, last_deleted, 0, rle));
@@ -4531,6 +4533,15 @@ compare:		/*
 			}
 			last_deleted = deleted;
 			rle = 1;
+
+			/*
+			 * Move to the next record. It's not a simple increment
+			 * because if it's the maximum record, incrementing it
+			 * wraps to 0 and this turns into an infinite loop.
+			 */
+next:			if (src_recno == UINT64_MAX)
+				break;
+			++src_recno;
 		}
 	}
 
@@ -5317,7 +5328,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			if (multi->addr.reuse)
 				multi->addr.addr = NULL;
 			else {
-				WT_RET(__rec_block_free(session,
+				WT_RET(__wt_btree_block_free(session,
 				    multi->addr.addr, multi->addr.size));
 				__wt_free(session, multi->addr.addr);
 			}
@@ -5400,8 +5411,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
-	size_t addr_size;
-	const uint8_t *addr;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -5426,21 +5435,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 */
 		if (__wt_ref_is_root(ref))
 			break;
-		if (ref->addr != NULL) {
-			/*
-			 * Free the page and clear the address (so we don't free
-			 * it twice).
-			 */
-			WT_RET(__wt_ref_info(
-			    session, ref, &addr, &addr_size, NULL));
-			WT_RET(__rec_block_free(session, addr, addr_size));
-			if (__wt_off_page(ref->home, ref->addr)) {
-				__wt_free(
-				    session, ((WT_ADDR *)ref->addr)->addr);
-				__wt_free(session, ref->addr);
-			}
-			ref->addr = NULL;
-		}
+		WT_RET(__wt_ref_block_free(session, ref));
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
@@ -5458,7 +5453,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * are checkpoints, and must be explicitly dropped.
 		 */
 		if (!__wt_ref_is_root(ref))
-			WT_RET(__rec_block_free(session,
+			WT_RET(__wt_btree_block_free(session,
 			    mod->mod_replace.addr, mod->mod_replace.size));
 
 		/* Discard the replacement page's address. */
@@ -5622,7 +5617,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			if (bnd->addr.reuse)
 				bnd->addr.addr = NULL;
 			else {
-				WT_TRET(__rec_block_free(session,
+				WT_TRET(__wt_btree_block_free(session,
 				    bnd->addr.addr, bnd->addr.size));
 				__wt_free(session, bnd->addr.addr);
 			}

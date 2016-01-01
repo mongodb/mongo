@@ -102,6 +102,7 @@ Encryptor
 Encryptors
 Enqueue
 Eron
+FALLOC
 FALLTHROUGH
 FH
 FLD
@@ -143,6 +144,7 @@ INIT
 INITIALIZER
 INMEM
 INTL
+ISA
 ITEMs
 Inline
 Intra
@@ -179,6 +181,7 @@ LevelDB
 Levyx
 Llqr
 Llqrt
+LoadLoad
 LockFile
 Lookaside
 Lookup
@@ -186,6 +189,7 @@ MALLOC
 MEM
 MEMALIGN
 MERCHANTABILITY
+MONGODB
 MSVC
 MULTIBLOCK
 MUTEX
@@ -224,6 +228,7 @@ Obama
 Outfmt
 PARAM
 POSIX
+PPC
 PREDEFINE
 PRIu
 PRNG
@@ -281,10 +286,13 @@ Spinlock
 Spinlocks
 Split's
 Stoica
+StoreLoad
+StoreStore
 TAILQ
 TCMalloc
 TODO
 TORTIOUS
+TSO
 TXN
 TXNC
 Timespec
@@ -299,6 +307,7 @@ ULINE
 URI
 URIs
 UTF
+UltraSparc
 Unbuffered
 UnixLib
 Unmap
@@ -358,6 +367,7 @@ arg
 argc
 args
 argv
+asm
 async
 asyncopp
 asyncops
@@ -368,6 +378,7 @@ automake
 bInheritHandle
 basecfg
 basho
+bcr
 bdb
 beginthreadex
 bigram
@@ -409,6 +420,7 @@ bzip
 calloc
 cas
 catfmt
+ccr
 cd
 centric
 cfg
@@ -420,6 +432,7 @@ checkpointer
 checkpointing
 checksum
 checksums
+children's
 chk
 chongo
 cip
@@ -594,6 +607,7 @@ free'd
 fscanf
 fstat
 fsync
+fsyncLock
 fsyncs
 ftruncate
 func
@@ -707,6 +721,7 @@ lookaside
 lookup
 lookups
 lossy
+lr
 lrt
 lru
 lseek
@@ -715,6 +730,7 @@ lsn
 lsnappy
 lt
 lu
+lwsync
 lz
 lzo
 madvise
@@ -722,6 +738,8 @@ majorp
 malloc
 marshall
 marshalled
+mbll
+mbss
 mem
 memalign
 membar
@@ -798,6 +816,7 @@ os
 ovfl
 ownp
 packv
+pagesize
 parens
 pareto
 parserp
@@ -876,6 +895,7 @@ runtime
 rwlock
 sH
 sHQ
+scalability
 sched
 scr
 sd
@@ -1017,6 +1037,7 @@ variable's
 vectorized
 versa
 vfprintf
+vm
 vpack
 vprintf
 vrfy

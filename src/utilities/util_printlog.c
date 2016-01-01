@@ -15,10 +15,10 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
 	int ch;
-	bool printable;
+	uint32_t flags;
 
-	printable = false;
-	while ((ch = __wt_getopt(progname, argc, argv, "f:p")) != EOF)
+	flags = 0;
+	while ((ch = __wt_getopt(progname, argc, argv, "f:x")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
 			if (freopen(__wt_optarg, "w", stdout) == NULL) {
@@ -27,8 +27,8 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 				return (1);
 			}
 			break;
-		case 'p':
-			printable = true;
+		case 'x':			/* hex output */
+			LF_SET(WT_TXN_PRINTLOG_HEX);
 			break;
 		case '?':
 		default:
@@ -41,8 +41,7 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	WT_UNUSED(printable);
-	ret = __wt_txn_printlog(session, stdout);
+	ret = __wt_txn_printlog(session, stdout, flags);
 
 	if (ret != 0) {
 		fprintf(stderr, "%s: printlog failed: %s\n",
@@ -61,7 +60,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "printlog [-p] [-f output-file]\n",
+	    "printlog [-x] [-f output-file]\n",
 	    progname, usage_prefix);
 	return (1);
 }

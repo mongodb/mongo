@@ -54,6 +54,12 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	    session, cfg->uris[0], NULL, NULL, &cursor)) != 0)
 		goto err;
 
+	/*
+	 * If we find the workload getting behind we multiply the number of
+	 * records to be truncated.
+	 */
+	trunc_cfg->catchup_multiplier = 1;
+
 	/* How many entries between each stone. */
 	trunc_cfg->stone_gap =
 	    (workload->truncate_count * workload->truncate_pct) / 100;
@@ -133,6 +139,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	char *truncate_key;
 	int ret, t_ret;
+	uint64_t used_stone_gap;
 
 	ret = 0;
 	trunc_cfg = &thread->trunc_cfg;
@@ -145,11 +152,32 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	trunc_cfg->last_total_inserts = trunc_cfg->total_inserts;
 
 	/* We are done if there isn't enough data to trigger a new milestone. */
-	if (trunc_cfg->expected_total <= trunc_cfg->needed_stones)
+	if (trunc_cfg->expected_total <= thread->workload->truncate_count)
 		return (0);
 
+	/*
+	 * If we are falling behind and using more than one stone per lap we
+	 * should widen the stone gap for this lap to try and catch up quicker.
+	 */
+	if (trunc_cfg->expected_total >
+	    thread->workload->truncate_count + trunc_cfg->stone_gap) {
+		/*
+		 * Increase the multiplier until we create stones that are
+		 * almost large enough to truncate the whole expected table size
+		 * in one operation.
+		 */
+		trunc_cfg->catchup_multiplier =
+		    WT_MIN(trunc_cfg->catchup_multiplier + 1,
+		    trunc_cfg->needed_stones - 1);
+	} else {
+		/* Back off if we start seeing an improvement */
+		trunc_cfg->catchup_multiplier =
+		    WT_MAX(trunc_cfg->catchup_multiplier - 1, 1);
+	}
+	used_stone_gap = trunc_cfg->stone_gap * trunc_cfg->catchup_multiplier;
+
 	while (trunc_cfg->num_stones < trunc_cfg->needed_stones) {
-		trunc_cfg->last_key += trunc_cfg->stone_gap;
+		trunc_cfg->last_key += used_stone_gap;
 		truncate_key = calloc(cfg->key_sz, 1);
 		if (truncate_key == NULL) {
 			lprintf(cfg, ENOMEM, 0,
@@ -165,7 +193,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 		}
 		generate_key(cfg, truncate_key, trunc_cfg->last_key);
 		truncate_item->key = truncate_key;
-		truncate_item->diff = trunc_cfg->stone_gap;
+		truncate_item->diff = used_stone_gap;
 		TAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
 		trunc_cfg->num_stones++;
 	}
@@ -188,7 +216,6 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 		lprintf(cfg, ret, 0, "Truncate: failed");
 		goto err;
 	}
-
 
 	*truncatedp = 1;
 	trunc_cfg->expected_total -= truncate_item->diff;

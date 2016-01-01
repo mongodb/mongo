@@ -313,7 +313,6 @@ size_t
 __wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, bool force_unicode)
 {
 	char abbrev;
-	u_char h;
 
 	if (!force_unicode) {
 		if (isprint(ch) && ch != '\\' && ch != '"') {
@@ -354,16 +353,8 @@ __wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, bool force_unicode)
 		*buf++ = 'u';
 		*buf++ = '0';
 		*buf++ = '0';
-		h = (((u_char)ch) >> 4) & 0xF;
-		if (h >= 10)
-			*buf++ = 'A' + (h - 10);
-		else
-			*buf++ = '0' + h;
-		h = ((u_char)ch) & 0xF;
-		if (h >= 10)
-			*buf++ = 'A' + (h - 10);
-		else
-			*buf++ = '0' + h;
+		*buf++ = __wt_hex[(ch & 0xf0) >> 4];
+		*buf++ = __wt_hex[ch & 0x0f];
 	}
 	return (6);
 }

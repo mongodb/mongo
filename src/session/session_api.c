@@ -148,7 +148,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		 * via the registered close callback.
 		 */
 		if (session->event_handler->handle_close != NULL &&
-		    !WT_STREQ(cursor->uri, WT_LAS_URI))
+		    !WT_STREQ(cursor->internal_uri, WT_LAS_URI))
 			WT_TRET(session->event_handler->handle_close(
 			    session->event_handler, wt_session, cursor));
 		WT_TRET(cursor->close(cursor));
@@ -1443,7 +1443,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	 */
 	if (open_metadata) {
 		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
-		if ((ret = __wt_metadata_open(session)) != 0) {
+		if ((ret = __wt_metadata_cursor(session, NULL)) != 0) {
 			wt_session = &session->iface;
 			WT_TRET(wt_session->close(wt_session, NULL));
 			return (ret);
@@ -1486,14 +1486,11 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	 * deadlocked getting the cursor late in the process.  Be defensive,
 	 * get it now.
 	 */
-	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR)) {
-		WT_WITHOUT_DHANDLE(session, ret =
-		    __wt_las_cursor_create(session, &session->las_cursor));
-		if (ret != 0) {
-			wt_session = &session->iface;
-			WT_TRET(wt_session->close(wt_session, NULL));
-			return (ret);
-		}
+	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR) &&
+	    (ret = __wt_las_cursor_open(session, &session->las_cursor)) != 0) {
+		wt_session = &session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+		return (ret);
 	}
 
 	*sessionp = session;

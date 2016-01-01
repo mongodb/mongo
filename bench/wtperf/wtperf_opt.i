@@ -117,11 +117,17 @@ DEF_OPT_AS_BOOL(insert_rmw, 0,
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
 DEF_OPT_AS_BOOL(log_partial, 0, "perform partial logging on first table only.")
 DEF_OPT_AS_UINT32(min_throughput, 0,
-    "abort if any throughput measured is less than this amount.  Requires "
-    "sample_interval to be configured")
-DEF_OPT_AS_UINT32(max_latency, 0,
-    "abort if any latency measured exceeds this number of milliseconds."
+    "notify if any throughput measured is less than this amount. "
+    "Aborts or prints warning based on min_throughput_fatal setting. "
     "Requires sample_interval to be configured")
+DEF_OPT_AS_BOOL(min_throughput_fatal, 0,
+    "print warning (false) or abort (true) of min_throughput failure.")
+DEF_OPT_AS_UINT32(max_latency, 0,
+    "notify if any latency measured exceeds this number of milliseconds."
+    "Aborts or prints warning based on min_throughput_fatal setting. "
+    "Requires sample_interval to be configured")
+DEF_OPT_AS_BOOL(max_latency_fatal, 0,
+    "print warning (false) or abort (true) of max_latency failure.")
 DEF_OPT_AS_UINT32(pareto, 0, "use pareto distribution for random numbers. Zero "
     "to disable, otherwise a percentage indicating how aggressive the "
     "distribution should be.")
@@ -134,6 +140,7 @@ DEF_OPT_AS_UINT32(random_range, 0,
     "if non zero choose a value from within this range as the key for "
     "insert operations")
 DEF_OPT_AS_BOOL(random_value, 0, "generate random content for the value")
+DEF_OPT_AS_UINT32(read_range, 0, "scan a range of keys after each search")
 DEF_OPT_AS_BOOL(reopen_connection, 1,
     "close and reopen the connection between populate and workload phases")
 DEF_OPT_AS_UINT32(report_interval, 2,
@@ -164,8 +171,8 @@ DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "'update' entries are the ratios of insert, read and update operations "
     "done by each worker thread; If a throttle value is provided each thread "
     "will do a maximum of that number of operations per second; multiple "
-    "workload configurations may be "
-    "specified; for example, a more complex threads configuration might be "
+    "workload configurations may be specified per threads configuration; "
+    "for example, a more complex threads configuration might be "
     "'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' "
     "which would create 2 threads doing nothing but reads and 8 threads "
     "each doing 50% inserts and 25% reads and updates.  Allowed configuration "

@@ -124,7 +124,7 @@ static CONFIG c[] = {
 
 	{ "data_source",
 	  "data source (file | helium | kvsbdb | lsm | table)",
-	  C_IGNORE | C_STRING, 0, 0, 0, NULL, &g.c_data_source },
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",
 	  "percent operations that are deletes",
@@ -133,6 +133,10 @@ static CONFIG c[] = {
 	{ "dictionary",
 	  "if values are dictionary compressed",		/* 20% */
 	  C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
+
+	{ "direct_io",
+	  "if direct I/O is configured for data objects",	/* 0% */
+	  C_IGNORE, 0, 0, 1, &g.c_direct_io, NULL },
 
 	{ "encryption",
 	  "type of encryption (none | rotn-7)",

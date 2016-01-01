@@ -33,6 +33,10 @@
 	(F_ISSET(dhandle, WT_DHANDLE_DEAD) ||				\
 	!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN))
 
+/* The metadata cursor's data handle. */
+#define	WT_SESSION_META_DHANDLE(s)					\
+	(((WT_CURSOR_BTREE *)((s)->meta_cursor))->btree->dhandle)
+
 /*
  * WT_DATA_HANDLE --
  *	A handle for a generic named data source.
