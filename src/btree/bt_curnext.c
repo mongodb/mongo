@@ -499,10 +499,10 @@ __cursor_key_order_check_row(
 
 	WT_ERR(__wt_scr_alloc(session, 512, &a));
 	WT_ERR(__wt_buf_set_printable(
-	    session, a, cbt->lastkey->data, cbt->lastkey->size));
+	    session, cbt->lastkey->data, cbt->lastkey->size, a));
 
 	WT_ERR(__wt_scr_alloc(session, 512, &b));
-	WT_ERR(__wt_buf_set_printable(session, b, key->data, key->size));
+	WT_ERR(__wt_buf_set_printable(session, key->data, key->size, b));
 
 	WT_PANIC_ERR(session, EINVAL,
 	    "WT_CURSOR.%s out-of-order returns: returned key %.*s then "
