@@ -498,18 +498,15 @@ __cursor_key_order_check_row(
 		    cbt->iface.key.data, cbt->iface.key.size));
 
 	WT_ERR(__wt_scr_alloc(session, 512, &a));
-	WT_ERR(__wt_buf_set_printable(
-	    session, cbt->lastkey->data, cbt->lastkey->size, a));
-
 	WT_ERR(__wt_scr_alloc(session, 512, &b));
-	WT_ERR(__wt_buf_set_printable(session, key->data, key->size, b));
 
 	WT_PANIC_ERR(session, EINVAL,
-	    "WT_CURSOR.%s out-of-order returns: returned key %.*s then "
+	    "WT_CURSOR.%s out-of-order returns: returned key %s then "
 	    "key %.*s",
 	    next ? "next" : "prev",
-	    (int)a->size, (const char *)a->data,
-	    (int)b->size, (const char *)b->data);
+	    __wt_buf_set_printable(
+	    session, cbt->lastkey->data, cbt->lastkey->size, a),
+	    __wt_buf_set_printable(session, key->data, key->size, b));
 
 err:	__wt_scr_free(session, &a);
 	__wt_scr_free(session, &b);
