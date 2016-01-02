@@ -13,11 +13,11 @@
  */
 typedef struct {
 	WT_REF **leaf;				/* List of leaf pages */
-	uint64_t leaf_next;			/* Next entry */
+	size_t	 leaf_next;			/* Next entry */
 	size_t   leaf_allocated;		/* Allocated bytes */
 
 	WT_ADDR *fl;				/* List of objects to free */
-	uint64_t fl_next;			/* Next entry */
+	size_t	 fl_next;			/* Next entry */
 	size_t   fl_allocated;			/* Allocated bytes */
 
 	WT_PAGE *root;				/* Created root page */
