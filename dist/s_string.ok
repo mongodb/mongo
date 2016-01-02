@@ -869,6 +869,7 @@ readonly
 readunlock
 realloc
 rebalance
+rebalanced
 rebalancing
 recno
 recnos
