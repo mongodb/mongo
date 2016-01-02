@@ -46,8 +46,8 @@ class test_rebalance(wttest.WiredTigerTestCase):
         uri = self.uri + self.name
         populate(self, uri, 'key_format=S', 10)
 
-	# Force to disk, we don't rebalance in-memory objects.
-	self.reopen_conn()
+        # Force to disk, we don't rebalance in-memory objects.
+        self.reopen_conn()
 
         # Open cursors should cause failure.
         if with_cursor:
