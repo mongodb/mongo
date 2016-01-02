@@ -1329,6 +1329,7 @@ struct __wt_session {
 	 */
 	int __F(log_printf)(WT_SESSION *session, const char *fmt, ...);
 
+#if !defined(DOXYGEN)
 	/*!
 	 * Rebalance a table
 	 *
@@ -1336,11 +1337,11 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param uri the current URI of the object, such as \c "table:mytable"
-	 * @configempty{WT_SESSION.rebalance, see dist/api_data.py}
 	 * @ebusy_errors
 	 */
 	int __F(rebalance)(
 	    WT_SESSION *session, const char *uri, const char *config);
+#endif
 
 	/*!
 	 * Rename an object.
