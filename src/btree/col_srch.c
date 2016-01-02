@@ -182,7 +182,8 @@ descend:	/*
 		 * page; otherwise return on error, the swap call ensures we're
 		 * holding nothing on failure.
 		 */
-		if ((ret = __wt_page_swap(session, current, descent, 0)) == 0) {
+		if ((ret = __wt_page_swap(
+		    session, current, descent, false, true, 0)) == 0) {
 			current = descent;
 			continue;
 		}

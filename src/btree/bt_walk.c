@@ -270,12 +270,8 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 			 * the parent can't have been evicted.
 			 */
 			if (!LF_ISSET(WT_READ_SKIP_INTL)) {
-				if ((ret = __wt_page_swap(
-				    session, couple, ref, flags)) != 0) {
-					WT_TRET(__wt_page_release(
-					    session, couple, flags));
-					WT_ERR(ret);
-				}
+				WT_ERR(__wt_page_swap(
+				    session, couple, ref, false, false, flags));
 				*refp = ref;
 				goto done;
 			}
@@ -389,7 +385,8 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 					}
 				}
 
-			ret = __wt_page_swap(session, couple, ref, flags);
+			ret = __wt_page_swap(
+			    session, couple, ref, true, true, flags);
 
 			/*
 			 * Not-found is an expected return when only walking

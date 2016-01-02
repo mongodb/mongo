@@ -250,15 +250,15 @@
 	__wt_scr_alloc_func(session, size, scratchp, __FILE__, __LINE__)
 #define	__wt_page_in(session, ref, flags)				\
 	__wt_page_in_func(session, ref, flags, __FILE__, __LINE__)
-#define	__wt_page_swap(session, held, want, flags)			\
-	__wt_page_swap_func(session, held, want, flags, __FILE__, __LINE__)
+#define	__wt_page_swap(s, h, w, n, r, f)				\
+	__wt_page_swap_func(s, h, w, n, r, f, __FILE__, __LINE__)
 #else
 #define	__wt_scr_alloc(session, size, scratchp)				\
 	__wt_scr_alloc_func(session, size, scratchp)
 #define	__wt_page_in(session, ref, flags)				\
 	__wt_page_in_func(session, ref, flags)
-#define	__wt_page_swap(session, held, want, flags)			\
-	__wt_page_swap_func(session, held, want, flags)
+#define	__wt_page_swap(s, h, w, n, r, f)				\
+	__wt_page_swap_func(s, h, w, n, r, f)
 #endif
 
 /* Random number generator state. */
