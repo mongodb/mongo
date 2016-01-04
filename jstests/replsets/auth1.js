@@ -44,7 +44,7 @@ print("make sure user is written before shutting down");
 MongoRunner.stopMongod(m);
 
 print("start up rs");
-var rs = new ReplSetTest({"name" : name, "nodes" : 3, "startPort" : port[0]});
+var rs = new ReplSetTest({"name" : name, "nodes" : 3});
 print("restart 0 with keyFile");
 m = rs.restart(0, {"keyFile" : key1_600});
 print("restart 1 with keyFile");
