@@ -104,7 +104,7 @@ class test_bulkload_backup(wttest.WiredTigerTestCase, suite_subprocess):
         self.backup(backupdir, session)
 
         # Open the target directory, and confirm the object has no contents.
-        conn = wiredtiger.wiredtiger_open(backupdir)
+        conn = self.wiredtiger_open(backupdir)
         session = conn.open_session()
         cursor = session.open_cursor(self.uri, None, None)
         self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)

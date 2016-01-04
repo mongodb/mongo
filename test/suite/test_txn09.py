@@ -32,7 +32,6 @@
 
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
@@ -91,7 +90,7 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
                 'transaction_sync=(enabled=false),'
 
         # print "Opening conn at '%s' with config '%s'" % (dir, conn_params)
-        conn = wiredtiger_open(dir, conn_params)
+        conn = self.wiredtiger_open(dir, conn_params)
         self.pr(`conn`)
         self.session2 = conn.open_session()
         return conn

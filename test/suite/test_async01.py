@@ -28,7 +28,7 @@
 
 import sys, threading, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open, WiredTigerError
+from wiredtiger import WiredTigerError
 from wtscenario import check_scenarios
 
 # TODO - tmp code
@@ -132,18 +132,10 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
         ('table-row', dict(tablekind='row',uri='table')),
     ])
 
-    # Overrides WiredTigerTestCase so that we can configure
-    # async operations.
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        conn_params = \
-                'create,error_prefix="%s: ",' % self.shortid() + \
-                'async=(enabled=true,ops_max=%s,' % self.async_ops + \
-                'threads=%s)' % self.async_threads
-        sys.stdout.flush()
-        conn = wiredtiger_open(dir, conn_params)
-        self.pr(`conn`)
-        return conn
+    # Enable async for this test.
+    def conn_config(self, dir):
+        return 'async=(enabled=true,ops_max=%s,' % self.async_ops + \
+            'threads=%s)' % self.async_threads
 
     def genkey(self, i):
         if self.tablekind == 'row':

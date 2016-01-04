@@ -81,7 +81,7 @@ class test_schema05(wttest.WiredTigerTestCase):
         extarg = self.extensionArg([('extractors', 'csv', 'csv_extractor')])
         connarg = 'create,error_prefix="{0}: ",{1}'.format(
             self.shortid(), extarg)
-        conn = wiredtiger.wiredtiger_open(dir, connarg)
+        conn = self.wiredtiger_open(dir, connarg)
         self.pr(`conn`)
         return conn
 

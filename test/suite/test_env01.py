@@ -99,7 +99,7 @@ class test_priv01(wttest.WiredTigerTestCase):
         else:
             os.putenv('WIREDTIGER_HOME', homeenv)
         try:
-            self.conn = wiredtiger.wiredtiger_open(homearg, configarg)
+            self.conn = self.wiredtiger_open(homearg, configarg)
             self.session = self.conn.open_session(None)
             self.populate_and_check()
         finally:

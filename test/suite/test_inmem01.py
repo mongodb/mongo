@@ -54,12 +54,9 @@ class test_inmem01(wttest.WiredTigerTestCase):
         ('row', dict(tablekind='row'))
     ])
 
-    # Override WiredTigerTestCase to create an in-memory database
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'cache_size=5MB,create,' +
-            'file_manager=(close_idle_time=0),in_memory=true,cache_size=5MB')
-        return conn
+    # create an in-memory database
+    conn_config = 'cache_size=5MB,' + \
+                  'file_manager=(close_idle_time=0),in_memory=true'
 
     def get_table_config(self):
         kf = 'key_format='

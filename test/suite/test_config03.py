@@ -127,7 +127,7 @@ class test_config03(test_base03.test_base03):
             args = successargs
 
         self.verbose(3, 'wiredtiger_open with args: ' + args)
-        conn = wiredtiger.wiredtiger_open(dir, args)
+        conn = self.wiredtiger_open(dir, args)
         self.pr(`conn`)
         return conn
 
