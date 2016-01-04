@@ -46,20 +46,19 @@ var checkNoChaining = function() {
 };
 
 var forceSync = function() {
+    var config;
+    try {
+        config = nodes[2].getDB("local").system.replset.findOne();
+    } catch (e) {
+        config = nodes[2].getDB("local").system.replset.findOne();
+    }
+    var targetHost = config.members[1].host;
+    printjson(nodes[2].getDB("admin").runCommand({replSetSyncFrom : targetHost}));
     assert.soon(
         function() {
-            var config = nodes[2].getDB("local").system.replset.findOne();
-            var targetHost = config.members[1].host;
-            printjson(nodes[2].getDB("admin").runCommand({replSetSyncFrom : targetHost}));
-            assert.soon(
-                function() {
-                    return nodes[2].getDB("test").foo.findOne() != null;
-                },
-                'Check for data after force sync', 5000
-            );
             return nodes[2].getDB("test").foo.findOne() != null;
         },
-        'Check force sync still works'
+        'Check for data after force sync'
     );
 };
 
