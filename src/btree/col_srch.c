@@ -183,7 +183,7 @@ descend:	/*
 		 * holding nothing on failure.
 		 */
 		if ((ret = __wt_page_swap(
-		    session, current, descent, false, true, 0)) == 0) {
+		    session, current, descent, WT_READ_RESTART_OK)) == 0) {
 			current = descent;
 			continue;
 		}

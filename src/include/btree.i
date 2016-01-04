@@ -1280,8 +1280,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
  * coupling up/down the tree.
  */
 static inline int
-__wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
-    WT_REF *want, bool notfound_ok, bool restart_ok, uint32_t flags
+__wt_page_swap_func(
+    WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -1314,9 +1314,9 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
 	 * Expected failures: page not found or restart. Our callers list the
 	 * errors they're expecting to handle.
 	 */
-	if (notfound_ok && ret == WT_NOTFOUND)
+	if (LF_ISSET(WT_READ_NOTFOUND_OK) && ret == WT_NOTFOUND)
 		return (WT_NOTFOUND);
-	if (restart_ok && ret == WT_RESTART)
+	if (LF_ISSET(WT_READ_RESTART_OK) && ret == WT_RESTART)
 		return (WT_RESTART);
 
 	/* Discard the original held page on either success or error. */
@@ -1336,12 +1336,12 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
 
 	/*
 	 * If we're returning an error, don't let it be one our caller expects
-	 * to handle: that expectation includes the held page not having been
-	 * released, and that's not the case.
+	 * to handle as returned by page-in: the expectation includes the held
+	 * page not having been released, and that's not the case.
 	 */
-	if (notfound_ok && ret == WT_NOTFOUND)
+	if (LF_ISSET(WT_READ_NOTFOUND_OK) && ret == WT_NOTFOUND)
 		return (EINVAL);
-	if (restart_ok && ret == WT_RESTART)
+	if (LF_ISSET(WT_READ_RESTART_OK) && ret == WT_RESTART)
 		return (EINVAL);
 
 	return (ret);

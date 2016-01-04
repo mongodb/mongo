@@ -271,7 +271,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 			 */
 			if (!LF_ISSET(WT_READ_SKIP_INTL)) {
 				WT_ERR(__wt_page_swap(
-				    session, couple, ref, false, false, flags));
+				    session, couple, ref, flags));
 				*refp = ref;
 				goto done;
 			}
@@ -385,8 +385,8 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 					}
 				}
 
-			ret = __wt_page_swap(
-			    session, couple, ref, true, true, flags);
+			ret = __wt_page_swap(session, couple, ref,
+			    WT_READ_NOTFOUND_OK | WT_READ_RESTART_OK | flags);
 
 			/*
 			 * Not-found is an expected return when only walking

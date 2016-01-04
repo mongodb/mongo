@@ -31,11 +31,13 @@ flags = {
     'page_read' : [
         'READ_CACHE',
         'READ_COMPACT',
+        'READ_NOTFOUND_OK',
         'READ_NO_EMPTY',
         'READ_NO_EVICT',
         'READ_NO_GEN',
         'READ_NO_WAIT',
         'READ_PREV',
+        'READ_RESTART_OK',
         'READ_SKIP_INTL',
         'READ_SKIP_LEAF',
         'READ_TRUNCATE',
