@@ -26,10 +26,11 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <list>
-#include <memory>
 #include <utility>
 
 #include "mongo/db/catalog/collection.h"
@@ -37,8 +38,10 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
@@ -47,12 +50,14 @@
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/rollback_source.h"
+#include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 namespace {
 
@@ -764,6 +769,137 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
                            _coordinator,
                            noSleep));
     ASSERT_TRUE(rollbackSource.called);
+}
+
+BSONObj makeApplyOpsOplogEntry(Timestamp ts, std::initializer_list<BSONObj> ops) {
+    BSONObjBuilder entry;
+    entry << "ts" << ts << "h" << 1LL << "op"
+          << "c"
+          << "ns"
+          << "admin";
+    {
+        BSONObjBuilder cmd(entry.subobjStart("o"));
+        BSONArrayBuilder subops(entry.subarrayStart("applyOps"));
+        for (const auto& op : ops) {
+            subops << op;
+        }
+    }
+    return entry.obj();
+}
+
+OpTime getOpTimeFromOplogEntry(const BSONObj& entry) {
+    const BSONElement tsElement = entry["ts"];
+    const BSONElement termElement = entry["t"];
+    const BSONElement hashElement = entry["h"];
+    ASSERT_EQUALS(bsonTimestamp, tsElement.type()) << entry;
+    ASSERT_TRUE(hashElement.isNumber()) << entry;
+    ASSERT_TRUE(termElement.eoo() || termElement.isNumber()) << entry;
+    long long term = hashElement.numberLong();
+    if (!termElement.eoo()) {
+        term = termElement.numberLong();
+    }
+    return OpTime(tsElement.timestamp(), term);
+}
+
+TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
+    createOplog(_txn.get());
+
+    {
+        AutoGetOrCreateDb autoDb(_txn.get(), "test", MODE_X);
+        mongo::WriteUnitOfWork wuow(_txn.get());
+        auto coll = autoDb.getDb()->getCollection("test.t");
+        if (!coll) {
+            coll = autoDb.getDb()->createCollection(_txn.get(), "test.t");
+        }
+        ASSERT(coll);
+        ASSERT_OK(coll->insertDocument(_txn.get(), BSON("_id" << 1 << "v" << 2), false));
+        ASSERT_OK(coll->insertDocument(_txn.get(), BSON("_id" << 2 << "v" << 4), false));
+        ASSERT_OK(coll->insertDocument(_txn.get(), BSON("_id" << 4), false));
+        wuow.commit();
+    }
+    const auto commonOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+    const auto applyOpsOperation =
+        std::make_pair(makeApplyOpsOplogEntry(Timestamp(Seconds(2), 0),
+                                              {BSON("op"
+                                                    << "u"
+                                                    << "ns"
+                                                    << "test.t"
+                                                    << "o2" << BSON("_id" << 1) << "o"
+                                                    << BSON("_id" << 1 << "v" << 2)),
+                                               BSON("op"
+                                                    << "u"
+                                                    << "ns"
+                                                    << "test.t"
+                                                    << "o2" << BSON("_id" << 2) << "o"
+                                                    << BSON("_id" << 2 << "v" << 4)),
+                                               BSON("op"
+                                                    << "d"
+                                                    << "ns"
+                                                    << "test.t"
+                                                    << "o" << BSON("_id" << 3)),
+                                               BSON("op"
+                                                    << "i"
+                                                    << "ns"
+                                                    << "test.t"
+                                                    << "o" << BSON("_id" << 4))}),
+                       RecordId(2));
+
+    class RollbackSourceLocal : public RollbackSourceMock {
+    public:
+        RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
+            : RollbackSourceMock(std::move(oplog)) {}
+
+        BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override {
+            int numFields = 0;
+            for (const auto element : filter) {
+                ++numFields;
+                ASSERT_EQUALS("_id", element.fieldNameStringData()) << filter;
+            }
+            ASSERT_EQUALS(1, numFields) << filter;
+            searchedIds.insert(filter.firstElement().numberInt());
+            switch (filter.firstElement().numberInt()) {
+                case 1:
+                    return BSON("_id" << 1 << "v" << 1);
+                case 2:
+                    return BSON("_id" << 2 << "v" << 3);
+                case 3:
+                    return BSON("_id" << 3 << "v" << 5);
+                case 4:
+                    return {};
+            }
+            FAIL("Unexpected findOne request") << filter;
+            return {};  // Unreachable; why doesn't compiler know?
+        }
+
+        mutable std::multiset<int> searchedIds;
+    } rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})));
+
+    _createCollection(_txn.get(), "test.t", CollectionOptions());
+    const auto opTime = getOpTimeFromOplogEntry(applyOpsOperation.first);
+    log() << "Now is " << opTime;
+    ASSERT_OK(syncRollback(_txn.get(),
+                           opTime,
+                           OplogInterfaceMock({applyOpsOperation, commonOperation}),
+                           rollbackSource,
+                           _coordinator,
+                           noSleep));
+    ASSERT_EQUALS(4U, rollbackSource.searchedIds.size());
+    ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(1));
+    ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(2));
+    ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(3));
+    ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(4));
+
+    AutoGetCollectionForRead acr(_txn.get(), "test.t");
+    BSONObj result;
+    ASSERT(Helpers::findOne(_txn.get(), acr.getCollection(), BSON("_id" << 1), result));
+    ASSERT_EQUALS(1, result["v"].numberInt()) << result;
+    ASSERT(Helpers::findOne(_txn.get(), acr.getCollection(), BSON("_id" << 2), result));
+    ASSERT_EQUALS(3, result["v"].numberInt()) << result;
+    ASSERT(Helpers::findOne(_txn.get(), acr.getCollection(), BSON("_id" << 3), result));
+    ASSERT_EQUALS(5, result["v"].numberInt()) << result;
+    ASSERT_FALSE(Helpers::findOne(_txn.get(), acr.getCollection(), BSON("_id" << 4), result))
+        << result;
 }
 
 TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
