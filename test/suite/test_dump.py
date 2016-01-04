@@ -109,7 +109,7 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['-h', self.dir, 'load', '-f', 'dump.out'])
 
         # Check the contents
-        conn = wiredtiger.wiredtiger_open(self.dir)
+        conn = self.wiredtiger_open(self.dir)
         session = conn.open_session()
         cursor = session.open_cursor(uri, None, None)
         self.populate_check(self, cursor, self.nentries)
@@ -119,7 +119,7 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['-h', self.dir, 'load', '-f', 'dump.out'])
 
         # Check the contents, they shouldn't have changed.
-        conn = wiredtiger.wiredtiger_open(self.dir)
+        conn = self.wiredtiger_open(self.dir)
         session = conn.open_session()
         cursor = session.open_cursor(uri, None, None)
         self.populate_check(self, cursor, self.nentries)

@@ -32,7 +32,6 @@
 import fnmatch, os, time
 from suite_subprocess import suite_subprocess
 from helper import simple_populate
-from wiredtiger import wiredtiger_open
 import wttest
 
 class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
@@ -44,15 +43,11 @@ class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
     source_uri = 'table:' + tablename + "_src"
     uri = 'table:' + tablename
 
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        conn_params = \
-            'create,error_prefix="%s: ",' % self.shortid() + \
-            'log=(archive=%s,enabled,file_max=%s,prealloc=false),' % (self.archive, self.logmax) + \
+    # Turn on logging for this test.
+    def conn_config(self, dir):
+        return 'log=(archive=%s,' % self.archive + \
+            'enabled,file_max=%s,prealloc=false),' % self.logmax + \
             'transaction_sync=(enabled=false),'
-        conn = wiredtiger_open(dir, conn_params)
-        self.pr(`conn`)
-        return conn
 
     def run_checkpoints(self):
         orig_logs = fnmatch.filter(os.listdir(self.home), "*Log*")

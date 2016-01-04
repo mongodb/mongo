@@ -28,14 +28,8 @@
 
 import sys, threading, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open, WiredTigerError
+from wiredtiger import WiredTigerError
 from wtscenario import check_scenarios
-
-# TODO - tmp code
-def tty_pr(s):
-    o = open('/dev/tty', 'w')
-    o.write(s + '\n')
-    o.close()
 
 class Callback(wiredtiger.AsyncCallback):
     def __init__(self, current):
@@ -49,7 +43,7 @@ class Callback(wiredtiger.AsyncCallback):
         self.lock = threading.RLock()
 
     def notify_error(self, key, value, optype, exp, desc):
-        tty_pr('ERROR: notify(' + str(key) + ',' + str(value) + ',' +
+        self.tty('ERROR: notify(' + str(key) + ',' + str(value) + ',' +
             str(optype) + '): ' + 'Expected: ' + str(exp) + ' ' + desc)
 
     def notify(self, op, op_ret, flags):
@@ -105,7 +99,7 @@ class Callback(wiredtiger.AsyncCallback):
                 self.nerror += 1
                 self.lock.release()
         except (BaseException) as err:
-            tty_pr('ERROR: exception in notify: ' + str(err))
+            self.tty('ERROR: exception in notify: ' + str(err))
             raise
 
         return 0
@@ -135,18 +129,10 @@ class test_async02(wttest.WiredTigerTestCase, suite_subprocess):
         ('table-row', dict(tablekind='row',uri='table')),
     ])
 
-    # Overrides WiredTigerTestCase so that we can configure
-    # async operations.
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        conn_params = \
-                'create,error_prefix="%s: ",' % self.shortid() + \
-                'async=(enabled=true,ops_max=%s,' % self.async_ops + \
-                'threads=%s)' % self.async_threads
-        sys.stdout.flush()
-        conn = wiredtiger_open(dir, conn_params)
-        self.pr(`conn`)
-        return conn
+    # Enable async for this test.
+    def conn_config(self, dir):
+        return 'async=(enabled=true,ops_max=%s,' % self.async_ops + \
+            'threads=%s)' % self.async_threads
 
     def genkey(self, i):
         if self.tablekind == 'row':

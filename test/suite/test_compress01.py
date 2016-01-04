@@ -52,13 +52,9 @@ class test_compress01(wttest.WiredTigerTestCase):
     nrecords = 10000
     bigvalue = "abcdefghij" * 1000
 
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open( dir, 'create,' +
-            ('error_prefix="%s: ",' % self.shortid()) +
-            self.extensionArg(self.compress))
-        self.pr(`conn`)
-        return conn
+    # Load the compression extension, compression is enabled elsewhere.
+    def conn_config(self, dir):
+        return self.extensionArg(self.compress)
 
     # Return the wiredtiger_open extension argument for a shared library.
     def extensionArg(self, name):

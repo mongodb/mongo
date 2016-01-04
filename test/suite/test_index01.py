@@ -39,11 +39,6 @@ class test_index01(wttest.WiredTigerTestCase):
     NUM_INDICES = 6
     index = ['%s:index%d' % (indexbase, i) for i in xrange(NUM_INDICES)]
 
-    def reopen(self):
-        self.conn.close()
-        self.conn = wiredtiger.wiredtiger_open('.', None)
-        self.session = self.conn.open_session()
-
     def create_table(self):
         self.pr('create table')
         self.session.create(self.tablename, 'key_format=Si,value_format=SSii,columns=(name,ID,dept,job,salary,year)')
