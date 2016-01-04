@@ -200,6 +200,23 @@ obj_checkpoint(void)
 }
 
 void
+obj_rebalance(void)
+{
+	WT_SESSION *session;
+	int ret;
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		testutil_die(ret, "conn.session");
+
+	if ((ret = session->rebalance(session, uri, NULL)) != 0)
+		if (ret != ENOENT && ret != EBUSY)
+			testutil_die(ret, "session.rebalance");
+
+	if ((ret = session->close(session, NULL)) != 0)
+		testutil_die(ret, "session.close");
+}
+
+void
 obj_upgrade(void)
 {
 	WT_SESSION *session;

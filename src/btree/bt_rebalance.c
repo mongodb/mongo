@@ -413,15 +413,15 @@ __wt_bt_rebalance(WT_SESSION_IMPL *session, const char *cfg[])
 	btree = S2BT(session);
 
 	/*
-	 * The tree needs to be clean and have been written to disk, as we
-	 * walk the disk images, not the in-memory pages.
+	 * If the tree has never been written to disk, we're done, rebalance
+	 * walks disk images, not in-memory pages. For the same reason, the
+	 * tree has to be clean.
 	 */
+	if (btree->root.page->dsk == NULL)
+		return (0);
 	if (btree->modified)
 		WT_RET_MSG(session, EINVAL,
 		    "tree is modified, only clean trees may be rebalanced");
-	if (btree->root.page->dsk == NULL)
-		WT_RET_MSG(session, EINVAL,
-		    "only trees persisted to stable storage may be rebalanced");
 
 	WT_CLEAR(_rstuff);
 	rs = &_rstuff;
