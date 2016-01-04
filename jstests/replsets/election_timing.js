@@ -26,6 +26,10 @@
         testReset: ElectionTimingTest.prototype.stopPrimaryReset
     },
 
+    /*
+    This test case is flakey since waiting for the old primary to shutdown can take longer than the
+    allowed timeout, even if a new primary was elected during the shutdown time.
+
     {
         name: "testV1StopTimeout1500",
         description: "protocolVersion 1, primary is stopped, electionTimeoutMillis set to 1500",
@@ -35,6 +39,7 @@
         // The settings object is merged into the replset config settings object.
         settings: {electionTimeoutMillis: 1500}
     },
+    */
 
     {
         name: "testV1StepDown",
