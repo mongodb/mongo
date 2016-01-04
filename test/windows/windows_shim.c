@@ -29,13 +29,6 @@
 #include "windows_shim.h"
 
 int
-sched_yield(void)
-{
-	(void)SwitchToThread();
-	return (0);
-}
-
-int
 sleep(int seconds)
 {
 	Sleep(seconds * 1000);

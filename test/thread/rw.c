@@ -205,10 +205,10 @@ reader(void *arg)
 	printf(" read thread %2d starting: tid: %s, file: %s\n",
 	    id, tid, s->name);
 
-	sched_yield();		/* Get all the threads created. */
+	__wt_yield();		/* Get all the threads created. */
 
 	if (session_per_op) {
-		for (i = 0; i < s->nops; ++i, ++s->reads, sched_yield()) {
+		for (i = 0; i < s->nops; ++i, ++s->reads, __wt_yield()) {
 			if ((ret = conn->open_session(
 			    conn, NULL, NULL, &session)) != 0)
 				testutil_die(ret, "conn.open_session");
@@ -226,7 +226,7 @@ reader(void *arg)
 		if ((ret = session->open_cursor(
 		    session, s->name, NULL, NULL, &cursor)) != 0)
 			testutil_die(ret, "session.open_cursor");
-		for (i = 0; i < s->nops; ++i, ++s->reads, sched_yield())
+		for (i = 0; i < s->nops; ++i, ++s->reads, __wt_yield())
 			reader_op(session, cursor, s);
 		if ((ret = session->close(session, NULL)) != 0)
 			testutil_die(ret, "session.close");
@@ -306,10 +306,10 @@ writer(void *arg)
 	printf("write thread %2d starting: tid: %s, file: %s\n",
 	    id, tid, s->name);
 
-	sched_yield();		/* Get all the threads created. */
+	__wt_yield();		/* Get all the threads created. */
 
 	if (session_per_op) {
-		for (i = 0; i < s->nops; ++i, sched_yield()) {
+		for (i = 0; i < s->nops; ++i, __wt_yield()) {
 			if ((ret = conn->open_session(
 			    conn, NULL, NULL, &session)) != 0)
 				testutil_die(ret, "conn.open_session");
@@ -327,7 +327,7 @@ writer(void *arg)
 		if ((ret = session->open_cursor(
 		    session, s->name, NULL, NULL, &cursor)) != 0)
 			testutil_die(ret, "session.open_cursor");
-		for (i = 0; i < s->nops; ++i, sched_yield())
+		for (i = 0; i < s->nops; ++i, __wt_yield())
 			writer_op(session, cursor, s);
 		if ((ret = session->close(session, NULL)) != 0)
 			testutil_die(ret, "session.close");
