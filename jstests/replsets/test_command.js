@@ -28,14 +28,22 @@
         'node 0' + replSet.nodes[0].host + ' failed to become primary'
     );
 
-    assert.commandWorked(
-        replSet.nodes[1].adminCommand({
+    // We need the try/catch to handle that the node may have hung up the connection due
+    // to a state change.
+    try {
+        assert.commandWorked(replSet.nodes[1].adminCommand({
             replSetTest: 1,
             waitForMemberState: ReplSetTest.State.SECONDARY,
             timeoutMillis: 60 * 1000,
-        }),
-        'node 1' + replSet.nodes[1].host + ' failed to become secondary'
-    );
+        }));
+    } catch (e) {
+        jsTestLog(e);
+        assert.commandWorked(replSet.nodes[1].adminCommand({
+            replSetTest: 1,
+            waitForMemberState: ReplSetTest.State.SECONDARY,
+            timeoutMillis: 60 * 1000,
+        }), 'node 1' + replSet.nodes[1].host + ' failed to become secondary');
+    }
 
     var primary = replSet.getPrimary();
     var secondary = replSet.getSecondary();
