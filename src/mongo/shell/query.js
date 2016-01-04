@@ -354,7 +354,7 @@ DBQuery.prototype._convertToCountCmd = function( applySkipLimit ) {
 DBQuery.prototype.count = function( applySkipLimit ) {
     var cmd = this._convertToCountCmd( applySkipLimit );
 
-    var res = this._db.runCommand( cmd );
+    var res = this._db.runReadCommand( cmd );
     if( res && res.n != null ) return res.n;
     throw _getErrorWithCode(res, "count failed: " + tojson( res ));
 }
