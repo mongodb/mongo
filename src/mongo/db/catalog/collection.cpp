@@ -480,21 +480,29 @@ Status Collection::aboutToDeleteCapped(OperationContext* txn,
 
 void Collection::deleteDocument(
     OperationContext* txn, const RecordId& loc, bool fromMigrate, bool cappedOK, bool noWarn) {
+    BSONObj doc = docFor(txn, loc).value();
+    deleteDocument(txn, loc, doc, fromMigrate, cappedOK, noWarn);
+}
+
+void Collection::deleteDocument(OperationContext* txn,
+                                const RecordId& loc,
+                                const BSONObj& doc,
+                                bool fromMigrate,
+                                bool cappedOK,
+                                bool noWarn) {
     if (isCapped() && !cappedOK) {
         log() << "failing remove on a capped ns " << _ns << endl;
         uasserted(10089, "cannot remove from a capped collection");
         return;
     }
 
-    Snapshotted<BSONObj> doc = docFor(txn, loc);
-
     auto opObserver = getGlobalServiceContext()->getOpObserver();
-    OpObserver::DeleteState deleteState = opObserver->aboutToDelete(txn, ns(), doc.value());
+    OpObserver::DeleteState deleteState = opObserver->aboutToDelete(txn, ns(), doc);
 
     /* check if any cursors point to us.  if so, advance them. */
     _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
 
-    _indexCatalog.unindexRecord(txn, doc.value(), loc, noWarn);
+    _indexCatalog.unindexRecord(txn, doc, loc, noWarn);
 
     _recordStore->deleteRecord(txn, loc);
 

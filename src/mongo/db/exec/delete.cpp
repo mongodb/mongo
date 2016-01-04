@@ -220,7 +220,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
         // Do the write, unless this is an explain.
         if (!_params.isExplain) {
             WriteUnitOfWork wunit(getOpCtx());
-            _collection->deleteDocument(getOpCtx(), rloc, _params.fromMigrate);
+            _collection->deleteDocument(getOpCtx(), rloc, member->obj.value(), _params.fromMigrate);
             wunit.commit();
         }
 
