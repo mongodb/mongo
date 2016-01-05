@@ -5096,13 +5096,15 @@ buildvariants:
   - name: compile
   - name: aggregation
   - name: aggregation_WT
+  - name: aggregation_WT_ese
   - name: aggregation_auth
+  - name: aggregation_read_concern_majority_passthrough_WT
   - name: audit
   - name: audit_WT
-  - name: auth_audit
-  - name: auth_audit_WT
   - name: auth
   - name: auth_WT
+  - name: auth_audit
+  - name: auth_audit_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: concurrency
@@ -5114,6 +5116,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: dur_jscore_passthrough
   - name: durability
   - name: ese_WT
   - name: failpoints
@@ -5127,20 +5130,25 @@ buildvariants:
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
-  - name: integration_tests_standalone
   - name: integration_tests_replset
+  - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_WT
+  - name: jsCore_WT_ese
   - name: jsCore_inMem
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_minimum_batch_size_WT
+  - name: jsCore_op_query
+  - name: jsCore_op_query_WT
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
   - name: mmap
   - name: mongosTest
+  - name: multiversion
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
@@ -5149,25 +5157,34 @@ buildvariants:
   - name: parallel_WT
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
+  - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
+  - name: replicasets_WT_ese
   - name: replicasets_auth
+  - name: replicasets_legacy
   - name: replication
   - name: replication_WT
   - name: replication_auth
   - name: sasl
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding
   - name: sharding_WT
+  - name: sharding_WT_ese
   - name: sharding_auth
   - name: sharding_auth_audit_WT
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_legacy_multiversion
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_legacy
+  - name: sharding_legacy_op_query_WT
+  - name: sharding_legacy_multiversion
+  - name: sharding_op_query_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
