@@ -150,4 +150,37 @@
 
     assert.eq(true, res.results[0], "Valid update failed");
     assert.eq(true, res.results[1], "Valid update failed");
+
+    // Foreground index build.
+    res = assert.commandWorked(db.adminCommand({
+        applyOps: [{"op": "i", "ns": db.getName() + ".system.indexes", "o": {
+            ns: t.getFullName(),
+            key: {a: 1},
+            name: "a_1",
+        }
+    }]}));
+    assert.eq(1, res.applied, "Incorrect number of operations applied");
+    assert.eq(true, res.results[0], "Foreground index creation failed");
+    res = t.getIndexes();
+    assert.eq(
+        1,
+        res.filter(function(element, index, array) {return element.name == 'a_1';}).length,
+        'Foreground index not found in listIndexes result: ' + tojson(res));
+
+    // Background indexes are created in the foreground when processed by applyOps.
+    res = assert.commandWorked(db.adminCommand({
+        applyOps: [{"op": "i", "ns": db.getName() + ".system.indexes", "o": {
+            ns: t.getFullName(),
+            key: {b: 1},
+            name: "b_1",
+            background: true,
+        }
+    }]}));
+    assert.eq(1, res.applied, "Incorrect number of operations applied");
+    assert.eq(true, res.results[0], "Background index creation failed");
+    res = t.getIndexes();
+    assert.eq(
+        1,
+        res.filter(function(element, index, array) {return element.name == 'b_1';}).length,
+        'Background index not found in listIndexes result: ' + tojson(res));
 })();
