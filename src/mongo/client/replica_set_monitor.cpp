@@ -459,6 +459,18 @@ void ReplicaSetMonitor::cleanup() {
     globalRSMonitorManager.removeAllMonitors();
 }
 
+bool ReplicaSetMonitor::isKnownToHaveGoodPrimary() const {
+    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+
+    for (const auto& node : _state->nodes) {
+        if (node.isMaster) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 Refresher::Refresher(const SetStatePtr& setState)
     : _set(setState), _scan(setState->currentScan), _startedNewScan(false) {
     if (_scan)

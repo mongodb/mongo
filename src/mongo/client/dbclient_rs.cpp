@@ -310,7 +310,7 @@ DBClientConnection* DBClientReplicaSet::checkMaster() {
 
     if (newConn == NULL || !errmsg.empty()) {
         monitor->failedHost(_masterHost);
-        uasserted(13639,
+        uasserted(ErrorCodes::FailedToSatisfyReadPreference,
                   str::stream() << "can't connect to new replica set master ["
                                 << _masterHost.toString() << "]"
                                 << (errmsg.empty() ? "" : ", err: ") << errmsg);
