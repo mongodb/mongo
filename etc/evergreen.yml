@@ -623,6 +623,7 @@ tasks:
       # invalid namespace (SERVER-10926).
       resmoke_args: --suites=jstestfuzz_replication_nodbhash --storageEngine=mmapv1
       should_shuffle: false
+      continue_on_failure: false
 
 ## jstestfuzz replica set WT ##
 - <<: *jstestfuzz_template
