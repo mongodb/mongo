@@ -34,7 +34,6 @@ for( var i = 0; i < 2; i++ ){
         assert(e.code == 8002 ||        // SCCC config down, for v3.0 compatibility.
                e.code == 10276 ||       // Transport error
                e.code == 13328 ||       // Connect error
-               e.code == 13639 ||       // Connect error to replSet primary
                e.code == ErrorCodes.HostUnreachable ||
                e.code == ErrorCodes.FailedToSatisfyReadPreference ||
                e.code == ErrorCodes.ReplicaSetNotFound);

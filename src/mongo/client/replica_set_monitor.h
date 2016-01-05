@@ -155,6 +155,11 @@ public:
     void appendInfo(BSONObjBuilder& b) const;
 
     /**
+     * Returns true if the monitor knows a usable primary from it's interal view.
+     */
+    bool isKnownToHaveGoodPrimary() const;
+
+    /**
      * Creates a new ReplicaSetMonitor, if it doesn't already exist.
      */
     static void createIfNeeded(const std::string& name, const std::set<HostAndPort>& servers);

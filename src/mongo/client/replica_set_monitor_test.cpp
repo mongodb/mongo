@@ -955,4 +955,17 @@ TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
     ASSERT(ns.host.empty());
 }
 
+TEST(ReplicaSetMonitor, NoPrimaryUpCheck) {
+    SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
+    ReplicaSetMonitor rsm(state);
+    ASSERT_FALSE(rsm.isKnownToHaveGoodPrimary());
+}
+
+TEST(ReplicaSetMonitor, PrimaryIsUpCheck) {
+    SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
+    state->nodes.front().isMaster = true;
+    ReplicaSetMonitor rsm(state);
+    ASSERT_TRUE(rsm.isKnownToHaveGoodPrimary());
+}
+
 }  // namespace

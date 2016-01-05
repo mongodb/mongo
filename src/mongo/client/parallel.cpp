@@ -395,60 +395,55 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
     const DBClientBase* rawConn = state->conn->getRawConn();
     bool allowShardVersionFailure = rawConn->type() == ConnectionString::SET &&
         DBClientReplicaSet::isSecondaryQuery(_qSpec.ns(), _qSpec.query(), _qSpec.options());
-    bool connIsDown = rawConn->isFailed();
-    if (allowShardVersionFailure && !connIsDown) {
-        // If the replica set connection believes that it has a valid primary that is up,
-        // confirm that the replica set monitor agrees that the suspected primary is indeed up.
+
+    // Skip shard version checking if primary is known to be down.
+    if (allowShardVersionFailure) {
         const DBClientReplicaSet* replConn = dynamic_cast<const DBClientReplicaSet*>(rawConn);
         invariant(replConn);
         ReplicaSetMonitorPtr rsMonitor = ReplicaSetMonitor::get(replConn->getSetName());
-        if (!rsMonitor->isHostUp(replConn->getSuspectedPrimaryHostAndPort())) {
-            connIsDown = true;
+        if (!rsMonitor->isKnownToHaveGoodPrimary()) {
+            state->conn->donotCheckVersion();
+
+            // A side effect of this short circuiting is the mongos will not be able figure out
+            // that the primary is now up on it's own and has to rely on other threads to refresh
+            // node states.
+
+            OCCASIONALLY {
+                const DBClientReplicaSet* repl = dynamic_cast<const DBClientReplicaSet*>(rawConn);
+                dassert(repl);
+                warning() << "Primary for " << repl->getServerAddress()
+                          << " was down before, bypassing setShardVersion."
+                          << " The local replica set view and targeting may be stale.";
+            }
+
+            return;
         }
     }
 
-    if (allowShardVersionFailure && connIsDown) {
-        // If we're doing a secondary-allowed query and the primary is down, don't attempt to
-        // set the shard version.
-
-        state->conn->donotCheckVersion();
-
-        // A side effect of this short circuiting is the mongos will not be able figure out that
-        // the primary is now up on it's own and has to rely on other threads to refresh node
-        // states.
-
-        OCCASIONALLY {
-            const DBClientReplicaSet* repl = dynamic_cast<const DBClientReplicaSet*>(rawConn);
-            dassert(repl);
-            warning() << "Primary for " << repl->getServerAddress()
-                      << " was down before, bypassing setShardVersion."
-                      << " The local replica set view and targeting may be stale.";
+    try {
+        if (state->conn->setVersion()) {
+            LOG(pc) << "needed to set remote version on connection to value "
+                    << "compatible with " << vinfo;
         }
-    } else {
-        try {
-            if (state->conn->setVersion()) {
-                // It's actually okay if we set the version here, since either the
-                // manager will be verified as compatible, or if the manager doesn't
-                // exist, we don't care about version consistency
-                LOG(pc) << "needed to set remote version on connection to value "
-                        << "compatible with " << vinfo;
-            }
-        } catch (const DBException&) {
-            if (allowShardVersionFailure) {
-                // It's okay if we don't set the version when talking to a secondary, we can
-                // be stale in any case.
+    } catch (const DBException& dbExcep) {
+        auto errCode = dbExcep.getCode();
+        if (allowShardVersionFailure &&
+            (ErrorCodes::isNotMasterError(ErrorCodes::fromInt(errCode)) ||
+             errCode == ErrorCodes::FailedToSatisfyReadPreference ||
+             errCode == 9001)) {  // socket exception
+            // It's okay if we don't set the version when talking to a secondary, we can
+            // be stale in any case.
 
-                OCCASIONALLY {
-                    const DBClientReplicaSet* repl =
-                        dynamic_cast<const DBClientReplicaSet*>(state->conn->getRawConn());
-                    dassert(repl);
-                    warning() << "Cannot contact primary for " << repl->getServerAddress()
-                              << " to check shard version."
-                              << " The local replica set view and targeting may be stale.";
-                }
-            } else {
-                throw;
+            OCCASIONALLY {
+                const DBClientReplicaSet* repl =
+                    dynamic_cast<const DBClientReplicaSet*>(state->conn->getRawConn());
+                dassert(repl);
+                warning() << "Cannot contact primary for " << repl->getServerAddress()
+                          << " to check shard version."
+                          << " The local replica set view and targeting may be stale.";
             }
+        } else {
+            throw;
         }
     }
 }

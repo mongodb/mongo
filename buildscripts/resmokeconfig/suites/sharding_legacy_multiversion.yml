@@ -47,6 +47,7 @@ selector:
     - jstests/sharding/zero_shard_version.js # SERVER-20530, fixed in v3.1.9
     - jstests/sharding/drop_sharded_db.js # SERVER-17723, fixed in v3.1.2
     - jstests/sharding/implicit_db_creation.js # SERVER-17723, fixed in v3.1.2
+    - jstests/sharding/secondary_query_routing.js # SERVER-18671, fixed in v3.3.0
 
     # The following tests fail because of known bugs:
     - jstests/sharding/move_primary_basic.js # SERVER-21851
