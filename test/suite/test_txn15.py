@@ -32,7 +32,7 @@
 
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open, stat
+from wiredtiger import stat
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
@@ -40,6 +40,13 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_txn15_1'
     create_params = 'key_format=i,value_format=i'
     entries = 100
+    # Turn on logging for this test.
+    def conn_config(self, dir):
+        return 'statistics=(fast),' + \
+            'log=(archive=false,enabled,file_max=100K),' + \
+            'use_environment=false,' + \
+            'transaction_sync=(enabled=%s),' % self.conn_enable + \
+            'transaction_sync=(method=%s),' % self.conn_method
 
     conn_sync_enabled = [
         ('en_off', dict(conn_enable='false')),
@@ -66,23 +73,6 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
     ]
     scenarios = multiply_scenarios('.', conn_sync_enabled, conn_sync_method,
         begin_sync, commit_sync)
-
-    # Overrides WiredTigerTestCase, add extra config params
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        #
-        # Turn off using any environment variables that may be set by the
-        # testing infrastructure.
-        #
-        conn_params = \
-            'create,statistics=(fast),error_prefix="%s: ",' % self.shortid() + \
-            'log=(archive=false,enabled,file_max=100K),' + \
-            'use_environment=false,' + \
-            'transaction_sync=(enabled=%s),' % self.conn_enable + \
-            'transaction_sync=(method=%s),' % self.conn_method
-        # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
-        conn = wiredtiger_open(dir, conn_params)
-        return conn
 
     # Given the different configuration settings determine if this group
     # of settings would result in either a wait for write or sync.
