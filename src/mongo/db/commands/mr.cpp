@@ -1465,6 +1465,11 @@ public:
                     if (config.limit && numInputs >= config.limit)
                         break;
                 }
+
+                // Record the indexes used by the PlanExecutor.
+                PlanSummaryStats stats;
+                Explain::getSummaryStats(*exec, &stats);
+                coll->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
             }
             pm.finished();
 
