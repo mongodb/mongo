@@ -461,15 +461,12 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		lineJson["host"] = line.Host
 		lineJson["vsize"] = text.FormatMegabyteAmount(int64(line.Virtual))
 		lineJson["res"] = text.FormatMegabyteAmount(int64(line.Resident))
-
+		lineJson["flushes"] = fmt.Sprintf("%v", line.Flushes)
+		lineJson["qr|qw"] = fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters)
+		lineJson["ar|aw"] = fmt.Sprintf("%v|%v", line.ActiveReaders, line.ActiveWriters)
+				
 		// add mmapv1-specific fields
 		if lineFlags&MMAPOnly > 0 {
-			lineJson["flushes"] = fmt.Sprintf("%v", line.Flushes)
-			lineJson["qr|qw"] = fmt.Sprintf("%v|%v", line.QueuedReaders,
-				line.QueuedWriters)
-			lineJson["ar|aw"] = fmt.Sprintf("%v|%v", line.ActiveReaders,
-				line.ActiveWriters)
-
 			mappedVal := ""      // empty for mongos
 			if line.Mapped > 0 { // not mongos, update accordingly
 				mappedVal = text.FormatMegabyteAmount(int64(line.Mapped))
