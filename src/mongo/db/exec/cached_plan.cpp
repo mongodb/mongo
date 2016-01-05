@@ -261,6 +261,12 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
         verify(StageBuilder::build(_txn, _collection, *solutions[0], _ws, &newRoot));
         _mainChildPlan.reset(newRoot);
         _mainQs.reset(solutions.popAndReleaseBack());
+
+        LOG(1)
+            << "Replanning of query resulted in single query solution, which will not be cached. "
+            << _canonicalQuery->toStringShort()
+            << " plan summary after replan: " << Explain::getPlanSummary(_mainChildPlan.get())
+            << " previous cache entry evicted: " << (shouldCache ? "yes" : "no");
         return Status::OK();
     }
 
@@ -282,7 +288,15 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
     }
 
     // Delegate to the MultiPlanStage's plan selection facility.
-    return multiPlanStage->pickBestPlan(yieldPolicy);
+    Status pickBestPlanStatus = multiPlanStage->pickBestPlan(yieldPolicy);
+    if (!pickBestPlanStatus.isOK()) {
+        return pickBestPlanStatus;
+    }
+
+    LOG(1) << "Replanning " << _canonicalQuery->toStringShort()
+           << " resulted in plan with summary: " << Explain::getPlanSummary(_mainChildPlan.get())
+           << ", which " << (shouldCache ? "has" : "has not") << " been written to the cache";
+    return Status::OK();
 }
 
 PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
