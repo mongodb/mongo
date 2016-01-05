@@ -36,15 +36,21 @@ from wtscenario import check_scenarios
 class test_rebalance(wttest.WiredTigerTestCase):
     name = 'test_rebalance'
 
+    # Use small pages so we generate some internal layout
+    # Setup LSM so multiple chunks are present
+    config = 'key_format=S,allocation_size=512,internal_page_max=512' + \
+             ',leaf_page_max=1k,lsm=(chunk_size=512k,merge_min=10)'
+
     scenarios = check_scenarios([
         ('file', dict(uri='file:')),
-        ('table', dict(uri='table:'))
+        ('table', dict(uri='table:')),
+        ('lsm', dict(uri='lsm:'))
     ])
 
     # Populate an object, then rebalance it.
     def rebalance(self, populate, with_cursor):
         uri = self.uri + self.name
-        populate(self, uri, 'key_format=S', 10)
+        populate(self, uri, self.config, 10000)
 
         # Force to disk, we don't rebalance in-memory objects.
         self.reopen_conn()
