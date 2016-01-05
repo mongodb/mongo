@@ -228,6 +228,16 @@ public:
                 PipelineD::prepareCursorSource(txn, collection, pPipeline, pCtx);
             pPipeline->stitch();
 
+            if (collection && input) {
+                // Record the indexes used by the input executor. Retrieval of summary stats for a
+                // PlanExecutor is normally done post execution. DocumentSourceCursor however will
+                // destroy the input PlanExecutor once the result set has been exhausted. For
+                // that reason we need to collect the indexes used prior to plan execution.
+                PlanSummaryStats stats;
+                Explain::getSummaryStats(*input, &stats);
+                collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
+            }
+
             // Create the PlanExecutor which returns results from the pipeline. The WorkingSet
             // ('ws') and the PipelineProxyStage ('proxy') will be owned by the created
             // PlanExecutor.
