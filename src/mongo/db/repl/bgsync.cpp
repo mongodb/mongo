@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/oplogreader.h"
@@ -160,7 +161,7 @@ BackgroundSync::BackgroundSync()
       _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
                          std::numeric_limits<long long>::max()),
       _lastFetchedHash(0),
-      _pause(true),
+      _stopped(true),
       _replCoord(getGlobalReplicationCoordinator()),
       _initialSyncRequestedFlag(false),
       _indexPrefetchConfig(PREFETCH_ALL) {}
@@ -179,7 +180,7 @@ void BackgroundSync::shutdown() {
     // Clear the buffer in case the producerThread is waiting in push() due to a full queue.
     invariant(inShutdown());
     clearBuffer();
-    _pause = true;
+    _stopped = true;
 }
 
 void BackgroundSync::producerThread() {
@@ -209,14 +210,14 @@ void BackgroundSync::producerThread() {
 
 void BackgroundSync::_producerThread() {
     const MemberState state = _replCoord->getMemberState();
-    // we want to pause when the state changes to primary
+    // Stop when the state changes to primary.
     if (_replCoord->isWaitingForApplierToDrain() || state.primary()) {
-        if (!isPaused()) {
+        if (!isStopped()) {
             stop();
         }
         if (_replCoord->isWaitingForApplierToDrain()) {
-            // Signal to consumers that we have entered the paused state if the signal isn't already
-            // in the queue.
+            // Signal to consumers that we have entered the stopped state
+            // if the signal isn't already in the queue.
             const boost::optional<BSONObj> lastObjectPushed = _buffer.lastObjectPushed();
             if (!lastObjectPushed || !lastObjectPushed->isEmpty()) {
                 const BSONObj sentinelDoc;
@@ -241,10 +242,10 @@ void BackgroundSync::_producerThread() {
         sleepsecs(1);
         return;
     }
-    // we want to unpause when we're no longer primary
+    // we want to start when we're no longer primary
     // start() also loads _lastOpTimeFetched, which we know is set from the "if"
     OperationContextImpl txn;
-    if (isPaused()) {
+    if (isStopped()) {
         start(&txn);
     }
 
@@ -295,7 +296,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
     long long lastHashFetched;
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (_pause) {
+        if (_stopped) {
             return;
         }
         lastOpTimeFetched = _lastOpTimeFetched;
@@ -367,9 +368,9 @@ void BackgroundSync::_produce(OperationContext* txn) {
     fetcher.wait();
     LOG(1) << "fetcher stopped reading remote oplog on " << source;
 
-    // If the background sync is paused after the fetcher is started, we need to
+    // If the background sync is stopped after the fetcher is started, we need to
     // re-evaluate our sync source and oplog common point.
-    if (isPaused()) {
+    if (isStopped()) {
         return;
     }
 
@@ -397,7 +398,37 @@ void BackgroundSync::_produce(OperationContext* txn) {
                 return connection->get();
             };
 
-        log() << "starting rollback: " << fetcherReturnStatus;
+        {
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            lastOpTimeFetched = _lastOpTimeFetched;
+        }
+
+        log() << "Starting rollback due to " << fetcherReturnStatus;
+
+        // Wait till all buffered oplog entries have drained and been applied.
+        auto lastApplied = _replCoord->getMyLastOptime();
+        if (lastApplied != _lastOpTimeFetched) {
+            log() << "Waiting for all operations from " << lastApplied << " until "
+                  << _lastOpTimeFetched << " to be applied before starting rollback.";
+            while (_lastOpTimeFetched > (lastApplied = _replCoord->getMyLastOptime())) {
+                sleepmillis(10);
+                if (isStopped() || inShutdown()) {
+                    return;
+                }
+            }
+        }
+        // check that we are at minvalid, otherwise we cannot roll back as we may be in an
+        // inconsistent state
+        BatchBoundaries boundaries = getMinValid(txn);
+        if (!boundaries.start.isNull() || boundaries.end > lastApplied) {
+            fassertNoTrace(18750,
+                           Status(ErrorCodes::UnrecoverableRollbackError,
+                                  str::stream()
+                                      << "need to rollback, but in inconsistent state. "
+                                      << "minvalid: " << boundaries.end.toString()
+                                      << " > our last optime: " << lastApplied.toString()));
+        }
+
         _rollback(txn, source, getConnection);
         stop();
     } else if (!fetcherReturnStatus.isOK()) {
@@ -422,8 +453,8 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
         return;
     }
 
-    // Check if we have been paused.
-    if (isPaused()) {
+    // Check if we have been stopped.
+    if (isStopped()) {
         return;
     }
 
@@ -491,7 +522,15 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
 
     // The count of the bytes of the documents read off the network.
     int networkDocumentBytes = 0;
-    Timestamp lastTS = _lastOpTimeFetched.getTimestamp();
+    Timestamp lastTS;
+    {
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        // If we are stopped then return without queueing this batch to apply.
+        if (_stopped) {
+            return;
+        }
+        lastTS = _lastOpTimeFetched.getTimestamp();
+    }
     int count = 0;
     for (auto&& doc : documents) {
         networkDocumentBytes += doc.objsize();
@@ -554,7 +593,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
             stdx::unique_lock<stdx::mutex> lock(_mutex);
             _lastFetchedHash = lastDoc["h"].numberLong();
             _lastOpTimeFetched = fassertStatusOK(28770, OpTime::parseFromOplogEntry(lastDoc));
-            LOG(3) << "batch lastOpTimeFetched: " << _lastOpTimeFetched;
+            LOG(3) << "batch resetting _lastOpTimeFetched: " << _lastOpTimeFetched;
         }
     }
 
@@ -581,7 +620,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     }
 
     // If we are transitioning to primary state, we need to leave
-    // this loop in order to go into bgsync-pause mode.
+    // this loop in order to go into bgsync-stop mode.
     if (_replCoord->isWaitingForApplierToDrain() || _replCoord->getMemberState().primary()) {
         return;
     }
@@ -591,8 +630,8 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
         return;
     }
 
-    // Check if we have been paused.
-    if (isPaused()) {
+    // Check if we have been stopped.
+    if (isStopped()) {
         return;
     }
 
@@ -647,7 +686,6 @@ void BackgroundSync::_rollback(OperationContext* txn,
     // Abort only when syncRollback detects we are in a unrecoverable state.
     // In other cases, we log the message contained in the error status and retry later.
     auto status = syncRollback(txn,
-                               _replCoord->getMyLastOptime(),
                                OplogInterfaceLocal(txn, rsOplogName),
                                RollbackSourceImpl(getConnection, source, rsOplogName),
                                _replCoord);
@@ -677,7 +715,7 @@ void BackgroundSync::cancelFetcher() {
 void BackgroundSync::stop() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    _pause = true;
+    _stopped = true;
     _syncSourceHost = HostAndPort();
     _lastOpTimeFetched = OpTime();
     _lastFetchedHash = 0;
@@ -688,7 +726,7 @@ void BackgroundSync::start(OperationContext* txn) {
 
     long long lastFetchedHash = _readLastAppliedHash(txn);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _pause = false;
+    _stopped = false;
 
     // reset _last fields with current oplog data
     _lastOpTimeFetched = _replCoord->getMyLastOptime();
@@ -697,9 +735,9 @@ void BackgroundSync::start(OperationContext* txn) {
     LOG(1) << "bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastFetchedHash;
 }
 
-bool BackgroundSync::isPaused() const {
+bool BackgroundSync::isStopped() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _pause;
+    return _stopped;
 }
 
 void BackgroundSync::clearBuffer() {

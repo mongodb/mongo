@@ -903,27 +903,12 @@ Status _syncRollback(OperationContext* txn,
 }  // namespace
 
 Status syncRollback(OperationContext* txn,
-                    const OpTime& lastOpTimeApplied,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
                     ReplicationCoordinator* replCoord,
                     const SleepSecondsFn& sleepSecondsFn) {
     invariant(txn);
     invariant(replCoord);
-
-    // check that we are at minvalid, otherwise we cannot rollback as we may be in an
-    // inconsistent state
-    {
-        BatchBoundaries boundaries = getMinValid(txn);
-        if (!boundaries.start.isNull() || boundaries.end > lastOpTimeApplied) {
-            severe() << "need to rollback, but in inconsistent state" << endl;
-            return Status(ErrorCodes::UnrecoverableRollbackError,
-                          str::stream() << "need to rollback, but in inconsistent state. "
-                                        << "minvalid: " << boundaries.end.toString()
-                                        << " > our last optime: " << lastOpTimeApplied.toString(),
-                          18750);
-        }
-    }
 
     log() << "beginning rollback" << rsLog;
 
@@ -936,12 +921,10 @@ Status syncRollback(OperationContext* txn,
 }
 
 Status syncRollback(OperationContext* txn,
-                    const OpTime& lastOpTimeWritten,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
                     ReplicationCoordinator* replCoord) {
     return syncRollback(txn,
-                        lastOpTimeWritten,
                         localOplog,
                         rollbackSource,
                         replCoord,

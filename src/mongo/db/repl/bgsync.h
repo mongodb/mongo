@@ -93,7 +93,7 @@ public:
 
     void shutdown();
 
-    bool isPaused() const;
+    bool isStopped() const;
 
     virtual ~BackgroundSync() {}
 
@@ -157,8 +157,8 @@ private:
     // a secondary.
     long long _lastFetchedHash;
 
-    // if produce thread should be running
-    bool _pause;
+    // if producer thread should not be running
+    bool _stopped;
 
     HostAndPort _syncSourceHost;
 
