@@ -48,8 +48,10 @@ using std::string;
 
 OperationContext* const noTxn = NULL;  // MockEnv doesn't need txn XXX SERVER-13931
 
-// Capped sleep interval is 640 mSec, Nyquist frequency is 1280 mSec => round up to 2 sec.
-const int MAX_IMMEDIATE_DELETE_WAIT_SECS = 2;
+// The range deleter cursor close wait interval increases exponentially from 5 milliseconds to an
+// upper bound of 500 msec. Three seconds should be enough time for changes in the cursors set to be
+// noticed.
+const Seconds MAX_IMMEDIATE_DELETE_WAIT(3);
 
 const mongo::repl::ReplSettings replSettings = {};
 
@@ -175,11 +177,8 @@ TEST(ImmediateDelete, ShouldWaitCursor) {
         KeyRange(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1)));
     deleterOption.waitForOpenCursors = true;
 
-    // VS2013 Doesn't support future<void>, so fake it with a bool.
-    stdx::packaged_task<bool()> deleterTask([&] {
-        deleter.deleteNow(noTxn, deleterOption, &errMsg);
-        return true;
-    });
+    stdx::packaged_task<bool()> deleterTask(
+        [&] { return deleter.deleteNow(noTxn, deleterOption, &errMsg); });
     stdx::future<bool> deleterFuture = deleterTask.get_future();
     stdx::thread deleterThread(std::move(deleterTask));
 
@@ -200,10 +199,10 @@ TEST(ImmediateDelete, ShouldWaitCursor) {
     env->addCursorId(ns, 200);
     env->removeCursorId(ns, 345);
 
-    ASSERT_TRUE(stdx::future_status::ready ==
-                deleterFuture.wait_for(stdx::chrono::seconds(MAX_IMMEDIATE_DELETE_WAIT_SECS)));
-
+    ASSERT_TRUE(stdx::future_status::ready == deleterFuture.wait_for(MAX_IMMEDIATE_DELETE_WAIT));
+    ASSERT_TRUE(deleterFuture.get());
     ASSERT_TRUE(env->deleteOccured());
+
     const DeletedRange deletedChunk(env->getLastDelete());
 
     ASSERT_EQUALS(ns, deletedChunk.ns);
@@ -233,11 +232,8 @@ TEST(ImmediateDelete, StopWhileWaitingCursor) {
         KeyRange(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1)));
     deleterOption.waitForOpenCursors = true;
 
-    // VS2013 Doesn't support future<void>, so fake it with a bool.
-    stdx::packaged_task<bool()> deleterTask([&] {
-        deleter.deleteNow(noTxn, deleterOption, &errMsg);
-        return true;
-    });
+    stdx::packaged_task<bool()> deleterTask(
+        [&] { return deleter.deleteNow(noTxn, deleterOption, &errMsg); });
     stdx::future<bool> deleterFuture = deleterTask.get_future();
     stdx::thread deleterThread(std::move(deleterTask));
 
@@ -254,9 +250,8 @@ TEST(ImmediateDelete, StopWhileWaitingCursor) {
 
     stop_deleter_guard.Execute();
 
-    ASSERT_TRUE(stdx::future_status::ready ==
-                deleterFuture.wait_for(stdx::chrono::seconds(MAX_IMMEDIATE_DELETE_WAIT_SECS)));
-
+    ASSERT_TRUE(stdx::future_status::ready == deleterFuture.wait_for(MAX_IMMEDIATE_DELETE_WAIT));
+    ASSERT_FALSE(deleterFuture.get());
     ASSERT_FALSE(env->deleteOccured());
 }
 
