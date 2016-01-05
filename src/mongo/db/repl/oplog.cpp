@@ -634,12 +634,21 @@ bool applyOperation_inlock(OperationContext* txn,
         const char* p = strchr(ns, '.');
         if (p && nsToCollectionSubstring(p) == "system.indexes") {
             if (o["background"].trueValue()) {
-                IndexBuilder* builder = new IndexBuilder(o);
-                // This spawns a new thread and returns immediately.
-                builder->go();
-                // Wait for thread to start and register itself
                 Lock::TempRelease release(txn->lockState());
-                IndexBuilder::waitForBgIndexStarting();
+                if (txn->lockState()->isLocked()) {
+                    // If TempRelease fails, background index build will deadlock.
+                    LOG(3) << "apply op: building background index " << o
+                           << " in the foreground because temp release failed";
+                    IndexBuilder builder(o);
+                    Status status = builder.buildInForeground(txn, db);
+                    uassertStatusOK(status);
+                } else {
+                    IndexBuilder* builder = new IndexBuilder(o);
+                    // This spawns a new thread and returns immediately.
+                    builder->go();
+                    // Wait for thread to start and register itself
+                    IndexBuilder::waitForBgIndexStarting();
+                }
             } else {
                 IndexBuilder builder(o);
                 Status status = builder.buildInForeground(txn, db);
