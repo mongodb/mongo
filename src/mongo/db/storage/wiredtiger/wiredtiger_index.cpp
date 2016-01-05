@@ -51,6 +51,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -71,6 +72,8 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FP_DECLARE(WTEmulateOutOfOrderNextIndexKey);
 
 using std::string;
 using std::vector;
@@ -617,7 +620,7 @@ public:
 
         if (!_lastMoveWasRestore)
             advanceWTCursor();
-        updatePosition();
+        updatePosition(true);
         return curr(parts);
     }
 
@@ -807,7 +810,7 @@ protected:
      * be called after a restore that did not restore to original state since that does not
      * logically move the cursor until the following call to next().
      */
-    void updatePosition() {
+    void updatePosition(bool inNext = false) {
         _lastMoveWasRestore = false;
         if (_cursorAtEof) {
             _eof = true;
@@ -820,6 +823,33 @@ protected:
         WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
         invariantWTOK(c->get_key(c, &item));
+
+        const auto isForwardNextCall = _forward && inNext && !_key.isEmpty();
+        if (isForwardNextCall) {
+            // Due to a bug in wired tiger (SERVER-21867) sometimes calling next
+            // returns something prev.
+            const int cmp =
+                std::memcmp(_key.getBuffer(), item.data, std::min(_key.getSize(), item.size));
+            bool nextNotIncreasing = cmp > 0 || (cmp == 0 && _key.getSize() > item.size);
+
+            if (MONGO_FAIL_POINT(WTEmulateOutOfOrderNextIndexKey)) {
+                log() << "WTIndex::updatePosition simulating next key not increasing.";
+                nextNotIncreasing = true;
+            }
+
+            if (nextNotIncreasing) {
+                // Our new key is less than the old key which means the next call moved to !next.
+                log() << "WTIndex::updatePosition -- the new key ( " << toHex(item.data, item.size)
+                      << ") is less than the previous key (" << _key.toString()
+                      << "), which is a bug.";
+
+                // Force a retry of the operation from our last known position by acting as-if
+                // we received a WT_ROLLBACK error.
+                throw WriteConflictException();
+            }
+        }
+
+        // Store (a copy of) the new item data as the current key for this cursor.
         _key.resetFromBuffer(item.data, item.size);
 
         if (atOrPastEndPointAfterSeeking()) {
