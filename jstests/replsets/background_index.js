@@ -22,7 +22,7 @@
     }
 
     // Add a background index.
-    coll.ensureIndex({x: 1, background: true});
+    coll.ensureIndex({x: 1}, {background: true});
 
     // Rename the collection.
     assert.commandWorked(
