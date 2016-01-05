@@ -36,7 +36,7 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hi
         """Makes a map from binary load address to description of library from the somap, which is
         a list of dictionaries describing individual loaded libraries.
         """
-        return { so_entry["b"] : so_entry for so_entry in somap_list }
+        return { so_entry["b"] : so_entry for so_entry in somap_list if so_entry.has_key("b") }
 
     base_addr_map = make_base_addr_map(trace_doc["processInfo"]["somap"])
 
