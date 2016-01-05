@@ -63,7 +63,6 @@ class RollbackSource;
  * while our rollback is in progress.
  *
  * @param txn Used to read and write from this node's databases
- * @param lastOpTimeWritten The last OpTime applied by the applier
  * @param localOplog reads the oplog on this server.
  * @param rollbackSource interface for sync source:
  *            provides oplog; and
@@ -76,14 +75,12 @@ class RollbackSource;
 using SleepSecondsFn = stdx::function<void(Seconds)>;
 
 Status syncRollback(OperationContext* txn,
-                    const OpTime& lastOpTimeWritten,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
                     ReplicationCoordinator* replCoord,
                     const SleepSecondsFn& sleepSecondsFn);
 
 Status syncRollback(OperationContext* txn,
-                    const OpTime& lastOpTimeWritten,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
                     ReplicationCoordinator* replCoord);

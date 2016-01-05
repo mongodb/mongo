@@ -173,14 +173,13 @@ TEST_F(RSRollbackTest, InconsistentMinValid) {
     repl::setMinValid(_txn.get(),
                       {OpTime(Timestamp(Seconds(0), 0), 0), OpTime(Timestamp(Seconds(1), 0), 0)});
     auto status = syncRollback(_txn.get(),
-                               OpTime(),
                                OplogInterfaceMock(kEmptyMockOperations),
                                RollbackSourceMock(std::unique_ptr<OplogInterface>(
                                    new OplogInterfaceMock(kEmptyMockOperations))),
                                _coordinator,
                                noSleep);
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
-    ASSERT_EQUALS(18750, status.location());
+    ASSERT_EQUALS(18752, status.location());
 }
 
 TEST_F(RSRollbackTest, SetFollowerModeFailed) {
@@ -200,7 +199,6 @@ TEST_F(RSRollbackTest, SetFollowerModeFailed) {
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed,
                   syncRollback(_txn.get(),
-                               OpTime(),
                                OplogInterfaceMock(kEmptyMockOperations),
                                RollbackSourceMock(std::unique_ptr<OplogInterface>(
                                    new OplogInterfaceMock(kEmptyMockOperations))),
@@ -215,7 +213,6 @@ TEST_F(RSRollbackTest, OplogStartMissing) {
     ASSERT_EQUALS(
         ErrorCodes::OplogStartMissing,
         syncRollback(_txn.get(),
-                     OpTime(),
                      OplogInterfaceMock(kEmptyMockOperations),
                      RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                          operation,
@@ -229,7 +226,6 @@ TEST_F(RSRollbackTest, NoRemoteOpLog) {
     auto operation =
         std::make_pair(BSON("ts" << ts.getTimestamp() << "h" << ts.getTerm()), RecordId());
     auto status = syncRollback(_txn.get(),
-                               ts,
                                OplogInterfaceMock({operation}),
                                RollbackSourceMock(std::unique_ptr<OplogInterface>(
                                    new OplogInterfaceMock(kEmptyMockOperations))),
@@ -252,7 +248,6 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
         }
     };
     ASSERT_THROWS_CODE(syncRollback(_txn.get(),
-                                    ts,
                                     OplogInterfaceMock({operation}),
                                     RollbackSourceLocal(std::unique_ptr<OplogInterface>(
                                         new OplogInterfaceMock(kEmptyMockOperations))),
@@ -269,7 +264,6 @@ TEST_F(RSRollbackTest, BothOplogsAtCommonPoint) {
         std::make_pair(BSON("ts" << ts.getTimestamp() << "h" << ts.getTerm()), RecordId(1));
     ASSERT_OK(
         syncRollback(_txn.get(),
-                     ts,
                      OplogInterfaceMock({operation}),
                      RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                          operation,
@@ -338,9 +332,7 @@ int _testRollbackDelete(OperationContext* txn,
                                        std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                                            commonOperation,
                                        })));
-    OpTime opTime(deleteOperation.first["ts"].timestamp(), deleteOperation.first["h"].Long());
     ASSERT_OK(syncRollback(txn,
-                           opTime,
                            OplogInterfaceMock({deleteOperation, commonOperation}),
                            rollbackSource,
                            coordinator,
@@ -413,11 +405,8 @@ TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    OpTime opTime(insertDocumentOperation.first["ts"].timestamp(),
-                  insertDocumentOperation.first["h"].Long());
     startCapturingLogMessages();
     auto status = syncRollback(_txn.get(),
-                               opTime,
                                OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                                rollbackSource,
                                _coordinator,
@@ -472,14 +461,11 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    OpTime opTime(insertDocumentOperation.first["ts"].timestamp(),
-                  insertDocumentOperation.first["h"].Long());
     // Repeat index creation operation and confirm that rollback attempts to drop index just once.
     // This can happen when an index is re-created with different options.
     startCapturingLogMessages();
     ASSERT_OK(syncRollback(
         _txn.get(),
-        opTime,
         OplogInterfaceMock({insertDocumentOperation, insertDocumentOperation, commonOperation}),
         rollbackSource,
         _coordinator,
@@ -535,11 +521,8 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    OpTime opTime(insertDocumentOperation.first["ts"].timestamp(),
-                  insertDocumentOperation.first["h"].Long());
     startCapturingLogMessages();
     ASSERT_OK(syncRollback(_txn.get(),
-                           opTime,
                            OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                            rollbackSource,
                            _coordinator,
@@ -585,11 +568,8 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingNamespace) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    OpTime opTime(insertDocumentOperation.first["ts"].timestamp(),
-                  insertDocumentOperation.first["h"].Long());
     startCapturingLogMessages();
     auto status = syncRollback(_txn.get(),
-                               opTime,
                                OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                                rollbackSource,
                                _coordinator,
@@ -632,11 +612,8 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandInvalidNamespace) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    OpTime opTime(insertDocumentOperation.first["ts"].timestamp(),
-                  insertDocumentOperation.first["h"].Long());
     startCapturingLogMessages();
     auto status = syncRollback(_txn.get(),
-                               opTime,
                                OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                                rollbackSource,
                                _coordinator,
@@ -678,11 +655,8 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    OpTime opTime(insertDocumentOperation.first["ts"].timestamp(),
-                  insertDocumentOperation.first["h"].Long());
     startCapturingLogMessages();
     auto status = syncRollback(_txn.get(),
-                               opTime,
                                OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                                rollbackSource,
                                _coordinator,
@@ -714,11 +688,8 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
         ASSERT_TRUE(db->getOrCreateCollection(_txn.get(), "test.t"));
         wuow.commit();
     }
-    OpTime opTime(unknownCommandOperation.first["ts"].timestamp(),
-                  unknownCommandOperation.first["h"].Long());
     auto status =
         syncRollback(_txn.get(),
-                     opTime,
                      OplogInterfaceMock({unknownCommandOperation, commonOperation}),
                      RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                          commonOperation,
@@ -755,10 +726,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
         commonOperation,
     })));
     _createCollection(_txn.get(), "test.t", CollectionOptions());
-    OpTime opTime(dropCollectionOperation.first["ts"].timestamp(),
-                  dropCollectionOperation.first["h"].Long());
     ASSERT_OK(syncRollback(_txn.get(),
-                           opTime,
                            OplogInterfaceMock({dropCollectionOperation, commonOperation}),
                            rollbackSource,
                            _coordinator,
@@ -782,10 +750,7 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
         commonOperation,
     })));
     _createCollection(_txn.get(), "test.t", CollectionOptions());
-    OpTime opTime(createCollectionOperation.first["ts"].timestamp(),
-                  createCollectionOperation.first["h"].Long());
     ASSERT_OK(syncRollback(_txn.get(),
-                           opTime,
                            OplogInterfaceMock({createCollectionOperation, commonOperation}),
                            rollbackSource,
                            _coordinator,
@@ -825,11 +790,8 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
         commonOperation,
     })));
     _createCollection(_txn.get(), "test.t", CollectionOptions());
-    OpTime opTime(collectionModificationOperation.first["ts"].timestamp(),
-                  collectionModificationOperation.first["h"].Long());
     startCapturingLogMessages();
     ASSERT_OK(syncRollback(_txn.get(),
-                           opTime,
                            OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                            rollbackSource,
                            _coordinator,
@@ -867,11 +829,8 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOpt
         commonOperation,
     })));
     _createCollection(_txn.get(), "test.t", CollectionOptions());
-    OpTime opTime(collectionModificationOperation.first["ts"].timestamp(),
-                  collectionModificationOperation.first["h"].Long());
     auto status =
         syncRollback(_txn.get(),
-                     opTime,
                      OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                      rollbackSource,
                      _coordinator,
