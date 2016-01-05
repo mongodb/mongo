@@ -93,10 +93,12 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting NONE here,
+                                                // Note: Even though we're setting UNSET here,
                                                 // kMajority implies JOURNAL if journaling is
-                                                // supported by mongod.
-                                                WriteConcernOptions::NONE,
+                                                // supported by mongod and
+                                                // writeConcernMajorityJournalDefault is set to true
+                                                // in the ReplicaSetConfig.
+                                                WriteConcernOptions::SyncMode::UNSET,
                                                 Seconds(15));
 
 const int kMaxConfigVersionInitRetry = 3;
@@ -789,6 +791,7 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
         // Make sure that if the command has a write concern that it is w:1 or w:majority, and
         // convert w:1 or no write concern to w:majority before sending.
         WriteConcernOptions writeConcern;
+        writeConcern.reset();
         const char* writeConcernFieldName = "writeConcern";
         BSONElement writeConcernElement = cmdObj[writeConcernFieldName];
         bool initialCmdHadWriteConcern = !writeConcernElement.eoo();

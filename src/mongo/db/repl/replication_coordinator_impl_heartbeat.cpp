@@ -138,7 +138,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         }
     }
     const Date_t now = _replExecutor.now();
-    const OpTime lastApplied = getMyLastOptime();  // Locks and unlocks _mutex.
+    const OpTime lastApplied = getMyLastAppliedOpTime();  // Locks and unlocks _mutex.
     Milliseconds networkTime(0);
     StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
@@ -165,15 +165,20 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         now, networkTime, target, hbStatusResponse, lastApplied);
 
     if (action.getAction() == HeartbeatResponseAction::NoAction && hbStatusResponse.isOK() &&
-        hbStatusResponse.getValue().hasOpTime() && targetIndex >= 0 &&
-        hbStatusResponse.getValue().hasState() &&
+        targetIndex >= 0 && hbStatusResponse.getValue().hasState() &&
         hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (hbStatusResponse.getValue().getConfigVersion() == _rsConfig.getConfigVersion()) {
-            _updateOpTimeFromHeartbeat_inlock(targetIndex, hbStatusResponse.getValue().getOpTime());
-            // TODO: Enable with Data Replicator
-            // lk.unlock();
-            //_dr.slavesHaveProgressed();
+        ReplSetHeartbeatResponse hbResp = hbStatusResponse.getValue();
+        if (hbResp.hasAppliedOpTime()) {
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            if (hbResp.getConfigVersion() == _rsConfig.getConfigVersion()) {
+                _updateOpTimesFromHeartbeat_inlock(
+                    targetIndex,
+                    hbResp.hasDurableOpTime() ? hbResp.getDurableOpTime() : OpTime(),
+                    hbResp.getAppliedOpTime());
+                // TODO: Enable with Data Replicator
+                // lk.unlock();
+                //_dr.slavesHaveProgressed();
+            }
         }
     }
 
@@ -186,14 +191,18 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     _handleHeartbeatResponseAction(action, hbStatusResponse);
 }
 
-void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat_inlock(int targetIndex,
-                                                                   const OpTime& optime) {
+void ReplicationCoordinatorImpl::_updateOpTimesFromHeartbeat_inlock(int targetIndex,
+                                                                    const OpTime& durableOpTime,
+                                                                    const OpTime& appliedOpTime) {
     invariant(_selfIndex >= 0);
     invariant(targetIndex >= 0);
 
     SlaveInfo& slaveInfo = _slaveInfo[targetIndex];
-    if (optime > slaveInfo.opTime) {
-        _updateSlaveInfoOptime_inlock(&slaveInfo, optime);
+    if (appliedOpTime > slaveInfo.lastAppliedOpTime) {
+        _updateSlaveInfoAppliedOpTime_inlock(&slaveInfo, appliedOpTime);
+    }
+    if (durableOpTime > slaveInfo.lastDurableOpTime) {
+        _updateSlaveInfoDurableOpTime_inlock(&slaveInfo, durableOpTime);
     }
 }
 
@@ -592,7 +601,7 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
                 // Secondaries might not see other secondaries in the cluster if they are not
                 // downstream.
                 HeartbeatResponseAction action =
-                    _topCoord->setMemberAsDown(now, memberIndex, _getMyLastOptime_inlock());
+                    _topCoord->setMemberAsDown(now, memberIndex, _getMyLastDurableOpTime_inlock());
                 // Don't mind potential asynchronous stepdown as this is the last step of
                 // liveness check.
                 _handleHeartbeatResponseAction(action, makeStatusWith<ReplSetHeartbeatResponse>());
@@ -731,7 +740,7 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTake
         _cancelAndRescheduleElectionTimeout_inlock();
     }
 
-    if (!_topCoord->becomeCandidateIfElectable(_replExecutor.now(), getMyLastOptime())) {
+    if (!_topCoord->becomeCandidateIfElectable(_replExecutor.now(), getMyLastDurableOpTime())) {
         if (isPriorityTakeOver) {
             log() << "Not starting an election for a priority takeover, since we are not "
                      "electable";

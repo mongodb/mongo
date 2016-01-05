@@ -77,13 +77,13 @@ ReplSettings createReplSettings() {
 class ReplicationCoordinatorRollbackMock : public ReplicationCoordinatorMock {
 public:
     ReplicationCoordinatorRollbackMock();
-    void resetLastOpTimeFromOplog(OperationContext* txn) override;
+    void resetLastOpTimesFromOplog(OperationContext* txn) override;
 };
 
 ReplicationCoordinatorRollbackMock::ReplicationCoordinatorRollbackMock()
     : ReplicationCoordinatorMock(createReplSettings()) {}
 
-void ReplicationCoordinatorRollbackMock::resetLastOpTimeFromOplog(OperationContext* txn) {}
+void ReplicationCoordinatorRollbackMock::resetLastOpTimesFromOplog(OperationContext* txn) {}
 
 class RollbackSourceMock : public RollbackSource {
 public:

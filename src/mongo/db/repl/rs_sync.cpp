@@ -107,7 +107,7 @@ void runSyncThread() {
             // 1. If the oplog is empty, do an initial sync
             // 2. If minValid has _initialSyncFlag set, do an initial sync
             // 3. If initialSyncRequested is true
-            if (getGlobalReplicationCoordinator()->getMyLastOptime().isNull() ||
+            if (getGlobalReplicationCoordinator()->getMyLastAppliedOpTime().isNull() ||
                 getInitialSyncFlag() || initialSyncRequested) {
                 syncDoInitialSync();
                 continue;  // start from top again in case sync failed.

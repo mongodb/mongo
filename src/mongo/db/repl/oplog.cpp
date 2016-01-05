@@ -219,7 +219,7 @@ public:
         : _newOpTime(newOpTime), _replCoord(replCoord) {}
 
     virtual void commit() {
-        _replCoord->setMyLastOptimeForward(_newOpTime);
+        _replCoord->setMyLastAppliedOpTimeForward(_newOpTime);
     }
 
     virtual void rollback() {}
@@ -465,7 +465,7 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops) {
 
     OpTime lastOptime;
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        lastOptime = replCoord->getMyLastOptime();
+        lastOptime = replCoord->getMyLastAppliedOpTime();
         invariant(!ops.empty());
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_X);

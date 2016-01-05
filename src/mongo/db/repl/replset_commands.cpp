@@ -45,6 +45,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/initial_sync.h"
+#include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -663,25 +664,43 @@ public:
 
         // accept and ignore handshakes sent from old (3.0-series) nodes without erroring to
         // enable mixed-version operation, since we no longer use the handshakes
-        if (cmdObj.hasField("handshake")) {
+        if (cmdObj.hasField("handshake"))
             return true;
-        }
+
+        // In the case of an update from a member with an invalid replica set config,
+        // we return our current config version.
+        long long configVersion = -1;
 
         UpdatePositionArgs args;
+
         status = args.initialize(cmdObj);
-        if (!status.isOK())
+        if (status.isOK()) {
+            // v3.2.2+ style replSetUpdatePosition command.
+            status = getGlobalReplicationCoordinator()->processReplSetUpdatePosition(
+                args, &configVersion);
+
+            if (status == ErrorCodes::InvalidReplicaSetConfig) {
+                result.append("configVersion", configVersion);
+            }
             return appendCommandStatus(result, status);
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Pre-3.2.2 style replSetUpdatePosition command.
+            OldUpdatePositionArgs oldArgs;
+            status = oldArgs.initialize(cmdObj);
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
 
-        // in the case of an update from a member with an invalid replica set config,
-        // we return our current config version
-        long long configVersion = -1;
-        status =
-            getGlobalReplicationCoordinator()->processReplSetUpdatePosition(args, &configVersion);
+            status = getGlobalReplicationCoordinator()->processReplSetUpdatePosition(
+                oldArgs, &configVersion);
 
-        if (status == ErrorCodes::InvalidReplicaSetConfig) {
-            result.append("configVersion", configVersion);
+            if (status == ErrorCodes::InvalidReplicaSetConfig) {
+                result.append("configVersion", configVersion);
+            }
+            return appendCommandStatus(result, status);
+        } else {
+            // Parsing error from UpdatePositionArgs.
+            return appendCommandStatus(result, status);
         }
-        return appendCommandStatus(result, status);
     }
 } cmdReplSetUpdatePosition;
 

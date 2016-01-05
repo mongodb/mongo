@@ -64,7 +64,7 @@ Tee* const migrateLog = RamLog::get("migrate");
 
 const int kDefaultWriteTimeoutForMigrationMs = 60 * 1000;
 const WriteConcernOptions DefaultWriteConcernForMigration(2,
-                                                          WriteConcernOptions::NONE,
+                                                          WriteConcernOptions::SyncMode::NONE,
                                                           kDefaultWriteTimeoutForMigrationMs);
 
 WriteConcernOptions getDefaultWriteConcernForMigration() {
@@ -77,7 +77,7 @@ WriteConcernOptions getDefaultWriteConcernForMigration() {
         }
     }
 
-    return WriteConcernOptions(1, WriteConcernOptions::NONE, 0);
+    return WriteConcernOptions(1, WriteConcernOptions::SyncMode::NONE, 0);
 }
 
 BSONObj createRecvChunkCommitRequest(const MigrationSessionId& sessionId) {

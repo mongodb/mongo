@@ -154,7 +154,7 @@ TEST(FindAndModifyRequest, UpdateWithSort) {
 TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
-    const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
+    const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
 
     auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
     request.setWriteConcern(writeConcern);
@@ -174,7 +174,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     const BSONObj update(BSON("y" << 1));
     const BSONObj sort(BSON("z" << -1));
     const BSONObj field(BSON("x" << 1 << "y" << 1));
-    const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
+    const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
 
     auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
     request.setFieldProjection(field);
@@ -246,7 +246,7 @@ TEST(FindAndModifyRequest, RemoveWithSort) {
 
 TEST(FindAndModifyRequest, RemoveWithWriteConcern) {
     const BSONObj query(BSON("x" << 1));
-    const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
+    const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
 
     auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
     request.setWriteConcern(writeConcern);
@@ -265,7 +265,7 @@ TEST(FindAndModifyRequest, RemoveWithFullSpec) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj sort(BSON("z" << -1));
     const BSONObj field(BSON("x" << 1 << "y" << 1));
-    const WriteConcernOptions writeConcern(2, WriteConcernOptions::FSYNC, 150);
+    const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
 
     auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
     request.setFieldProjection(field);

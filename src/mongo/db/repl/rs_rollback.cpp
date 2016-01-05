@@ -791,9 +791,9 @@ void syncFixUp(OperationContext* txn,
         warn = true;
     }
 
-    // Reload the lastOpTimeApplied value in the replcoord and the lastAppliedHash value in
-    // bgsync to reflect our new last op.
-    replCoord->resetLastOpTimeFromOplog(txn);
+    // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the
+    // lastAppliedHash value in bgsync to reflect our new last op.
+    replCoord->resetLastOpTimesFromOplog(txn);
 
     // done
     if (warn)

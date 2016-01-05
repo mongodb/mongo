@@ -64,7 +64,7 @@ const char kMinOpTimeUpdaters[] = "minOpTimeUpdaters";
 
 const Seconds kWriteTimeout(15);
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::NONE,
+                                                WriteConcernOptions::SyncMode::UNSET,
                                                 kWriteTimeout);
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(recoverShardingState, bool, true);

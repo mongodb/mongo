@@ -76,6 +76,7 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(ReplicaSetConfig::kDefaultElectionTimeoutPeriod,
                   config.getElectionTimeoutPeriod());
     ASSERT_TRUE(config.isChainingAllowed());
+    ASSERT_FALSE(config.getWriteConcernMajorityShouldJournal());
     ASSERT_FALSE(config.isConfigServer());
     ASSERT_EQUALS(0, config.getProtocolVersion());
 }
@@ -104,6 +105,7 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS(0, config.getDefaultWriteConcern().wNumNodes);
     ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
     ASSERT_FALSE(config.isChainingAllowed());
+    ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
     ASSERT_FALSE(config.isConfigServer());
     ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
@@ -975,7 +977,7 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
     ASSERT_OK(configA.initialize(BSON(
         "_id"
         << "asdf"
-        << "version" << 9 << "members"
+        << "version" << 9 << "writeConcernMajorityJournalDefault" << true << "members"
         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                  << "localhost:12345"
                                  << "arbiterOnly" << true << "votes" << 1)
@@ -993,14 +995,14 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
                                     << BSON("coast"
                                             << "west"
                                             << "hdd"
-                                            << "true"))) << "protocolVersion" << 0
-        << "settings" << BSON("heartbeatIntervalMillis"
-                              << 5000 << "heartbeatTimeoutSecs" << 20 << "electionTimeoutMillis"
-                              << 4 << "chainingAllowd" << true << "getLastErrorDefaults"
-                              << BSON("w"
-                                      << "majority") << "getLastErrorModes"
-                              << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
-                                              << BSON("coast" << 2))))));
+                                            << "true"))) << "protocolVersion" << 0 << "settings"
+
+        << BSON("heartbeatIntervalMillis"
+                << 5000 << "heartbeatTimeoutSecs" << 20 << "electionTimeoutMillis" << 4
+                << "chainingAllowd" << true << "getLastErrorDefaults" << BSON("w"
+                                                                              << "majority")
+                << "getLastErrorModes" << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
+                                                       << BSON("coast" << 2))))));
     BSONObj configObjA = configA.toBSON();
     // Ensure a protocolVersion does not show up if it is 0 to maintain cross version compatibility.
     ASSERT_FALSE(configObjA.hasField("protocolVersion"));
@@ -1197,6 +1199,23 @@ TEST(ReplicaSetConfig, CheckConfigServerCantHaveSlaveDelay) {
     ASSERT_STRING_CONTAINS(status.reason(), "cannot have a non-zero slaveDelay");
 }
 
+TEST(ReplicaSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJournalDefault) {
+    serverGlobalParams.configsvr = true;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.configsvr = false; });
+    ReplicaSetConfig configA;
+    ASSERT_OK(
+        configA.initialize(BSON("_id"
+                                << "rs0"
+                                << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
+                                << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                      << "localhost:12345")
+                                                           << BSON("_id" << 1 << "host"
+                                                                         << "localhost:54321"))
+                                << "writeConcernMajorityJournalDefault" << false)));
+    Status status = configA.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), " must be true in replica set configurations being ");
+}
 
 TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
     ReplicaSetConfig configA;
@@ -1254,6 +1273,50 @@ TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
     ASSERT_EQUALS(Milliseconds(1000), configB.getPriorityTakeoverDelay(4));
 }
 
+TEST(ReplicaSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajorityJournalDefault) {
+    // PV0, should default to false.
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_OK(config.validate());
+    ASSERT_FALSE(config.getWriteConcernMajorityShouldJournal());
+    ASSERT_FALSE(config.toBSON().hasField("writeConcernMajorityJournalDefault"));
+
+    // Should be able to set it true in PV0.
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345"))
+                                     << "writeConcernMajorityJournalDefault" << true)));
+    ASSERT_OK(config.validate());
+    ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
+    ASSERT_TRUE(config.toBSON().hasField("writeConcernMajorityJournalDefault"));
+
+    // PV1, should default to true.
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "protocolVersion" << 1 << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_OK(config.validate());
+    ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
+    ASSERT_FALSE(config.toBSON().hasField("writeConcernMajorityJournalDefault"));
+
+    // Should be able to set it false in PV1.
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "protocolVersion" << 1 << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345"))
+                                     << "writeConcernMajorityJournalDefault" << false)));
+    ASSERT_OK(config.validate());
+    ASSERT_FALSE(config.getWriteConcernMajorityShouldJournal());
+    ASSERT_TRUE(config.toBSON().hasField("writeConcernMajorityJournalDefault"));
+}
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

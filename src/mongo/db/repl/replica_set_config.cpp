@@ -61,20 +61,23 @@ const std::string kMembersFieldName = "members";
 const std::string kSettingsFieldName = "settings";
 const std::string kStepDownCheckWriteConcernModeName = "$stepDownCheck";
 const std::string kProtocolVersionFieldName = "protocolVersion";
+const std::string kWriteConcernMajorityJournalDefaultFieldName =
+    "writeConcernMajorityJournalDefault";
 
 const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
                                                  ReplicaSetConfig::kVersionFieldName,
                                                  kMembersFieldName,
                                                  kSettingsFieldName,
                                                  kProtocolVersionFieldName,
-                                                 ReplicaSetConfig::kConfigServerFieldName};
+                                                 ReplicaSetConfig::kConfigServerFieldName,
+                                                 kWriteConcernMajorityJournalDefaultFieldName};
 
-const std::string kElectionTimeoutFieldName = "electionTimeoutMillis";
-const std::string kHeartbeatIntervalFieldName = "heartbeatIntervalMillis";
-const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
 const std::string kChainingAllowedFieldName = "chainingAllowed";
+const std::string kElectionTimeoutFieldName = "electionTimeoutMillis";
 const std::string kGetLastErrorDefaultsFieldName = "getLastErrorDefaults";
 const std::string kGetLastErrorModesFieldName = "getLastErrorModes";
+const std::string kHeartbeatIntervalFieldName = "heartbeatIntervalMillis";
+const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
 
 }  // namespace
 
@@ -156,6 +159,16 @@ Status ReplicaSetConfig::_initialize(const BSONObj& cfg, bool forInitiate, bool 
             _protocolVersion = 1;
         }
     }
+
+    //
+    // Parse writeConcernMajorityJournalDefault
+    //
+    status = bsonExtractBooleanFieldWithDefault(cfg,
+                                                kWriteConcernMajorityJournalDefaultFieldName,
+                                                _protocolVersion == 1,
+                                                &_writeConcernMajorityJournalDefault);
+    if (!status.isOK())
+        return status;
 
     //
     // Parse settings
@@ -454,6 +467,12 @@ Status ReplicaSetConfig::validate() const {
                           "Nodes being used for config servers must be started with the "
                           "--configsvr flag");
         }
+        if (!_writeConcernMajorityJournalDefault) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << kWriteConcernMajorityJournalDefaultFieldName
+                                        << " must be true in replica set configurations being "
+                                           "used for config servers");
+        }
     } else if (serverGlobalParams.configsvr) {
         return Status(ErrorCodes::BadValue,
                       "Nodes started with the --configsvr flag must have configsvr:true in "
@@ -616,8 +635,20 @@ BSONObj ReplicaSetConfig::toBSON() const {
         configBuilder.append(kConfigServerFieldName, _configServer);
     }
 
+    // Only include writeConcernMajorityJournalDefault if it is not the default version for this
+    // ProtocolVersion to prevent breaking cross version-3.2.1 compatibilty of ReplicaSetConfigs.
     if (_protocolVersion > 0) {
         configBuilder.append(kProtocolVersionFieldName, _protocolVersion);
+        // Only include writeConcernMajorityJournalDefault if it is not the default version for this
+        // ProtocolVersion to prevent breaking cross version-3.2.1 compatibilty of
+        // ReplicaSetConfigs.
+        if (!_writeConcernMajorityJournalDefault) {
+            configBuilder.append(kWriteConcernMajorityJournalDefaultFieldName,
+                                 _writeConcernMajorityJournalDefault);
+        }
+    } else if (_writeConcernMajorityJournalDefault) {
+        configBuilder.append(kWriteConcernMajorityJournalDefaultFieldName,
+                             _writeConcernMajorityJournalDefault);
     }
 
     BSONArrayBuilder members(configBuilder.subarrayStart(kMembersFieldName));

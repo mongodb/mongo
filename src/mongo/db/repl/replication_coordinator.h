@@ -67,6 +67,7 @@ namespace repl {
 class BackgroundSync;
 class HandshakeArgs;
 class IsMasterResponse;
+class OldUpdatePositionArgs;
 class OplogReader;
 class OpTime;
 class ReadConcernArgs;
@@ -293,11 +294,22 @@ public:
      *
      * The new value of "opTime" must be no less than any prior value passed to this method, and
      * it is the caller's job to properly synchronize this behavior.  The exception to this rule
-     * is that after calls to resetLastOpTimeFromOplog(), the minimum acceptable value for
+     * is that after calls to resetLastOpTimesFromOplog(), the minimum acceptable value for
      * "opTime" is reset based on the contents of the oplog, and may go backwards due to
      * rollback.
      */
-    virtual void setMyLastOptime(const OpTime& opTime) = 0;
+    virtual void setMyLastAppliedOpTime(const OpTime& opTime) = 0;
+
+    /**
+     * Updates our internal tracking of the last OpTime durable to this node.
+     *
+     * The new value of "opTime" must be no less than any prior value passed to this method, and
+     * it is the caller's job to properly synchronize this behavior.  The exception to this rule
+     * is that after calls to resetLastOpTimesFromOplog(), the minimum acceptable value for
+     * "opTime" is reset based on the contents of the oplog, and may go backwards due to
+     * rollback.
+     */
+    virtual void setMyLastDurableOpTime(const OpTime& opTime) = 0;
 
     /**
      * Updates our internal tracking of the last OpTime applied to this node, but only
@@ -307,12 +319,22 @@ public:
      * This function is used by logOp() on a primary, since the ops in the oplog do not
      * necessarily commit in sequential order.
      */
-    virtual void setMyLastOptimeForward(const OpTime& opTime) = 0;
+    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime) = 0;
+
+    /**
+     * Updates our internal tracking of the last OpTime durable to this node, but only
+     * if the supplied optime is later than the current last OpTime known to the replication
+     * coordinator.
+     *
+     * This function is used by logOp() on a primary, since the ops in the oplog do not
+     * necessarily commit in sequential order.
+     */
+    virtual void setMyLastDurableOpTimeForward(const OpTime& opTime) = 0;
 
     /**
      * Same as above, but used during places we need to zero our last optime.
      */
-    virtual void resetMyLastOptime() = 0;
+    virtual void resetMyLastOpTimes() = 0;
 
     /**
      * Updates our the message we include in heartbeat responses.
@@ -320,9 +342,14 @@ public:
     virtual void setMyHeartbeatMessage(const std::string& msg) = 0;
 
     /**
-     * Returns the last optime recorded by setMyLastOptime.
+     * Returns the last optime recorded by setMyLastAppliedOpTime.
      */
-    virtual OpTime getMyLastOptime() const = 0;
+    virtual OpTime getMyLastAppliedOpTime() const = 0;
+
+    /**
+     * Returns the last optime recorded by setMyLastDurableOpTime.
+     */
+    virtual OpTime getMyLastDurableOpTime() const = 0;
 
     /**
      * Waits until the optime of the current node is at least the opTime specified in
@@ -408,6 +435,7 @@ public:
      *
      * The returned bool indicates whether or not the command was created.
      */
+    virtual bool prepareOldReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
     virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
 
     /**
@@ -573,7 +601,12 @@ public:
      * were applied.
      * "configVersion" will be populated with our config version if and only if we return
      * InvalidReplicaSetConfig.
+     *
+     * The OldUpdatePositionArgs version provides support for the pre-3.2.2 format of
+     * UpdatePositionArgs.
      */
+    virtual Status processReplSetUpdatePosition(const OldUpdatePositionArgs& updates,
+                                                long long* configVersion) = 0;
     virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                 long long* configVersion) = 0;
 
@@ -594,8 +627,9 @@ public:
 
     /**
      * Returns a vector of members that have applied the operation with OpTime 'op'.
+     * "durablyWritten" indicates whether the operation has to be durably applied.
      */
-    virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op) = 0;
+    virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op, bool durablyWritten) = 0;
 
     /**
      * Returns a vector of the members other than ourself in the replica set, as specified in
@@ -620,10 +654,10 @@ public:
     virtual Status checkReplEnabledForCommand(BSONObjBuilder* result) = 0;
 
     /**
-     * Loads the optime from the last op in the oplog into the coordinator's lastOpApplied
-     * value.
+     * Loads the optime from the last op in the oplog into the coordinator's lastAppliedOpTime and
+     * lastDurableOpTime values.
      */
-    virtual void resetLastOpTimeFromOplog(OperationContext* txn) = 0;
+    virtual void resetLastOpTimesFromOplog(OperationContext* txn) = 0;
 
     /**
      * Returns the OpTime of the latest replica set-committed op known to this server.
@@ -659,6 +693,12 @@ public:
      * Returns true if the V1 election protocol is being used and false otherwise.
      */
     virtual bool isV1ElectionProtocol() = 0;
+
+    /**
+     * Returns whether or not majority write concerns should implicitly journal, if j has not been
+     * explicitly set.
+     */
+    virtual bool getWriteConcernMajorityShouldJournal() = 0;
 
     /**
      * Writes into 'output' all the information needed to generate a summary of the current
@@ -738,6 +778,13 @@ public:
      * return. It should not be used when an exact amount is needed.
      */
     virtual size_t getNumUncommittedSnapshots() = 0;
+
+    /**
+     * Returns a new WriteConcernOptions based on "wc" but with UNSET syncMode reset to JOURNAL or
+     * NONE based on our rsConfig.
+     */
+    virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
+        WriteConcernOptions wc) = 0;
 
 protected:
     ReplicationCoordinator();

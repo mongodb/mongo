@@ -58,7 +58,7 @@ namespace {
 
 const int kDefaultWTimeoutMs = 60 * 1000;
 const WriteConcernOptions DefaultWriteConcern(WriteConcernOptions::kMajority,
-                                              WriteConcernOptions::NONE,
+                                              WriteConcernOptions::SyncMode::UNSET,
                                               kDefaultWTimeoutMs);
 
 enum CleanupResult { CleanupResult_Done, CleanupResult_Continue, CleanupResult_Error };

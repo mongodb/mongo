@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,29 +26,63 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/repl/repl_client_info.h"
+#include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/util/decorable.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
+
+class Status;
+
 namespace repl {
 
-const Client::Decoration<ReplClientInfo> ReplClientInfo::forClient =
-    Client::declareDecoration<ReplClientInfo>();
+/**
+ * Arguments to the handshake command.
+ */
+class OldUpdatePositionArgs {
+public:
+    struct UpdateInfo {
+        UpdateInfo(const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberId);
 
-void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* txn) {
-    ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(txn->getServiceContext());
-    if (replCoord->isReplEnabled() && txn->writesAreReplicated()) {
-        setLastOp(replCoord->getMyLastAppliedOpTime());
+        OID rid;
+        OpTime ts;
+        long long cfgver;
+        long long memberId;
+    };
+
+    typedef std::vector<UpdateInfo>::const_iterator UpdateIterator;
+
+    /**
+     * Initializes this OldUpdatePositionArgs from the contents of "argsObj".
+     */
+    Status initialize(const BSONObj& argsObj);
+
+    /**
+     * Gets a begin iterator over the UpdateInfos stored in this OldUpdatePositionArgs.
+     */
+    UpdateIterator updatesBegin() const {
+        return _updates.begin();
     }
-}
+
+    /**
+     * Gets an end iterator over the UpdateInfos stored in this OldUpdatePositionArgs.
+     */
+    UpdateIterator updatesEnd() const {
+        return _updates.end();
+    }
+
+    /**
+     * Returns a BSONified version of the object.
+     * _updates is only included if it is not empty.
+     */
+    BSONObj toBSON() const;
+
+private:
+    std::vector<UpdateInfo> _updates;
+};
 
 }  // namespace repl
 }  // namespace mongo

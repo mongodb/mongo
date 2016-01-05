@@ -353,7 +353,7 @@ TEST_F(ReplCoordHBV1Test, ArbiterRecordsCommittedOpTimeFromHeartbeatMetadata) {
         ASSERT_OK(metadata.getStatus());
         getReplCoord()->processReplSetMetadata(metadata.getValue());
 
-        ASSERT_EQ(getReplCoord()->getMyLastOptime().getTimestamp(), expected.getTimestamp());
+        ASSERT_EQ(getReplCoord()->getMyLastAppliedOpTime().getTimestamp(), expected.getTimestamp());
     };
 
     OpTime committedOpTime{Timestamp{10, 10}, 10};

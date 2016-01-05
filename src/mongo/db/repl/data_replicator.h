@@ -127,7 +127,7 @@ struct DataReplicatorOptions {
 
     Applier::ApplyOperationFn applierFn;
     RollbackFn rollbackFn;
-    Reporter::PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn;
+    Reporter::PrepareReplSetUpdatePositionCommandFn prepareOldReplSetUpdatePositionCommandFn;
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
     SetFollowerModeFn setFollowerMode;
@@ -205,7 +205,7 @@ public:
 
     // For testing only
 
-    void _resetState_inlock(Timestamp lastAppliedOptime);
+    void _resetState_inlock(Timestamp lastAppliedOpTime);
     void _setInitialSyncStorageInterface(CollectionCloner::StorageInterface* si);
 
 private:

@@ -42,7 +42,7 @@ namespace repl {
 MemberHeartbeatData::MemberHeartbeatData() : _health(-1), _authIssue(false) {
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
-    _lastResponse.setOpTime(OpTime());
+    _lastResponse.setAppliedOpTime(OpTime());
 }
 
 void MemberHeartbeatData::setUpValues(Date_t now,
@@ -60,10 +60,9 @@ void MemberHeartbeatData::setUpValues(Date_t now,
     if (!hbResponse.hasElectionTime()) {
         hbResponse.setElectionTime(_lastResponse.getElectionTime());
     }
-    if (!hbResponse.hasOpTime()) {
-        hbResponse.setOpTime(_lastResponse.getOpTime());
+    if (!hbResponse.hasAppliedOpTime()) {
+        hbResponse.setAppliedOpTime(_lastResponse.getAppliedOpTime());
     }
-
     // Log if the state changes
     if (_lastResponse.getState() != hbResponse.getState()) {
         log() << "Member " << host.toString() << " is now in state "
@@ -82,7 +81,7 @@ void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeat
     _lastResponse = ReplSetHeartbeatResponse();
     _lastResponse.setState(MemberState::RS_DOWN);
     _lastResponse.setElectionTime(Timestamp());
-    _lastResponse.setOpTime(OpTime());
+    _lastResponse.setAppliedOpTime(OpTime());
     _lastResponse.setHbMsg(heartbeatMessage);
     _lastResponse.setSyncingTo(HostAndPort());
 }
@@ -96,7 +95,7 @@ void MemberHeartbeatData::setAuthIssue(Date_t now) {
     _lastResponse = ReplSetHeartbeatResponse();
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
-    _lastResponse.setOpTime(OpTime());
+    _lastResponse.setAppliedOpTime(OpTime());
     _lastResponse.setHbMsg("");
     _lastResponse.setSyncingTo(HostAndPort());
 }

@@ -88,11 +88,11 @@ void truncateAndResetOplog(OperationContext* txn,
     // Note: the following order is important.
     // The bgsync thread uses an empty optime as a sentinel to know to wait
     // for initial sync; thus, we must
-    // ensure the lastAppliedOptime is empty before restarting the bgsync thread
+    // ensure the lastAppliedOpTime is empty before restarting the bgsync thread
     // via stop().
     // We must clear the sync source blacklist after calling stop()
     // because the bgsync thread, while running, may update the blacklist.
-    replCoord->resetMyLastOptime();
+    replCoord->resetMyLastOpTimes();
     bgsync->stop();
     bgsync->clearBuffer();
 
@@ -214,7 +214,7 @@ bool _initialSyncClone(OperationContext* txn,
  * @return if applying the oplog succeeded.
  */
 bool _initialSyncApplyOplog(OperationContext* ctx, repl::InitialSync* syncer, OplogReader* r) {
-    const OpTime startOpTime = getGlobalReplicationCoordinator()->getMyLastOptime();
+    const OpTime startOpTime = getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();
     BSONObj lastOp;
 
     // If the fail point is set, exit failing.
@@ -370,7 +370,7 @@ Status _initialSync() {
     // prime oplog, but don't need to actually apply the op as the cloned data already reflects it.
     OpTime lastOptime = writeOpsToOplog(&txn, {lastOp});
     ReplClientInfo::forClient(txn.getClient()).setLastOp(lastOptime);
-    replCoord->setMyLastOptime(lastOptime);
+    replCoord->setMyLastAppliedOpTime(lastOptime);
     setNewTimestamp(lastOptime.getTimestamp());
 
     std::string msg = "oplog sync 1 of 3";
@@ -425,7 +425,7 @@ Status _initialSync() {
     {
         ScopedTransaction scopedXact(&txn, MODE_IX);
         AutoGetDb autodb(&txn, "local", MODE_X);
-        OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
+        OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastAppliedOpTime());
         log() << "set minValid=" << lastOpTimeWritten;
 
         // Initial sync is now complete.  Flag this by setting minValid to the last thing

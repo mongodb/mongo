@@ -215,4 +215,5 @@ assert.eq( originalSeed, seedString(rst1), "Set didn't come back up with the sam
 addShard( st, rst1 );
 
 jsTestLog( "finishing!" )
-st.stop()
+// this should be fixed by SERVER-22176
+st.stop({ allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] })

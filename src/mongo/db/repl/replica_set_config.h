@@ -228,6 +228,14 @@ public:
     }
 
     /**
+     * Returns whether or not majority write concerns should implicitly journal, if j has not been
+     * explicitly set.
+     */
+    bool getWriteConcernMajorityShouldJournal() const {
+        return _writeConcernMajorityJournalDefault;
+    }
+
+    /**
      * Returns true if this replica set is for use as a config server replica set.
      */
     bool isConfigServer() const {
@@ -323,6 +331,7 @@ private:
     Milliseconds _heartbeatInterval = kDefaultHeartbeatInterval;
     Seconds _heartbeatTimeoutPeriod = kDefaultHeartbeatTimeoutPeriod;
     bool _chainingAllowed = kDefaultChainingAllowed;
+    bool _writeConcernMajorityJournalDefault = false;
     int _majorityVoteCount = 0;
     int _writeMajority = 0;
     int _totalVotingMembers = 0;

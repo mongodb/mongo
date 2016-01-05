@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -45,10 +45,13 @@ namespace repl {
 class UpdatePositionArgs {
 public:
     struct UpdateInfo {
-        UpdateInfo(const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberId);
+        UpdateInfo(const OpTime& applied,
+                   const OpTime& durable,
+                   long long aCfgver,
+                   long long aMemberId);
 
-        OID rid;
-        OpTime ts;
+        OpTime appliedOpTime;
+        OpTime durableOpTime;
         long long cfgver;
         long long memberId;
     };

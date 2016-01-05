@@ -366,7 +366,9 @@ functions:
         set -o verbose
 
         rm -rf /data/install /data/multiversion
-        ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${multiversion_platform_arch|"Linux/x86_64"} "2.6" "3.0" "3.2"
+        # 3.2.1 is needed to check cross version compatibility as it is the final version
+        # to use the old style replSetUpdatePosition command.
+        ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${multiversion_platform_arch|"Linux/x86_64"} "2.4" "2.6" "3.0" "3.2" "3.2.1"
 
 pre:
   - command: shell.track

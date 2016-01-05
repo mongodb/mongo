@@ -179,7 +179,7 @@ protected:
             return _rollbackFn(txn, lastOpTimeWritten, syncSource);
         };
 
-        options.prepareReplSetUpdatePositionCommandFn =
+        options.prepareOldReplSetUpdatePositionCommandFn =
             []() -> StatusWith<BSONObj> { return BSON("replSetUpdatePosition" << 1); };
         options.getMyLastOptime = [this]() { return _myLastOpTime; };
         options.setMyLastOptime = [this](const OpTime& opTime) { _setMyLastOptime(opTime); };

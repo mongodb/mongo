@@ -293,7 +293,8 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
 
     const WriteConcernOptions& writeConcern = _txn->getWriteConcern();
     bool silentWC = writeConcern.wMode.empty() && writeConcern.wNumNodes == 0 &&
-        writeConcern.syncMode == WriteConcernOptions::NONE;
+        (writeConcern.syncMode == WriteConcernOptions::SyncMode::NONE ||
+         writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET);
 
     Timer commandTimer;
 

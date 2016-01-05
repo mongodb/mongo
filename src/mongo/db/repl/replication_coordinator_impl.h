@@ -37,6 +37,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/data_replicator.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -104,7 +105,8 @@ public:
                                ReplicationCoordinatorExternalState* externalState,
                                TopologyCoordinator* topoCoord,
                                ReplicationExecutor* replExec,
-                               int64_t prngSeed);
+                               int64_t prngSeed,
+                               stdx::function<bool()>* isDurableStorageEngineFn);
     virtual ~ReplicationCoordinatorImpl();
 
     // ================== Members of public ReplicationCoordinator API ===================
@@ -170,15 +172,18 @@ public:
 
     virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts);
 
-    virtual void setMyLastOptime(const OpTime& opTime);
+    virtual void setMyLastAppliedOpTime(const OpTime& opTime);
+    virtual void setMyLastDurableOpTime(const OpTime& opTime);
 
-    virtual void setMyLastOptimeForward(const OpTime& opTime);
+    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime);
+    virtual void setMyLastDurableOpTimeForward(const OpTime& opTime);
 
-    virtual void resetMyLastOptime();
+    virtual void resetMyLastOpTimes();
 
     virtual void setMyHeartbeatMessage(const std::string& msg);
 
-    virtual OpTime getMyLastOptime() const override;
+    virtual OpTime getMyLastAppliedOpTime() const override;
+    virtual OpTime getMyLastDurableOpTime() const override;
 
     virtual ReadConcernResponse waitUntilOpTime(OperationContext* txn,
                                                 const ReadConcernArgs& settings) override;
@@ -199,6 +204,7 @@ public:
 
     virtual void signalUpstreamUpdater() override;
 
+    virtual bool prepareOldReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) override;
     virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) override;
 
     virtual Status processReplSetGetStatus(BSONObjBuilder* result) override;
@@ -245,6 +251,8 @@ public:
     virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                        BSONObjBuilder* response) override;
 
+    virtual Status processReplSetUpdatePosition(const OldUpdatePositionArgs& updates,
+                                                long long* configVersion) override;
     virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                 long long* configVersion) override;
 
@@ -252,7 +260,8 @@ public:
 
     virtual bool buildsIndexes() override;
 
-    virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op) override;
+    virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op,
+                                                       bool durablyWritten) override;
 
     virtual std::vector<HostAndPort> getOtherNodesInReplSet() const override;
 
@@ -266,7 +275,7 @@ public:
 
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) override;
 
-    virtual void resetLastOpTimeFromOplog(OperationContext* txn) override;
+    virtual void resetLastOpTimesFromOplog(OperationContext* txn) override;
 
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const OpTime& syncSourceLastOpTime,
@@ -289,6 +298,8 @@ public:
                                       ReplSetHeartbeatResponse* response) override;
 
     virtual bool isV1ElectionProtocol() override;
+
+    virtual bool getWriteConcernMajorityShouldJournal() override;
 
     virtual void summarizeAsHtml(ReplSetHtmlSummary* s) override;
 
@@ -314,6 +325,9 @@ public:
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
     virtual size_t getNumUncommittedSnapshots() override;
+
+    virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
+        WriteConcernOptions wc) override;
 
     // ================== Test support API ===================
 
@@ -341,9 +355,10 @@ public:
     Date_t getPriorityTakeover_forTest() const;
 
     /**
-     * Simple wrapper around _setLastOptime_inlock to make it easier to test.
+     * Simple wrappers around _setLastOptime_inlock to make it easier to test.
      */
-    Status setLastOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
+    Status setLastAppliedOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
+    Status setLastDurableOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
 
     /**
      * Non-blocking version of stepDown.
@@ -436,7 +451,8 @@ private:
                                int64_t prngSeed,
                                executor::NetworkInterface* network,
                                StorageInterface* storage,
-                               ReplicationExecutor* replExec);
+                               ReplicationExecutor* replExec,
+                               stdx::function<bool()>* isDurableStorageEngineFn);
     /**
      * Configuration states for a replica set node.
      *
@@ -485,7 +501,10 @@ private:
     // Struct that holds information about nodes in this replication group, mainly used for
     // tracking replication progress for write concern satisfaction.
     struct SlaveInfo {
-        OpTime opTime;            // Our last known OpTime that this slave has replicated to.
+        // Our last known OpTime that this slave has applied and journaled to.
+        OpTime lastDurableOpTime;
+        // Our last known OpTime that this slave has applied, whether journaled or unjournaled.
+        OpTime lastAppliedOpTime;
         HostAndPort hostAndPort;  // Client address of the slave.
         int memberId =
             -1;   // Id of the node in the replica set config, or -1 if we're not a replSet.
@@ -519,11 +538,18 @@ private:
     void _addSlaveInfo_inlock(const SlaveInfo& slaveInfo);
 
     /**
-     * Updates the item in _slaveInfo pointed to by 'slaveInfo' with the given OpTime 'opTime'
-     * and wakes up any threads waiting for replication that now have their write concern
-     * satisfied.
+     * Updates the durableOpTime field on the item in _slaveInfo pointed to by 'slaveInfo' with the
+     * given OpTime 'opTime' and wakes up any threads waiting for replication that now have their
+     * write concern satisfied.
      */
-    void _updateSlaveInfoOptime_inlock(SlaveInfo* slaveInfo, const OpTime& opTime);
+    void _updateSlaveInfoDurableOpTime_inlock(SlaveInfo* slaveInfo, const OpTime& opTime);
+
+    /**
+     * Updates the appliedOpTime field on the item in _slaveInfo pointed to by 'slaveInfo' with the
+     * given OpTime 'opTime' and wakes up any threads waiting for replication that now have their
+     * write concern satisfied.
+     */
+    void _updateSlaveInfoAppliedOpTime_inlock(SlaveInfo* slaveInfo, const OpTime& opTime);
 
     /**
      * Returns the index into _slaveInfo where data corresponding to ourself is stored.
@@ -531,6 +557,11 @@ private:
      * _slaveInfo.
      */
     size_t _getMyIndexInSlaveInfo_inlock() const;
+
+    /**
+     * Returns the _writeConcernMajorityJournalDefault of our current _rsConfig.
+     */
+    bool getWriteConcernMajorityShouldJournal_inlock() const;
 
     /**
      * Helper method that removes entries from _slaveInfo if they correspond to a node
@@ -665,15 +696,18 @@ private:
 
     /**
      * Helper for _doneWaitingForReplication_inlock that takes an integer write concern.
+     * "durablyWritten" indicates whether the operation has to be durably applied.
      */
-    bool _haveNumNodesReachedOpTime_inlock(const OpTime& opTime, int numNodes);
+    bool _haveNumNodesReachedOpTime_inlock(const OpTime& opTime, int numNodes, bool durablyWritten);
 
     /**
      * Helper for _doneWaitingForReplication_inlock that takes a tag pattern representing a
      * named write concern mode.
+     * "durablyWritten" indicates whether the operation has to be durably applied.
      */
     bool _haveTaggedNodesReachedOpTime_inlock(const OpTime& opTime,
-                                              const ReplicaSetTagPattern& tagPattern);
+                                              const ReplicaSetTagPattern& tagPattern,
+                                              bool durablyWritten);
 
     Status _checkIfWriteConcernCanBeSatisfied_inlock(const WriteConcernOptions& writeConcern) const;
 
@@ -702,7 +736,8 @@ private:
 
     int _getMyId_inlock() const;
 
-    OpTime _getMyLastOptime_inlock() const;
+    OpTime _getMyLastAppliedOpTime_inlock() const;
+    OpTime _getMyLastDurableOpTime_inlock() const;
 
     /**
      * Bottom half of setFollowerMode.
@@ -722,24 +757,44 @@ private:
      * This is only valid to call on replica sets.
      * "configVersion" will be populated with our config version if it and the configVersion
      * of "args" differ.
+     *
+     * The OldUpdatePositionArgs version provides support for the pre-3.2.2 format of
+     * UpdatePositionArgs.
      */
+    Status _setLastOptime_inlock(const OldUpdatePositionArgs::UpdateInfo& args,
+                                 long long* configVersion);
     Status _setLastOptime_inlock(const UpdatePositionArgs::UpdateInfo& args,
                                  long long* configVersion);
 
     /**
-     * Helper method for setMyLastOptime that takes in a unique lock on
+     * Helper method for setMyLastAppliedOptime that takes in a unique lock on
      * _mutex.  The passed in lock must already be locked.  It is unspecified what state the
      * lock will be in after this method finishes.
      *
-     * This function has the same rules for "opTime" as setMyLastOptime(), unless
+     * This function has the same rules for "opTime" as setMyLastAppliedOptime(), unless
      * "isRollbackAllowed" is true.
      *
      * This function will also report our position externally (like upstream) if necessary.
      */
-    void _setMyLastOptimeAndReport_inlock(stdx::unique_lock<stdx::mutex>* lock,
-                                          const OpTime& opTime,
-                                          bool isRollbackAllowed);
-    void _setMyLastOptime_inlock(const OpTime& opTime, bool isRollbackAllowed);
+    void _setMyLastAppliedOpTimeAndReport_inlock(stdx::unique_lock<stdx::mutex>* lock,
+                                                 const OpTime& opTime,
+                                                 bool isRollbackAllowed);
+    void _setMyLastAppliedOpTime_inlock(const OpTime& opTime, bool isRollbackAllowed);
+
+    /**
+     * Helper method for setMyLastDurableOptime that takes in a unique lock on
+     * _mutex.  The passed in lock must already be locked.  It is unspecified what state the
+     * lock will be in after this method finishes.
+     *
+     * This function has the same rules for "opTime" as setMyLastDurableOptime(), unless
+     * "isRollbackAllowed" is true.
+     *
+     * This function will also report our position externally (like upstream) if necessary.
+     */
+    void _setMyLastDurableOpTimeAndReport_inlock(stdx::unique_lock<stdx::mutex>* lock,
+                                                 const OpTime& opTime,
+                                                 bool isRollbackAllowed);
+    void _setMyLastDurableOpTime_inlock(const OpTime& opTime, bool isRollbackAllowed);
 
     /**
      * Schedules a heartbeat to be sent to "target" at "when". "targetIndex" is the index
@@ -766,9 +821,12 @@ private:
     /**
      * Helper for _handleHeartbeatResponse.
      *
-     * Updates the optime associated with the member at "memberIndex" in our config.
+     * Updates the lastDurableOpTime and lastAppliedOpTime associated with the member at
+     * "memberIndex" in our config.
      */
-    void _updateOpTimeFromHeartbeat_inlock(int memberIndex, const OpTime& optime);
+    void _updateOpTimesFromHeartbeat_inlock(int targetIndex,
+                                            const OpTime& durableOpTime,
+                                            const OpTime& appliedOpTime);
 
     /**
      * Starts a heartbeat for each member in the current config.  Called within the executor
@@ -1235,8 +1293,7 @@ private:
     // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
     int _rbid;  // (M)
 
-    // list of information about clients waiting on replication.  Does *not* own the
-    // WaiterInfos.
+    // list of information about clients waiting on replication.  Does *not* own the WaiterInfos.
     std::vector<WaiterInfo*> _replicationWaiterList;  // (M)
 
     // list of information about clients waiting for a particular opTime.
@@ -1391,6 +1448,9 @@ private:
 
     // Cached copy of the current config protocol version.
     AtomicInt64 _protVersion;  // (S)
+
+    // Lambda indicating durability of storageEngine.
+    stdx::function<bool()> _isDurableStorageEngine;  // (R)
 };
 
 }  // namespace repl

@@ -148,22 +148,36 @@ void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {
     // TODO
 }
 
-void ReplicationCoordinatorMock::setMyLastOptime(const OpTime& opTime) {
-    _myLastOpTime = opTime;
+void ReplicationCoordinatorMock::setMyLastAppliedOpTime(const OpTime& opTime) {
+    _myLastAppliedOpTime = opTime;
 }
 
-void ReplicationCoordinatorMock::setMyLastOptimeForward(const OpTime& opTime) {
-    if (opTime > _myLastOpTime) {
-        _myLastOpTime = opTime;
+void ReplicationCoordinatorMock::setMyLastDurableOpTime(const OpTime& opTime) {
+    _myLastDurableOpTime = opTime;
+}
+
+void ReplicationCoordinatorMock::setMyLastAppliedOpTimeForward(const OpTime& opTime) {
+    if (opTime > _myLastAppliedOpTime) {
+        _myLastAppliedOpTime = opTime;
     }
 }
 
-void ReplicationCoordinatorMock::resetMyLastOptime() {
-    _myLastOpTime = OpTime();
+void ReplicationCoordinatorMock::setMyLastDurableOpTimeForward(const OpTime& opTime) {
+    if (opTime > _myLastDurableOpTime) {
+        _myLastDurableOpTime = opTime;
+    }
 }
 
-OpTime ReplicationCoordinatorMock::getMyLastOptime() const {
-    return _myLastOpTime;
+void ReplicationCoordinatorMock::resetMyLastOpTimes() {
+    _myLastDurableOpTime = OpTime();
+}
+
+OpTime ReplicationCoordinatorMock::getMyLastAppliedOpTime() const {
+    return _myLastAppliedOpTime;
+}
+
+OpTime ReplicationCoordinatorMock::getMyLastDurableOpTime() const {
+    return _myLastDurableOpTime;
 }
 
 ReadConcernResponse ReplicationCoordinatorMock::waitUntilOpTime(OperationContext* txn,
@@ -202,6 +216,12 @@ Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {
 }
 
 void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
+
+bool ReplicationCoordinatorMock::prepareOldReplSetUpdatePositionCommand(
+    BSONObjBuilder* cmdBuilder) {
+    cmdBuilder->append("replSetUpdatePosition", 1);
+    return true;
+}
 
 bool ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
     cmdBuilder->append("replSetUpdatePosition", 1);
@@ -284,6 +304,12 @@ Status ReplicationCoordinatorMock::processReplSetElect(const ReplSetElectArgs& a
     return Status::OK();
 }
 
+Status ReplicationCoordinatorMock::processReplSetUpdatePosition(
+    const OldUpdatePositionArgs& updates, long long* configVersion) {
+    // TODO
+    return Status::OK();
+}
+
 Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                                 long long* configVersion) {
     // TODO
@@ -300,7 +326,8 @@ bool ReplicationCoordinatorMock::buildsIndexes() {
     return true;
 }
 
-std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
+std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op,
+                                                                       bool durablyWritten) {
     return std::vector<HostAndPort>();
 }
 
@@ -328,7 +355,7 @@ HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource(const Timestamp& las
 
 void ReplicationCoordinatorMock::blacklistSyncSource(const HostAndPort& host, Date_t until) {}
 
-void ReplicationCoordinatorMock::resetLastOpTimeFromOplog(OperationContext* txn) {
+void ReplicationCoordinatorMock::resetLastOpTimesFromOplog(OperationContext* txn) {
     invariant(false);
 }
 
@@ -367,6 +394,10 @@ bool ReplicationCoordinatorMock::isV1ElectionProtocol() {
     return true;
 }
 
+bool ReplicationCoordinatorMock::getWriteConcernMajorityShouldJournal() {
+    return true;
+}
+
 void ReplicationCoordinatorMock::summarizeAsHtml(ReplSetHtmlSummary* output) {}
 
 long long ReplicationCoordinatorMock::getTerm() {
@@ -396,6 +427,14 @@ void ReplicationCoordinatorMock::waitUntilSnapshotCommitted(OperationContext* tx
 
 size_t ReplicationCoordinatorMock::getNumUncommittedSnapshots() {
     return 0;
+}
+
+WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptionsSyncMode(
+    WriteConcernOptions wc) {
+    if (wc.syncMode == WriteConcernOptions::SyncMode::UNSET) {
+        wc.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
+    }
+    return wc;
 }
 
 }  // namespace repl
