@@ -238,7 +238,7 @@ void BackgroundSync::_producerThread() {
     }
 
     // We need to wait until initial sync has started.
-    if (_replCoord->getMyLastOptime().isNull()) {
+    if (_replCoord->getMyLastAppliedOpTime().isNull()) {
         sleepsecs(1);
         return;
     }
@@ -406,11 +406,11 @@ void BackgroundSync::_produce(OperationContext* txn) {
         log() << "Starting rollback due to " << fetcherReturnStatus;
 
         // Wait till all buffered oplog entries have drained and been applied.
-        auto lastApplied = _replCoord->getMyLastOptime();
-        if (lastApplied != _lastOpTimeFetched) {
+        auto lastApplied = _replCoord->getMyLastAppliedOpTime();
+        if (lastApplied != lastOpTimeFetched) {
             log() << "Waiting for all operations from " << lastApplied << " until "
-                  << _lastOpTimeFetched << " to be applied before starting rollback.";
-            while (_lastOpTimeFetched > (lastApplied = _replCoord->getMyLastOptime())) {
+                  << lastOpTimeFetched << " to be applied before starting rollback.";
+            while (lastOpTimeFetched > (lastApplied = _replCoord->getMyLastAppliedOpTime())) {
                 sleepmillis(10);
                 if (isStopped() || inShutdown()) {
                     return;
@@ -730,7 +730,7 @@ void BackgroundSync::start(OperationContext* txn) {
     _stopped = false;
 
     // reset _last fields with current oplog data
-    _lastOpTimeFetched = _replCoord->getMyLastOptime();
+    _lastOpTimeFetched = _replCoord->getMyLastAppliedOpTime();
     _lastFetchedHash = lastFetchedHash;
 
     LOG(1) << "bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastFetchedHash;

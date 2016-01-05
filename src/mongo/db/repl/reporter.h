@@ -50,7 +50,7 @@ public:
     using PrepareReplSetUpdatePositionCommandFn = stdx::function<StatusWith<BSONObj>()>;
 
     Reporter(ReplicationExecutor* executor,
-             PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn,
+             PrepareReplSetUpdatePositionCommandFn prepareOldReplSetUpdatePositionCommandFn,
              const HostAndPort& target);
     virtual ~Reporter();
 
@@ -105,7 +105,7 @@ private:
     ReplicationExecutor* _executor;
 
     // Prepares update command object.
-    PrepareReplSetUpdatePositionCommandFn _prepareReplSetUpdatePositionCommandFn;
+    PrepareReplSetUpdatePositionCommandFn _prepareOldReplSetUpdatePositionCommandFn;
 
     // Host to whom the Reporter sends updates.
     HostAndPort _target;

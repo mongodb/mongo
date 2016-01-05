@@ -68,8 +68,10 @@ private:
 
     /* Inform the sync target of our current position in the oplog, as well as the positions
      * of all secondaries chained through us.
+     * "oldStyle" indicates whether or not the upstream node is pre-3.2.2 and needs the older style
+     * ReplSetUpdatePosition commands as a result.
      */
-    Status updateUpstream(OperationContext* txn);
+    Status updateUpstream(OperationContext* txn, bool oldStyle);
 
     bool hasConnection() {
         return _connection.get();
@@ -92,6 +94,8 @@ private:
     bool _positionChanged = false;
     // Once this is set to true the _run method will terminate
     bool _shutdownSignaled = false;
+    // Indicates whether our syncSource can't accept the new version of the UpdatePosition command.
+    bool _fallBackToOldUpdatePosition = false;
 };
 }  // namespace repl
 }  // namespace mongo

@@ -178,7 +178,7 @@ public:
 
         BSONObjBuilder result;
         // TODO(siyuan) Output term of OpTime
-        result.append("latestOptime", replCoord->getMyLastOptime().getTimestamp());
+        result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
         const std::string& oplogNS =
             replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet

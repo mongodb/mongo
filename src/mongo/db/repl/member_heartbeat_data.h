@@ -68,8 +68,8 @@ public:
     const HostAndPort& getSyncSource() const {
         return _lastResponse.getSyncingTo();
     }
-    OpTime getOpTime() const {
-        return _lastResponse.getOpTime();
+    OpTime getAppliedOpTime() const {
+        return _lastResponse.getAppliedOpTime();
     }
     int getConfigVersion() const {
         return _lastResponse.getConfigVersion();

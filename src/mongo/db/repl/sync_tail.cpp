@@ -216,13 +216,9 @@ ApplyBatchFinalizer::~ApplyBatchFinalizer() {
 }
 
 void ApplyBatchFinalizer::record(OpTime newOp) {
-    const bool mustWaitUntilDurable = _replCoord->isV1ElectionProtocol();
-    if (!mustWaitUntilDurable) {
-        // We have to use setMyLastOptimeForward since this thread races with
-        // logTransitionToPrimaryToOplog.
-        _replCoord->setMyLastOptimeForward(newOp);
-        return;
-    }
+    // We have to use setMyLastAppliedOpTimeForward since this thread races with
+    // logTransitionToPrimaryToOplog.
+    _replCoord->setMyLastAppliedOpTimeForward(newOp);
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _latestOpTime = newOp;
@@ -252,9 +248,9 @@ void ApplyBatchFinalizer::_run() {
         auto txn = cc().makeOperationContext();
         txn->recoveryUnit()->goingToWaitUntilDurable();
         txn->recoveryUnit()->waitUntilDurable();
-        // We have to use setMyLastOptimeForward since this thread races with
+        // We have to use setMyLastDurableOpTimeForward since this thread races with
         // logTransitionToPrimaryToOplog.
-        _replCoord->setMyLastOptimeForward(latestOpTime);
+        _replCoord->setMyLastDurableOpTimeForward(latestOpTime);
     }
 }
 }  // anonymous namespace containing ApplyBatchFinalizer definitions.
@@ -716,7 +712,7 @@ void SyncTail::oplogApplication() {
 
     auto minValidBoundaries = getMinValid(&txn);
     OpTime originalEndOpTime(minValidBoundaries.end);
-    OpTime lastWriteOpTime{replCoord->getMyLastOptime()};
+    OpTime lastWriteOpTime{replCoord->getMyLastAppliedOpTime()};
     while (!inShutdown()) {
         OpQueue ops;
 
@@ -747,6 +743,10 @@ void SyncTail::oplogApplication() {
             if (replCoord->isWaitingForApplierToDrain()) {
                 replCoord->signalDrainComplete(&txn);
             }
+
+            // Reset when triggered in case it was from a rollback, safe to do at any time.
+            lastWriteOpTime = replCoord->getMyLastAppliedOpTime();
+
             continue;  // This wasn't a real op. Don't try to apply it.
         }
 

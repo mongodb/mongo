@@ -104,7 +104,8 @@ TEST_F(ReplCoordElectV1Test, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     ASSERT(getReplCoord()->getMemberState().secondary())
         << getReplCoord()->getMemberState().toString();
 
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(10, 0), 0));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(10, 0), 0));
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
@@ -160,7 +161,8 @@ TEST_F(ReplCoordElectV1Test, StartElectionDoesNotStartAnElectionWhenNodeIsRecove
     ASSERT(getReplCoord()->getMemberState().recovering())
         << getReplCoord()->getMemberState().toString();
 
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(10, 0), 0));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(10, 0), 0));
     simulateEnoughHeartbeatsForElectability();
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
@@ -177,7 +179,8 @@ TEST_F(ReplCoordElectV1Test, ElectionSucceedsWhenNodeIsTheOnlyNode) {
                                                      << "node1:12345")) << "protocolVersion" << 1),
                        HostAndPort("node1", 12345));
 
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(10, 0), 0));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(10, 0), 0));
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
     getReplCoord()->waitForElectionFinish_forTest();
     ASSERT(getReplCoord()->getMemberState().primary())
@@ -208,7 +211,8 @@ TEST_F(ReplCoordElectV1Test, ElectionSucceedsWhenAllNodesVoteYea) {
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop txn;
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     startCapturingLogMessages();
     simulateSuccessfulV1Election();
@@ -243,7 +247,8 @@ TEST_F(ReplCoordElectV1Test, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
                              << "protocolVersion" << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop txn;
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     startCapturingLogMessages();
     simulateSuccessfulV1Election();
@@ -276,7 +281,8 @@ TEST_F(ReplCoordElectV1Test, ElectionFailsWhenInsufficientVotesAreReceivedDuring
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    getReplCoord()->setMyLastDurableOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -331,7 +337,8 @@ TEST_F(ReplCoordElectV1Test, ElectionFailsWhenDryRunResponseContainsANewerTerm) 
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    getReplCoord()->setMyLastDurableOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -390,7 +397,8 @@ TEST_F(ReplCoordElectV1Test, NodeWillNotStandForElectionDuringHeartbeatReconfig)
              << "protocolVersion" << 1),
         HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
 
     // set hbreconfig to hang while in progress
     getExternalState()->setStoreLocalConfigDocumentToHang(true);
@@ -498,7 +506,8 @@ TEST_F(ReplCoordElectV1Test, NodeWillNotStandForElectionDuringHeartbeatReconfig)
 //
 //    OperationContextNoop txn;
 //    OpTime time1(Timestamp(100, 1), 0);
-//    getReplCoord()->setMyLastOptime(time1);
+//    getReplCoord()->setMyLastAppliedOpTime(time1);
+//    getReplCoord()->setMyLastDurableOpTime(time1);
 //    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 //
 //    simulateEnoughHeartbeatsForElectability();
@@ -556,7 +565,8 @@ TEST_F(ReplCoordElectV1Test, ElectionFailsWhenInsufficientVotesAreReceivedDuring
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    getReplCoord()->setMyLastDurableOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -603,7 +613,8 @@ TEST_F(ReplCoordElectV1Test, ElectionsAbortWhenNodeTransitionsToRollbackState) {
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    getReplCoord()->setMyLastDurableOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -637,7 +648,8 @@ TEST_F(ReplCoordElectV1Test, ElectionFailsWhenVoteRequestResponseContainsANewerT
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    getReplCoord()->setMyLastDurableOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -687,7 +699,8 @@ TEST_F(ReplCoordElectV1Test, ElectionFailsWhenTermChangesDuringDryRun) {
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    getReplCoord()->setMyLastDurableOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -722,7 +735,8 @@ TEST_F(ReplCoordElectV1Test, ElectionFailsWhenTermChangesDuringActualElection) {
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    getReplCoord()->setMyLastDurableOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -775,7 +789,8 @@ TEST_F(ReplCoordElectV1Test, SchedulesPriorityTakeoverIfNodeHasHigherPriorityTha
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    replCoord->setMyLastOptime(time1);
+    replCoord->setMyLastAppliedOpTime(time1);
+    replCoord->setMyLastDurableOpTime(time1);
     ASSERT(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
 
     ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());

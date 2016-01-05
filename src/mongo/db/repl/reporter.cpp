@@ -41,10 +41,10 @@ namespace repl {
 using executor::RemoteCommandRequest;
 
 Reporter::Reporter(ReplicationExecutor* executor,
-                   PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn,
+                   PrepareReplSetUpdatePositionCommandFn prepareOldReplSetUpdatePositionCommandFn,
                    const HostAndPort& target)
     : _executor(executor),
-      _prepareReplSetUpdatePositionCommandFn(prepareReplSetUpdatePositionCommandFn),
+      _prepareOldReplSetUpdatePositionCommandFn(prepareOldReplSetUpdatePositionCommandFn),
       _target(target),
       _status(Status::OK()),
       _willRunAgain(false),
@@ -52,7 +52,7 @@ Reporter::Reporter(ReplicationExecutor* executor,
     uassert(ErrorCodes::BadValue, "null replication executor", executor);
     uassert(ErrorCodes::BadValue,
             "null function to create replSetUpdatePosition command object",
-            prepareReplSetUpdatePositionCommandFn);
+            prepareOldReplSetUpdatePositionCommandFn);
     uassert(ErrorCodes::BadValue, "target name cannot be empty", !target.empty());
 }
 
@@ -105,11 +105,11 @@ Status Reporter::_schedule_inlock() {
 
     LOG(2) << "Reporter scheduling report to : " << _target;
 
-    auto prepareResult = _prepareReplSetUpdatePositionCommandFn();
+    auto prepareResult = _prepareOldReplSetUpdatePositionCommandFn();
 
     if (!prepareResult.isOK()) {
         // Returning NodeNotFound because currently this is the only way
-        // prepareReplSetUpdatePositionCommand() can fail in production.
+        // prepareOldReplSetUpdatePositionCommand() can fail in production.
         return Status(ErrorCodes::NodeNotFound,
                       "Reporter failed to create replSetUpdatePositionCommand command.");
     }

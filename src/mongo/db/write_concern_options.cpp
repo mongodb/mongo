@@ -72,6 +72,7 @@ WriteConcernOptions::WriteConcernOptions(const std::string& mode,
     : syncMode(sync), wNumNodes(0), wMode(mode), wTimeout(durationCount<Milliseconds>(timeout)) {}
 
 Status WriteConcernOptions::parse(const BSONObj& obj) {
+    reset();
     if (obj.isEmpty()) {
         return Status(ErrorCodes::FailedToParse, "write concern object cannot be empty");
     }
@@ -94,10 +95,11 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
         return Status(ErrorCodes::FailedToParse, "fsync and j options cannot be used together");
 
     if (j) {
-        syncMode = JOURNAL;
-    }
-    if (fsync) {
-        syncMode = FSYNC;
+        syncMode = SyncMode::JOURNAL;
+    } else if (fsync) {
+        syncMode = SyncMode::FSYNC;
+    } else if (!jEl.eoo()) {
+        syncMode = SyncMode::NONE;
     }
 
     BSONElement e = obj["w"];
@@ -172,10 +174,12 @@ BSONObj WriteConcernOptions::toBSON() const {
         builder.append("w", wMode);
     }
 
-    if (syncMode == FSYNC) {
+    if (syncMode == SyncMode::FSYNC) {
         builder.append("fsync", true);
-    } else if (syncMode == JOURNAL) {
+    } else if (syncMode == SyncMode::JOURNAL) {
         builder.append("j", true);
+    } else if (syncMode == SyncMode::NONE) {
+        builder.append("j", false);
     }
 
     builder.append("wtimeout", wTimeout);

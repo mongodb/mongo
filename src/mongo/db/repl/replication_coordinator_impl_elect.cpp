@@ -121,7 +121,7 @@ void ReplicationCoordinatorImpl::_startElectSelf() {
 
 
     invariant(_rsConfig.getMemberAt(_selfIndex).isElectable());
-    OpTime lastOpTimeApplied(_getMyLastOptime_inlock());
+    OpTime lastOpTimeApplied(_getMyLastAppliedOpTime_inlock());
 
     if (lastOpTimeApplied.isNull()) {
         log() << "not trying to elect self, "
@@ -275,7 +275,7 @@ void ReplicationCoordinatorImpl::_recoverFromElectionTie(
         return;
     }
     auto now = _replExecutor.now();
-    auto lastOpApplied = getMyLastOptime();
+    auto lastOpApplied = getMyLastAppliedOpTime();
     if (_topCoord->checkShouldStandForElection(now, lastOpApplied)) {
         fassert(28817, _topCoord->becomeCandidateIfElectable(now, lastOpApplied));
         _startElectSelf();

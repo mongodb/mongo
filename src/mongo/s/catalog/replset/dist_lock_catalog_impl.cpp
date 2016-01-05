@@ -65,10 +65,10 @@ const char kFindAndModifyResponseResultDocField[] = "value";
 const char kLocalTimeField[] = "localTime";
 const ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly, TagSet());
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                // Note: Even though we're setting NONE here,
+                                                // Note: Even though we're setting UNSET here,
                                                 // kMajority implies JOURNAL if journaling is
                                                 // supported by this mongod.
-                                                WriteConcernOptions::NONE,
+                                                WriteConcernOptions::SyncMode::UNSET,
                                                 Seconds(15));
 
 /**

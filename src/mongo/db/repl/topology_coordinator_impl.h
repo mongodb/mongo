@@ -183,11 +183,13 @@ public:
                                             const ReplSetHeartbeatArgs& args,
                                             const std::string& ourSetName,
                                             const OpTime& lastOpApplied,
+                                            const OpTime& lastOpDurable,
                                             ReplSetHeartbeatResponse* response);
     virtual Status prepareHeartbeatResponseV1(Date_t now,
                                               const ReplSetHeartbeatArgsV1& args,
                                               const std::string& ourSetName,
                                               const OpTime& lastOpApplied,
+                                              const OpTime& lastOpDurable,
                                               ReplSetHeartbeatResponse* response);
     virtual void prepareStatusResponse(const ReplicationExecutor::CallbackArgs& data,
                                        Date_t now,

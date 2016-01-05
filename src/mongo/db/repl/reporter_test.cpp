@@ -52,7 +52,7 @@ public:
         _result = newResult;
     }
 
-    bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
+    bool prepareOldReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
         if (!_result) {
             return _result;
         }
@@ -85,7 +85,7 @@ protected:
 
     std::unique_ptr<Reporter> reporter;
     std::unique_ptr<MockProgressManager> posUpdater;
-    Reporter::PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn;
+    Reporter::PrepareReplSetUpdatePositionCommandFn prepareOldReplSetUpdatePositionCommandFn;
 };
 
 ReporterTest::ReporterTest() {}
@@ -93,16 +93,16 @@ ReporterTest::ReporterTest() {}
 void ReporterTest::setUp() {
     ReplicationExecutorTest::setUp();
     posUpdater.reset(new MockProgressManager());
-    prepareReplSetUpdatePositionCommandFn = [this]() -> StatusWith<BSONObj> {
+    prepareOldReplSetUpdatePositionCommandFn = [this]() -> StatusWith<BSONObj> {
         BSONObjBuilder bob;
-        if (posUpdater->prepareReplSetUpdatePositionCommand(&bob)) {
+        if (posUpdater->prepareOldReplSetUpdatePositionCommand(&bob)) {
             return bob.obj();
         }
         return Status(ErrorCodes::OperationFailed,
                       "unable to prepare replSetUpdatePosition command object");
     };
     reporter.reset(new Reporter(&getReplExecutor(),
-                                [this]() { return prepareReplSetUpdatePositionCommandFn(); },
+                                [this]() { return prepareOldReplSetUpdatePositionCommandFn(); },
                                 HostAndPort("h1")));
     launchExecutorThread();
 }
@@ -138,12 +138,12 @@ TEST_F(ReporterTest, InvalidConstruction) {
                   UserException);
 
     // null ReplicationExecutor
-    ASSERT_THROWS(Reporter(nullptr, prepareReplSetUpdatePositionCommandFn, HostAndPort("h1")),
+    ASSERT_THROWS(Reporter(nullptr, prepareOldReplSetUpdatePositionCommandFn, HostAndPort("h1")),
                   UserException);
 
     // empty HostAndPort
     ASSERT_THROWS(
-        Reporter(&getReplExecutor(), prepareReplSetUpdatePositionCommandFn, HostAndPort()),
+        Reporter(&getReplExecutor(), prepareOldReplSetUpdatePositionCommandFn, HostAndPort()),
         UserException);
 }
 

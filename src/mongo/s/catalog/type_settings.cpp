@@ -192,7 +192,7 @@ std::unique_ptr<WriteConcernOptions> SettingsType::getWriteConcern() const {
     dassert(_key == BalancerDocKey);
 
     if (isSecondaryThrottleSet() && !getSecondaryThrottle()) {
-        return stdx::make_unique<WriteConcernOptions>(1, WriteConcernOptions::NONE, 0);
+        return stdx::make_unique<WriteConcernOptions>(1, WriteConcernOptions::SyncMode::NONE, 0);
     } else if (!isMigrationWriteConcernSet()) {
         // Default setting.
         return nullptr;

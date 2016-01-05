@@ -51,7 +51,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(false, hbResponse.hasElectionTime());
     ASSERT_EQUALS(false, hbResponse.hasIsElectable());
     ASSERT_EQUALS(false, hbResponse.hasTime());
-    ASSERT_EQUALS(false, hbResponse.hasOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(false, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -75,7 +76,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(false, hbResponse.hasElectionTime());
     ASSERT_EQUALS(false, hbResponse.hasIsElectable());
     ASSERT_EQUALS(false, hbResponse.hasTime());
-    ASSERT_EQUALS(false, hbResponse.hasOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(false, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -101,7 +103,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(false, hbResponse.hasElectionTime());
     ASSERT_EQUALS(false, hbResponse.hasIsElectable());
     ASSERT_EQUALS(false, hbResponse.hasTime());
-    ASSERT_EQUALS(false, hbResponse.hasOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(false, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -128,7 +131,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(false, hbResponse.hasIsElectable());
     ASSERT_EQUALS(false, hbResponse.hasTime());
-    ASSERT_EQUALS(false, hbResponse.hasOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(false, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -150,14 +154,15 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(Status::OK(), initializeResult);
     ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toString());
 
-    // set opTime
-    hbResponse.setOpTime(OpTime(Timestamp(10), 0));
+    // set durableOpTime
+    hbResponse.setDurableOpTime(OpTime(Timestamp(10), 0));
     ++fieldsSet;
     ASSERT_EQUALS(false, hbResponse.hasState());
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(false, hbResponse.hasIsElectable());
     ASSERT_EQUALS(false, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(false, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -167,7 +172,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
 
     hbResponseObj = hbResponse.toBSON(false);
     ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
@@ -175,7 +180,41 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
+
+    initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
+    ASSERT_EQUALS(Status::OK(), initializeResult);
+    ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON(false).toString());
+
+    // set appliedOpTime
+    hbResponse.setAppliedOpTime(OpTime(Timestamp(50), 0));
+    ++fieldsSet;
+    ASSERT_EQUALS(false, hbResponse.hasState());
+    ASSERT_EQUALS(true, hbResponse.hasElectionTime());
+    ASSERT_EQUALS(false, hbResponse.hasIsElectable());
+    ASSERT_EQUALS(false, hbResponse.hasTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
+    ASSERT_EQUALS(false, hbResponse.hasConfig());
+    ASSERT_EQUALS(false, hbResponse.isMismatched());
+    ASSERT_EQUALS(false, hbResponse.isReplSet());
+    ASSERT_EQUALS(false, hbResponse.isStateDisagreement());
+    ASSERT_EQUALS("rs0", hbResponse.getReplicaSetName());
+    ASSERT_EQUALS("", hbResponse.getHbMsg());
+    ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
+    ASSERT_EQUALS(1, hbResponse.getConfigVersion());
+    ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
+
+    hbResponseObj = hbResponse.toBSON(false);
+    ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
+    ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
+    ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
+    ASSERT_EQUALS(1, hbResponseObj["v"].Number());
+    ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
 
     initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
     ASSERT_EQUALS(Status::OK(), initializeResult);
@@ -188,7 +227,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(false, hbResponse.hasIsElectable());
     ASSERT_EQUALS(true, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(false, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -198,7 +238,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(Seconds(10), hbResponse.getTime());
 
     hbResponseObj = hbResponse.toBSON(false);
@@ -207,7 +248,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
 
     initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj, 0);
@@ -221,7 +263,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(true, hbResponse.hasIsElectable());
     ASSERT_EQUALS(true, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(false, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -231,7 +274,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(Seconds(10), hbResponse.getTime());
     ASSERT_EQUALS(true, hbResponse.isElectable());
 
@@ -241,7 +285,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
     ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
 
@@ -257,7 +302,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(true, hbResponse.hasIsElectable());
     ASSERT_EQUALS(true, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(true, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -267,7 +313,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(Seconds(10), hbResponse.getTime());
     ASSERT_EQUALS(true, hbResponse.isElectable());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -278,7 +325,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
     ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -294,7 +342,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(true, hbResponse.hasIsElectable());
     ASSERT_EQUALS(true, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(true, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -306,7 +355,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(Seconds(10), hbResponse.getTime());
     ASSERT_EQUALS(true, hbResponse.isElectable());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -317,7 +367,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
     ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -334,7 +385,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(true, hbResponse.hasIsElectable());
     ASSERT_EQUALS(true, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(true, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(false, hbResponse.isReplSet());
@@ -346,7 +398,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(Seconds(10), hbResponse.getTime());
     ASSERT_EQUALS(true, hbResponse.isElectable());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -357,7 +410,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
     ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -376,7 +430,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(true, hbResponse.hasIsElectable());
     ASSERT_EQUALS(true, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(true, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(true, hbResponse.isReplSet());
@@ -388,7 +443,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort(), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(Seconds(10), hbResponse.getTime());
     ASSERT_EQUALS(true, hbResponse.isElectable());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -399,7 +455,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
     ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -419,7 +476,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(true, hbResponse.hasIsElectable());
     ASSERT_EQUALS(true, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(true, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(true, hbResponse.isReplSet());
@@ -431,7 +489,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort("syncTarget"), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(Seconds(10), hbResponse.getTime());
     ASSERT_EQUALS(true, hbResponse.isElectable());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -442,7 +501,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
     ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -462,7 +522,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(true, hbResponse.hasIsElectable());
     ASSERT_EQUALS(true, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(true, hbResponse.hasConfig());
     ASSERT_EQUALS(false, hbResponse.isMismatched());
     ASSERT_EQUALS(true, hbResponse.isReplSet());
@@ -474,7 +535,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort("syncTarget"), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(Seconds(10), hbResponse.getTime());
     ASSERT_EQUALS(true, hbResponse.isElectable());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -485,7 +547,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS("lub dub", hbResponseObj["hbmsg"].String());
     ASSERT_EQUALS(1, hbResponseObj["v"].Number());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
-    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 50), hbResponseObj["opTime"].timestamp());
+    ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["durableOpTime"]["ts"].timestamp());
     ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
     ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -505,7 +568,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(true, hbResponse.hasElectionTime());
     ASSERT_EQUALS(true, hbResponse.hasIsElectable());
     ASSERT_EQUALS(true, hbResponse.hasTime());
-    ASSERT_EQUALS(true, hbResponse.hasOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasDurableOpTime());
+    ASSERT_EQUALS(true, hbResponse.hasAppliedOpTime());
     ASSERT_EQUALS(true, hbResponse.hasConfig());
     ASSERT_EQUALS(true, hbResponse.isMismatched());
     ASSERT_EQUALS(true, hbResponse.isReplSet());
@@ -517,7 +581,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(HostAndPort("syncTarget"), hbResponse.getSyncingTo());
     ASSERT_EQUALS(1, hbResponse.getConfigVersion());
     ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 10), 0), hbResponse.getDurableOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 50), 0), hbResponse.getAppliedOpTime());
     ASSERT_EQUALS(Seconds(10), hbResponse.getTime());
     ASSERT_EQUALS(true, hbResponse.isElectable());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -557,7 +622,23 @@ TEST(ReplSetHeartbeatResponse, InitializeWrongTimeType) {
         result.reason());
 }
 
-TEST(ReplSetHeartbeatResponse, InitializeWrongOpTimeType) {
+TEST(ReplSetHeartbeatResponse, InitializeWrongDurableOpTimeType) {
+    ReplSetHeartbeatResponse hbResponse;
+    BSONObj initializerObj = BSON("ok" << 1.0 << "durableOpTime"
+                                       << "hello");
+    Status result = hbResponse.initialize(initializerObj, 0);
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
+    ASSERT_EQUALS("\"durableOpTime\" had the wrong type. Expected Object, found String",
+                  result.reason());
+
+    BSONObj initializerObj2 = BSON("ok" << 1.0 << "durableOpTime" << OpTime().getTimestamp());
+    Status result2 = hbResponse.initialize(initializerObj2, 0);
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, result2);
+    ASSERT_EQUALS("\"durableOpTime\" had the wrong type. Expected Object, found Timestamp",
+                  result2.reason());
+}
+
+TEST(ReplSetHeartbeatResponse, InitializeWrongAppliedOpTimeType) {
     ReplSetHeartbeatResponse hbResponse;
     BSONObj initializerObj = BSON("ok" << 1.0 << "opTime"
                                        << "hello");
@@ -719,7 +800,7 @@ TEST(ReplSetHeartbeatResponse, InitializeBothOpTimeTypesSameResult) {
     result = hbResponseTimestamp.initialize(initializerTimestamp.obj(), 0);
     ASSERT_EQUALS(Status::OK(), result);
 
-    ASSERT_EQUALS(hbResponseTimestamp.getOpTime(), hbResponseTimestamp.getOpTime());
+    ASSERT_EQUALS(hbResponseTimestamp.getAppliedOpTime(), hbResponseTimestamp.getAppliedOpTime());
 }
 
 TEST(ReplSetHeartbeatResponse, NoConfigStillInitializing) {

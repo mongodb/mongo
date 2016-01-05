@@ -37,7 +37,7 @@ class Status;
 
 struct WriteConcernOptions {
 public:
-    enum SyncMode { NONE, FSYNC, JOURNAL };
+    enum class SyncMode { UNSET, NONE, FSYNC, JOURNAL };
 
     static const int kNoTimeout = 0;
     static const int kNoWaiting = -1;
@@ -51,6 +51,9 @@ public:
 
     WriteConcernOptions() {
         reset();
+        // We set syncMode to NONE to avoid having an UNSET syncMode in default WriteConcernOptions
+        // since that can cause invariants to trigger.
+        syncMode = SyncMode::NONE;
     }
 
     WriteConcernOptions(int numNodes, SyncMode sync, int timeout);
@@ -94,7 +97,7 @@ public:
     bool validForConfigServers() const;
 
     void reset() {
-        syncMode = NONE;
+        syncMode = SyncMode::UNSET;
         wNumNodes = 0;
         wMode = "";
         wTimeout = 0;

@@ -207,7 +207,8 @@ private:
         ReplSetHeartbeatResponse hb;
         hb.setConfigVersion(1);
         hb.setState(memberState);
-        hb.setOpTime(lastOpTimeSender);
+        hb.setDurableOpTime(lastOpTimeSender);
+        hb.setAppliedOpTime(lastOpTimeSender);
         hb.setElectionTime(electionTime);
 
         StatusWith<ReplSetHeartbeatResponse> hbResponse = responseStatus.isOK()
@@ -1327,7 +1328,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     hb.setState(MemberState::RS_SECONDARY);
     hb.setElectionTime(electionTime);
     hb.setHbMsg("READY");
-    hb.setOpTime(oplogProgress);
+    hb.setAppliedOpTime(oplogProgress);
+    hb.setDurableOpTime(oplogProgress);
     StatusWith<ReplSetHeartbeatResponse> hbResponseGood = StatusWith<ReplSetHeartbeatResponse>(hb);
 
     updateConfig(
@@ -2960,7 +2962,8 @@ TEST_F(
     hbArgs.setSenderId(1);
     hbArgs.setSenderHost(HostAndPort("host3", 27017));
     ReplSetHeartbeatResponse hbResp;
-    ASSERT_OK(getTopoCoord().prepareHeartbeatResponse(now(), hbArgs, "rs0", election, &hbResp));
+    ASSERT_OK(
+        getTopoCoord().prepareHeartbeatResponse(now(), hbArgs, "rs0", election, election, &hbResp));
     ASSERT(!hbResp.hasIsElectable() || hbResp.isElectable()) << hbResp.toString();
 }
 
@@ -4245,8 +4248,8 @@ public:
                                   OpTime lastOpApplied,
                                   ReplSetHeartbeatResponse* response,
                                   Status* result) {
-        *result =
-            getTopoCoord().prepareHeartbeatResponse(now()++, args, "rs0", lastOpApplied, response);
+        *result = getTopoCoord().prepareHeartbeatResponse(
+            now()++, args, "rs0", lastOpApplied, lastOpApplied, response);
     }
 };
 
@@ -4319,7 +4322,7 @@ TEST_F(PrepareHeartbeatResponseTest,
     ASSERT_FALSE(response.isElectable());
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -4343,7 +4346,7 @@ TEST_F(PrepareHeartbeatResponseTest,
     ASSERT_FALSE(response.isElectable());
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -4368,7 +4371,7 @@ TEST_F(PrepareHeartbeatResponseTest,
     ASSERT_FALSE(response.isElectable());
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -4393,7 +4396,7 @@ TEST_F(PrepareHeartbeatResponseTest,
     ASSERT_FALSE(response.isElectable());
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -4417,7 +4420,7 @@ TEST_F(PrepareHeartbeatResponseTest,
     ASSERT_FALSE(response.isElectable());
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -4444,7 +4447,7 @@ TEST_F(PrepareHeartbeatResponseTest,
     ASSERT_TRUE(response.isElectable());
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getDurableOpTime());
     ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -4460,13 +4463,13 @@ TEST_F(TopoCoordTest, SetConfigVersionToNegativeTwoInHeartbeatResponseWhenNoConf
     args.setSenderId(20);
     ReplSetHeartbeatResponse response;
     // prepare response and check the results
-    Status result =
-        getTopoCoord().prepareHeartbeatResponse(now()++, args, "rs0", OpTime(), &response);
+    Status result = getTopoCoord().prepareHeartbeatResponse(
+        now()++, args, "rs0", OpTime(), OpTime(), &response);
     ASSERT_OK(result);
     ASSERT_FALSE(response.isElectable());
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_STARTUP, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -4493,7 +4496,7 @@ TEST_F(PrepareHeartbeatResponseTest,
     ASSERT_TRUE(response.isElectable());
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_PRIMARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(Timestamp(11, 0), 0), response.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(11, 0), 0), response.getDurableOpTime());
     ASSERT_EQUALS(Timestamp(10, 0), response.getElectionTime());
     ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
@@ -4527,7 +4530,7 @@ TEST_F(PrepareHeartbeatResponseTest,
     ASSERT_TRUE(response.isElectable());
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getDurableOpTime());
     ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     // changed to a syncing message because our sync source changed recently
     ASSERT_EQUALS("syncing from: h2:27017", response.getHbMsg());
@@ -4854,7 +4857,7 @@ TEST_F(HeartbeatResponseTest, ReconfigBetweenHeartbeatRequestAndRepsonse) {
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_PRIMARY), 0);
-    hb.setOpTime(lastOpTimeApplied);
+    hb.setDurableOpTime(lastOpTimeApplied);
     hb.setElectionTime(election.getTimestamp());
     StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
@@ -4903,7 +4906,7 @@ TEST_F(HeartbeatResponseTest, ReconfigNodeRemovedBetweenHeartbeatRequestAndRepso
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_PRIMARY), 0);
-    hb.setOpTime(lastOpTimeApplied);
+    hb.setDurableOpTime(lastOpTimeApplied);
     hb.setElectionTime(election.getTimestamp());
     StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(

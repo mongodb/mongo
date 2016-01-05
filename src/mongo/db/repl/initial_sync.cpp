@@ -112,7 +112,7 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
 
         const OpTime lastOpTime = multiApply(txn, ops);
 
-        replCoord->setMyLastOptime(lastOpTime);
+        replCoord->setMyLastAppliedOpTime(lastOpTime);
         setNewTimestamp(lastOpTime.getTimestamp());
 
         if (inShutdown()) {
@@ -122,8 +122,7 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
         // if the last op applied was our end, return
         if (lastOpTime == endOpTime) {
             LOG(1) << "SyncTail applied " << entriesApplied << " entries (" << bytesApplied
-                   << " bytes)"
-                   << " and finished at opTime " << endOpTime;
+                   << " bytes) and finished at opTime " << endOpTime;
             return;
         }
     }  // end of while (true)

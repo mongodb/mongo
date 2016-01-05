@@ -209,7 +209,8 @@ private:
         ReplSetHeartbeatResponse hb;
         hb.setConfigVersion(1);
         hb.setState(memberState);
-        hb.setOpTime(lastOpTimeSender);
+        hb.setDurableOpTime(lastOpTimeSender);
+        hb.setAppliedOpTime(lastOpTimeSender);
         hb.setElectionTime(electionTime);
         hb.setTerm(getTopoCoord().getTerm());
 
@@ -1320,7 +1321,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     hb.setState(MemberState::RS_SECONDARY);
     hb.setElectionTime(electionTime);
     hb.setHbMsg("READY");
-    hb.setOpTime(oplogProgress);
+    hb.setDurableOpTime(oplogProgress);
+    hb.setAppliedOpTime(oplogProgress);
     StatusWith<ReplSetHeartbeatResponse> hbResponseGood = StatusWith<ReplSetHeartbeatResponse>(hb);
 
     updateConfig(
@@ -1553,7 +1555,7 @@ public:
                                     ReplSetHeartbeatResponse* response,
                                     Status* result) {
         *result = getTopoCoord().prepareHeartbeatResponseV1(
-            now()++, args, "rs0", lastOpApplied, response);
+            now()++, args, "rs0", lastOpApplied, lastOpApplied, response);
     }
 };
 
@@ -1625,13 +1627,13 @@ TEST_F(TopoCoordTest, SetConfigVersionToNegativeTwoInHeartbeatResponseWhenNoConf
     args.setSenderId(20);
     ReplSetHeartbeatResponse response;
     // prepare response and check the results
-    Status result =
-        getTopoCoord().prepareHeartbeatResponseV1(now()++, args, "rs0", OpTime(), &response);
+    Status result = getTopoCoord().prepareHeartbeatResponseV1(
+        now()++, args, "rs0", OpTime(), OpTime(), &response);
     ASSERT_OK(result);
     // this change to true because we can now see a majority, unlike in the previous cases
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_STARTUP, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     // default term of topology coordinator is -1
     ASSERT_EQUALS(-1, response.getTerm());
     ASSERT_EQUALS(-2, response.getConfigVersion());
@@ -1651,7 +1653,7 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ASSERT_OK(result);
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
@@ -1671,7 +1673,7 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ASSERT_OK(result);
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
@@ -1692,7 +1694,7 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ASSERT_TRUE(response.hasConfig());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
@@ -1713,7 +1715,7 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ASSERT_FALSE(response.hasConfig());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-    ASSERT_EQUALS(OpTime(), response.getOpTime());
+    ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
     ASSERT_EQUALS(0, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
@@ -1736,7 +1738,7 @@ TEST_F(PrepareHeartbeatResponseV1Test, SetStatePrimaryInHeartbeatResponseWhenPri
     ASSERT_EQUALS(MemberState::RS_PRIMARY, response.getState().s);
     ASSERT_TRUE(response.hasElectionTime());
     ASSERT_EQUALS(getTopoCoord().getElectionTime(), response.getElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(11, 0), 0), response.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(11, 0), 0), response.getDurableOpTime());
     ASSERT_EQUALS(0, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
@@ -1767,7 +1769,7 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_FALSE(response.hasElectionTime());
-    ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getOpTime());
+    ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getDurableOpTime());
     ASSERT_EQUALS(0, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
     ASSERT_EQUALS(HostAndPort("h2"), response.getSyncingTo());
@@ -3133,7 +3135,7 @@ TEST_F(HeartbeatResponseTestV1, ReconfigNodeRemovedBetweenHeartbeatRequestAndRep
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_PRIMARY), 0);
-    hb.setOpTime(lastOpTimeApplied);
+    hb.setDurableOpTime(lastOpTimeApplied);
     hb.setElectionTime(election.getTimestamp());
     StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
@@ -3182,7 +3184,7 @@ TEST_F(HeartbeatResponseTestV1, ReconfigBetweenHeartbeatRequestAndRepsonse) {
 
     ReplSetHeartbeatResponse hb;
     hb.initialize(BSON("ok" << 1 << "v" << 1 << "state" << MemberState::RS_PRIMARY), 0);
-    hb.setOpTime(lastOpTimeApplied);
+    hb.setDurableOpTime(lastOpTimeApplied);
     hb.setElectionTime(election.getTimestamp());
     StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(

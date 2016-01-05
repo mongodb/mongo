@@ -161,7 +161,7 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     ASSERT(getReplCoord()->getMemberState().secondary())
         << getReplCoord()->getMemberState().toString();
 
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(10, 0), 0));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(10, 0), 0));
 
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
@@ -232,7 +232,7 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenAllNodesVoteYea) {
                                                          << "node3:12345")));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OperationContextNoop txn;
-    getReplCoord()->setMyLastOptime(OpTime{{100, 1}, 0});
+    getReplCoord()->setMyLastAppliedOpTime(OpTime{{100, 1}, 0});
     getExternalState()->setLastOpTime(OpTime{{100, 1}, 0});
 
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -259,7 +259,7 @@ TEST_F(ReplCoordElectTest, ElectionFailsWhenOneNodeVotesNay) {
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -304,7 +304,7 @@ TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -349,7 +349,7 @@ TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
@@ -384,7 +384,7 @@ TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
                                                                          << "node5:12345"))),
         HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
 
     // set hbreconfig to hang while in progress
     getExternalState()->setStoreLocalConfigDocumentToHang(true);
@@ -478,7 +478,7 @@ TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrim
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
-    getReplCoord()->setMyLastOptime(time1);
+    getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     auto net = getNet();

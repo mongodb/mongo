@@ -113,12 +113,13 @@ void ReplCoordTest::init() {
 
     TopologyCoordinatorImpl::Options settings;
     _topo = new TopologyCoordinatorImpl(settings);
+    stdx::function<bool()> _durablityLambda = []() -> bool { return true; };
     _net = new NetworkInterfaceMock;
     _storage = new StorageInterfaceMock;
     _replExec.reset(new ReplicationExecutor(_net, _storage, seed));
     _externalState = new ReplicationCoordinatorExternalStateMock;
-    _repl.reset(
-        new ReplicationCoordinatorImpl(_settings, _externalState, _topo, _replExec.get(), seed));
+    _repl.reset(new ReplicationCoordinatorImpl(
+        _settings, _externalState, _topo, _replExec.get(), seed, &_durablityLambda));
 }
 
 void ReplCoordTest::init(const ReplSettings& settings) {
