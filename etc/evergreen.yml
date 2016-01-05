@@ -611,7 +611,20 @@ tasks:
       should_shuffle: false
       continue_on_failure: false
 
-## jstestfuzz replica set ##
+## jstestfuzz replica set mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      # Run the mmapv1 tests without the dbHash hook, as a DB could be created with an
+      # invalid namespace (SERVER-10926).
+      resmoke_args: --suites=jstestfuzz_replication_nodbhash --storageEngine=mmapv1
+      should_shuffle: false
+
+## jstestfuzz replica set WT ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_WT
   commands:
@@ -623,7 +636,7 @@ tasks:
       should_shuffle: false
       continue_on_failure: false
 
-## jstestfuzz sharded cluster ##
+## jstestfuzz sharded cluster WT ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_WT
   commands:
@@ -2189,6 +2202,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2405,6 +2419,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2538,6 +2553,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mongosTest
@@ -2640,6 +2656,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2726,6 +2743,7 @@ buildvariants:
   - name: jsCore_WT_ese
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2817,6 +2835,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -2978,6 +2997,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3074,6 +3094,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3238,6 +3259,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3346,6 +3368,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3714,6 +3737,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3805,6 +3829,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3893,6 +3918,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -3967,6 +3993,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4070,6 +4097,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4173,6 +4201,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4255,6 +4284,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4302,6 +4332,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4353,6 +4384,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
@@ -4425,6 +4457,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4503,6 +4536,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
@@ -4575,6 +4609,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4733,6 +4768,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -4805,6 +4841,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
@@ -5214,6 +5251,7 @@ buildvariants:
   - name: compile
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: unittests
@@ -5271,6 +5309,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: mmap
