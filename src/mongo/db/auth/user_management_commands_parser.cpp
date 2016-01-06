@@ -234,6 +234,9 @@ Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
     if (!status.isOK()) {
         return status;
     }
+    if (userName.find('\0') != std::string::npos) {
+        return Status(ErrorCodes::BadValue, "Username cannot contain NULL characters");
+    }
 
     parsedArgs->userName = UserName(userName, dbname);
 
