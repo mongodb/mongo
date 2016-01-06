@@ -637,6 +637,18 @@ tasks:
       should_shuffle: false
       continue_on_failure: false
 
+## jstestfuzz sharded cluster mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_sharded
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      resmoke_args: --suites=jstestfuzz_sharded --storageEngine=mmapv1
+      should_shuffle: false
+      continue_on_failure: false
+
 ## jstestfuzz sharded cluster WT ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_WT
@@ -2205,6 +2217,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -2422,6 +2435,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -2556,6 +2570,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mongosTest
   - name: mmap
@@ -2659,6 +2674,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -2746,6 +2762,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: noPassthrough
@@ -2838,6 +2855,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3000,6 +3018,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3097,6 +3116,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3262,6 +3282,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -3371,6 +3392,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3740,6 +3762,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -3832,6 +3855,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -3921,6 +3945,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -3996,6 +4021,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4100,6 +4126,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4204,6 +4231,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4287,6 +4315,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -4335,6 +4364,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -4387,6 +4417,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
   - name: sasl
@@ -4460,6 +4491,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4539,6 +4571,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: replicasets_auth
   - name: sasl
@@ -4612,6 +4645,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -4771,6 +4805,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
@@ -4844,6 +4879,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
@@ -5254,6 +5290,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: unittests
 
@@ -5312,6 +5349,7 @@ buildvariants:
   - name: jstestfuzz_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
