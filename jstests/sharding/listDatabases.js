@@ -34,6 +34,10 @@ dbInConfigEntryCheck(getDBSection(dbArray, "config"));
 var adminSection = getDBSection(dbArray, 'admin');
 assert(!adminSection);
 
+// Local database should never be returned
+var localSection = getDBSection(dbArray, 'local');
+assert(!localSection);
+
 // add doc in admin db on the config server.
 mongos.getDB('admin').test.insert({ _id: 1 });
 res = mongos.adminCommand("listDatabases");
