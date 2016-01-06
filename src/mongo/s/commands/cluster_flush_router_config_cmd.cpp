@@ -30,6 +30,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 
@@ -70,6 +71,7 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
+        grid.shardRegistry()->reload(txn);
         grid.catalogCache()->invalidateAll();
 
         result.appendBool("flushed", true);
