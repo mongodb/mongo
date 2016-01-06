@@ -117,7 +117,8 @@ public:
     void update(const RecordId& oldLoc, const BSONObj& newDoc) {
         WriteUnitOfWork wunit(&_txn);
         BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_txn, oldLoc).releaseToBson();
-        oplogUpdateEntryArgs args;
+        OplogUpdateEntryArgs args;
+        args.ns = _coll->ns().ns();
         _coll->updateDocument(&_txn,
                               oldLoc,
                               Snapshotted<BSONObj>(_txn.recoveryUnit()->getSnapshotId(), oldDoc),
@@ -125,7 +126,7 @@ public:
                               false,
                               true,
                               NULL,
-                              args);
+                              &args);
         wunit.commit();
     }
 

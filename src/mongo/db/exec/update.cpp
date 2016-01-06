@@ -525,7 +525,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 newObj = oldObj.value();
                 const RecordData oldRec(oldObj.value().objdata(), oldObj.value().objsize());
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
-                oplogUpdateEntryArgs args;
+                OplogUpdateEntryArgs args;
+                args.ns = _collection->ns().ns();
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
@@ -535,7 +536,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     Snapshotted<RecordData>(oldObj.snapshotId(), oldRec),
                     source,
                     _damages,
-                    args);
+                    &args);
                 newObj = uassertStatusOK(std::move(newRecStatus)).releaseToBson();
             }
 
@@ -554,7 +555,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
             if (!request->isExplain()) {
                 invariant(_collection);
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
-                oplogUpdateEntryArgs args;
+                OplogUpdateEntryArgs args;
+                args.ns = _collection->ns().ns();
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
@@ -565,7 +567,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                                                                        true,
                                                                        driver->modsAffectIndices(),
                                                                        _params.opDebug,
-                                                                       args);
+                                                                       &args);
                 uassertStatusOK(res.getStatus());
                 newLoc = res.getValue();
             }

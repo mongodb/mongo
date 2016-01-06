@@ -38,10 +38,23 @@ struct CollectionOptions;
 class NamespaceString;
 class OperationContext;
 
-struct oplogUpdateEntryArgs {
+/**
+ * Holds document update information used in logging.
+ */
+struct OplogUpdateEntryArgs {
+    // Name of the collection in which document is being updated.
     std::string ns;
+
+    // Fully updated document with damages (update modifiers) applied.
+    BSONObj updatedDoc;
+
+    // Document containing update modifiers -- e.g. $set and $unset
     BSONObj update;
+
+    // Document containing the _id field of the doc being updated.
     BSONObj criteria;
+
+    // True if this update comes from a chunk migration.
     bool fromMigrate;
 };
 
@@ -52,8 +65,15 @@ public:
     OpObserver() {}
     ~OpObserver() {}
 
+    /**
+     * Holds document deletion information used in logging.
+     */
     struct DeleteState {
+        // Contains the _id field of the document being deleted.
         BSONObj idDoc;
+
+        // True if doc being deleted is located in a currently migrating
+        // chunk, where this is the chunk source.
         bool isMigrating = false;
     };
 
@@ -66,7 +86,7 @@ public:
                    std::vector<BSONObj>::const_iterator begin,
                    std::vector<BSONObj>::const_iterator end,
                    bool fromMigrate = false);
-    void onUpdate(OperationContext* txn, oplogUpdateEntryArgs args);
+    void onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& args);
     DeleteState aboutToDelete(OperationContext* txn, const NamespaceString& ns, const BSONObj& doc);
     /**
      * Handles logging before document is deleted.

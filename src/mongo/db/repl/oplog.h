@@ -109,7 +109,7 @@ void _logOp(OperationContext* txn,
             const char* opstr,
             const char* ns,
             const BSONObj& obj,
-            BSONObj* o2,
+            const BSONObj* o2,
             bool fromMigrate,
             const std::string& oplogCollectionName,
             ReplicationCoordinator::Mode replicationMode,
@@ -119,7 +119,7 @@ void logOp(OperationContext* txn,
            const char* opstr,
            const char* ns,
            const BSONObj& obj,
-           BSONObj* o2,
+           const BSONObj* o2,
            bool fromMigrate);
 
 // Flush out the cached pointers to the local database and oplog.

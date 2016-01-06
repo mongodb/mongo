@@ -423,7 +423,7 @@ private:
 };
 
 void AuthzManagerExternalStateLocal::logOp(
-    OperationContext* txn, const char* op, const char* ns, const BSONObj& o, BSONObj* o2) {
+    OperationContext* txn, const char* op, const char* ns, const BSONObj& o, const BSONObj* o2) {
     if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
         ns == AuthorizationManager::adminCommandNamespace.ns()) {
         txn->recoveryUnit()->registerChange(new AuthzManagerLogOpHandler(this, op, ns, o, o2));

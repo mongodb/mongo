@@ -715,7 +715,7 @@ void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
 }
 
 void AuthorizationManager::logOp(
-    OperationContext* txn, const char* op, const char* ns, const BSONObj& o, BSONObj* o2) {
+    OperationContext* txn, const char* op, const char* ns, const BSONObj& o, const BSONObj* o2) {
     _externalState->logOp(txn, op, ns, o, o2);
     if (appliesToAuthzData(op, ns, o)) {
         _invalidateRelevantCacheData(op, ns, o, o2);

@@ -76,7 +76,7 @@ void OpObserver::onInserts(OperationContext* txn,
     }
 }
 
-void OpObserver::onUpdate(OperationContext* txn, oplogUpdateEntryArgs args) {
+void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& args) {
     // Do not log a no-op operation; see SERVER-21738
     if (args.update.isEmpty()) {
         return;
@@ -85,7 +85,7 @@ void OpObserver::onUpdate(OperationContext* txn, oplogUpdateEntryArgs args) {
     repl::logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria, args.fromMigrate);
     AuthorizationManager::get(txn->getServiceContext())
         ->logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria);
-    logUpdateOpForSharding(txn, args.ns.c_str(), args.criteria, args.fromMigrate);
+    logUpdateOpForSharding(txn, args.ns.c_str(), args.updatedDoc, args.fromMigrate);
     logOpForDbHash(txn, args.ns.c_str());
     if (strstr(args.ns.c_str(), ".system.js")) {
         Scope::storedFuncMod(txn);

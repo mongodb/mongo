@@ -352,10 +352,11 @@ public:
         // This allows us to check that we don't return the new copy of a doc by asserting
         // foo < limit().
         BSONObj newDoc = BSON("_id" << updatedId << "foo" << limit() + 10);
-        oplogUpdateEntryArgs args;
+        OplogUpdateEntryArgs args;
+        args.ns = coll->ns().ns();
         {
             WriteUnitOfWork wuow(&_txn);
-            coll->updateDocument(&_txn, *it, oldDoc, newDoc, false, false, NULL, args);
+            coll->updateDocument(&_txn, *it, oldDoc, newDoc, false, false, NULL, &args);
             wuow.commit();
         }
         exec->restoreState();
@@ -373,7 +374,7 @@ public:
             oldDoc = coll->docFor(&_txn, *it);
             {
                 WriteUnitOfWork wuow(&_txn);
-                coll->updateDocument(&_txn, *it++, oldDoc, newDoc, false, false, NULL, args);
+                coll->updateDocument(&_txn, *it++, oldDoc, newDoc, false, false, NULL, &args);
                 wuow.commit();
             }
         }

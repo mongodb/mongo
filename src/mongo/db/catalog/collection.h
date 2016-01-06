@@ -294,9 +294,11 @@ public:
                           bool enforceQuota);
 
     /**
-     * updates the document @ oldLocation with newDoc
-     * if the document fits in the old space, it is put there
-     * if not, it is moved
+     * Updates the document @ oldLocation with newDoc.
+     *
+     * If the document fits in the old space, it is put there; if not, it is moved.
+     * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
+     * success.
      * @return the post update location of the doc (may or may not be the same as oldLocation)
      */
     StatusWith<RecordId> updateDocument(OperationContext* txn,
@@ -306,13 +308,15 @@ public:
                                         bool enforceQuota,
                                         bool indexesAffected,
                                         OpDebug* debug,
-                                        oplogUpdateEntryArgs& args);
+                                        OplogUpdateEntryArgs* args);
 
     bool updateWithDamagesSupported() const;
 
     /**
      * Not allowed to modify indexes.
      * Illegal to call if updateWithDamagesSupported() returns false.
+     * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on
+     * success.
      * @return the contents of the updated record.
      */
     StatusWith<RecordData> updateDocumentWithDamages(OperationContext* txn,
@@ -320,7 +324,7 @@ public:
                                                      const Snapshotted<RecordData>& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages,
-                                                     oplogUpdateEntryArgs& args);
+                                                     OplogUpdateEntryArgs* args);
 
     // -----------
 

@@ -511,7 +511,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
                                                 bool enforceQuota,
                                                 bool indexesAffected,
                                                 OpDebug* debug,
-                                                oplogUpdateEntryArgs& args) {
+                                                OplogUpdateEntryArgs* args) {
     {
         auto status = checkValidation(txn, newDoc);
         if (!status.isOK()) {
@@ -530,6 +530,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
 
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(oldDoc.snapshotId() == txn->recoveryUnit()->getSnapshotId());
+    invariant(newDoc.isOwned());
 
     if (_needCappedLock) {
         // X-lock the metadata resource for this capped collection until the end of the WUOW. This
@@ -615,8 +616,8 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
         if (!s.isOK())
             return StatusWith<RecordId>(s);
         invariant(sid == txn->recoveryUnit()->getSnapshotId());
-        args.ns = ns().ns();
-        getGlobalServiceContext()->getOpObserver()->onUpdate(txn, args);
+        args->updatedDoc = newDoc;
+        getGlobalServiceContext()->getOpObserver()->onUpdate(txn, *args);
 
         return newLocation;
     }
@@ -642,8 +643,8 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
     }
 
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
-    args.ns = ns().ns();
-    getGlobalServiceContext()->getOpObserver()->onUpdate(txn, args);
+    args->updatedDoc = newDoc;
+    getGlobalServiceContext()->getOpObserver()->onUpdate(txn, *args);
 
     return newLocation;
 }
@@ -678,7 +679,7 @@ StatusWith<RecordData> Collection::updateDocumentWithDamages(
     const Snapshotted<RecordData>& oldRec,
     const char* damageSource,
     const mutablebson::DamageVector& damages,
-    oplogUpdateEntryArgs& args) {
+    OplogUpdateEntryArgs* args) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(oldRec.snapshotId() == txn->recoveryUnit()->getSnapshotId());
     invariant(updateWithDamagesSupported());
@@ -690,8 +691,8 @@ StatusWith<RecordData> Collection::updateDocumentWithDamages(
         _recordStore->updateWithDamages(txn, loc, oldRec.value(), damageSource, damages);
 
     if (newRecStatus.isOK()) {
-        args.ns = ns().ns();
-        getGlobalServiceContext()->getOpObserver()->onUpdate(txn, args);
+        args->updatedDoc = newRecStatus.getValue().toBson();
+        getGlobalServiceContext()->getOpObserver()->onUpdate(txn, *args);
     }
     return newRecStatus;
 }

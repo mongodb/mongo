@@ -79,14 +79,14 @@ void logInsertOpForSharding(OperationContext* txn,
  * to determine whether the update should be logged to the migration transfer mods log.
  *
  * 'ns' name of the collection in which the operation will occur.
- * 'pattern' contains the _id value of the doc being updated.
+ * 'updatedDoc' updated document.
  * 'notInActiveChunk' if true indicates that the update is coming from a donor shard
  * in a current chunk migration, and so does not need to be entered in this shard's
  * outgoing transfer log.
  */
 void logUpdateOpForSharding(OperationContext* txn,
                             const char* ns,
-                            const BSONObj& pattern,
+                            const BSONObj& updatedDoc,
                             bool notInActiveChunk);
 
 /**

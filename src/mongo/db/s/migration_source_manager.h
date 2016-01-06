@@ -75,13 +75,13 @@ public:
                      bool notInActiveChunk);
 
     /**
-     * If a migration for the chunk in 'ns' containing the document with the _id in 'pattern' is
-     * in progress, saves this update to the transfer mods log. The entries saved here are later
-     * transferred to the receiving side of the migration.
+     * If a migration for the chunk in 'ns' containing 'updatedDoc' is in progress, saves this
+     * update to the transfer mods log. The entries saved here are later transferred to the
+     * receiving side of the migration.
      */
     void logUpdateOp(OperationContext* txn,
                      const char* ns,
-                     const BSONObj& pattern,
+                     const BSONObj& updatedDoc,
                      bool notInActiveChunk);
 
     /**

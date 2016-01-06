@@ -233,24 +233,24 @@ void MigrationSourceManager::logInsertOp(OperationContext* txn,
     if (!_active || (_nss != ns))
         return;
 
-    BSONElement ide = obj["_id"];
-    if (ide.eoo()) {
-        warning() << "logInsertOp got mod with no _id, ignoring  obj: " << obj << migrateLog;
+    BSONElement idElement = obj["_id"];
+    if (idElement.eoo()) {
+        warning() << "logInsertOp got a document with no _id field, ignoring inserted document: "
+                  << obj << migrateLog;
         return;
     }
+    BSONObj idObj(idElement.wrap());
 
     if (!isInRange(obj, _min, _max, _shardKeyPattern)) {
         return;
     }
-
-    BSONObj idObj(ide.wrap());
 
     txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, 'i'));
 }
 
 void MigrationSourceManager::logUpdateOp(OperationContext* txn,
                                          const char* ns,
-                                         const BSONObj& pattern,
+                                         const BSONObj& updatedDoc,
                                          bool notInActiveChunk) {
     ensureShardVersionOKOrThrow(txn, ns);
 
@@ -262,23 +262,15 @@ void MigrationSourceManager::logUpdateOp(OperationContext* txn,
     if (!_active || (_nss != ns))
         return;
 
-    BSONElement ide = pattern.getField("_id");
-    if (ide.eoo()) {
-        warning() << "logUpdateOp got mod with no _id, ignoring  obj: " << pattern << migrateLog;
+    BSONElement idElement = updatedDoc["_id"];
+    if (idElement.eoo()) {
+        warning() << "logUpdateOp got a document with no _id field, ignoring updatedDoc: "
+                  << updatedDoc << migrateLog;
         return;
     }
-    BSONObj idObj(ide.wrap());
+    BSONObj idObj(idElement.wrap());
 
-    BSONObj fullDoc;
-    OldClientContext ctx(txn, _nss.ns(), false);
-    if (!Helpers::findById(txn, ctx.db(), _nss.ns().c_str(), idObj, fullDoc)) {
-        warning() << "logUpdateOp couldn't find: " << idObj << " even though should have"
-                  << migrateLog;
-        dassert(false);  // TODO: Abort the migration.
-        return;
-    }
-
-    if (!isInRange(fullDoc, _min, _max, _shardKeyPattern)) {
+    if (!isInRange(updatedDoc, _min, _max, _shardKeyPattern)) {
         return;
     }
 
@@ -296,12 +288,13 @@ void MigrationSourceManager::logDeleteOp(OperationContext* txn,
 
     dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
 
-    BSONElement ide = obj["_id"];
-    if (ide.eoo()) {
-        warning() << "logDeleteOp got mod with no _id, ignoring  obj: " << obj << migrateLog;
+    BSONElement idElement = obj["_id"];
+    if (idElement.eoo()) {
+        warning() << "logDeleteOp got a document with no _id field, ignoring deleted doc: " << obj
+                  << migrateLog;
         return;
     }
-    BSONObj idObj(ide.wrap());
+    BSONObj idObj(idElement.wrap());
 
     txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, 'd'));
 }

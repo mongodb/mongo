@@ -441,11 +441,11 @@ void logInsertOpForSharding(OperationContext* txn,
 
 void logUpdateOpForSharding(OperationContext* txn,
                             const char* ns,
-                            const BSONObj& pattern,
+                            const BSONObj& updatedDoc,
                             bool notInActiveChunk) {
     ShardingState* shardingState = ShardingState::get(txn);
     if (shardingState->enabled())
-        shardingState->migrationSourceManager()->logUpdateOp(txn, ns, pattern, notInActiveChunk);
+        shardingState->migrationSourceManager()->logUpdateOp(txn, ns, updatedDoc, notInActiveChunk);
 }
 
 void logDeleteOpForSharding(OperationContext* txn,

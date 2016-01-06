@@ -312,7 +312,7 @@ public:
                const char* opstr,
                const char* ns,
                const BSONObj& obj,
-               BSONObj* patt);
+               const BSONObj* patt);
 
 private:
     /**
