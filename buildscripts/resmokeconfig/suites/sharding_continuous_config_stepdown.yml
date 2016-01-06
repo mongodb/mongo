@@ -4,10 +4,6 @@ selector:
     - jstests/sharding/*.js
     - jstests/sharding/replset_config/*.js
     exclude_files:
-    # SERVER-20694
-    - jstests/sharding/csrs_upgrade.js
-    # Test is flaky - SERVER-20580
-    - jstests/sharding/csrs_upgrade_during_migrate.js
     # Auth tests require authentication on the stepdown thread's connection
     - jstests/sharding/auth*.js
     - jstests/sharding/cleanup_orphaned_auth.js

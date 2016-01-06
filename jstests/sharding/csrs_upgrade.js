@@ -14,6 +14,9 @@
  * config.version is read to confirm the availability of metadata
  * reads.
  */
+
+load("jstests/replsets/rslib.js");
+
 var st;
 (function() {
     "use strict";
@@ -96,33 +99,6 @@ var st;
         }
     });
 
-    var waitUntilAllCaughtUp = function(csrs) {
-        var rsStatus;
-        var firstConflictingIndex;
-        var ot;
-        var otherOt;
-        assert.soon(function () {
-            rsStatus = csrs[0].adminCommand('replSetGetStatus');
-            if (rsStatus.ok != 1) {
-                return false;
-            }
-            assert.eq(csrs.length, rsStatus.members.length, tojson(rsStatus));
-            ot = rsStatus.members[0].optime;
-            for (var i = 1; i < rsStatus.members.length; ++i) {
-                otherOt = rsStatus.members[i].optime;
-                if (bsonWoCompare({ts: otherOt.ts}, {ts: ot.ts}) ||
-                    bsonWoCompare({t: otherOt.t},  {t: ot.t})) {
-                    firstConflictingIndex = i;
-                    return false;
-                }
-            }
-            return true;
-        }, function () {
-            return "Optimes of members 0 (" + tojson(ot) + ") and " + firstConflictingIndex + " (" +
-                tojson(otherOt) + ") are different in " + tojson(rsStatus);
-        });
-    };
-
     var shardConfigs = st.s0.getCollection("config.shards").find().toArray();
     assert.eq(2, shardConfigs.length);
     var shard0Name = shardConfigs[0]._id;
@@ -192,7 +168,7 @@ var st;
     assertOpsWork(st.s0, "using SCCC protocol when first config server is primary of " +
                   csrs.length + "-node replica set");
 
-    waitUntilAllCaughtUp(csrs);
+    waitUntilAllNodesCaughtUp(csrs);
 
     jsTest.log("Shutting down second and third SCCC config server nodes");
     MongoRunner.stopMongod(st.c1);
