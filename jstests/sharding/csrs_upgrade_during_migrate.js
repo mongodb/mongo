@@ -120,10 +120,7 @@ var st;
     jsTest.log("Adding non-voting members to csrs set: " + tojson(csrsConfig));
     assert.commandWorked(csrs[0].adminCommand({replSetReconfig: csrsConfig}));
 
-    // This write is an easy way to wait for all members of the CSRS set to have
-    // replicated all of the documents.
-    assert.writeOK(csrs[0].getCollection('config.tmp').insert({},
-                                                              { writeConcern: { w:csrs.length }}));
+    waitUntilAllNodesCaughtUp(csrs);
 
     jsTest.log("Starting long-running chunk migration");
     // Turn on fail point to confirm that moveChunk aborts before getting to the critical section.
@@ -145,8 +142,9 @@ var st;
                     return st.s0.getDB('config').changelog.findOne({what: 'moveChunk.start'});
                 });
 
-    jsTest.log("Shutting down second and third SCCC config server nodes");
-    MongoRunner.stopMongod(st.c1);
+    // Only shut down one of the SCCC config servers to avoid any period without any config servers
+    // online.
+    jsTest.log("Shutting down third SCCC config server node");
     MongoRunner.stopMongod(st.c2);
 
     csrsConfig.members.forEach(function (member) { member.votes = 1; member.priority = 1});
