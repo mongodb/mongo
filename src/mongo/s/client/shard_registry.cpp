@@ -207,7 +207,7 @@ void ShardRegistry::reload(OperationContext* txn) {
             continue;
         }
 
-        _addShard_inlock(shardType);
+        _addShard_inlock(shardType, false);
     }
 }
 
@@ -334,10 +334,10 @@ void ShardRegistry::_addConfigShard_inlock() {
     ShardType configServerShard;
     configServerShard.setName("config");
     configServerShard.setHost(_configServerCS.toString());
-    _addShard_inlock(configServerShard);
+    _addShard_inlock(configServerShard, true);
 }
 
-void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
+void ShardRegistry::_addShard_inlock(const ShardType& shardType, bool passHostName) {
     // This validation should ideally go inside the ShardType::validate call. However, doing
     // it there would prevent us from loading previously faulty shard hosts, which might have
     // been stored (i.e., the entire getAllShards call would fail).
@@ -355,27 +355,38 @@ void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
         // mechanism and must only be reachable through CatalogManagerLegacy or legacy-style queries
         // and inserts. Do not create targeter for these connections. This code should go away after
         // 3.2 is released.
+        // Config server updates must pass the host name to avoid deadlock
         shard = std::make_shared<Shard>(shardType.getName(), shardHost, nullptr);
+        _updateLookupMapsForShard_inlock(std::move(shard), shardHost);
     } else {
         // Non-SYNC shards use targeter factory.
         shard = std::make_shared<Shard>(
             shardType.getName(), shardHost, _targeterFactory->create(shardHost));
+        if (passHostName) {
+            _updateLookupMapsForShard_inlock(std::move(shard), shardHost);
+        } else {
+            _updateLookupMapsForShard_inlock(std::move(shard),
+                                             boost::optional<const ConnectionString&>(boost::none));
+        }
+    }
+}
+
+void ShardRegistry::updateLookupMapsForShard(
+    shared_ptr<Shard> shard, boost::optional<const ConnectionString&> optConnString) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _updateLookupMapsForShard_inlock(std::move(shard), optConnString);
+}
+
+void ShardRegistry::_updateLookupMapsForShard_inlock(
+    shared_ptr<Shard> shard, boost::optional<const ConnectionString&> optConnString) {
+    auto oldConnString = shard->getConnString();
+    auto newConnString = optConnString ? *optConnString : shard->getTargeter()->connectionString();
+
+    if (oldConnString.toString() != newConnString.toString()) {
+        log() << "Updating ShardRegistry connection string for shard " << shard->getId()
+              << " from: " << oldConnString.toString() << " to: " << newConnString.toString();
     }
 
-    _updateLookupMapsForShard_inlock(std::move(shard), shardHost);
-}
-
-void ShardRegistry::updateLookupMapsForShard(shared_ptr<Shard> shard,
-                                             const ConnectionString& newConnString) {
-    log() << "Updating ShardRegistry connection string for shard " << shard->getId()
-          << " from: " << shard->getConnString().toString() << " to: " << newConnString.toString();
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _updateLookupMapsForShard_inlock(std::move(shard), newConnString);
-}
-
-void ShardRegistry::_updateLookupMapsForShard_inlock(shared_ptr<Shard> shard,
-                                                     const ConnectionString& newConnString) {
-    auto oldConnString = shard->getConnString();
     for (const auto& host : oldConnString.getServers()) {
         _lookup.erase(host.toString());
         _hostLookup.erase(host);
