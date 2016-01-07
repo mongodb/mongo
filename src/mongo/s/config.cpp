@@ -80,15 +80,16 @@ DBConfig::CollectionInfo::CollectionInfo(const BSONObj& in) {
     _dropped = in[CollectionType::dropped()].trueValue();
 
     if (in[CollectionType::keyPattern()].isABSONObj()) {
-        shard(new ChunkManager(in));
+        std::unique_ptr<ChunkManager> newManager(new ChunkManager(in));
+        shard(std::move(newManager));
     }
 
     _dirty = false;
 }
 
-void DBConfig::CollectionInfo::shard(ChunkManager* manager) {
+void DBConfig::CollectionInfo::shard(std::unique_ptr<ChunkManager> manager) {
     // Do this *first* so we're invisible to everyone else
-    manager->loadExistingRanges(configServer.getPrimary().getConnString(), NULL);
+    manager->loadExistingRanges(configServer.getPrimary().getConnString(), nullptr);
 
     //
     // Collections with no chunks are unsharded, no matter what the collections entry says
@@ -96,14 +97,14 @@ void DBConfig::CollectionInfo::shard(ChunkManager* manager) {
     //
 
     if (manager->numChunks() != 0) {
-        _cm = ChunkManagerPtr(manager);
-        _key = manager->getShardKeyPattern().toBSON().getOwned();
-        _unqiue = manager->isUnique();
+        _cm.reset(manager.release());
+        _key = _cm->getShardKeyPattern().toBSON().getOwned();
+        _unqiue = _cm->isUnique();
         _dirty = true;
         _dropped = false;
     } else {
-        warning() << "no chunks found for collection " << manager->getns() << ", assuming unsharded"
-                  << endl;
+        warning() << "no chunks found for collection " << manager->getns()
+                  << ", assuming unsharded";
         unshard();
     }
 }
@@ -235,10 +236,12 @@ ChunkManagerPtr DBConfig::shardCollection(const string& ns,
         collectionDetail.append("numChunks", (int)(initPoints->size() + 1));
         configServer.logChange("shardCollection.start", ns, collectionDetail.obj());
 
-        ChunkManager* cm = new ChunkManager(ns, fieldsAndOrder, unique);
-        cm->createFirstChunks(
-            configServer.getPrimary().getConnString(), getPrimary(), initPoints, initShards);
-        ci.shard(cm);
+        {
+            std::unique_ptr<ChunkManager> cm(new ChunkManager(ns, fieldsAndOrder, unique));
+            cm->createFirstChunks(
+                configServer.getPrimary().getConnString(), getPrimary(), initPoints, initShards);
+            ci.shard(std::move(cm));
+        }
 
         _save();
 

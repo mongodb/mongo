@@ -78,7 +78,7 @@ class DBConfig {
             _cm.reset(cm);
         }
 
-        void shard(ChunkManager* cm);
+        void shard(std::unique_ptr<ChunkManager> manager);
         void unshard();
 
         bool isDirty() const {
