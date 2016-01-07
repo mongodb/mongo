@@ -5152,6 +5152,9 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
+  - name: jstestfuzz
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: bulk_gle_passthrough
