@@ -235,6 +235,8 @@ private:
 
     void _replaceCatalogManager(const executor::TaskExecutor::CallbackArgs& args);
 
+    void _unlockOldDistLocks(std::string processID);
+
     ServiceContext* _service;
     ShardRegistry* _shardRegistry;
     HostAndPort _thisHost;
@@ -251,6 +253,7 @@ private:
 
     ConnectionString _nextConfigConnectionString;                   // Guarded by _observerMutex.
     executor::TaskExecutor::EventHandle _nextConfigChangeComplete;  // Guarded by _observerMutex.
+    bool _configChangeComplete{false};
 };
 
 class ForwardingCatalogManager::ScopedDistLock {

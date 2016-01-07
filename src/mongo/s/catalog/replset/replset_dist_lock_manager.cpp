@@ -108,6 +108,10 @@ void ReplSetDistLockManager::shutDown(OperationContext* txn, bool allowNetworkin
     }
 }
 
+std::string ReplSetDistLockManager::getProcessID() {
+    return _processID;
+}
+
 bool ReplSetDistLockManager::isShutDown() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _isShutDown;
@@ -417,6 +421,13 @@ void ReplSetDistLockManager::unlock(OperationContext* txn, const DistLockHandle&
     } else {
         LOG(0) << "distributed lock with " << LocksType::lockID() << ": " << lockSessionID
                << "' unlocked.";
+    }
+}
+
+void ReplSetDistLockManager::unlockAll(OperationContext* txn, const std::string& processID) {
+    Status status = _catalog->unlockAll(txn, processID);
+    if (!status.isOK()) {
+        warning() << "Error while trying to unlock existing distributed locks" << causedBy(status);
     }
 }
 

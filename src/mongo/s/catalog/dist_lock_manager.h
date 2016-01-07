@@ -114,6 +114,11 @@ public:
     virtual void shutDown(OperationContext* txn, bool allowNetworking) = 0;
 
     /**
+     * Returns the process ID for this DistLockManager.
+     */
+    virtual std::string getProcessID() = 0;
+
+    /**
      * Tries multiple times to lock, using the specified lock try interval, until
      * a certain amount of time has passed or when any error that is not LockBusy
      * occurred.
@@ -132,6 +137,13 @@ public:
         StringData whyMessage,
         stdx::chrono::milliseconds waitFor = kDefaultLockTimeout,
         stdx::chrono::milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
+
+    /**
+     * Makes a best-effort attempt to unlock all locks owned by the given processID.
+     * Only implemented for the ReplSetDistLockManager and only used after catalog manager swap
+     * during upgrade to CSRS.
+     */
+    virtual void unlockAll(OperationContext* txn, const std::string& processID) = 0;
 
 protected:
     /**

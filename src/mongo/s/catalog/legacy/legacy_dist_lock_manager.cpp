@@ -75,6 +75,10 @@ void LegacyDistLockManager::shutDown(OperationContext* txn, bool allowNetworking
     }
 }
 
+std::string LegacyDistLockManager::getProcessID() {
+    return _processId;
+}
+
 StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
     OperationContext* txn,
     StringData name,
@@ -226,5 +230,9 @@ Status LegacyDistLockManager::checkStatus(OperationContext* txn, const DistLockH
 void LegacyDistLockManager::enablePinger(bool enable) {
     stdx::lock_guard<stdx::mutex> sl(_mutex);
     _pingerEnabled = enable;
+}
+
+void LegacyDistLockManager::unlockAll(OperationContext* txn, const std::string& processID) {
+    fassertFailed(34367);  // Only supported for CSRS
 }
 }

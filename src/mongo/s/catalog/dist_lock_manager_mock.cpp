@@ -63,6 +63,10 @@ void DistLockManagerMock::shutDown(OperationContext* txn, bool allowNetworking) 
     uassert(28659, "DistLockManagerMock shut down with outstanding locks present", _locks.empty());
 }
 
+std::string DistLockManagerMock::getProcessID() {
+    return "Mock dist lock manager process id";
+}
+
 StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lock(
     OperationContext* txn,
     StringData name,
@@ -89,6 +93,10 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lock(
     _locks.push_back(info);
 
     return DistLockManager::ScopedDistLock(nullptr, info.lockID, this);
+}
+
+void DistLockManagerMock::unlockAll(OperationContext* txn, const std::string& processID) {
+    fassertFailed(34366);  // Not implemented for the mock
 }
 
 void DistLockManagerMock::unlock(OperationContext* txn, const DistLockHandle& lockHandle) {

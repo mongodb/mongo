@@ -74,6 +74,8 @@ public:
 
     virtual Status unlock(OperationContext* txn, const OID& lockSessionID) override;
 
+    virtual Status unlockAll(OperationContext* txn, const std::string& processID) override;
+
     virtual StatusWith<ServerInfo> getServerInfo(OperationContext* txn) override;
 
     virtual StatusWith<LocksType> getLockByTS(OperationContext* txn,

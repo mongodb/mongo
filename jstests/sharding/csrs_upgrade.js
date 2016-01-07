@@ -212,7 +212,9 @@ var st;
                 var stateIsRemoved = csrsStatus.members[i].stateStr == "REMOVED";
                 // If the storage engine supports committed reads, it shouldn't go into REMOVED
                 // state, but if it does not then it should.
-                if (supportsCommitted ? stateIsRemoved : !stateIsRemoved) {
+                if (supportsCommitted) {
+                    assert(!stateIsRemoved);
+                } else if (!stateIsRemoved) {
                     return false;
                 }
             }

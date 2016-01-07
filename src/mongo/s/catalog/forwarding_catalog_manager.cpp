@@ -204,7 +204,7 @@ ForwardingCatalogManager::ScopedDistLock& ForwardingCatalogManager::ScopedDistLo
 
 Status ForwardingCatalogManager::ScopedDistLock::checkForPendingCatalogSwap() {
     stdx::lock_guard<stdx::mutex> lk(_fcm->_observerMutex);
-    if (!_fcm->_nextConfigChangeComplete.isValid()) {
+    if (!_fcm->_nextConfigChangeComplete.isValid() || _fcm->_configChangeComplete) {
         return Status::OK();
     }
     return Status(ErrorCodes::IncompatibleCatalogManager,
@@ -322,16 +322,25 @@ auto ForwardingCatalogManager::retry(OperationContext* txn, Callable&& c)
     MONGO_UNREACHABLE;
 }
 
+void ForwardingCatalogManager::_unlockOldDistLocks(std::string processID) {
+    Client::initThreadIfNotAlready("DistributedLockUnlocker");
+    auto txn = cc().makeOperationContext();
+    log() << "Unlocking existing distributed locks after catalog manager swap";
+    rwlock_shared oplk(_operationLock);
+    _actual->getDistLockManager()->unlockAll(txn.get(), processID);
+}
+
 void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::CallbackArgs& args) {
     if (!args.status.isOK()) {
         return;
     }
-    Client::initThreadIfNotAlready();
+    Client::initThreadIfNotAlready("CatalogManagerReplacer");
     auto txn = cc().makeOperationContext();
     log() << "Swapping sharding Catalog Manager from mirrored (SCCC) to replica set (CSRS) mode";
 
     stdx::lock_guard<RWLock> oplk(_operationLock);
     stdx::lock_guard<stdx::mutex> oblk(_observerMutex);
+    std::string distLockProcessID = _actual->getDistLockManager()->getProcessID();
     _actual->shutDown(txn.get(), /* allowNetworking */ false);
     _actual = makeCatalogManager(_service, _nextConfigConnectionString, _shardRegistry, _thisHost);
     _shardRegistry->updateConfigServerConnectionString(_nextConfigConnectionString);
@@ -339,6 +348,15 @@ void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::Callba
     // server consistency checker for the legacy catalog manager.
     fassert(28790, _actual->startup(txn.get(), false /* allowNetworking */));
     args.executor->signalEvent(_nextConfigChangeComplete);
+    _configChangeComplete = true;
+
+    log() << "Swapping sharding Catalog Manager to replica set (CSRS) mode completed successfully";
+
+    // Must be done in a new thread to avoid deadlock resulting from running network operations
+    // within a TaskExecutor callback.
+    stdx::thread distLockUnlockThread(
+        [this, distLockProcessID] { _unlockOldDistLocks(distLockProcessID); });
+    distLockUnlockThread.detach();
 }
 
 CatalogManager::ConfigServerMode ForwardingCatalogManager::getMode() {

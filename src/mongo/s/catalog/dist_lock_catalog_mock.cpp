@@ -332,4 +332,9 @@ void DistLockCatalogMock::expectGetServerInfo(GetServerInfoFunc checkerFunc,
     _getServerInfoChecker = checkerFunc;
     _getServerInfoReturnValue = returnThis;
 }
+
+Status DistLockCatalogMock::unlockAll(OperationContext* txn, const std::string& processID) {
+    return Status(ErrorCodes::IllegalOperation,
+                  str::stream() << "unlockAll not expected to be called; processID: " << processID);
+}
 }
