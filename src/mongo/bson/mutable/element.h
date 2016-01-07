@@ -454,6 +454,12 @@ namespace mutablebson {
          */
         Status setValueSafeNum(const SafeNum value);
 
+        /** Set the value of this Element to the value from another Element.
+         *
+         * The name of this Element is not modified.
+         */
+        Status setValueElement(ConstElement setFrom);
+
 
         //
         // Accessors

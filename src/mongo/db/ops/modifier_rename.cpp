@@ -235,10 +235,8 @@ namespace mongo {
                                 (_preparedState->toIdxFound == (_toFieldRef.numParts()-1));
 
         if (destExists) {
-            removeStatus = _preparedState->toElemFound.remove();
-            if (!removeStatus.isOK()) {
-                return removeStatus;
-            }
+            // Set destination element to the value of the source element.
+            return _preparedState->toElemFound.setValueElement(_preparedState->fromElemFound);
         }
 
         // Creates the final element that's going to be the in 'doc'.
