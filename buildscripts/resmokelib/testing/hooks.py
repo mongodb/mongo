@@ -276,8 +276,11 @@ class CheckReplDBHash(CustomBehavior):
         list_db_output = secondary_conn.admin.command("listDatabases")
         secondary_dbs = [db["name"] for db in list_db_output["databases"]]
 
+        # There may be a difference in databases which is not considered an error, when
+        # the database only contains system collections. This difference is only logged
+        # when others are encountered, i.e., success = False.
         missing_on_primary, missing_on_secondary = CheckReplDBHash._check_difference(
-            set(primary_dbs), set(secondary_dbs), "database", sb)
+            set(primary_dbs), set(secondary_dbs), "database")
 
         for missing_db in missing_on_secondary:
             db = primary_conn[missing_db]
@@ -304,6 +307,7 @@ class CheckReplDBHash(CustomBehavior):
             # It is only an error if there are any non-system collections in the database,
             # otherwise it's not well defined if it should exist or not.
             if non_system_colls:
+                sb.append("Database %s present on secondary but not on primary." % (missing_db))
                 CheckReplDBHash._dump_all_collections(db, non_system_colls, sb)
                 success = False
 
@@ -358,7 +362,7 @@ class CheckReplDBHash(CustomBehavior):
         secondary_coll_names = set(secondary_coll_hashes.keys())
 
         missing_on_primary, missing_on_secondary = CheckReplDBHash._check_difference(
-            primary_coll_names, secondary_coll_names, "collection", sb)
+            primary_coll_names, secondary_coll_names, "collection", sb=sb)
 
         if missing_on_primary or missing_on_secondary:
 
@@ -497,7 +501,7 @@ class CheckReplDBHash(CustomBehavior):
             sb.append("All documents matched.")
 
     @staticmethod
-    def _check_difference(primary_set, secondary_set, item_type_name, sb):
+    def _check_difference(primary_set, secondary_set, item_type_name, sb=None):
         """
         Returns true if the contents of 'primary_set' and
         'secondary_set' are identical, and false otherwise. The sets
@@ -516,8 +520,9 @@ class CheckReplDBHash(CustomBehavior):
         for item in secondary_set - primary_set:
             missing_on_primary.add(item)
 
-        CheckReplDBHash._append_differences(
-            missing_on_primary, missing_on_secondary, item_type_name, sb)
+        if sb is not None:
+            CheckReplDBHash._append_differences(
+                missing_on_primary, missing_on_secondary, item_type_name, sb)
 
         return (missing_on_primary, missing_on_secondary)
 
