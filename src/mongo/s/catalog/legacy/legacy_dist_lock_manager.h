@@ -52,12 +52,16 @@ public:
     virtual void startUp() override;
     virtual void shutDown(OperationContext* txn, bool allowNetworking) override;
 
+    virtual std::string getProcessID() override;
+
     virtual StatusWith<DistLockManager::ScopedDistLock> lock(
         OperationContext* txn,
         StringData name,
         StringData whyMessage,
         stdx::chrono::milliseconds waitFor,
         stdx::chrono::milliseconds lockTryInterval) override;
+
+    virtual void unlockAll(OperationContext* txn, const std::string& processID) override;
 
     // For testing only.
     void enablePinger(bool enable);

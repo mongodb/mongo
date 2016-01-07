@@ -125,11 +125,18 @@ public:
 
     /**
      * Attempts to set the state of the lock document with lockSessionID to unlocked. Returns OK,
-     * if at the end of this call it is determined that the lock is defintely not owned by the
+     * if at the end of this call it is determined that the lock is definitely not owned by the
      * specified session (i.e., it is not owned at all or if it is owned by a different session).
      * Otherwise, it returns an error status. Common errors include socket errors.
      */
     virtual Status unlock(OperationContext* txn, const OID& lockSessionID) = 0;
+
+    /**
+     * Unlocks all distributed locks with the given owning process ID.  Does not provide any
+     * indication as to how many locks were actually unlocked.  So long as the update command runs
+     * successfully, returns OK, otherwise returns an error status.
+     */
+    virtual Status unlockAll(OperationContext* txn, const std::string& processID) = 0;
 
     /**
      * Get some information from the config server primary.

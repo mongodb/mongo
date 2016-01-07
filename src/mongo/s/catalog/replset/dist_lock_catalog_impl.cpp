@@ -46,6 +46,10 @@
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/time_support.h"
 
@@ -322,6 +326,41 @@ Status DistLockCatalogImpl::unlock(OperationContext* txn, const OID& lockSession
     }
 
     return findAndModifyStatus;
+}
+
+Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& processID) {
+    std::unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
+    updateDoc->setQuery(BSON(LocksType::process(processID)));
+    updateDoc->setUpdateExpr(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
+    updateDoc->setUpsert(false);
+    updateDoc->setMulti(true);
+
+    std::unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
+    updateRequest->addToUpdates(updateDoc.release());
+
+    BatchedCommandRequest request(updateRequest.release());
+    request.setNS(_locksNS);
+    request.setWriteConcern(kMajorityWriteConcern.toBSON());
+
+    BSONObj cmdObj = request.toBSON();
+
+    auto response = _client->runCommandOnConfigWithRetries(
+        txn, "config", cmdObj, ShardRegistry::kAllRetriableErrors);
+
+
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+
+    BatchedCommandResponse batchResponse;
+    std::string errmsg;
+    if (!batchResponse.parseBSON(response.getValue(), &errmsg)) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream()
+                          << "Failed to parse config server response to batch request for "
+                             "unlocking existing distributed locks" << causedBy(errmsg));
+    }
+    return batchResponse.toStatus();
 }
 
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(OperationContext* txn) {

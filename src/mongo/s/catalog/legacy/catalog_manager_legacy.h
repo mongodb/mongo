@@ -204,7 +204,7 @@ private:
     ConnectionString _configServerConnectionString;
     std::vector<ConnectionString> _configServers;
 
-    // Distribted lock manager singleton.
+    // Distributed lock manager singleton.
     std::unique_ptr<DistLockManager> _distLockManager;
 
     // protects _inShutdown, _consistentFromLastCheck; used by _consistencyCheckerCV

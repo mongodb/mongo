@@ -36,7 +36,11 @@ var st;
         });
     };
 
-    var addSlaveDelay = function(rst) {
+    /*
+     * If 'delayed' is true adds a 30 second slave delay to the secondary of the set referred to by
+     * 'rst'.  If 'delayed' is false, removes slave delay from the secondary.
+     */
+    var setSlaveDelay = function(rst, delayed) {
         var conf = rst.getPrimary().getDB('local').system.replset.findOne();
         conf.version++;
         var secondaryIndex = 0;
@@ -45,7 +49,7 @@ var st;
         }
         conf.members[secondaryIndex].priority = 0;
         conf.members[secondaryIndex].hidden = true;
-        conf.members[secondaryIndex].slaveDelay = 30;
+        conf.members[secondaryIndex].slaveDelay = delayed ? 30 : 0;
         reconfig(rst, conf);
     }
 
@@ -90,8 +94,8 @@ var st;
         }()), {writeConcern: {w: 'majority'}});
 
     jsTest.log("Introducing slave delay on shards to ensure migration is slow");
-    addSlaveDelay(st.rs0);
-    addSlaveDelay(st.rs1);
+    setSlaveDelay(st.rs0, true);
+    setSlaveDelay(st.rs1, true);
 
     jsTest.log("Restarting " + st.c0.name + " as a standalone replica set");
     var csrsConfig = {
@@ -126,11 +130,6 @@ var st;
     waitUntilAllNodesCaughtUp(csrs);
 
     jsTest.log("Starting long-running chunk migration");
-    // Turn on fail point to confirm that moveChunk aborts before getting to the critical section.
-    var res = st.rs0.getPrimary().adminCommand({configureFailPoint: "moveChunkHangAtStep4",
-                                                mode: "alwaysOn"});
-    assert.commandWorked(res);
-
     var joinParallelShell = startParallelShell(
         function() {
             var res = db.adminCommand({moveChunk: "csrs_upgrade_during_migrate.data",
@@ -175,11 +174,15 @@ var st;
 
         var i;
         for (i = 0; i < csrsStatus.members.length; ++i) {
-            if (TestData.storageEngine != "wiredTiger" && TestData.storageEngine != "") {
-                // NOTE: "" means default storage engine, which is WiredTiger.
-                if (csrsStatus.members[i].name == csrs[0].name &&
-                    csrsStatus.members[i].stateStr != "REMOVED") {
-
+            if (csrsStatus.members[i].name == csrs[0].name) {
+                var supportsCommitted =
+                    csrs[0].getDB("admin").serverStatus().storageEngine.supportsCommittedReads;
+                var stateIsRemoved = csrsStatus.members[i].stateStr == "REMOVED";
+                // If the storage engine supports committed reads, it shouldn't go into REMOVED
+                // state, but if it does not then it should.
+                if (supportsCommitted) {
+                    assert(!stateIsRemoved);
+                } else if (!stateIsRemoved) {
                     return false;
                 }
             }
@@ -194,11 +197,27 @@ var st;
 
     joinParallelShell(); // This will verify that the migration failed with the expected code
 
-    // TODO(spencer): Uncomment once SERVER-20037 is fixed.
-    // jsTest.log("Ensure that leftover distributed locks don't prevent future migrations");
-    // assert.commandWorked(st.s0.adminCommand({moveChunk: dataCollectionName,
-    //                                          find: { _id: 0 },
-    //                                          to: shardConfigs[1]._id
-    //                                         }));
+    jsTest.log("Shutting down final SCCC config server now that upgrade is complete");
+    MongoRunner.stopMongod(st.c1);
+
+    jsTest.log("Ensure that leftover distributed locks don't prevent future migrations");
+    // Remove slave delay so that the migration can finish in a reasonable amount of time.
+    setSlaveDelay(st.rs0, false);
+    setSlaveDelay(st.rs1, false);
+
+    // Due to SERVER-20290 the recipient shard may not immediately realize that the migration that
+    // was going on during the upgrade has been aborted, so we need to wait until it notices this
+    // before starting a new migration.
+    // TODO(spencer): Remove this after SERVER-20290 is fixed.
+    assert.soon(function() {
+                   var res = st.rs1.getPrimary().adminCommand('_recvChunkStatus');
+                   assert.commandWorked(res);
+                   return !res.active;
+                });
+
+    assert.commandWorked(st.s0.adminCommand({moveChunk: dataCollectionName,
+                                             find: { _id: 0 },
+                                             to: shardConfigs[1]._id
+                                            }));
 
 }());
