@@ -3836,6 +3836,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: httpinterface
   - name: integration_tests_replset
   - name: integration_tests_standalone
   - name: jsCore
