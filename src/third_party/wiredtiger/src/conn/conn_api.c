@@ -2003,6 +2003,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_sweep_config(session, cfg));
 	WT_ERR(__wt_verbose_config(session, cfg));
 
+	/* Initialize the OS page size for mmap */
+	conn->page_size = __wt_get_vm_pagesize();
+
 	/* Now that we know if verbose is configured, output the version. */
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_VERSION, "%s", WIREDTIGER_VERSION_STRING));

@@ -216,6 +216,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 
+retry:
 	current_id = last_running = txn_global->current;
 	oldest_session = NULL;
 	prev_oldest_id = txn_global->oldest_id;
@@ -287,43 +288,60 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 	    WT_TXNID_LT(txn_global->last_running, last_running);
 
 	/* Update the oldest ID. */
-	if ((WT_TXNID_LT(prev_oldest_id, oldest_id) || last_running_moved) &&
-	    __wt_atomic_casiv32(&txn_global->scan_count, 1, -1)) {
-		WT_ORDERED_READ(session_cnt, conn->session_cnt);
-		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
-			if ((id = s->id) != WT_TXN_NONE &&
-			    WT_TXNID_LT(id, last_running))
-				last_running = id;
-			if ((id = s->snap_min) != WT_TXN_NONE &&
-			    WT_TXNID_LT(id, oldest_id))
-				oldest_id = id;
-		}
+	if (WT_TXNID_LT(prev_oldest_id, oldest_id) || last_running_moved) {
+		/*
+		 * We know we want to update.  Check if we're racing.
+		 */
+		if (__wt_atomic_casiv32(&txn_global->scan_count, 1, -1)) {
+			WT_ORDERED_READ(session_cnt, conn->session_cnt);
+			for (i = 0, s = txn_global->states;
+			    i < session_cnt; i++, s++) {
+				if ((id = s->id) != WT_TXN_NONE &&
+				WT_TXNID_LT(id, last_running))
+					last_running = id;
+				if ((id = s->snap_min) != WT_TXN_NONE &&
+				WT_TXNID_LT(id, oldest_id))
+					oldest_id = id;
+			}
 
-		if (WT_TXNID_LT(last_running, oldest_id))
-			oldest_id = last_running;
+			if (WT_TXNID_LT(last_running, oldest_id))
+				oldest_id = last_running;
 
 #ifdef HAVE_DIAGNOSTIC
-		/*
-		 * Make sure the ID doesn't move past any named snapshots.
-		 *
-		 * Don't include the read/assignment in the assert statement.
-		 * Coverity complains if there are assignments only done in
-		 * diagnostic builds, and when the read is from a volatile.
-		 */
-		id = txn_global->nsnap_oldest_id;
-		WT_ASSERT(session,
-		    id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
+			/*
+			 * Make sure the ID doesn't move past any named
+			 * snapshots.
+			 *
+			 * Don't include the read/assignment in the assert
+			 * statement.  Coverity complains if there are
+			 * assignments only done in diagnostic builds, and
+			 * when the read is from a volatile.
+			 */
+			id = txn_global->nsnap_oldest_id;
+			WT_ASSERT(session,
+			    id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
 #endif
-		if (WT_TXNID_LT(txn_global->last_running, last_running))
-			txn_global->last_running = last_running;
-		if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
-			txn_global->oldest_id = oldest_id;
-		WT_ASSERT(session, txn_global->scan_count == -1);
-		txn_global->scan_count = 0;
+			if (WT_TXNID_LT(txn_global->last_running, last_running))
+				txn_global->last_running = last_running;
+			if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
+				txn_global->oldest_id = oldest_id;
+			WT_ASSERT(session, txn_global->scan_count == -1);
+			txn_global->scan_count = 0;
+		} else {
+			/*
+			 * We wanted to update the oldest ID but we're racing
+			 * another thread.  Retry if this is a forced update.
+			 */
+			WT_ASSERT(session, txn_global->scan_count > 0);
+			(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
+			if (force) {
+				__wt_yield();
+				goto retry;
+			}
+		}
 	} else {
 		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
-		    current_id - oldest_id > 10000 && last_running_moved &&
-		    oldest_session != NULL) {
+		    current_id - oldest_id > 10000 && oldest_session != NULL) {
 			(void)__wt_verbose(session, WT_VERB_TRANSACTION,
 			    "old snapshot %" PRIu64
 			    " pinned in session %d [%s]"

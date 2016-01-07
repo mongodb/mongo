@@ -12,28 +12,6 @@ WT_PROCESS __wt_process;			/* Per-process structure */
 static int __wt_pthread_once_failed;		/* If initialization failed */
 
 /*
- * __system_is_little_endian --
- *	Check if the system is little endian.
- */
-static int
-__system_is_little_endian(void)
-{
-	uint64_t v;
-	bool little;
-
-	v = 1;
-	little = *((uint8_t *)&v) != 0;
-
-	if (little)
-		return (0);
-
-	fprintf(stderr,
-	    "This release of the WiredTiger data engine does not support "
-	    "big-endian systems; contact WiredTiger for more information.\n");
-	return (EINVAL);
-}
-
-/*
  * __wt_global_once --
  *	Global initialization, run once.
  */
@@ -41,11 +19,6 @@ static void
 __wt_global_once(void)
 {
 	WT_DECL_RET;
-
-	if ((ret = __system_is_little_endian()) != 0) {
-		__wt_pthread_once_failed = ret;
-		return;
-	}
 
 	if ((ret =
 	    __wt_spin_init(NULL, &__wt_process.spinlock, "global")) != 0) {
@@ -115,7 +88,7 @@ __wt_attach(WT_SESSION_IMPL *session)
 
 	/* Sleep forever, the debugger will interrupt us when it attaches. */
 	for (;;)
-		__wt_sleep(100, 0);
+		__wt_sleep(10, 0);
 #else
 	WT_UNUSED(session);
 #endif

@@ -132,6 +132,76 @@ __wt_search_insert(
 }
 
 /*
+ * __check_leaf_key_range --
+ *	Check the search key is in the leaf page's key range.
+ */
+static inline int
+__check_leaf_key_range(WT_SESSION_IMPL *session,
+    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
+{
+	WT_BTREE *btree;
+	WT_COLLATOR *collator;
+	WT_ITEM *item;
+	WT_PAGE_INDEX *pindex;
+	uint32_t indx;
+	int cmp;
+
+	btree = S2BT(session);
+	collator = btree->collator;
+	item = cbt->tmp;
+
+	/*
+	 * There are reasons we can't do the fast checks, and we continue with
+	 * the leaf page search in those cases, only skipping the complete leaf
+	 * page search if we know it's not going to work.
+	 */
+	cbt->compare = 0;
+
+	/*
+	 * First, confirm we have the right parent page-index slot, and quit if
+	 * we don't. We don't search for the correct slot, that would make this
+	 * cheap test expensive.
+	 */
+	WT_INTL_INDEX_GET(session, leaf->home, pindex);
+	indx = leaf->pindex_hint;
+	if (indx >= pindex->entries || pindex->index[indx] != leaf)
+		return (0);
+
+	/*
+	 * Check if the search key is smaller than the parent's starting key for
+	 * this page.
+	 *
+	 * We can't compare against slot 0 on a row-store internal page because
+	 * reconciliation doesn't build it, it may not be a valid key.
+	 */
+	if (indx != 0) {
+		__wt_ref_key(leaf->home, leaf, &item->data, &item->size);
+		WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
+		if (cmp < 0) {
+			cbt->compare = 1;	/* page keys > search key */
+			return (0);
+		}
+	}
+
+	/*
+	 * Check if the search key is greater than or equal to the starting key
+	 * for the parent's next page.
+	 */
+	++indx;
+	if (indx < pindex->entries) {
+		__wt_ref_key(
+		    leaf->home, pindex->index[indx], &item->data, &item->size);
+		WT_RET(__wt_compare(session, collator, srch_key, item, &cmp));
+		if (cmp >= 0) {
+			cbt->compare = -1;	/* page keys < search key */
+			return (0);
+		}
+	}
+
+	return (0);
+}
+
+/*
  * __wt_row_search --
  *	Search a row-store tree for a specific key.
  */
@@ -179,8 +249,29 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	append_check = insert && cbt->append_tree;
 	descend_right = true;
 
-	/* We may only be searching a single leaf page, not the full tree. */
+	/*
+	 * We may be searching only a single leaf page, not the full tree. In
+	 * the normal case where the page links to a parent, check the page's
+	 * parent keys before doing the full search, it's faster when the
+	 * cursor is being re-positioned. (One case where the page doesn't
+	 * have a parent is if it is being re-instantiated in memory as part
+	 * of a split).
+	 */
 	if (leaf != NULL) {
+		if (leaf->home != NULL) {
+			WT_RET(__check_leaf_key_range(
+			    session, srch_key, leaf, cbt));
+			if (cbt->compare != 0) {
+				/*
+				 * !!!
+				 * WT_CURSOR.search_near uses the slot value to
+				 * decide if there was an on-page match.
+				 */
+				cbt->slot = 0;
+				return (0);
+			}
+		}
+
 		current = leaf;
 		goto leaf_only;
 	}
@@ -195,15 +286,6 @@ restart_page:	page = current->page;
 			break;
 
 		WT_INTL_INDEX_GET(session, page, pindex);
-
-		/*
-		 * Fast-path internal pages with one child, a common case for
-		 * the root page in new trees.
-		 */
-		if (pindex->entries == 1) {
-			descent = pindex->index[0];
-			goto descend;
-		}
 
 		/* Fast-path appends. */
 		if (append_check) {
@@ -542,12 +624,18 @@ err:	/*
 int
 __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
-	WT_INSERT *p, *t;
+	WT_INSERT *ins, **start, **stop;
+	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
-	uint32_t cnt;
+	uint32_t choice, entries, i;
+	int level;
 
 	page = cbt->ref->page;
 
+	start = stop = NULL;		/* [-Wconditional-uninitialized] */
+	entries = 0;			/* [-Wconditional-uninitialized] */
+
+	/* If the page has disk-based entries, select from them. */
 	if (page->pg_row_entries != 0) {
 		cbt->compare = 0;
 		cbt->slot = __wt_random(&session->rnd) % page->pg_row_entries;
@@ -562,24 +650,115 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	/*
 	 * If the tree is new (and not empty), it might have a large insert
-	 * list. Count how many records are in the list.
+	 * list.
 	 */
 	F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
 	if ((cbt->ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
 		return (WT_NOTFOUND);
-	for (cnt = 1, p = WT_SKIP_FIRST(cbt->ins_head);; ++cnt)
-		if ((p = WT_SKIP_NEXT(p)) == NULL)
-			break;
 
 	/*
-	 * Select a random number from 0 to (N - 1), return that record.
+	 * Walk down the list until we find a level with at least 50 entries,
+	 * that's where we'll start rolling random numbers. The value 50 is
+	 * used to ignore levels with only a few entries, that is, levels which
+	 * are potentially badly skewed.
 	 */
-	cnt = __wt_random(&session->rnd) % cnt;
-	for (p = t = WT_SKIP_FIRST(cbt->ins_head);; t = p)
-		if (cnt-- == 0 || (p = WT_SKIP_NEXT(p)) == NULL)
+	for (ins_head = cbt->ins_head,
+	    level = WT_SKIP_MAXDEPTH - 1; level >= 0; --level) {
+		start = &ins_head->head[level];
+		for (entries = 0, stop = start;
+		    *stop != NULL; stop = &(*stop)->next[level])
+			++entries;
+
+		if (entries > 50)
 			break;
+	}
+
+	/*
+	 * If it's a tiny list and we went all the way to level 0, correct the
+	 * level; entries is correctly set.
+	 */
+	if (level < 0)
+		level = 0;
+
+	/*
+	 * Step down the skip list levels, selecting a random chunk of the name
+	 * space at each level.
+	 */
+	while (level > 0) {
+		/*
+		 * There are (entries) or (entries + 1) chunks of the name space
+		 * considered at each level. They are: between start and the 1st
+		 * element, between the 1st and 2nd elements, and so on to the
+		 * last chunk which is the name space after the stop element on
+		 * the current level. This last chunk of name space may or may
+		 * not be there: as we descend the levels of the skip list, this
+		 * chunk may appear, depending if the next level down has
+		 * entries logically after the stop point in the current level.
+		 * We can't ignore those entries: because of the algorithm used
+		 * to determine the depth of a skiplist, there may be a large
+		 * number of entries "revealed" by descending a level.
+		 *
+		 * If the next level down has more items after the current stop
+		 * point, there are (entries + 1) chunks to consider, else there
+		 * are (entries) chunks.
+		 */
+		if (*(stop - 1) == NULL)
+			choice = __wt_random(&session->rnd) % entries;
+		else
+			choice = __wt_random(&session->rnd) % (entries + 1);
+
+		if (choice == entries) {
+			/*
+			 * We selected the name space after the stop element on
+			 * this level. Set the start point to the current stop
+			 * point, descend a level and move the stop element to
+			 * the end of the list, that is, the end of the newly
+			 * discovered name space, counting entries as we go.
+			 */
+			start = stop;
+			--start;
+			--level;
+			for (entries = 0, stop = start;
+			    *stop != NULL; stop = &(*stop)->next[level])
+				++entries;
+		} else {
+			/*
+			 * We selected another name space on the level. Move the
+			 * start pointer the selected number of entries forward
+			 * to the start of the selected chunk (if the selected
+			 * number is 0, start won't move). Set the stop pointer
+			 * to the next element in the list and drop both start
+			 * and stop down a level.
+			 */
+			for (i = 0; i < choice; ++i)
+				start = &(*start)->next[level];
+			stop = &(*start)->next[level];
+
+			--start;
+			--stop;
+			--level;
+
+			/* Count the entries in the selected name space. */
+			for (entries = 0,
+			    ins = *start; ins != *stop; ins = ins->next[level])
+				++entries;
+		}
+	}
+
+	/*
+	 * When we reach the bottom level, entries will already be set. Select
+	 * a random entry from the name space and return it.
+	 *
+	 * It should be impossible for the entries count to be 0 at this point,
+	 * but check for it out of paranoia and to quiet static testing tools.
+	 */
+	if (entries > 0)
+		entries = __wt_random(&session->rnd) % entries;
+	for (ins = *start; entries > 0; --entries)
+		ins = ins->next[0];
+
+	cbt->ins = ins;
 	cbt->compare = 0;
-	cbt->ins = t;
 
 	return (0);
 }

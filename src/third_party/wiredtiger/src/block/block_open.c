@@ -405,27 +405,37 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	 * Reading from the live system's structure normally requires locking,
 	 * but it's an 8B statistics read, there's no need.
 	 */
-	stats->allocation_size = block->allocsize;
-	stats->block_checkpoint_size = (int64_t)block->live.ckpt_size;
-	stats->block_magic = WT_BLOCK_MAGIC;
-	stats->block_major = WT_BLOCK_MAJOR_VERSION;
-	stats->block_minor = WT_BLOCK_MINOR_VERSION;
-	stats->block_reuse_bytes = (int64_t)block->live.avail.bytes;
-	stats->block_size = block->fh->size;
+	WT_STAT_WRITE(stats, allocation_size, block->allocsize);
+	WT_STAT_WRITE(
+	    stats, block_checkpoint_size, (int64_t)block->live.ckpt_size);
+	WT_STAT_WRITE(stats, block_magic, WT_BLOCK_MAGIC);
+	WT_STAT_WRITE(stats, block_major, WT_BLOCK_MAJOR_VERSION);
+	WT_STAT_WRITE(stats, block_minor, WT_BLOCK_MINOR_VERSION);
+	WT_STAT_WRITE(
+	    stats, block_reuse_bytes, (int64_t)block->live.avail.bytes);
+	WT_STAT_WRITE(stats, block_size, block->fh->size);
 }
 
 /*
  * __wt_block_manager_size --
- *	Set the size statistic for a file.
+ *	Return the size of a live block handle.
  */
 int
-__wt_block_manager_size(
-    WT_SESSION_IMPL *session, const char *filename, WT_DSRC_STATS *stats)
+__wt_block_manager_size(WT_BM *bm, WT_SESSION_IMPL *session, wt_off_t *sizep)
 {
-	wt_off_t filesize;
+	WT_UNUSED(session);
 
-	WT_RET(__wt_filesize_name(session, filename, false, &filesize));
-	stats->block_size = filesize;
-
+	*sizep = bm->block->fh == NULL ? 0 : bm->block->fh->size;
 	return (0);
+}
+
+/*
+ * __wt_block_manager_named_size --
+ *	Return the size of a named file.
+ */
+int
+__wt_block_manager_named_size(
+    WT_SESSION_IMPL *session, const char *name, wt_off_t *sizep)
+{
+	return (__wt_filesize_name(session, name, false, sizep));
 }

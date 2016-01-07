@@ -60,6 +60,7 @@ static const CONFIG default_cfg = {
 	0,				/* total seconds running */
 	0,				/* has truncate */
 	{NULL, NULL},			/* the truncate queue */
+	{NULL, NULL},                   /* the config queue */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -371,6 +372,53 @@ err:		cfg->error = cfg->stop = 1;
 	return (NULL);
 }
 
+/*
+ * do_range_reads --
+ *	If configured to execute a sequence of next operations after each
+ *	search do them. Ensuring the keys we see are always in order.
+ */
+static int
+do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
+{
+	size_t range;
+	uint64_t next_val, prev_val;
+	char *range_key_buf;
+	char buf[512];
+	int ret;
+
+	ret = 0;
+
+	if (cfg->read_range == 0)
+		return (0);
+
+	memset(&buf[0], 0, 512 * sizeof(char));
+	range_key_buf = &buf[0];
+
+	/* Save where the first key is for comparisons. */
+	cursor->get_key(cursor, &range_key_buf);
+	extract_key(range_key_buf, &next_val);
+
+	for (range = 0; range < cfg->read_range; ++range) {
+		prev_val = next_val;
+		ret = cursor->next(cursor);
+		/* We are done if we reach the end. */
+		if (ret != 0)
+			break;
+
+		/* Retrieve and decode the key */
+		cursor->get_key(cursor, &range_key_buf);
+		extract_key(range_key_buf, &next_val);
+		if (next_val < prev_val) {
+			lprintf(cfg, EINVAL, 0,
+			    "Out of order keys %" PRIu64
+			    " came before %" PRIu64,
+			    prev_val, next_val);
+			return (EINVAL);
+		}
+	}
+	return (0);
+}
+
 static void *
 worker(void *arg)
 {
@@ -381,8 +429,8 @@ worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
-	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i;
+	int64_t ops, ops_per_txn, throttle_ops;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret, truncated;
@@ -533,7 +581,14 @@ worker(void *arg)
 					    "get_value in read.");
 					goto err;
 				}
+				/*
+				 * If we want to read a range, then call next
+				 * for several operations, confirming that the
+				 * next key is in the correct order.
+				 */
+				ret = do_range_reads(cfg, cursor);
 			}
+
 			if (ret == 0 || ret == WT_NOTFOUND)
 				break;
 			goto op_err;
@@ -1097,9 +1152,10 @@ monitor(void *arg)
 	uint32_t read_avg, read_min, read_max;
 	uint32_t insert_avg, insert_min, insert_max;
 	uint32_t update_avg, update_min, update_max;
-	uint32_t latency_max;
+	uint32_t latency_max, level;
 	u_int i;
-	int ret;
+	int msg_err, ret;
+	const char *str;
 	char buf[64], *path;
 
 	cfg = (CONFIG *)arg;
@@ -1197,25 +1253,41 @@ monitor(void *arg)
 
 		if (latency_max != 0 &&
 		    (read_max > latency_max || insert_max > latency_max ||
-		     update_max > latency_max))
-			/*
-			 * Make this a non-fatal error and print WARNING in
-			 * the output so Jenkins can flag it as unstable.
-			 */
-			lprintf(cfg, 0, 0,
-			    "WARNING: max latency exceeded: threshold %" PRIu32
+		     update_max > latency_max)) {
+			if (cfg->max_latency_fatal) {
+				level = 1;
+				msg_err = WT_PANIC;
+				str = "ERROR";
+			} else {
+				level = 0;
+				msg_err = 0;
+				str = "WARNING";
+			}
+			lprintf(cfg, msg_err, level,
+			    "%s: max latency exceeded: threshold %" PRIu32
 			    " read max %" PRIu32 " insert max %" PRIu32
-			    " update max %" PRIu32, latency_max,
+			    " update max %" PRIu32, str, latency_max,
 			    read_max, insert_max, update_max);
+		}
 		if (min_thr != 0 &&
 		    ((cur_reads != 0 && cur_reads < min_thr) ||
 		    (cur_inserts != 0 && cur_inserts < min_thr) ||
-		    (cur_updates != 0 && cur_updates < min_thr)))
-			lprintf(cfg, WT_PANIC, 0,
-			    "minimum throughput not met: threshold %" PRIu64
+		    (cur_updates != 0 && cur_updates < min_thr))) {
+			if (cfg->min_throughput_fatal) {
+				level = 1;
+				msg_err = WT_PANIC;
+				str = "ERROR";
+			} else {
+				level = 0;
+				msg_err = 0;
+				str = "WARNING";
+			}
+			lprintf(cfg, msg_err, level,
+			    "%s: minimum throughput not met: threshold %" PRIu64
 			    " reads %" PRIu64 " inserts %" PRIu64
-			    " updates %" PRIu64, min_thr, cur_reads,
+			    " updates %" PRIu64, str, min_thr, cur_reads,
 			    cur_inserts, cur_updates);
+		}
 		last_reads = reads;
 		last_inserts = inserts;
 		last_updates = updates;
@@ -1534,8 +1606,10 @@ execute_workload(CONFIG *cfg)
 		lprintf(cfg, 0, 1,
 		    "Starting workload #%d: %" PRId64 " threads, inserts=%"
 		    PRId64 ", reads=%" PRId64 ", updates=%" PRId64
-		    ", truncate=%" PRId64, i + 1, workp->threads, workp->insert,
-		    workp->read, workp->update, workp->truncate);
+		    ", truncate=%" PRId64 ", throttle=%" PRId64,
+		    i + 1, workp->threads, workp->insert,
+		    workp->read, workp->update, workp->truncate,
+		    workp->throttle);
 
 		/* Figure out the workload's schedule. */
 		if ((ret = run_mix_schedule(cfg, workp)) != 0)
@@ -1906,7 +1980,7 @@ start_run(CONFIG *cfg)
 	monitor_created = ret = 0;
 					/* [-Wconditional-uninitialized] */
 	memset(&monitor_thread, 0, sizeof(monitor_thread));
-	
+
 	if ((ret = setup_log_file(cfg)) != 0)
 		goto err;
 
@@ -2083,6 +2157,8 @@ main(int argc, char *argv[])
 	memset(cfg, 0, sizeof(*cfg));
 	if (config_assign(cfg, &default_cfg))
 		goto err;
+
+	TAILQ_INIT(&cfg->config_head);
 
 	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = __wt_getopt("wtperf", argc, argv, opts)) != EOF)
@@ -2289,6 +2365,9 @@ main(int argc, char *argv[])
 	if ((ret = config_sanity(cfg)) != 0)
 		goto err;
 
+	/* Write a copy of the config. */
+	config_to_file(cfg);
+
 	/* Display the configuration. */
 	if (cfg->verbose > 1)
 		config_print(cfg);
@@ -2314,7 +2393,7 @@ start_threads(CONFIG *cfg,
     WORKLOAD *workp, CONFIG_THREAD *base, u_int num, void *(*func)(void *))
 {
 	CONFIG_THREAD *thread;
-	u_int i, j;
+	u_int i;
 	int ret;
 
 	/* Initialize the threads. */
@@ -2323,15 +2402,13 @@ start_threads(CONFIG *cfg,
 		thread->workload = workp;
 
 		/*
-		 * We don't want the threads executing in lock-step, move each
-		 * new RNG state further along in the sequence.
+		 * We don't want the threads executing in lock-step, seed each
+		 * one differently.
 		 */
-		if (i == 0)
-			__wt_random_init(&thread->rnd);
-		else
-			thread->rnd = (thread - 1)->rnd;
-		for (j = 0; j < 1000; ++j)
-			(void)__wt_random(&thread->rnd);
+		if ((ret = __wt_random_init_seed(NULL, &thread->rnd)) != 0) {
+			lprintf(cfg, ret, 0, "Error initializing RNG");
+			return (ret);
+		}
 
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
@@ -2427,6 +2504,11 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 	if (usecs_to_complete < USEC_PER_SEC)
 		(void)usleep((useconds_t)(USEC_PER_SEC - usecs_to_complete));
 
+	/*
+	 * After sleeping, set the interval to the current time.
+	 */
+	if (__wt_epoch(NULL, &now) != 0)
+		return;
 	*ops = 0;
 	*interval = now;
 }

@@ -727,6 +727,10 @@ __evict_request_walk_clear(WT_SESSION_IMPL *session)
 
 	F_CLR(session, WT_SESSION_CLEAR_EVICT_WALK);
 
+	/* An error is unexpected - flag the failure. */
+	if (ret != 0)
+		__wt_err(session, ret, "Failed to clear eviction walk point");
+
 	return (ret);
 }
 
@@ -760,20 +764,18 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
+	WT_DECL_RET;
 	WT_EVICT_ENTRY *evict;
 	u_int i, elem;
+
+	*evict_resetp = false;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 
-	/*
-	 * If the file isn't evictable, there's no work to do.
-	 */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
-		*evict_resetp = false;
+	/* If the file wasn't evictable, there's no work to do. */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		return (0);
-	}
-	*evict_resetp = true;
 
 	/*
 	 * Hold the walk lock to set the "no eviction" flag: no new pages from
@@ -784,7 +786,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp)
 	__wt_spin_unlock(session, &cache->evict_walk_lock);
 
 	/* Clear any existing LRU eviction walk for the file. */
-	WT_RET(__evict_request_walk_clear(session));
+	WT_ERR(__evict_request_walk_clear(session));
 
 	/* Hold the evict lock to remove any queued pages from this file. */
 	__wt_spin_lock(session, &cache->evict_lock);
@@ -806,7 +808,11 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp)
 	while (btree->evict_busy > 0)
 		__wt_yield();
 
+	*evict_resetp = true;
 	return (0);
+
+err:	F_CLR(btree, WT_BTREE_NO_EVICTION);
+	return (ret);
 }
 
 /*

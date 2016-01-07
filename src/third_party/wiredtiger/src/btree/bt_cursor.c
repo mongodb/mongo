@@ -62,8 +62,18 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 static inline int
 __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 {
-	return (btree->type == BTREE_COL_FIX &&
-	    !F_ISSET(cbt, WT_CBT_MAX_RECORD));
+	/*
+	 * When there's no exact match, column-store search returns the key
+	 * nearest the searched-for key (continuing past keys smaller than the
+	 * searched-for key to return the next-largest key). Therefore, if the
+	 * returned comparison is -1, the searched-for key was larger than any
+	 * row on the page's standard information or column-store insert list.
+	 *
+	 * If the returned comparison is NOT -1, there was a row equal to or
+	 * larger than the searched-for key, and we implicitly create missing
+	 * rows.
+	 */
+	return (btree->type == BTREE_COL_FIX && cbt->compare != -1);
 }
 
 /*
@@ -502,18 +512,13 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 	case BTREE_COL_VAR:
 		/*
 		 * If WT_CURSTD_APPEND is set, insert a new record (ignoring
-		 * the application's record number).  First we search for the
-		 * maximum possible record number so the search ends on the
-		 * last page.  The real record number is assigned by the
-		 * serialized append operation.
+		 * the application's record number). The real record number
+		 * is assigned by the serialized append operation.
 		 */
 		if (F_ISSET(cursor, WT_CURSTD_APPEND))
-			cbt->iface.recno = UINT64_MAX;
+			cbt->iface.recno = WT_RECNO_OOB;
 
 		WT_ERR(__cursor_col_search(session, cbt, NULL));
-
-		if (F_ISSET(cursor, WT_CURSTD_APPEND))
-			cbt->iface.recno = WT_RECNO_OOB;
 
 		/*
 		 * If not overwriting, fail if the key exists.  Creating a
@@ -830,6 +835,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	wt_off_t size;
 	uint64_t skip;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -866,10 +872,12 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 		 * !!!
 		 * Ideally, the number would be prime to avoid restart issues.
 		 */
-		if (cbt->next_random_sample_size != 0)
+		if (cbt->next_random_sample_size != 0) {
+			WT_ERR(btree->bm->size(btree->bm, session, &size));
 			cbt->next_random_leaf_skip = (uint64_t)
-			    ((btree->bm->block->fh->size / btree->allocsize) /
+			    ((size / btree->allocsize) /
 			    cbt->next_random_sample_size) + 1;
+		}
 
 		/*
 		 * Choose a leaf page from the tree.
@@ -1225,6 +1233,11 @@ __wt_btcur_open(WT_CURSOR_BTREE *cbt)
 {
 	cbt->row_key = &cbt->_row_key;
 	cbt->tmp = &cbt->_tmp;
+
+#ifdef HAVE_DIAGNOSTIC
+	cbt->lastkey = &cbt->_lastkey;
+	cbt->lastrecno = WT_RECNO_OOB;
+#endif
 }
 
 /*
@@ -1250,6 +1263,9 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, bool lowlevel)
 
 	__wt_buf_free(session, &cbt->_row_key);
 	__wt_buf_free(session, &cbt->_tmp);
+#ifdef HAVE_DIAGNOSTIC
+	__wt_buf_free(session, &cbt->_lastkey);
+#endif
 
 	return (ret);
 }

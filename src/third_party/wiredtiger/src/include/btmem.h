@@ -478,7 +478,7 @@ struct __wt_page {
 #define	pg_row_ins	u.row.ins
 #undef	pg_row_upd
 #define	pg_row_upd	u.row.upd
-#define	pg_row_entries	u.row.entries
+#undef	pg_row_entries
 #define	pg_row_entries	u.row.entries
 
 		/* Fixed-length column-store leaf page. */
@@ -1049,7 +1049,7 @@ struct __wt_insert_head {
 	uint64_t __prev_split_gen = (session)->split_gen;		\
 	if (__prev_split_gen == 0)					\
 		do {                                                    \
-			WT_PUBLISH((session)->split_gen,                \
+			WT_PUBLISH((session)->split_gen,		\
 			    S2C(session)->split_gen);                   \
 		} while ((session)->split_gen != S2C(session)->split_gen)
 

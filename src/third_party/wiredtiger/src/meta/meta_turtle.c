@@ -271,8 +271,7 @@ err:	WT_TRET(__wt_fclose(&fp, WT_FHANDLE_READ));
  *	Update the turtle file.
  */
 int
-__wt_turtle_update(
-    WT_SESSION_IMPL *session, const char *key,  const char *value)
+__wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
 {
 	WT_FH *fh;
 	WT_DECL_ITEM(buf);

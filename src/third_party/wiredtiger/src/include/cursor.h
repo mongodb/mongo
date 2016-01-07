@@ -200,18 +200,23 @@ struct __wt_cursor_btree {
 
 	uint8_t	append_tree;		/* Cursor appended to the tree */
 
+#ifdef HAVE_DIAGNOSTIC
+	/* Check that cursor next/prev never returns keys out-of-order. */
+	WT_ITEM *lastkey, _lastkey;
+	uint64_t lastrecno;
+#endif
+
 #define	WT_CBT_ACTIVE		0x01	/* Active in the tree */
 #define	WT_CBT_ITERATE_APPEND	0x02	/* Col-store: iterating append list */
 #define	WT_CBT_ITERATE_NEXT	0x04	/* Next iteration configuration */
 #define	WT_CBT_ITERATE_PREV	0x08	/* Prev iteration configuration */
-#define	WT_CBT_MAX_RECORD	0x10	/* Col-store: past end-of-table */
-#define	WT_CBT_NO_TXN   	0x20	/* Non-transactional cursor
+#define	WT_CBT_NO_TXN   	0x10	/* Non-transactional cursor
 					   (e.g. on a checkpoint) */
-#define	WT_CBT_SEARCH_SMALLEST	0x40	/* Row-store: small-key insert list */
+#define	WT_CBT_SEARCH_SMALLEST	0x20	/* Row-store: small-key insert list */
 
 #define	WT_CBT_POSITION_MASK		/* Flags associated with position */ \
 	(WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV | \
-	WT_CBT_MAX_RECORD | WT_CBT_SEARCH_SMALLEST)
+	WT_CBT_SEARCH_SMALLEST)
 
 	uint8_t flags;
 };
@@ -219,33 +224,32 @@ struct __wt_cursor_btree {
 struct __wt_cursor_bulk {
 	WT_CURSOR_BTREE cbt;
 
-	WT_REF	*ref;			/* The leaf page */
-	WT_PAGE *leaf;
-
 	/*
 	 * Variable-length column store compares values during bulk load as
 	 * part of RLE compression, row-store compares keys during bulk load
 	 * to avoid corruption.
 	 */
-	WT_ITEM last;			/* Last key/value seen */
+	bool	first_insert;		/* First insert */
+	WT_ITEM	last;			/* Last key/value inserted */
 
 	/*
-	 * Variable-length column-store RLE counter (also overloaded to mean
-	 * the first time through the bulk-load insert routine, when set to 0).
+	 * Additional column-store bulk load support.
 	 */
-	uint64_t rle;
+	uint64_t recno;			/* Record number */
+	uint64_t rle;			/* Variable-length RLE counter */
 
 	/*
-	 * Fixed-length column-store current entry in memory chunk count, and
-	 * the maximum number of records per chunk.
+	 * Additional fixed-length column store bitmap bulk load support:
+	 * current entry in memory chunk count, and the maximum number of
+	 * records per chunk.
 	 */
+	bool	 bitmap;		/* Bitmap bulk load */
 	uint32_t entry;			/* Entry count */
 	uint32_t nrecs;			/* Max records per chunk */
 
-	/* Special bitmap bulk load for fixed-length column stores. */
-	bool	bitmap;
-
-	void	*reconcile;		/* Reconciliation information */
+	void	*reconcile;		/* Reconciliation support */
+	WT_REF	*ref;			/* The leaf page */
+	WT_PAGE *leaf;
 };
 
 struct __wt_cursor_config {
