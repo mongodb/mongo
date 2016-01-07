@@ -18,3 +18,4 @@ executor:
         set_parameters:
           enableTestCommands: 1
         verbose: ''
+      num_shards: 2
