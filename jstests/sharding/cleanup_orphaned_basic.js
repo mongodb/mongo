@@ -52,13 +52,6 @@ var shardAdmin = st.shard0.getDB('admin');
 var badNS = ' \\/."*<>:|?';
 assert.commandFailed(shardAdmin.runCommand({cleanupOrphaned: badNS}));
 
-/*****************************************************************************
- * Unsharded namespaces.
- ****************************************************************************/
-
-// cleanupOrphaned fails on unsharded database.
-assert.commandFailed(shardAdmin.runCommand({cleanupOrphaned: ns}));
-
 // cleanupOrphaned works on sharded collection.
 assert.commandWorked(mongosAdmin.runCommand({
     enableSharding: coll.getDB().getName()
