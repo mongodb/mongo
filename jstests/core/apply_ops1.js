@@ -61,6 +61,47 @@
       'applyOps should fail on non-"n" operation type with empty "ns" field value'
     );
 
+    // Missing 'o' field value in an operation of type 'i' on 'system.indexes' collection.
+    assert.commandFailedWithCode(
+        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes'}]}),
+        ErrorCodes.NoSuchKey,
+        'applyOps should fail on system.indexes insert operation without "o" field');
+
+    // Non-object 'o' field value in an operation of type 'i' on 'system.indexes' collection.
+    assert.commandFailedWithCode(
+        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes', o: 'bar'}]}),
+        ErrorCodes.TypeMismatch,
+        'applyOps should fail on system.indexes insert operation with non-object "o" field');
+
+    // Missing 'ns' field in index spec.
+    assert.commandFailedWithCode(
+        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes', o: {
+            key: {a: 1},
+            name: 'a_1',
+        }}]}),
+        ErrorCodes.NoSuchKey,
+        'applyOps should fail on system.indexes insert operation with missing index namespace');
+
+    // Non-string 'ns' field in index spec.
+    assert.commandFailedWithCode(
+        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes', o: {
+            ns: 12345,
+            key: {a: 1},
+            name: 'a_1',
+        }}]}),
+        ErrorCodes.TypeMismatch,
+        'applyOps should fail on system.indexes insert operation with non-string index namespace');
+
+    // Invalid 'ns' field in index spec.
+    assert.commandFailedWithCode(
+        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes', o: {
+            ns: 'invalid_namespace',
+            key: {a: 1},
+            name: 'a_1',
+        }}]}),
+        ErrorCodes.InvalidNamespace,
+        'applyOps should fail on system.indexes insert operation with invalid index namespace');
+
     // Valid 'ns' field value in unknown operation type 'x'.
     assert.commandFailed(
       db.adminCommand({applyOps: [{op: 'x', ns: t.getFullName()}]}),
