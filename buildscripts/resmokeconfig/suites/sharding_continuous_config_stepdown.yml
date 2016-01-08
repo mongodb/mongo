@@ -63,6 +63,7 @@ selector:
     - jstests/sharding/tag_range.js
     - jstests/sharding/top_chunk_autosplit.js
     - jstests/sharding/count_config_servers.js
+    - jstests/sharding/conf_server_write_concern.js
     # Calls the config server primary directly (not through mongos)
     - jstests/sharding/moveprimary_ignore_sharded.js
     - jstests/sharding/min_optime_recovery.js
@@ -78,8 +79,9 @@ selector:
     - jstests/sharding/startup_with_all_configs_down.js
     # Test runs really slow with the primary continuously stepping down
     - jstests/sharding/zbigMapReduce.js
-    # Unknown balancer errors - need to be investigated
-    - jstests/sharding/in_memory_sort_limit.js
+    # Continuous config server step down only available with CSRS
+    - jstests/sharding/csrs_upgrade_during_migrate.js
+    - jstests/sharding/csrs_upgrade.js
 executor:
   js_test:
     config:

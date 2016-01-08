@@ -5,6 +5,7 @@
 
 // Contains the declaration for ScopedThread and CountDownLatch
 load('jstests/libs/parallelTester.js');
+load("jstests/replsets/rslib.js");
 
 (function() {
 'use strict';
@@ -110,6 +111,16 @@ ReplSetTest = function ReplSetTestWithContinuousPrimaryStepdown() {
         if (_scopedPrimaryStepdownThread) {
             throw new Error('Continuous failover thread is already active');
         }
+
+        // Reduce electionTimeoutMillis to 5 seconds, from 10, so that chunk migrations don't
+        // time out because of the CSRS primary being down so often for so long.
+        print('Reducing electionTimeoutMillis to 5 seconds');
+        var rsconfig = this.getConfigFromPrimary();
+        rsconfig.version++;
+        rsconfig.settings.electionTimeoutMillis = 5000;
+        reconfig(this, rsconfig);
+        assert.eq(this.getConfigFromPrimary().settings.electionTimeoutMillis, 5000, 
+                  "Failed to lower the electionTimeoutMillis to 5000 milliseconds");
 
         _scopedPrimaryStepdownThreadStopCounter = new CountDownLatch(1);
         _scopedPrimaryStepdownThread = new ScopedThread(_continuousPrimaryStepdownFn,
