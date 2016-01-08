@@ -144,6 +144,7 @@ bool Sync::shouldRetry(OperationContext* txn, const BSONObj& o) {
         }
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "InsertRetry", nss.ns());
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace repl

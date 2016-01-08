@@ -81,6 +81,7 @@ bool getInitialSyncFlag() {
         return false;
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "getInitialSyncFlags", minvalidNS);
+    MONGO_UNREACHABLE;
 }
 
 void setMinValid(OperationContext* ctx, OpTime ts) {
