@@ -204,7 +204,6 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
     CollectionInfo collInfo;
     collInfo.useChunkManager(manager);
     collInfo.save(txn, ns);
-    manager->reload(txn, true);
 
     // Tell the primary mongod to refresh its data
     // TODO:  Think the real fix here is for mongos to just

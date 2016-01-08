@@ -102,15 +102,6 @@ public:
         return _validDiffs;
     }
 
-    // Whether or not a range exists in the min/max region
-    bool isOverlapping(const BSONObj& min, const BSONObj& max);
-
-    // Removes all ranges in the region from min/max
-    void removeOverlapping(const BSONObj& min, const BSONObj& max);
-
-    // Returns a subset of ranges overlapping the region min/max
-    RangeOverlap overlappingRange(const BSONObj& min, const BSONObj& max);
-
     // Applies changes to the config data from a vector of chunks passed in. Also includes minor
     // version changes for particular major-version chunks if explicitly specified.
     // Returns the number of diffs processed, or -1 if the diffs were inconsistent.
@@ -141,6 +132,12 @@ protected:
 
 private:
     void _assertAttached() const;
+
+    // Whether or not a range exists in the min/max region
+    bool _isOverlapping(const BSONObj& min, const BSONObj& max);
+
+    // Returns a subset of ranges overlapping the region min/max
+    RangeOverlap _overlappingRange(const BSONObj& min, const BSONObj& max);
 
     std::string _ns;
     RangeMap* _currMap;

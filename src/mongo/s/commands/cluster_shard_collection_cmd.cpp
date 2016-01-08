@@ -403,6 +403,10 @@ public:
             return appendCommandStatus(result, status);
         }
 
+        // Make sure the metadata for the collection being sharded gets reloaded on the next access
+        config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nsStr.db().toString()));
+        config->invalidateNs(nsStr.ns());
+
         result << "collectionsharded" << ns;
 
         // Only initially move chunks when using a hashed shard key
