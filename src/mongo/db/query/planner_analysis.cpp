@@ -677,10 +677,8 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
         hasNode(solnRoot, STAGE_GEO_NEAR_2D) || hasNode(solnRoot, STAGE_GEO_NEAR_2DSPHERE) ||
         (!lpq.getSort().isEmpty() && !hasSortStage) || hasNotRootSort;
 
-    // Only these stages can produce flagged results.  A stage has to hold state past one call
-    // to work(...) in order to possibly flag a result.
-    const bool couldProduceFlagged =
-        hasAndHashStage || hasNode(solnRoot, STAGE_AND_SORTED) || hasNode(solnRoot, STAGE_FETCH);
+    // Only index intersection stages ever produce flagged results.
+    const bool couldProduceFlagged = hasAndHashStage || hasNode(solnRoot, STAGE_AND_SORTED);
 
     const bool shouldAddMutation = !cannotKeepFlagged && couldProduceFlagged;
 

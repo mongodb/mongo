@@ -180,11 +180,6 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
     *out = idToTest;
     ++_commonStats.advanced;
 
-    // But don't return it if it's flagged.
-    if (_ws->isFlagged(*out)) {
-        return PlanStage::NEED_TIME;
-    }
-
     return PlanStage::ADVANCED;
 }
 
@@ -198,16 +193,15 @@ void MergeSortStage::doInvalidate(OperationContext* txn,
          valueIt++) {
         WorkingSetMember* member = _ws->get(valueIt->id);
         if (member->hasLoc() && (dl == member->loc)) {
-            // Force a fetch and flag.  We could possibly merge this result back in later.
+            // Fetch the about-to-be mutated result.
             WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
-            _ws->flagForReview(valueIt->id);
             ++_specificStats.forcedFetches;
         }
     }
 
-    // If we see DL again it is not the same record as it once was so we still want to
-    // return it.
-    if (_dedup) {
+    // If we see the deleted RecordId again it is not the same record as it once was so we still
+    // want to return it.
+    if (_dedup && INVALIDATION_DELETION == type) {
         _seen.erase(dl);
     }
 }

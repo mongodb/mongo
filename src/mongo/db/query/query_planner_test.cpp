@@ -3384,18 +3384,17 @@ TEST_F(QueryPlannerTest, NoMutationsForSort) {
         "{cscan: {dir: 1}}}}}}");
 }
 
-// An index scan + fetch requires a keep node as it can flag data.  Also make sure we put it in
-// the right place, under the sort.
-TEST_F(QueryPlannerTest, MutationsFromFetch) {
+// A basic index scan, fetch, and sort plan cannot produce flagged data.
+TEST_F(QueryPlannerTest, MutationsFromFetchWithSort) {
     params.options = QueryPlannerParams::KEEP_MUTATIONS;
     addIndex(BSON("a" << 1));
     runQuerySortProj(fromjson("{a: 5}"), fromjson("{b:1}"), BSONObj());
     assertSolutionExists(
-        "{sort: {pattern: {b:1}, limit: 0, node: {keep: {node: {sortKeyGen: {node: "
-        "{fetch: {node: {ixscan: {pattern: {a:1}}}}}}}}}}}");
+        "{sort: {pattern: {b:1}, limit: 0, node: {sortKeyGen: {node: "
+        "{fetch: {node: {ixscan: {pattern: {a:1}}}}}}}}}");
 }
 
-// Index scan w/covering doesn't require a keep node as there's no fetch.
+// Index scan w/covering doesn't require a keep node.
 TEST_F(QueryPlannerTest, NoFetchNoKeep) {
     params.options = QueryPlannerParams::KEEP_MUTATIONS;
     addIndex(BSON("x" << 1));
@@ -3446,6 +3445,58 @@ TEST_F(QueryPlannerTest, NoKeepWithNToReturn) {
         "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}, "
         "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
         "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}]}}}}");
+}
+
+// Mergesort plans do not require a keep mutations stage.
+TEST_F(QueryPlannerTest, NoKeepWithMergeSort) {
+    params.options = QueryPlannerParams::KEEP_MUTATIONS;
+
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQuerySortProj(fromjson("{a: {$in: [1, 2]}}"), BSON("b" << 1), BSONObj());
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {mergeSort: {nodes: ["
+        "{ixscan: {pattern: {a: 1, b: 1},"
+        "bounds: {a: [[1,1,true,true]], b: [['MinKey','MaxKey',true,true]]}}},"
+        "{ixscan: {pattern: {a: 1, b: 1},"
+        "bounds: {a: [[2,2,true,true]], b: [['MinKey','MaxKey',true,true]]}}}]}}}}");
+}
+
+// Hash-based index intersection plans require a keep mutations stage.
+TEST_F(QueryPlannerTest, AndHashRequiresKeepMutations) {
+    params.options = QueryPlannerParams::KEEP_MUTATIONS;
+    params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    runQuery(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists("{fetch: {filter: {a: {$gte: 0}}, node: {ixscan: {pattern: {b: 1}}}}}");
+    assertSolutionExists("{fetch: {filter: {b: {$gte: 0}}, node: {ixscan: {pattern: {a: 1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {keep: {node: {andHash: {nodes: ["
+        "{ixscan: {pattern: {a: 1}}},"
+        "{ixscan: {pattern: {b: 1}}}]}}}}}}");
+}
+
+// Sort-based index intersection plans require a keep mutations stage.
+TEST_F(QueryPlannerTest, AndSortedRequiresKeepMutations) {
+    params.options = QueryPlannerParams::KEEP_MUTATIONS;
+    params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    runQuery(fromjson("{a: 2, b: 3}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists("{fetch: {filter: {a: 2}, node: {ixscan: {pattern: {b: 1}}}}}");
+    assertSolutionExists("{fetch: {filter: {b: 3}, node: {ixscan: {pattern: {a: 1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {keep: {node: {andSorted: {nodes: ["
+        "{ixscan: {pattern: {a: 1}}},"
+        "{ixscan: {pattern: {b: 1}}}]}}}}}}");
 }
 
 // Make sure a top-level $or hits the limiting number

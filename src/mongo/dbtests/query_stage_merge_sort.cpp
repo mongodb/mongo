@@ -588,31 +588,28 @@ public:
             ++it;
         }
 
-        // Invalidate locs[11].  Should force a fetch.  We don't get it back.
+        // Invalidate locs[11].  Should force a fetch and return the deleted document.
         ms->saveState();
         ms->invalidate(&_txn, *it, INVALIDATION_DELETION);
         ms->restoreState();
 
         // Make sure locs[11] was fetched for us.
         {
-            // TODO: If we have "return upon invalidation" ever triggerable, do the following test.
-            /*
-                WorkingSetID id = WorkingSet::INVALID_ID;
-                PlanStage::StageState status;
-                do {
-                    status = ms->work(&id);
-                } while (PlanStage::ADVANCED != status);
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState status;
+            do {
+                status = ms->work(&id);
+            } while (PlanStage::ADVANCED != status);
 
-                WorkingSetMember* member = ws.get(id);
-                ASSERT(!member->hasLoc());
-                ASSERT(member->hasObj());
-                string index(1, 'a' + count);
-                BSONElement elt;
-                ASSERT_TRUE(member->getFieldDotted(index, &elt));
-                ASSERT_EQUALS(1, elt.numberInt());
-                ASSERT(member->getFieldDotted("foo", &elt));
-                ASSERT_EQUALS(count, elt.numberInt());
-            */
+            WorkingSetMember* member = ws.get(id);
+            ASSERT(!member->hasLoc());
+            ASSERT(member->hasObj());
+            string index(1, 'a' + count);
+            BSONElement elt;
+            ASSERT_TRUE(member->getFieldDotted(index, &elt));
+            ASSERT_EQUALS(1, elt.numberInt());
+            ASSERT(member->getFieldDotted("foo", &elt));
+            ASSERT_EQUALS(count, elt.numberInt());
 
             ++it;
             ++count;
@@ -640,6 +637,105 @@ public:
     }
 };
 
+// Test that if a WSM buffered inside the merge sort stage gets updated, we return the document and
+// then correctly dedup if we see the same RecordId again.
+class QueryStageMergeSortInvalidationMutationDedup : public QueryStageMergeSortTestBase {
+public:
+    void run() {
+        OldClientWriteContext ctx(&_txn, ns());
+        Database* db = ctx.db();
+        Collection* coll = db->getCollection(ns());
+        if (!coll) {
+            WriteUnitOfWork wuow(&_txn);
+            coll = db->createCollection(&_txn, ns());
+            wuow.commit();
+        }
+
+        // Insert data.
+        insert(BSON("_id" << 4 << "a" << 4));
+        insert(BSON("_id" << 5 << "a" << 5));
+        insert(BSON("_id" << 6 << "a" << 6));
+
+        addIndex(BSON("a" << 1));
+
+        std::set<RecordId> rids;
+        getLocs(&rids, coll);
+        set<RecordId>::iterator it = rids.begin();
+
+        WorkingSet ws;
+        WorkingSetMember* member;
+        MergeSortStageParams msparams;
+        msparams.pattern = BSON("a" << 1);
+        auto ms = stdx::make_unique<MergeSortStage>(&_txn, msparams, &ws, coll);
+
+        // First child scans [5, 10].
+        {
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("a" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 5);
+            params.bounds.endKey = BSON("" << 10);
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            auto fetchStage = stdx::make_unique<FetchStage>(
+                &_txn, &ws, new IndexScan(&_txn, params, &ws, nullptr), nullptr, coll);
+            ms->addChild(fetchStage.release());
+        }
+
+        // Second child scans [4, 10].
+        {
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("a" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 4);
+            params.bounds.endKey = BSON("" << 10);
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            auto fetchStage = stdx::make_unique<FetchStage>(
+                &_txn, &ws, new IndexScan(&_txn, params, &ws, nullptr), nullptr, coll);
+            ms->addChild(fetchStage.release());
+        }
+
+        // First doc should be {a: 4}.
+        member = getNextResult(&ws, ms.get());
+        ASSERT_EQ(member->getState(), WorkingSetMember::LOC_AND_OBJ);
+        ASSERT_EQ(member->loc, *it);
+        ASSERT_EQ(member->obj.value(), BSON("_id" << 4 << "a" << 4));
+        ++it;
+
+        // Doc {a: 5} gets invalidated by an update.
+        ms->invalidate(&_txn, *it, INVALIDATION_MUTATION);
+
+        // Invalidated doc {a: 5} should still get returned.
+        member = getNextResult(&ws, ms.get());
+        ASSERT_EQ(member->getState(), WorkingSetMember::OWNED_OBJ);
+        ASSERT_EQ(member->obj.value(), BSON("_id" << 5 << "a" << 5));
+        ++it;
+
+        // We correctly dedup the invalidated doc and return {a: 6} next.
+        member = getNextResult(&ws, ms.get());
+        ASSERT_EQ(member->getState(), WorkingSetMember::LOC_AND_OBJ);
+        ASSERT_EQ(member->loc, *it);
+        ASSERT_EQ(member->obj.value(), BSON("_id" << 6 << "a" << 6));
+    }
+
+private:
+    WorkingSetMember* getNextResult(WorkingSet* ws, PlanStage* stage) {
+        while (!stage->isEOF()) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState status = stage->work(&id);
+            if (PlanStage::ADVANCED != status) {
+                continue;
+            }
+
+            return ws->get(id);
+        }
+
+        FAIL("Expected to produce another result but hit EOF");
+        return nullptr;
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("query_stage_merge_sort_test") {}
@@ -652,6 +748,7 @@ public:
         add<QueryStageMergeSortOneStageEOF>();
         add<QueryStageMergeSortManyShort>();
         add<QueryStageMergeSortInvalidation>();
+        add<QueryStageMergeSortInvalidationMutationDedup>();
     }
 };
 
