@@ -732,6 +732,20 @@ Status applyOperation_inlock(OperationContext* txn,
 
     if (*opType == 'i') {
         if (nsToCollectionSubstring(ns) == "system.indexes") {
+            uassert(ErrorCodes::NoSuchKey,
+                    str::stream() << "Missing expected index spec in field 'o': " << op,
+                    !fieldO.eoo());
+            uassert(ErrorCodes::TypeMismatch,
+                    str::stream() << "Expected object for index spec in field 'o': " << op,
+                    fieldO.isABSONObj());
+
+            std::string indexNs;
+            uassertStatusOK(bsonExtractStringField(o, "ns", &indexNs));
+            const NamespaceString indexNss(indexNs);
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid namespace in index spec: " << op,
+                    indexNss.isValid());
+
             opCounters->gotInsert();
             if (o["background"].trueValue()) {
                 Lock::TempRelease release(txn->lockState());
