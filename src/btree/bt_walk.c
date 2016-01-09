@@ -32,8 +32,8 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	 * loop is from the hint to the end of the list, and the second loop
 	 * is from the start of the list to the end of the list.  (The second
 	 * loop overlaps the first, but that only happen in cases where we've
-	 * deepened the tree and aren't going to find our slot at all, that's
-	 * not worth optimizing.)
+	 * split the tree and aren't going to find our slot at all, that's not
+	 * worth optimizing.)
 	 *
 	 * It's not an error for the reference hint to be wrong, it just means
 	 * the first retrieval (which sets the hint for subsequent retrievals),
@@ -59,10 +59,9 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 		}
 
 	/*
-	 * If we don't find our reference, the page split into a new level and
-	 * our home pointer references the wrong page.  After internal pages
-	 * deepen, their reference structure home value are updated; yield and
-	 * wait for that to happen.
+	 * If we don't find our reference, the page split and our home pointer
+	 * references the wrong page. When internal pages split, their WT_REF
+	 * structure home values are updated; yield and wait for that to happen.
 	 */
 	__wt_yield();
 	goto retry;
@@ -129,6 +128,43 @@ __page_ascend(WT_SESSION_IMPL *session,
 	}
 
 	*refp = parent_ref;
+}
+
+/*
+ * __page_descend --
+ *	Descend the tree one level.
+ */
+static void
+__page_descend(WT_SESSION_IMPL *session,
+    WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp, bool prev)
+{
+	WT_PAGE_INDEX *pindex;
+
+	/*
+	 * Ref is a child page into which we're descending, and on which we
+	 * have a hazard pointer.
+	 */
+	for (;; __wt_yield()) {
+		WT_INTL_INDEX_GET(session, ref->page, pindex);
+		*slotp = prev ? pindex->entries - 1 : 0;
+
+		/*
+		 * When internal pages split, the WT_REF structures being moved
+		 * are updated first. If the last WT_REF on the page into which
+		 * we're descending doesn't reference the page as its home, the
+		 * page has split and a "previous" cursor moving to the last
+		 * slot on the page would be in the wrong part of the namespace.
+		 * The test isn't necessary for a "next" cursor because we do
+		 * right-hand splits on internal pages and the first part of the
+		 * page's namespace won't have changed as part of the split.
+		 * Rather than testing the direction boolean, do the test the
+		 * "previous" cursor movement requires, it's not wrong for the
+		 * "next" cursor movement.
+		 */
+		if (pindex->index[*slotp]->home == ref->page)
+			break;
+	}
+	*pindexp = pindex;
 }
 
 /*
@@ -443,9 +479,10 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 			 */
 			if (WT_PAGE_IS_INTERNAL(ref->page)) {
 descend:			couple = ref;
-				WT_INTL_INDEX_GET(session, ref->page, pindex);
-				slot = prev ? pindex->entries - 1 : 0;
 				empty_internal = true;
+
+				__page_descend(
+				    session, ref, &pindex, &slot, prev);
 			} else {
 				/*
 				 * Optionally skip leaf pages, the second half.
