@@ -29,14 +29,14 @@ typedef struct {
 
 	WT_ITEM *tmp1;				/* Temporary buffers */
 	WT_ITEM *tmp2;
-} WT_RSTUFF;
+} WT_REBALANCE_STUFF;
 
 /*
  * __rebalance_discard --
  *	Free the allocated information.
  */
 static void
-__rebalance_discard(WT_SESSION_IMPL *session, WT_RSTUFF *rs)
+__rebalance_discard(WT_SESSION_IMPL *session, WT_REBALANCE_STUFF *rs)
 {
 	while (rs->leaf_next > 0) {
 		--rs->leaf_next;
@@ -58,9 +58,9 @@ __rebalance_discard(WT_SESSION_IMPL *session, WT_RSTUFF *rs)
  */
 static int
 __rebalance_leaf_append(WT_SESSION_IMPL *session,
-    const uint8_t *key, size_t key_len,
-    uint64_t recno,
-    const uint8_t *addr, size_t addr_len, u_int addr_type, WT_RSTUFF *rs)
+    const uint8_t *key, size_t key_len, uint64_t recno,
+    const uint8_t *addr, size_t addr_len, u_int addr_type,
+    WT_REBALANCE_STUFF *rs)
 {
 	WT_ADDR *copy_addr;
 	WT_REF *copy;
@@ -102,7 +102,7 @@ __rebalance_leaf_append(WT_SESSION_IMPL *session,
  */
 static int
 __rebalance_fl_append(WT_SESSION_IMPL *session,
-    const uint8_t *addr, size_t addr_len, WT_RSTUFF *rs)
+    const uint8_t *addr, size_t addr_len, WT_REBALANCE_STUFF *rs)
 {
 	WT_ADDR *copy;
 
@@ -123,7 +123,7 @@ __rebalance_fl_append(WT_SESSION_IMPL *session,
  * found.
  */
 static int
-__rebalance_internal(WT_SESSION_IMPL *session, WT_RSTUFF *rs)
+__rebalance_internal(WT_SESSION_IMPL *session, WT_REBALANCE_STUFF *rs)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -172,7 +172,7 @@ err:	__wt_page_out(session, &page);
  *	Free the tracked internal pages and overflow keys.
  */
 static int
-__rebalance_free_original(WT_SESSION_IMPL *session, WT_RSTUFF *rs)
+__rebalance_free_original(WT_SESSION_IMPL *session, WT_REBALANCE_STUFF *rs)
 {
 	WT_ADDR *addr;
 	uint64_t i;
@@ -196,7 +196,7 @@ __rebalance_free_original(WT_SESSION_IMPL *session, WT_RSTUFF *rs)
  */
 static int
 __rebalance_col_walk(
-    WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_RSTUFF *rs)
+    WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_REBALANCE_STUFF *rs)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -254,7 +254,7 @@ err:	__wt_scr_free(session, &buf);
  */
 static int
 __rebalance_row_leaf_key(WT_SESSION_IMPL *session,
-    const uint8_t *addr, size_t addr_len, WT_ITEM *key, WT_RSTUFF *rs)
+    const uint8_t *addr, size_t addr_len, WT_ITEM *key, WT_REBALANCE_STUFF *rs)
 {
 	WT_PAGE *page;
 	WT_DECL_RET;
@@ -277,7 +277,7 @@ __rebalance_row_leaf_key(WT_SESSION_IMPL *session,
  */
 static int
 __rebalance_row_walk(
-    WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_RSTUFF *rs)
+    WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_REBALANCE_STUFF *rs)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -405,7 +405,7 @@ __wt_bt_rebalance(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_RSTUFF *rs, _rstuff;
+	WT_REBALANCE_STUFF *rs, _rstuff;
 	bool evict_reset;
 
 	WT_UNUSED(cfg);
