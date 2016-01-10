@@ -338,7 +338,6 @@ extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
 extern int __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full);
 extern int __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile);
 extern int __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing);
-extern int __wt_evict_page_clean_update( WT_SESSION_IMPL *session, WT_REF *ref, bool closing);
 extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
 extern int __wt_log_flush_lsn(WT_SESSION_IMPL *session, WT_LSN *lsn, bool start);
 extern int __wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn);
