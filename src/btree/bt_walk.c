@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __page_refp --
+ * __ref_index_slot --
  *      Return the page's index and slot for a reference.
  */
 static inline void
-__page_refp(WT_SESSION_IMPL *session,
+__ref_index_slot(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
 	WT_PAGE_INDEX *pindex;
@@ -40,19 +40,19 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	 * is slower.
 	 */
 	i = ref->pindex_hint;
-	if (i < pindex->entries && pindex->index[i]->page == ref->page) {
+	if (i < pindex->entries && pindex->index[i] == ref) {
 		*pindexp = pindex;
 		*slotp = i;
 		return;
 	}
 	while (++i < pindex->entries)
-		if (pindex->index[i]->page == ref->page) {
+		if (pindex->index[i] == ref) {
 			*pindexp = pindex;
 			*slotp = ref->pindex_hint = i;
 			return;
 		}
 	for (i = 0; i < pindex->entries; ++i)
-		if (pindex->index[i]->page == ref->page) {
+		if (pindex->index[i] == ref) {
 			*pindexp = pindex;
 			*slotp = ref->pindex_hint = i;
 			return;
@@ -115,7 +115,7 @@ __page_ascend(WT_SESSION_IMPL *session,
 		parent_ref = ref->home->pg_intl_parent_ref;
 		if (__wt_ref_is_root(parent_ref))
 			break;
-		__page_refp(session, parent_ref, pindexp, slotp);
+		__ref_index_slot(session, parent_ref, pindexp, slotp);
 
 		/*
 		 * When internal pages split, the WT_REF structures being moved
@@ -261,7 +261,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	}
 
 	/* Figure out the current slot in the WT_REF array. */
-	__page_refp(session, ref, &pindex, &slot);
+	__ref_index_slot(session, ref, &pindex, &slot);
 
 	for (;;) {
 		/*
@@ -467,7 +467,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 				    couple == couple_orig ||
 				    WT_PAGE_IS_INTERNAL(couple->page));
 				ref = couple;
-				__page_refp(session, ref, &pindex, &slot);
+				__ref_index_slot(session, ref, &pindex, &slot);
 				if (couple == couple_orig)
 					break;
 			}
