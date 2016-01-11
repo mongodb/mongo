@@ -3,31 +3,53 @@
 // scan or whether the plan is covered (index only).
 
 /**
- * Given the root stage of explain's JSON representation of a query plan ('root'), returns the
- * subdocument with its stage as 'stage'. Returns null if the plan does not have such a stage.
+ * Given the root stage of explain's JSON representation of a query plan ('root'), returns all
+ * subdocuments whose stage is 'stage'. Returns an empty array if the plan does not have the
+ * requested stage.
  */
-function getPlanStage(root, stage) {
+function getPlanStages(root, stage) {
+    var results = [];
+
     if (root.stage === stage) {
-        return root;
-    } else if ("inputStage" in root) {
-        return getPlanStage(root.inputStage, stage);
-    } else if ("inputStages" in root) {
+        results.push(root);
+    }
+
+    if ("inputStage" in root) {
+        results = results.concat(getPlanStages(root.inputStage, stage));
+    }
+
+    if ("inputStages" in root) {
         for (var i = 0; i < root.inputStages.length; i++) {
-            var stage = getPlanStage(root.inputStages[i], stage);
-            if (stage !== null) {
-                return stage;
-            }
-        }
-    } else if ("shards" in root) {
-        for (var i = 0; i < root.shards.length; i++) {
-            var stage = getPlanStage(root.shards[i].winningPlan, stage);
-            if (stage !== null) {
-                return stage;
-            }
+            results = results.concat(getPlanStages(root.inputStages[i], stage));
         }
     }
 
-    return null;
+    if ("shards" in root) {
+        for (var i = 0; i < root.shards.length; i++) {
+            results = results.concat(getPlanStages(root.shards[i].winningPlan, stage));
+        }
+    }
+
+    return results;
+}
+
+/**
+ * Given the root stage of explain's JSON representation of a query plan ('root'), returns the
+ * subdocument with its stage as 'stage'. Returns null if the plan does not have such a stage.
+ * Asserts that no more than one stage is a match.
+ */
+function getPlanStage(root, stage) {
+    var planStageList = getPlanStages(root, stage);
+
+    if (planStageList.length === 0) {
+        return null;
+    }
+    else {
+        assert(planStageList.length === 1,
+               "getPlanStage expects to find 0 or 1 matching stages. planStageList: "
+               + tojson(planStageList));
+        return planStageList[0];
+    }
 }
 
 /**
