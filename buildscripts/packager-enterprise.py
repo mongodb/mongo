@@ -48,98 +48,12 @@ DEFAULT_ARCHES=["x86_64"]
 DISTROS=["suse", "debian","redhat","ubuntu","amazon"]
 
 
-class Spec(object):
-    def __init__(self, ver, gitspec = None, rel = None):
-        self.ver = ver
-        self.gitspec = gitspec
-        self.rel = rel
-
-    # Nightly version numbers can be in the form: 3.0.7-pre-, or 3.0.7-5-g3b67ac
-    #
-    def is_nightly(self):
-        return bool(re.search("-$", self.version())) or bool(re.search("\d-\d+-g[0-9a-f]+$", self.version()))
-
-    def is_rc(self):
-        return bool(re.search("-rc\d+$", self.version()))
-
-    def is_pre_release(self):
-        return self.is_rc() or self.is_nightly()
-
-    def version(self):
-        return self.ver
-
-    def metadata_gitspec(self):
-        """Git revision to use for spec+control+init+manpage files.
-           The default is the release tag for the version being packaged."""
-        if(self.gitspec):
-          return self.gitspec
-        else:
-          return 'r' + self.version()
-
-    def version_better_than(self, version_string):
-        # FIXME: this is wrong, but I'm in a hurry.
-        # e.g., "1.8.2" < "1.8.10", "1.8.2" < "1.8.2-rc1"
-        return self.ver > version_string
-
+class EnterpriseSpec(packager.Spec):
     def suffix(self):
         return "-enterprise" if int(self.ver.split(".")[1])%2==0 else "-enterprise-unstable"
 
-    def prelease(self):
-      # "N" is either passed in on the command line, or "1"
-      #
-      # 1) Standard release - "N" 
-      # 2) Nightly (snapshot) - "0.N.YYYYMMDDlatest"
-      # 3) RC's - "0.N.rcX"
-      if self.rel:
-        corenum = self.rel
-      else:
-        corenum = 1
-      # RC's
-      if self.is_rc():
-        return "0.%s.%s" % (corenum, re.sub('.*-','',self.version()))
-      # Nightlies
-      elif self.is_nightly():
-        return "0.%s.%s" % (corenum, time.strftime("%Y%m%d"))
-      else:
-        return str(corenum)
 
-
-    def pversion(self, distro):
-        # Note: Debian packages have funny rules about dashes in
-        # version numbers, and RPM simply forbids dashes.  pversion
-        # will be the package's version number (but we need to know
-        # our upstream version too).
-        if re.search("^(debian|ubuntu)", distro.name()):
-            return re.sub("-", "~", self.ver)
-        elif re.search("(suse|redhat|fedora|centos|amazon)", distro.name()):
-            return re.sub("-.*", "", self.ver)
-        else:
-            raise Exception("BUG: unsupported platform?")
-
-    def branch(self):
-        """Return the major and minor portions of the specified version.
-        For example, if the version is "2.5.5" the branch would be "2.5"
-        """
-        return ".".join(self.ver.split(".")[0:2])
-
-class Distro(object):
-    def __init__(self, string):
-        self.n=string
-
-    def name(self):
-        return self.n
-
-    def pkgbase(self):
-        return "mongodb"
-
-    def archname(self, arch):
-        if re.search("^(debian|ubuntu)", self.n):
-            return "i386" if arch.endswith("86") else "amd64"
-        elif re.search("^(suse|centos|redhat|fedora|amazon)", self.n):
-            return "i686" if arch.endswith("86") else "x86_64"
-        else:
-            raise Exception("BUG: unsupported platform?")
-
+class EnterpriseDistro(packager.Distro):
     def repodir(self, arch, build_os, spec):
         """Return the directory where we'll place the package files for
         (distro, distro_version) in that distro's preferred repository
@@ -191,83 +105,23 @@ class Distro(object):
         else:
             raise Exception("BUG: unsupported platform?")
 
-    def repo_component(self):
-        """Return the name of the section/component/pool we are publishing into -
-        e.g. "multiverse" for Ubuntu, "main" for debian."""
-        if self.n == 'ubuntu':
-          return "multiverse"
-        elif self.n == 'debian':
-          return "main"
-        else:
-            raise Exception("unsupported distro: %s" % self.n)
-
-    def repo_os_version(self, build_os):
-        """Return an OS version suitable for package repo directory
-        naming - e.g. 5, 6 or 7 for redhat/centos, "precise," "wheezy," etc.
-        for Ubuntu/Debian, 11 for suse, "2013.03" for amazon"""
-        if self.n == 'suse':
-            return re.sub(r'^suse(\d+)$', r'\1', build_os)
-        if self.n == 'redhat':
-            return re.sub(r'^rhel(\d).*$', r'\1', build_os)
-        if self.n == 'amazon':
-            return "2013.03"
-        elif self.n == 'ubuntu':
-            if build_os == 'ubuntu1204':
-                return "precise"
-            elif build_os == 'ubuntu1404':
-                return "trusty"
-            else:
-                raise Exception("unsupported build_os: %s" % build_os)
-        elif self.n == 'debian':
-            if build_os == 'debian71':
-                return 'wheezy'
-            else:
-                raise Exception("unsupported build_os: %s" % build_os)
-        else:
-            raise Exception("unsupported distro: %s" % self.n)
-
-    def make_pkg(self, build_os, arch, spec, srcdir):
-        if re.search("^(debian|ubuntu)", self.n):
-            return packager.make_deb(self, build_os, arch, spec, srcdir)
-        elif re.search("^(suse|centos|redhat|fedora|amazon)", self.n):
-            return packager.make_rpm(self, build_os, arch, spec, srcdir)
-        else:
-            raise Exception("BUG: unsupported platform?")
-
     def build_os(self):
         """Return the build os label in the binary package to download ("rhel57", "rhel62" and "rhel70"
-        for redhat, "ubuntu1204" and "ubuntu1404" for Ubuntu, "debian71" for Debian), and "suse11"
-        for SUSE)"""
+        for redhat, the others are delegated to the super class
+        """
 
-        if re.search("(suse)", self.n):
-            return [ "suse11", "suse12" ]
         if re.search("(redhat|fedora|centos)", self.n):
             return [ "rhel70", "rhel62", "rhel57" ]
-        elif self.n == 'amazon':
-            return [ "amazon" ]
-        elif self.n == 'ubuntu':
-            return [ "ubuntu1204", "ubuntu1404" ]
-        elif self.n == 'debian':
-            return [ "debian71" ]
         else:
-            raise Exception("BUG: unsupported platform?")
-
-    def release_dist(self, build_os):
-        """Return the release distribution to use in the rpm - "el5" for rhel 5.x,
-        "el6" for rhel 6.x, return anything else unchanged"""
-
-        if self.n == 'amazon':
-          return 'amzn1'
-        else:
-          return re.sub(r'^rh(el\d).*$', r'\1', build_os)
+            return super(EnterpriseDistro, self).build_os()
 
 def main(argv):
 
-    distros=[Distro(distro) for distro in DISTROS]
+    distros=[EnterpriseDistro(distro) for distro in DISTROS]
 
     args = packager.get_args(distros)
 
-    spec = Spec(args.server_version, args.metadata_gitspec, args.release_number)
+    spec = EnterpriseSpec(args.server_version, args.metadata_gitspec, args.release_number)
 
     oldcwd=os.getcwd()
     srcdir=oldcwd+"/../"
