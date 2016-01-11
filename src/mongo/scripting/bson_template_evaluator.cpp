@@ -239,6 +239,8 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalSeqInt(BsonTemplateEval
         if (!spec["mod"].isNumber())
             return StatusOpEvaluationError;
         int modval = spec["mod"].numberInt();
+        if (modval <= 0)
+            return StatusOpEvaluationError;
         curr_seqval = (curr_seqval % modval);
     }
 
