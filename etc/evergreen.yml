@@ -471,10 +471,13 @@ tasks:
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
           mv mongodb-*.${ext|tgz} mongodb-binaries.tgz
 
-          # If strip is on the path (everywhere except windows) then we should strip the unit test binaries
+          # If strip is on the path (everywhere except windows) then we should strip the test binaries
           # before tarring them up
           if [ -x ${strip_path|/usr/bin/strip} ]; then
             cat build/unittests.txt | xargs ${strip_command|/usr/bin/strip}
+            cat build/integration_tests.txt | xargs ${strip_command|/usr/bin/strip}
+            ${strip_command|/usr/bin/strip} dbtest
+            ${strip_command|/usr/bin/strip} mongobridge
           fi
 
           # On windows we need to make sure the paths in unittests.txt are compatible with cygwin tar
