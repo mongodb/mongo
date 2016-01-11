@@ -258,9 +258,10 @@ var runner = (function() {
         }
     }
 
-    function WorkloadFailure(err, stack, header) {
+    function WorkloadFailure(err, stack, tid, header) {
         this.err = err;
         this.stack = stack;
+        this.tid = tid;
         this.header = header;
 
         this.format = function format() {
@@ -269,25 +270,27 @@ var runner = (function() {
     }
 
     function throwError(workerErrs) {
+        // Returns an array containing all unique values from the stackTraces array,
+        // their corresponding number of occurrences in the stackTraces array, and
+        // the associated thread ids (tids).
+        function freqCount(stackTraces, tids) {
+            var uniqueStackTraces = [];
+            var associatedTids = [];
 
-        // Returns an array containing all unique values from the specified array
-        // and their corresponding number of occurrences in the original array.
-        function freqCount(arr) {
-            var unique = [];
-            var freqs = [];
-
-            arr.forEach(function(item) {
-                var i = unique.indexOf(item);
+            stackTraces.forEach(function(item, stackTraceIndex) {
+                var i = uniqueStackTraces.indexOf(item);
                 if (i < 0) {
-                    unique.push(item);
-                    freqs.push(1);
+                    uniqueStackTraces.push(item);
+                    associatedTids.push(new Set([tids[stackTraceIndex]]));
                 } else {
-                    freqs[i]++;
+                    associatedTids[i].add(tids[stackTraceIndex]);
                 }
             });
 
-            return unique.map(function(value, i) {
-                return { value: value, freq: freqs[i] };
+            return uniqueStackTraces.map(function(value, i) {
+                return { value: value,
+                         freq: associatedTids[i].size,
+                         tids: Array.from(associatedTids[i]) };
             });
         }
 
@@ -302,8 +305,10 @@ var runner = (function() {
             return num + ' ' + str + suffix;
         }
 
-        function prepareMsg(stackTraces) {
-            var uniqueTraces = freqCount(stackTraces);
+        function prepareMsg(workerErrs) {
+            var stackTraces = workerErrs.map(e => e.format());
+            var stackTids = workerErrs.map(e => e.tid);
+            var uniqueTraces = freqCount(stackTraces, stackTids);
             var numUniqueTraces = uniqueTraces.length;
 
             // Special case message when threads all have the same trace
@@ -312,21 +317,19 @@ var runner = (function() {
                        indent(uniqueTraces[0].value, 8);
             }
 
-            var summary = pluralize('thread', stackTraces.length) + ' threw ' +
-                          numUniqueTraces + ' different exceptions:\n\n';
+            var summary = pluralize('exception', stackTraces.length) + ' were thrown, ' +
+                          numUniqueTraces + ' of which were unique:\n\n';
 
             return summary + uniqueTraces.map(function(obj) {
-                var line = pluralize('thread', obj.freq) + ' threw\n';
+                var line = pluralize('thread', obj.freq) +
+                                     ' with tids ' + JSON.stringify(obj.tids) +
+                                     ' threw\n';
                 return indent(line + obj.value, 8);
             }).join('\n\n');
         }
 
         if (workerErrs.length > 0) {
-            var stackTraces = workerErrs.map(function(e) {
-                return e.format();
-            });
-
-            var err = new Error(prepareMsg(stackTraces) + '\n');
+            var err = new Error(prepareMsg(workerErrs) + '\n');
 
             // Avoid having any stack traces omitted from the logs
             var maxLogLine = 10 * 1024; // 10KB
@@ -436,7 +439,7 @@ var runner = (function() {
             // before the workload's teardown method is called.
             cluster.checkDbHashes(dbHashBlacklist, 'before workload teardown');
         } catch (e) {
-            errors.push(new WorkloadFailure(e.toString(), e.stack,
+            errors.push(new WorkloadFailure(e.toString(), e.stack, 'main',
                                             header + ' checking consistency on secondaries'));
             return false;
         }
@@ -444,7 +447,7 @@ var runner = (function() {
         try {
             teardownWorkload(workload, context, cluster);
         } catch (e) {
-            errors.push(new WorkloadFailure(e.toString(), e.stack, header + ' Teardown'));
+            errors.push(new WorkloadFailure(e.toString(), e.stack, 'main', header + ' Teardown'));
             return false;
         }
         return true;
@@ -459,7 +462,7 @@ var runner = (function() {
                 newData = cluster.recordAllConfigServerData();
             } catch (e) {
                 var failureType = 'Config Server Data Collection';
-                errors.push(new WorkloadFailure(e.toString(), e.stack, failureType));
+                errors.push(new WorkloadFailure(e.toString(), e.stack, 'main', failureType));
                 return;
             }
 
@@ -515,7 +518,8 @@ var runner = (function() {
                 // Threads must be joined before destruction, so do this
                 // even in the presence of exceptions.
                 errors.push(...threadMgr.joinAll().map(e =>
-                    new WorkloadFailure(e.err, e.stack, 'Foreground ' + e.workloads.join(' '))));
+                    new WorkloadFailure(e.err, e.stack, e.tid,
+                                        'Foreground ' + e.workloads.join(' '))));
             }
         } finally {
             // Call each foreground workload's teardown function. After all teardowns have completed
@@ -676,7 +680,8 @@ var runner = (function() {
                 // Set a flag so background threads know to terminate.
                 bgThreadMgr.markAllForTermination();
                 errors.push(...bgThreadMgr.joinAll().map(e =>
-                    new WorkloadFailure(e.err, e.stack, 'Background ' + e.workloads.join(' '))));
+                    new WorkloadFailure(e.err, e.stack, e.tid,
+                                        'Background ' + e.workloads.join(' '))));
             }
         } finally {
             try {

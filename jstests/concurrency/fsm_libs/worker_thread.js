@@ -105,7 +105,13 @@ var workerThread = (function() {
                 return { ok: 1 };
             } catch(e) {
                 args.errorLatch.countDown();
-                return { ok: 0, err: e.toString(), stack: e.stack, workloads: workloads };
+                return {
+                    ok: 0,
+                    err: e.toString(),
+                    stack: e.stack,
+                    tid: args.tid,
+                    workloads: workloads,
+                };
             }
         } finally {
             // Avoid retention of connection object
