@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
 """
 A script that provides:
 1. Ability to grab binaries where possible from LLVM.
