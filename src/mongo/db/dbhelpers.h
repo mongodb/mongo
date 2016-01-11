@@ -177,33 +177,6 @@ struct Helpers {
                                  bool fromMigrate = false,
                                  bool onlyRemoveOrphanedDocs = false);
 
-
-    // TODO: This will supersede Chunk::MaxObjectsPerChunk
-    static const long long kMaxDocsPerChunk;
-
-    /**
-     * Get sorted disklocs that belong to a range of a namespace defined over an index
-     * key pattern (KeyRange).
-     *
-     * @param chunk range of a namespace over an index key pattern.
-     * @param maxChunkSizeBytes max number of bytes that we will retrieve locs for, if the
-     * range is estimated larger (from avg doc stats) we will stop recording locs.
-     * @param locs set to record locs in
-     * @param estChunkSizeBytes chunk size estimated from doc count and avg doc size
-     * @param chunkTooBig whether the chunk was estimated larger than our maxChunkSizeBytes
-     * @param errmsg filled with textual description of error if this call return false
-     *
-     * @return NamespaceNotFound if the namespace doesn't exist
-     * @return IndexNotFound if the index pattern doesn't match any indexes
-     * @return InvalidLength if the estimated size exceeds maxChunkSizeBytes
-     */
-    static Status getLocsInRange(OperationContext* txn,
-                                 const KeyRange& range,
-                                 long long maxChunkSizeBytes,
-                                 std::set<RecordId>* locs,
-                                 long long* numDocs,
-                                 long long* estChunkSizeBytes);
-
     /**
      * Remove all documents from a collection.
      * You do not need to set the database before calling.
