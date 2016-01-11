@@ -209,6 +209,18 @@ void BackgroundSync::producerThread() {
     stop();
 }
 
+void BackgroundSync::_signalNoNewDataForApplier() {
+    // Signal to consumers that we have entered the stopped state
+    // if the signal isn't already in the queue.
+    const boost::optional<BSONObj> lastObjectPushed = _buffer.lastObjectPushed();
+    if (!lastObjectPushed || !lastObjectPushed->isEmpty()) {
+        const BSONObj sentinelDoc;
+        _buffer.pushEvenIfFull(sentinelDoc);
+        bufferCountGauge.increment();
+        bufferSizeGauge.increment(sentinelDoc.objsize());
+    }
+}
+
 void BackgroundSync::_producerThread() {
     const MemberState state = _replCoord->getMemberState();
     // Stop when the state changes to primary.
@@ -217,15 +229,7 @@ void BackgroundSync::_producerThread() {
             stop();
         }
         if (_replCoord->isWaitingForApplierToDrain()) {
-            // Signal to consumers that we have entered the stopped state
-            // if the signal isn't already in the queue.
-            const boost::optional<BSONObj> lastObjectPushed = _buffer.lastObjectPushed();
-            if (!lastObjectPushed || !lastObjectPushed->isEmpty()) {
-                const BSONObj sentinelDoc;
-                _buffer.pushEvenIfFull(sentinelDoc);
-                bufferCountGauge.increment();
-                bufferSizeGauge.increment(sentinelDoc.objsize());
-            }
+            _signalNoNewDataForApplier();
         }
         sleepsecs(1);
         return;
@@ -692,6 +696,7 @@ void BackgroundSync::_rollback(OperationContext* txn,
                                RollbackSourceImpl(getConnection, source, rsOplogName),
                                _replCoord);
     if (status.isOK()) {
+        _signalNoNewDataForApplier();
         return;
     }
     if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
