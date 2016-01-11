@@ -748,6 +748,10 @@ void SyncTail::oplogApplication() {
             if (replCoord->isWaitingForApplierToDrain()) {
                 replCoord->signalDrainComplete(&txn);
             }
+
+            // Reset when triggered in case it was from a rollback, safe to do at any time.
+            lastWriteOpTime = replCoord->getMyLastOptime();
+
             continue;  // This wasn't a real op. Don't try to apply it.
         }
 

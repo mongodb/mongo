@@ -171,6 +171,14 @@ private:
     void _produce(OperationContext* txn);
 
     /**
+     * Signals to the applier that we have no new data,
+     * and are in sync with the applier at this point.
+     *
+     * NOTE: Used after rollback and during draining to transition to Primary role;
+     */
+    void _signalNoNewDataForApplier();
+
+    /**
      * Processes query responses from fetcher.
      */
     void _fetcherCallback(const StatusWith<Fetcher::QueryResponse>& result,
