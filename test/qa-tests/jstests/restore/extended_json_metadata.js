@@ -4,8 +4,8 @@
     load('jstests/configs/plain_28.config.js');
   }
 
-  if (dump_targets == "archive") {
-      print('skipping test incompatable with archiving');
+  if (dump_targets != "standard") {
+      print('skipping test incompatable with archiving or compression');
       return assert(true);
   }
 

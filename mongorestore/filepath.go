@@ -396,6 +396,9 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 		return nil
 	}
 	metadataName := baseName + ".metadata.json"
+	if restore.InputOptions.Gzip {
+		metadataName += ".gz"
+	}
 	for _, entry := range entries {
 		if entry.Name() == metadataName {
 			metadataPath := entry.Path()

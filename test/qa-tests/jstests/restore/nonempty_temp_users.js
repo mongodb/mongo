@@ -29,7 +29,9 @@
     );
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(toolTest, ['dump'].
+            concat(getDumpTarget(dumpTarget)));
+    assert.neq(1, ret);
 
     // clear out the user
     adminDB.dropAllUsers();

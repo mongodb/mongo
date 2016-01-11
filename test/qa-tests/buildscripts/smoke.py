@@ -607,6 +607,9 @@ def runTest(test, result):
         if auth and usedb:
             evalString += 'jsTest.authenticate(db.getMongo());'
 
+        if os.getenv('SMOKE_EVAL') is not None:
+            evalString += os.getenv('SMOKE_EVAL')
+
         argv = argv + [ '--eval', evalString]
 
 
