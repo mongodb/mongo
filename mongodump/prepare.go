@@ -246,10 +246,7 @@ func (dump *MongoDump) NewIntent(dbName, colName string) (*intents.Intent, error
 				return nil, fmt.Errorf(`"%v.%v" contains a path separator '%c' `+
 					`and can't be dumped to the filesystem`, dbName, colName, c)
 			}
-			path := dump.outputPath(dbName, colName) + ".bson"
-			if dump.OutputOptions.Gzip {
-				path += ".gz"
-			}
+			path := nameGz(dump.OutputOptions.Gzip, dump.outputPath(dbName, colName)+".bson")
 			intent.BSONFile = &realBSONFile{path: path, intent: intent, gzip: dump.OutputOptions.Gzip}
 		}
 		if !intent.IsSystemIndexes() {
@@ -259,10 +256,7 @@ func (dump *MongoDump) NewIntent(dbName, colName string) (*intents.Intent, error
 					Buffer: &bytes.Buffer{},
 				}
 			} else {
-				path := dump.outputPath(dbName, colName+".metadata.json")
-				if dump.OutputOptions.Gzip {
-					path += ".gz"
-				}
+				path := nameGz(dump.OutputOptions.Gzip, dump.outputPath(dbName, colName+".metadata.json"))
 				intent.MetadataFile = &realMetadataFile{path: path, intent: intent, gzip: dump.OutputOptions.Gzip}
 			}
 		}
@@ -327,9 +321,9 @@ func (dump *MongoDump) CreateUsersRolesVersionIntentsForDB(db string) error {
 		rolesIntent.BSONFile = &archive.MuxIn{Intent: rolesIntent, Mux: dump.archive.Mux}
 		versionIntent.BSONFile = &archive.MuxIn{Intent: versionIntent, Mux: dump.archive.Mux}
 	} else {
-		usersIntent.BSONFile = &realBSONFile{path: filepath.Join(outDir, "$admin.system.users.bson"), intent: usersIntent, gzip: dump.OutputOptions.Gzip}
-		rolesIntent.BSONFile = &realBSONFile{path: filepath.Join(outDir, "$admin.system.roles.bson"), intent: rolesIntent, gzip: dump.OutputOptions.Gzip}
-		versionIntent.BSONFile = &realBSONFile{path: filepath.Join(outDir, "$admin.system.version.bson"), intent: versionIntent, gzip: dump.OutputOptions.Gzip}
+		usersIntent.BSONFile = &realBSONFile{path: filepath.Join(outDir, nameGz(dump.OutputOptions.Gzip, "$admin.system.users.bson")), intent: usersIntent, gzip: dump.OutputOptions.Gzip}
+		rolesIntent.BSONFile = &realBSONFile{path: filepath.Join(outDir, nameGz(dump.OutputOptions.Gzip, "$admin.system.roles.bson")), intent: rolesIntent, gzip: dump.OutputOptions.Gzip}
+		versionIntent.BSONFile = &realBSONFile{path: filepath.Join(outDir, nameGz(dump.OutputOptions.Gzip, "$admin.system.version.bson")), intent: versionIntent, gzip: dump.OutputOptions.Gzip}
 	}
 	dump.manager.Put(usersIntent)
 	dump.manager.Put(rolesIntent)
@@ -453,4 +447,11 @@ func (dump *MongoDump) CreateAllIntents() error {
 		}
 	}
 	return nil
+}
+
+func nameGz(gz bool, name string) string {
+	if gz {
+		return name + ".gz"
+	}
+	return name
 }

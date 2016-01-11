@@ -70,6 +70,7 @@ mongo_tools_variables:
       - name: legacy24
       - name: qa-tests
       - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-gzip
       - name: unit
     osx_108_ssl_task_list: &osx_108_ssl_tasks
       - name: dist
@@ -99,6 +100,7 @@ mongo_tools_variables:
       - name: qa-tests
       - name: qa-tests-unstable
       - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-gzip
       - name: qa-tests-wt
       - name: text
       - name: unit
@@ -179,6 +181,9 @@ mongo_tools_variables:
         distros:
         - windows-64-vs2013-test
       - name: qa-dump-restore-archiving
+        distros:
+        - windows-64-vs2013-test
+      - name: qa-dump-restore-gzip
         distros:
         - windows-64-vs2013-test
       - name: unit
@@ -1152,6 +1157,43 @@ tasks:
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
           chmod 400 jstests/libs/key*
           SMOKE_EVAL="load('jstests/configs/archive_targets.js')" PATH=$PATH:/data/multiversion python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 dump restore
+
+- name: qa-dump-restore-gzip
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_url: "${mongo30_url}"
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -e
+          mv ./mongodb/mongod${extension} .
+          mv ./mongodb/mongo${extension} .
+          mv ./mongodb/mongos${extension} .
+          mv test/qa-tests/* .
+          chmod +x mongo*
+          rm -rf /data/install /data/multiversion
+          python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
+          chmod 400 jstests/libs/key*
+          SMOKE_EVAL="load('jstests/configs/gzip_targets.js')" PATH=$PATH:/data/multiversion python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 dump restore
 
 - name: qa-tests-wt
   depends_on:

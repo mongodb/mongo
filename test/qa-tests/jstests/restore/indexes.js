@@ -73,6 +73,36 @@
     var indexesPost = testColl.getIndexes();
     assert.eq(indexesPre.length, indexesPost.length);
 
+    if ( dump_targets != "archive" ) {
+
+        // drop the collection again
+        testColl.drop();
+        // sanity check that the drop worked
+        assert.eq(0, testColl.count());
+
+        assert.eq(0, testColl.getIndexes().length);
+        
+        // restore the data, but this time mentioning the bson file specifically
+        ret = toolTest.runTool.apply(
+                toolTest,
+                ['restore'].
+                    concat(getRestoreTarget(dumpTarget+"/test/coll.bson")).
+                    concat(commonToolArgs)
+        );
+        assert.eq(0, ret);
+
+        // make sure the data was restored correctly
+        assert.eq(15, testColl.count());
+
+        // make sure the indexes were restored correctly
+        var indexesPost = testColl.getIndexes();
+        assert.eq(indexesPre.length, indexesPost.length);
+
+    } else {
+        jsTest.log('skipping bson file restore test while running with archiving'); 
+    }
+
+
     // success
     toolTest.stop();
 
