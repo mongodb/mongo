@@ -497,7 +497,7 @@ __wt_meta_track_init(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) {
 		WT_RET(__wt_open_internal_session(conn,
-		    "metadata-ckpt", false, WT_SESSION_NO_DATA_HANDLES,
+		    "metadata-ckpt", true, false,
 		    &conn->meta_ckpt_session));
 
 		/*
