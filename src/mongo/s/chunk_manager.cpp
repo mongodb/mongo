@@ -330,8 +330,7 @@ bool ChunkManager::_load(OperationContext* txn,
 
 shared_ptr<ChunkManager> ChunkManager::reload(OperationContext* txn, bool force) const {
     const NamespaceString nss(_ns);
-    auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
-    shared_ptr<DBConfig> config = uassertStatusOK(status);
+    auto config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nss.db().toString()));
 
     return config->getChunkManagerIfExists(txn, getns(), force);
 }

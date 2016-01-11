@@ -451,6 +451,12 @@ public:
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }
+
+                // Make sure the cached metadata for the collection knows that we are now sharded
+                const NamespaceString finalNss(finalColLong);
+                confOut = uassertStatusOK(
+                    grid.catalogCache()->getDatabase(txn, finalNss.db().toString()));
+                confOut->getChunkManager(txn, finalNss.ns(), true /* force */);
             }
 
             map<BSONObj, int> chunkSizes;

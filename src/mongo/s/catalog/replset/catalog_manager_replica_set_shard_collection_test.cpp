@@ -215,56 +215,6 @@ public:
         });
     }
 
-    void expectReloadCollection(const CollectionType& collection) {
-        onFindCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
-
-            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
-
-            auto query =
-                assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
-
-            ASSERT_EQ(CollectionType::ConfigNS, query->ns());
-            {
-                BSONObjBuilder b;
-                b.appendRegex(CollectionType::fullNs(),
-                              string(str::stream() << "^" << collection.getNs().db() << "\\."));
-                ASSERT_EQ(b.obj(), query->getFilter());
-            }
-            ASSERT_EQ(BSONObj(), query->getSort());
-
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
-
-            return vector<BSONObj>{collection.toBSON()};
-        });
-    }
-
-    void expectLoadNewestChunk(const string& ns, const ChunkType& chunk) {
-        onFindCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
-
-            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
-
-            auto query =
-                assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
-            BSONObj expectedQuery = BSON(ChunkType::ns(ns));
-            BSONObj expectedSort = BSON(ChunkType::DEPRECATED_lastmod() << -1);
-
-            ASSERT_EQ(ChunkType::ConfigNS, query->ns());
-            ASSERT_EQ(expectedQuery, query->getFilter());
-            ASSERT_EQ(expectedSort, query->getSort());
-            ASSERT_EQ(1, query->getLimit().get());
-
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
-
-            return vector<BSONObj>{chunk.toBSON()};
-        });
-    }
-
 protected:
     const HostAndPort configHost{"configHost1"};
     const HostAndPort clientHost{"clientHost1"};
@@ -418,13 +368,6 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     // Handle the update to the collection entry in config.collectinos.
     expectUpdateCollection(expectedCollection);
-
-    // Respond to various requests for reloading parts of the chunk/collection metadata.
-    expectGetDatabase(db);
-    expectGetDatabase(db);
-    expectReloadCollection(expectedCollection);
-    expectReloadChunks(ns, {expectedChunk});
-    expectLoadNewestChunk(ns, expectedChunk);
 
     // Expect the set shard version for that namespace
     expectSetShardVersion(shardHost, shard, NamespaceString(ns), actualVersion);
@@ -596,13 +539,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     // Handle the update to the collection entry in config.collectinos.
     expectUpdateCollection(expectedCollection);
 
-    // Respond to various requests for reloading parts of the chunk/collection metadata.
-    expectGetDatabase(db);
-    expectGetDatabase(db);
-    expectReloadCollection(expectedCollection);
-    expectReloadChunks(ns, expectedChunks);
-    expectLoadNewestChunk(ns, expectedChunks[4]);
-
     // Expect the set shard version for that namespace
     expectSetShardVersion(shard0Host, shard0, NamespaceString(ns), expectedChunks[4].getVersion());
 
@@ -772,13 +708,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     // Handle the update to the collection entry in config.collectinos.
     expectUpdateCollection(expectedCollection);
-
-    // Respond to various requests for reloading parts of the chunk/collection metadata.
-    expectGetDatabase(db);
-    expectGetDatabase(db);
-    expectReloadCollection(expectedCollection);
-    expectReloadChunks(ns, expectedChunks);
-    expectLoadNewestChunk(ns, expectedChunks[4]);
 
     // Expect the set shard version for that namespace
     expectSetShardVersion(shardHost, shard, NamespaceString(ns), expectedChunks[4].getVersion());

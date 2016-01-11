@@ -100,7 +100,7 @@ void CollectionInfo::unshard() {
     _key = BSONObj();
 }
 
-void CollectionInfo::useChunkManager(ChunkManagerPtr manager) {
+void CollectionInfo::useChunkManager(std::shared_ptr<ChunkManager> manager) {
     _cm = manager;
     _key = manager->getShardKeyPattern().toBSON().getOwned();
     _unique = manager->isUnique();
@@ -253,10 +253,10 @@ void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
 }
 
 
-ChunkManagerPtr DBConfig::getChunkManagerIfExists(OperationContext* txn,
-                                                  const string& ns,
-                                                  bool shouldReload,
-                                                  bool forceReload) {
+std::shared_ptr<ChunkManager> DBConfig::getChunkManagerIfExists(OperationContext* txn,
+                                                                const string& ns,
+                                                                bool shouldReload,
+                                                                bool forceReload) {
     // Don't report exceptions here as errors in GetLastError
     LastError::Disabled ignoreForGLE(&LastError::get(cc()));
 
