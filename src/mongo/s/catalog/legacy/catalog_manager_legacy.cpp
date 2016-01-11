@@ -290,6 +290,7 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     }
 
     ShardId dbPrimaryShardId = status.getValue().value.getPrimary();
+    const auto primaryShard = grid.shardRegistry()->getShard(txn, dbPrimaryShardId);
 
     // This is an extra safety check that the collection is not getting sharded concurrently by
     // two different mongos instances. It is not 100%-proof, but it reduces the chance that two
@@ -311,26 +312,23 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder;
 
     // Record start in changelog
-    BSONObjBuilder collectionDetail;
-    collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
-    collectionDetail.append("collection", ns);
-    string dbPrimaryShardStr;
     {
-        const auto shard = grid.shardRegistry()->getShard(txn, dbPrimaryShardId);
-        dbPrimaryShardStr = shard->toString();
-    }
-    collectionDetail.append("primary", dbPrimaryShardStr);
+        BSONObjBuilder collectionDetail;
+        collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
+        collectionDetail.append("collection", ns);
+        collectionDetail.append("primary", primaryShard->toString());
 
-    {
-        BSONArrayBuilder initialShards(collectionDetail.subarrayStart("initShards"));
-        for (const ShardId& shardId : initShardIds) {
-            initialShards.append(shardId);
+        {
+            BSONArrayBuilder initialShards(collectionDetail.subarrayStart("initShards"));
+            for (const ShardId& shardId : initShardIds) {
+                initialShards.append(shardId);
+            }
         }
+
+        collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
+
+        logChange(txn, "shardCollection.start", ns, collectionDetail.obj());
     }
-
-    collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
-
-    logChange(txn, "shardCollection.start", ns, collectionDetail.obj());
 
     shared_ptr<ChunkManager> manager(new ChunkManager(ns, fieldsAndOrder, unique));
     Status createFirstChunksStatus =
@@ -343,44 +341,26 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     CollectionInfo collInfo;
     collInfo.useChunkManager(manager);
     collInfo.save(txn, ns);
-    manager->reload(txn, true);
 
     // Tell the primary mongod to refresh its data
     // TODO:  Think the real fix here is for mongos to just
     //        assume that all collections are sharded, when we get there
-    for (int i = 0; i < 4; i++) {
-        if (i == 3) {
-            warning() << "too many tries updating initial version of " << ns << " on shard primary "
-                      << dbPrimaryShardStr
-                      << ", other mongoses may not see the collection as sharded immediately";
-            break;
-        }
+    SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
+        grid.shardRegistry()->getConfigServerConnectionString(),
+        dbPrimaryShardId,
+        primaryShard->getConnString(),
+        NamespaceString(ns),
+        manager->getVersion(),
+        true);
 
-        try {
-            const auto shard = grid.shardRegistry()->getShard(txn, dbPrimaryShardId);
-            ShardConnection conn(shard->getConnString(), ns);
-            bool isVersionSet = conn.setVersion();
-            conn.done();
-            if (!isVersionSet) {
-                warning() << "could not update initial version of " << ns << " on shard primary "
-                          << dbPrimaryShardStr;
-            } else {
-                break;
-            }
-        } catch (const DBException& e) {
-            warning() << "could not update initial version of " << ns << " on shard primary "
-                      << dbPrimaryShardStr << causedBy(e);
-        }
-
-        sleepsecs(i);
+    auto ssvStatus = grid.shardRegistry()->runCommandWithNotMasterRetries(
+        txn, dbPrimaryShardId, "admin", ssv.toBSON());
+    if (!ssvStatus.isOK()) {
+        warning() << "could not update initial version of " << ns << " on shard primary "
+                  << dbPrimaryShardId << ssvStatus.getStatus();
     }
 
-    // Record finish in changelog
-    BSONObjBuilder finishDetail;
-
-    finishDetail.append("version", manager->getVersion().toString());
-
-    logChange(txn, "shardCollection.end", ns, finishDetail.obj());
+    logChange(txn, "shardCollection.end", ns, BSON("version" << manager->getVersion().toString()));
 
     return Status::OK();
 }

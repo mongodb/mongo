@@ -1,9 +1,10 @@
 //
 // Tests that we can dump collection metadata via getShardVersion()
 //
+(function() {
+'use strict';
 
 var st = new ShardingTest({ shards : 2, mongos : 1 });
-st.stopBalancer();
 
 var mongos = st.s0;
 var coll = mongos.getCollection( "foo.bar" );
@@ -11,16 +12,16 @@ var admin = mongos.getDB( "admin" );
 var shards = mongos.getCollection( "config.shards" ).find().toArray();
 var shardAdmin = st.shard0.getDB( "admin" );
 
-assert( admin.runCommand({ enableSharding : coll.getDB() + "" }).ok );
-printjson( admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._id }) );
-assert( admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } }).ok );
+assert.commandWorked(admin.runCommand({ enableSharding : coll.getDB() + "" }));
+st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
+assert.commandWorked(admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } }));
 
-assert( shardAdmin.runCommand({ getShardVersion : coll + "" }).ok );
-printjson( shardAdmin.runCommand({ getShardVersion : coll + "", fullMetadata : true }) );
+assert.commandWorked(shardAdmin.runCommand({ getShardVersion : coll + "" }));
 
-// Make sure we have chunks info
-var result = 
-    shardAdmin.runCommand({ getShardVersion : coll + "", fullMetadata : true });
+// Make sure we have chunks information on the shard after the shard collection call
+var result =
+    assert.commandWorked(shardAdmin.runCommand({ getShardVersion : coll + "", fullMetadata : true }));
+printjson(result);
 var metadata = result.metadata;
 
 assert.eq( metadata.chunks.length, 1 );
@@ -52,3 +53,5 @@ assert( metadata.chunks[1][1]._id + "" == MaxKey + "" );
 assert( metadata.shardVersion + "" == result.global + "" );
 
 st.stop();
+
+})();
