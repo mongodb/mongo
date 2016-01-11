@@ -5,7 +5,7 @@
 A prototype hang analyzer for MCI integration to help investigate test timeouts
 
 1. Script supports taking dumps, and/or dumping a summary of useful information about a process
-2. Script will iterate through a list of interesting processes (mongo, mongod, and mongos), 
+2. Script will iterate through a list of interesting processes (mongo, mongod, and mongos),
     and run the tools from step 1.
 
 Supports Linux, MacOS X, and Windows.
@@ -187,7 +187,23 @@ class LLDBDumper(object):
 
         stream.write("INFO: Debugger %s, analyzing %d\n" % (dbg, pid))
 
-        call([dbg, "--version"])
+        lldb_version = callo([dbg, "--version"])
+
+        stream.write(lldb_version)
+
+        # Do we have the XCode or LLVM version of lldb?
+        # Old versions of lldb do not work well when taking commands via a file
+        # XCode (7.2): lldb-340.4.119
+        # LLVM - lldb version 3.7.0 ( revision )
+
+        if 'version' not in lldb_version:
+            # We have XCode's lldb
+            lldb_version = lldb_version[lldb_version.index("lldb-"):]
+            lldb_version = lldb_version.replace('lldb-', '')
+            lldb_major_version = int(lldb_version[:lldb_version.index('.')])
+            if lldb_major_version < 340:
+                stream.write("WARNING: Debugger lldb is too old, please upgrade to XCode 7.2\n")
+                return
 
         cmds = [
             "attach -p %d" % pid,
