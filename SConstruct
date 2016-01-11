@@ -815,6 +815,7 @@ envDict = dict(BUILD_ROOT=buildDir,
                INSTALL_DIR=installDir,
                CONFIG_HEADER_DEFINES={},
                LIBDEPS_TAG_EXPANSIONS=[],
+               ENV = os.environ,
                )
 
 env = Environment(variables=env_vars, **envDict)
