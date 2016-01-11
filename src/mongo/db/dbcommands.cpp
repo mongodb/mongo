@@ -1350,7 +1350,17 @@ void Command::execCommand(OperationContext* txn,
 bool Command::run(OperationContext* txn,
                   const rpc::RequestInterface& request,
                   rpc::ReplyBuilderInterface* replyBuilder) {
-    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(reserveBytesForReply()));
+    auto bytesToReserve = reserveBytesForReply();
+
+// SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in conjunction with the
+// additional memory pressure introduced by reply buffer pre-allocation, causes the concurrency
+// suite to run extremely slowly. As a workaround we do not pre-allocate in Windows DEBUG builds.
+#ifdef _WIN32
+    if (kDebugBuild)
+        bytesToReserve = 0;
+#endif
+
+    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
 
     repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
 
