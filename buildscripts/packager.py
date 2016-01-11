@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # This program makes Debian and RPM repositories for MongoDB, by
 # downloading our tarballs of statically linked executables and

@@ -1,4 +1,4 @@
-#!/usr/bin/python -B
+#!/usr/bin/env python
 
 """ Usage: make_opcode_doc.py PATH_TO_MOZILLA_CENTRAL
 
