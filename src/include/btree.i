@@ -1457,17 +1457,54 @@ __wt_split_intl_race(
 	 *
 	 * There's a page-split race when we walk the tree: if we're splitting
 	 * an internal page into its parent, we update the parent's page index
-	 * and then update the page being split, and it's not an atomic update.
-	 * A thread could read the parent page's original page index, and then
-	 * read the page's replacement index. Because internal page splits work
-	 * by replacing the original page with the initial part of the original
-	 * page, the result of this race is we will have a key that's past the
-	 * end of the current page, and the parent's page index will have moved.
+	 * before updating the split page's page index, and it's not an atomic
+	 * update. A thread can read the parent page's original page index and
+	 * then read the split page's replacement index.
 	 *
-	 * It's also possible a thread could read the parent page's replacement
-	 * page index, and then read the page's original index. Because internal
-	 * splits work by truncating the original page, the original page's old
-	 * content is compatible, this isn't a problem and we ignore this race.
+	 * Because internal page splits work by truncating the original page to
+	 * the initial part of the original page, the result of this race is we
+	 * will have a search key that points past the end of the current page.
+	 * This is only an issue when we search past the end of the page, if we
+	 * find a WT_REF in the page with the namespace we're searching for, we
+	 * don't care if the WT_REF moved or not while we were searching, we
+	 * have the correct page.
+	 *
+	 * For example, imagine an internal page with 3 child pages, with the
+	 * namespaces a-f, g-h and i-j; the first child page splits. The parent
+	 * starts out with the following page-index:
+	 *
+	 *	| ... | a | g | i | ... |
+	 *
+	 * which changes to this:
+	 *
+	 *	| ... | a | c | e | g | i | ... |
+	 *
+	 * The child starts out with the following page-index:
+	 *
+	 *	| a | b | c | d | e | f |
+	 *
+	 * which changes to this:
+	 *
+	 *	| a | b |
+	 *
+	 * The thread searches the original parent page index for the key "cat",
+	 * it couples to the "a" child page; if it uses the replacement child
+	 * page index, it will search past the end of the page and couple to the
+	 * "b" page, which is wrong.
+	 *
+	 * To detect the problem, we remember the parent page's page index used
+	 * to descend the tree. Whenever we search past the end of a page, we
+	 * check to see if the parent's page index has changed since our use of
+	 * it during descent. As the problem only appears if we read the split
+	 * page's replacement index, the parent page's index must already have
+	 * changed, ensuring we detect the problem.
+	 *
+	 * It's possible for the opposite race to happen (a thread could read
+	 * the parent page's replacement page index and then read the split
+	 * page's original index). This isn't a problem because internal splits
+	 * work by truncating the split page, so the split page search is for
+	 * content the split page retains after the split, and we ignore this
+	 * race.
 	 */
 	WT_INTL_INDEX_GET(session, parent, pindex);
 	return (pindex != saved_pindex);
