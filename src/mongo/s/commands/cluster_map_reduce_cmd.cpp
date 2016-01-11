@@ -451,13 +451,6 @@ public:
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }
-
-                // Make sure the metadata for the collection being sharded gets reloaded on the next
-                // access
-                const NamespaceString finalNss(finalColLong);
-                confOut = uassertStatusOK(
-                    grid.catalogCache()->getDatabase(txn, finalNss.db().toString()));
-                confOut->invalidateNs(finalNss.ns());
             }
 
             map<BSONObj, int> chunkSizes;

@@ -64,14 +64,23 @@ void ConfigDiffTracker<ValType>::attach(const std::string& ns,
 }
 
 template <class ValType>
-bool ConfigDiffTracker<ValType>::_isOverlapping(const BSONObj& min, const BSONObj& max) {
-    RangeOverlap overlap = _overlappingRange(min, max);
+bool ConfigDiffTracker<ValType>::isOverlapping(const BSONObj& min, const BSONObj& max) {
+    RangeOverlap overlap = overlappingRange(min, max);
 
     return overlap.first != overlap.second;
 }
 
 template <class ValType>
-typename ConfigDiffTracker<ValType>::RangeOverlap ConfigDiffTracker<ValType>::_overlappingRange(
+void ConfigDiffTracker<ValType>::removeOverlapping(const BSONObj& min, const BSONObj& max) {
+    _assertAttached();
+
+    RangeOverlap overlap = overlappingRange(min, max);
+
+    _currMap->erase(overlap.first, overlap.second);
+}
+
+template <class ValType>
+typename ConfigDiffTracker<ValType>::RangeOverlap ConfigDiffTracker<ValType>::overlappingRange(
     const BSONObj& min, const BSONObj& max) {
     _assertAttached();
 
@@ -148,12 +157,9 @@ int ConfigDiffTracker<ValType>::calculateConfigDiff(OperationContext* txn,
             (*_maxShardVersions)[shard] = chunkVersion;
         }
 
-        // See if we need to remove any chunks we are currently tracking because of this chunk's
-        // changes
-        {
-            RangeOverlap overlap = _overlappingRange(chunk.getMin(), chunk.getMax());
-            _currMap->erase(overlap.first, overlap.second);
-        }
+        // See if we need to remove any chunks we are currently tracking because of this
+        // chunk's changes
+        removeOverlapping(chunk.getMin(), chunk.getMax());
 
         // Figure out which of the new chunks we need to track
         // Important - we need to actually own this doc, in case the cursor decides to getMore
@@ -172,7 +178,7 @@ int ConfigDiffTracker<ValType>::calculateConfigDiff(OperationContext* txn,
         //
         // TODO: This checks for overlap, we also should check for holes here iff we're
         // tracking all chunks.
-        if (_isOverlapping(chunk.getMin(), chunk.getMax())) {
+        if (isOverlapping(chunk.getMin(), chunk.getMax())) {
             return -1;
         }
 
@@ -204,7 +210,7 @@ typename ConfigDiffTracker<ValType>::QueryAndSort ConfigDiffTracker<ValType>::co
     // This ensures that changes to chunk version (which will always be higher) will always come
     // *after* our current position in the chunk cursor.
 
-    QueryAndSort queryObj(queryB.obj(), BSON(ChunkType::DEPRECATED_lastmod() << 1));
+    QueryAndSort queryObj(queryB.obj(), BSON("lastmod" << 1));
 
     LOG(2) << "major version query from " << *_maxVersion << " and over "
            << _maxShardVersions->size() << " shards is " << queryObj;
