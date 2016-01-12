@@ -504,7 +504,7 @@ skip_insert:			if (col_update(tinfo,
 		 */
 		if (!insert) {
 			dir = (int)mmrand(&tinfo->rnd, 0, 1);
-			for (np = 0; np < mmrand(&tinfo->rnd, 1, 30); ++np) {
+			for (np = 0; np < mmrand(&tinfo->rnd, 1, 100); ++np) {
 				if (notfound)
 					break;
 				if (nextprev(cursor, dir, &notfound))
