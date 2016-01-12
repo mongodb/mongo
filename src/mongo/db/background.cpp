@@ -71,9 +71,10 @@ private:
 typedef StringMap<boost::shared_ptr<BgInfo>> BgInfoMap;
 typedef BgInfoMap::const_iterator BgInfoMapIterator;
 
-boost::mutex m;
-BgInfoMap dbsInProg;
-BgInfoMap nsInProg;
+// Static data for this file is never destroyed.
+boost::mutex& m = *(new boost::mutex());
+BgInfoMap& dbsInProg = *(new BgInfoMap());
+BgInfoMap& nsInProg = *(new BgInfoMap());
 
 void BgInfo::recordBegin() {
     ++_opsInProgCount;
@@ -117,6 +118,7 @@ void awaitNoBgOps(boost::unique_lock<boost::mutex>& lk, BgInfoMap* bgiMap, const
 }
 
 }  // namespace
+
 bool BackgroundOperation::inProgForDb(const StringData& db) {
     boost::mutex::scoped_lock lk(m);
     return dbsInProg.find(db) != dbsInProg.end();
