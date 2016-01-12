@@ -55,7 +55,7 @@ int
 config_assign(CONFIG *dest, const CONFIG *src)
 {
 	CONFIG_QUEUE_ENTRY *conf_line, *tmp_line;
-	size_t i, len;
+	size_t i;
 	char *newstr, **pstr;
 
 	config_free(dest);
@@ -84,8 +84,7 @@ config_assign(CONFIG *dest, const CONFIG *src)
 			pstr = (char **)
 			    ((u_char *)dest + config_opts[i].offset);
 			if (*pstr != NULL) {
-				len = strlen(*pstr) + 1;
-				newstr = dmalloc(len);
+				newstr = dmalloc(strlen(*pstr) + 1);
 				newstr = dstrdup(*pstr);
 				*pstr = newstr;
 			}
@@ -96,9 +95,8 @@ config_assign(CONFIG *dest, const CONFIG *src)
 
 	/* Clone the config string information into the new cfg object */
 	TAILQ_FOREACH(conf_line, &src->config_head, c) {
-		len = strlen(conf_line->string);
 		tmp_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
-		tmp_line->string = dcalloc(len + 1, 1);
+		tmp_line->string = dcalloc(strlen(conf_line->string) + 1, 1);
 		tmp_line->string = dstrdup(tmp_line->string);
 		TAILQ_INSERT_TAIL(&dest->config_head, tmp_line, c);
 	}
@@ -726,7 +724,7 @@ config_to_file(CONFIG *cfg)
 	fp = NULL;
 
 	/* Backup the config */
-	req_len = strlen(cfg->home) + strlen("/CONFIG.wtperf") + 1
+	req_len = strlen(cfg->home) + strlen("/CONFIG.wtperf") + 1;
 	path = dcalloc(req_len, 1);
 	snprintf(path, req_len, "%s/CONFIG.wtperf", cfg->home);
 	if ((fp = fopen(path, "w")) == NULL) {
