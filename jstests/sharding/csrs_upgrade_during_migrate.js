@@ -3,6 +3,9 @@
  * migration is taking place.
  * It verifies that the migration detects when a catalog manager swap is required and aborts the
  * migration before reaching the critical section.
+ *
+ * This test restarts nodes and expects the data to still be present.
+ * @tags: [requires_persistence]
  */
 load("jstests/replsets/rslib.js");
 
