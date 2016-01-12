@@ -1,8 +1,7 @@
 // 2 nodes with non-default priority.
 // 3-node replica set with priorities 3, 3 and 1 (default)
 // Start replica set. Ensure that highest priority node becomes primary eventually.
-// Shut down the primary and confirm that the next highest priority node becomes primary.
-// Repeat until 2 nodes are left standing.
+// Step down the primary and confirm that the next highest priority node becomes primary.
 load('jstests/replsets/rslib.js');
 
 (function () {
@@ -17,19 +16,31 @@ var replSet = new ReplSetTest({name: name, nodes: [
 replSet.startSet();
 replSet.initiate();
 
-var primary = replSet.getPrimary();
+var primary;
 var primaryIndex = -1;
-replSet.nodes.find(function(node, index, array) {
-    if (primary.host == node.host) {
-        primaryIndex = index;
-        return true;
-    }
-    return false;
-});
-assert.neq(-1, primaryIndex,
-           'expected one of the nodes with priority 3 to become primary');
+var defaultPriorityNodeIndex = 2;
+assert.soon(
+    function() {
+        primary = replSet.getPrimary();
+        replSet.nodes.find(function(node, index, array) {
+            if (primary.host == node.host) {
+                primaryIndex = index;
+                return true;
+            }
+            return false;
+        });
+        return primaryIndex !== defaultPriorityNodeIndex;
+    },
+    'neither of the priority 3 nodes was elected primary',
+    60000, // timeout
+    1000 // interval
+);
 
-replSet.stop(primaryIndex);
+try {
+    assert.commandWorked(primary.getDB('admin').runCommand({replSetStepDown: 30}));
+} catch (x) {
+    // expected
+}
 var newPrimaryIndex = primaryIndex === 0 ? 1 : 0;
 
 // Refresh connections to nodes.
