@@ -63,6 +63,20 @@ selector:
     - jstests/sharding/tag_range.js
     - jstests/sharding/top_chunk_autosplit.js
     - jstests/sharding/count_config_servers.js
+    - jstests/sharding/conf_server_write_concern.js
+    - jstests/sharding/split_large_key.js
+    # No retries on direct writes to the config/admin databases on the config servers
+    - jstests/sharding/listDatabases.js
+    - jstests/sharding/bulk_insert.js
+    - jstests/sharding/printShardingStatus.js
+    # Balancer writes (direct write to config database with no retries)
+    - jstests/sharding/remove2.js
+    - jstests/sharding/auto2.js
+    - jstests/sharding/features3.js
+    - jstests/sharding/in_memory_sort_limit.js
+    - jstests/sharding/parallel.js
+    - jstests/sharding/migrateBig.js
+    - jstests/sharding/sharding_rs1.js
     # Calls the config server primary directly (not through mongos)
     - jstests/sharding/moveprimary_ignore_sharded.js
     - jstests/sharding/min_optime_recovery.js
@@ -78,12 +92,23 @@ selector:
     - jstests/sharding/replset_config/batch_write_command_sharded.js
     - jstests/sharding/replset_config/config_rs_no_primary.js
     - jstests/sharding/startup_with_all_configs_down.js
+    - jstests/sharding/replset_config/lagged_config_secondary.js
+    - jstests/sharding/replset_config/autodiscover_config_rs_from_secondary.js
+    - jstests/sharding/sharding_state_after_stepdown.js
+    - jstests/sharding/rs_stepdown_and_pooling.js
+    - jstests/sharding/mongos_no_replica_set_refresh.js
+    # Nothing is affected by config server step down
+    - jstests/sharding/replset_config/basic_sharding_params.js
+    # ShardingTest is never used, so continuous step down thread never starts
+    - jstests/sharding/replset_config/config_rs_change.js
+    - jstests/sharding/replset_config/empty_cluster_init.js
     # Test runs really slow with the primary continuously stepping down
     - jstests/sharding/zbigMapReduce.js
-    # Unknown balancer errors - need to be investigated
-    - jstests/sharding/in_memory_sort_limit.js
     # Continuous config server step down only available with CSRS
     - jstests/sharding/csrs_upgrade*.js
+    # Temporarily blacklisted until more robust
+    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
+    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
 executor:
   js_test:
     config:

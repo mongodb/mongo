@@ -5,6 +5,7 @@
 
 // Contains the declaration for ScopedThread and CountDownLatch
 load('jstests/libs/parallelTester.js');
+load("jstests/replsets/rslib.js");
 
 (function() {
     'use strict';

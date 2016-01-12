@@ -25,8 +25,6 @@ load("jstests/replsets/rslib.js");
     var mongos = st.s;
     var config = mongos.getDB("config");
 
-    config.settings.update({_id: "balancer"}, {$set: {stopped: true}}, true);
-
     printjson(mongos.getCollection("foo.bar").findOne());
 
     var primary = rsObj.getPrimary();
