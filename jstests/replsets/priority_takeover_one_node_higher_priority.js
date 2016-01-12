@@ -24,7 +24,8 @@
     var electionTimeoutMillis = config.settings.electionTimeoutMillis;
     var stepDownGuardMillis = electionTimeoutMillis * 2;
     var stepDownException = assert.throws(function() {
-        primary.adminCommand({replSetStepDown: stepDownGuardMillis / 1000});
+        var result = primary.adminCommand({replSetStepDown: stepDownGuardMillis / 1000});
+        print('replSetStepDown did not throw exception but returned: ' + tojson(result));
     });
     assert.neq(-1, tojson(stepDownException).indexOf('error doing query'),
                'replSetStepDown did not disconnect client');
