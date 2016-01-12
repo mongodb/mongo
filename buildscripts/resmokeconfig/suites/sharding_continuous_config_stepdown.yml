@@ -89,6 +89,8 @@ selector:
     # Continuous config server step down only available with CSRS
     - jstests/sharding/csrs_upgrade_during_migrate.js
     - jstests/sharding/csrs_upgrade.js
+    # Temporarily blacklisted until more robust
+    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
 executor:
   js_test:
     config:
