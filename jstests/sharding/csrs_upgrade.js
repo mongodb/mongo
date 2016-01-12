@@ -13,6 +13,9 @@
  * availability or unavailability of metadata writes, and
  * config.version is read to confirm the availability of metadata
  * reads.
+ *
+ * This test restarts nodes and expects the data to still be present.
+ * @tags: [requires_persistence]
  */
 
 load("jstests/replsets/rslib.js");
