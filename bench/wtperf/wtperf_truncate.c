@@ -102,17 +102,9 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	if (trunc_cfg->stone_gap != 0) {
 		trunc_cfg->expected_total = (end_point - start_point);
 		for (i = 1; i <= trunc_cfg->needed_stones; i++) {
-			truncate_key = calloc(cfg->key_sz, 1);
-			if (truncate_key == NULL) {
-				ret = enomem(cfg);
-				goto err;
-			}
-			truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
-			if (truncate_item == NULL) {
-				free(truncate_key);
-				ret = enomem(cfg);
-				goto err;
-			}
+			truncate_key = dcalloc(cfg->key_sz, 1);
+			truncate_item =
+			    dcalloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 			generate_key(
 			    cfg, truncate_key, trunc_cfg->stone_gap * i);
 			truncate_item->key = truncate_key;
@@ -178,19 +170,8 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 
 	while (trunc_cfg->num_stones < trunc_cfg->needed_stones) {
 		trunc_cfg->last_key += used_stone_gap;
-		truncate_key = calloc(cfg->key_sz, 1);
-		if (truncate_key == NULL) {
-			lprintf(cfg, ENOMEM, 0,
-			    "truncate: couldn't allocate key array");
-			return (ENOMEM);
-		}
-		truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
-		if (truncate_item == NULL) {
-			free(truncate_key);
-			lprintf(cfg, ENOMEM, 0,
-			    "truncate: couldn't allocate item");
-			return (ENOMEM);
-		}
+		truncate_key = dcalloc(cfg->key_sz, 1);
+		truncate_item = dcalloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 		generate_key(cfg, truncate_key, trunc_cfg->last_key);
 		truncate_item->key = truncate_key;
 		truncate_item->diff = used_stone_gap;

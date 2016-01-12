@@ -498,6 +498,7 @@ datasets
 datasource
 datastore
 dbc
+dcalloc
 decile
 deciles
 decl

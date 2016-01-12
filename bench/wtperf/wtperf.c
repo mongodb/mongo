@@ -452,12 +452,7 @@ worker(void *arg)
 		lprintf(cfg, ret, 0, "worker: WT_CONNECTION.open_session");
 		goto err;
 	}
-	cursors = calloc(cfg->table_count, sizeof(WT_CURSOR *));
-	if (cursors == NULL) {
-		lprintf(cfg, ENOMEM, 0,
-		    "worker: couldn't allocate cursor array");
-		goto err;
-	}
+	cursors = dcalloc(cfg->table_count, sizeof(WT_CURSOR *));
 	for (i = 0; i < cfg->table_count_idle; i++) {
 		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], (int)i);
 		if ((ret = session->open_cursor(
@@ -917,12 +912,7 @@ populate_thread(void *arg)
 	cursor_config =
 	    (cfg->populate_threads == 1 && !cfg->index) ? "bulk" : NULL;
 	/* Create the cursors. */
-	cursors = calloc(cfg->table_count, sizeof(WT_CURSOR *));
-	if (cursors == NULL) {
-		lprintf(cfg, ENOMEM, 0,
-		    "worker: couldn't allocate cursor array");
-		goto err;
-	}
+	cursors = dcalloc(cfg->table_count, sizeof(WT_CURSOR *));
 	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->open_cursor(
 		    session, cfg->uris[i], NULL,
@@ -1168,10 +1158,7 @@ monitor(void *arg)
 
 	/* Open the logging file. */
 	len = strlen(cfg->monitor_dir) + 100;
-	if ((path = malloc(len)) == NULL) {
-		(void)enomem(cfg);
-		goto err;
-	}
+	path = dmalloc(len);
 	snprintf(path, len, "%s/monitor", cfg->monitor_dir);
 	if ((fp = fopen(path, "w")) == NULL) {
 		lprintf(cfg, errno, 0, "%s", path);
@@ -1392,9 +1379,7 @@ execute_populate(CONFIG *cfg)
 
 	cfg->insert_key = 0;
 
-	if ((cfg->popthreads =
-	    calloc(cfg->populate_threads, sizeof(CONFIG_THREAD))) == NULL)
-		return (enomem(cfg));
+	cfg->popthreads = dcalloc(cfg->populate_threads, sizeof(CONFIG_THREAD));
 	if (cfg->use_asyncops > 0) {
 		lprintf(cfg, 0, 1, "Starting %" PRIu32 " async thread(s)",
 		    cfg->async_threads);
@@ -1587,11 +1572,7 @@ execute_workload(CONFIG *cfg)
 		cfg->in_warmup = 1;
 
 	/* Allocate memory for the worker threads. */
-	if ((cfg->workers =
-	    calloc((size_t)cfg->workers_cnt, sizeof(CONFIG_THREAD))) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
+	cfg->workers = dcalloc((size_t)cfg->workers_cnt, sizeof(CONFIG_THREAD));
 
 	if (cfg->use_asyncops > 0) {
 		lprintf(cfg, 0, 1, "Starting %" PRIu32 " async thread(s)",
@@ -1773,17 +1754,9 @@ create_uris(CONFIG *cfg)
 
 	ret = 0;
 	base_uri_len = strlen(cfg->base_uri);
-	cfg->uris = calloc(cfg->table_count, sizeof(char *));
-	if (cfg->uris == NULL) {
-		ret = ENOMEM;
-		goto err;
-	}
+	cfg->uris = dcalloc(cfg->table_count, sizeof(char *));
 	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i] = calloc(base_uri_len + 5, 1);
-		if (uri == NULL) {
-			ret = ENOMEM;
-			goto err;
-		}
+		uri = cfg->uris[i] = dcalloc(base_uri_len + 5, 1);
 		/*
 		 * If there is only one table, just use base name.
 		 */
@@ -1880,40 +1853,22 @@ start_all_runs(CONFIG *cfg)
 		return (start_run(cfg));
 
 	/* Allocate an array to hold our config struct copies. */
-	configs = calloc(cfg->database_count, sizeof(CONFIG *));
-	if (configs == NULL)
-		return (ENOMEM);
+	configs = dcalloc(cfg->database_count, sizeof(CONFIG *));
 
 	/* Allocate an array to hold our thread IDs. */
-	threads = calloc(cfg->database_count, sizeof(pthread_t));
-	if (threads == NULL) {
-		ret = ENOMEM;
-		goto err;
-	}
+	threads = dcalloc(cfg->database_count, sizeof(pthread_t));
 
 	home_len = strlen(cfg->home);
 	cmd_len = (home_len * 2) + 30; /* Add some slop. */
-	cmd_buf = calloc(cmd_len, 1);
-	if (cmd_buf == NULL) {
-		ret = ENOMEM;
-		goto err;
-	}
+	cmd_buf = dcalloc(cmd_len, 1);
 	for (i = 0; i < cfg->database_count; i++) {
-		next_cfg = calloc(1, sizeof(CONFIG));
-		if (next_cfg == NULL) {
-			ret = ENOMEM;
-			goto err;
-		}
+		next_cfg = dcalloc(1, sizeof(CONFIG));
 		configs[i] = next_cfg;
 		if ((ret = config_assign(next_cfg, cfg)) != 0)
 			goto err;
 
 		/* Setup a unique home directory for each database. */
-		new_home = malloc(home_len + 5);
-		if (new_home == NULL) {
-			ret = ENOMEM;
-			goto err;
-		}
+		new_home = dmalloc(home_len + 5);
 		snprintf(new_home, home_len + 5, "%s/D%02d", cfg->home, (int)i);
 		next_cfg->home = new_home;
 
@@ -2041,12 +1996,8 @@ start_run(CONFIG *cfg)
 			lprintf(cfg, 0, 1,
 			    "Starting %" PRIu32 " checkpoint thread(s)",
 			    cfg->checkpoint_threads);
-			if ((cfg->ckptthreads =
-			    calloc(cfg->checkpoint_threads,
-			    sizeof(CONFIG_THREAD))) == NULL) {
-				ret = enomem(cfg);
-				goto err;
-			}
+			cfg->ckptthreads = dcalloc(
+			     cfg->checkpoint_threads, sizeof(CONFIG_THREAD));
 			if (start_threads(cfg, NULL, cfg->ckptthreads,
 			    cfg->checkpoint_threads, checkpoint_worker) != 0)
 				goto err;
@@ -2255,10 +2206,7 @@ main(int argc, char *argv[])
 		 * to 4096 if needed.
 		 */
 		req_len = strlen(",async=(enabled=true,threads=)") + 4;
-		if ((cfg->async_config = calloc(req_len, 1)) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
+		cfg->async_config = dcalloc(req_len, 1);
 		snprintf(cfg->async_config, req_len,
 		    ",async=(enabled=true,threads=%d)",
 		    cfg->async_threads);
@@ -2281,10 +2229,7 @@ main(int argc, char *argv[])
 	/* Build the URI from the table name. */
 	req_len = strlen("table:") +
 	    strlen(HELIUM_NAME) + strlen(cfg->table_name) + 2;
-	if ((cfg->base_uri = calloc(req_len, 1)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
+	cfg->base_uri = dcalloc(req_len, 1);
 	snprintf(cfg->base_uri, req_len, "table:%s%s%s",
 	    cfg->helium_mount == NULL ? "" : HELIUM_NAME,
 	    cfg->helium_mount == NULL ? "" : "/",
@@ -2303,10 +2248,7 @@ main(int argc, char *argv[])
 			req_len += strlen(cfg->async_config);
 		if (cfg->compress_ext != NULL)
 			req_len += strlen(cfg->compress_ext);
-		if ((cc_buf = calloc(req_len, 1)) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
+		cc_buf = dcalloc(req_len, 1);
 		/*
 		 * This is getting hard to parse.
 		 */
@@ -2331,10 +2273,7 @@ main(int argc, char *argv[])
 			req_len += strlen(cfg->compress_table);
 		if (cfg->index)
 			req_len += strlen(INDEX_COL_NAMES);
-		if ((tc_buf = calloc(req_len, 1)) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
+		tc_buf = dcalloc(req_len, 1);
 		/*
 		 * This is getting hard to parse.
 		 */
@@ -2353,10 +2292,7 @@ main(int argc, char *argv[])
 	if (cfg->log_partial && cfg->table_count > 1) {
 		req_len = strlen(cfg->table_config) +
 		    strlen(LOG_PARTIAL_CONFIG) + 1;
-		if ((cfg->partial_config = calloc(req_len, 1)) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
+		cfg->partial_config = dcalloc(req_len, 1);
 		snprintf((char *)cfg->partial_config, req_len, "%s%s",
 		    (char *)cfg->table_config, LOG_PARTIAL_CONFIG);
 	}
@@ -2416,10 +2352,8 @@ start_threads(CONFIG *cfg,
 		 * don't, it's not enough memory to bother.  These buffers hold
 		 * strings: trailing NUL is included in the size.
 		 */
-		if ((thread->key_buf = calloc(cfg->key_sz, 1)) == NULL)
-			return (enomem(cfg));
-		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
-			return (enomem(cfg));
+		thread->key_buf = dcalloc(cfg->key_sz, 1);
+		thread->value_buf = dcalloc(cfg->value_sz, 1);
 		/*
 		 * Initialize and then toss in a bit of random values if needed.
 		 */
