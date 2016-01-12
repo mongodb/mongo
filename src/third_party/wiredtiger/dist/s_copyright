@@ -1,5 +1,8 @@
 #! /bin/sh
 
+# Only run when building a release
+test -z "$WT_RELEASE_BUILD" && exit 0
+
 # Check the copyrights.
 
 c1=__wt.1$$
