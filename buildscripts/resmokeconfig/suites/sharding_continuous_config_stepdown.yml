@@ -82,7 +82,7 @@ selector:
     # Nothing is affected by config server step down
     - jstests/sharding/replset_config/basic_sharding_params.js
     # ShardingTest is never used, so continuous step down thread never starts
-    - jstests/sharding/replset_config/confis_rs_change.js
+    - jstests/sharding/replset_config/config_rs_change.js
     - jstests/sharding/replset_config/empty_cluster_init.js
     # Test runs really slow with the primary continuously stepping down
     - jstests/sharding/zbigMapReduce.js
