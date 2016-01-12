@@ -472,7 +472,7 @@ tasks:
 
           if [ "${has_packages|}" = "true" ] ; then
             cd buildscripts
-            ${python|python} ${packager_script} --prefix `pwd`/.. --distros ${packager_distro} --tarball `pwd`/../mongodb-binaries.tgz -s ${version} -m HEAD
+            ${python|python} ${packager_script} --prefix `pwd`/.. --distros ${packager_distro} --tarball `pwd`/../mongodb-binaries.tgz -s ${version} -m HEAD -a ${packager_arch}
             cd ..
           fi
     - command: archive.targz_pack
@@ -2535,6 +2535,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
+    packager_arch: x86_64
     packager_distro: ubuntu1204
   tasks:
   - name: compile
@@ -2641,6 +2642,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
+    packager_arch: x86_64
     packager_distro: ubuntu1404
   tasks:
   - name: compile
@@ -2747,6 +2749,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: amazon
   tasks:
   - name: compile
@@ -2821,6 +2824,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
+    packager_arch: x86_64
     packager_distro: amazon
   tasks:
   - name: compile
@@ -3783,6 +3787,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: rhel57
   tasks:
   - name: compile
@@ -3830,6 +3835,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: rhel62
   tasks:
   - name: compile
@@ -3969,6 +3975,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: rhel70
   tasks:
   - name: compile
@@ -4015,6 +4022,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
+    packager_arch: x86_64
     packager_distro: rhel55
   tasks:
   - name: compile
@@ -4122,6 +4130,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
+    packager_arch: x86_64
     packager_distro: rhel62
   tasks:
   - name: compile
@@ -4227,6 +4236,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
+    packager_arch: x86_64
     packager_distro: rhel70
   tasks:
   - name: compile
@@ -4339,6 +4349,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: ubuntu1204
   tasks:
   - name: compile
@@ -4386,6 +4397,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: ubuntu1404
   tasks:
   - name: compile
@@ -4437,6 +4449,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: suse12
   tasks:
   - name: compile
@@ -4483,6 +4496,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
+    packager_arch: x86_64
     packager_distro: suse12
   tasks:
   - name: compile
@@ -4591,6 +4605,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: suse11
   tasks:
   - name: compile
@@ -4637,6 +4652,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
+    packager_arch: x86_64
     packager_distro: suse11
   tasks:
   - name: compile
@@ -4829,6 +4845,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: debian71
   tasks:
   - name: compile
@@ -4875,6 +4892,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
+    packager_arch: x86_64
     packager_distro: debian71
   tasks:
   - name: compile
@@ -4988,6 +5006,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
+    packager_arch: x86_64
     packager_distro: rhel62
   tasks:
   - name: compile
