@@ -2,6 +2,8 @@
 // This tests that providing a proper password works and that providing no password or incorrect
 // password fails.  It uses both mongod and mongo to run the tests, since the mongod binary
 // does not return error statuses to indicate an error.
+// This test requires ssl support in mongo-tools
+// @tags: [requires_ssl_mongo_tools]
 var baseName = "jstests_ssl_ssl_cert_password";
 var dbpath = MongoRunner.dataPath + baseName;
 var external_scratch_dir = MongoRunner.dataPath + baseName + "/external/";
