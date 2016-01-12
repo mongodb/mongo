@@ -41,9 +41,6 @@ import tempfile
 import time
 import urlparse
 
-# The MongoDB names for the architectures we support.
-DEFAULT_ARCHES=["x86_64"]
-
 # Made up names for the flavors of distribution we package for.
 DISTROS=["suse", "debian","redhat","ubuntu","amazon"]
 
@@ -105,15 +102,20 @@ class EnterpriseDistro(packager.Distro):
         else:
             raise Exception("BUG: unsupported platform?")
 
-    def build_os(self):
+    def build_os(self, arch):
         """Return the build os label in the binary package to download ("rhel57", "rhel62" and "rhel70"
         for redhat, the others are delegated to the super class
         """
+        if arch == "ppc64le":
+            if self.n == 'ubuntu':
+                return [ "ubuntu1504" ]
+            else:
+                return []
 
         if re.search("(redhat|fedora|centos)", self.n):
             return [ "rhel70", "rhel62", "rhel57" ]
         else:
-            return super(EnterpriseDistro, self).build_os()
+            return super(EnterpriseDistro, self).build_os(arch)
 
 def main(argv):
 
@@ -138,12 +140,13 @@ def main(argv):
     try:
       # Download the binaries.
       urlfmt="http://downloads.mongodb.com/linux/mongodb-linux-%s-enterprise-%s-%s.tgz"
+      made_pkg = False
 
       # Build a package for each distro/spec/arch tuple, and
       # accumulate the repository-layout directories.
       for (distro, arch) in packager.crossproduct(distros, args.arches):
 
-          for build_os in distro.build_os():
+          for build_os in distro.build_os(arch):
             if build_os in args.distros or not args.distros:
 
               if args.tarball:
@@ -155,6 +158,11 @@ def main(argv):
 
               repo = make_package(distro, build_os, arch, spec, srcdir)
               make_repo(repo, distro, build_os, spec)
+
+              made_pkg = True
+
+      if not made_pkg:
+          raise Exception("No valid combination of distro and arch selected")
 
     finally:
         os.chdir(oldcwd)
@@ -250,7 +258,7 @@ def make_deb_repo(repo, distro, build_os, spec):
 Label: mongodb
 Suite: %s
 Codename: %s/mongodb-enterprise
-Architectures: amd64
+Architectures: amd64 ppc64el
 Components: %s
 Description: MongoDB packages
 """ % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
