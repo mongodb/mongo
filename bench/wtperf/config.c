@@ -736,8 +736,8 @@ config_to_file(CONFIG *cfg)
 	fp = NULL;
 
 	/* Backup the config */
-	req_len = strlen(cfg->home) + 14;
-	if ((path = calloc(req_len + 1, 1)) == NULL) {
+	req_len = strlen(cfg->home) + strlen("/CONFIG.wtperf") + 1;
+	if ((path = calloc(req_len, 1)) == NULL) {
 		(void)enomem(cfg);
 		goto err;
 	}
