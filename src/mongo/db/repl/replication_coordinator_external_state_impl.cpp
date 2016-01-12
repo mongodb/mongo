@@ -374,12 +374,6 @@ void ReplicationCoordinatorExternalStateImpl::signalApplierToCancelFetcher() {
     BackgroundSync::get()->cancelFetcher();
 }
 
-OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext(
-    const std::string& threadName) {
-    Client::initThreadIfNotAlready(threadName.c_str());
-    return new OperationContextImpl();
-}
-
 void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {
     std::vector<std::string> dbNames;
     StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();

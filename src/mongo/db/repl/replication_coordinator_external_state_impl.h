@@ -73,7 +73,6 @@ public:
     virtual void recoverShardingState(OperationContext* txn);
     virtual void signalApplierToChooseNewSyncSource();
     virtual void signalApplierToCancelFetcher();
-    virtual OperationContext* createOperationContext(const std::string& threadName);
     virtual void dropAllTempCollections(OperationContext* txn);
     void dropAllSnapshots() final;
     void updateCommittedSnapshot(SnapshotName newCommitPoint) final;

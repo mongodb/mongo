@@ -34,8 +34,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
@@ -202,11 +200,6 @@ void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToCancelFetcher() {
     _isApplierSignaledToCancelFetcher = true;
-}
-
-OperationContext* ReplicationCoordinatorExternalStateMock::createOperationContext(
-    const std::string& threadName) {
-    return new OperationContextReplMock;
 }
 
 void ReplicationCoordinatorExternalStateMock::dropAllTempCollections(OperationContext* txn) {}

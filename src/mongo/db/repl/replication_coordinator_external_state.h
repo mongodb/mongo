@@ -198,12 +198,6 @@ public:
     virtual void signalApplierToCancelFetcher() = 0;
 
     /**
-     * Returns an OperationContext, owned by the caller, that may be used in methods of
-     * the same instance that require an OperationContext.
-     */
-    virtual OperationContext* createOperationContext(const std::string& threadName) = 0;
-
-    /**
      * Drops all temporary collections on all databases except "local".
      *
      * The implementation may assume that the caller has acquired the global exclusive lock
