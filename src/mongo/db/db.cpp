@@ -40,6 +40,7 @@
 #include <signal.h>
 #include <string>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -87,13 +88,14 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context_d.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/ttl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -446,6 +448,8 @@ static void _initAndListen(int listenPort) {
 #endif
 
     logProcessDetails();
+
+    checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
 
     // Due to SERVER-15389, we must setupSockets first thing at startup in order to avoid
     // obtaining too high a file descriptor for our calls to select().

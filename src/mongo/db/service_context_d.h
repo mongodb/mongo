@@ -48,6 +48,8 @@ public:
 
     StorageEngine* getGlobalStorageEngine() override;
 
+    void createLockFile();
+
     void initializeGlobalStorageEngine() override;
 
     void shutdownGlobalStorageEngineCleanly() override;

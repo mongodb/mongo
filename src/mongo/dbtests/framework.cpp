@@ -34,10 +34,12 @@
 
 #include <string>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/dbtests/dbtests.h"
@@ -65,6 +67,7 @@ int runDbTests(int argc, char** argv) {
     srand((unsigned)frameworkGlobalParams.seed);
     printBuildInfo();
 
+    checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
     getGlobalServiceContext()->initializeGlobalStorageEngine();
 
     {

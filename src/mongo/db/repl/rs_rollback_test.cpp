@@ -33,6 +33,7 @@
 #include <list>
 #include <utility>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -53,6 +54,7 @@
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
@@ -141,6 +143,7 @@ private:
 void RSRollbackTest::setUp() {
     ServiceContext* serviceContext = getGlobalServiceContext();
     if (!serviceContext->getGlobalStorageEngine()) {
+        checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
         // When using the 'devnull' storage engine, it is fine for the temporary directory to
         // go away after the global storage engine is initialized.
         unittest::TempDir tempDir("rs_rollback_test");

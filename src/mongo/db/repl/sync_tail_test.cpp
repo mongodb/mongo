@@ -30,12 +30,13 @@
 
 #include <memory>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bgsync.h"
@@ -44,9 +45,10 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
 
@@ -84,6 +86,7 @@ private:
 void SyncTailTest::setUp() {
     ServiceContext* serviceContext = getGlobalServiceContext();
     if (!serviceContext->getGlobalStorageEngine()) {
+        checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
         // When using the 'devnull' storage engine, it is fine for the temporary directory to
         // go away after the global storage engine is initialized.
         unittest::TempDir tempDir("sync_tail_test");
