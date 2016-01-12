@@ -1765,7 +1765,7 @@ create_uris(CONFIG *cfg)
 		else
 			sprintf(uri, "%s%05d", cfg->base_uri, i);
 	}
-err:	if (ret != 0 && cfg->uris != NULL) {
+	if (ret != 0 && cfg->uris != NULL) {
 		for (i = 0; i < cfg->table_count; i++)
 			free(cfg->uris[i]);
 		free(cfg->uris);
