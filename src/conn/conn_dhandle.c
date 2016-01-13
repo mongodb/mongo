@@ -119,23 +119,6 @@ __wt_conn_dhandle_find(
 }
 
 /*
- * __conn_dhandle_mark_dead --
- *	Mark a data handle dead.
- */
-static int
-__conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
-{
-	/*
-	 * Handle forced discard (e.g., when dropping a file).
-	 *
-	 * We need exclusive access to the file -- disable ordinary
-	 * eviction and drain any blocks already queued.
-	 */
-	F_SET(session->dhandle, WT_DHANDLE_DEAD);
-	return (0);
-}
-
-/*
  * __wt_conn_btree_sync_and_close --
  *	Sync and close the underlying btree handle.
  */
@@ -192,7 +175,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		if (force && (bm == NULL || !bm->is_mapped(bm, session))) {
-			WT_ERR(__conn_dhandle_mark_dead(session));
+			F_SET(session->dhandle, WT_DHANDLE_DEAD);
 			marked_dead = true;
 		}
 		if (!marked_dead || final)
