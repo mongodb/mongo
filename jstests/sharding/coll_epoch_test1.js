@@ -1,8 +1,7 @@
 // Tests various cases of dropping and recreating collections in the same namespace with multiple mongoses
 
 var st = new ShardingTest({ shards : 3, mongos : 3, verbose : 1 })
-// Stop balancer, it'll interfere
-st.stopBalancer()
+// Balancer is by default stopped, thus it will not interfere
 
 // Use separate mongoses for admin, inserting data, and validating results, so no
 // single-mongos tricks will work

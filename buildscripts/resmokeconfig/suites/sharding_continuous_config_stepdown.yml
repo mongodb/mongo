@@ -64,6 +64,16 @@ selector:
     - jstests/sharding/top_chunk_autosplit.js
     - jstests/sharding/count_config_servers.js
     - jstests/sharding/conf_server_write_concern.js
+    # No retries on direct writes to the config/admin databases on the config servers
+    - jstests/sharding/listDatabases.js
+    - jstests/sharding/bulk_insert.js
+    - jstests/sharding/printShardingStatus.js
+    # Balancer writes (direct write to config database with no retries)
+    - jstests/sharding/remove2.js
+    - jstests/sharding/auto2.js
+    - jstests/sharding/features3.js
+    - jstests/sharding/in_memory_sort_limit.js
+    - jstests/sharding/parallel.js
     # Calls the config server primary directly (not through mongos)
     - jstests/sharding/moveprimary_ignore_sharded.js
     - jstests/sharding/min_optime_recovery.js
@@ -80,6 +90,9 @@ selector:
     - jstests/sharding/startup_with_all_configs_down.js
     - jstests/sharding/replset_config/lagged_config_secondary.js
     - jstests/sharding/replset_config/autodiscover_config_rs_from_secondary.js
+    - jstests/sharding/sharding_state_after_stepdown.js
+    - jstests/sharding/rs_stepdown_and_pooling.js
+    - jstests/sharding/mongos_no_replica_set_refresh.js
     # Nothing is affected by config server step down
     - jstests/sharding/replset_config/basic_sharding_params.js
     # ShardingTest is never used, so continuous step down thread never starts

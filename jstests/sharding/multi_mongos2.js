@@ -16,8 +16,7 @@ s1.getDB('test').existing.insert({_id:1})
 assert.eq(1, s1.getDB('test').existing.count({_id:1}));
 assert.eq(1, s2.getDB('test').existing.count({_id:1}));
 
-// We need to turn off the balancer before doing manual moves, otherwise they can interfere
-s1.stopBalancer()
+// Balancer is by default stopped, thus it will not interfere with manual chunk moves.
 
 s2.adminCommand( { shardcollection : "test.existing" , key : { _id : 1 } } );
 assert.commandWorked(s2.adminCommand({ split: "test.existing", middle: { _id: 5 }}));

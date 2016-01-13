@@ -7,7 +7,6 @@
 load("jstests/libs/analyze_plan.js");
 
 var st = new ShardingTest({ shards : 1 });
-st.stopBalancer();
 
 var mongos = st.s0;
 var admin = mongos.getDB( "admin" );

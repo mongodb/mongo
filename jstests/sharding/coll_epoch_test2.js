@@ -5,8 +5,7 @@
 //
 
 var st = new ShardingTest({ shards : 2, mongos : 5, verbose : 1 })
-// Stop balancer, it'll interfere
-st.stopBalancer()
+// Balancer is by default stopped, thus it will not interfere
 
 // Use separate mongos for reading, updating, inserting, removing data
 var readMongos = st.s1

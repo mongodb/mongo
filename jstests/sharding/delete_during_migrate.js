@@ -4,9 +4,7 @@
 
 // start up a new sharded cluster
 var st = new ShardingTest({ shards : 2, mongos : 1 });
-
-// stop balancer since we want manual control for this
-st.stopBalancer();
+// Balancer is by default stopped, thus we have manual control
 
 var dbname = "testDB";
 var coll = "foo";

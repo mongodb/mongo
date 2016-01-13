@@ -8,11 +8,7 @@ var st = new ShardingTest({ name: "mongos_no_detect_sharding",
 var mongos = st.s
 var config = mongos.getDB("config")
 
-config.settings.update({ _id : "balancer" }, { $set : { stopped : true } }, true )
-
-
 print( "Creating unsharded connection..." )
-
 
 var mongos2 = st._mongos[1]
 

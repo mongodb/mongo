@@ -5,7 +5,6 @@
 //
 
 var st = new ShardingTest({ shards : 2, verbose : 4 });
-st.stopBalancer();
 
 var mongos = st.s0;
 var coll = mongos.getCollection("foo.bar");

@@ -7,8 +7,8 @@ var st = new ShardingTest({ shards : 1,
                             mongos : 1, 
                             other : { mongosOptions : { chunkSize : 1, verbose : 2 }}});
 
-// The balancer may interfere unpredictably with the chunk moves/splits depending on timing.
-st.stopBalancer();
+// The balancer is by default stopped, thus it will NOT interfere unpredictably with the chunk 
+// moves/splits depending on the timing.
 
 // Test is not valid for debug build, heuristics get all mangled by debug reload behavior
 var isDebugBuild = st.s0.getDB( "admin" ).serverBuildInfo().debug;

@@ -6,8 +6,10 @@ var verifyOutput = function(out) {
     assert.eq(out.counts.output, 512, "output count is wrong");
 }
 
-var st = new ShardingTest({ shards : 2, verbose : 1, mongos : 1, other : { chunkSize: 1 } });
-st.startBalancer();
+var st = new ShardingTest({ shards : 2,
+                            verbose : 1,
+                            mongos : 1,
+                            other : { chunkSize: 1, enableBalancer: true }});
 
 st.adminCommand( { enablesharding : "mrShard" } )
 st.ensurePrimaryShard('mrShard', 'shard0001');
