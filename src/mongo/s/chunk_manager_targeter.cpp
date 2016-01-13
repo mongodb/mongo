@@ -60,8 +60,8 @@ static bool getDBConfigSafe(const StringData& db, DBConfigPtr& config, string* e
     return config.get();
 }
 
-ChunkManagerTargeter::ChunkManagerTargeter()
-    : _needsTargetingRefresh(false), _stats(new TargeterStats) {}
+ChunkManagerTargeter::ChunkManagerTargeter(TargeterStats* stats)
+    : _needsTargetingRefresh(false), _stats(stats) {}
 
 Status ChunkManagerTargeter::init(const NamespaceString& nss) {
     _nss = nss;
@@ -600,10 +600,6 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
 void ChunkManagerTargeter::noteCouldNotTarget() {
     dassert(_remoteShardVersions.empty());
     _needsTargetingRefresh = true;
-}
-
-const TargeterStats* ChunkManagerTargeter::getStats() const {
-    return _stats.get();
 }
 
 Status ChunkManagerTargeter::refreshIfNeeded(bool* wasChanged) {

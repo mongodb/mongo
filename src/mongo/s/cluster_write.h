@@ -36,7 +36,6 @@
 
 namespace mongo {
 
-class ClusterWriterStats;
 class BatchWriteExecStats;
 
 class ClusterWriter {
@@ -45,7 +44,7 @@ public:
 
     void write(const BatchedCommandRequest& request, BatchedCommandResponse* response);
 
-    const ClusterWriterStats& getStats();
+    const BatchWriteExecStats& getStats();
 
 private:
     void configWrite(const BatchedCommandRequest& request,
@@ -57,22 +56,7 @@ private:
     bool _autoSplit;
     int _timeoutMillis;
 
-    boost::scoped_ptr<ClusterWriterStats> _stats;
-};
-
-class ClusterWriterStats {
-public:
-    // Transfers ownership to the cluster write stats
-    void setShardStats(BatchWriteExecStats* _shardStats);
-
-    bool hasShardStats() const;
-
-    const BatchWriteExecStats& getShardStats() const;
-
-    // TODO: When we have ConfigCoordinator stats, put these here too.
-
-private:
-    boost::scoped_ptr<BatchWriteExecStats> _shardStats;
+    BatchWriteExecStats _stats;
 };
 
 /**

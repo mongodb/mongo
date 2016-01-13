@@ -452,8 +452,8 @@ Status Strategy::commandOpWrite(const std::string& dbName,
                                 std::vector<CommandResult>* results) {
     // Note that this implementation will not handle targeting retries and does not completely
     // emulate write behavior
-
-    ChunkManagerTargeter targeter;
+    TargeterStats targeterStats;
+    ChunkManagerTargeter targeter(&targeterStats);
     Status status =
         targeter.init(NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()));
     if (!status.isOK())

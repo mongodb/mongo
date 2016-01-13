@@ -73,11 +73,8 @@ public:
      * This function does not throw, any errors are reported via the clientResponse.
      */
     void executeBatch(const BatchedCommandRequest& clientRequest,
-                      BatchedCommandResponse* clientResponse);
-
-    const BatchWriteExecStats& getStats();
-
-    BatchWriteExecStats* releaseStats();
+                      BatchedCommandResponse* clientResponse,
+                      BatchWriteExecStats* stats);
 
 private:
     // Not owned here
@@ -88,9 +85,6 @@ private:
 
     // Not owned here
     MultiCommandDispatch* _dispatcher;
-
-    // Stats
-    std::auto_ptr<BatchWriteExecStats> _stats;
 };
 
 struct HostOpTime {

@@ -101,10 +101,10 @@ TEST(BatchWriteExecTests, SingleOp) {
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
     BatchedCommandResponse response;
-    backend.exec->executeBatch(request, &response);
+    BatchWriteExecStats stats;
+    backend.exec->executeBatch(request, &response, &stats);
     ASSERT(response.getOk());
 
-    const BatchWriteExecStats& stats = backend.exec->getStats();
     ASSERT_EQUALS(stats.numRounds, 1);
 }
 
@@ -134,7 +134,8 @@ TEST(BatchWriteExecTests, SingleOpError) {
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
     BatchedCommandResponse response;
-    backend.exec->executeBatch(request, &response);
+    BatchWriteExecStats stats;
+    backend.exec->executeBatch(request, &response, &stats);
     ASSERT(response.getOk());
     ASSERT_EQUALS(response.getN(), 0);
     ASSERT(response.isErrDetailsSet());
@@ -142,7 +143,6 @@ TEST(BatchWriteExecTests, SingleOpError) {
     ASSERT(response.getErrDetailsAt(0)->getErrMessage().find(errResponse.getErrMessage()) !=
            string::npos);
 
-    const BatchWriteExecStats& stats = backend.exec->getStats();
     ASSERT_EQUALS(stats.numRounds, 1);
 }
 
@@ -177,10 +177,10 @@ TEST(BatchWriteExecTests, StaleOp) {
 
     // Execute request
     BatchedCommandResponse response;
-    backend.exec->executeBatch(request, &response);
+    BatchWriteExecStats stats;
+    backend.exec->executeBatch(request, &response, &stats);
     ASSERT(response.getOk());
 
-    const BatchWriteExecStats& stats = backend.exec->getStats();
     ASSERT_EQUALS(stats.numStaleBatches, 1);
 }
 
@@ -213,10 +213,10 @@ TEST(BatchWriteExecTests, MultiStaleOp) {
 
     // Execute request
     BatchedCommandResponse response;
-    backend.exec->executeBatch(request, &response);
+    BatchWriteExecStats stats;
+    backend.exec->executeBatch(request, &response, &stats);
     ASSERT(response.getOk());
 
-    const BatchWriteExecStats& stats = backend.exec->getStats();
     ASSERT_EQUALS(stats.numStaleBatches, 3);
 }
 
@@ -253,7 +253,8 @@ TEST(BatchWriteExecTests, TooManyStaleOp) {
 
     // Execute request
     BatchedCommandResponse response;
-    backend.exec->executeBatch(request, &response);
+    BatchWriteExecStats stats;
+    backend.exec->executeBatch(request, &response, &stats);
     ASSERT(response.getOk());
     ASSERT_EQUALS(response.getN(), 0);
     ASSERT(response.isErrDetailsSet());
@@ -295,10 +296,10 @@ TEST(BatchWriteExecTests, ManyStaleOpWithMigration) {
 
     // Execute request
     BatchedCommandResponse response;
-    backend.exec->executeBatch(request, &response);
+    BatchWriteExecStats stats;
+    backend.exec->executeBatch(request, &response, &stats);
     ASSERT(response.getOk());
 
-    const BatchWriteExecStats& stats = backend.exec->getStats();
     ASSERT_EQUALS(stats.numStaleBatches, 10);
 }
 

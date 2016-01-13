@@ -50,7 +50,7 @@ struct TargeterStats;
  */
 class ChunkManagerTargeter : public NSTargeter {
 public:
-    ChunkManagerTargeter();
+    ChunkManagerTargeter(TargeterStats* stats);
 
     /**
      * Initializes the ChunkManagerTargeter with the latest targeting information for the
@@ -91,11 +91,6 @@ public:
      * Also see NSTargeter::refreshIfNeeded().
      */
     Status refreshIfNeeded(bool* wasChanged);
-
-    /**
-     * Returns the stats. Note that the returned stats object is still owned by this targeter.
-     */
-    const TargeterStats* getStats() const;
 
 private:
     // Different ways we can refresh metadata
@@ -152,8 +147,8 @@ private:
     // Stores whether we need to check the remote server on refresh
     bool _needsTargetingRefresh;
 
-    // Represents only the view and not really part of the targeter state.
-    mutable boost::scoped_ptr<TargeterStats> _stats;
+    // Represents only the view and not really part of the targeter state. This is not owned here.
+    TargeterStats* _stats;
 };
 
 struct TargeterStats {

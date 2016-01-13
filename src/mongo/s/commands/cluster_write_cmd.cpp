@@ -218,9 +218,9 @@ bool ClusterWriteCmd::run(OperationContext* txn,
     }
 
     // Save the last opTimes written on each shard for this client, to allow GLE to work
-    if (ClientInfo::exists() && writer.getStats().hasShardStats()) {
+    if (ClientInfo::exists()) {
         ClientInfo* clientInfo = ClientInfo::get(NULL);
-        clientInfo->addHostOpTimes(writer.getStats().getShardStats().getWriteOpTimes());
+        clientInfo->addHostOpTimes(writer.getStats().getWriteOpTimes());
     }
 
     // TODO

@@ -389,34 +389,35 @@ void ClusterWriter::write(const BatchedCommandRequest& origRequest,
 }
 
 ClusterWriter::ClusterWriter(bool autoSplit, int timeoutMillis)
-    : _autoSplit(autoSplit), _timeoutMillis(timeoutMillis), _stats(new ClusterWriterStats) {}
+    : _autoSplit(autoSplit), _timeoutMillis(timeoutMillis) {}
 
-const ClusterWriterStats& ClusterWriter::getStats() {
-    return *_stats;
+const BatchWriteExecStats& ClusterWriter::getStats() {
+    return _stats;
 }
 
 void ClusterWriter::shardWrite(const BatchedCommandRequest& request,
                                BatchedCommandResponse* response) {
-    ChunkManagerTargeter targeter;
-    Status targetInitStatus = targeter.init(request.getTargetingNSS());
+    TargeterStats targeterStats;
+    {
+        ChunkManagerTargeter targeter(&targeterStats);
+        Status targetInitStatus = targeter.init(request.getTargetingNSS());
 
-    if (!targetInitStatus.isOK()) {
-        warning() << "could not initialize targeter for"
-                  << (request.isInsertIndexRequest() ? " index" : "") << " write op in collection "
-                  << request.getTargetingNS() << endl;
+        if (!targetInitStatus.isOK()) {
+            warning() << "could not initialize targeter for"
+                      << (request.isInsertIndexRequest() ? " index" : "")
+                      << " write op in collection " << request.getTargetingNS() << endl;
 
-        // Errors will be reported in response if we are unable to target
+            // Errors will be reported in response if we are unable to target
+        }
+
+        DBClientShardResolver resolver;
+        DBClientMultiCommand dispatcher;
+        BatchWriteExec exec(&targeter, &resolver, &dispatcher);
+        exec.executeBatch(request, response, &_stats);
     }
 
-    DBClientShardResolver resolver;
-    DBClientMultiCommand dispatcher;
-    BatchWriteExec exec(&targeter, &resolver, &dispatcher);
-    exec.executeBatch(request, response);
-
     if (_autoSplit)
-        splitIfNeeded(request.getNS(), *targeter.getStats());
-
-    _stats->setShardStats(exec.releaseStats());
+        splitIfNeeded(request.getNS(), targeterStats);
 }
 
 void ClusterWriter::configWrite(const BatchedCommandRequest& request,
@@ -439,18 +440,6 @@ void ClusterWriter::configWrite(const BatchedCommandRequest& request,
 
     ConfigCoordinator exec(&dispatcher, configHosts);
     exec.executeBatch(request, response, fsyncCheck);
-}
-
-void ClusterWriterStats::setShardStats(BatchWriteExecStats* shardStats) {
-    _shardStats.reset(shardStats);
-}
-
-bool ClusterWriterStats::hasShardStats() const {
-    return NULL != _shardStats.get();
-}
-
-const BatchWriteExecStats& ClusterWriterStats::getShardStats() const {
-    return *_shardStats;
 }
 
 }  // namespace mongo
