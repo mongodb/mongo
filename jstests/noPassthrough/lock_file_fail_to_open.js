@@ -13,8 +13,12 @@
     try {
         clearRawMongoProgramOutput();
         // Start another one which should fail to start as there is already a lockfile in its dbpath.
-        var mongo2 = MongoRunner.runMongod({dbpath:  dbPath,
+        var mongo2 = null;
+        try {
+            // Can't use assert.throws as behavior is different on Windows/Linux.
+            mongo2 = MongoRunner.runMongod({dbpath:  dbPath,
                                             noCleanData: true});
+        } catch (ex) {}
         // We should have failed to start.
         assert(mongo2 === null);
         var logContents = rawMongoProgramOutput();
