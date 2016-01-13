@@ -5,6 +5,10 @@ selector:
     exclude_files: 
 # TODO: SERVER-21578
     - jstests/multiVersion/balancer_multiVersion_detect.js
+# TODO: SERVER-21925
+    - jstests/multiVersion/0_test_launching.js
+    - jstests/multiVersion/1_test_launching_replset.js
+    - jstests/multiVersion/2_test_launching_cluster.js
 
 # Multiversion tests start their own mongod's.
 executor:
