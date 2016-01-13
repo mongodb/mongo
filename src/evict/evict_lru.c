@@ -988,6 +988,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
+	btree = NULL;
 	dhandle = NULL;
 	dhandle_locked = incr = false;
 	retries = 0;
