@@ -102,6 +102,17 @@
         ErrorCodes.InvalidNamespace,
         'applyOps should fail on system.indexes insert operation with invalid index namespace');
 
+    // Inconsistent database name in index spec namespace.
+    assert.commandFailedWithCode(
+        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes', o: {
+            ns: 'baddbprefix' + t.getFullName(),
+            key: {a: 1},
+            name: 'a_1',
+        }}]}),
+        ErrorCodes.InvalidNamespace,
+        'applyOps should fail on system.indexes insert operation with index namespace containing ' +
+        'inconsistent database name');
+
     // Valid 'ns' field value in unknown operation type 'x'.
     assert.commandFailed(
       db.adminCommand({applyOps: [{op: 'x', ns: t.getFullName()}]}),
