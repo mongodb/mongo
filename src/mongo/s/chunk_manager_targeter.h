@@ -55,7 +55,7 @@ struct TargeterStats {
  */
 class ChunkManagerTargeter : public NSTargeter {
 public:
-    ChunkManagerTargeter(const NamespaceString& nss);
+    ChunkManagerTargeter(const NamespaceString& nss, TargeterStats* stats);
 
     /**
      * Initializes the ChunkManagerTargeter with the latest targeting information for the
@@ -98,11 +98,6 @@ public:
      * Also see NSTargeter::refreshIfNeeded().
      */
     Status refreshIfNeeded(OperationContext* txn, bool* wasChanged);
-
-    /**
-     * Returns the stats. Note that the returned stats object is still owned by this targeter.
-     */
-    const TargeterStats* getStats() const;
 
 private:
     // Different ways we can refresh metadata
@@ -158,8 +153,8 @@ private:
     // Stores whether we need to check the remote server on refresh
     bool _needsTargetingRefresh;
 
-    // Represents only the view and not really part of the targeter state.
-    mutable TargeterStats _stats;
+    // Represents only the view and not really part of the targeter state. This is not owned here.
+    TargeterStats* _stats;
 
     // Zero or one of these are filled at all times
     // If sharded, _manager, if unsharded, _primary, on error, neither

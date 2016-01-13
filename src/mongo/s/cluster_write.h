@@ -32,10 +32,8 @@
 
 namespace mongo {
 
-class ClusterWriterStats;
 class BatchedCommandRequest;
 class BatchedCommandResponse;
-class BatchWriteExecStats;
 class OperationContext;
 
 class ClusterWriter {
@@ -46,28 +44,13 @@ public:
                const BatchedCommandRequest& request,
                BatchedCommandResponse* response);
 
-    const ClusterWriterStats& getStats();
+    const BatchWriteExecStats& getStats();
 
 private:
     const bool _autoSplit;
     const int _timeoutMillis;
 
-    std::unique_ptr<ClusterWriterStats> _stats;
-};
-
-class ClusterWriterStats {
-public:
-    // Transfers ownership to the cluster write stats
-    void setShardStats(BatchWriteExecStats* _shardStats);
-
-    bool hasShardStats() const;
-
-    const BatchWriteExecStats& getShardStats() const;
-
-    // TODO: When we have ConfigCoordinator stats, put these here too.
-
-private:
-    std::unique_ptr<BatchWriteExecStats> _shardStats;
+    BatchWriteExecStats _stats;
 };
 
 /**
