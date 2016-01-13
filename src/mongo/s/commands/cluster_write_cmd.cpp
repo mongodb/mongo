@@ -193,9 +193,8 @@ public:
         }
 
         // Save the last opTimes written on each shard for this client, to allow GLE to work
-        if (haveClient() && writer.getStats().hasShardStats()) {
-            ClusterLastErrorInfo::get(cc())
-                .addHostOpTimes(writer.getStats().getShardStats().getWriteOpTimes());
+        if (haveClient()) {
+            ClusterLastErrorInfo::get(cc()).addHostOpTimes(writer.getStats().getWriteOpTimes());
         }
 
         // TODO
@@ -232,9 +231,9 @@ private:
                                   std::vector<Strategy::CommandResult>* results) {
         // Note that this implementation will not handle targeting retries and does not completely
         // emulate write behavior
-
+        TargeterStats stats;
         ChunkManagerTargeter targeter(
-            NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()));
+            NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()), &stats);
         Status status = targeter.init(txn);
         if (!status.isOK())
             return status;

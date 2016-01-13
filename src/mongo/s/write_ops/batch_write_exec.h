@@ -75,11 +75,8 @@ public:
      */
     void executeBatch(OperationContext* txn,
                       const BatchedCommandRequest& clientRequest,
-                      BatchedCommandResponse* clientResponse);
-
-    const BatchWriteExecStats& getStats();
-
-    BatchWriteExecStats* releaseStats();
+                      BatchedCommandResponse* clientResponse,
+                      BatchWriteExecStats* stats);
 
 private:
     // Not owned here
@@ -90,9 +87,6 @@ private:
 
     // Not owned here
     MultiCommandDispatch* _dispatcher;
-
-    // Stats
-    std::unique_ptr<BatchWriteExecStats> _stats;
 };
 
 struct HostOpTime {

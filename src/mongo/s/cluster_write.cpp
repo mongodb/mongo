@@ -256,50 +256,40 @@ void ClusterWriter::write(OperationContext* txn,
 
         grid.catalogManager(txn)->writeConfigServerDirect(txn, *request, response);
     } else {
-        ChunkManagerTargeter targeter(request->getTargetingNSS());
+        TargeterStats targeterStats;
 
-        Status targetInitStatus = targeter.init(txn);
-        if (!targetInitStatus.isOK()) {
-            toBatchError(Status(targetInitStatus.code(),
-                                str::stream() << "unable to target"
-                                              << (request->isInsertIndexRequest() ? " index" : "")
-                                              << " write op for collection "
-                                              << request->getTargetingNS()
-                                              << causedBy(targetInitStatus)),
-                         response);
-            return;
+        {
+            ChunkManagerTargeter targeter(request->getTargetingNSS(), &targeterStats);
+
+            Status targetInitStatus = targeter.init(txn);
+            if (!targetInitStatus.isOK()) {
+                toBatchError(Status(targetInitStatus.code(),
+                                    str::stream()
+                                        << "unable to target"
+                                        << (request->isInsertIndexRequest() ? " index" : "")
+                                        << " write op for collection " << request->getTargetingNS()
+                                        << causedBy(targetInitStatus)),
+                             response);
+                return;
+            }
+
+            DBClientShardResolver resolver;
+            DBClientMultiCommand dispatcher;
+            BatchWriteExec exec(&targeter, &resolver, &dispatcher);
+            exec.executeBatch(txn, *request, response, &_stats);
         }
-
-        DBClientShardResolver resolver;
-        DBClientMultiCommand dispatcher;
-        BatchWriteExec exec(&targeter, &resolver, &dispatcher);
-        exec.executeBatch(txn, *request, response);
 
         if (_autoSplit) {
-            splitIfNeeded(txn, request->getNS(), *targeter.getStats());
+            splitIfNeeded(txn, request->getNS(), targeterStats);
         }
-
-        _stats->setShardStats(exec.releaseStats());
     }
 }
 
 ClusterWriter::ClusterWriter(bool autoSplit, int timeoutMillis)
-    : _autoSplit(autoSplit), _timeoutMillis(timeoutMillis), _stats(new ClusterWriterStats) {}
+    : _autoSplit(autoSplit), _timeoutMillis(timeoutMillis) {}
 
-const ClusterWriterStats& ClusterWriter::getStats() {
-    return *_stats;
-}
-
-void ClusterWriterStats::setShardStats(BatchWriteExecStats* shardStats) {
-    _shardStats.reset(shardStats);
-}
-
-bool ClusterWriterStats::hasShardStats() const {
-    return NULL != _shardStats.get();
-}
-
-const BatchWriteExecStats& ClusterWriterStats::getShardStats() const {
-    return *_shardStats;
+const BatchWriteExecStats& ClusterWriter::getStats() {
+    return _stats;
 }
 
 }  // namespace mongo

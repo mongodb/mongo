@@ -263,8 +263,9 @@ bool wasMetadataRefreshed(const ChunkManagerPtr& managerA,
 
 }  // namespace
 
-ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss)
-    : _nss(nss), _needsTargetingRefresh(false) {}
+ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss, TargeterStats* stats)
+    : _nss(nss), _needsTargetingRefresh(false), _stats(stats) {}
+
 
 Status ChunkManagerTargeter::init(OperationContext* txn) {
     auto status = grid.implicitCreateDb(txn, _nss.db().toString());
@@ -515,7 +516,7 @@ Status ChunkManagerTargeter::targetShardKey(OperationContext* txn,
     // Track autosplit stats for sharded collections
     // Note: this is only best effort accounting and is not accurate.
     if (estDataSize > 0) {
-        _stats.chunkSizeDelta[chunk->getMin()] += estDataSize;
+        _stats->chunkSizeDelta[chunk->getMin()] += estDataSize;
     }
 
     *endpoint = new ShardEndpoint(chunk->getShardId(), _manager->getVersion(chunk->getShardId()));
@@ -597,10 +598,6 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
 void ChunkManagerTargeter::noteCouldNotTarget() {
     dassert(_remoteShardVersions.empty());
     _needsTargetingRefresh = true;
-}
-
-const TargeterStats* ChunkManagerTargeter::getStats() const {
-    return &_stats;
 }
 
 Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasChanged) {
@@ -712,7 +709,6 @@ Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refre
             // Dumps the db info, reloads it all, synchronization between threads happens
             // internally.
             config->reload(txn);
-            config->getChunkManagerIfExists(txn, _nss.ns(), true, true);
         } catch (const DBException& ex) {
             return Status(ErrorCodes::UnknownError, ex.toString());
         }
