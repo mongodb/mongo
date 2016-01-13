@@ -84,7 +84,6 @@ config_assign(CONFIG *dest, const CONFIG *src)
 			pstr = (char **)
 			    ((u_char *)dest + config_opts[i].offset);
 			if (*pstr != NULL) {
-				newstr = dmalloc(strlen(*pstr) + 1);
 				newstr = dstrdup(*pstr);
 				*pstr = newstr;
 			}
@@ -96,7 +95,6 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	/* Clone the config string information into the new cfg object */
 	TAILQ_FOREACH(conf_line, &src->config_head, c) {
 		tmp_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
-		tmp_line->string = dcalloc(strlen(conf_line->string) + 1, 1);
 		tmp_line->string = dstrdup(conf_line->string);
 		TAILQ_INSERT_TAIL(&dest->config_head, tmp_line, c);
 	}
@@ -416,7 +414,6 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		strp = (char **)valueloc;
 		newlen = v->len + 1;
 		if (*strp == NULL) {
-			newstr = dcalloc(newlen, sizeof(char));
 			newstr = dstrdup(v->str);
 		} else {
 			newlen += (strlen(*strp) + 1);
@@ -445,7 +442,6 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		}
 		strp = (char **)valueloc;
 		free(*strp);
-		newstr = dcalloc(v->len + 1, 1);
 		newstr = dstrdup(v->str);
 		*strp = newstr;
 		break;
@@ -592,7 +588,6 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 	 * a null byte to be added.
 	 */
 	config_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
-	config_line->string = dcalloc(len + 1, 1);
 	config_line->string = dstrdup(optstr);
 	TAILQ_INSERT_TAIL(&cfg->config_head, config_line, c);
 
