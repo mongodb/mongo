@@ -45,6 +45,7 @@ extern int __wt_block_map( WT_SESSION_IMPL *session, WT_BLOCK *block, void *mapp
 extern int __wt_block_unmap( WT_SESSION_IMPL *session, WT_BLOCK *block, void *map, size_t maplen, void **mappingcookie);
 extern int __wt_block_manager_open(WT_SESSION_IMPL *session, const char *filename, const char *cfg[], bool forced_salvage, bool readonly, uint32_t allocsize, WT_BM **bmp);
 extern int __wt_block_manager_truncate( WT_SESSION_IMPL *session, const char *filename, uint32_t allocsize);
+extern int __wt_block_manager_drop(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_block_manager_create( WT_SESSION_IMPL *session, const char *filename, uint32_t allocsize);
 extern void __wt_block_configure_first_fit(WT_BLOCK *block, bool on);
 extern int __wt_block_open(WT_SESSION_IMPL *session, const char *filename, const char *cfg[], bool forced_salvage, bool readonly, uint32_t allocsize, WT_BLOCK **blockp);
