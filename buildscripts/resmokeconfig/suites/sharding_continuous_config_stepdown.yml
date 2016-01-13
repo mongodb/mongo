@@ -91,6 +91,7 @@ selector:
     - jstests/sharding/csrs_upgrade.js
     # Temporarily blacklisted until more robust
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
+    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
 executor:
   js_test:
     config:
