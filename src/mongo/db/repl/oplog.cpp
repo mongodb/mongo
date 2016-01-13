@@ -745,6 +745,10 @@ Status applyOperation_inlock(OperationContext* txn,
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace in index spec: " << op,
                     indexNss.isValid());
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Database name mismatch for database ("
+                                  << nsToDatabaseSubstring(ns) << ") while creating index: " << op,
+                    nsToDatabaseSubstring(ns) == indexNss.db());
 
             opCounters->gotInsert();
             if (o["background"].trueValue()) {
