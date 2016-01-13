@@ -832,17 +832,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
 
         if (!member->hasLoc()) {
             // We expect to be here because of an invalidation causing a force-fetch.
-
-            // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so
-            // will not produce any more results even if there is another matching document.
-            // Throw a WCE here so that these operations get another chance to find a matching
-            // document. The findAndModify command should automatically retry if it gets a WCE. The
-            // findAndModify command should automatically retry if it gets a WCE.
-            // TODO: this is not necessary if there was no sort specified.
-            if (_params.request->shouldReturnAnyDocs()) {
-                throw WriteConflictException();
-            }
-
             ++_specificStats.nInvalidateSkips;
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;

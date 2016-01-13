@@ -10,6 +10,8 @@
  *
  * This workload was designed to reproduce SERVER-18304.
  */
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
+
 var $config = (function() {
 
     var data =  {
@@ -65,10 +67,15 @@ var $config = (function() {
             assertAlways.commandWorked(res);
 
             var doc = res.value;
-            assertWhenOwnColl.neq(
-                doc, null, 'findAndModify should have found and removed a matching document');
+            if (isMongod(db) && !isMMAPv1(db)) {
+                // MMAPv1 does not automatically retry if there was a conflict, so it is expected
+                // that it may return null in the case of a conflict. All other storage engines
+                // should automatically retry the operation, and thus should never return null.
+                assertWhenOwnColl.neq(
+                    doc, null, 'findAndModify should have found and removed a matching document');
+            }
             if (doc !== null) {
-                this.saveDocId.call(this, db, collName, doc._id);
+                this.saveDocId(db, collName, doc._id);
             }
         }
 
@@ -106,10 +113,16 @@ var $config = (function() {
         var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
 
         if (this.opName === 'removed') {
-            // Each findAndModify should remove exactly one document, and this.numDocs ==
-            // this.iterations * this.threadCount, so there should not be any documents remaining.
-            assertWhenOwnColl.eq(
-                db[collName].find().itcount(), 0, 'Expected all documents to have been removed');
+            if (isMongod(db) && !isMMAPv1(db)) {
+                // On storage engines other than MMAPv1, each findAndModify should remove exactly
+                // one document. This is not true on MMAPv1 since it will not automatically retry a
+                // findAndModify when there is a conflict, indicating there were no matches instead.
+                // Since this.numDocs == this.iterations * this.threadCount, there should not be any
+                // documents remaining.
+                assertWhenOwnColl.eq(db[collName].find().itcount(),
+                                     0,
+                                     'Expected all documents to have been removed');
+            }
         }
 
         assertWhenOwnColl(function() {

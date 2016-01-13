@@ -13,6 +13,7 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
 load('jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js'); // for $config
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -43,10 +44,15 @@ var $config = extendWorkload($config, function($config, $super) {
             assertAlways.commandWorked(res);
 
             var doc = res.value;
-            assertWhenOwnColl.neq(
-                doc, null, 'findAndModify should have found and updated a matching document');
+            if (isMongod(db) && !isMMAPv1(db)) {
+                // MMAPv1 does not automatically retry if there was a conflict, so it is expected
+                // that it may return null in the case of a conflict. All other storage engines
+                // should automatically retry the operation, and thus should never return null.
+                assertWhenOwnColl.neq(
+                    doc, null, 'findAndModify should have found and updated a matching document');
+            }
             if (doc !== null) {
-                this.saveDocId.call(this, db, collName, doc._id);
+                this.saveDocId(db, collName, doc._id);
             }
         }
 
