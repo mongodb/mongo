@@ -1048,6 +1048,7 @@ retry:	while (slot < max_entries && ret == 0) {
 				(void)__wt_atomic_subi32(
 				    &dhandle->session_inuse, 1);
 				incr = false;
+				cache->evict_file_next = NULL;
 			}
 			dhandle = TAILQ_NEXT(dhandle, q);
 		}
@@ -1103,6 +1104,9 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * exclusive access when a handle is being closed.
 		 */
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+			/* Remember the file we should visit first, next loop. */
+			cache->evict_file_next = dhandle;
+
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __evict_walk_file(session, &slot));
 			WT_ASSERT(session, session->split_gen == 0);
@@ -1122,12 +1126,7 @@ retry:	while (slot < max_entries && ret == 0) {
 	}
 
 	if (incr) {
-		/* Remember the file we should visit first, next loop. */
-		cache->evict_file_next = dhandle;
-
-		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-		    !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
-		    dhandle->session_inuse > 0);
+		WT_ASSERT(session, dhandle->session_inuse > 0);
 		(void)__wt_atomic_subi32(&dhandle->session_inuse, 1);
 		incr = false;
 	}
