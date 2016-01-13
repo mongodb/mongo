@@ -141,6 +141,29 @@ __conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __conn_dhandle_clear_open --
+ *	Clear a data handle's open flag .
+ */
+static int
+__conn_dhandle_clear_open(WT_SESSION_IMPL *session)
+{
+	bool evict_reset;
+
+	/*
+	 * We need exclusive access to the file -- disable ordinary
+	 * eviction and drain any blocks already queued.
+	 */
+	if (S2C(session)->cache->evict_file_next == session->dhandle)
+		WT_RET(__wt_verbose(session, WT_VERB_TEMPORARY,
+		    "clear_open: Clear matching dh %llx", session->dhandle));
+	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
+	F_CLR(session->dhandle, WT_DHANDLE_OPEN);
+	if (evict_reset)
+		__wt_evict_file_exclusive_off(session);
+	return (0);
+}
+
+/*
  * __wt_conn_btree_sync_and_close --
  *	Sync and close the underlying btree handle.
  */
@@ -207,7 +230,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	 * another call to sync and close.
 	 */
 	if (!marked_dead) {
-		F_CLR(dhandle, WT_DHANDLE_OPEN);
+		WT_ERR(__conn_dhandle_clear_open(session));
 		if (dhandle->checkpoint == NULL)
 			--S2C(session)->open_btree_count;
 	}
