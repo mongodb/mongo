@@ -31,7 +31,6 @@
 
 #pragma once
 
-
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_connection.h"
@@ -71,11 +70,11 @@ public:
 
     // Please do not reorder. cursor destructor can use conn.
     // On a related note, never attempt to cleanup these pointers manually.
-    ShardConnectionPtr conn;
+    std::shared_ptr<ShardConnection> conn;
     DBClientCursorPtr cursor;
 
     // Version information
-    ChunkManagerPtr manager;
+    std::shared_ptr<ChunkManager> manager;
     std::shared_ptr<Shard> primary;
 
     // Cursor status information
@@ -215,7 +214,7 @@ private:
                                       std::shared_ptr<Shard> primary /* in */,
                                       const NamespaceString& ns,
                                       const std::string& vinfo,
-                                      ChunkManagerPtr manager /* in */);
+                                      std::shared_ptr<ChunkManager> manager /* in */);
 
     // LEGACY init - Needed for map reduce
     void _oldInit();

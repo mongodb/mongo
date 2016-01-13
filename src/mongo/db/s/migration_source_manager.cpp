@@ -335,6 +335,7 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
                                               long long maxChunkSize,
                                               string& errmsg,
                                               BSONObjBuilder& result) {
+    ScopedTransaction scopedXact(txn, MODE_IS);
     AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
 
     Collection* collection = autoColl.getCollection();
@@ -448,8 +449,6 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
     }
 
     log() << "moveChunk number of documents: " << cloneLocsRemaining() << migrateLog;
-
-    txn->recoveryUnit()->abandonSnapshot();
     return true;
 }
 

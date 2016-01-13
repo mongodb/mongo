@@ -271,25 +271,7 @@ public:
             uassertStatusOK(ChunkMoveWriteConcernOptions::initFromCommand(cmdObj));
         const auto& writeConcern = moveWriteConcernOptions.getWriteConcern();
 
-        BSONObj shardKeyPattern;
-        if (cmdObj.hasField("shardKeyPattern")) {
-            shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
-        } else {
-            // shardKeyPattern may not be provided if another shard is from pre 2.2
-            // In that case, assume the shard key pattern is the same as the range
-            // specifiers provided.
-            BSONObj keya = Helpers::inferKeyPattern(min);
-            BSONObj keyb = Helpers::inferKeyPattern(max);
-            verify(keya == keyb);
-
-            warning()
-                << "No shard key pattern provided by source shard for migration."
-                   " This is likely because the source shard is running a version prior to 2.2."
-                   " Falling back to assuming the shard key matches the pattern of the min and max"
-                   " chunk range specifiers.  Inferred shard key: " << keya;
-
-            shardKeyPattern = keya.getOwned();
-        }
+        BSONObj shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
 
         const string fromShard(cmdObj["from"].String());
 

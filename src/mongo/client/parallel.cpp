@@ -370,13 +370,14 @@ void ParallelSortClusteredCursor::_handleStaleNS(OperationContext* txn,
     }
 }
 
-void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(OperationContext* txn,
-                                                               PCStatePtr state,
-                                                               const ShardId& shardId,
-                                                               std::shared_ptr<Shard> primary,
-                                                               const NamespaceString& ns,
-                                                               const string& vinfo,
-                                                               ChunkManagerPtr manager) {
+void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
+    OperationContext* txn,
+    PCStatePtr state,
+    const ShardId& shardId,
+    std::shared_ptr<Shard> primary,
+    const NamespaceString& ns,
+    const string& vinfo,
+    std::shared_ptr<ChunkManager> manager) {
     if (manager) {
         state->manager = manager;
     } else if (primary) {

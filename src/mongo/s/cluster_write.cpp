@@ -58,8 +58,6 @@ using std::map;
 using std::string;
 using std::stringstream;
 
-const int ConfigOpTimeoutMillis = 30 * 1000;
-
 namespace {
 
 /**

@@ -147,9 +147,6 @@ private:
     bool _setVersion;
 };
 
-typedef std::shared_ptr<ChunkManager> ChunkManagerPtr;
-typedef std::shared_ptr<ShardConnection> ShardConnectionPtr;
-
 extern DBConnectionPool shardConnectionPool;
 
 }  // namespace mongo
