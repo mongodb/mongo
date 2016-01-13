@@ -97,7 +97,7 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	TAILQ_FOREACH(conf_line, &src->config_head, c) {
 		tmp_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
 		tmp_line->string = dcalloc(strlen(conf_line->string) + 1, 1);
-		tmp_line->string = dstrdup(tmp_line->string);
+		tmp_line->string = dstrdup(conf_line->string);
 		TAILQ_INSERT_TAIL(&dest->config_head, tmp_line, c);
 	}
 	return (0);
