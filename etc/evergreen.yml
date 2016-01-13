@@ -3902,7 +3902,7 @@ buildvariants:
   - name: sharding_legacy_op_query_WT
   - name: sharding_op_query_WT
   - name: sharding_legacy_multiversion
-  - name: sharding_csrs_continuous_config_stepdown_WT  
+  - name: sharding_csrs_continuous_config_stepdown_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -5162,7 +5162,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1410-build
-  stepback: false
+  stepback: true
   batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl'"
@@ -5280,7 +5280,7 @@ buildvariants:
   display_name: ~ ASAN SSL Ubuntu 14.10
   run_on:
   - ubuntu1410-build
-  stepback: false
+  stepback: true
   batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl'"
