@@ -1104,7 +1104,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * exclusive access when a handle is being closed.
 		 */
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
-			/* Remember the file we should visit first, next loop. */
+			/* Remember the file to visit first, next loop. */
 			cache->evict_file_next = dhandle;
 
 			WT_WITH_DHANDLE(session, dhandle,
