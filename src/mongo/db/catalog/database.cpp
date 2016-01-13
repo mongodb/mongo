@@ -432,8 +432,6 @@ Status Database::renameCollection(OperationContext* txn,
                                   bool stayTemp) {
     audit::logRenameCollection(currentClient.get(), fromNS, toNS);
     invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
-    BackgroundOperation::assertNoBgOpInProgForNs(fromNS);
-    BackgroundOperation::assertNoBgOpInProgForNs(toNS);
 
     {  // remove anything cached
         Collection* coll = getCollection(fromNS);

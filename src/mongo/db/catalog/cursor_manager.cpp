@@ -34,7 +34,6 @@
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -314,7 +313,6 @@ CursorManager::~CursorManager() {
 
 void CursorManager::invalidateAll(bool collectionGoingAway) {
     SimpleMutex::scoped_lock lk(_mutex);
-    fassert(28819, !BackgroundOperation::inProgForNs(_nss));
 
     for (ExecSet::iterator it = _nonCachedExecutors.begin(); it != _nonCachedExecutors.end();
          ++it) {
