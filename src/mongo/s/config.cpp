@@ -367,13 +367,15 @@ ChunkManagerPtr DBConfig::getChunkManager(const string& ns, bool shouldReload, b
     ChunkVersion oldVersion;
     ChunkManagerPtr oldManager;
 
+    const auto currentReloadIteration = _reloadCount.load();
+
     {
         scoped_lock lk(_lock);
 
         bool earlyReload = !_collections[ns].isSharded() && (shouldReload || forceReload);
         if (earlyReload) {
-            // this is to catch cases where there this is a new sharded collection
-            _reload();
+            // This is to catch cases where there this is a new sharded collection
+            _loadIfNeeded(currentReloadIteration);
         }
 
         CollectionInfo& ci = _collections[ns];
@@ -530,11 +532,16 @@ void DBConfig::unserialize(const BSONObj& from) {
 }
 
 bool DBConfig::load() {
+    const auto currentReloadIteration = _reloadCount.load();
     scoped_lock lk(_lock);
-    return _load();
+    return _loadIfNeeded(currentReloadIteration);
 }
 
-bool DBConfig::_load() {
+bool DBConfig::_loadIfNeeded(Counter reloadIteration) {
+    if (reloadIteration != _reloadCount.load()) {
+        return true;
+    }
+
     ScopedDbConnection conn(configServer.modelServer(), 30.0);
 
     BSONObj dbObj = conn->findOne(DatabaseType::ConfigNS, BSON(DatabaseType::name(_name)));
@@ -580,6 +587,8 @@ bool DBConfig::_load() {
 
     conn.done();
 
+    _reloadCount.fetchAndAdd(1);
+
     return true;
 }
 
@@ -617,10 +626,11 @@ void DBConfig::_save(bool db, bool coll) {
 
 bool DBConfig::reload() {
     bool successful = false;
+    const auto currentReloadIteration = _reloadCount.load();
 
     {
         scoped_lock lk(_lock);
-        successful = _reload();
+        successful = _loadIfNeeded(currentReloadIteration);
     }
 
     //
@@ -632,11 +642,6 @@ bool DBConfig::reload() {
         grid.removeDBIfExists(*this);
 
     return successful;
-}
-
-bool DBConfig::_reload() {
-    // TODO: i don't think is 100% correct
-    return _load();
 }
 
 bool DBConfig::dropDatabase(string& errmsg) {
