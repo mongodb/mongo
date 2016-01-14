@@ -348,19 +348,6 @@ dmalloc(size_t len)
 }
 
 /*
- * dstrdup --
- *      Call strdup, dying on failure.
- */
-static inline char *
-dstrdup(const char *str)
-{
-	char *p;
-
-	if ((p = strdup(str)) == NULL)
-		die(errno, "strdup");
-	return (p);
-}
-/*
  * dcalloc --
  *      Call calloc, dying on failure.
  */
@@ -373,4 +360,33 @@ dcalloc(size_t num, size_t len)
 		die(errno, "calloc");
 	return (p);
 }
+
+/*
+ * drealloc --
+ *      Call realloc, dying on failure.
+ */
+static inline void *
+drealloc(void *p, size_t len)
+{
+	void *repl;
+
+	if ((repl = realloc(p, len)) == NULL)
+		die(errno, "realloc");
+	return (repl);
+}
+
+/*
+ * dstrdup --
+ *      Call strdup, dying on failure.
+ */
+static inline char *
+dstrdup(const char *str)
+{
+	char *p;
+
+	if ((p = strdup(str)) == NULL)
+		die(errno, "strdup");
+	return (p);
+}
+
 #endif
