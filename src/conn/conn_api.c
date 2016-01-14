@@ -2064,6 +2064,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * DATABASE HOME, IT'S WHAT WE USE TO DECIDE IF WE'RE CREATING OR NOT.
 	 */
 	WT_ERR(__wt_turtle_init(session));
+
+	__wt_metadata_init(session);
 	WT_ERR(__wt_metadata_cursor(session, NULL));
 
 	/* Start the worker threads and run recovery. */

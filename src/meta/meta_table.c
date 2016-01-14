@@ -9,6 +9,18 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_metadata_init --
+ *	Metadata initialization.
+ */
+void
+__wt_metadata_init(WT_SESSION_IMPL *session)
+{
+	/* We cache the metadata file's URI hash for fast detection. */
+	S2C(session)->meta_uri_hash =
+	    __wt_hash_city64(WT_METAFILE_URI, strlen(WT_METAFILE_URI));
+}
+
+/*
  * __metadata_turtle --
  *	Return if a key's value should be taken from the turtle file.
  */
