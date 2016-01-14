@@ -879,24 +879,38 @@ def CheckForToolchain(context, toolchain, lang_name, compiler_var, source_suffix
     context.Result(result)
     return result
 
+endian = get_option( "endian" )
+
+if endian == "auto":
+    endian = sys.byteorder
+
+if endian == "little":
+    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "1234")
+elif endian == "big":
+    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "4321")
+
 # These preprocessor macros came from
 # http://nadeausoftware.com/articles/2012/02/c_c_tip_how_detect_processor_type_using_compiler_predefined_macros
 #
 # NOTE: Remember to add a trailing comma to form any required one
 # element tuples, or your configure checks will fail in strange ways.
 processor_macros = {
-    'arm'    : ('__arm__',),
-    'arm64'  : ('__arm64__', '__aarch64__'),
-    'i386'   : ('__i386', '_M_IX86'),
-    'ppc64'  : ('__powerpc64__',),
-    's390x'  : ('__s390x__',),
-    'sparc'  : ('__sparc',),
-    'x86_64' : ('__x86_64', '_M_AMD64'),
+    'arm'    : { 'endian': 'little', 'defines': ('__arm__',) },
+    'arm64'  : { 'endian': 'little', 'defines': ('__arm64__', '__aarch64__')},
+    'i386'   : { 'endian': 'little', 'defines': ('__i386', '_M_IX86')},
+    'ppc64le': { 'endian': 'little', 'defines': ('__powerpc64__',)},
+    's390x'  : { 'endian': 'big',    'defines': ('__s390x__',)},
+    'sparc'  : { 'endian': 'big',    'defines': ('__sparc',)},
+    'x86_64' : { 'endian': 'little', 'defines': ('__x86_64', '_M_AMD64')},
 }
 
 def CheckForProcessor(context, which_arch):
     def run_compile_check(arch):
-        full_macros = " || ".join([ "defined(%s)" % (v) for v in processor_macros[arch]])
+        full_macros = " || ".join([ "defined(%s)" % (v) for v in processor_macros[arch]['defines']])
+
+        if not endian == processor_macros[arch]['endian']:
+            return False
+
         test_body = """
         #if {0}
         /* Detected {1} */
@@ -1156,16 +1170,6 @@ if has_option('mute'):
     env.Append( LINKCOMSTR = "Linking $TARGET" )
     env.Append( SHLINKCOMSTR = env["LINKCOMSTR"] )
     env.Append( ARCOMSTR = "Generating library $TARGET" )
-
-endian = get_option( "endian" )
-
-if endian == "auto":
-    endian = sys.byteorder
-
-if endian == "little":
-    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "1234")
-elif endian == "big":
-    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "4321")
 
 if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     # The libraries we build in LIBDEPS_OBJS mode are just placeholders for tracking dependencies.
