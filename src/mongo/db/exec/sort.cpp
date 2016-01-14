@@ -101,12 +101,7 @@ bool SortStage::isEOF() {
     return child()->isEOF() && _sorted && (_data.end() == _resultIterator);
 }
 
-PlanStage::StageState SortStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
     const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes);
     if (_memUsage > maxBytes) {
         mongoutils::str::stream ss;
@@ -156,7 +151,6 @@ PlanStage::StageState SortStage::work(WorkingSetID* out) {
 
             addToBuffer(item);
 
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         } else if (PlanStage::IS_EOF == code) {
             // TODO: We don't need the lock for this.  We could ask for a yield and do this work
@@ -164,7 +158,6 @@ PlanStage::StageState SortStage::work(WorkingSetID* out) {
             sortBuffer();
             _resultIterator = _data.begin();
             _sorted = true;
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         } else if (PlanStage::FAILURE == code || PlanStage::DEAD == code) {
             *out = id;
@@ -178,10 +171,7 @@ PlanStage::StageState SortStage::work(WorkingSetID* out) {
                 *out = WorkingSetCommon::allocateStatusMember(_ws, status);
             }
             return code;
-        } else if (PlanStage::NEED_TIME == code) {
-            ++_commonStats.needTime;
         } else if (PlanStage::NEED_YIELD == code) {
-            ++_commonStats.needYield;
             *out = id;
         }
 
@@ -201,7 +191,6 @@ PlanStage::StageState SortStage::work(WorkingSetID* out) {
         _wsidByDiskLoc.erase(member->loc);
     }
 
-    ++_commonStats.advanced;
     return PlanStage::ADVANCED;
 }
 

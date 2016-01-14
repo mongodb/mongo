@@ -56,7 +56,7 @@ OplogStart::OplogStart(OperationContext* txn,
       _workingSet(ws),
       _filter(filter) {}
 
-PlanStage::StageState OplogStart::work(WorkingSetID* out) {
+PlanStage::StageState OplogStart::doWork(WorkingSetID* out) {
     // We do our (heavy) init in a work(), where work is expected.
     if (_needInit) {
         CollectionScanParams params;

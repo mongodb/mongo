@@ -77,7 +77,7 @@ public:
         }
     }
 
-    StageState work(WorkingSetID* out) override {
+    StageState doWork(WorkingSetID* out) override {
         MONGO_UNREACHABLE;
     }
 

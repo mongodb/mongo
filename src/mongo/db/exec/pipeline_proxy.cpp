@@ -55,7 +55,7 @@ PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
       _childExec(child),
       _ws(ws) {}
 
-PlanStage::StageState PipelineProxyStage::work(WorkingSetID* out) {
+PlanStage::StageState PipelineProxyStage::doWork(WorkingSetID* out) {
     if (!out) {
         return PlanStage::FAILURE;
     }

@@ -280,12 +280,7 @@ bool CachedPlanStage::isEOF() {
     return _results.empty() && child()->isEOF();
 }
 
-PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState CachedPlanStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -294,22 +289,11 @@ PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
     if (!_results.empty()) {
         *out = _results.front();
         _results.pop_front();
-        _commonStats.advanced++;
         return PlanStage::ADVANCED;
     }
 
     // Nothing left in trial period buffer.
-    StageState childStatus = child()->work(out);
-
-    if (PlanStage::ADVANCED == childStatus) {
-        _commonStats.advanced++;
-    } else if (PlanStage::NEED_YIELD == childStatus) {
-        _commonStats.needYield++;
-    } else if (PlanStage::NEED_TIME == childStatus) {
-        _commonStats.needTime++;
-    }
-
-    return childStatus;
+    return child()->work(out);
 }
 
 void CachedPlanStage::doInvalidate(OperationContext* txn,

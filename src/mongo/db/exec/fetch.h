@@ -58,7 +58,7 @@ public:
     ~FetchStage();
 
     bool isEOF() final;
-    StageState work(WorkingSetID* out) final;
+    StageState doWork(WorkingSetID* out) final;
 
     void doSaveState() final;
     void doRestoreState() final;

@@ -81,12 +81,7 @@ PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
     return state;
 }
 
-PlanStage::StageState NearStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState NearStage::doWork(WorkingSetID* out) {
     WorkingSetID toReturn = WorkingSet::INVALID_ID;
     Status error = Status::OK();
     PlanStage::StageState nextState = PlanStage::NEED_TIME;
@@ -114,12 +109,8 @@ PlanStage::StageState NearStage::work(WorkingSetID* out) {
         *out = WorkingSetCommon::allocateStatusMember(_workingSet, error);
     } else if (PlanStage::ADVANCED == nextState) {
         *out = toReturn;
-        ++_commonStats.advanced;
     } else if (PlanStage::NEED_YIELD == nextState) {
         *out = toReturn;
-        ++_commonStats.needYield;
-    } else if (PlanStage::NEED_TIME == nextState) {
-        ++_commonStats.needTime;
     } else if (PlanStage::IS_EOF == nextState) {
         _commonStats.isEOF = true;
     }

@@ -728,12 +728,7 @@ bool UpdateStage::isEOF() {
     return doneUpdating() && !needInsert();
 }
 
-PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -758,7 +753,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 member->obj = Snapshotted<BSONObj>(getOpCtx()->recoveryUnit()->getSnapshotId(),
                                                    newObj.getOwned());
                 member->transitionToOwnedObj();
-                ++_commonStats.advanced;
                 return PlanStage::ADVANCED;
             }
         }
@@ -785,7 +779,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
 
         *out = _idReturning;
         _idReturning = WorkingSet::INVALID_ID;
-        ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     }
 
@@ -823,7 +816,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
             }
 
             ++_specificStats.nInvalidateSkips;
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
         loc = member->loc;
@@ -837,7 +829,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
             // Found a loc that refers to a document we had already updated. Note that
             // we can never remove from _updatedLocs because updates by other clients
             // could cause us to encounter a document again later.
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
 
@@ -848,7 +839,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 // our snapshot has changed, refetch
                 if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, cursor)) {
                     // document was deleted, we're done here
-                    ++_commonStats.needTime;
                     return PlanStage::NEED_TIME;
                 }
 
@@ -856,7 +846,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 CanonicalQuery* cq = _params.canonicalQuery;
                 if (cq && !cq->root()->matchesBSON(member->obj.value(), NULL)) {
                     // doesn't match predicates anymore!
-                    ++_commonStats.needTime;
                     return PlanStage::NEED_TIME;
                 }
             }
@@ -910,7 +899,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
             _idRetrying = id;
             memberFreer.Dismiss();  // Keep this member around so we can retry updating it.
             *out = WorkingSet::INVALID_ID;
-            _commonStats.needYield++;
             return NEED_YIELD;
         }
 
@@ -936,7 +924,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 memberFreer.Dismiss();
             }
             *out = WorkingSet::INVALID_ID;
-            _commonStats.needYield++;
             return NEED_YIELD;
         }
 
@@ -946,16 +933,13 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
 
             memberFreer.Dismiss();  // Keep this member around so we can return it.
             *out = id;
-            ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
 
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::IS_EOF == status) {
         // The child is out of results, but we might not be done yet because we still might
         // have to do an insert.
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::FAILURE == status) {
         *out = id;
@@ -968,10 +952,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
             return PlanStage::FAILURE;
         }
         return status;
-    } else if (PlanStage::NEED_TIME == status) {
-        ++_commonStats.needTime;
     } else if (PlanStage::NEED_YIELD == status) {
-        ++_commonStats.needYield;
         *out = id;
     }
 

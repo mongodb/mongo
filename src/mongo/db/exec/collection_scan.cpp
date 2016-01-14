@@ -68,12 +68,7 @@ CollectionScan::CollectionScan(OperationContext* txn,
     _specificStats.direction = params.direction;
 }
 
-PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     if (_isDead) {
         Status status(
             ErrorCodes::CappedPositionLost,
@@ -118,7 +113,6 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
                 }
             }
 
-            _commonStats.needTime++;
             return PlanStage::NEED_TIME;
         }
 
@@ -132,7 +126,6 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
                 WorkingSetMember* member = _workingSet->get(_wsidForFetch);
                 member->setFetcher(fetcher.release());
                 *out = _wsidForFetch;
-                _commonStats.needYield++;
                 return PlanStage::NEED_YIELD;
             }
 
@@ -177,11 +170,9 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
 
     if (Filter::passes(member, _filter)) {
         *out = memberID;
-        ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     } else {
         _workingSet->free(memberID);
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }
 }

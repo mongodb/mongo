@@ -55,7 +55,7 @@ void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {
     _iterators.push_back(std::move(it));
 }
 
-PlanStage::StageState MultiIteratorStage::work(WorkingSetID* out) {
+PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
     if (_collection == NULL) {
         Status status(ErrorCodes::InternalError, "MultiIteratorStage died on null collection");
         *out = WorkingSetCommon::allocateStatusMember(_ws, status);

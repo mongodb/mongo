@@ -98,10 +98,7 @@ bool MultiPlanStage::isEOF() {
     return bestPlan.results.empty() && bestPlan.root->isEOF();
 }
 
-PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
     if (_failure) {
         *out = _statusMemberId;
         return PlanStage::FAILURE;
@@ -113,7 +110,6 @@ PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
     if (!bestPlan.results.empty()) {
         *out = bestPlan.results.front();
         bestPlan.results.pop_front();
-        _commonStats.advanced++;
         return PlanStage::ADVANCED;
     }
 
@@ -142,15 +138,6 @@ PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
     if (hasBackupPlan() && PlanStage::ADVANCED == state) {
         LOG(5) << "Best plan had a blocking stage, became unblocked\n";
         _backupPlanIdx = kNoSuchPlan;
-    }
-
-    // Increment stats.
-    if (PlanStage::ADVANCED == state) {
-        _commonStats.advanced++;
-    } else if (PlanStage::NEED_TIME == state) {
-        _commonStats.needTime++;
-    } else if (PlanStage::NEED_YIELD == state) {
-        _commonStats.needYield++;
     }
 
     return state;

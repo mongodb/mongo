@@ -107,12 +107,7 @@ bool AndHashStage::isEOF() {
         _children[_children.size() - 1]->isEOF();
 }
 
-PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState AndHashStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -233,7 +228,6 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
     if (_dataMap.end() == it) {
         // Child's output wasn't in every previous child.  Throw it out.
         _ws->free(*out);
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else {
         // Child's output was in every previous child.  Merge any key data in
@@ -244,7 +238,6 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
         AndCommon::mergeFrom(_ws, hashID, *member);
         _ws->free(*out);
 
-        ++_commonStats.advanced;
         *out = hashID;
         return PlanStage::ADVANCED;
     }
@@ -281,7 +274,6 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
             // happen if we're seeing a newer copy of the same doc in a more recent snapshot.
             // Throw out the newer copy of the doc.
             _ws->free(id);
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
 
@@ -291,7 +283,6 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
         // Update memory stats.
         _memUsage += member->getMemUsage();
 
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::IS_EOF == childStatus) {
         // Done reading child 0.
@@ -303,7 +294,6 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
             return PlanStage::IS_EOF;
         }
 
-        ++_commonStats.needTime;
         _specificStats.mapAfterChild.push_back(_dataMap.size());
 
         return PlanStage::NEED_TIME;
@@ -320,10 +310,7 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
         }
         return childStatus;
     } else {
-        if (PlanStage::NEED_TIME == childStatus) {
-            ++_commonStats.needTime;
-        } else if (PlanStage::NEED_YIELD == childStatus) {
-            ++_commonStats.needYield;
+        if (PlanStage::NEED_YIELD == childStatus) {
             *out = id;
         }
 
@@ -363,7 +350,6 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
             _memUsage += olderMember->getMemUsage() - memUsageBefore;
         }
         _ws->free(id);
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::IS_EOF == childStatus) {
         // Finished with a child.
@@ -404,7 +390,6 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
             _hashingChildren = false;
         }
 
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
         *out = id;
@@ -419,10 +404,7 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
         }
         return childStatus;
     } else {
-        if (PlanStage::NEED_TIME == childStatus) {
-            ++_commonStats.needTime;
-        } else if (PlanStage::NEED_YIELD == childStatus) {
-            ++_commonStats.needYield;
+        if (PlanStage::NEED_YIELD == childStatus) {
             *out = id;
         }
 

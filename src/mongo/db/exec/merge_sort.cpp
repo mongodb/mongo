@@ -69,12 +69,7 @@ bool MergeSortStage::isEOF() {
     return _merging.empty() && _noResultToMerge.empty();
 }
 
-PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -101,7 +96,6 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
                     if (_seen.end() != _seen.find(member->loc)) {
                         // ...drop it.
                         _ws->free(id);
-                        ++_commonStats.needTime;
                         ++_specificStats.dupsDropped;
                         return PlanStage::NEED_TIME;
                     } else {
@@ -129,13 +123,11 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
             // Insert the result (indirectly) into our priority queue.
             _merging.push(_mergingData.begin());
 
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         } else if (PlanStage::IS_EOF == code) {
             // There are no more results possible from this child.  Don't bother with it
             // anymore.
             _noResultToMerge.pop();
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         } else if (PlanStage::FAILURE == code || PlanStage::DEAD == code) {
             *out = id;
@@ -150,11 +142,8 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
             }
             return code;
         } else {
-            if (PlanStage::NEED_TIME == code) {
-                ++_commonStats.needTime;
-            } else if (PlanStage::NEED_YIELD == code) {
+            if (PlanStage::NEED_YIELD == code) {
                 *out = id;
-                ++_commonStats.needYield;
             }
 
             return code;
@@ -178,7 +167,6 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
 
     // Return the min.
     *out = idToTest;
-    ++_commonStats.advanced;
 
     return PlanStage::ADVANCED;
 }

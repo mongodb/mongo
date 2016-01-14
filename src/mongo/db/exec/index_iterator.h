@@ -51,7 +51,7 @@ public:
                        BSONObj keyPattern,
                        std::unique_ptr<SortedDataInterface::Cursor> cursor);
 
-    PlanStage::StageState work(WorkingSetID* out) final;
+    PlanStage::StageState doWork(WorkingSetID* out) final;
 
     bool isEOF() final;
 

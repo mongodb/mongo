@@ -51,7 +51,7 @@ public:
 
     void addIterator(std::unique_ptr<RecordCursor> it);
 
-    PlanStage::StageState work(WorkingSetID* out) final;
+    PlanStage::StageState doWork(WorkingSetID* out) final;
 
     bool isEOF() final;
 

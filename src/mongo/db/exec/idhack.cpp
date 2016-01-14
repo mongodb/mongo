@@ -101,12 +101,7 @@ bool IDHackStage::isEOF() {
     return _done;
 }
 
-PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
     if (_done) {
         return PlanStage::IS_EOF;
     }
@@ -152,7 +147,6 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
             _idBeingPagedIn = id;
             member->setFetcher(fetcher.release());
             *out = id;
-            _commonStats.needYield++;
             return NEED_YIELD;
         }
 
@@ -174,7 +168,6 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
             _workingSet->free(id);
 
         *out = WorkingSet::INVALID_ID;
-        _commonStats.needYield++;
         return NEED_YIELD;
     }
 }
@@ -192,7 +185,6 @@ PlanStage::StageState IDHackStage::advance(WorkingSetID id,
     }
 
     _done = true;
-    ++_commonStats.advanced;
     *out = id;
     return PlanStage::ADVANCED;
 }

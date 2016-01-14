@@ -69,7 +69,7 @@ public:
      */
     size_t getMemUsage() const;
 
-    StageState work(WorkingSetID* out) final;
+    StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;

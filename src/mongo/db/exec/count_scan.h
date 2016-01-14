@@ -68,7 +68,7 @@ class CountScan final : public PlanStage {
 public:
     CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet);
 
-    StageState work(WorkingSetID* out) final;
+    StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
     void doSaveState() final;
     void doRestoreState() final;

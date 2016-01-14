@@ -32,7 +32,26 @@
 
 #include "mongo/db/exec/plan_stage.h"
 
+#include "mongo/db/exec/scoped_timer.h"
+
 namespace mongo {
+
+PlanStage::StageState PlanStage::work(WorkingSetID* out) {
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
+    ++_commonStats.works;
+
+    StageState workResult = doWork(out);
+
+    if (StageState::ADVANCED == workResult) {
+        ++_commonStats.advanced;
+    } else if (StageState::NEED_TIME == workResult) {
+        ++_commonStats.needTime;
+    } else if (StageState::NEED_YIELD == workResult) {
+        ++_commonStats.needYield;
+    }
+
+    return workResult;
+}
 
 void PlanStage::saveState() {
     ++_commonStats.yields;

@@ -185,7 +185,7 @@ public:
      * Stage returns StageState::ADVANCED if *out is set to the next unit of output.  Otherwise,
      * returns another value of StageState to indicate the stage's status.
      */
-    virtual StageState work(WorkingSetID* out) = 0;
+    StageState work(WorkingSetID* out);
 
     /**
      * Returns true if no more work can be done on the query / out of results.
@@ -318,6 +318,11 @@ public:
     virtual const SpecificStats* getSpecificStats() const = 0;
 
 protected:
+    /**
+     * Performs one unit of work.  See comment at work() above.
+     */
+    virtual StageState doWork(WorkingSetID* out) = 0;
+
     /**
      * Saves any stage-specific state required to resume where it was if the underlying data
      * changes.

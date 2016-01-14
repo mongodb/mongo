@@ -63,12 +63,7 @@ bool AndSortedStage::isEOF() {
     return _isEOF;
 }
 
-PlanStage::StageState AndSortedStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState AndSortedStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -123,7 +118,6 @@ PlanStage::StageState AndSortedStage::getTargetLoc(WorkingSetID* out) {
             _workingTowardRep.push(i);
         }
 
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else if (PlanStage::IS_EOF == state) {
         _isEOF = true;
@@ -142,10 +136,7 @@ PlanStage::StageState AndSortedStage::getTargetLoc(WorkingSetID* out) {
         _isEOF = true;
         return state;
     } else {
-        if (PlanStage::NEED_TIME == state) {
-            ++_commonStats.needTime;
-        } else if (PlanStage::NEED_YIELD == state) {
-            ++_commonStats.needYield;
+        if (PlanStage::NEED_YIELD == state) {
             *out = id;
         }
 
@@ -191,17 +182,14 @@ PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
                 _targetLoc = RecordId();
 
                 *out = toReturn;
-                ++_commonStats.advanced;
                 return PlanStage::ADVANCED;
             }
             // More children need to be advanced to _targetLoc.
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         } else if (member->loc < _targetLoc) {
             // The front element of _workingTowardRep hasn't hit the thing we're AND-ing with
             // yet.  Try again later.
             _ws->free(id);
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         } else {
             // member->loc > _targetLoc.
@@ -224,7 +212,6 @@ PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
                 }
             }
             // Need time to chase after the new _targetLoc.
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     } else if (PlanStage::IS_EOF == state) {
@@ -246,10 +233,7 @@ PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
         _ws->free(_targetId);
         return state;
     } else {
-        if (PlanStage::NEED_TIME == state) {
-            ++_commonStats.needTime;
-        } else if (PlanStage::NEED_YIELD == state) {
-            ++_commonStats.needYield;
+        if (PlanStage::NEED_YIELD == state) {
             *out = id;
         }
 

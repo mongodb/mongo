@@ -54,12 +54,7 @@ bool OrStage::isEOF() {
     return _currentChild >= _children.size();
 }
 
-PlanStage::StageState OrStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -79,7 +74,6 @@ PlanStage::StageState OrStage::work(WorkingSetID* out) {
                 // ...drop it.
                 ++_specificStats.dupsDropped;
                 _ws->free(id);
-                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             } else {
                 // Otherwise, note that we've seen it.
@@ -90,12 +84,10 @@ PlanStage::StageState OrStage::work(WorkingSetID* out) {
         if (Filter::passes(member, _filter)) {
             // Match!  return it.
             *out = id;
-            ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         } else {
             // Does not match, try again.
             _ws->free(id);
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     } else if (PlanStage::IS_EOF == childStatus) {
@@ -106,7 +98,6 @@ PlanStage::StageState OrStage::work(WorkingSetID* out) {
         if (isEOF()) {
             return PlanStage::IS_EOF;
         } else {
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     } else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
@@ -121,10 +112,7 @@ PlanStage::StageState OrStage::work(WorkingSetID* out) {
             *out = WorkingSetCommon::allocateStatusMember(_ws, status);
         }
         return childStatus;
-    } else if (PlanStage::NEED_TIME == childStatus) {
-        ++_commonStats.needTime;
     } else if (PlanStage::NEED_YIELD == childStatus) {
-        ++_commonStats.needYield;
         *out = id;
     }
 

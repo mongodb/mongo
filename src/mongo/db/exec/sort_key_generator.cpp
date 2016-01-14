@@ -281,15 +281,9 @@ bool SortKeyGeneratorStage::isEOF() {
     return child()->isEOF();
 }
 
-PlanStage::StageState SortKeyGeneratorStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState SortKeyGeneratorStage::doWork(WorkingSetID* out) {
     if (!_sortKeyGen) {
         _sortKeyGen = stdx::make_unique<SortKeyGenerator>(_sortSpec, _query);
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }
 
@@ -312,10 +306,6 @@ PlanStage::StageState SortKeyGeneratorStage::work(WorkingSetID* out) {
 
     if (stageState == PlanStage::IS_EOF) {
         _commonStats.isEOF = true;
-    } else if (stageState == PlanStage::NEED_TIME) {
-        ++_commonStats.needTime;
-    } else if (stageState == PlanStage::NEED_YIELD) {
-        ++_commonStats.needYield;
     }
 
     return stageState;

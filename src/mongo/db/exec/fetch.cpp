@@ -74,12 +74,7 @@ bool FetchStage::isEOF() {
     return child()->isEOF();
 }
 
-PlanStage::StageState FetchStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -116,7 +111,6 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
                     _idRetrying = id;
                     member->setFetcher(fetcher.release());
                     *out = id;
-                    _commonStats.needYield++;
                     return NEED_YIELD;
                 }
 
@@ -124,7 +118,6 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
                 // as well as an unowned object
                 if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, _cursor)) {
                     _ws->free(id);
-                    _commonStats.needTime++;
                     return NEED_TIME;
                 }
             } catch (const WriteConflictException& wce) {
@@ -133,7 +126,6 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
                 member->makeObjOwnedIfNeeded();
                 _idRetrying = id;
                 *out = WorkingSet::INVALID_ID;
-                _commonStats.needYield++;
                 return NEED_YIELD;
             }
         }
@@ -151,10 +143,7 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
             *out = WorkingSetCommon::allocateStatusMember(_ws, status);
         }
         return status;
-    } else if (PlanStage::NEED_TIME == status) {
-        ++_commonStats.needTime;
     } else if (PlanStage::NEED_YIELD == status) {
-        ++_commonStats.needYield;
         *out = id;
     }
 
@@ -214,13 +203,9 @@ PlanStage::StageState FetchStage::returnIfMatches(WorkingSetMember* member,
 
     if (Filter::passes(member, _filter)) {
         *out = memberID;
-
-        ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     } else {
         _ws->free(memberID);
-
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }
 }

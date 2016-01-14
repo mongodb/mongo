@@ -95,7 +95,7 @@ public:
               WorkingSet* workingSet,
               const MatchExpression* filter);
 
-    StageState work(WorkingSetID* out) final;
+    StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
     void doSaveState() final;
     void doRestoreState() final;

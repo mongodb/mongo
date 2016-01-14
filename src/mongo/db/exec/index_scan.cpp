@@ -121,12 +121,7 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
     }
 }
 
-PlanStage::StageState IndexScan::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     // Get the next kv pair from the index, if any.
     boost::optional<IndexKeyEntry> kv;
     try {
@@ -176,7 +171,6 @@ PlanStage::StageState IndexScan::work(WorkingSetID* out) {
 
             case IndexBoundsChecker::MUST_ADVANCE:
                 _scanState = NEED_SEEK;
-                _commonStats.needTime++;
                 return PlanStage::NEED_TIME;
         }
     }
@@ -195,14 +189,12 @@ PlanStage::StageState IndexScan::work(WorkingSetID* out) {
         if (!_returned.insert(kv->loc).second) {
             // We've seen this RecordId before. Skip it this time.
             ++_specificStats.dupsDropped;
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     }
 
     if (_filter) {
         if (!Filter::passes(kv->key, _keyPattern, _filter)) {
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
     }
@@ -224,7 +216,6 @@ PlanStage::StageState IndexScan::work(WorkingSetID* out) {
     }
 
     *out = id;
-    ++_commonStats.advanced;
     return PlanStage::ADVANCED;
 }
 

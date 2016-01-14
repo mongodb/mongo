@@ -198,11 +198,7 @@ StatusWith<BSONObj> GroupStage::finalizeResults() {
     return results;
 }
 
-PlanStage::StageState GroupStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState GroupStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -215,7 +211,6 @@ PlanStage::StageState GroupStage::work(WorkingSetID* out) {
             return PlanStage::FAILURE;
         }
         _groupState = GroupState_ReadingFromChild;
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }
 
@@ -225,10 +220,8 @@ PlanStage::StageState GroupStage::work(WorkingSetID* out) {
     StageState state = child()->work(&id);
 
     if (PlanStage::NEED_TIME == state) {
-        ++_commonStats.needTime;
         return state;
     } else if (PlanStage::NEED_YIELD == state) {
-        ++_commonStats.needYield;
         *out = id;
         return state;
     } else if (PlanStage::FAILURE == state) {
@@ -257,7 +250,6 @@ PlanStage::StageState GroupStage::work(WorkingSetID* out) {
 
         _ws->free(id);
 
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     } else {
         // We're done reading from our child.
@@ -277,7 +269,6 @@ PlanStage::StageState GroupStage::work(WorkingSetID* out) {
         member->obj = Snapshotted<BSONObj>(SnapshotId(), results.getValue());
         member->transitionToOwnedObj();
 
-        ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     }
 }

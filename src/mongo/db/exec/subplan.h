@@ -75,7 +75,7 @@ public:
     static bool canUseSubplanning(const CanonicalQuery& query);
 
     bool isEOF() final;
-    StageState work(WorkingSetID* out) final;
+    StageState doWork(WorkingSetID* out) final;
 
     StageType stageType() const final {
         return STAGE_SUBPLAN;

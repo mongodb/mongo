@@ -192,12 +192,7 @@ bool ProjectionStage::isEOF() {
     return child()->isEOF();
 }
 
-PlanStage::StageState ProjectionStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState ProjectionStage::doWork(WorkingSetID* out) {
     WorkingSetID id = WorkingSet::INVALID_ID;
     StageState status = child()->work(&id);
 
@@ -214,7 +209,6 @@ PlanStage::StageState ProjectionStage::work(WorkingSetID* out) {
         }
 
         *out = id;
-        ++_commonStats.advanced;
     } else if (PlanStage::FAILURE == status || PlanStage::DEAD == status) {
         *out = id;
         // If a stage fails, it may create a status WSM to indicate why it
@@ -226,10 +220,7 @@ PlanStage::StageState ProjectionStage::work(WorkingSetID* out) {
             Status status(ErrorCodes::InternalError, ss);
             *out = WorkingSetCommon::allocateStatusMember(_ws, status);
         }
-    } else if (PlanStage::NEED_TIME == status) {
-        _commonStats.needTime++;
     } else if (PlanStage::NEED_YIELD == status) {
-        _commonStats.needYield++;
         *out = id;
     }
 

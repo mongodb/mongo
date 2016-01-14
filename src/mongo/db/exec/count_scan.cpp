@@ -64,13 +64,9 @@ CountScan::CountScan(OperationContext* txn, const CountScanParams& params, Worki
 }
 
 
-PlanStage::StageState CountScan::work(WorkingSetID* out) {
-    ++_commonStats.works;
+PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF)
         return PlanStage::IS_EOF;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
 
     boost::optional<IndexKeyEntry> entry;
     const bool needInit = !_cursor;
@@ -106,12 +102,10 @@ PlanStage::StageState CountScan::work(WorkingSetID* out) {
 
     if (_shouldDedup && !_returned.insert(entry->loc).second) {
         // *loc was already in _returned.
-        ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }
 
     *out = WorkingSet::INVALID_ID;
-    ++_commonStats.advanced;
     return PlanStage::ADVANCED;
 }
 

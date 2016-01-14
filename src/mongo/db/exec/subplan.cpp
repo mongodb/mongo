@@ -511,28 +511,13 @@ bool SubplanStage::isEOF() {
     return child()->isEOF();
 }
 
-PlanStage::StageState SubplanStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState SubplanStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
 
     invariant(child());
-    StageState state = child()->work(out);
-
-    if (PlanStage::NEED_TIME == state) {
-        ++_commonStats.needTime;
-    } else if (PlanStage::NEED_YIELD == state) {
-        ++_commonStats.needYield;
-    } else if (PlanStage::ADVANCED == state) {
-        ++_commonStats.advanced;
-    }
-
-    return state;
+    return child()->work(out);
 }
 
 unique_ptr<PlanStageStats> SubplanStage::getStats() {

@@ -95,12 +95,7 @@ void CountStage::trivialCount() {
     _specificStats.trivialCount = true;
 }
 
-PlanStage::StageState CountStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState CountStage::doWork(WorkingSetID* out) {
     // This stage never returns a working set member.
     *out = WorkingSet::INVALID_ID;
 
@@ -154,11 +149,9 @@ PlanStage::StageState CountStage::work(WorkingSetID* out) {
         }
     } else if (PlanStage::NEED_YIELD == state) {
         *out = id;
-        _commonStats.needYield++;
         return PlanStage::NEED_YIELD;
     }
 
-    _commonStats.needTime++;
     return PlanStage::NEED_TIME;
 }
 

@@ -55,12 +55,7 @@ bool EnsureSortedStage::isEOF() {
     return child()->isEOF();
 }
 
-PlanStage::StageState EnsureSortedStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState EnsureSortedStage::doWork(WorkingSetID* out) {
     StageState stageState = child()->work(out);
 
     if (PlanStage::ADVANCED == stageState) {
@@ -76,20 +71,12 @@ PlanStage::StageState EnsureSortedStage::work(WorkingSetID* out) {
             // 'member' is out of order. Drop it from the result set.
             _ws->free(*out);
             ++_specificStats.nDropped;
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
 
         invariant(curSortKey.isOwned());
         _prevSortKey = curSortKey;
-        ++_commonStats.advanced;
         return PlanStage::ADVANCED;
-    }
-
-    if (PlanStage::NEED_TIME == stageState) {
-        ++_commonStats.needTime;
-    } else if (PlanStage::NEED_YIELD == stageState) {
-        ++_commonStats.needYield;
     }
 
     return stageState;

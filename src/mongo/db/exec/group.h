@@ -87,7 +87,7 @@ public:
                WorkingSet* workingSet,
                PlanStage* child);
 
-    StageState work(WorkingSetID* out) final;
+    StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 
     StageType stageType() const final {

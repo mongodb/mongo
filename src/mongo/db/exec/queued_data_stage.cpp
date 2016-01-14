@@ -43,12 +43,7 @@ const char* QueuedDataStage::kStageType = "QUEUED_DATA";
 QueuedDataStage::QueuedDataStage(OperationContext* opCtx, WorkingSet* ws)
     : PlanStage(kStageType, opCtx), _ws(ws) {}
 
-PlanStage::StageState QueuedDataStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState QueuedDataStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -57,11 +52,8 @@ PlanStage::StageState QueuedDataStage::work(WorkingSetID* out) {
     _results.pop();
 
     if (PlanStage::ADVANCED == state) {
-        ++_commonStats.advanced;
         *out = _members.front();
         _members.pop();
-    } else if (PlanStage::NEED_TIME == state) {
-        ++_commonStats.needTime;
     }
 
     return state;

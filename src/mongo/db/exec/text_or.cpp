@@ -133,12 +133,7 @@ const SpecificStats* TextOrStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-PlanStage::StageState TextOrStage::work(WorkingSetID* out) {
-    ++_commonStats.works;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+PlanStage::StageState TextOrStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
     }
@@ -158,21 +153,6 @@ PlanStage::StageState TextOrStage::work(WorkingSetID* out) {
         case State::kDone:
             // Should have been handled above.
             invariant(false);
-            break;
-    }
-
-    // Increment common stats counters.
-    switch (stageState) {
-        case PlanStage::ADVANCED:
-            ++_commonStats.advanced;
-            break;
-        case PlanStage::NEED_TIME:
-            ++_commonStats.needTime;
-            break;
-        case PlanStage::NEED_YIELD:
-            ++_commonStats.needYield;
-            break;
-        default:
             break;
     }
 

@@ -53,7 +53,7 @@ public:
     ~KeepMutationsStage();
 
     bool isEOF() final;
-    StageState work(WorkingSetID* out) final;
+    StageState doWork(WorkingSetID* out) final;
 
     StageType stageType() const final {
         return STAGE_KEEP_MUTATIONS;

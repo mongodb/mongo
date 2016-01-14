@@ -67,13 +67,9 @@ DistinctScan::DistinctScan(OperationContext* txn,
     _commonStats.isEOF = !_checker.getStartSeekPoint(&_seekPoint);
 }
 
-PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
-    ++_commonStats.works;
+PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF)
         return PlanStage::IS_EOF;
-
-    // Adds the amount of time taken by work() to executionTimeMillis.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
 
     boost::optional<IndexKeyEntry> kv;
     try {
@@ -95,7 +91,6 @@ PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
     switch (_checker.checkKey(kv->key, &_seekPoint)) {
         case IndexBoundsChecker::MUST_ADVANCE:
             // Try again next time. The checker has adjusted the _seekPoint.
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
 
         case IndexBoundsChecker::DONE:
@@ -122,7 +117,6 @@ PlanStage::StageState DistinctScan::work(WorkingSetID* out) {
             _workingSet->transitionToLocAndIdx(id);
 
             *out = id;
-            ++_commonStats.advanced;
             return PlanStage::ADVANCED;
     }
     invariant(false);

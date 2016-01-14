@@ -49,7 +49,7 @@ public:
                        const std::shared_ptr<PlanExecutor>& child,
                        WorkingSet* ws);
 
-    PlanStage::StageState work(WorkingSetID* out) final;
+    PlanStage::StageState doWork(WorkingSetID* out) final;
 
     bool isEOF() final;
 
