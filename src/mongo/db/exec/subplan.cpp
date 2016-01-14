@@ -163,10 +163,6 @@ std::unique_ptr<MatchExpression> SubplanStage::rewriteToRootedOr(
 }
 
 Status SubplanStage::planSubqueries() {
-    // Adds the amount of time taken by planSubqueries() to executionTimeMillis. There's lots of
-    // work that happens here, so this is needed for the time accounting to make sense.
-    ScopedTimer timer(&_commonStats.executionTimeMillis);
-
     _orExpression = _query->root()->shallowClone();
     if (isContainedOr(_orExpression.get())) {
         _orExpression = rewriteToRootedOr(std::move(_orExpression));
