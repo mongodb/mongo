@@ -300,6 +300,8 @@ __wt_block_desc_byteswap(WT_BLOCK_DESC *desc)
 	desc->majorv = __wt_bswap16(desc->majorv);
 	desc->minorv = __wt_bswap16(desc->minorv);
 	desc->cksum = __wt_bswap32(desc->cksum);
+#else
+	WT_UNUSED(desc);
 #endif
 }
 
@@ -355,6 +357,8 @@ __wt_block_header_byteswap(WT_BLOCK_HEADER *blk)
 #ifdef WORDS_BIGENDIAN
 	blk->disk_size = __wt_bswap32(blk->disk_size);
 	blk->cksum = __wt_bswap32(blk->cksum);
+#else
+	WT_UNUSED(blk);
 #endif
 }
 
