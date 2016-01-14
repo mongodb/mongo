@@ -241,10 +241,22 @@ class test_join01(wttest.WiredTigerTestCase):
         # Joining a non positioned cursor
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.join(jc, ic0, 'compare=ge'),
-            '/requires key be set/')
+            '/requires reference cursor be positioned/')
+        ic0.set_key('val1')
+        # Joining a non positioned cursor (no search or next has been done)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.join(jc, ic0, 'compare=ge'),
+            '/requires reference cursor be positioned/')
+        ic0.set_key('valXX')
+        self.assertEqual(ic0.search(), wiredtiger.WT_NOTFOUND)
+        # Joining a non positioned cursor after failed search
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.join(jc, ic0, 'compare=ge'),
+            '/requires reference cursor be positioned/')
 
-        # minimally position the cursors now
-        ic0.next()
+        # position the cursors now
+        ic0.set_key('val1')
+        ic0.search()
         ic0again.next()
         icB.next()
 
@@ -256,7 +268,7 @@ class test_join01(wttest.WiredTigerTestCase):
         # The cursor must be positioned
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.join(jc, ic1, 'compare=ge'),
-            '/requires key be set/')
+            '/requires reference cursor be positioned/')
         ic1.next()
 
         # The first cursor joined cannot be bloom
