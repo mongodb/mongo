@@ -22,8 +22,9 @@
         // We should have failed to start.
         assert(mongo2 === null);
         var logContents = rawMongoProgramOutput();
-        assert(logContents.indexOf("Unable to lock file") > 0);
-
+        assert(logContents.indexOf("Unable to lock file") > 0 ||
+               // Windows error message is different.
+               logContents.indexOf("Unable to create/open lock file") > 0);
     } finally {
         MongoRunner.stopMongod(mongo1);
     }

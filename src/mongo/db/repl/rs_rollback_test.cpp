@@ -143,7 +143,6 @@ private:
 void RSRollbackTest::setUp() {
     ServiceContext* serviceContext = getGlobalServiceContext();
     if (!serviceContext->getGlobalStorageEngine()) {
-        checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
         // When using the 'devnull' storage engine, it is fine for the temporary directory to
         // go away after the global storage engine is initialized.
         unittest::TempDir tempDir("rs_rollback_test");
@@ -151,6 +150,7 @@ void RSRollbackTest::setUp() {
         mongo::storageGlobalParams.dbpath = tempDir.path();
         mongo::storageGlobalParams.engine = "ephemeralForTest";
         mongo::storageGlobalParams.engineSetByUser = true;
+        checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
         serviceContext->initializeGlobalStorageEngine();
     }
 
