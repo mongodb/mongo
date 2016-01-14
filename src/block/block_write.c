@@ -203,6 +203,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_FH *fh;
 	size_t align_size;
 	wt_off_t offset;
+	uint32_t cksum;
 	bool local_locked;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
@@ -260,8 +261,9 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	if (data_cksum)
 		F_SET(blk, WT_BLOCK_DATA_CKSUM);
 	blk->cksum = 0;
-	blk->cksum = __wt_cksum(
+	blk->cksum = cksum = __wt_cksum(
 	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
+	__wt_block_header_byteswap(blk);
 
 	/* Pre-allocate some number of extension structures. */
 	WT_RET(__wt_block_ext_prealloc(session, 5));
@@ -325,11 +327,11 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	WT_RET(__wt_verbose(session, WT_VERB_WRITE,
 	    "off %" PRIuMAX ", size %" PRIuMAX ", cksum %" PRIu32,
-	    (uintmax_t)offset, (uintmax_t)align_size, blk->cksum));
+	    (uintmax_t)offset, (uintmax_t)align_size, cksum));
 
 	*offsetp = offset;
 	*sizep = WT_STORE_SIZE(align_size);
-	*cksump = blk->cksum;
+	*cksump = cksum;
 
 	return (ret);
 }

@@ -139,6 +139,7 @@ __wt_block_read_off_blind(
 	WT_RET(__wt_read(
 	    session, block->fh, offset, (size_t)block->allocsize, buf->mem));
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
+	__wt_block_header_byteswap(blk);
 
 	/*
 	 * Copy out the size and checksum (we're about to re-use the buffer),
@@ -194,6 +195,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	buf->size = size;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
+	__wt_block_header_byteswap(blk);
 	if (blk->cksum == cksum) {
 		blk->cksum = 0;
 		page_cksum = __wt_cksum(buf->mem,

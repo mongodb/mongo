@@ -289,6 +289,21 @@ struct __wt_block_desc {
 #define	WT_BLOCK_DESC_SIZE		16
 
 /*
+ * __wt_block_desc_byteswap --
+ *	Handle big- and little-endian transformation of the description block.
+ */
+static inline void
+__wt_block_desc_byteswap(WT_BLOCK_DESC *desc)
+{
+#ifdef WORDS_BIGENDIAN
+	desc->magic = __wt_bswap32(desc->magic);
+	desc->majorv = __wt_bswap16(desc->majorv);
+	desc->minorv = __wt_bswap16(desc->minorv);
+	desc->cksum = __wt_bswap32(desc->cksum);
+#endif
+}
+
+/*
  * WT_BLOCK_HEADER --
  *	Blocks have a common header, a WT_PAGE_HEADER structure followed by a
  * block-manager specific structure: WT_BLOCK_HEADER is WiredTiger's default.
@@ -329,6 +344,19 @@ struct __wt_block_header {
  * the compiler inserts padding it will break the world.
  */
 #define	WT_BLOCK_HEADER_SIZE		12
+
+/*
+ * __wt_block_header_byteswap --
+ *	Handle big- and little-endian transformation of the header block.
+ */
+static inline void
+__wt_block_header_byteswap(WT_BLOCK_HEADER *blk)
+{
+#ifdef WORDS_BIGENDIAN
+	blk->disk_size = __wt_bswap32(blk->disk_size);
+	blk->cksum = __wt_bswap32(blk->cksum);
+#endif
+}
 
 /*
  * WT_BLOCK_HEADER_BYTE

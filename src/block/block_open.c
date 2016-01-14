@@ -338,6 +338,7 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 	desc->cksum = 0;
 	desc->cksum = __wt_cksum(desc, allocsize);
 
+	__wt_block_desc_byteswap(desc);
 	ret = __wt_write(session, fh, (wt_off_t)0, (size_t)allocsize, desc);
 
 	__wt_scr_free(session, &buf);
@@ -364,6 +365,8 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	    block->fh, (wt_off_t)0, (size_t)block->allocsize, buf->mem));
 
 	desc = buf->mem;
+	__wt_block_desc_byteswap(desc);
+
 	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
 	    "%s: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
