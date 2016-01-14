@@ -3312,6 +3312,7 @@ buildvariants:
   - enterprise
   run_on:
   - windows-64-vs2013-test
+  batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl sasl'"
     exe: ".exe"
@@ -4961,6 +4962,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
@@ -4972,7 +4974,6 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: rhel62
-  batchtime: 1440 # 1 day
   tasks:
   - name: compile
     distros:
