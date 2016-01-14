@@ -61,14 +61,17 @@ MONGO_FP_DECLARE(maxTimeNeverTimeOut);
 // todo : move more here
 
 CurOp::CurOp(Client* client, CurOp* wrapped) : _client(client), _wrapped(wrapped) {
-    if (_wrapped)
-        _client->_curOp = this;
     _start = 0;
     _active = false;
     _reset();
     _op = 0;
     _opNum = _nextOpNum.fetchAndAdd(1);
     _command = NULL;
+
+    if (_wrapped) {
+        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
+        _client->_curOp = this;
+    }
 }
 
 void CurOp::_reset() {
