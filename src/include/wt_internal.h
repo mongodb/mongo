@@ -302,6 +302,7 @@ union __wt_rand_state;
 #include "msvc.h"
 #endif
 #include "hardware.h"
+#include "endian.h"
 
 #include "queue.h"
 
