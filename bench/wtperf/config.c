@@ -64,14 +64,14 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	if (src->uris != NULL) {
 		dest->uris = dcalloc(src->table_count, sizeof(char *));
 		for (i = 0; i < src->table_count; i++)
-			dest->uris[i] = strdup(src->uris[i]);
+			dest->uris[i] = dstrdup(src->uris[i]);
 	}
 	dest->ckptthreads = NULL;
 	dest->popthreads = NULL;
 	dest->workers = NULL;
 
 	if (src->base_uri != NULL)
-		dest->base_uri = strdup(src->base_uri);
+		dest->base_uri = dstrdup(src->base_uri);
 	if (src->workload != NULL) {
 		dest->workload = dcalloc(WORKLOAD_MAX, sizeof(WORKLOAD));
 		memcpy(dest->workload,
