@@ -1,0 +1,4 @@
+{"_id":{"$oid":"546651e74bf6e4cb017c5312"},"a":1.0,"b":"I am a string","c":{"$timestamp":{"t":1415991783,"i":1}},"d":{"$binary":"VEVTVCBUM1NU","$type":"00"}}
+{"_id":{"$oid":"546651f74bf6e4cb017c5313"},"a":2.5,"b":"I am a string","c":{"$timestamp":{"t":1415991799,"i":1}},"d":{"$binary":"VEVTVCBUM1ND","$type":"00"}}
+{"_id":{"$oid":"546652084bf6e4cb017c5314"},"a":4.0,"b":"string2"}
+{"_id":{"$oid":"546652254bf6e4cb017c5315"},"a":4.01,"b":"string3","c":{"key":"value"}}

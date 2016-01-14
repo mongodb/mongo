@@ -3,6 +3,7 @@ package main
 
 import (
 	"github.com/mongodb/mongo-tools/bsondump"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/signals"
@@ -36,35 +37,48 @@ func main() {
 
 	log.SetVerbosity(opts.Verbosity)
 
-	// pull out the filename
-	if len(args) == 0 {
-		log.Logf(log.Always, "must provide a filename")
-		log.Logf(log.Always, "try 'bsondump --help' for more information")
-		os.Exit(util.ExitBadOptions)
-	} else if len(args) > 1 {
+	if len(args) > 1 {
 		log.Logf(log.Always, "too many positional arguments: %v", args)
 		log.Logf(log.Always, "try 'bsondump --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
+	// If the user specified a bson input file
+	if len(args) == 1 {
+		if bsonDumpOpts.BSONFileName != "" {
+			log.Logf(log.Always, "Cannot specify both a positional argument and --bsonFile")
+			os.Exit(util.ExitBadOptions)
+		}
+
+		bsonDumpOpts.BSONFileName = args[0]
+	}
+
 	dumper := bsondump.BSONDump{
 		ToolOptions:     opts,
 		BSONDumpOptions: bsonDumpOpts,
-		FileName:        args[0],
-		Out:             os.Stdout,
 	}
+
+	reader, err := bsonDumpOpts.GetBSONReader()
+	if err != nil {
+		log.Logf(log.Always, "Getting BSON Reader Failed: %v", err)
+		os.Exit(util.ExitError)
+	}
+	dumper.BSONSource = db.NewBSONSource(reader)
+	defer dumper.BSONSource.Close()
+
+	writer, err := bsonDumpOpts.GetWriter()
+	if err != nil {
+		log.Logf(log.Always, "Getting Writer Failed: %v", err)
+		os.Exit(util.ExitError)
+	}
+	dumper.Out = writer
+	defer dumper.Out.Close()
 
 	log.Logf(log.DebugLow, "running bsondump with --objcheck: %v", bsonDumpOpts.ObjCheck)
 
 	if len(bsonDumpOpts.Type) != 0 && bsonDumpOpts.Type != "debug" && bsonDumpOpts.Type != "json" {
 		log.Logf(log.Always, "Unsupported output type '%v'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)
 		os.Exit(util.ExitBadOptions)
-	}
-
-	err = dumper.Open()
-	if err != nil {
-		log.Logf(log.Always, "Failed: %v", err)
-		os.Exit(util.ExitError)
 	}
 
 	var numFound int

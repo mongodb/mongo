@@ -15,6 +15,12 @@ type BSONDumpOptions struct {
 
 	// Display JSON data with indents
 	Pretty bool `long:"pretty" description:"output JSON formatted to be human-readable"`
+
+	// Path to input BSON file
+	BSONFileName string `long:"bsonFile" description:"path to BSON file to dump to JSON; default is stdin"`
+
+	// Path to output file
+	OutFileName string `long:"outFile" description:"path to output file to dump BSON to; default is stdout"`
 }
 
 func (_ *BSONDumpOptions) Name() string {

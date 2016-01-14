@@ -16,7 +16,10 @@
 
     x = _runMongoProgram( "bsondump", sampleFilepath, sampleFilepath);
     assert.neq(x, 0, "bsondump should exit with failure when given multiple files");
-   
+
+    x = _runMongoProgram( "bsondump", '--bsonFile', sampleFilepath, sampleFilepath);
+    assert.neq(x, 0, "bsondump should exit with failure when given both an out file and a positional argument");
+
     x = _runMongoProgram( "bsondump", "-vvvv", sampleFilepath);
     assert.eq(x, 0, "bsondump should exit with success when given verbosity");
     x = _runMongoProgram( "bsondump", "--verbose", sampleFilepath);

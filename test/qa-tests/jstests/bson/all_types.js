@@ -1,4 +1,4 @@
-// This test runs bsondump on a .bson file containing non-deprecated BSON types 
+// This test runs bsondump on a .bson file containing non-deprecated BSON types
 // and makes sure their debug type values exist in the output.
 
 (function(){
