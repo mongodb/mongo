@@ -1176,7 +1176,7 @@ __evict_init_candidate(
 	evict->ref = ref;
 	evict->btree = S2BT(session);
 
-	/* Mark the page on the list */
+	/* Mark the page on the list; set last to flush the other updates. */
 	F_SET_ATOMIC(ref->page, WT_PAGE_EVICT_LRU);
 }
 
@@ -1385,9 +1385,15 @@ __evict_get_ref(
 	if (is_server && candidates > 1)
 		candidates /= 2;
 
-	/* Get the next page queued for eviction. */
+	/*
+	 * Get the next page queued for eviction: check both the WT_REF and the
+	 * page's flag: they're not set atomically, we can race with the server
+	 * setting them. Check the page's flag last, it's the element set last
+	 * and atomically.
+	 */
 	while ((evict = cache->evict_current) != NULL &&
-	    evict < cache->evict_queue + candidates && evict->ref != NULL) {
+	    evict < cache->evict_queue + candidates && evict->ref != NULL &&
+	    F_ISSET_ATOMIC(evict->ref->page, WT_PAGE_EVICT_LRU)) {
 		WT_ASSERT(session, evict->btree != NULL);
 
 		/* Move to the next item. */
