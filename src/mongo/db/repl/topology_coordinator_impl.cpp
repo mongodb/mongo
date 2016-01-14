@@ -766,6 +766,10 @@ Status TopologyCoordinatorImpl::prepareHeartbeatResponseV1(Date_t now,
 
     response->setState(myState.s);
 
+    if (myState.primary()) {
+        response->setElectionTime(_electionTime);
+    }
+
     response->setOpTime(lastOpApplied);
 
     if (_currentPrimaryIndex != -1) {

@@ -1734,6 +1734,8 @@ TEST_F(PrepareHeartbeatResponseV1Test, SetStatePrimaryInHeartbeatResponseWhenPri
     ASSERT_FALSE(response.hasConfig());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_PRIMARY, response.getState().s);
+    ASSERT_TRUE(response.hasElectionTime());
+    ASSERT_EQUALS(getTopoCoord().getElectionTime(), response.getElectionTime());
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 0), response.getOpTime());
     ASSERT_EQUALS(0, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
@@ -1764,6 +1766,7 @@ TEST_F(PrepareHeartbeatResponseV1Test,
     ASSERT_FALSE(response.hasConfig());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+    ASSERT_FALSE(response.hasElectionTime());
     ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getOpTime());
     ASSERT_EQUALS(0, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
