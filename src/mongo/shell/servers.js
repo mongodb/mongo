@@ -114,9 +114,9 @@ MongoRunner.VersionSub = function(regex, version) {
 // being checked in '0_test_launching.js' to verify it is susbstituted correctly.
 MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
                                // To-be-updated when we branch for the next release.
-                               new MongoRunner.VersionSub(/^last-stable$/, "3.0"),
-                               new MongoRunner.VersionSub(/^3\.1(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^3\.2(\..*){0,1}/, "") ];
+                               new MongoRunner.VersionSub(/^last-stable$/, "3.2"),
+                               new MongoRunner.VersionSub(/^3\.3(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^3\.4(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
 
