@@ -72,7 +72,6 @@ static const char * const debug_tconfig = "";
 
 static void	*checkpoint_worker(void *);
 static int	 create_tables(CONFIG *);
-static int	 create_uris(CONFIG *);
 static int	drop_all_tables(CONFIG *);
 static int	 execute_populate(CONFIG *);
 static int	 execute_workload(CONFIG *);
@@ -1744,15 +1743,13 @@ out:	return (ret);
 /*
  * Populate the uri array if more than one table is being used.
  */
-static int
+static void
 create_uris(CONFIG *cfg)
 {
 	size_t base_uri_len;
 	uint32_t i;
-	int ret;
 	char *uri;
 
-	ret = 0;
 	base_uri_len = strlen(cfg->base_uri);
 	cfg->uris = dcalloc(cfg->table_count, sizeof(char *));
 	for (i = 0; i < cfg->table_count; i++) {
@@ -1765,13 +1762,6 @@ create_uris(CONFIG *cfg)
 		else
 			sprintf(uri, "%s%05d", cfg->base_uri, i);
 	}
-	if (ret != 0 && cfg->uris != NULL) {
-		for (i = 0; i < cfg->table_count; i++)
-			free(cfg->uris[i]);
-		free(cfg->uris);
-		cfg->uris = NULL;
-	}
-	return (ret);
 }
 
 static int
@@ -1958,8 +1948,7 @@ start_run(CONFIG *cfg)
 			    ret, 0, "Error loading Helium: %s", helium_buf);
 	}
 
-	if ((ret = create_uris(cfg)) != 0)
-		goto err;
+	create_uris(cfg);
 	if ((ret = create_tables(cfg)) != 0)
 		goto err;
 
@@ -2116,9 +2105,9 @@ main(int argc, char *argv[])
 		switch (ch) {
 		case 'C':
 			if (user_cconfig == NULL)
-				user_cconfig = strdup(__wt_optarg);
+				user_cconfig = dstrdup(__wt_optarg);
 			else {
-				user_cconfig = realloc(user_cconfig,
+				user_cconfig = drealloc(user_cconfig,
 				    strlen(user_cconfig) +
 				    strlen(__wt_optarg) + 2);
 				strcat(user_cconfig, ",");
@@ -2133,9 +2122,9 @@ main(int argc, char *argv[])
 			break;
 		case 'T':
 			if (user_tconfig == NULL)
-				user_tconfig = strdup(__wt_optarg);
+				user_tconfig = dstrdup(__wt_optarg);
 			else {
-				user_tconfig = realloc(user_tconfig,
+				user_tconfig = drealloc(user_tconfig,
 				    strlen(user_tconfig) +
 				    strlen(__wt_optarg) + 2);
 				strcat(user_tconfig, ",");
