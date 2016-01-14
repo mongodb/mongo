@@ -1520,8 +1520,8 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 	if (txn_busy && pct_full < 100)
 		return (0);
 
-	if (busy == 1)
-		txn_busy = 1;
+	if (busy)
+		txn_busy = true;
 
 	/* Wake the eviction server if we need to do work. */
 	WT_RET(__wt_evict_server_wake(session));
