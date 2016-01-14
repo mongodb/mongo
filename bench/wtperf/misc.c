@@ -40,7 +40,7 @@ setup_log_file(CONFIG *cfg)
 	if (cfg->verbose < 1)
 		return (0);
 
-	fname = calloc(strlen(cfg->monitor_dir) +
+	fname = dcalloc(strlen(cfg->monitor_dir) +
 	    strlen(cfg->table_name) + strlen(".stat") + 2, 1);
 
 	sprintf(fname, "%s/%s.stat", cfg->monitor_dir, cfg->table_name);
