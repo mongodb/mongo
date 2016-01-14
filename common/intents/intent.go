@@ -43,7 +43,10 @@ func (it *Intent) Namespace() string {
 }
 
 func (it *Intent) IsOplog() bool {
-	return it.DB == "" && it.C == "oplog"
+	if it.DB == "" && it.C == "oplog" {
+		return true
+	}
+	return it.DB == "local" && (it.C == "oplog.rs" || it.C == "oplog.$main")
 }
 
 func (it *Intent) IsUsers() bool {
@@ -84,6 +87,26 @@ func (intent *Intent) IsSpecialCollection() bool {
 	return intent.IsSystemIndexes() || intent.IsUsers() || intent.IsRoles() || intent.IsAuthVersion()
 }
 
+func (existing *Intent) MergeIntent(intent *Intent) {
+	// merge new intent into old intent
+	if existing.BSONFile == nil {
+		existing.BSONFile = intent.BSONFile
+	}
+	if existing.Size == 0 {
+		existing.Size = intent.Size
+	}
+	if existing.Location == "" {
+		existing.Location = intent.Location
+	}
+	if existing.MetadataFile == nil {
+		existing.MetadataFile = intent.MetadataFile
+	}
+	if existing.MetadataLocation == "" {
+		existing.MetadataLocation = intent.MetadataLocation
+	}
+
+}
+
 type Manager struct {
 	// intents are for all of the regular user created collections
 	intents map[string]*Intent
@@ -109,6 +132,12 @@ type Manager struct {
 	rolesIntent   *Intent
 	versionIntent *Intent
 	indexIntents  map[string]*Intent
+
+	// Tells the manager if it should choose a single oplog when multiple are provided.
+	smartPickOplog bool
+
+	// Indicates if an the manager has seen two conflicting oplogs.
+	oplogConflict bool
 }
 
 func NewIntentManager() *Manager {
@@ -118,7 +147,13 @@ func NewIntentManager() *Manager {
 		intentsByDiscoveryOrder: []*Intent{},
 		priotitizerLock:         &sync.Mutex{},
 		indexIntents:            map[string]*Intent{},
+		smartPickOplog:          false,
+		oplogConflict:           false,
 	}
+}
+
+func (mgr *Manager) SetSmartPickOplog(smartPick bool) {
+	mgr.smartPickOplog = smartPick
 }
 
 // HasConfigDBIntent returns a bool indicating if any of the intents refer to the "config" database.
@@ -132,6 +167,72 @@ func (mgr *Manager) HasConfigDBIntent() bool {
 	return false
 }
 
+// PutOplogIntent takes an intent for an oplog and stores it in the intent manager with the
+// provided key. If the manager has smartPickOplog enabled, then it uses a priority system
+// to determine which oplog intent to maintain as the actual oplog.
+func (manager *Manager) PutOplogIntent(intent *Intent, managerKey string) {
+	if manager.smartPickOplog {
+		if existing := manager.specialIntents[managerKey]; existing != nil {
+			existing.MergeIntent(intent)
+			return
+		}
+		if manager.oplogIntent == nil {
+			// If there is no oplog intent, make this one the oplog.
+			manager.oplogIntent = intent
+			manager.specialIntents[managerKey] = intent
+		} else if intent.DB == "" {
+			// We already have an oplog and this is a top priority oplog.
+			if manager.oplogIntent.DB == "" {
+				// If the manager's current oplog is also top priority, we have a
+				// conflict and ignore this oplog.
+				manager.oplogConflict = true
+			} else {
+				// If the manager's current oplog is lower priority, replace it and
+				// move that one to be a normal intent.
+				manager.putNormalIntent(manager.oplogIntent)
+				delete(manager.specialIntents, manager.oplogIntent.Namespace())
+				manager.oplogIntent = intent
+				manager.specialIntents[managerKey] = intent
+			}
+		} else {
+			// We already have an oplog and this is a low priority oplog.
+			if manager.oplogIntent.DB != "" {
+				// If the manager's current oplog is also low priority, set a conflict.
+				manager.oplogConflict = true
+			}
+			// No matter what, set this lower priority oplog to be a normal intent.
+			manager.putNormalIntent(intent)
+		}
+	} else {
+		if intent.DB == "" && intent.C == "oplog" {
+			// If this is a normal oplog, then add it as an oplog intent.
+			if existing := manager.specialIntents[managerKey]; existing != nil {
+				existing.MergeIntent(intent)
+				return
+			}
+			manager.oplogIntent = intent
+			manager.specialIntents[managerKey] = intent
+		} else {
+			manager.putNormalIntent(intent)
+		}
+	}
+}
+
+func (manager *Manager) putNormalIntent(intent *Intent) {
+	// BSON and metadata files for the same collection are merged
+	// into the same intent. This is done to allow for simple
+	// pairing of BSON + metadata without keeping track of the
+	// state of the filepath walker
+	if existing := manager.intents[intent.Namespace()]; existing != nil {
+		existing.MergeIntent(intent)
+		return
+	}
+
+	// if key doesn't already exist, add it to the manager
+	manager.intents[intent.Namespace()] = intent
+	manager.intentsByDiscoveryOrder = append(manager.intentsByDiscoveryOrder, intent)
+}
+
 // Put inserts an intent into the manager. Intents for the same collection
 // are merged together, so that BSON and metadata files for the same collection
 // are returned in the same intent.
@@ -142,8 +243,7 @@ func (manager *Manager) Put(intent *Intent) {
 
 	// bucket special-case collections
 	if intent.IsOplog() {
-		manager.oplogIntent = intent
-		manager.specialIntents[intent.Namespace()] = intent
+		manager.PutOplogIntent(intent, intent.Namespace())
 		return
 	}
 	if intent.IsSystemIndexes() {
@@ -173,33 +273,11 @@ func (manager *Manager) Put(intent *Intent) {
 		return
 	}
 
-	// BSON and metadata files for the same collection are merged
-	// into the same intent. This is done to allow for simple
-	// pairing of BSON + metadata without keeping track of the
-	// state of the filepath walker
-	if existing := manager.intents[intent.Namespace()]; existing != nil {
-		// merge new intent into old intent
-		if existing.BSONFile == nil {
-			existing.BSONFile = intent.BSONFile
-		}
-		if existing.Size == 0 {
-			existing.Size = intent.Size
-		}
-		if existing.Location == "" {
-			existing.Location = intent.Location
-		}
-		if existing.MetadataFile == nil {
-			existing.MetadataFile = intent.MetadataFile
-		}
-		if existing.MetadataLocation == "" {
-			existing.MetadataLocation = intent.MetadataLocation
-		}
-		return
-	}
+	manager.putNormalIntent(intent)
+}
 
-	// if key doesn't already exist, add it to the manager
-	manager.intents[intent.Namespace()] = intent
-	manager.intentsByDiscoveryOrder = append(manager.intentsByDiscoveryOrder, intent)
+func (manager *Manager) GetOplogConflict() bool {
+	return manager.oplogConflict
 }
 
 // Intents returns a slice containing all of the intents in the manager.

@@ -118,6 +118,14 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 			return fmt.Errorf("error parsing timestamp argument to --oplogLimit: %v", err)
 		}
 	}
+	if restore.InputOptions.OplogFile != "" {
+		if !restore.InputOptions.OplogReplay {
+			return fmt.Errorf("cannot use --oplogFile without --oplogReplay enabled")
+		}
+		if restore.InputOptions.Archive != "" {
+			return fmt.Errorf("cannot use --oplogFile with --archive specified")
+		}
+	}
 
 	// check if we are using a replica set and fall back to w=1 if we aren't (for <= 2.4)
 	nodeType, err := restore.SessionProvider.GetNodeType()
@@ -183,6 +191,9 @@ func (restore *MongoRestore) Restore() error {
 
 	// Build up all intents to be restored
 	restore.manager = intents.NewIntentManager()
+	if restore.InputOptions.Archive == "" && restore.InputOptions.OplogReplay {
+		restore.manager.SetSmartPickOplog(true)
+	}
 
 	if restore.InputOptions.Archive != "" {
 		archiveReader, err := restore.getArchiveReader()
@@ -294,6 +305,20 @@ func (restore *MongoRestore) Restore() error {
 	if restore.isMongos && restore.manager.HasConfigDBIntent() && restore.ToolOptions.DB == "" {
 		return fmt.Errorf("cannot do a full restore on a sharded system - " +
 			"remove the 'config' directory from the dump directory first")
+	}
+
+	if restore.InputOptions.OplogFile != "" {
+		err = restore.CreateIntentForOplog()
+		if err != nil {
+			return fmt.Errorf("error reading oplog file: %v", err)
+		}
+	}
+	if restore.InputOptions.OplogReplay && restore.manager.Oplog() == nil {
+		return fmt.Errorf("no oplog file to replay; make sure you run mongodump with --oplog")
+	}
+	if restore.manager.GetOplogConflict() {
+		return fmt.Errorf("cannot provide both an oplog.bson file and an oplog file with --oplogFile, " +
+			"nor can you provide both a local/oplog.rs.bson and a local/oplog.$main.bson file.")
 	}
 
 	if restore.InputOptions.Archive != "" {

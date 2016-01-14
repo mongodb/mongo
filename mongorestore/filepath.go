@@ -230,7 +230,6 @@ func (restore *MongoRestore) getInfoFromFilename(filename string) (string, FileT
 // the databases and collections it finds.
 func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike, filterDB string, filterCollection string) error {
 	log.Logf(log.DebugHigh, "using %v as dump root directory", dir.Path())
-	foundOplog := false
 	entries, err := dir.ReadDir()
 	if err != nil {
 		return fmt.Errorf("error reading root dump folder: %v", err)
@@ -253,7 +252,6 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike, filterDB stri
 				if restore.InputOptions.OplogReplay {
 					log.Log(log.DebugLow, "found oplog.bson file to replay")
 				}
-				foundOplog = true
 				oplogIntent := &intents.Intent{
 					C:        "oplog",
 					Size:     entry.Size(),
@@ -298,10 +296,34 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike, filterDB stri
 			}
 		}
 	}
-	if restore.InputOptions.OplogReplay && !foundOplog {
-		return fmt.Errorf("no %v/oplog.bson file to replay; make sure you run mongodump with --oplog", dir.Path())
-	}
 	return nil
+}
+
+// CreateIntentForOplog creates an intent for a file that we want to treat as an oplog.
+func (restore *MongoRestore) CreateIntentForOplog() error {
+	target, err := newActualPath(restore.InputOptions.OplogFile)
+	db := ""
+	collection := "oplog"
+	if err != nil {
+		return err
+	}
+	log.Logf(log.DebugLow, "reading oplog from %v", target.Path())
+
+	if target.IsDir() {
+		return fmt.Errorf("file %v is a directory, not a bson file", target.Path())
+	}
+
+	// Then create its intent.
+	intent := &intents.Intent{
+		DB:       db,
+		C:        collection,
+		Size:     target.Size(),
+		Location: target.Path(),
+	}
+	intent.BSONFile = &realBSONFile{path: target.Path(), intent: intent, gzip: restore.InputOptions.Gzip}
+	restore.manager.PutOplogIntent(intent, "oplogFile")
+	return nil
+
 }
 
 // CreateIntentsForDB drills down into the dir folder, creating intents
