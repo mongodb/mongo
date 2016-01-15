@@ -596,7 +596,7 @@ var runner = (function() {
         var bgWorkloads = executionOptions.backgroundWorkloads;
         loadWorkloadContext(bgWorkloads, bgContext, executionOptions,
                             false /* applyMultipliers */);
-        var bgThreadMgr = new ThreadManager(clusterOptions, { composed: false });
+        var bgThreadMgr = new ThreadManager(clusterOptions);
 
         var cluster = new Cluster(clusterOptions);
         if (cluster.isSharded()) {

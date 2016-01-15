@@ -7,7 +7,7 @@ load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread
  * Helper for spawning and joining worker threads.
  */
 
-var ThreadManager = function(clusterOptions, executionMode) {
+var ThreadManager = function(clusterOptions, executionMode = { composed: false }) {
     if (!(this instanceof ThreadManager)) {
         return new ThreadManager(clusterOptions, executionMode);
     }
