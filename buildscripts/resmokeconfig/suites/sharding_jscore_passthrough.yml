@@ -10,6 +10,7 @@ selector:
     - jstests/core/capped6.js  # captrunc.
     - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
     - jstests/core/capped_empty.js  # emptycapped.
+    - jstests/core/capped_update.js # uses godinsert and can't run under replication.
     - jstests/core/check_shard_index.js  # checkShardingIndex.
     - jstests/core/collection_truncate.js  # emptycapped.
     - jstests/core/compact_keeps_indexes.js  # compact.

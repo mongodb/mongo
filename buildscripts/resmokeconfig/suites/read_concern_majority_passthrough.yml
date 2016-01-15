@@ -11,6 +11,7 @@ selector:
     - jstests/core/batch_write_command*.js # these tests use various write concerns
     - jstests/core/bench_test*.js # benchRun() used for writes
     - jstests/core/bypass_doc_validation.js # applyOps() used for writes
+    - jstests/core/capped_update.js # uses godinsert and can't run under replication.
     - jstests/core/crud_api.js # has specific w:0 tests
     - jstests/core/error2.js # db.eval() used
     - jstests/core/eval0.js # db.eval() used

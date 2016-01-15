@@ -7,6 +7,7 @@ selector:
     - jstests/core/dbadmin.js
     - jstests/core/opcounters_write_cmd.js
     - jstests/core/read_after_optime.js
+    - jstests/core/capped_update.js
 
 executor:
   js_test:

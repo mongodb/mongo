@@ -6,6 +6,7 @@ selector:
     # These tests are not expected to pass with master-slave:
     - jstests/core/dbadmin.js
     - jstests/core/opcounters_write_cmd.js
+    - jstests/core/capped_update.js
 
 executor:
   js_test:
