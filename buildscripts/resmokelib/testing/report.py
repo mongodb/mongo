@@ -201,7 +201,7 @@ class TestReport(unittest.TestResult):
         if test_info.end_time is None:
             raise ValueError("stopTest was not called on %s" % (test.basename()))
 
-        test_info.status = "error"
+        test_info.status = "fail"
         test_info.return_code = return_code
 
         # Recompute number of success, failures, and errors.
