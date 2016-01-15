@@ -339,9 +339,12 @@ void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::Callba
     log() << "Swapping sharding Catalog Manager from mirrored (SCCC) to replica set (CSRS) mode";
 
     stdx::lock_guard<RWLock> oplk(_operationLock);
-    stdx::lock_guard<stdx::mutex> oblk(_observerMutex);
     std::string distLockProcessID = _actual->getDistLockManager()->getProcessID();
+    // Shut down the old catalog manager before taking _observerMutex to prevent deadlock with
+    // the LegacyDistLockPinger thread calling scheduleReplaceCatalogManagerIfNeeded.
     _actual->shutDown(txn.get(), /* allowNetworking */ false);
+
+    stdx::lock_guard<stdx::mutex> oblk(_observerMutex);
     _actual = makeCatalogManager(_service, _nextConfigConnectionString, _shardRegistry, _thisHost);
     _shardRegistry->updateConfigServerConnectionString(_nextConfigConnectionString);
     // Note: this assumes that downgrade is not supported, as this will not start the config
@@ -589,7 +592,7 @@ Status ForwardingCatalogManager::createDatabase(OperationContext* txn, const std
 DistLockManager* ForwardingCatalogManager::getDistLockManager() {
     warning() << "getDistLockManager called on ForwardingCatalogManager which should never happen "
                  "outside of unit tests!";
-    stdx::lock_guard<stdx::mutex> lk(_observerMutex);
+    rwlock_shared oplk(_operationLock);
     return _actual->getDistLockManager();
 }
 
