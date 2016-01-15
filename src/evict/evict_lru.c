@@ -860,7 +860,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *evict;
 	uint64_t cutoff;
-	uint32_t candidates, entries, i;
+	uint32_t base, candidates, entries, i;
 
 	cache = S2C(session)->cache;
 
@@ -922,13 +922,19 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		cache->evict_candidates = candidates;
 	}
 
-	/* If we have more than the minimum number of entries, clear them. */
-	if (cache->evict_entries > WT_EVICT_WALK_BASE) {
-		for (i = WT_EVICT_WALK_BASE, evict = cache->evict_queue + i;
-		    i < cache->evict_entries;
-		    i++, evict++)
+	/*
+	 * Clear anything more than the maximum tracked number of entries (but
+	 * don't clear past the number of candidates for eviction). This sets
+	 * the base of where new entries are added to the array and checking
+	 * against the candidate count avoids operating in the same space as
+	 * threads removing entries from the array.
+	 */
+	base = WT_MAX(cache->evict_candidates, WT_EVICT_WALK_BASE);
+	if (cache->evict_entries > base) {
+		for (i = base, evict = cache->evict_queue + i;
+		    i < cache->evict_entries; i++, evict++)
 			__evict_list_clear(session, evict);
-		cache->evict_entries = WT_EVICT_WALK_BASE;
+		cache->evict_entries = base;
 	}
 
 	cache->evict_current = cache->evict_queue;
@@ -1387,9 +1393,11 @@ __evict_get_ref(
 
 	/*
 	 * Get the next page queued for eviction: check both the WT_REF and the
-	 * page's flag: they're not set atomically, we can race with the server
-	 * setting them. Check the page's flag last, it's the element set last
-	 * and atomically.
+	 * page's flag: they're not set atomically and the page's flag's atomic
+	 * set is the action used to publish the other structure elements. (To
+	 * be clear, we're not supposed to race, the server adding new elements
+	 * to the array isn't supposed to be operating in the same part of the
+	 * array as the threads removing elements, but paranoia is healthy.)
 	 */
 	while ((evict = cache->evict_current) != NULL &&
 	    evict < cache->evict_queue + candidates && evict->ref != NULL &&
