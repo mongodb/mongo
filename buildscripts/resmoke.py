@@ -23,6 +23,9 @@ if __name__ == "__main__" and __package__ is None:
 def _execute_suite(suite, logging_config):
     """
     Executes each test group of 'suite', failing fast if requested.
+
+    Returns true if the execution of the suite was interrupted by the
+    user, and false otherwise.
     """
 
     logger = resmokelib.logging.loggers.EXECUTOR
@@ -64,15 +67,15 @@ def _execute_suite(suite, logging_config):
             executor.run()
             if resmokelib.config.FAIL_FAST and group.return_code != 0:
                 suite.return_code = group.return_code
-                return
-        except resmokelib.errors.StopExecution:
+                return False
+        except resmokelib.errors.UserInterrupt:
             suite.return_code = 130  # Simulate SIGINT as exit code.
-            return
+            return True
         except:
             logger.exception("Encountered an error when running %ss of suite %s.",
                              group.test_kind, suite.get_name())
             suite.return_code = 2
-            return
+            return False
 
 
 def _log_summary(logger, suites, time_taken):
@@ -146,20 +149,21 @@ def main():
         resmoke_logger.info("Suites available to execute:\n%s", "\n".join(suite_names))
         sys.exit(0)
 
+    interrupted = False
     suites = resmokelib.parser.get_suites(values, args)
     try:
         for suite in suites:
             resmoke_logger.info(_dump_suite_config(suite, logging_config))
 
             suite.record_start()
-            _execute_suite(suite, logging_config)
+            interrupted = _execute_suite(suite, logging_config)
             suite.record_end()
 
             resmoke_logger.info("=" * 80)
             resmoke_logger.info("Summary of %s suite: %s",
                                 suite.get_name(), _summarize_suite(suite))
 
-            if resmokelib.config.FAIL_FAST and suite.return_code != 0:
+            if interrupted or (resmokelib.config.FAIL_FAST and suite.return_code != 0):
                 time_taken = time.time() - start_time
                 _log_summary(resmoke_logger, suites, time_taken)
                 sys.exit(suite.return_code)
@@ -171,6 +175,9 @@ def main():
         exit_code = max(suite.return_code for suite in suites)
         sys.exit(exit_code)
     finally:
+        if not interrupted:
+            resmokelib.logging.flush.stop_thread()
+
         if resmokelib.config.REPORT_FILE is not None:
             _write_report_file(suites, resmokelib.config.REPORT_FILE)
 

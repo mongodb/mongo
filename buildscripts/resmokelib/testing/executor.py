@@ -84,7 +84,7 @@ class TestGroupExecutor(object):
 
                 # If the user triggered a KeyboardInterrupt, then we should stop.
                 if interrupted:
-                    raise errors.StopExecution("Received interrupt from user")
+                    raise errors.UserInterrupt("Received interrupt from user")
 
                 sb = []  # String builder.
                 self._test_group.summarize_latest(sb)
