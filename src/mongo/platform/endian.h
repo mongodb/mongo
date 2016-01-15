@@ -38,8 +38,6 @@
 #pragma push_macro("MONGO_UINT16_SWAB")
 #pragma push_macro("MONGO_UINT32_SWAB")
 #pragma push_macro("MONGO_UINT64_SWAB")
-#pragma push_macro("MONGO_LITTLE_ENDIAN")
-#pragma push_macro("MONGO_BIG_ENDIAN")
 #pragma push_macro("htobe16")
 #pragma push_macro("htobe32")
 #pragma push_macro("htobe64")
@@ -56,8 +54,6 @@
 #undef MONGO_UINT16_SWAB
 #undef MONGO_UINT32_SWAB
 #undef MONGO_UINT64_SWAB
-#undef MONGO_LITTLE_ENDIAN
-#undef MONGO_BIG_ENDIAN
 #undef htobe16
 #undef htobe32
 #undef htobe64
@@ -511,8 +507,6 @@ inline T littleToNative(T t) {
 #undef MONGO_UINT16_SWAB
 #undef MONGO_UINT32_SWAB
 #undef MONGO_UINT64_SWAB
-#undef MONGO_LITTLE_ENDIAN
-#undef MONGO_BIG_ENDIAN
 #undef htobe16
 #undef htobe32
 #undef htobe64
@@ -529,8 +523,6 @@ inline T littleToNative(T t) {
 #pragma pop_macro("MONGO_UINT16_SWAB")
 #pragma pop_macro("MONGO_UINT32_SWAB")
 #pragma pop_macro("MONGO_UINT64_SWAB")
-#pragma pop_macro("MONGO_LITTLE_ENDIAN")
-#pragma pop_macro("MONGO_BIG_ENDIAN")
 #pragma pop_macro("htobe16")
 #pragma pop_macro("htobe32")
 #pragma pop_macro("htobe64")

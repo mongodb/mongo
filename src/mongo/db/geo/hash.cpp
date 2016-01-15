@@ -113,8 +113,11 @@ inline static long long mask64For(const int i) {
     return 1LL << (63 - i);
 }
 
-// Binary data is stored in some particular byte ordering that requires this.
-static void copyAndReverse(char* dst, const char* src) {
+// copyAndReverse is used to reverse the order of bytes when copying between BinData and GeoHash.
+// GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the quadrant.
+// In BinData, the GeoHash of a 2D index is compared from LSB to MSB, so the bytes should be
+// reversed on little-endian systems.
+inline static void copyAndReverse(char* dst, const char* src) {
     for (unsigned a = 0; a < 8; a++) {
         dst[a] = src[7 - a];
     }
@@ -147,23 +150,6 @@ void GeoHash::initFromString(const char* s) {
     for (int i = 0; s[i] != '\0'; ++i)
         if (s[i] == '1')
             setBit(i, 1);
-}
-
-// This only works if e is BinData.
-GeoHash::GeoHash(const BSONElement& e, unsigned bits) {
-    _bits = bits;
-    if (e.type() == BinData) {
-        int len = 0;
-        copyAndReverse((char*)&_hash, e.binData(len));
-        verify(len == 8);
-    } else {
-        cout << "GeoHash bad element: " << e << endl;
-        uassert(13047,
-                "wrong type for geo index. if you're using a pre-release version,"
-                " need to rebuild index",
-                0);
-    }
-    clearUnusedBits();
 }
 
 GeoHash::GeoHash(unsigned x, unsigned y, unsigned bits) {
@@ -434,7 +420,16 @@ void GeoHash::clearUnusedBits() {
 
 static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const char* fieldName) {
     char buf[8];
+#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
+    // Reverse the order of bytes when copying between BinData and GeoHash.
+    // GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the
+    // quadrant.
+    // In BinData, the GeoHash of a 2D index is compared from LSB to MSB, so the bytes should be
+    // reversed on little-endian systems
     copyAndReverse(buf, (char*)&hash);
+#else
+    std::memcpy(buf, reinterpret_cast<char*>(&hash), 8);
+#endif
     builder->appendBinData(fieldName, 8, bdtCustom, buf);
 }
 
@@ -671,12 +666,6 @@ GeoHash GeoHashConverter::hash(const Point& p) const {
     return hash(p.x, p.y);
 }
 
-GeoHash GeoHashConverter::hash(const BSONElement& e) const {
-    if (e.isABSONObj())
-        return hash(e.embeddedObject());
-    return GeoHash(e, _params.bits);
-}
-
 GeoHash GeoHashConverter::hash(const BSONObj& o) const {
     return hash(o, NULL);
 }
@@ -734,10 +723,6 @@ Point GeoHashConverter::unhashToPoint(const GeoHash& h) const {
     Point point;
     unhash(h, &point.x, &point.y);
     return point;
-}
-
-Point GeoHashConverter::unhashToPoint(const BSONElement& e) const {
-    return unhashToPoint(hash(e));
 }
 
 BSONObj GeoHashConverter::unhashToBSONObj(const GeoHash& h) const {
