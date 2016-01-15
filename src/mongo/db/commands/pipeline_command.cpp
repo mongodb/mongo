@@ -86,7 +86,6 @@ static bool handleCursorCommand(OperationContext* txn,
 
     // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
     BSONArrayBuilder resultsArray;
-    const int byteLimit = FindCommon::kMaxBytesToReturnToClientAtOnce;
     BSONObj next;
     for (int objCount = 0; objCount < batchSize; objCount++) {
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
@@ -98,9 +97,9 @@ static bool handleCursorCommand(OperationContext* txn,
             break;
         }
 
-        // If adding this object will cause us to exceed the BSON size limit, then we stash it for
-        // later.
-        if (resultsArray.len() + next.objsize() > byteLimit) {
+        // If adding this object will cause us to exceed the message size limit, then we stash it
+        // for later.
+        if (!FindCommon::haveSpaceForNext(next, objCount, resultsArray.len())) {
             exec->enqueue(next);
             break;
         }

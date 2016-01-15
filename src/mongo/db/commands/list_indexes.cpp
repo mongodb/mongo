@@ -194,15 +194,20 @@ public:
 
         BSONArrayBuilder firstBatch;
 
-        const int byteLimit = FindCommon::kMaxBytesToReturnToClientAtOnce;
-        for (long long objCount = 0; objCount < batchSize && firstBatch.len() < byteLimit;
-             objCount++) {
+        for (long long objCount = 0; objCount < batchSize; objCount++) {
             BSONObj next;
             PlanExecutor::ExecState state = exec->getNext(&next, NULL);
             if (state == PlanExecutor::IS_EOF) {
                 break;
             }
             invariant(state == PlanExecutor::ADVANCED);
+
+            // If we can't fit this result inside the current batch, then we stash it for later.
+            if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
+                exec->enqueue(next);
+                break;
+            }
+
             firstBatch.append(next);
         }
 

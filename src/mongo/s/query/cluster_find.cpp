@@ -282,7 +282,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;
-    while (!FindCommon::enoughForFirstBatch(query.getParsed(), results->size(), bytesBuffered)) {
+    while (!FindCommon::enoughForFirstBatch(query.getParsed(), results->size())) {
         auto next = ccc->next();
         if (!next.isOK()) {
             return next.getStatus();
@@ -299,19 +299,16 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             break;
         }
 
-        // If adding this object will cause us to exceed the BSON size limit, then we stash it for
-        // later. By using BSONObjMaxUserSize, we ensure that there is enough room for the
-        // "envelope" (e.g. the "ns" and "id" fields included in the response) before exceeding
-        // BSONObjMaxInternalSize.
-        int sizeEstimate = bytesBuffered + next.getValue()->objsize() +
-            ((results->size() + 1U) * kPerDocumentOverheadBytesUpperBound);
-        if (sizeEstimate > BSONObjMaxUserSize && !results->empty()) {
+        // If adding this object will cause us to exceed the message size limit, then we stash it
+        // for later.
+        if (!FindCommon::haveSpaceForNext(*next.getValue(), results->size(), bytesBuffered)) {
             ccc->queueResult(*next.getValue());
             break;
         }
 
-        // Add doc to the batch.
-        bytesBuffered += next.getValue()->objsize();
+        // Add doc to the batch. Account for the space overhead associated with returning this doc
+        // inside a BSON array.
+        bytesBuffered += (next.getValue()->objsize() + kPerDocumentOverheadBytesUpperBound);
         results->push_back(std::move(*next.getValue()));
     }
 
@@ -434,7 +431,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
     long long batchSize = request.batchSize.value_or(0);
     long long startingFrom = pinnedCursor.getValue().getNumReturnedSoFar();
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
-    while (!FindCommon::enoughForGetMore(batchSize, batch.size(), bytesBuffered)) {
+    while (!FindCommon::enoughForGetMore(batchSize, batch.size())) {
         auto next = pinnedCursor.getValue().next();
         if (!next.isOK()) {
             return next.getStatus();
@@ -448,19 +445,14 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
             break;
         }
 
-        // If adding this object will cause us to exceed the BSON size limit, then we stash it for
-        // later. By using BSONObjMaxUserSize, we ensure that there is enough room for the
-        // "envelope" (e.g. the "ns" and "id" fields included in the response) before exceeding
-        // BSONObjMaxInternalSize.
-        int sizeEstimate = bytesBuffered + next.getValue()->objsize() +
-            ((batch.size() + 1U) * kPerDocumentOverheadBytesUpperBound);
-        if (sizeEstimate > BSONObjMaxUserSize && !batch.empty()) {
+        if (!FindCommon::haveSpaceForNext(*next.getValue(), batch.size(), bytesBuffered)) {
             pinnedCursor.getValue().queueResult(*next.getValue());
             break;
         }
 
-        // Add doc to the batch.
-        bytesBuffered += next.getValue()->objsize();
+        // Add doc to the batch. Account for the space overhead associated with returning this doc
+        // inside a BSON array.
+        bytesBuffered += (next.getValue()->objsize() + kPerDocumentOverheadBytesUpperBound);
         batch.push_back(std::move(*next.getValue()));
     }
 

@@ -302,11 +302,10 @@ public:
         BSONObj obj;
         PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
         long long numResults = 0;
-        while (!FindCommon::enoughForFirstBatch(pq, numResults, firstBatch.bytesUsed()) &&
+        while (!FindCommon::enoughForFirstBatch(pq, numResults) &&
                PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
-            // If adding this object will cause us to exceed the BSON size limit, then we stash
-            // it for later.
-            if (firstBatch.bytesUsed() + obj.objsize() > BSONObjMaxUserSize && numResults > 0) {
+            // If we can't fit this result inside the current batch, then we stash it for later.
+            if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
                 exec->enqueue(obj);
                 break;
             }

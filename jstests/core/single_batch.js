@@ -8,14 +8,14 @@
     // Approximately 1 MB.
     var padding = new Array(1024 * 1024).join("x");
 
-    // Insert ~10 MB of data.
-    for (var i = 0; i < 10; i++) {
+    // Insert ~20 MB of data.
+    for (var i = 0; i < 20; i++) {
         assert.writeOK(coll.insert({_id: i, padding: padding}));
     }
 
-    // The limit is 8, but we should end up with fewer documents since 8 docs won't fit in a single
-    // 4 MB batch.
-    var numResults = coll.find().limit(-8).itcount();
-    assert.lt(numResults, 8);
+    // The limit is 18, but we should end up with fewer documents since 18 docs won't fit in a
+    // single 16 MB batch.
+    var numResults = coll.find().limit(-18).itcount();
+    assert.lt(numResults, 18);
     assert.gt(numResults, 0);
 })();

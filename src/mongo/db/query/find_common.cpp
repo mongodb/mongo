@@ -38,26 +38,24 @@ namespace mongo {
 
 MONGO_FP_DECLARE(keepCursorPinnedDuringGetMore);
 
-bool FindCommon::enoughForFirstBatch(const LiteParsedQuery& pq,
-                                     long long numDocs,
-                                     int bytesBuffered) {
+bool FindCommon::enoughForFirstBatch(const LiteParsedQuery& pq, long long numDocs) {
     if (!pq.getEffectiveBatchSize()) {
-        // If there is no batch size, we stop generating additional results as soon as we have
-        // either 101 documents or at least 1MB of data.
-        return (bytesBuffered > 1024 * 1024) || numDocs >= LiteParsedQuery::kDefaultBatchSize;
+        // We enforce a default batch size for the initial find if no batch size is specified.
+        return numDocs >= LiteParsedQuery::kDefaultBatchSize;
     }
 
-    // If there is a batch size, we add results until either satisfying this batch size or exceeding
-    // the 4MB size threshold.
-    return numDocs >= pq.getEffectiveBatchSize().value() ||
-        bytesBuffered > kMaxBytesToReturnToClientAtOnce;
+    return numDocs >= pq.getEffectiveBatchSize().value();
 }
 
-bool FindCommon::enoughForGetMore(long long effectiveBatchSize,
-                                  long long numDocs,
-                                  int bytesBuffered) {
-    return (effectiveBatchSize && numDocs >= effectiveBatchSize) ||
-        (bytesBuffered > kMaxBytesToReturnToClientAtOnce);
+bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int bytesBuffered) {
+    invariant(numDocs >= 0);
+    if (!numDocs) {
+        // Allow the first output document to exceed the limit to ensure we can always make
+        // progress.
+        return true;
+    }
+
+    return (bytesBuffered + nextDoc.objsize()) <= kMaxBytesToReturnToClientAtOnce;
 }
 
 BSONObj FindCommon::transformSortSpec(const BSONObj& sortSpec) {

@@ -213,7 +213,14 @@ void generateBatch(int ntoreturn,
     PlanExecutor* exec = cursor->getExecutor();
 
     BSONObj obj;
-    while (PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, NULL))) {
+    while (!FindCommon::enoughForGetMore(ntoreturn, *numResults) &&
+           PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, NULL))) {
+        // If we can't fit this result inside the current batch, then we stash it for later.
+        if (!FindCommon::haveSpaceForNext(obj, *numResults, bb->len())) {
+            exec->enqueue(obj);
+            break;
+        }
+
         // Add result to output buffer.
         bb->appendBuf((void*)obj.objdata(), obj.objsize());
 
@@ -226,10 +233,6 @@ void generateBatch(int ntoreturn,
             if (BSONType::Date == e.type() || BSONType::bsonTimestamp == e.type()) {
                 *slaveReadTill = e.timestamp();
             }
-        }
-
-        if (FindCommon::enoughForGetMore(ntoreturn, *numResults, bb->len())) {
-            break;
         }
     }
 
@@ -589,6 +592,12 @@ std::string runQuery(OperationContext* txn,
     }
 
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+        // If we can't fit this result inside the current batch, then we stash it for later.
+        if (!FindCommon::haveSpaceForNext(obj, numResults, bb.len())) {
+            exec->enqueue(obj);
+            break;
+        }
+
         // Add result to output buffer.
         bb.appendBuf((void*)obj.objdata(), obj.objsize());
 
@@ -603,7 +612,7 @@ std::string runQuery(OperationContext* txn,
             }
         }
 
-        if (FindCommon::enoughForFirstBatch(pq, numResults, bb.len())) {
+        if (FindCommon::enoughForFirstBatch(pq, numResults)) {
             LOG(5) << "Enough for first batch, wantMore=" << pq.wantMore()
                    << " ntoreturn=" << pq.getNToReturn().value_or(0) << " numResults=" << numResults
                    << endl;

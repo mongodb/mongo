@@ -426,11 +426,11 @@ public:
         // timeout to the user.
         BSONObj obj;
         try {
-            while (PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, NULL))) {
-                // If adding this object will cause us to exceed the BSON size limit, then we
+            while (!FindCommon::enoughForGetMore(request.batchSize.value_or(0), *numResults) &&
+                   PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, NULL))) {
+                // If adding this object will cause us to exceed the message size limit, then we
                 // stash it for later.
-                if (nextBatch->bytesUsed() + obj.objsize() > BSONObjMaxUserSize &&
-                    *numResults > 0) {
+                if (!FindCommon::haveSpaceForNext(obj, *numResults, nextBatch->bytesUsed())) {
                     exec->enqueue(obj);
                     break;
                 }
@@ -438,11 +438,6 @@ public:
                 // Add result to output buffer.
                 nextBatch->append(obj);
                 (*numResults)++;
-
-                if (FindCommon::enoughForGetMore(
-                        request.batchSize.value_or(0), *numResults, nextBatch->bytesUsed())) {
-                    break;
-                }
             }
         } catch (const UserException& except) {
             if (isAwaitData && except.getCode() == ErrorCodes::ExceededTimeLimit) {

@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
@@ -42,34 +43,41 @@ MONGO_FP_FORWARD_DECLARE(keepCursorPinnedDuringGetMore);
  */
 class FindCommon {
 public:
-    // The size threshold at which we stop adding result documents to a getMore response or a find
-    // response that has a batchSize set (i.e. once the sum of the document sizes in bytes exceeds
-    // this value, no further documents are added).
-    static const int kMaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
+    // The maximum amount of user data to return to a client in a single batch.
+    //
+    // This max may be exceeded by epsilon for output documents that approach the maximum user
+    // document size. That is, if we must return a BSONObjMaxUserSize document, then the total
+    // response size will be BSONObjMaxUserSize plus the amount of size required for the message
+    // header and the cursor response "envelope". (The envolope contains namespace and cursor id
+    // info.)
+    static const int kMaxBytesToReturnToClientAtOnce = BSONObjMaxUserSize;
 
     // The initial size of the query response buffer.
     static const int kInitReplyBufferSize = 32768;
 
     /**
-     * Returns true if enough results have been prepared to stop adding more to the first batch.
+     * Returns true if the batchSize for the initial find has been satisfied.
      *
      * If 'pq' does not have a batchSize, the default batchSize is respected.
      */
-    static bool enoughForFirstBatch(const LiteParsedQuery& pq,
-                                    long long numDocs,
-                                    int bytesBuffered);
+    static bool enoughForFirstBatch(const LiteParsedQuery& pq, long long numDocs);
 
     /**
-     * Returns true if enough results have been prepared to stop adding more to a getMore batch.
+     * Returns true if the batchSize for the getMore has been satisfied.
      *
-     * An 'effectiveBatchSize' value of zero is interpreted as the absence of a batchSize;
-     * in this case, returns true only once the size threshold is exceeded. If 'effectiveBatchSize'
-     * is positive, returns true once either are added until we have either satisfied the batch size
-     * or exceeded the size threshold.
+     * An 'effectiveBatchSize' value of zero is interpreted as the absence of a batchSize, in which
+     * case this method returns false.
      */
-    static bool enoughForGetMore(long long effectiveBatchSize,
-                                 long long numDocs,
-                                 int bytesBuffered);
+    static bool enoughForGetMore(long long effectiveBatchSize, long long numDocs) {
+        return effectiveBatchSize && numDocs >= effectiveBatchSize;
+    }
+
+    /**
+     * Given the number of docs ('numDocs') and bytes ('bytesBuffered') currently buffered as a
+     * response to a cursor-generating command, returns true if there are enough remaining bytes in
+     * our budget to fit 'nextDoc'.
+     */
+    static bool haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int bytesBuffered);
 
     /**
      * Transforms the raw sort spec into one suitable for use as the ordering specification in
