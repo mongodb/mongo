@@ -89,10 +89,6 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
     const uint8_t *addr, size_t addr_size,
     uint8_t *root_addr, size_t *root_addr_sizep, bool checkpoint)
 {
-	WT_CONNECTION_IMPL *conn;
-
-	conn = S2C(session);
-
 	/* If not opening a checkpoint, we're opening the live system. */
 	bm->is_live = !checkpoint;
 	WT_RET(__wt_block_checkpoint_load(session, bm->block,
