@@ -58,7 +58,7 @@ using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
-/** Helper to build and manipulate a $inc mod. */
+/** Helper to build and manipulate a $inc/$mul modifier */
 class Mod {
 public:
     explicit Mod(BSONObj modObj)
@@ -554,7 +554,7 @@ TEST(Lifecycle, IncModCanBeReused) {
 
 // Given the current implementation of $mul, we really only need one test for
 // $mul. However, in the future, we should probably write additional ones, or, perhaps find
-// a way to run all the obove tests in both modes.
+// a way to run all the above tests in both modes.
 TEST(Multiplication, ApplyAndLogSimpleDocument) {
     Document doc(fromjson("{ a : { b : 2 } }"));
     Mod incMod(fromjson("{ $mul: { 'a.b' : 3 } }"));
