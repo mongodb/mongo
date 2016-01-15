@@ -201,8 +201,14 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		page_cksum = __wt_cksum(buf->mem,
 		    F_ISSET(blk, WT_BLOCK_DATA_CKSUM) ?
 		    size : WT_BLOCK_COMPRESS_SKIP);
-		if (page_cksum == cksum)
+		if (page_cksum == cksum) {
+			/*
+			 * Swap the page-header as needed; this doesn't belong
+			 * here, but it's the best place to catch all callers.
+			 */
+			__wt_page_header_byteswap(buf->mem);
 			return (0);
+		}
 
 		if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
 			__wt_errx(session,

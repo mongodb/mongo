@@ -209,6 +209,12 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	fh = block->fh;
 
+	/*
+	 * Swap the page-header as needed; this doesn't belong here, but it's
+	 * the best place to catch all callers.
+	 */
+	__wt_page_header_byteswap(buf->mem);
+
 	/* Buffers should be aligned for writing. */
 	if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
 		WT_ASSERT(session, F_ISSET(buf, WT_ITEM_ALIGNED));
@@ -333,5 +339,5 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	*sizep = WT_STORE_SIZE(align_size);
 	*cksump = cksum;
 
-	return (ret);
+	return (0);
 }
