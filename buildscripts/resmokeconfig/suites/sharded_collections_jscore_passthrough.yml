@@ -12,6 +12,7 @@ selector:
     - jstests/core/check_shard_index.js  # checkShardingIndex.
     - jstests/core/collection_truncate.js  # emptycapped.
     - jstests/core/compact_keeps_indexes.js  # compact.
+    - jstests/core/capped_update.js  # uses godinsert and can't run under replication.
     - jstests/core/auth_copydb.js # copyDatabase.
     - jstests/core/copydb.js # copyDatabase.
     - jstests/core/dbadmin.js  # "local" database.
