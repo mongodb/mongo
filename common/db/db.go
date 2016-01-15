@@ -43,7 +43,11 @@ const (
 	ErrNsNotFound         = "ns not found"
 	// replication errors list the replset name if we are talking to a mongos,
 	// so we can only check for this universal prefix
-	ErrReplTimeoutPrefix = "waiting for replication timed out"
+	ErrReplTimeoutPrefix            = "waiting for replication timed out"
+	ErrCouldNotContactPrimaryPrefix = "could not contact primary for replica set"
+	ErrUnableToTargetPrefix         = "unable to target"
+	ErrNotMaster                    = "not master"
+	ErrConnectionRefusedSuffix      = "Connection refused"
 )
 
 var (
@@ -215,8 +219,13 @@ func IsConnectionError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if err.Error() == ErrNoReachableServers || err.Error() == io.EOF.Error() ||
-		strings.HasPrefix(err.Error(), ErrReplTimeoutPrefix) {
+	if err.Error() == ErrNoReachableServers ||
+		err.Error() == io.EOF.Error() ||
+		strings.HasPrefix(err.Error(), ErrReplTimeoutPrefix) ||
+		strings.HasPrefix(err.Error(), ErrCouldNotContactPrimaryPrefix) ||
+		strings.HasPrefix(err.Error(), ErrUnableToTargetPrefix) ||
+		err.Error() == ErrNotMaster ||
+		strings.HasSuffix(err.Error(), ErrConnectionRefusedSuffix) {
 		return true
 	}
 	return false
