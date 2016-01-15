@@ -32,6 +32,8 @@
 
 #include "mongo/db/commands/mr.h"
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -53,6 +55,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/find_common.h"
@@ -73,6 +76,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -696,6 +700,11 @@ void State::insert(const string& ns, const BSONObj& o) {
         b.appendElements(o);
         BSONObj bo = b.obj();
 
+        StatusWith<BSONObj> res = fixDocumentForInsert(bo);
+        uassertStatusOK(res.getStatus());
+        if (!res.getValue().isEmpty()) {
+            bo = res.getValue();
+        }
         uassertStatusOK(coll->insertDocument(_txn, bo, true));
         wuow.commit();
     }
@@ -715,6 +724,17 @@ void State::_insertToInc(BSONObj& o) {
         bool shouldReplicateWrites = _txn->writesAreReplicated();
         _txn->setReplicatedWrites(false);
         ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, _txn, shouldReplicateWrites);
+
+        // The documents inserted into the incremental collection are of the form
+        // {"0": <key>, "1": <value>}, so we cannot call fixDocumentForInsert(o) here because the
+        // check that the document has an "_id" field would fail. Instead, we directly verify that
+        // the size of the document to insert is smaller than 16MB.
+        if (o.objsize() > BSONObjMaxUserSize) {
+            uasserted(ErrorCodes::BadValue,
+                      str::stream() << "object to insert too large for incremental collection"
+                                    << ". size in bytes: " << o.objsize()
+                                    << ", max size: " << BSONObjMaxUserSize);
+        }
         uassertStatusOK(coll->insertDocument(_txn, o, true, false));
         wuow.commit();
     }
