@@ -189,8 +189,8 @@ protected:
     /**
      * Returns true if it is successful at loading the DBConfig, false if the database is not found,
      * and throws on all other errors.
-     * Also returns true without reloading if reloadIteration is equal to the _reloadCount. This is
-     * to avoid multiple threads attempting to reload do duplicate work.
+     * Also returns true without reloading if reloadIteration is not equal to the _reloadCount.
+     * This is to avoid multiple threads attempting to reload do duplicate work.
      */
     bool _loadIfNeeded(OperationContext* txn, Counter reloadIteration);
 
