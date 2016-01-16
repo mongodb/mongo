@@ -199,6 +199,7 @@ public:
     void getAllShards(std::set<Shard>& shards) const;
 
     void getAllShardedCollections(std::set<std::string>& namespaces) const;
+
 protected:
     typedef AtomicUInt64::WordType Counter;
 
