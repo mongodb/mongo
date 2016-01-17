@@ -443,6 +443,10 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		strp = (char **)valueloc;
 		free(*strp);
 		newstr = dstrdup(v->str);
+		/*
+		 * We add a nullbyte to this string to truncate the
+		 * trailing quotation mark.
+		 */
 		newstr[v->len] = '\0';
 		*strp = newstr;
 		break;
