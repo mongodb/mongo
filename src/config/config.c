@@ -471,8 +471,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	if (conf->depth == 0)
 		return (WT_NOTFOUND);
 
-	return (__config_err(conf,
-	    "Closing brackets missing from config string", EINVAL));
+	return (__config_err(conf, "Unbalanced brackets", EINVAL));
 }
 
 /*
