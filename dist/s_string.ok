@@ -546,6 +546,7 @@ dsrc
 dst
 dstlen
 dstrdup
+dstrndup
 dsync
 dumpcmp
 dumpfile

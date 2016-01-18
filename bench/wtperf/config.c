@@ -442,7 +442,11 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		}
 		strp = (char **)valueloc;
 		free(*strp);
-		newstr = dstrdup(v->str);
+		/*
+		 * We duplicate the string to len rather than len+1 as we want
+		 * to truncate the trailing quotation mark.
+		 */
+		newstr = dstrndup(v->str,  v->len);
 		*strp = newstr;
 		break;
 	}

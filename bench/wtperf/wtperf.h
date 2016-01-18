@@ -389,4 +389,18 @@ dstrdup(const char *str)
 	return (p);
 }
 
+/*
+ * dstrndup --
+ *      Call strndup, dying on failure.
+ */
+static inline char *
+dstrndup(const char *str, const size_t len)
+{
+	char *p;
+
+	if ((p = strndup(str, len)) == NULL)
+		die(errno, "strndup");
+	return (p);
+}
+
 #endif
