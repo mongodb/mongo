@@ -65,11 +65,12 @@ __wt_remove_if_exists(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
- * __wt_rename_and_sync --
+ * __wt_rename_and_sync_directory --
  *	Rename a file and sync the enclosing directory.
  */
 int
-__wt_rename_and_sync(WT_SESSION_IMPL *session, const char *from, const char *to)
+__wt_rename_and_sync_directory(
+    WT_SESSION_IMPL *session, const char *from, const char *to)
 {
 	const char *fp, *tp;
 	bool same_directory;
@@ -102,11 +103,11 @@ __wt_rename_and_sync(WT_SESSION_IMPL *session, const char *from, const char *to)
 }
 
 /*
- * __wt_sync_and_rename_fh --
+ * __wt_fh_sync_and_rename --
  *	Sync and close a file, and swap it into place.
  */
 int
-__wt_sync_and_rename_fh(
+__wt_fh_sync_and_rename(
     WT_SESSION_IMPL *session, WT_FH **fhp, const char *from, const char *to)
 {
 	WT_DECL_RET;
@@ -120,15 +121,15 @@ __wt_sync_and_rename_fh(
 	WT_TRET(__wt_close(session, &fh));
 	WT_RET(ret);
 
-	return (__wt_rename_and_sync(session, from, to));
+	return (__wt_rename_and_sync_directory(session, from, to));
 }
 
 /*
- * __wt_sync_and_rename_fp --
+ * __wt_sync_fp_and_rename --
  *	Sync and close a file, and swap it into place.
  */
 int
-__wt_sync_and_rename_fp(
+__wt_sync_fp_and_rename(
     WT_SESSION_IMPL *session, FILE **fpp, const char *from, const char *to)
 {
 	FILE *fp;
@@ -139,5 +140,5 @@ __wt_sync_and_rename_fp(
 	/* Flush to disk and close the handle. */
 	WT_RET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
 
-	return (__wt_rename_and_sync(session, from, to));
+	return (__wt_rename_and_sync_directory(session, from, to));
 }
