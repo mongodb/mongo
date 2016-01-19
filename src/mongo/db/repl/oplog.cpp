@@ -191,7 +191,7 @@ public:
 
         memcpy(buf, _frame.objdata(), _frame.objsize() - 1);  // don't copy final EOO
 
-        reinterpret_cast<int*>(buf)[0] = documentSize();
+        DataView(buf).write<LittleEndian<int>>(documentSize());
 
         buf += (_frame.objsize() - 1);
         buf[0] = (char)Object;
