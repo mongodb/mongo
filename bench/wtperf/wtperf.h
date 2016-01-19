@@ -66,6 +66,7 @@
 
 typedef struct __config CONFIG;
 typedef struct __config_thread CONFIG_THREAD;
+typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 
 #define	EXT_PFX	",extensions=("
 #define	EXT_SFX	")"
@@ -90,10 +91,10 @@ typedef struct {
 	int64_t insert;			/* Insert ratio */
 	int64_t read;			/* Read ratio */
 	int64_t update;			/* Update ratio */
-	int64_t throttle;		/* Maximum operations/second */
 		/* Number of operations per transaction. Zero for autocommit */
 	int64_t ops_per_txn;
 	int64_t truncate;		/* Truncate ratio */
+	uint64_t throttle;              /* Maximum operations/second */
 	uint64_t truncate_pct;		/* Truncate Percent */
 	uint64_t truncate_count;	/* Truncate Count */
 
@@ -106,8 +107,7 @@ typedef struct {
 } WORKLOAD;
 
 /* Steering items for the truncate workload */
-typedef struct __truncate_struct TRUNCATE_CONFIG;
-struct __truncate_struct {
+typedef struct {
 	uint64_t stone_gap;
 	uint64_t needed_stones;
 	uint64_t final_stone_gap;
@@ -117,7 +117,7 @@ struct __truncate_struct {
 	uint64_t num_stones;
 	uint64_t last_key;
 	uint64_t catchup_multiplier;
-};
+} TRUNCATE_CONFIG;
 
 /* Queue entry for use with the Truncate Logic */
 struct __truncate_queue_entry {
@@ -125,13 +125,20 @@ struct __truncate_queue_entry {
 	uint64_t diff;			/* Number of items to be truncated*/
 	TAILQ_ENTRY(__truncate_queue_entry) q;
 };
-typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 
 struct __config_queue_entry {
 	char *string;
 	TAILQ_ENTRY(__config_queue_entry) c;
 };
 typedef struct __config_queue_entry CONFIG_QUEUE_ENTRY;
+
+/* Steering for the throttle configuration */
+typedef struct {
+	struct timespec last_increment;	/* Time that we last added more ops */
+	uint64_t ops_count;		/* The number of ops this increment */
+	uint64_t ops_per_increment;	/* Ops to add per increment */
+	uint64_t usecs_increment;	/* Time interval of each increment */
+} THROTTLE_CONFIG;
 
 #define	LOG_PARTIAL_CONFIG	",log=(enabled=false)"
 /*
@@ -264,14 +271,16 @@ struct __config_thread {		/* Per-thread structure */
 
 	WORKLOAD *workload;		/* Workload */
 
+	THROTTLE_CONFIG throttle_cfg;   /* Throttle configuration */
+
+	TRUNCATE_CONFIG trunc_cfg;      /* Truncate configuration */
+
 	TRACK ckpt;			/* Checkpoint operations */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
 	TRACK update;			/* Update operations */
 	TRACK truncate;			/* Truncate operations */
 	TRACK truncate_sleep;		/* Truncate sleep operations */
-	TRUNCATE_CONFIG trunc_cfg;	/* Truncate configuration */
-
 };
 
 void	 cleanup_truncate_config(CONFIG *);
@@ -293,6 +302,7 @@ int	 run_truncate(
     CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(CONFIG *);
 int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
+int	 setup_throttle(CONFIG_THREAD*);
 uint64_t sum_ckpt_ops(CONFIG *);
 uint64_t sum_insert_ops(CONFIG *);
 uint64_t sum_pop_ops(CONFIG *);
@@ -300,6 +310,7 @@ uint64_t sum_read_ops(CONFIG *);
 uint64_t sum_truncate_ops(CONFIG *);
 uint64_t sum_update_ops(CONFIG *);
 void	 usage(void);
+int	 worker_throttle(CONFIG_THREAD*);
 
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 #if defined(__GNUC__)
