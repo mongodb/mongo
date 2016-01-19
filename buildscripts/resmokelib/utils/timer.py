@@ -86,14 +86,17 @@ class AlarmClock(threading.Thread):
         Repeatedly calls 'func' with a delay of 'interval' seconds between executions.
 
         If the timer is snoozed before 'func' is called, then it waits to be reset.
-        After is has been reset, the timer will again wait 'interval' seconds and
+        After it has been reset, the timer will again wait 'interval' seconds and
         then try to call 'func'.
 
         If the timer is dismissed, then no subsequent executions of 'func' are made.
         """
 
-        with self.lock:
-            while not self.dismissed:
+        while True:
+            with self.lock:
+                if self.dismissed:
+                    return
+
                 # Wait for the specified amount of time.
                 self.cond.wait(self.interval)
 
@@ -112,8 +115,11 @@ class AlarmClock(threading.Thread):
                     self.snoozed = False
                     continue
 
-                # Execute the function.
-                self.func(*self.args, **self.kwargs)
+            # Execute the function after the lock has been released to prevent potential deadlocks
+            # with the invoked function.
+            self.func(*self.args, **self.kwargs)
 
+            # Reacquire the lock.
+            with self.lock:
                 # Ignore snoozes that took place while the function was being executed.
                 self.snoozed = False
