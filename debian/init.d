@@ -28,20 +28,20 @@
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: An object/document-oriented database
-# Description:       MongoDB is a high-performance, open source, schema-free 
+# Description:       MongoDB is a high-performance, open source, schema-free
 #                    document-oriented data store that's easy to deploy, manage
 #                    and use. It's network accessible, written in C++ and offers
 #                    the following features:
-#                    
+#
 #                       * Collection oriented storage - easy storage of object-
 #                         style data
 #                       * Full index support, including on inner objects
 #                       * Query profiling
 #                       * Replication and fail-over support
-#                       * Efficient storage of binary data including large 
+#                       * Efficient storage of binary data including large
 #                         objects (e.g. videos)
 #                       * Automatic partitioning for cloud-level scalability
-#                    
+#
 #                    High performance, scalability, and reasonable depth of
 #                    functionality are the goals for the project.
 ### END INIT INFO
@@ -58,9 +58,12 @@ CONF=/etc/mongod.conf
 PIDFILE=/var/run/$NAME.pid
 ENABLE_MONGOD=yes
 
-# Include mongodb defaults if available
+# Include mongodb defaults if available.
+# All variables set before this point can be overridden by users, by
+# setting them directly in the defaults file. Use this to explicitly
+# override these values, at your own risk.
 if [ -f /etc/default/$NAME ] ; then
-	. /etc/default/$NAME
+        . /etc/default/$NAME
 fi
 
 # Handle NUMA access to CPUs (SERVER-3574)
@@ -75,6 +78,7 @@ else
     DAEMON_OPTS="-- "${DAEMON_OPTS:-"--config $CONF"}
 fi
 
+
 if test ! -x $DAEMON; then
     echo "Could not find $DAEMON"
     exit 0
@@ -87,7 +91,7 @@ fi
 . /lib/lsb/init-functions
 
 STARTTIME=1
-DIETIME=10                   # Time to wait for the server to die, in seconds
+DIETIME=10                  # Time to wait for the server to die, in seconds
                             # If this value is set too low you might not
                             # let some servers to die gracefully and
                             # 'restart' will not work
@@ -144,7 +148,7 @@ start_server() {
                         --make-pidfile --chuid $DAEMONUSER:$DAEMONGROUP \
                         --exec $NUMACTL $DAEMON $DAEMON_OPTS
             errcode=$?
-	return $errcode
+        return $errcode
 }
 
 stop_server() {
@@ -154,32 +158,32 @@ stop_server() {
                         --user $DAEMONUSER \
                         --exec $DAEMON
             errcode=$?
-	return $errcode
+        return $errcode
 }
 
 force_stop() {
 # Force the process to die killing it manually
-	[ ! -e "$PIDFILE" ] && return
-	if running ; then
-		kill -15 $pid
-	# Is it really dead?
-		sleep "$DIETIME"s
-		if running ; then
-			kill -9 $pid
-			sleep "$DIETIME"s
-			if running ; then
-				echo "Cannot kill $NAME (pid=$pid)!"
-				exit 1
-			fi
-		fi
-	fi
-	rm -f $PIDFILE
+        [ ! -e "$PIDFILE" ] && return
+        if running ; then
+                kill -15 $pid
+        # Is it really dead?
+                sleep "$DIETIME"s
+                if running ; then
+                        kill -9 $pid
+                        sleep "$DIETIME"s
+                        if running ; then
+                                echo "Cannot kill $NAME (pid=$pid)!"
+                                exit 1
+                        fi
+                fi
+        fi
+        rm -f $PIDFILE
 }
 
 
 case "$1" in
   start)
-	log_daemon_msg "Starting $DESC" "$NAME"
+        log_daemon_msg "Starting $DESC" "$NAME"
         # Check if it's running first
         if running ;  then
             log_progress_msg "apparently already running"
@@ -190,7 +194,7 @@ case "$1" in
             # NOTE: Some servers might die some time after they start,
             # this code will detect this issue if STARTTIME is set
             # to a reasonable value
-            [ -n "$STARTTIME" ] && sleep $STARTTIME # Wait some time 
+            [ -n "$STARTTIME" ] && sleep $STARTTIME # Wait some time
             if  running ;  then
                 # It's ok, the server started and is running
                 log_end_msg 0
@@ -202,12 +206,12 @@ case "$1" in
             # Either we could not start it
             log_end_msg 1
         fi
-	;;
+        ;;
   stop)
         log_daemon_msg "Stopping $DESC" "$NAME"
         if running ; then
             # Only stop the server if we see it running
-			errcode=0
+                        errcode=0
             stop_server || errcode=$?
             log_end_msg $errcode
         else
@@ -223,14 +227,14 @@ case "$1" in
         if running; then
             # If it's still running try to kill it more forcefully
             log_daemon_msg "Stopping (force) $DESC" "$NAME"
-			errcode=0
+                        errcode=0
             force_stop || errcode=$?
             log_end_msg $errcode
         fi
-	;;
+        ;;
   restart|force-reload)
         log_daemon_msg "Restarting $DESC" "$NAME"
-		errcode=0
+                errcode=0
         stop_server || errcode=$?
         # Wait some sensible amount, some server need this
         [ -n "$DIETIME" ] && sleep $DIETIME
@@ -238,7 +242,7 @@ case "$1" in
         [ -n "$STARTTIME" ] && sleep $STARTTIME
         running || errcode=$?
         log_end_msg $errcode
-	;;
+        ;;
   status)
 
         log_daemon_msg "Checking status of $DESC" "$NAME"
@@ -258,10 +262,10 @@ case "$1" in
         ;;
 
   *)
-	N=/etc/init.d/$NAME
-	echo "Usage: $N {start|stop|force-stop|restart|force-reload|status}" >&2
-	exit 1
-	;;
+        N=/etc/init.d/$NAME
+        echo "Usage: $N {start|stop|force-stop|restart|force-reload|status}" >&2
+        exit 1
+        ;;
 esac
 
 exit 0

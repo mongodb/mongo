@@ -10,27 +10,23 @@
 
 . /etc/rc.d/init.d/functions
 
-# things from mongod.conf get there by mongod reading it
-
-
 # NOTE: if you change any OPTIONS here, you get what you pay for:
 # this script assumes all options are in the config file.
 CONFIGFILE="/etc/mongod.conf"
 OPTIONS=" -f $CONFIGFILE"
-SYSCONFIG="/etc/sysconfig/mongod"
-
-PIDFILEPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*(processManagement\.)?pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d "[:blank:]\"'" | awk -F'#' '{print $1}'`
 
 mongod=${MONGOD-/usr/bin/mongod}
 
 MONGO_USER=mongod
 MONGO_GROUP=mongod
 
+# All variables set before this point can be overridden by users, by
+# setting them directly in the SYSCONFIG file. Use this to explicitly
+# override these values, at your own risk.
+SYSCONFIG="/etc/sysconfig/mongod"
 if [ -f "$SYSCONFIG" ]; then
     . "$SYSCONFIG"
 fi
-
-PIDDIR=`dirname $PIDFILEPATH`
 
 # Handle NUMA access to CPUs (SERVER-3574)
 # This verifies the existence of numactl as well as testing that the command works
@@ -41,6 +37,10 @@ then
 else
     NUMACTL=""
 fi
+
+# things from mongod.conf get there by mongod reading it
+PIDFILEPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*(processManagement\.)?pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d "[:blank:]\"'" | awk -F'#' '{print $1}'`
+PIDDIR=`dirname $PIDFILEPATH`
 
 start()
 {
