@@ -47,6 +47,8 @@ executor:
     config:
       shell_options:
         readMode: commands
+    hooks:
+    - class: ValidateCollections
     fixture:
       class: ShardedClusterFixture
       mongos_options:
