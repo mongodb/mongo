@@ -674,7 +674,7 @@ session_ops(WT_SESSION *session)
 	/*! [Compact a table] */
 
 	/*! [Rebalance a table] */
-	ret = session->rebalance(session, "table:old", NULL);
+	ret = session->rebalance(session, "table:mytable", NULL);
 	/*! [Rebalance a table] */
 
 	/*! [Rename a table] */
