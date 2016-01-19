@@ -2147,7 +2147,6 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
-  - name: lint
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -2707,7 +2706,6 @@ buildvariants:
   - name: compile
     distros:
     - linux-64-amzn-build
-  - name: lint
   - name: aggregation_auth
   - name: aggregation_WT
   - name: audit
@@ -5031,7 +5029,6 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1404-build
-  # - name: lint
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
