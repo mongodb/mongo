@@ -1970,6 +1970,10 @@ err:
 	    myslot.slot != NULL)
 		ret = myslot.slot->slot_error;
 
+	if (LF_ISSET(WT_LOG_FLUSH))
+		WT_ASSERT(session, __wt_log_cmp(&log->write_lsn, &lsn) >= 0);
+	if (LF_ISSET(WT_LOG_FSYNC))
+		WT_ASSERT(session, __wt_log_cmp(&log->sync_lsn, &lsn) >= 0);
 	return (ret);
 }
 
