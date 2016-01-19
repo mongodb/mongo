@@ -188,6 +188,17 @@ TEST(LiteParsedQueryTest, ForbidTailableWithNonNaturalSort) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(LiteParsedQueryTest, ForbidTailableWithSingleBatch) {
+    BSONObj cmdObj = fromjson(
+        "{find: 'testns',"
+        "tailable: true,"
+        "singleBatch: true}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
 TEST(LiteParsedQueryTest, AllowTailableWithNaturalSort) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"

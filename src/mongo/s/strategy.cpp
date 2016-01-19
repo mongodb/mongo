@@ -339,6 +339,8 @@ void Strategy::commandOp(OperationContext* txn,
 void Strategy::getMore(OperationContext* txn, Request& request) {
     const char* ns = request.getns();
     const int ntoreturn = request.d().pullInt();
+    uassert(
+        34369, str::stream() << "Invalid ntoreturn for OP_GET_MORE: " << ntoreturn, ntoreturn >= 0);
     const long long id = request.d().pullInt64();
 
     // TODO: Handle stale config exceptions here from coll being dropped or sharded during op for
@@ -354,7 +356,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
 
     boost::optional<long long> batchSize;
     if (ntoreturn) {
-        batchSize = abs(ntoreturn);
+        batchSize = ntoreturn;
     }
     GetMoreRequest getMoreRequest(
         NamespaceString(ns), id, batchSize, boost::none, boost::none, boost::none);

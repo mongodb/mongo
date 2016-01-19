@@ -54,15 +54,8 @@
     assert(cursor.hasNext());
     assert.eq(7, cursor.next()["_id"]);
 
-    // Tailable with negative limit
-    var cursor = t.find().addOption(2).limit(-100);
-    for (var i = 1; i <= 7; i++) {
-        assert.eq(i, cursor.next()["_id"]);
-    }
-    assert(!cursor.hasNext());
-    t.save({_id: 8});
-    assert(cursor.hasNext());
-    assert.eq(8, cursor.next()["_id"]);
+    // Tailable with negative limit is an error.
+    assert.throws(function() { t.find().addOption(2).limit(-100).next(); });
 
     // Tests that a tailable cursor over an empty capped collection produces a dead cursor, intended
     // to be run on both mongod and mongos. For SERVER-20720.

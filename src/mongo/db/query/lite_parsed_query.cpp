@@ -653,12 +653,18 @@ Status LiteParsedQuery::validate() const {
                       "'limit' or 'batchSize' fields can not be set with 'ntoreturn' field.");
     }
 
-    // Tailable cursors cannot have any sort other than {$natural: 1}.
     if (_tailable) {
+        // Tailable cursors cannot have any sort other than {$natural: 1}.
         const BSONObj expectedSort = BSON("$natural" << 1);
         if (!_sort.isEmpty() && _sort != expectedSort) {
             return Status(ErrorCodes::BadValue,
                           "cannot use tailable option with a sort other than {$natural: 1}");
+        }
+
+        // Cannot indicate that you want a 'singleBatch' if the cursor is tailable.
+        if (!_wantMore) {
+            return Status(ErrorCodes::BadValue,
+                          "cannot use tailable option with the 'singleBatch' option");
         }
     }
 

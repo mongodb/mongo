@@ -252,6 +252,8 @@ QueryResult::View getMore(OperationContext* txn,
                           long long cursorid,
                           bool* exhaust,
                           bool* isCursorAuthorized) {
+    invariant(ntoreturn >= 0);
+
     CurOp& curop = *CurOp::get(txn);
 
     // For testing, we may want to fail if we receive a getmore.
