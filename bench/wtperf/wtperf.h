@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -127,6 +127,12 @@ struct __truncate_queue_entry {
 };
 typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 
+struct __config_queue_entry {
+	char *string;
+	TAILQ_ENTRY(__config_queue_entry) c;
+};
+typedef struct __config_queue_entry CONFIG_QUEUE_ENTRY;
+
 #define	LOG_PARTIAL_CONFIG	",log=(enabled=false)"
 /*
  * NOTE:  If you add any fields to this structure here, you must also add
@@ -181,6 +187,9 @@ struct __config {			/* Configuration structure */
 	/* Queue head for use with the Truncate Logic */
 	TAILQ_HEAD(__truncate_qh, __truncate_queue_entry) stone_head;
 
+	/* Queue head to save a copy of the config to be output */
+	TAILQ_HEAD(__config_qh, __config_queue_entry) config_head;
+
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
 #include "wtperf_opt.i"
@@ -189,6 +198,7 @@ struct __config {			/* Configuration structure */
 
 #define	ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
+#define	READ_RANGE_OPS	10
 #define	THROTTLE_OPS	100
 
 #define	THOUSAND	(1000ULL)
@@ -271,13 +281,14 @@ void	 config_free(CONFIG *);
 int	 config_opt_file(CONFIG *, const char *);
 int	 config_opt_line(CONFIG *, const char *);
 int	 config_opt_str(CONFIG *, const char *, const char *);
+void	 config_to_file(CONFIG *);
+void	 config_consolidate(CONFIG *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
 void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_print(CONFIG *);
-int	 enomem(const CONFIG *);
 int	 run_truncate(
     CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(CONFIG *);
@@ -303,6 +314,93 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 	 * Don't change to snprintf, sprintf is faster in some tests.
 	 */
 	sprintf(key_buf, "%0*" PRIu64, cfg->key_sz - 1, keyno);
+}
+
+static inline void
+extract_key(char *key_buf, uint64_t *keynop)
+{
+	sscanf(key_buf, "%" SCNu64, keynop);
+}
+
+/*
+ * die --
+ *      Print message and exit on failure.
+ */
+static inline void
+die(int e, const char *str)
+{
+	fprintf(stderr, "Call to %s failed: %s", str, wiredtiger_strerror(e));
+	exit(EXIT_FAILURE);
+}
+
+/*
+ * dmalloc --
+ *      Call malloc, dying on failure.
+ */
+static inline void *
+dmalloc(size_t len)
+{
+	void *p;
+
+	if ((p = malloc(len)) == NULL)
+		die(errno, "malloc");
+	return (p);
+}
+
+/*
+ * dcalloc --
+ *      Call calloc, dying on failure.
+ */
+static inline void *
+dcalloc(size_t num, size_t len)
+{
+	void *p;
+
+	if ((p = calloc(len, num)) == NULL)
+		die(errno, "calloc");
+	return (p);
+}
+
+/*
+ * drealloc --
+ *      Call realloc, dying on failure.
+ */
+static inline void *
+drealloc(void *p, size_t len)
+{
+	void *repl;
+
+	if ((repl = realloc(p, len)) == NULL)
+		die(errno, "realloc");
+	return (repl);
+}
+
+/*
+ * dstrdup --
+ *      Call strdup, dying on failure.
+ */
+static inline char *
+dstrdup(const char *str)
+{
+	char *p;
+
+	if ((p = strdup(str)) == NULL)
+		die(errno, "strdup");
+	return (p);
+}
+
+/*
+ * dstrndup --
+ *      Call strndup, dying on failure.
+ */
+static inline char *
+dstrndup(const char *str, const size_t len)
+{
+	char *p;
+
+	if ((p = strndup(str, len)) == NULL)
+		die(errno, "strndup");
+	return (p);
 }
 
 #endif

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -33,7 +33,7 @@
 
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open, stat
+from wiredtiger import stat
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
@@ -42,6 +42,9 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablebase
     numfiles = 50
     numkv = 1000
+    conn_config = 'file_manager=(close_handle_minimum=0,' + \
+                  'close_idle_time=6,close_scan_interval=2),' + \
+                  'statistics=(fast),'
 
     types = [
         ('row', dict(tabletype='row',
@@ -53,26 +56,6 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     scenarios = types
-
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        self.backup_dir = os.path.join(self.home, "WT_BACKUP")
-        # Configure sweep to run every 2 seconds with a 6 second timeout.
-        # That matches the ratio of the default 10 and 30 seconds.
-        conn_params = \
-                ',create,error_prefix="%s: ",' % self.shortid() + \
-                'file_manager=(close_handle_minimum=0,' + \
-                'close_idle_time=6,close_scan_interval=2),' + \
-                'statistics=(fast),'
-        # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
-        try:
-            conn = wiredtiger_open(dir, conn_params)
-        except wiredtiger.WiredTigerError as e:
-            print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
-        self.pr(`conn`)
-        self.session2 = conn.open_session()
-        return conn
 
     def test_ops(self):
         #

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -185,9 +185,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	if (id == WT_TXN_ABORTED)
 		return (false);
 
-	/*
-	 * Read-uncommitted transactions see all other changes.
-	 */
+	/* Read-uncommitted transactions see all other changes. */
 	if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
 		return (true);
 

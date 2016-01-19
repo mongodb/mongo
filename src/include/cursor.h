@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -104,6 +104,14 @@ struct __wt_cursor_btree {
 	uint64_t recno;			/* Record number */
 
 	/*
+	 * Next-random cursors can optionally be configured to step through a
+	 * percentage of the total leaf pages to their next value. Note the
+	 * configured value and the calculated number of leaf pages to skip.
+	 */
+	uint64_t next_random_leaf_skip;
+	u_int	 next_random_sample_size;
+
+	/*
 	 * The search function sets compare to:
 	 *	< 1 if the found key is less than the specified key
 	 *	  0 if the found key matches the specified key
@@ -192,18 +200,23 @@ struct __wt_cursor_btree {
 
 	uint8_t	append_tree;		/* Cursor appended to the tree */
 
+#ifdef HAVE_DIAGNOSTIC
+	/* Check that cursor next/prev never returns keys out-of-order. */
+	WT_ITEM *lastkey, _lastkey;
+	uint64_t lastrecno;
+#endif
+
 #define	WT_CBT_ACTIVE		0x01	/* Active in the tree */
 #define	WT_CBT_ITERATE_APPEND	0x02	/* Col-store: iterating append list */
 #define	WT_CBT_ITERATE_NEXT	0x04	/* Next iteration configuration */
 #define	WT_CBT_ITERATE_PREV	0x08	/* Prev iteration configuration */
-#define	WT_CBT_MAX_RECORD	0x10	/* Col-store: past end-of-table */
-#define	WT_CBT_NO_TXN   	0x20	/* Non-transactional cursor
+#define	WT_CBT_NO_TXN   	0x10	/* Non-transactional cursor
 					   (e.g. on a checkpoint) */
-#define	WT_CBT_SEARCH_SMALLEST	0x40	/* Row-store: small-key insert list */
+#define	WT_CBT_SEARCH_SMALLEST	0x20	/* Row-store: small-key insert list */
 
 #define	WT_CBT_POSITION_MASK		/* Flags associated with position */ \
 	(WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV | \
-	WT_CBT_MAX_RECORD | WT_CBT_SEARCH_SMALLEST)
+	WT_CBT_SEARCH_SMALLEST)
 
 	uint8_t flags;
 };

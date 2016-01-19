@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __page_refp --
+ * __ref_index_slot --
  *      Return the page's index and slot for a reference.
  */
 static inline void
-__page_refp(WT_SESSION_IMPL *session,
+__ref_index_slot(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
 	WT_PAGE_INDEX *pindex;
@@ -32,53 +32,231 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	 * loop is from the hint to the end of the list, and the second loop
 	 * is from the start of the list to the end of the list.  (The second
 	 * loop overlaps the first, but that only happen in cases where we've
-	 * deepened the tree and aren't going to find our slot at all, that's
-	 * not worth optimizing.)
+	 * split the tree and aren't going to find our slot at all, that's not
+	 * worth optimizing.)
 	 *
 	 * It's not an error for the reference hint to be wrong, it just means
 	 * the first retrieval (which sets the hint for subsequent retrievals),
 	 * is slower.
 	 */
 	i = ref->pindex_hint;
-	if (i < pindex->entries && pindex->index[i]->page == ref->page) {
+	if (i < pindex->entries && pindex->index[i] == ref) {
 		*pindexp = pindex;
 		*slotp = i;
 		return;
 	}
 	while (++i < pindex->entries)
-		if (pindex->index[i]->page == ref->page) {
+		if (pindex->index[i] == ref) {
 			*pindexp = pindex;
 			*slotp = ref->pindex_hint = i;
 			return;
 		}
 	for (i = 0; i < pindex->entries; ++i)
-		if (pindex->index[i]->page == ref->page) {
+		if (pindex->index[i] == ref) {
 			*pindexp = pindex;
 			*slotp = ref->pindex_hint = i;
 			return;
 		}
 
 	/*
-	 * If we don't find our reference, the page split into a new level and
-	 * our home pointer references the wrong page.  After internal pages
-	 * deepen, their reference structure home value are updated; yield and
-	 * wait for that to happen.
+	 * If we don't find our reference, the page split and our home pointer
+	 * references the wrong page. When internal pages split, their WT_REF
+	 * structure home values are updated; yield and wait for that to happen.
 	 */
 	__wt_yield();
 	goto retry;
 }
 
 /*
- * __wt_tree_walk --
+ * __ref_is_leaf --
+ *	Check if a reference is for a leaf page.
+ */
+static inline bool
+__ref_is_leaf(WT_REF *ref)
+{
+	size_t addr_size;
+	u_int type;
+	const uint8_t *addr;
+
+	/*
+	 * If the page has a disk address, we can crack it to figure out if
+	 * this page is a leaf page or not. If there's no address, the page
+	 * isn't on disk and we don't know the page type.
+	 */
+	__wt_ref_info(ref, &addr, &addr_size, &type);
+	return (addr == NULL ?
+	    false : type == WT_CELL_ADDR_LEAF || type == WT_CELL_ADDR_LEAF_NO);
+}
+
+/*
+ * __page_ascend --
+ *	Ascend the tree one level.
+ */
+static void
+__page_ascend(WT_SESSION_IMPL *session,
+    WT_REF **refp, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
+{
+	WT_REF *parent_ref, *ref;
+
+	/*
+	 * Ref points to the first/last slot on an internal page from which we
+	 * are ascending the tree, moving to the parent page. This is tricky
+	 * because the internal page we're on may be splitting into its parent.
+	 * Find a stable configuration where the page we start from and the
+	 * page we're moving to are connected. The tree eventually stabilizes
+	 * into that configuration, keep trying until we succeed.
+	 */
+	for (ref = *refp;;) {
+		/*
+		 * Find our parent slot on the next higher internal page, the
+		 * slot from which we move to a next/prev slot, checking that
+		 * we haven't reached the root.
+		 */
+		parent_ref = ref->home->pg_intl_parent_ref;
+		if (__wt_ref_is_root(parent_ref))
+			break;
+		__ref_index_slot(session, parent_ref, pindexp, slotp);
+
+		/*
+		 * There's a split race when a cursor moving forwards through
+		 * the tree ascends the tree. If we're splitting an internal
+		 * page into its parent, we move the WT_REF structures and
+		 * then update the parent's page index before updating the split
+		 * page's page index, and it's not an atomic update. A thread
+		 * can read the split page's original page index and then read
+		 * the parent page's replacement index.
+		 *
+		 * This can create a race for next-cursor movements.
+		 *
+		 * For example, imagine an internal page with 3 child pages,
+		 * with the namespaces a-f, g-h and i-j; the first child page
+		 * splits. The parent starts out with the following page-index:
+		 *
+		 *	| ... | a | g | i | ... |
+		 *
+		 * which changes to this:
+		 *
+		 *	| ... | a | c | e | g | i | ... |
+		 *
+		 * The split page starts out with the following page-index:
+		 *
+		 *	| a | b | c | d | e | f |
+		 *
+		 * Imagine a cursor finishing the 'f' part of the namespace that
+		 * starts its ascent to the parent's 'a' slot. Then the page
+		 * splits and the parent page's page index is replaced. If the
+		 * cursor then searches the parent's replacement page index for
+		 * the 'a' slot, it finds it and then increments to the slot
+		 * after the 'a' slot, the 'c' slot, and then it incorrectly
+		 * repeats its traversal of part of the namespace.
+		 *
+		 * This function takes a WT_REF argument which is the page from
+		 * which we start our ascent. If the parent's slot we find in
+		 * our search doesn't point to the same page as that initial
+		 * WT_REF, there's a race and we start over again.
+		 */
+		if (ref->home == parent_ref->page)
+			break;
+	}
+
+	*refp = parent_ref;
+}
+
+/*
+ * __page_descend --
+ *	Descend the tree one level.
+ */
+static void
+__page_descend(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_PAGE_INDEX **pindexp, uint32_t *slotp, bool prev)
+{
+	WT_PAGE_INDEX *pindex;
+
+	/*
+	 * Ref is a child page into which we're descending, and on which we
+	 * have a hazard pointer.
+	 */
+	for (;; __wt_yield()) {
+		WT_INTL_INDEX_GET(session, page, pindex);
+		*slotp = prev ? pindex->entries - 1 : 0;
+
+		/*
+		 * There's a split race when a cursor moving backwards through
+		 * the tree descends the tree. If we're splitting an internal
+		 * page into its parent, we move the WT_REF structures and
+		 * update the parent's page index before updating the split
+		 * page's page index, and it's not an atomic update. A thread
+		 * can read the parent page's replacement page index and then
+		 * read the split page's original index.
+		 *
+		 * This can create a race for previous-cursor movements.
+		 *
+		 * For example, imagine an internal page with 3 child pages,
+		 * with the namespaces a-f, g-h and i-j; the first child page
+		 * splits. The parent starts out with the following page-index:
+		 *
+		 *	| ... | a | g | i | ... |
+		 *
+		 * The split page starts out with the following page-index:
+		 *
+		 *	| a | b | c | d | e | f |
+		 *
+		 * The first step is to move the c-f ranges into a new subtree,
+		 * so, for example we might have two new internal pages 'c' and
+		 * 'e', where the new 'c' page references the c-d namespace and
+		 * the new 'e' page references the e-f namespace. The top of the
+		 * subtree references the parent page, but until the parent's
+		 * page index is updated, any threads in the subtree won't be
+		 * able to ascend out of the subtree. However, once the parent
+		 * page's page index is updated to this:
+		 *
+		 *	| ... | a | c | e | g | i | ... |
+		 *
+		 * threads in the subtree can ascend into the parent. Imagine a
+		 * cursor in the c-d part of the namespace that ascends to the
+		 * parent's 'c' slot. It would then decrement to the slot before
+		 * the 'c' slot, the 'a' slot.
+		 *
+		 * The previous-cursor movement selects the last slot in the 'a'
+		 * page; if the split page's page-index hasn't been updated yet,
+		 * it will select the 'f' slot, which is incorrect. Once the
+		 * split page's page index is updated to this:
+		 *
+		 *	| a | b |
+		 *
+		 * the previous-cursor movement will select the 'b' slot, which
+		 * is correct.
+		 *
+		 * This function takes an argument which is the internal page
+		 * from which we're descending. If the last slot on the page no
+		 * longer points to the current page as its "home", the page is
+		 * being split and part of its namespace moved. We have the
+		 * correct page and we don't have to move, all we have to do is
+		 * wait until the split page's page index is updated.
+		 *
+		 * No test is necessary for a next-cursor movement because we
+		 * do right-hand splits on internal pages and the initial part
+		 * of the page's namespace won't change as part of a split.
+		 * Instead of testing the direction boolean, do the test the
+		 * previous cursor movement requires in all cases, even though
+		 * it will always succeed for a next-cursor movement.
+		 */
+		if (pindex->index[*slotp]->home == page)
+			break;
+	}
+	*pindexp = pindex;
+}
+
+/*
+ * __tree_walk_internal --
  *	Move to the next/previous page in the tree.
  */
-int
-__wt_tree_walk(WT_SESSION_IMPL *session,
-    WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
+static inline int
+__tree_walk_internal(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *walkcntp, uint64_t *skipleafcntp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
 	bool empty_internal, prev, skip;
@@ -153,7 +331,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
 		goto descend;
 	}
 
-ascend:	/*
+	/*
 	 * If the active page was the root, we've reached the walk's end.
 	 * Release any hazard-pointer we're holding.
 	 */
@@ -163,17 +341,18 @@ ascend:	/*
 	}
 
 	/* Figure out the current slot in the WT_REF array. */
-	__page_refp(session, ref, &pindex, &slot);
+	__ref_index_slot(session, ref, &pindex, &slot);
 
 	for (;;) {
 		/*
-		 * If we're at the last/first slot on the page, return this page
-		 * in post-order traversal.  Otherwise we move to the next/prev
-		 * slot and left/right-most element in its subtree.
+		 * If we're at the last/first slot on the internal page, return
+		 * it in post-order traversal. Otherwise move to the next/prev
+		 * slot and left/right-most element in that subtree.
 		 */
-		if ((prev && slot == 0) ||
+		while ((prev && slot == 0) ||
 		    (!prev && slot == pindex->entries - 1)) {
-			ref = ref->home->pg_intl_parent_ref;
+			/* Ascend to the parent. */
+			__page_ascend(session, &ref, &pindex, &slot);
 
 			/*
 			 * If we got all the way through an internal page and
@@ -185,40 +364,33 @@ ascend:	/*
 				empty_internal = false;
 			}
 
-			/* Optionally skip internal pages. */
-			if (LF_ISSET(WT_READ_SKIP_INTL))
-				goto ascend;
-
 			/*
-			 * We've ascended the tree and are returning an internal
-			 * page.  If it's the root, discard our hazard pointer,
-			 * otherwise, swap our hazard pointer for the page we'll
-			 * return.
+			 * If at the root and returning internal pages, return
+			 * the root page, otherwise we're done. Regardless, no
+			 * hazard pointer is required, release the one we hold.
 			 */
-			if (__wt_ref_is_root(ref))
+			if (__wt_ref_is_root(ref)) {
 				WT_ERR(__wt_page_release(
 				    session, couple, flags));
-			else {
-				/*
-				 * Locate the reference to our parent page then
-				 * swap our child hazard pointer for the parent.
-				 * We don't handle restart or not-found returns.
-				 * It would require additional complexity and is
-				 * not a possible return: we're moving to the
-				 * parent of the current child page, our parent
-				 * reference can't have split or been evicted.
-				 */
-				__page_refp(session, ref, &pindex, &slot);
-				if ((ret = __wt_page_swap(
-				    session, couple, ref, flags)) != 0) {
-					WT_TRET(__wt_page_release(
-					    session, couple, flags));
-					WT_ERR(ret);
-				}
+				if (!LF_ISSET(WT_READ_SKIP_INTL))
+					*refp = ref;
+				goto done;
 			}
 
-			*refp = ref;
-			goto done;
+			/*
+			 * Optionally return internal pages. Swap our previous
+			 * hazard pointer for the page we'll return. We don't
+			 * handle restart or not-found returns, it would require
+			 * additional complexity and is not a possible return:
+			 * we're moving to the parent of the current child page,
+			 * the parent can't have been evicted.
+			 */
+			if (!LF_ISSET(WT_READ_SKIP_INTL)) {
+				WT_ERR(__wt_page_swap(
+				    session, couple, ref, flags));
+				*refp = ref;
+				goto done;
+			}
 		}
 
 		if (prev)
@@ -304,7 +476,33 @@ ascend:	/*
 					break;
 			}
 
-			ret = __wt_page_swap(session, couple, ref, flags);
+			/*
+			 * Optionally skip leaf pages: skip all leaf pages if
+			 * WT_READ_SKIP_LEAF is set, when the skip-leaf-count
+			 * variable is non-zero, skip some count of leaf pages.
+			 * If this page is disk-based, crack the cell to figure
+			 * out it's a leaf page without reading it.
+			 *
+			 * If skipping some number of leaf pages, decrement the
+			 * count of pages to zero, and then take the next leaf
+			 * page we can. Be cautious around the page decrement,
+			 * if for some reason don't take this particular page,
+			 * we can take the next one, and, there are additional
+			 * tests/decrements when we're about to return a leaf
+			 * page.
+			 */
+			if (skipleafcntp != NULL || LF_ISSET(WT_READ_SKIP_LEAF))
+				if (__ref_is_leaf(ref)) {
+					if (LF_ISSET(WT_READ_SKIP_LEAF))
+						break;
+					if (*skipleafcntp > 0) {
+						--*skipleafcntp;
+						break;
+					}
+				}
+
+			ret = __wt_page_swap(session, couple, ref,
+			    WT_READ_NOTFOUND_OK | WT_READ_RESTART_OK | flags);
 
 			/*
 			 * Not-found is an expected return when only walking
@@ -349,7 +547,7 @@ ascend:	/*
 				    couple == couple_orig ||
 				    WT_PAGE_IS_INTERNAL(couple->page));
 				ref = couple;
-				__page_refp(session, ref, &pindex, &slot);
+				__ref_index_slot(session, ref, &pindex, &slot);
 				if (couple == couple_orig)
 					break;
 			}
@@ -359,13 +557,30 @@ ascend:	/*
 			 * A new page: configure for traversal of any internal
 			 * page's children, else return the leaf page.
 			 */
-descend:		couple = ref;
-			page = ref->page;
-			if (WT_PAGE_IS_INTERNAL(page)) {
-				WT_INTL_INDEX_GET(session, page, pindex);
-				slot = prev ? pindex->entries - 1 : 0;
+			if (WT_PAGE_IS_INTERNAL(ref->page)) {
+descend:			couple = ref;
 				empty_internal = true;
+
+				__page_descend(
+				    session, ref->page, &pindex, &slot, prev);
 			} else {
+				/*
+				 * Optionally skip leaf pages, the second half.
+				 * We didn't have an on-page cell to figure out
+				 * if it was a leaf page, we had to acquire the
+				 * hazard pointer and look at the page.
+				 */
+				if (skipleafcntp != NULL ||
+				    LF_ISSET(WT_READ_SKIP_LEAF)) {
+					couple = ref;
+					if (LF_ISSET(WT_READ_SKIP_LEAF))
+						break;
+					if (*skipleafcntp > 0) {
+						--*skipleafcntp;
+						break;
+					}
+				}
+
 				*refp = ref;
 				goto done;
 			}
@@ -375,4 +590,38 @@ descend:		couple = ref;
 done:
 err:	WT_LEAVE_PAGE_INDEX(session);
 	return (ret);
+}
+
+/*
+ * __wt_tree_walk --
+ *	Move to the next/previous page in the tree.
+ */
+int
+__wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
+{
+	return (__tree_walk_internal(session, refp, NULL, NULL, flags));
+}
+
+/*
+ * __wt_tree_walk_count --
+ *	Move to the next/previous page in the tree, tracking how many
+ *	references were visited to get there.
+ */
+int
+__wt_tree_walk_count(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
+{
+	return (__tree_walk_internal(session, refp, walkcntp, NULL, flags));
+}
+
+/*
+ * __wt_tree_walk_skip --
+ *	Move to the next/previous page in the tree, skipping a certain number
+ *	of leaf pages before returning.
+ */
+int
+__wt_tree_walk_skip(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *skipleafcntp, uint32_t flags)
+{
+	return (__tree_walk_internal(session, refp, NULL, skipleafcntp, flags));
 }

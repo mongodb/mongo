@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -1807,7 +1807,7 @@ err:	if (page != NULL)
  */
 static int
 __slvg_row_build_internal(
-    WT_SESSION_IMPL *session, uint32_t leaf_cnt,  WT_STUFF *ss)
+    WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF *ss)
 {
 	WT_ADDR *addr;
 	WT_DECL_RET;

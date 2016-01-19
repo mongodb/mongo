@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -268,3 +268,6 @@ union __wt_rand_state {
 		uint32_t w, z;
 	} x;
 };
+
+/* Shared array for converting to hex */
+extern const u_char __wt_hex[];

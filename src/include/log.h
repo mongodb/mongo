@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -265,6 +265,11 @@ struct __wt_log_desc {
 	uint16_t	minorv;		/* 06-07: Minor version */
 	uint64_t	log_size;	/* 08-15: Log file size */
 };
+
+/*
+ * Flags for __wt_txn_op_printlog.
+ */
+#define	WT_TXN_PRINTLOG_HEX	0x0001	/* Add hex output */
 
 /*
  * WT_LOG_REC_DESC --

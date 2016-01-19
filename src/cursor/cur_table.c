@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -968,8 +968,11 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strdup(session, tmp->data, &ctable->cfg[1]));
 
 	if (0) {
-err:		WT_TRET(__curtable_close(cursor));
-		*cursorp = NULL;
+err:		if (*cursorp != NULL) {
+			WT_TRET(__wt_cursor_close(*cursorp));
+			*cursorp = NULL;
+		}
+		WT_TRET(__curtable_close(cursor));
 	}
 
 	__wt_scr_free(session, &tmp);

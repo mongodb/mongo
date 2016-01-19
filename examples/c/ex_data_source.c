@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -439,7 +439,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	{
 	/*! [WT_EXTENSION metadata search] */
 	/*
-	 * Insert a new WiredTiger metadata record.
+	 * Search for a WiredTiger metadata record.
 	 */
 	const char *key = "datasource_uri";
 	char *value;

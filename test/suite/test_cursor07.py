@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -32,7 +32,7 @@
 
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open, stat
+from wiredtiger import stat
 from wtscenario import check_scenarios
 import wttest
 
@@ -48,23 +48,10 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
         ('regular', dict(reopen=False)),
         ('reopen', dict(reopen=True))
     ])
-
-    # Overrides WiredTigerTestCase - add logging
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        self.txn_sync = '(method=dsync,enabled)'
-        conn_params = \
-                'log=(archive=false,enabled,file_max=%s)' % self.logmax + \
-                ',create,error_prefix="%s: ",' % self.shortid() + \
-                'transaction_sync="%s",' % self.txn_sync
-        # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
-        try:
-            conn = wiredtiger_open(dir, conn_params)
-        except wiredtiger.WiredTigerError as e:
-            print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
-        self.pr(`conn`)
-        self.session2 = conn.open_session()
-        return conn
+    # Enable logging for this test.
+    def conn_config(self, dir):
+        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+            'transaction_sync="(method=dsync,enabled)"'
 
     def test_log_cursor(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)

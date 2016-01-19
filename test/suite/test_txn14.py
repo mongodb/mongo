@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -32,7 +32,6 @@
 
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
@@ -41,6 +40,7 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
     create_params = 'key_format=i,value_format=i'
     entries = 10000
     extra_entries = 5
+    conn_config = 'log=(archive=false,enabled,file_max=100K)'
 
     sync_list = [
         ('write', dict(sync='off')),
@@ -48,11 +48,6 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         ('bg', dict(sync='background')),
     ]
     scenarios = multiply_scenarios('.', sync_list)
-
-    # Overrides WiredTigerTestCase, add extra config params
-    def setUpConnectionOpen(self, dir):
-        self.conn_config = 'log=(archive=false,enabled,file_max=100K),'
-        return wttest.WiredTigerTestCase.setUpConnectionOpen(self, dir)
 
     def simulate_crash_restart(self, olddir, newdir):
         ''' Simulate a crash from olddir and restart in newdir. '''

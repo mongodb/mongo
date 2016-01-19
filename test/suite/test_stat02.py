@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -60,13 +60,9 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     scenarios = number_scenarios(
         multiply_scenarios('.', uri, data_config, cursor_config))
 
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,' +
-            'statistics=(' + self.data_config + '),' +
-            'error_prefix="%s: "' % self.shortid())
-        return conn
+    # Turn on statistics for this test.
+    def conn_config(self, dir):
+        return 'statistics=(%s)' % self.data_config
 
     # For each database/cursor configuration, confirm the right combinations
     # succeed or fail.
@@ -87,13 +83,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
 # Test the connection "clear" configuration.
 class test_stat_cursor_conn_clear(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_conn_clear'
-
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,statistics=(all),' +
-            'error_prefix="%s: "' % self.shortid())
-        return conn
+    conn_config = 'statistics=(all)'
 
     def test_stat_cursor_conn_clear(self):
         uri = 'table:' + self.pfx
@@ -123,13 +113,7 @@ class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
     ]
 
     scenarios = number_scenarios(multiply_scenarios('.', uri))
-
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,statistics=(all),' +
-            'error_prefix="%s: "' % self.shortid())
-        return conn
+    conn_config = 'statistics=(all)'
 
     def test_stat_cursor_dsrc_clear(self):
         self.pop(self, self.uri, 'key_format=S', 100)
@@ -159,13 +143,7 @@ class test_stat_cursor_fast(wttest.WiredTigerTestCase):
     ]
 
     scenarios = number_scenarios(multiply_scenarios('.', uri))
-
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,statistics=(all),' +
-            'error_prefix="%s: "' % self.shortid())
-        return conn
+    conn_config = 'statistics=(all)'
 
     def test_stat_cursor_fast(self):
         self.pop(self, self.uri, 'key_format=S', 100)
@@ -194,7 +172,7 @@ class test_stat_cursor_conn_error(wttest.WiredTigerTestCase):
             config = 'create,statistics=(' + i[0] + ',' + i[1] + ')'
             msg = '/only one statistics configuration value/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                lambda: wiredtiger.wiredtiger_open('.', config), msg)
+                lambda: self.wiredtiger_open('.', config), msg)
 
 
 # Test data-source error combinations.
@@ -209,13 +187,7 @@ class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
     ]
 
     scenarios = number_scenarios(multiply_scenarios('.', uri))
-
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,statistics=(all),' +
-            'error_prefix="%s: "' % self.shortid())
-        return conn
+    conn_config = 'statistics=(all)'
 
     def test_stat_cursor_dsrc_error(self):
         self.pop(self, self.uri, 'key_format=S', 100)

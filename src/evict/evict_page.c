@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -8,8 +8,9 @@
 
 #include "wt_internal.h"
 
-static int  __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, bool);
-static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, bool *, bool);
+static int __evict_page_clean_update(WT_SESSION_IMPL *, WT_REF *, bool);
+static int __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, bool);
+static int __evict_review(WT_SESSION_IMPL *, WT_REF *, bool *, bool);
 
 /*
  * __evict_exclusive_clear --
@@ -117,7 +118,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 * Pages that belong to dead trees never write back to disk
 		 * and can't support page splits.
 		 */
-		WT_ERR(__wt_evict_page_clean_update(
+		WT_ERR(__evict_page_clean_update(
 		    session, ref, tree_dead || closing));
 	else
 		WT_ERR(__evict_page_dirty_update(session, ref, closing));
@@ -200,12 +201,11 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 }
 
 /*
- * __wt_evict_page_clean_update --
+ * __evict_page_clean_update --
  *	Update a clean page's reference on eviction.
  */
-int
-__wt_evict_page_clean_update(
-    WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
+static int
+__evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_DECL_RET;
 

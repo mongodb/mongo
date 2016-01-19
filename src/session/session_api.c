@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -148,7 +148,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		 * via the registered close callback.
 		 */
 		if (session->event_handler->handle_close != NULL &&
-		    !WT_STREQ(cursor->uri, WT_LAS_URI))
+		    !WT_STREQ(cursor->internal_uri, WT_LAS_URI))
 			WT_TRET(session->event_handler->handle_close(
 			    session->event_handler, wt_session, cursor));
 		WT_TRET(cursor->close(cursor));
@@ -648,6 +648,7 @@ static int
 __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
     WT_CURSOR *ref_cursor, const char *config)
 {
+	WT_CURSOR *firstcg;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR_JOIN *cjoin;
@@ -661,6 +662,7 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	uint8_t flags, range;
 
 	count = 0;
+	firstcg = NULL;
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, join, config, cfg);
 	table = NULL;
@@ -672,15 +674,18 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		cindex = (WT_CURSOR_INDEX *)ref_cursor;
 		idx = cindex->index;
 		table = cindex->table;
-		WT_CURSOR_CHECKKEY(ref_cursor);
+		firstcg = cindex->cg_cursors[0];
 	} else if (WT_PREFIX_MATCH(ref_cursor->uri, "table:")) {
 		idx = NULL;
 		ctable = (WT_CURSOR_TABLE *)ref_cursor;
 		table = ctable->table;
-		WT_CURSOR_CHECKKEY(ctable->cg_cursors[0]);
+		firstcg = ctable->cg_cursors[0];
 	} else
 		WT_ERR_MSG(session, EINVAL, "not an index or table cursor");
 
+	if (!F_ISSET(firstcg, WT_CURSTD_KEY_SET))
+		WT_ERR_MSG(session, EINVAL,
+		    "requires reference cursor be positioned");
 	cjoin = (WT_CURSOR_JOIN *)join_cursor;
 	if (cjoin->table != table)
 		WT_ERR_MSG(session, EINVAL,
@@ -1443,7 +1448,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	 */
 	if (open_metadata) {
 		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
-		if ((ret = __wt_metadata_open(session)) != 0) {
+		if ((ret = __wt_metadata_cursor(session, NULL)) != 0) {
 			wt_session = &session->iface;
 			WT_TRET(wt_session->close(wt_session, NULL));
 			return (ret);
@@ -1486,14 +1491,11 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	 * deadlocked getting the cursor late in the process.  Be defensive,
 	 * get it now.
 	 */
-	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR)) {
-		WT_WITHOUT_DHANDLE(session, ret =
-		    __wt_las_cursor_create(session, &session->las_cursor));
-		if (ret != 0) {
-			wt_session = &session->iface;
-			WT_TRET(wt_session->close(wt_session, NULL));
-			return (ret);
-		}
+	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR) &&
+	    (ret = __wt_las_cursor_open(session, &session->las_cursor)) != 0) {
+		wt_session = &session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+		return (ret);
 	}
 
 	*sessionp = session;
