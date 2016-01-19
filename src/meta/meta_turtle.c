@@ -296,7 +296,7 @@ __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
 	WT_ERR(__wt_write(session, fh, 0, buf->size, buf->data));
 
 	/* Flush the handle and rename the file into place. */
-	ret = __wt_sync_and_rename_fh(
+	ret = __wt_fh_sync_and_rename(
 	    session, &fh, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE);
 
 	/* Close any file handle left open, remove any temporary file. */
