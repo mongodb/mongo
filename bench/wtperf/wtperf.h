@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -289,7 +289,6 @@ void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_print(CONFIG *);
-int	 enomem(const CONFIG *);
 int	 run_truncate(
     CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(CONFIG *);
@@ -321,6 +320,87 @@ static inline void
 extract_key(char *key_buf, uint64_t *keynop)
 {
 	sscanf(key_buf, "%" SCNu64, keynop);
+}
+
+/*
+ * die --
+ *      Print message and exit on failure.
+ */
+static inline void
+die(int e, const char *str)
+{
+	fprintf(stderr, "Call to %s failed: %s", str, wiredtiger_strerror(e));
+	exit(EXIT_FAILURE);
+}
+
+/*
+ * dmalloc --
+ *      Call malloc, dying on failure.
+ */
+static inline void *
+dmalloc(size_t len)
+{
+	void *p;
+
+	if ((p = malloc(len)) == NULL)
+		die(errno, "malloc");
+	return (p);
+}
+
+/*
+ * dcalloc --
+ *      Call calloc, dying on failure.
+ */
+static inline void *
+dcalloc(size_t num, size_t len)
+{
+	void *p;
+
+	if ((p = calloc(len, num)) == NULL)
+		die(errno, "calloc");
+	return (p);
+}
+
+/*
+ * drealloc --
+ *      Call realloc, dying on failure.
+ */
+static inline void *
+drealloc(void *p, size_t len)
+{
+	void *repl;
+
+	if ((repl = realloc(p, len)) == NULL)
+		die(errno, "realloc");
+	return (repl);
+}
+
+/*
+ * dstrdup --
+ *      Call strdup, dying on failure.
+ */
+static inline char *
+dstrdup(const char *str)
+{
+	char *p;
+
+	if ((p = strdup(str)) == NULL)
+		die(errno, "strdup");
+	return (p);
+}
+
+/*
+ * dstrndup --
+ *      Call strndup, dying on failure.
+ */
+static inline char *
+dstrndup(const char *str, const size_t len)
+{
+	char *p;
+
+	if ((p = strndup(str, len)) == NULL)
+		die(errno, "strndup");
+	return (p);
 }
 
 #endif

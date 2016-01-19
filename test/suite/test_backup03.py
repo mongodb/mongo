@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -75,13 +75,8 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     scenarios = number_scenarios(multiply_scenarios('.', list))
-
     # Create a large cache, otherwise this test runs quite slowly.
-    def setUpConnectionOpen(self, dir):
-        wtopen_args = 'create,cache_size=1G'
-        conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
-        self.pr(`conn`)
-        return conn
+    conn_config = 'cache_size=1G'
 
     # Populate a set of objects.
     def populate(self):
@@ -102,7 +97,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Check that a URI doesn't exist, both the meta-data and the file names.
     def confirmPathDoesNotExist(self, uri):
-        conn = wiredtiger.wiredtiger_open(self.dir)
+        conn = self.wiredtiger_open(self.dir)
         session = conn.open_session()
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: session.open_cursor(uri, None, None))

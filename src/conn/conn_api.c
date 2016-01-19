@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -1749,7 +1749,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Flush the handle and rename the file into place. */
-	ret = __wt_sync_and_rename_fp(
+	ret = __wt_sync_fp_and_rename(
 	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG);
 
 	if (0) {

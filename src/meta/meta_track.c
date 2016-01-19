@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -141,7 +141,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		    ret = bm->checkpoint_resolve(bm, session));
 		break;
 	case WT_ST_DROP_COMMIT:
-		if ((ret = __wt_remove_if_exists(session, trk->a)) != 0)
+		if ((ret = __wt_block_manager_drop(session, trk->a)) != 0)
 			__wt_err(session, ret,
 			    "metadata remove dropped file %s", trk->a);
 		break;
@@ -189,7 +189,7 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		 * For removes, b is NULL.
 		 */
 		if (trk->a != NULL && trk->b != NULL &&
-		    (ret = __wt_rename(session,
+		    (ret = __wt_rename_and_sync_directory(session,
 		    trk->b + strlen("file:"), trk->a + strlen("file:"))) != 0)
 			__wt_err(session, ret,
 			    "metadata unroll rename %s to %s", trk->b, trk->a);

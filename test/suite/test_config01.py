@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -41,7 +41,7 @@ class test_config01(test_base03.test_base03):
         wtopen_args = 'create'
         if hasattr(self, 'cache_size'):
             wtopen_args += ',cache_size=' + str(self.cache_size)
-        conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
+        conn = self.wiredtiger_open(dir, wtopen_args)
         self.pr(`conn`)
         return conn
 

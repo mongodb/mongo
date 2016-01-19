@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -130,8 +130,8 @@ __bloom_open_cursor(WT_BLOOM *bloom, WT_CURSOR *owner)
 	c = NULL;
 	WT_RET(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
 
-	/* XXX Layering violation: bump the cache priority for Bloom filters. */
-	((WT_CURSOR_BTREE *)c)->btree->evict_priority = WT_EVICT_INT_SKEW;
+	/* Bump the cache priority for Bloom filters. */
+	__wt_evict_priority_set(session, WT_EVICT_INT_SKEW);
 
 	bloom->c = c;
 	return (0);

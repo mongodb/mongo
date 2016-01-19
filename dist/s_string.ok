@@ -498,6 +498,7 @@ datasets
 datasource
 datastore
 dbc
+dcalloc
 decile
 deciles
 decl
@@ -537,6 +538,7 @@ dmalloc
 dmsg
 doxgen
 doxygen
+drealloc
 ds
 dsb
 dsk
@@ -544,6 +546,7 @@ dsrc
 dst
 dstlen
 dstrdup
+dstrndup
 dsync
 dumpcmp
 dumpfile

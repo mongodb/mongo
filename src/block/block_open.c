@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -41,6 +41,16 @@ __wt_block_manager_truncate(
 err:	WT_TRET(__wt_close(session, &fh));
 
 	return (ret);
+}
+
+/*
+ * __wt_block_manager_drop --
+ *	Drop a file.
+ */
+int
+__wt_block_manager_drop(WT_SESSION_IMPL *session, const char *filename)
+{
+	 return (__wt_remove_if_exists(session, filename));
 }
 
 /*

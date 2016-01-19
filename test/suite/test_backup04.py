@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -59,13 +59,9 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     ])
 
     # Create a large cache, otherwise this test runs quite slowly.
-    def setUpConnectionOpen(self, dir):
-        wtopen_args = \
-            'create,cache_size=1G,log=(archive=false,enabled,file_max=%s)' % \
+    def conn_config(self, dir):
+        return 'cache_size=1G,log=(archive=false,enabled,file_max=%s)' % \
             self.logmax
-        conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
-        self.pr(`conn`)
-        return conn
 
     def populate(self, uri, dsize, rows):
         self.pr('populate: ' + uri + ' with ' + str(rows) + ' rows')

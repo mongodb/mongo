@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -107,7 +107,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr('encarg = ' + encarg + ' extarg = ' + extarg)
         completed = False
         try:
-            conn = wiredtiger.wiredtiger_open(dir,
+            conn = self.wiredtiger_open(dir,
                 'create,error_prefix="{0}: ",{1}{2}'.format(
                  self.shortid(), encarg, extarg))
         except (BaseException) as err:

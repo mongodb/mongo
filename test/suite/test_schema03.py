@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -219,6 +219,9 @@ class test_schema03(wttest.WiredTigerTestCase):
     - between each step, whether to close/reopen the connection
     """
 
+    # Boost cache size and number of sessions for this test
+    conn_config = 'cache_size=100m,session_max=1000'
+
     ################################################################
     # These three variables can be altered to help generate
     # and pare down failing test cases.
@@ -296,12 +299,6 @@ class test_schema03(wttest.WiredTigerTestCase):
             self.skipTest('Require %d open files, only %d available' % newlimit)
         resource.setrlimit(resource.RLIMIT_NOFILE, newlimit)
         super(test_schema03, self).setUp()
-
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,cache_size=100m,session_max=1000')
-        self.pr(`conn`)
-        return conn
 
     def tearDown(self):
         super(test_schema03, self).tearDown()

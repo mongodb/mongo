@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -82,7 +82,7 @@ class test_config02(wttest.WiredTigerTestCase):
         else:
             os.putenv('WIREDTIGER_HOME', homeenv)
         try:
-            self.conn = wiredtiger.wiredtiger_open(homearg, configarg)
+            self.conn = self.wiredtiger_open(homearg, configarg)
             self.session = self.conn.open_session(None)
             self.populate_and_check()
         finally:
@@ -144,7 +144,7 @@ class test_config02(wttest.WiredTigerTestCase):
     def test_home_does_not_exist(self):
         dir = 'nondir'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: wiredtiger.wiredtiger_open(dir, 'create'),
+            lambda: self.wiredtiger_open(dir, 'create'),
             '/(No such file or directory|The system cannot find the path specified)/')
 
     def test_home_not_writeable(self):
@@ -154,7 +154,7 @@ class test_config02(wttest.WiredTigerTestCase):
         os.mkdir(dir)
         os.chmod(dir, 0555)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: wiredtiger.wiredtiger_open(dir, 'create'),
+            lambda: self.wiredtiger_open(dir, 'create'),
             '/Permission denied/')
 
 if __name__ == '__main__':

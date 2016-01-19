@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __page_refp --
+ * __ref_index_slot --
  *      Return the page's index and slot for a reference.
  */
 static inline void
-__page_refp(WT_SESSION_IMPL *session,
+__ref_index_slot(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
 	WT_PAGE_INDEX *pindex;
@@ -32,37 +32,36 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	 * loop is from the hint to the end of the list, and the second loop
 	 * is from the start of the list to the end of the list.  (The second
 	 * loop overlaps the first, but that only happen in cases where we've
-	 * deepened the tree and aren't going to find our slot at all, that's
-	 * not worth optimizing.)
+	 * split the tree and aren't going to find our slot at all, that's not
+	 * worth optimizing.)
 	 *
 	 * It's not an error for the reference hint to be wrong, it just means
 	 * the first retrieval (which sets the hint for subsequent retrievals),
 	 * is slower.
 	 */
 	i = ref->pindex_hint;
-	if (i < pindex->entries && pindex->index[i]->page == ref->page) {
+	if (i < pindex->entries && pindex->index[i] == ref) {
 		*pindexp = pindex;
 		*slotp = i;
 		return;
 	}
 	while (++i < pindex->entries)
-		if (pindex->index[i]->page == ref->page) {
+		if (pindex->index[i] == ref) {
 			*pindexp = pindex;
 			*slotp = ref->pindex_hint = i;
 			return;
 		}
 	for (i = 0; i < pindex->entries; ++i)
-		if (pindex->index[i]->page == ref->page) {
+		if (pindex->index[i] == ref) {
 			*pindexp = pindex;
 			*slotp = ref->pindex_hint = i;
 			return;
 		}
 
 	/*
-	 * If we don't find our reference, the page split into a new level and
-	 * our home pointer references the wrong page.  After internal pages
-	 * deepen, their reference structure home value are updated; yield and
-	 * wait for that to happen.
+	 * If we don't find our reference, the page split and our home pointer
+	 * references the wrong page. When internal pages split, their WT_REF
+	 * structure home values are updated; yield and wait for that to happen.
 	 */
 	__wt_yield();
 	goto retry;
@@ -116,19 +115,136 @@ __page_ascend(WT_SESSION_IMPL *session,
 		parent_ref = ref->home->pg_intl_parent_ref;
 		if (__wt_ref_is_root(parent_ref))
 			break;
-		__page_refp(session, parent_ref, pindexp, slotp);
+		__ref_index_slot(session, parent_ref, pindexp, slotp);
 
 		/*
-		 * When internal pages split, the WT_REF structures being moved
-		 * are updated first. If the WT_REF we started with references
-		 * the same page as we found on our search of the parent, there
-		 * is a consistent view.
+		 * There's a split race when a cursor moving forwards through
+		 * the tree ascends the tree. If we're splitting an internal
+		 * page into its parent, we move the WT_REF structures and
+		 * then update the parent's page index before updating the split
+		 * page's page index, and it's not an atomic update. A thread
+		 * can read the split page's original page index and then read
+		 * the parent page's replacement index.
+		 *
+		 * This can create a race for next-cursor movements.
+		 *
+		 * For example, imagine an internal page with 3 child pages,
+		 * with the namespaces a-f, g-h and i-j; the first child page
+		 * splits. The parent starts out with the following page-index:
+		 *
+		 *	| ... | a | g | i | ... |
+		 *
+		 * which changes to this:
+		 *
+		 *	| ... | a | c | e | g | i | ... |
+		 *
+		 * The split page starts out with the following page-index:
+		 *
+		 *	| a | b | c | d | e | f |
+		 *
+		 * Imagine a cursor finishing the 'f' part of the namespace that
+		 * starts its ascent to the parent's 'a' slot. Then the page
+		 * splits and the parent page's page index is replaced. If the
+		 * cursor then searches the parent's replacement page index for
+		 * the 'a' slot, it finds it and then increments to the slot
+		 * after the 'a' slot, the 'c' slot, and then it incorrectly
+		 * repeats its traversal of part of the namespace.
+		 *
+		 * This function takes a WT_REF argument which is the page from
+		 * which we start our ascent. If the parent's slot we find in
+		 * our search doesn't point to the same page as that initial
+		 * WT_REF, there's a race and we start over again.
 		 */
 		if (ref->home == parent_ref->page)
 			break;
 	}
 
 	*refp = parent_ref;
+}
+
+/*
+ * __page_descend --
+ *	Descend the tree one level.
+ */
+static void
+__page_descend(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_PAGE_INDEX **pindexp, uint32_t *slotp, bool prev)
+{
+	WT_PAGE_INDEX *pindex;
+
+	/*
+	 * Ref is a child page into which we're descending, and on which we
+	 * have a hazard pointer.
+	 */
+	for (;; __wt_yield()) {
+		WT_INTL_INDEX_GET(session, page, pindex);
+		*slotp = prev ? pindex->entries - 1 : 0;
+
+		/*
+		 * There's a split race when a cursor moving backwards through
+		 * the tree descends the tree. If we're splitting an internal
+		 * page into its parent, we move the WT_REF structures and
+		 * update the parent's page index before updating the split
+		 * page's page index, and it's not an atomic update. A thread
+		 * can read the parent page's replacement page index and then
+		 * read the split page's original index.
+		 *
+		 * This can create a race for previous-cursor movements.
+		 *
+		 * For example, imagine an internal page with 3 child pages,
+		 * with the namespaces a-f, g-h and i-j; the first child page
+		 * splits. The parent starts out with the following page-index:
+		 *
+		 *	| ... | a | g | i | ... |
+		 *
+		 * The split page starts out with the following page-index:
+		 *
+		 *	| a | b | c | d | e | f |
+		 *
+		 * The first step is to move the c-f ranges into a new subtree,
+		 * so, for example we might have two new internal pages 'c' and
+		 * 'e', where the new 'c' page references the c-d namespace and
+		 * the new 'e' page references the e-f namespace. The top of the
+		 * subtree references the parent page, but until the parent's
+		 * page index is updated, any threads in the subtree won't be
+		 * able to ascend out of the subtree. However, once the parent
+		 * page's page index is updated to this:
+		 *
+		 *	| ... | a | c | e | g | i | ... |
+		 *
+		 * threads in the subtree can ascend into the parent. Imagine a
+		 * cursor in the c-d part of the namespace that ascends to the
+		 * parent's 'c' slot. It would then decrement to the slot before
+		 * the 'c' slot, the 'a' slot.
+		 *
+		 * The previous-cursor movement selects the last slot in the 'a'
+		 * page; if the split page's page-index hasn't been updated yet,
+		 * it will select the 'f' slot, which is incorrect. Once the
+		 * split page's page index is updated to this:
+		 *
+		 *	| a | b |
+		 *
+		 * the previous-cursor movement will select the 'b' slot, which
+		 * is correct.
+		 *
+		 * This function takes an argument which is the internal page
+		 * from which we're descending. If the last slot on the page no
+		 * longer points to the current page as its "home", the page is
+		 * being split and part of its namespace moved. We have the
+		 * correct page and we don't have to move, all we have to do is
+		 * wait until the split page's page index is updated.
+		 *
+		 * No test is necessary for a next-cursor movement because we
+		 * do right-hand splits on internal pages and the initial part
+		 * of the page's namespace won't change as part of a split.
+		 * Instead of testing the direction boolean, do the test the
+		 * previous cursor movement requires in all cases, even though
+		 * it will always succeed for a next-cursor movement.
+		 */
+		if (pindex->index[*slotp]->home == page)
+			break;
+	}
+	*pindexp = pindex;
 }
 
 /*
@@ -225,7 +341,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	}
 
 	/* Figure out the current slot in the WT_REF array. */
-	__page_refp(session, ref, &pindex, &slot);
+	__ref_index_slot(session, ref, &pindex, &slot);
 
 	for (;;) {
 		/*
@@ -270,12 +386,8 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 			 * the parent can't have been evicted.
 			 */
 			if (!LF_ISSET(WT_READ_SKIP_INTL)) {
-				if ((ret = __wt_page_swap(
-				    session, couple, ref, flags)) != 0) {
-					WT_TRET(__wt_page_release(
-					    session, couple, flags));
-					WT_ERR(ret);
-				}
+				WT_ERR(__wt_page_swap(
+				    session, couple, ref, flags));
 				*refp = ref;
 				goto done;
 			}
@@ -389,7 +501,8 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 					}
 				}
 
-			ret = __wt_page_swap(session, couple, ref, flags);
+			ret = __wt_page_swap(session, couple, ref,
+			    WT_READ_NOTFOUND_OK | WT_READ_RESTART_OK | flags);
 
 			/*
 			 * Not-found is an expected return when only walking
@@ -434,7 +547,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 				    couple == couple_orig ||
 				    WT_PAGE_IS_INTERNAL(couple->page));
 				ref = couple;
-				__page_refp(session, ref, &pindex, &slot);
+				__ref_index_slot(session, ref, &pindex, &slot);
 				if (couple == couple_orig)
 					break;
 			}
@@ -446,9 +559,10 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 			 */
 			if (WT_PAGE_IS_INTERNAL(ref->page)) {
 descend:			couple = ref;
-				WT_INTL_INDEX_GET(session, ref->page, pindex);
-				slot = prev ? pindex->entries - 1 : 0;
 				empty_internal = true;
+
+				__page_descend(
+				    session, ref->page, &pindex, &slot, prev);
 			} else {
 				/*
 				 * Optionally skip leaf pages, the second half.
