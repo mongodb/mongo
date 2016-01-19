@@ -1705,6 +1705,10 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 *
 	 * The new WT_REF is not quite identical: we have to instantiate a key,
 	 * and the new reference is visible to readers once the split completes.
+	 *
+	 * Don't copy any deleted page state: we may be splitting a page that
+	 * was instantiated after a truncate and that history should not be
+	 * carried onto these new child pages.
 	 */
 	WT_ERR(__wt_calloc_one(session, &split_ref[0]));
 	parent_incr += sizeof(WT_REF);
@@ -1745,13 +1749,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		__wt_scr_free(session, &key);
 	} else
 		child->key.recno = ref->key.recno;
-
-	/*
-	 * Don't copy any deleted page state: we may be splitting a page that
-	 * was instantiated after a truncate and that history should not be
-	 * carried onto these new child pages.
-	 */
-	child->page_del = NULL;
 
 	/*
 	 * The second page in the split is a new WT_REF/page pair.
