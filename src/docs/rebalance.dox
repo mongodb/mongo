@@ -1,0 +1,14 @@
+/*! @m_page{{c,java},rebalance,Rebalance}
+
+The WT_SESSION::rebalance method can be used to rebalance data sources'
+underlying btrees. If a tree has become unbalanced (that is, one part of
+the tree is excessively deep), WT_SESSION::rebalance rewrites the tree
+as a balanced tree.
+
+The data source must be quiescent.
+
+The WT_SESSION::rebalance method should never be needed, as WiredTiger
+btrees are maintained as balanced trees. It is only provided as a tool
+to handle the unexpected.
+
+ */
