@@ -153,6 +153,21 @@ class test_config04(wttest.WiredTigerTestCase):
         # Note: There isn't any direct way to know that this was set.
         self.common_test('hazard_max=50')
 
+    def test_invalid_config(self):
+        msg = '/Unbalanced brackets/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '}'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '{'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '{}}'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '(]}'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '(create=]}'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '(create='), msg)
+
     def test_session_max(self):
         # Note: There isn't any direct way to know that this was set,
         # but we'll have a separate functionality test to test for
