@@ -382,18 +382,18 @@ __create_index(WT_SESSION_IMPL *session,
 	    { WT_CONFIG_BASE(session, index_meta), NULL, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
 	const char *source, *sourceconf, *idxname, *tablename;
-	char *idxconf;
+	char *idxconf, *origconf;
 	size_t tlen;
-	bool have_extractor;
+	bool exists, have_extractor;
 	u_int i, npublic_cols;
 
 	sourceconf = NULL;
-	idxconf = NULL;
+	idxconf = origconf = NULL;
 	WT_CLEAR(confbuf);
 	WT_CLEAR(fmt);
 	WT_CLEAR(extra_cols);
 	WT_CLEAR(namebuf);
-	have_extractor = false;
+	exists = have_extractor = false;
 
 	tablename = name;
 	if (!WT_PREFIX_SKIP(tablename, "index:"))
@@ -402,6 +402,14 @@ __create_index(WT_SESSION_IMPL *session,
 	if (idxname == NULL)
 		WT_RET_MSG(session, EINVAL, "Invalid index name, "
 		    "should be <table name>:<index name>: %s", name);
+
+	/* Check if the file already exists. */
+	if ((ret = __wt_metadata_search(session, name, &origconf)) !=
+	    WT_NOTFOUND) {
+		if (exclusive)
+			WT_TRET(EEXIST);
+		exists = true;
+	}
 
 	tlen = (size_t)(idxname++ - tablename);
 	if ((ret =
@@ -525,23 +533,20 @@ __create_index(WT_SESSION_IMPL *session,
 	cfg[1] = sourceconf;
 	cfg[2] = confbuf.data;
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
-	if ((ret = __wt_metadata_insert(session, name, idxconf)) != 0) {
-		/*
-		 * If the entry already exists in the metadata, we're done.
-		 * This is an error for exclusive creates but okay otherwise.
-		 */
-		if (ret == WT_DUPLICATE_KEY)
-			ret = exclusive ? EEXIST : 0;
-		goto err;
-	}
+	if (!exists)
+		WT_ERR(__wt_metadata_insert(session, name, idxconf));
+	else if (strcmp(idxconf, origconf) != 0)
+		WT_ERR_MSG(session, EINVAL, "%s: does not match existing "
+		    "configuration", name);
 
 	/* Make sure that the configuration is valid. */
 	WT_ERR(__wt_schema_open_index(
 	    session, table, idxname, strlen(idxname), &idx));
-
-	WT_ERR(__fill_index(session, table, idx));
+	if (!exists)
+		WT_ERR(__fill_index(session, table, idx));
 
 err:	__wt_free(session, idxconf);
+	__wt_free(session, origconf);
 	__wt_free(session, sourceconf);
 	__wt_buf_free(session, &confbuf);
 	__wt_buf_free(session, &extra_cols);
