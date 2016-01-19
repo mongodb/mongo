@@ -4413,6 +4413,10 @@ buildvariants:
     packager_script: packager-enterprise.py
     packager_arch: ppc64le
     packager_distro: ubuntu1504
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: ppc64le-enterprise-ubuntu1504
   tasks:
   - name: compile
   - name: aggregation
