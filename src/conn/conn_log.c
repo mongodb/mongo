@@ -511,7 +511,7 @@ typedef struct {
  *	write_lsn in LSN order after the buffer is written to the log file.
  */
 int
-__wt_log_wrlsn(WT_SESSION_IMPL *session)
+__wt_log_wrlsn(WT_SESSION_IMPL *session, int *yield)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -550,6 +550,8 @@ restart:
 	 * based on the release LSN, and then look for them in order.
 	 */
 	if (written_i > 0) {
+		if (yield != NULL)
+			*yield = 0;
 		WT_INSERTION_SORT(written, written_i,
 		    WT_LOG_WRLSN_ENTRY, WT_WRLSN_ENTRY_CMP_LT);
 		/*
@@ -660,22 +662,30 @@ __log_wrlsn_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int yield;
 
 	session = arg;
 	conn = S2C(session);
+	yield = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Write out any log record buffers.
 		 */
-		WT_ERR(__wt_log_wrlsn(session));
-		WT_ERR(__wt_cond_wait(session, conn->log_wrlsn_cond, 10000));
+		WT_ERR(__wt_log_wrlsn(session, &yield));
+		/*
+		 * If __wt_log_wrlsn did work we want to yield instead of sleep.
+		 */
+		if (yield++ < 1000)
+			__wt_yield();
+		else
+			WT_ERR(__wt_cond_wait(session, conn->log_wrlsn_cond, 10000));
 	}
 	/*
 	 * On close we need to do this one more time because there could
 	 * be straggling log writes that need to be written.
 	 */
 	WT_ERR(__wt_log_force_write(session, 1));
-	WT_ERR(__wt_log_wrlsn(session));
+	WT_ERR(__wt_log_wrlsn(session, NULL));
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
 	}
