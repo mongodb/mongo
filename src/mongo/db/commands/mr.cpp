@@ -1559,6 +1559,26 @@ public:
 
 } mapReduceCommand;
 
+namespace {
+Status _checkForCatalogManagerChange(ForwardingCatalogManager* catalogManager,
+                                     CatalogManager::ConfigServerMode initialConfigServerMode) {
+    Status status = catalogManager->checkForPendingCatalogChange();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto currentConfigServerMode = catalogManager->getMode();
+    if (currentConfigServerMode != initialConfigServerMode) {
+        invariant(initialConfigServerMode == CatalogManager::ConfigServerMode::SCCC &&
+                  currentConfigServerMode == CatalogManager::ConfigServerMode::CSRS);
+        return Status(ErrorCodes::IncompatibleCatalogManager,
+                      "CatalogManager was swapped from SCCC to CSRS mode during mapreduce."
+                      "Aborting mapreduce to unblock mongos.");
+    }
+    return Status::OK();
+}
+}  // namespace
+
 /**
  * This class represents a map/reduce command executed on the output server of a sharded env
  */
@@ -1598,6 +1618,11 @@ public:
                        str::stream() << "Can not execute mapReduce with output database "
                                      << dbname));
         }
+
+        // Store the initial catalog manager mode so we can check if it changes at any point.
+        CatalogManager::ConfigServerMode initialConfigServerMode =
+            grid.catalogManager(txn)->getMode();
+
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
@@ -1696,6 +1721,12 @@ public:
         BSONObj query;
         BSONArrayBuilder chunkSizes;
         while (true) {
+            Status status = _checkForCatalogManagerChange(grid.forwardingCatalogManager(),
+                                                          initialConfigServerMode);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
             ChunkPtr chunk;
             if (chunks.size() > 0) {
                 chunk = chunks[index];
@@ -1714,6 +1745,12 @@ public:
             int chunkSize = 0;
 
             while (cursor.more() || !values.empty()) {
+                status = _checkForCatalogManagerChange(grid.forwardingCatalogManager(),
+                                                       initialConfigServerMode);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status);
+                }
+
                 BSONObj t;
                 if (cursor.more()) {
                     t = cursor.next().getOwned();

@@ -36,6 +36,7 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/grid.h"
 
 namespace {
 
@@ -102,6 +103,18 @@ public:
         CloneOptions opts;
         opts.fromDB = dbname;
         opts.slaveOk = cmdObj["slaveOk"].trueValue();
+        opts.checkForCatalogChange = cmdObj["_checkForCatalogChange"].trueValue();
+
+        if (opts.checkForCatalogChange) {
+            auto catalogManager = grid.catalogManager(txn);
+            if (!catalogManager) {
+                return appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::NotYetInitialized,
+                           "Cannot run clone command for use by sharding movePrimary command on a "
+                           "node that isn't yet sharding aware"));
+            }
+        }
 
         // See if there's any collections we should ignore
         if (cmdObj["collsToIgnore"].type() == Array) {

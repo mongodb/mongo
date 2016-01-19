@@ -76,6 +76,8 @@ public:
     // Only public because of unit tests
     DistLockManager* getDistLockManager() override;
 
+    ConfigServerMode getMode() override;
+
     /**
      * If desiredMode doesn't equal _actual->getMode(), schedules work to swap the actual catalog
      * manager to one of the type specified by desiredMode.
@@ -90,6 +92,11 @@ public:
      * complete. It is illegal to call unless scheduleReplaceCatalogManagerIfNeeded has been called.
      */
     void waitForCatalogManagerChange(OperationContext* txn);
+
+    /**
+     * Checks to see if we are currently waiting to swap the catalog manager.
+     */
+    Status checkForPendingCatalogChange();
 
     /**
      * Returns a ScopedDistLock which is the RAII type for holding a distributed lock.
@@ -115,8 +122,6 @@ public:
                                               BSONArrayBuilder* builder) override;
 
 private:
-    ConfigServerMode getMode() override;
-
     Status startup(OperationContext* txn, bool allowNetworking) override;
 
     void shutDown(OperationContext* txn, bool allowNetworking = true) override;
@@ -274,7 +279,7 @@ public:
      * returns a non-OK status the caller must release the lock (most likely by failing the current
      * operation).
      */
-    Status checkForPendingCatalogSwap();
+    Status checkForPendingCatalogChange();
 
     /**
      * Queries the config server to make sure the lock is still present, as well as checking

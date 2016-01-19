@@ -382,7 +382,7 @@ void Balancer::_doBalanceRound(OperationContext* txn,
 
     // For each collection, check if the balancing policy recommends moving anything around.
     for (const auto& coll : collections) {
-        uassertStatusOK(distLock->checkForPendingCatalogSwap());
+        uassertStatusOK(distLock->checkForPendingCatalogChange());
 
         // Skip collections for which balancing is disabled
         const NamespaceString& nss = coll.getNs();

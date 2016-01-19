@@ -60,6 +60,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -111,6 +112,31 @@ BSONObj fixindex(const string& newDbName, BSONObj o) {
     return res;
 }
 
+namespace {
+Status _checkForCatalogManagerChangeIfNeeded(const CloneOptions& opts) {
+    if (!opts.checkForCatalogChange) {
+        return Status::OK();
+    }
+    auto catalogManager = grid.forwardingCatalogManager();
+    invariant(catalogManager);
+
+    Status status = catalogManager->checkForPendingCatalogChange();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto currentConfigServerMode = catalogManager->getMode();
+    if (currentConfigServerMode != opts.initialCatalogMode) {
+        invariant(opts.initialCatalogMode == CatalogManager::ConfigServerMode::SCCC &&
+                  currentConfigServerMode == CatalogManager::ConfigServerMode::CSRS);
+        return Status(ErrorCodes::IncompatibleCatalogManager,
+                      "CatalogManager was swapped from SCCC to CSRS mode during movePrimary."
+                      "Aborting movePrimary to unblock mongos.");
+    }
+    return Status::OK();
+}
+}  // namespace
+
 Cloner::Cloner() {}
 
 struct Cloner::Fun {
@@ -118,6 +144,7 @@ struct Cloner::Fun {
 
     void operator()(DBClientCursorBatchIterator& i) {
         invariant(from_collection.coll() != "system.indexes");
+        uassertStatusOK(_checkForCatalogManagerChangeIfNeeded(_opts));
 
         // XXX: can probably take dblock instead
         unique_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_X));
@@ -241,6 +268,7 @@ struct Cloner::Fun {
     BSONObj from_options;
     NamespaceString to_collection;
     time_t saveLast;
+    CloneOptions _opts;
 };
 
 /* copy the specified collection
@@ -251,7 +279,7 @@ void Cloner::copy(OperationContext* txn,
                   const BSONObj& from_opts,
                   const NamespaceString& to_collection,
                   bool masterSameProcess,
-                  bool slaveOk,
+                  const CloneOptions& opts,
                   Query query) {
     LOG(2) << "\t\tcloning collection " << from_collection << " to " << to_collection << " on "
            << _conn->getServerAddress() << " with filter " << query.toString() << endl;
@@ -262,8 +290,9 @@ void Cloner::copy(OperationContext* txn,
     f.from_options = from_opts;
     f.to_collection = to_collection;
     f.saveLast = time(0);
+    f._opts = opts;
 
-    int options = QueryOption_NoCursorTimeout | (slaveOk ? QueryOption_SlaveOk : 0);
+    int options = QueryOption_NoCursorTimeout | (opts.slaveOk ? QueryOption_SlaveOk : 0);
     {
         Lock::TempRelease tempRelease(txn->lockState());
         _conn->query(stdx::function<void(DBClientCursorBatchIterator&)>(f),
@@ -407,7 +436,9 @@ bool Cloner::copyCollection(OperationContext* txn,
     }
 
     // main data
-    copy(txn, dbname, nss, options, nss, false, true, Query(query).snapshot());
+    CloneOptions opts;
+    opts.slaveOk = true;
+    copy(txn, dbname, nss, options, nss, false, opts, Query(query).snapshot());
 
     /* TODO : copyIndexes bool does not seem to be implemented! */
     if (!shouldCopyIndexes) {
@@ -482,6 +513,8 @@ Status Cloner::copyDb(OperationContext* txn,
     if (clonedColls) {
         clonedColls->clear();
     }
+
+    uassertStatusOK(_checkForCatalogManagerChangeIfNeeded(opts));
 
     {
         // getCollectionInfos may make a remote call, which may block indefinitely, so release
@@ -580,7 +613,8 @@ Status Cloner::copyDb(OperationContext* txn,
             if (opts.snapshot)
                 q.snapshot();
 
-            copy(txn, toDBName, from_name, options, to_name, masterSameProcess, opts.slaveOk, q);
+            uassertStatusOK(_checkForCatalogManagerChangeIfNeeded(opts));
+            copy(txn, toDBName, from_name, options, to_name, masterSameProcess, opts, q);
 
             // Copy releases the lock, so we need to re-load the database. This should
             // probably throw if the database has changed in between, but for now preserve
@@ -636,6 +670,8 @@ Status Cloner::copyDb(OperationContext* txn,
 
             NamespaceString from_name(opts.fromDB, collectionName);
             NamespaceString to_name(toDBName, collectionName);
+
+            uassertStatusOK(_checkForCatalogManagerChangeIfNeeded(opts));
 
             copyIndexes(txn,
                         toDBName,
