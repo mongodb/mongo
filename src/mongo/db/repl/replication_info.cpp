@@ -239,6 +239,7 @@ public:
         result.appendDate("localTime", jsTime());
         result.append("maxWireVersion", WireSpec::instance().maxWireVersionIncoming);
         result.append("minWireVersion", WireSpec::instance().minWireVersionIncoming);
+        result.append("readOnly", storageGlobalParams.readOnly);
         return true;
     }
 } cmdismaster;

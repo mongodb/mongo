@@ -204,6 +204,14 @@ Status addMongodOptions(moe::OptionSection* options) {
                                       moe::Switch,
                                       "each database will be stored in a separate directory");
 
+    storage_options.addOptionChaining(
+                        "storage.readOnly",
+                        "readOnly",
+                        moe::Switch,
+                        "enable read-only mode - if true the server will not accept writes.")
+        .setSources(moe::SourceAll);
+
+
     general_options.addOptionChaining(
                         "noIndexBuildRetry",
                         "noIndexBuildRetry",
@@ -1016,6 +1024,11 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     if (params.count("storage.directoryPerDB")) {
         storageGlobalParams.directoryperdb = params["storage.directoryPerDB"].as<bool>();
     }
+
+    if (params.count("storage.readOnly")) {
+        storageGlobalParams.readOnly = params["storage.readOnly"].as<bool>();
+    }
+
     if (params.count("cpu")) {
         serverGlobalParams.cpu = params["cpu"].as<bool>();
     }

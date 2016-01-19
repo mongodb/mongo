@@ -99,6 +99,8 @@ struct StorageGlobalParams {
     // Do not set this value on production systems.
     // In almost every situation, you should use the default setting.
     AtomicDouble syncdelay{60.0};  // seconds between fsyncs
+
+    bool readOnly = false;
 };
 
 extern StorageGlobalParams storageGlobalParams;
