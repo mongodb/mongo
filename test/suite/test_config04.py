@@ -158,11 +158,15 @@ class test_config04(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.wiredtiger_open('.', '}'), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '{'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.wiredtiger_open('.', '{}}'), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.wiredtiger_open('.', '(]}'), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.wiredtiger_open('.', '(create=]}'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '(create='), msg)
 
     def test_session_max(self):
         # Note: There isn't any direct way to know that this was set,
