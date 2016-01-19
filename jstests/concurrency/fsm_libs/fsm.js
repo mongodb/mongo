@@ -45,12 +45,10 @@ var fsm = (function() {
             currentState = nextState;
         }
 
+        // Null out the workload connection cache and perform garbage collection to clean up,
+        // i.e., close, the open connections.
         if (args.passConnectionCache) {
-            connCache.mongos.forEach(conn => conn = null);
-            connCache.config.forEach(conn => conn = null);
-
-            var shardNames = Object.keys(connCache.shards);
-            shardNames.forEach(name => connCache.shards[name].forEach(conn => conn = null));
+            connCache = null;
             gc();
         }
     }
