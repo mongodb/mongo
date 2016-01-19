@@ -514,7 +514,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 
 	/* Bulk loads require a leaf page for reconciliation: create it now. */
 	if (F_ISSET(btree, WT_BTREE_BULK)) {
-		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
+		WT_ERR(__wt_btree_new_leaf_page(session, 1, &leaf));
 		ref->page = leaf;
 		ref->state = WT_REF_MEM;
 		WT_ERR(__wt_page_modify_init(session, leaf));
@@ -538,7 +538,8 @@ err:	if (leaf != NULL)
  *	Create an empty leaf page.
  */
 int
-__wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep)
+__wt_btree_new_leaf_page(
+    WT_SESSION_IMPL *session, uint64_t recno, WT_PAGE **pagep)
 {
 	WT_BTREE *btree;
 
@@ -547,15 +548,15 @@ __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		WT_RET(__wt_page_alloc(
-		    session, WT_PAGE_COL_FIX, 1, 0, false, pagep));
+		    session, WT_PAGE_COL_FIX, recno, 0, false, pagep));
 		break;
 	case BTREE_COL_VAR:
 		WT_RET(__wt_page_alloc(
-		    session, WT_PAGE_COL_VAR, 1, 0, false, pagep));
+		    session, WT_PAGE_COL_VAR, recno, 0, false, pagep));
 		break;
 	case BTREE_ROW:
 		WT_RET(__wt_page_alloc(
-		    session, WT_PAGE_ROW_LEAF, 0, 0, false, pagep));
+		    session, WT_PAGE_ROW_LEAF, WT_RECNO_OOB, 0, false, pagep));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

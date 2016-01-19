@@ -305,7 +305,7 @@ struct __wt_page_modify {
 	struct {
 		/*
 		 * Appended items to column-stores: there is only a single one
-		 * of these per column-store tree.
+		 * of these active at a time per column-store tree.
 		 */
 		WT_INSERT_HEAD **append;
 
@@ -319,9 +319,18 @@ struct __wt_page_modify {
 		 * huge.
 		 */
 		WT_INSERT_HEAD **update;
+
+		/*
+		 * Split-saved last column-store page record. If a column-store
+		 * page is split, we save the first record number moved so that
+		 * during reconciliation we know the page's last record and can
+		 * write any implicitly created deleted records for the page.
+		 */
+		uint64_t split_recno;
 	} leaf;
 #define	mod_append		u2.leaf.append
 #define	mod_update		u2.leaf.update
+#define	mod_split_recno		u2.leaf.split_recno
 	} u2;
 
 	/*

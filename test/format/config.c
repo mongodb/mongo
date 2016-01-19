@@ -327,8 +327,10 @@ config_in_memory(void)
 		g.c_backups = 0;
 	if (!config_is_perm("checkpoints"))
 		g.c_checkpoints = 0;
-	if (!config_is_perm("compression"))
-		g.c_compression = 0;
+	if (!config_is_perm("compression")) {
+		g.c_compression = dstrdup("none");
+		g.c_compression_flag = COMPRESS_NONE;
+	}
 	if (!config_is_perm("logging"))
 		g.c_logging = 0;
 	if (!config_is_perm("salvage"))
@@ -496,7 +498,7 @@ config_clear(void)
 		F_CLR(cp, C_TEMP);
 		if (!F_ISSET(cp, C_PERM) &&
 		    F_ISSET(cp, C_STRING) && cp->vstr != NULL) {
-			free(*cp->vstr);
+			free((void *)*cp->vstr);
 			*cp->vstr = NULL;
 		}
 	}
@@ -561,7 +563,7 @@ config_single(const char *s, int perm)
 			    &g.c_logging_compression_flag);
 			*cp->vstr = strdup(ep);
 		} else {
-			free(*cp->vstr);
+			free((void *)*cp->vstr);
 			*cp->vstr = strdup(ep);
 		}
 		if (*cp->vstr == NULL)

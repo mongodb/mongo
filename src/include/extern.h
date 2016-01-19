@@ -135,7 +135,7 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern void __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, bool is_recno);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size);
-extern int __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep);
+extern int __wt_btree_new_leaf_page( WT_SESSION_IMPL *session, uint64_t recno, WT_PAGE **pagep);
 extern void __wt_btree_evictable(WT_SESSION_IMPL *session, bool on);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);

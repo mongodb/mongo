@@ -31,13 +31,12 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage)
 			return (WT_NOTFOUND);
 
 	/*
-	 * This code looks different from the cursor-previous code.  The append
-	 * list appears on the last page of the tree, but it may be preceded by
-	 * other rows, which means the cursor's recno will be set to a value and
-	 * we simply want to increment it.  If the cursor's recno is NOT set,
-	 * we're starting our iteration in a tree that has only appended items.
-	 * In that case, recno will be 0 and happily enough the increment will
-	 * set it to 1, which is correct.
+	 * This code looks different from the cursor-previous code. The append
+	 * list may be preceded by other rows, which means the cursor's recno
+	 * will be set to a value and we simply want to increment it. If the
+	 * cursor's recno is NOT set, we're starting an iteration in a tree with
+	 * only appended items. In that case, recno will be 0 and happily enough
+	 * the increment will set it to 1, which is correct.
 	 */
 	__cursor_set_recno(cbt, cbt->recno + 1);
 
@@ -610,7 +609,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 	 */
 	for (newpage = false;; newpage = true) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
-		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
 
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
 			switch (page->type) {
@@ -644,9 +642,9 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 				break;
 
 			/*
-			 * The last page in a column-store has appended entries.
-			 * We handle it separately from the usual cursor code:
-			 * it's only that one page and it's in a simple format.
+			 * Column-store pages may have appended entries. Handle
+			 * it separately from the usual cursor code, it's in a
+			 * simple format.
 			 */
 			if (page->type != WT_PAGE_ROW_LEAF &&
 			    (cbt->ins_head = WT_COL_APPEND(page)) != NULL) {
