@@ -354,6 +354,11 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	} else
 		ret = WT_NOTFOUND;
 
+#ifdef HAVE_DIAGNOSTIC
+	if (ret == 0)
+		WT_ERR(__wt_cursor_key_order_init(session, cbt));
+#endif
+
 err:	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));
 	return (ret);
@@ -463,6 +468,11 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		} else if ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND)
 			exact = -1;
 	}
+
+#ifdef HAVE_DIAGNOSTIC
+	if (ret == 0)
+		WT_ERR(__wt_cursor_key_order_init(session, cbt));
+#endif
 
 err:	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));

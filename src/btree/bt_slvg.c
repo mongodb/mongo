@@ -1817,7 +1817,7 @@ __slvg_row_build_internal(
 
 	/* Allocate a row-store root (internal) page and fill it in. */
 	WT_RET(__wt_page_alloc(
-	    session, WT_PAGE_ROW_INT, 0, leaf_cnt, true, &page));
+	    session, WT_PAGE_ROW_INT, WT_RECNO_OOB, leaf_cnt, true, &page));
 	WT_ERR(__slvg_modify_init(session, page));
 
 	pindex = WT_INTL_INDEX_GET_SAFE(page);

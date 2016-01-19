@@ -25,7 +25,7 @@ __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
  *	Flush a directory to ensure a file creation is durable.
  */
 int
-__wt_directory_sync(WT_SESSION_IMPL *session, char *path)
+__wt_directory_sync(WT_SESSION_IMPL *session, const char *path)
 {
 	WT_UNUSED(session);
 	WT_UNUSED(path);

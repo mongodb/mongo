@@ -674,6 +674,7 @@ static int
 __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
     WT_CURSOR *ref_cursor, const char *config)
 {
+	WT_CURSOR *firstcg;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR_JOIN *cjoin;
@@ -687,6 +688,7 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	uint8_t flags, range;
 
 	count = 0;
+	firstcg = NULL;
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, join, config, cfg);
 	table = NULL;
@@ -698,15 +700,18 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		cindex = (WT_CURSOR_INDEX *)ref_cursor;
 		idx = cindex->index;
 		table = cindex->table;
-		WT_CURSOR_CHECKKEY(ref_cursor);
+		firstcg = cindex->cg_cursors[0];
 	} else if (WT_PREFIX_MATCH(ref_cursor->uri, "table:")) {
 		idx = NULL;
 		ctable = (WT_CURSOR_TABLE *)ref_cursor;
 		table = ctable->table;
-		WT_CURSOR_CHECKKEY(ctable->cg_cursors[0]);
+		firstcg = ctable->cg_cursors[0];
 	} else
 		WT_ERR_MSG(session, EINVAL, "not an index or table cursor");
 
+	if (!F_ISSET(firstcg, WT_CURSTD_KEY_SET))
+		WT_ERR_MSG(session, EINVAL,
+		    "requires reference cursor be positioned");
 	cjoin = (WT_CURSOR_JOIN *)join_cursor;
 	if (cjoin->table != table)
 		WT_ERR_MSG(session, EINVAL,
