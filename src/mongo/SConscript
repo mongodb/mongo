@@ -199,7 +199,7 @@ generatedVersionFile = env.Substfile(
         ('@mongo_version_extra_str@', version_extra),
         ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
         ('@buildinfo_js_engine@', js_engine_ver),
-        ('@buildinfo_allocator@', GetOption('allocator')),
+        ('@buildinfo_allocator@', env['MONGO_ALLOCATOR']),
         ('@buildinfo_modules@', module_list),
         ('@buildinfo_environment_data@', buildInfoInitializer),
     ])
