@@ -288,6 +288,7 @@ Status ChunkMoveOperationState::commitMigration() {
 
     Status startStatus = ShardingStateRecovery::startMetadataOp(_txn);
     if (!startStatus.isOK()) {
+        warning() << "Failed to write sharding state recovery document" << causedBy(startStatus);
         return startStatus;
     }
 

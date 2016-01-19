@@ -204,17 +204,24 @@ var st;
     // Remove slave delay so that the migration can finish in a reasonable amount of time.
     setSlaveDelay(st.rs0, false);
     setSlaveDelay(st.rs1, false);
+    st.rs0.awaitReplication();
+    st.rs1.awaitReplication();
 
     // Due to SERVER-20290 the recipient shard may not immediately realize that the migration that
     // was going on during the upgrade has been aborted, so we need to wait until it notices this
     // before starting a new migration.
     // TODO(spencer): Remove this after SERVER-20290 is fixed.
+    jsTest.log("Waiting for previous migration to be fully cleaned up");
     assert.soon(function() {
                    var res = st.rs1.getPrimary().adminCommand('_recvChunkStatus');
                    assert.commandWorked(res);
+                   if (res.active) {
+                       printjson(res);
+                   }
                    return !res.active;
                 });
 
+    jsTest.log("Starting new migration after upgrade, which should succeed");
     assert.commandWorked(st.s0.adminCommand({moveChunk: dataCollectionName,
                                              find: { _id: 0 },
                                              to: shardConfigs[1]._id
