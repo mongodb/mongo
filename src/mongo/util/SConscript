@@ -233,7 +233,7 @@ env.CppUnitTest(
     ],
 )
 
-if get_option('allocator') == 'tcmalloc':
+if env['MONGO_ALLOCATOR'] == 'tcmalloc':
     tcmspEnv = env.Clone()
 
     if not use_system_version_of_library('tcmalloc'):

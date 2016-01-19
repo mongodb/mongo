@@ -213,7 +213,7 @@ if usemozjs:
         ])
 
 gperftoolsEnv = env
-if (GetOption("allocator") == "tcmalloc"):
+if (gperftoolsEnv['MONGO_ALLOCATOR'] == "tcmalloc"):
     if use_system_version_of_library("tcmalloc"):
         gperftoolsEnv = env.Clone(
             SYSLIBDEPS=[
