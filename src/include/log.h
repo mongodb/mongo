@@ -253,6 +253,24 @@ struct __wt_log_record {
 };
 
 /*
+ * __wt_log_record_byteswap --
+ *	Handle big- and little-endian transformation of the log file
+ *	description block.
+ */
+static inline void
+__wt_log_record_byteswap(WT_LOG_RECORD *record)
+{
+#ifdef	WORDS_BIGENDIAN
+	record->len = __wt_bswap32(record->len);
+	record->checksum = __wt_bswap32(record->checksum);
+	record->flags = __wt_bswap16(record->flags);
+	record->mem_len = __wt_bswap32(record->mem_len);
+#else
+	WT_UNUSED(record);
+#endif
+}
+
+/*
  * WT_LOG_DESC --
  *	The log file's description.
  */
@@ -265,6 +283,24 @@ struct __wt_log_desc {
 	uint16_t	minorv;		/* 06-07: Minor version */
 	uint64_t	log_size;	/* 08-15: Log file size */
 };
+
+/*
+ * __wt_log_desc_byteswap --
+ *	Handle big- and little-endian transformation of the log file
+ *	description block.
+ */
+static inline void
+__wt_log_desc_byteswap(WT_LOG_DESC *desc)
+{
+#ifdef	WORDS_BIGENDIAN
+	desc->log_magic = __wt_bswap32(desc->log_magic);
+	desc->majorv = __wt_bswap16(desc->majorv);
+	desc->minorv = __wt_bswap16(desc->minorv);
+	desc->log_size = __wt_bswap64(desc->log_size);
+#else
+	WT_UNUSED(desc);
+#endif
+}
 
 /*
  * Flags for __wt_txn_op_printlog.

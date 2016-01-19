@@ -602,6 +602,7 @@ __log_file_header(
 	desc->majorv = WT_LOG_MAJOR_VERSION;
 	desc->minorv = WT_LOG_MINOR_VERSION;
 	desc->log_size = (uint64_t)conn->log_file_max;
+	__wt_log_desc_byteswap(desc);
 
 	/*
 	 * Now that the record is set up, initialize the record header.
@@ -609,6 +610,7 @@ __log_file_header(
 	logrec->len = log->allocsize;
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, log->allocsize);
+	__wt_log_record_byteswap(logrec);
 	WT_CLEAR(tmp);
 	memset(&myslot, 0, sizeof(myslot));
 	myslot.slot = &tmp;
@@ -674,7 +676,9 @@ __log_openfile(WT_SESSION_IMPL *session,
 		memset(buf->mem, 0, allocsize);
 		WT_ERR(__wt_read(session, *fh, 0, allocsize, buf->mem));
 		logrec = (WT_LOG_RECORD *)buf->mem;
+		__wt_log_record_byteswap(logrec);
 		desc = (WT_LOG_DESC *)logrec->record;
+		__wt_log_desc_byteswap(desc);
 		if (desc->log_magic != WT_LOG_MAGIC)
 			WT_PANIC_RET(session, WT_ERROR,
 			   "log file %s corrupted: Bad magic number %" PRIu32,
@@ -1608,6 +1612,7 @@ advance:
 		 */
 		buf->size = reclen;
 		logrec = (WT_LOG_RECORD *)buf->mem;
+		__wt_log_record_byteswap(logrec);
 		cksum = logrec->checksum;
 		logrec->checksum = 0;
 		logrec->checksum = __wt_cksum(logrec, logrec->len);
@@ -1894,6 +1899,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->len = (uint32_t)record->size;
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, record->size);
+	__wt_log_record_byteswap(logrec);
 
 	WT_STAT_FAST_CONN_INCR(session, log_writes);
 
