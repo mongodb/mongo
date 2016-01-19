@@ -202,19 +202,12 @@ ForwardingCatalogManager::ScopedDistLock& ForwardingCatalogManager::ScopedDistLo
     return *this;
 }
 
-Status ForwardingCatalogManager::ScopedDistLock::checkForPendingCatalogSwap() {
-    stdx::lock_guard<stdx::mutex> lk(_fcm->_observerMutex);
-    if (!_fcm->_nextConfigChangeComplete.isValid() || _fcm->_configChangeComplete) {
-        return Status::OK();
-    }
-    return Status(ErrorCodes::IncompatibleCatalogManager,
-                  "Need to swap sharding catalog manager.  Config server "
-                  "reports that it is in replica set mode, but we are still using the "
-                  "legacy SCCC protocol for config server communication");
+Status ForwardingCatalogManager::ScopedDistLock::checkForPendingCatalogChange() {
+    return _fcm->checkForPendingCatalogChange();
 }
 
 Status ForwardingCatalogManager::ScopedDistLock::checkStatus() {
-    Status status = checkForPendingCatalogSwap();
+    Status status = checkForPendingCatalogChange();
     if (!status.isOK()) {
         return status;
     }
@@ -266,6 +259,17 @@ void ForwardingCatalogManager::waitForCatalogManagerChange(OperationContext* txn
     auto configChangeComplete = _nextConfigChangeComplete;
     oblk.unlock();
     _shardRegistry->getExecutor()->waitForEvent(configChangeComplete);
+}
+
+Status ForwardingCatalogManager::checkForPendingCatalogChange() {
+    stdx::lock_guard<stdx::mutex> lk(_observerMutex);
+    if (!_nextConfigChangeComplete.isValid() || _configChangeComplete) {
+        return Status::OK();
+    }
+    return Status(ErrorCodes::IncompatibleCatalogManager,
+                  "Need to swap sharding catalog manager.  Config server "
+                  "reports that it is in replica set mode, but we are still using the "
+                  "legacy SCCC protocol for config server communication");
 }
 
 namespace {

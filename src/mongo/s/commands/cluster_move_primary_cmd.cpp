@@ -47,6 +47,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/set_shard_version_request.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -160,6 +161,8 @@ public:
         BSONObj moveStartDetails =
             _buildMoveEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls);
 
+        uassertStatusOK(scopedDistLock.getValue().checkForPendingCatalogChange());
+
         auto catalogManager = grid.catalogManager(txn);
         catalogManager->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
 
@@ -168,14 +171,29 @@ public:
 
         ScopedDbConnection toconn(toShard->getConnString());
 
+        {
+            // Make sure the target node is sharding aware so that it can detect catalog manager
+            // swaps.
+            auto ssvRequest = SetShardVersionRequest::makeForInitNoPersist(
+                grid.shardRegistry()->getConfigServerConnectionString(),
+                toShard->getId(),
+                toShard->getConnString());
+            BSONObj res;
+            bool ok = toconn->runCommand("admin", ssvRequest.toBSON(), res);
+            if (!ok) {
+                return appendCommandStatus(result, getStatusFromCommandResult(res));
+            }
+        }
+
         // TODO ERH - we need a clone command which replays operations from clone start to now
         //            can just use local.oplog.$main
         BSONObj cloneRes;
-        bool worked = toconn->runCommand(
-            dbname.c_str(),
-            BSON("clone" << fromShard->getConnString().toString() << "collsToIgnore" << barr.arr()
-                         << bypassDocumentValidationCommandOption() << true),
-            cloneRes);
+        bool worked = toconn->runCommand(dbname.c_str(),
+                                         BSON("clone" << fromShard->getConnString().toString()
+                                                      << "collsToIgnore" << barr.arr()
+                                                      << bypassDocumentValidationCommandOption()
+                                                      << true << "_checkForCatalogChange" << true),
+                                         cloneRes);
         toconn.done();
 
         if (!worked) {
@@ -183,6 +201,8 @@ public:
             errmsg = "clone failed";
             return false;
         }
+
+        uassertStatusOK(scopedDistLock.getValue().checkForPendingCatalogChange());
 
         const string oldPrimary = fromShard->getConnString().toString();
 
@@ -221,6 +241,7 @@ public:
                     try {
                         log() << "movePrimary dropping cloned collection " << el.String() << " on "
                               << oldPrimary;
+                        uassertStatusOK(scopedDistLock.getValue().checkForPendingCatalogChange());
                         fromconn->dropCollection(el.String());
                     } catch (DBException& e) {
                         e.addContext(str::stream()

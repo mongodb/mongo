@@ -237,7 +237,7 @@ public:
 
         timing.done(2);
 
-        Status distLockStatus = distLock->checkForPendingCatalogSwap();
+        Status distLockStatus = distLock->checkForPendingCatalogChange();
         if (!distLockStatus.isOK()) {
             warning() << "Aborting migration due to need to swap current catalog manager"
                       << causedBy(distLockStatus);
@@ -313,7 +313,7 @@ public:
 
         timing.done(3);
 
-        distLockStatus = distLock->checkForPendingCatalogSwap();
+        distLockStatus = distLock->checkForPendingCatalogChange();
         if (!distLockStatus.isOK()) {
             warning() << "Aborting migration due to need to swap current catalog manager"
                       << causedBy(distLockStatus);
@@ -417,7 +417,7 @@ public:
 
             txn->checkForInterrupt();
 
-            distLockStatus = distLock->checkForPendingCatalogSwap();
+            distLockStatus = distLock->checkForPendingCatalogChange();
             if (!distLockStatus.isOK()) {
                 warning() << "Aborting migration due to need to swap current catalog manager"
                           << causedBy(distLockStatus);
@@ -427,7 +427,7 @@ public:
 
         timing.done(4);
 
-        distLockStatus = distLock->checkForPendingCatalogSwap();
+        distLockStatus = distLock->checkForPendingCatalogChange();
         if (!distLockStatus.isOK()) {
             warning() << "Aborting migration due to need to swap current catalog manager"
                       << causedBy(distLockStatus);
