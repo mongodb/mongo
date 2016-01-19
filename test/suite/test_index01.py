@@ -217,5 +217,20 @@ class test_index01(wttest.WiredTigerTestCase):
             self.assertEqual(list(self.index_iter(i)), [])
         self.drop_table()
 
+    def test_exclusive(self):
+        '''Create indices, then try to create another index exclusively'''
+        self.create_table()
+        # non-exclusive recreate is allowed
+        self.session.create(self.index[0], 'columns=(dept)')
+        # exclusive recreate
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.index[0],
+            'columns=(dept),exclusive'))
+        # non-exclusive create with differing configuration
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.index[0],
+            'columns=(salary)'), '/does not match existing configuration/')
+        self.drop_table()
+
 if __name__ == '__main__':
     wttest.run()
