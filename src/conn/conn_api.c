@@ -1605,6 +1605,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "mutex",		WT_VERB_MUTEX },
 		{ "overflow",		WT_VERB_OVERFLOW },
 		{ "read",		WT_VERB_READ },
+		{ "rebalance",		WT_VERB_REBALANCE },
 		{ "reconcile",		WT_VERB_RECONCILE },
 		{ "recovery",		WT_VERB_RECOVERY },
 		{ "salvage",		WT_VERB_SALVAGE },

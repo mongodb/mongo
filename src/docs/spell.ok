@@ -66,6 +66,7 @@ NoSQL
 OPTYPE
 PRELOAD
 README
+Rebalance
 RedHat
 RepMgr
 Riak
@@ -120,6 +121,7 @@ boolean
 booleans
 br
 btree
+btrees
 bufs
 builtin
 builtins
@@ -378,6 +380,7 @@ readlock
 realclean
 realloc
 realloc'd
+rebalance
 recno
 recnoN
 recnum

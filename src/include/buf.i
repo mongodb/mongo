@@ -92,18 +92,6 @@ __wt_buf_setstr(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *s)
 }
 
 /*
- * __wt_buf_set_printable --
- *	Set the contents of the buffer to a printable representation of a
- * byte string.
- */
-static inline int
-__wt_buf_set_printable(
-    WT_SESSION_IMPL *session, WT_ITEM *buf, const void *from_arg, size_t size)
-{
-	return (__wt_raw_to_esc_hex(session, from_arg, size, buf));
-}
-
-/*
  * __wt_buf_free --
  *	Free a buffer.
  */

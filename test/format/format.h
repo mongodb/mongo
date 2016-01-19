@@ -122,6 +122,8 @@ typedef struct {
 
 	char *helium_mount;			/* Helium volume */
 
+	char *wiredtiger_open_config;		/* Database open config */
+
 #ifdef HAVE_BERKELEY_DB
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
@@ -216,6 +218,7 @@ typedef struct {
 	uint32_t c_reverse;
 	uint32_t c_rows;
 	uint32_t c_runs;
+	uint32_t c_rebalance;
 	uint32_t c_salvage;
 	uint32_t c_split_pct;
 	uint32_t c_statistics;
@@ -329,6 +332,8 @@ void	 wts_load(void);
 void	 wts_open(const char *, int, WT_CONNECTION **);
 void	 wts_ops(int);
 void	 wts_read_scan(void);
+void	 wts_rebalance(void);
+void	 wts_reopen(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);

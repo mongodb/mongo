@@ -564,6 +564,7 @@ connection_runtime_config = [
             'mutex',
             'overflow',
             'read',
+            'rebalance',
             'reconcile',
             'recovery',
             'salvage',
@@ -892,6 +893,7 @@ methods = {
         type='list'),
 ]),
 
+'WT_SESSION.rebalance' : Method([]),
 'WT_SESSION.rename' : Method([]),
 'WT_SESSION.reset' : Method([]),
 'WT_SESSION.salvage' : Method([

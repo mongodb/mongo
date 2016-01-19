@@ -333,6 +333,8 @@ config_in_memory(void)
 	}
 	if (!config_is_perm("logging"))
 		g.c_logging = 0;
+	if (!config_is_perm("rebalance"))
+		g.c_rebalance = 0;
 	if (!config_is_perm("salvage"))
 		g.c_salvage = 0;
 	if (!config_is_perm("verify"))
