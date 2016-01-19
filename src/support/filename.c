@@ -81,7 +81,7 @@ __wt_rename_and_sync_directory(
 	/*
 	 * Flush the backing directory to guarantee the rename. My reading of
 	 * POSIX 1003.1 is there's no guarantee flushing only one of the from
-	 * an to directories, or flushing a common parent, is sufficient, and
+	 * or to directories, or flushing a common parent, is sufficient, and
 	 * even if POSIX were to make that guarantee, existing filesystems are
 	 * known to not provide the guarantee or only provide the guarantee
 	 * with specific mount options. Flush both of the from/to directories
