@@ -151,7 +151,14 @@ next:	if (pack->cur == pack->end)
 
 	switch (pv->type) {
 	case 'S':
+		return (0);
 	case 's':
+		if (pv->size < 1)
+			WT_RET_MSG(pack->session, EINVAL,
+			    "Fixed length strings must be at least 1 byte "
+			    "in format '%.*s'",
+			    (int)(pack->end - pack->orig), pack->orig);
+		return (0);
 	case 'x':
 		return (0);
 	case 't':
