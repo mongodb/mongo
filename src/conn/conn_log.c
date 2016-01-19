@@ -675,7 +675,7 @@ __log_wrlsn_server(void *arg)
 		/*
 		 * If __wt_log_wrlsn did work we want to yield instead of sleep.
 		 */
-		if (yield++ < 1000)
+		if (yield++ < WT_THOUSAND)
 			__wt_yield();
 		else
 			WT_ERR(__wt_cond_wait(session, conn->log_wrlsn_cond, 10000));
