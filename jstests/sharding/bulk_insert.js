@@ -49,10 +49,9 @@ var resetColls = function() {
     assert.writeOK(collDi.remove({}));
 };
 
-var isDupKeyError = function(err)
-{
+var isDupKeyError = function(err) {
     return /dup key/.test(err + "");
-}
+};
 
 jsTest.log("Collections created.");
 st.printShardingStatus();
@@ -255,7 +254,7 @@ var inserts = [{ukey : 0},
                {ukey : -3},
                {hello : "world"},
                {ukey : 4},
-               {ukey : 4}]
+               {ukey : 4}];
 
 // Last error here is mongos error
 res = assert.writeError(collSh.insert(inserts, 1));
@@ -276,14 +275,14 @@ assert.eq(6, collDi.find().itcount());
 //
 
 jsTest.log("Testing bulk insert (no COE) with WBL...");
-
 resetColls();
+
 var inserts = [{ukey : 1},
                {ukey : -1}];
 
 var staleCollSh = staleMongos.getCollection(collSh + "");
+assert.eq(null, staleCollSh.findOne(), 'Collections should be empty');
 
-staleCollSh.findOne();
 assert.commandWorked(admin.runCommand({ moveChunk : collSh + "",
                                         find : {ukey : 0},
                                         to : shards[1]._id,
@@ -301,28 +300,17 @@ assert.writeOK(staleCollSh.insert(inserts));
 //
 
 jsTest.log("Testing bulk insert (no COE) with WBL and large objects...")
-
-var data1MB = "x";
-while (data1MB.length < 1024 * 1024)
-    data1MB += data1MB;
-
-var data10MB = "";
-for (var i = 0; i < 10; i++)
-    data10MB += data1MB;
-
 resetColls();
-var inserts = [{ukey : 1,
-                data : data10MB},
-               {ukey : 2,
-                data : data10MB},
-               {ukey : -1,
-                data : data10MB},
-               {ukey : -2,
-                data : data10MB}]
+
+var data10MB = 'x'.repeat(10 * 1024 * 1024);
+var inserts = [{ukey : 1, data : data10MB},
+               {ukey : 2, data : data10MB},
+               {ukey : -1, data : data10MB},
+               {ukey : -2, data : data10MB}];
 
 staleCollSh = staleMongos.getCollection(collSh + "");
+assert.eq(null, staleCollSh.findOne(), 'Collections should be empty');
 
-staleCollSh.findOne();
 assert.commandWorked(admin.runCommand({ moveChunk : collSh + "",
                                         find : {ukey : 0},
                                         to : shards[1]._id,
