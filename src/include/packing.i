@@ -273,8 +273,10 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		return (s);
 	case 's':
 	case 'S':
-		if (pv->type == 's' || pv->havesize)
+		if (pv->havesize)
 			s = pv->size;
+		else if (pv->type == 's')
+			s = 1;
 		else
 			s = strlen(pv->u.s) + 1;
 		return (s);
@@ -330,9 +332,11 @@ __pack_write(
 		*pp += pv->size;
 		break;
 	case 's':
-		WT_SIZE_CHECK_PACK(pv->size, maxlen);
-		memcpy(*pp, pv->u.s, pv->size);
-		*pp += pv->size;
+		s = pv->havesize ? pv->size : 1;
+		WT_SIZE_CHECK_PACK(s, maxlen);
+		if (s > 0)
+			memcpy(*pp, pv->u.s, s);
+		*pp += s;
 		break;
 	case 'S':
 		s = strlen(pv->u.s);
@@ -467,8 +471,10 @@ __unpack_read(WT_SESSION_IMPL *session,
 		break;
 	case 's':
 	case 'S':
-		if (pv->type == 's' || pv->havesize)
+		if (pv->havesize)
 			s = pv->size;
+		else if (pv->type == 's')
+			s = 1;
 		else
 			s = strlen((const char *)*pp) + 1;
 		if (s > 0)

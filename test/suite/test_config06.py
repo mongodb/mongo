@@ -32,6 +32,8 @@ import wiredtiger, wttest
 #    Test session.create configurations.
 class test_config06(wttest.WiredTigerTestCase):
     uri = 'table:test_config06'
+    key = 'keyABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    value = 'valueABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
     def session_config(self, config):
         msg = '/Invalid argument/'
@@ -46,6 +48,49 @@ class test_config06(wttest.WiredTigerTestCase):
         self.session_config('key_format=s,value_format=0s')
         self.session_config('key_format=0t,value_format=4t')
         self.session_config('key_format=4t,value_format=0t')
+
+    # Smoke-test the string formats with length specifiers; both formats should
+    # ignore trailing bytes, verify that.
+    def format_string(self, fmt, len):
+        k = self.key
+        v = self.value
+        self.session.create(self.uri, \
+            "key_format=" + str(len) + fmt + ",value_format=" + str(len) + fmt)
+        cursor = self.session.open_cursor(self.uri, None)
+        cursor[k] = v
+        self.assertEquals(cursor[k[:len]], v[:len])
+    def test_format_string_S_1(self):
+        self.format_string('S', 1)
+    def test_format_string_S_4(self):
+        self.format_string('S', 4)
+    def test_format_string_S_10(self):
+        self.format_string('S', 10)
+    def test_format_string_s_1(self):
+        self.format_string('s', 1)
+    def test_format_string_s_4(self):
+        self.format_string('s', 4)
+    def test_format_string_s_10(self):
+        self.format_string('s', 10)
+
+    def test_format_string_S_default(self):
+        k = self.key
+        v = self.value
+        self.session.create(self.uri, "key_format=S,value_format=S")
+        cursor = self.session.open_cursor(self.uri, None)
+        cursor[k] = v
+        self.assertEquals(cursor[k], v)
+
+    '''
+    CURRENTLY DOES NOT WORK
+    def test_format_string_s_default(self):
+        k = self.key
+        v = self.value
+        self.session.create(self.uri, "key_format=s,value_format=s")
+        cursor = self.session.open_cursor(self.uri, None)
+        cursor[k] = v
+        self.assertEquals(cursor[k[:1]], v[:1])
+    '''
+
 
 if __name__ == '__main__':
     wttest.run()
