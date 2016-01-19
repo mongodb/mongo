@@ -1663,7 +1663,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_DECL_RET;
 	WT_DECL_ITEM(key);
 	WT_INSERT *ins, **insp, *moved_ins, *prev_ins;
-	WT_INSERT_HEAD *ins_head;
+	WT_INSERT_HEAD *ins_head, *tmp_ins_head;
 	WT_PAGE *page, *right;
 	WT_REF *child, *split_ref[2] = { NULL, NULL };
 	size_t page_decr, parent_incr, right_incr;
@@ -1831,12 +1831,9 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * for simplicity, the previous skip list pointers originally allocated
 	 * can be ignored.)
 	 */
-	if (type == WT_PAGE_ROW_LEAF)
-		right->pg_row_ins[0]->head[0] =
-		    right->pg_row_ins[0]->tail[0] = moved_ins;
-	else
-		right->modify->mod_append[0]->head[0] =
-		    right->modify->mod_append[0]->tail[0] = moved_ins;
+	tmp_ins_head = type == WT_PAGE_ROW_LEAF ?
+	    right->pg_row_ins[0] : right->modify->mod_append[0];
+	tmp_ins_head->head[0] = tmp_ins_head->tail[0] = moved_ins;
 
 	/*
 	 * Remove the entry from the orig page (i.e truncate the skip list).
