@@ -73,9 +73,9 @@ class MasterSlaveFixture(interface.ReplFixture):
         # Keep retrying this until it times out waiting for replication.
         def insert_fn(remaining_secs):
             remaining_millis = int(round(remaining_secs * 1000))
-            client.resmoke.await_ready.insert({"awaiting": "ready"},
-                                              w=2,
-                                              wtimeout=remaining_millis)
+            write_concern = pymongo.WriteConcern(w=2, wtimeout=remaining_millis)
+            coll = client.resmoke.get_collection("await_ready", write_concern=write_concern)
+            coll.insert_one({"awaiting": "ready"})
 
         try:
             self.retry_until_wtimeout(insert_fn)
@@ -152,9 +152,9 @@ class MasterSlaveFixture(interface.ReplFixture):
             # Keep retrying this until it times out waiting for replication.
             def insert_fn(remaining_secs):
                 remaining_millis = int(round(remaining_secs * 1000))
-                client[db_name].resmoke_await_repl.insert({"awaiting": "repl"},
-                                                          w=2,
-                                                          wtimeout=remaining_millis)
+                write_concern = pymongo.WriteConcern(w=2, wtimeout=remaining_millis)
+                coll = client[db_name].get_collection("await_repl", write_concern=write_concern)
+                coll.insert_one({"awaiting": "repl"})
 
             try:
                 self.retry_until_wtimeout(insert_fn)
