@@ -626,7 +626,7 @@ static void finishCurrentOp(OperationContext* txn, CurOp* currentOp, WriteErrorD
                << causedBy(opError->getErrMessage()) << endl;
     }
 
-    bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kWrite,
+    bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kCommand,
                                                        logger::LogSeverity::Debug(1));
     bool logSlow = executionTime > (serverGlobalParams.slowMS + currentOp->getExpectedLatencyMs());
 

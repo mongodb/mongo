@@ -801,7 +801,7 @@ std::string runQuery(OperationContext* txn,
                                        shardingState.getVersion(nss.ns()));
     }
 
-    const logger::LogComponent queryLogComponent = logger::LogComponent::kQuery;
+    const logger::LogComponent commandLogComponent = logger::LogComponent::kCommand;
     const logger::LogSeverity logLevelOne = logger::LogSeverity::Debug(1);
 
     PlanSummaryStats summaryStats;
@@ -816,7 +816,7 @@ std::string runQuery(OperationContext* txn,
 
     // Set debug information for consumption by the profiler.
     if (dbProfilingLevel > 0 || curop.elapsedMillis() > serverGlobalParams.slowMS ||
-        logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
+        logger::globalLogDomain()->shouldLog(commandLogComponent, logLevelOne)) {
         // Get BSON stats.
         scoped_ptr<PlanStageStats> execStats(exec->getStats());
         BSONObjBuilder statsBob;
