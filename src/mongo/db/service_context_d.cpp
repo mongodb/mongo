@@ -140,6 +140,14 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
                           << storageGlobalParams.engine,
             factory);
 
+    if (storageGlobalParams.readOnly) {
+        uassert(34368,
+                str::stream()
+                    << "Server was started in read-only mode, but the configured storage engine, "
+                    << storageGlobalParams.engine << ", does not support read-only operation",
+                factory->supportsReadOnly());
+    }
+
     std::unique_ptr<StorageEngineMetadata> metadata = StorageEngineMetadata::forPath(dbpath);
 
     // Validate options in metadata against current startup options.

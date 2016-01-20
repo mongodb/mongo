@@ -118,11 +118,12 @@ env.Library(
         'record_store_v1_simple_iterator.cpp',
         ],
     LIBDEPS= [
-        'extent',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/progress_meter',
+        'extent',
         ]
     )
 

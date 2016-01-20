@@ -30,8 +30,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/decorable.h"
@@ -239,6 +240,9 @@ public:
         : _txn(txn),
           _committed(false),
           _toplevel(txn->_ruState == OperationContext::kNotInUnitOfWork) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot execute a write operation in read-only mode",
+                !storageGlobalParams.readOnly);
         _txn->lockState()->beginWriteUnitOfWork();
         if (_toplevel) {
             _txn->recoveryUnit()->beginUnitOfWork(_txn);
@@ -247,6 +251,7 @@ public:
     }
 
     ~WriteUnitOfWork() {
+        dassert(!storageGlobalParams.readOnly);
         if (!_committed) {
             invariant(_txn->_ruState != OperationContext::kNotInUnitOfWork);
             if (_toplevel) {

@@ -68,6 +68,10 @@ public:
         builder.appendBool("directoryPerDB", params.directoryperdb);
         return builder.obj();
     }
+
+    bool supportsReadOnly() const override {
+        return true;
+    }
 };
 
 }  // namespace

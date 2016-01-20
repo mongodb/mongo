@@ -12,8 +12,10 @@
     assert(!mongod.getDB("admin").serverStatus().storageEngine.readOnly);
     MongoRunner.stopMongod(mongod);
 
-    mongod = MongoRunner.runMongod({readOnly: ""});
-    assert(mongod.getDB("admin").isMaster().readOnly);
-    assert(mongod.getDB("admin").serverStatus().storageEngine.readOnly);
-    MongoRunner.stopMongod(mongod);
+    // TODO: uncomment when readOnly mode is implemented in mmapv1.
+    //
+    // mongod = MongoRunner.runMongod({readOnly: ""});
+    // assert(mongod.getDB("admin").isMaster().readOnly);
+    // assert(mongod.getDB("admin").serverStatus().storageEngine.readOnly);
+    // MongoRunner.stopMongod(mongod);
 }());

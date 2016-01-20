@@ -95,6 +95,7 @@ env.Library(
         'sorted_data_interface_test_unindex.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
         'index_entry_comparison',
@@ -128,8 +129,9 @@ env.Library(
         'record_store_test_validate.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/unittest/unittest',
         ],
     LIBDEPS_TAGS=[
         # Depends on newHarnessHelper, which does not have a unique definition

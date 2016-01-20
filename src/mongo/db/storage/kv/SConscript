@@ -41,6 +41,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         'kv_database_catalog_entry_core',
     ],
 )
@@ -71,6 +72,7 @@ env.Library(
         'kv_database_catalog_entry_get_index_mock.cpp'
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         'kv_database_catalog_entry_core',
         'kv_engine_core',
         'kv_storage_engine',
