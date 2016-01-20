@@ -113,7 +113,7 @@ worker_throttle(CONFIG_THREAD *thread)
 
 	/*
 	 * Take the minimum so we don't overfill the queue.
-	 */ 
+	 */
 	throttle_cfg->ops_count =
 	    WT_MIN(throttle_cfg->ops_count, thread->workload->throttle);
 
