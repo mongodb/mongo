@@ -1,9 +1,6 @@
 (function () {
 
-var s = new ShardingTest({ name: "stats",
-                           shards: 2,
-                           mongos: 1,
-                           other: { enableBalancer: true } });
+var s = new ShardingTest({ name: "stats", shards: 2, mongos: 1 });
 
 s.adminCommand( { enablesharding : "test" } );
 
