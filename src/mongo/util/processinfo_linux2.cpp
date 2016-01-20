@@ -24,7 +24,7 @@
 #ifdef __GLIBC__
 #include <gnu/libc-version.h>
 #else
-#define gnu_get_libc_version(x) "musl libc"
+#define gnu_get_libc_version(x) "Unknow"
 #endif
 
 #include <sys/utsname.h>
