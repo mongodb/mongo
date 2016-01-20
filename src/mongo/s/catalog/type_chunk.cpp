@@ -52,7 +52,6 @@ const BSONField<bool> ChunkType::jumbo("jumbo");
 const BSONField<Date_t> ChunkType::DEPRECATED_lastmod("lastmod");
 const BSONField<OID> ChunkType::DEPRECATED_epoch("lastmodEpoch");
 
-
 StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
     ChunkType chunk;
 

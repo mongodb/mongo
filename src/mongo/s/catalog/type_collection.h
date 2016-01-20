@@ -57,9 +57,6 @@ public:
     static const BSONField<Date_t> updatedAt;
     static const BSONField<BSONObj> keyPattern;
     static const BSONField<bool> unique;
-    static const BSONField<bool> noBalance;
-    static const BSONField<bool> dropped;
-
 
     /**
      * Constructs a new DatabaseType object from BSON. Also does validation of the contents.

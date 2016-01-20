@@ -37,6 +37,12 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace {
+
+const BSONField<bool> kNoBalance("noBalance");
+const BSONField<bool> kDropped("dropped");
+
+}  // namespace
 
 const std::string CollectionType::ConfigNS = "config.collections";
 
@@ -45,9 +51,6 @@ const BSONField<OID> CollectionType::epoch("lastmodEpoch");
 const BSONField<Date_t> CollectionType::updatedAt("lastmod");
 const BSONField<BSONObj> CollectionType::keyPattern("key");
 const BSONField<bool> CollectionType::unique("unique");
-const BSONField<bool> CollectionType::noBalance("noBalance");
-const BSONField<bool> CollectionType::dropped("dropped");
-
 
 StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
     CollectionType coll;
@@ -63,7 +66,7 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
 
     {
         OID collEpoch;
-        Status status = bsonExtractOIDField(source, epoch.name(), &collEpoch);
+        Status status = bsonExtractOIDFieldWithDefault(source, epoch.name(), OID(), &collEpoch);
         if (!status.isOK())
             return status;
 
@@ -81,7 +84,7 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
 
     {
         bool collDropped;
-        Status status = bsonExtractBooleanField(source, dropped.name(), &collDropped);
+        Status status = bsonExtractBooleanField(source, kDropped.name(), &collDropped);
         if (status.isOK()) {
             coll._dropped = collDropped;
         } else if (status == ErrorCodes::NoSuchKey) {
@@ -122,7 +125,7 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
 
     {
         bool collNoBalance;
-        Status status = bsonExtractBooleanField(source, noBalance.name(), &collNoBalance);
+        Status status = bsonExtractBooleanField(source, kNoBalance.name(), &collNoBalance);
         if (status.isOK()) {
             coll._allowBalance = !collNoBalance;
         } else if (status == ErrorCodes::NoSuchKey) {
@@ -180,7 +183,7 @@ BSONObj CollectionType::toBSON() const {
     }
     builder.append(epoch.name(), _epoch.get_value_or(OID()));
     builder.append(updatedAt.name(), _updatedAt.get_value_or(Date_t()));
-    builder.append(dropped.name(), _dropped.get_value_or(false));
+    builder.append(kDropped.name(), _dropped.get_value_or(false));
 
     // These fields are optional, so do not include them in the metadata for the purposes of
     // consuming less space on the config servers.
@@ -194,7 +197,7 @@ BSONObj CollectionType::toBSON() const {
     }
 
     if (_allowBalance.is_initialized()) {
-        builder.append(noBalance.name(), !_allowBalance.get());
+        builder.append(kNoBalance.name(), !_allowBalance.get());
     }
 
     return builder.obj();
