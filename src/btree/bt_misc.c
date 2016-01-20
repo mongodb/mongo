@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -101,7 +101,7 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *buf)
 		return (buf->data);
 	}
 
-	(void)__wt_ref_info(session, ref, &addr, &addr_size, NULL);
+	__wt_ref_info(ref, &addr, &addr_size, NULL);
 	return (__wt_addr_string(session, addr, addr_size, buf));
 }
 
@@ -124,6 +124,22 @@ __wt_addr_string(WT_SESSION_IMPL *session,
 		buf->size = strlen("[NoAddr]");
 	} else if (btree == NULL || (bm = btree->bm) == NULL ||
 	    bm->addr_string(bm, session, buf, addr, addr_size) != 0) {
+		buf->data = "[Error]";
+		buf->size = strlen("[Error]");
+	}
+	return (buf->data);
+}
+
+/*
+ * __wt_buf_set_printable --
+ *	Set the contents of the buffer to a printable representation of a
+ * byte string.
+ */
+const char *
+__wt_buf_set_printable(
+    WT_SESSION_IMPL *session, const void *p, size_t size, WT_ITEM *buf)
+{
+	if (__wt_raw_to_esc_hex(session, p, size, buf)) {
 		buf->data = "[Error]";
 		buf->size = strlen("[Error]");
 	}

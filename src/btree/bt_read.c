@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -375,11 +375,13 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Get the address: if there is no address, the page was deleted, but a
 	 * subsequent search or insert is forcing re-creation of the name space.
 	 */
-	WT_ERR(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
+	__wt_ref_info(ref, &addr, &addr_size, NULL);
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 
-		WT_ERR(__wt_btree_new_leaf_page(session, &page));
+		WT_ERR(__wt_btree_new_leaf_page(session,
+		    btree->type == BTREE_ROW ? WT_RECNO_OOB : ref->key.recno,
+		    &page));
 		ref->page = page;
 		goto done;
 	}

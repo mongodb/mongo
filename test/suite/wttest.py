@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -135,9 +135,31 @@ class CapturedFd(object):
         self.expectpos = os.path.getsize(self.filename)
 
 
+class TestSuiteConnection(object):
+    def __init__(self, conn, connlist):
+        connlist.append(conn)
+        self._conn = conn
+        self._connlist = connlist
+
+    def close(self):
+        self._connlist.remove(self._conn)
+        return self._conn.close()
+
+    # Proxy everything except what we explicitly define to the
+    # wrapped connection
+    def __getattr__(self, attr):
+        if attr in self.__dict__:
+            return getattr(self, attr)
+        else:
+            return getattr(self._conn, attr)
+
+
 class WiredTigerTestCase(unittest.TestCase):
     _globalSetup = False
     _printOnceSeen = {}
+
+    # conn_config can be overridden to add to basic connection configuration.
+    # Can be a string or a callable function or lambda expression.
     conn_config = ''
 
     @staticmethod
@@ -198,12 +220,31 @@ class WiredTigerTestCase(unittest.TestCase):
         return "%s.%s.%s" %  (self.__module__,
                               self.className(), self._testMethodName)
 
-    # Can be overridden
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,error_prefix="%s",%s' % (self.shortid(), self.conn_config))
+    # Can be overridden, but first consider setting self.conn_config .
+    def setUpConnectionOpen(self, home):
+        self.home = home
+        config = self.conn_config
+        if hasattr(config, '__call__'):
+            config = config(home)
+        # In case the open starts additional threads, flush first to
+        # avoid confusion.
+        sys.stdout.flush()
+        conn_param = 'create,error_prefix="%s: ",%s' % (self.shortid(), config)
+        try:
+            conn = self.wiredtiger_open(home, conn_param)
+        except wiredtiger.WiredTigerError as e:
+            print "Failed wiredtiger_open: dir '%s', config '%s'" % \
+                (home, conn_param)
+            raise e
         self.pr(`conn`)
         return conn
+
+    # Replacement for wiredtiger.wiredtiger_open that returns
+    # a proxied connection that knows to close it itself at the
+    # end of the run, unless it was already closed.
+    def wiredtiger_open(self, home=None, config=''):
+        conn = wiredtiger.wiredtiger_open(home, config)
+        return TestSuiteConnection(conn, self._connections)
 
     # Can be overridden
     def setUpSessionOpen(self, conn):
@@ -244,6 +285,8 @@ class WiredTigerTestCase(unittest.TestCase):
         self.__class__.wt_ntests += 1
         if WiredTigerTestCase._verbose > 2:
             self.prhead('started in ' + self.testdir, True)
+        # tearDown needs connections list, set it here in case the open fails.
+        self._connections = []
         self.origcwd = os.getcwd()
         shutil.rmtree(self.testdir, ignore_errors=True)
         if os.path.exists(self.testdir):
@@ -269,10 +312,18 @@ class WiredTigerTestCase(unittest.TestCase):
             skipped = (excinfo[0] == unittest.SkipTest)
         self.pr('finishing')
 
-        try:
-            self.close_conn()
-        except:
-            pass
+        # Close all connections that weren't explicitly closed.
+        # Connections left open (as a result of a test failure)
+        # can result in cascading errors.  We also make sure
+        # self.conn is on the list of active connections.
+        if not self.conn in self._connections:
+            self._connections.append(self.conn)
+        for conn in self._connections:
+            try:
+                conn.close()
+            except:
+                pass
+        self._connections = []
 
         try:
             self.fdTearDown()

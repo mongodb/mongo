@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -28,19 +28,6 @@
 
 #include "wtperf.h"
 
-int
-enomem(const CONFIG *cfg)
-{
-	const char *msg;
-
-	msg = "Unable to allocate memory";
-	if (cfg->logf == NULL)
-		fprintf(stderr, "%s\n", msg);
-	else
-		lprintf(cfg, ENOMEM, 0, "%s", msg);
-	return (ENOMEM);
-}
-
 /* Setup the logging output mechanism. */
 int
 setup_log_file(CONFIG *cfg)
@@ -53,9 +40,8 @@ setup_log_file(CONFIG *cfg)
 	if (cfg->verbose < 1)
 		return (0);
 
-	if ((fname = calloc(strlen(cfg->monitor_dir) +
-	    strlen(cfg->table_name) + strlen(".stat") + 2, 1)) == NULL)
-		return (enomem(cfg));
+	fname = dcalloc(strlen(cfg->monitor_dir) +
+	    strlen(cfg->table_name) + strlen(".stat") + 2, 1);
 
 	sprintf(fname, "%s/%s.stat", cfg->monitor_dir, cfg->table_name);
 	cfg->logf = fopen(fname, "w");

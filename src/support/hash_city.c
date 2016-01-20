@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -98,6 +98,12 @@ static uint32_t UNALIGNED_LOAD32(const char *p) {
 #include <libkern/OSByteOrder.h>
 #define	bswap_32(x) OSSwapInt32(x)
 #define	bswap_64(x) OSSwapInt64(x)
+
+#elif defined(__sun)
+
+#include <sys/byteorder.h>
+#define	bswap_32 BSWAP_32
+#define	bswap_64 BSWAP_64
 
 #else
 #include <byteswap.h>

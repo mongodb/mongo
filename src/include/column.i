@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -176,6 +176,16 @@ __col_insert_search(WT_INSERT_HEAD *inshead,
 			continue;
 		}
 
+		/*
+		 * When no exact match is found, the search returns the smallest
+		 * key larger than the searched-for key, or the largest key
+		 * smaller than the searched-for key, if there is no larger key.
+		 * Our callers depend on that: specifically, the fixed-length
+		 * column store cursor code interprets returning a key smaller
+		 * than the searched-for key to mean the searched-for key is
+		 * larger than any key on the page. Don't change that behavior,
+		 * things will break.
+		 */
 		ins_recno = WT_INSERT_RECNO(ret_ins);
 		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
 
@@ -204,9 +214,9 @@ __col_var_last_recno(WT_PAGE *page)
 	WT_COL_RLE *repeat;
 
 	/*
-	 * If there's an append list (the last page), then there may be more
-	 * records on the page.  This function ignores those records, so our
-	 * callers have to handle that explicitly, if they care.
+	 * If there's an append list, there may be more records on the page.
+	 * This function ignores those records, our callers must handle that
+	 * explicitly, if they care.
 	 */
 	if (page->pg_var_nrepeats == 0)
 		return (page->pg_var_entries == 0 ? 0 :
@@ -225,9 +235,9 @@ static inline uint64_t
 __col_fix_last_recno(WT_PAGE *page)
 {
 	/*
-	 * If there's an append list (the last page), then there may be more
-	 * records on the page.  This function ignores those records, so our
-	 * callers have to handle that explicitly, if they care.
+	 * If there's an append list, there may be more records on the page.
+	 * This function ignores those records, our callers must handle that
+	 * explicitly, if they care.
 	 */
 	return (page->pg_fix_entries == 0 ? 0 :
 	    page->pg_fix_recno + (page->pg_fix_entries - 1));
@@ -282,7 +292,17 @@ __col_var_search(WT_PAGE *page, uint64_t recno, uint64_t *start_recnop)
 		start_recno = repeat->recno + repeat->rle;
 	}
 
-	if (recno >= start_recno + (page->pg_var_entries - start_indx))
+	/*
+	 * !!!
+	 * The test could be written more simply as:
+	 *
+	 * 	(recno >= start_recno + (page->pg_var_entries - start_indx))
+	 *
+	 * It's split into two parts because the simpler test will overflow if
+	 * searching for large record numbers.
+	 */
+	if (recno >= start_recno &&
+	    recno - start_recno >= page->pg_var_entries - start_indx)
 		return (NULL);
 
 	return (page->pg_var_d + start_indx + (uint32_t)(recno - start_recno));

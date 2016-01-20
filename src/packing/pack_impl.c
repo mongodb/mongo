@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -176,6 +176,8 @@ __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt,
 
 	/* Outfmt should complete before infmt */
 	while ((ret = __pack_next(&packout, &pvout)) == 0) {
+		if (p >= end)
+			WT_ERR(EINVAL);
 		WT_ERR(__pack_next(&packin, &pvin));
 		before = p;
 		WT_ERR(__unpack_read(session, &pvin, &p, (size_t)(end - p)));

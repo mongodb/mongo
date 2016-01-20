@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -45,7 +45,7 @@ obj_bulk(void)
 			testutil_die(ret, "session.create");
 
 	if (ret == 0) {
-		sched_yield();
+		__wt_yield();
 		if ((ret = session->open_cursor(
 		    session, uri, NULL, "bulk", &c)) == 0) {
 			if ((ret = c->close(c)) != 0)
@@ -78,7 +78,7 @@ obj_bulk_unique(int force)
 	if ((ret = session->create(session, new_uri, config)) != 0)
 		testutil_die(ret, "session.create: %s", new_uri);
 
-	sched_yield();
+	__wt_yield();
 	if ((ret =
 	    session->open_cursor(session, new_uri, NULL, "bulk", &c)) != 0)
 		testutil_die(ret, "session.open_cursor: %s", new_uri);
@@ -154,7 +154,7 @@ obj_create_unique(int force)
 	if ((ret = session->create(session, new_uri, config)) != 0)
 		testutil_die(ret, "session.create");
 
-	sched_yield();
+	__wt_yield();
 	while ((ret = session->drop(
 	    session, new_uri, force ? "force" : NULL)) != 0)
 		if (ret != EBUSY)
@@ -194,6 +194,23 @@ obj_checkpoint(void)
 	if ((ret = session->checkpoint(session, "force")) != 0)
 		if (ret != ENOENT)
 			testutil_die(ret, "session.checkpoint");
+
+	if ((ret = session->close(session, NULL)) != 0)
+		testutil_die(ret, "session.close");
+}
+
+void
+obj_rebalance(void)
+{
+	WT_SESSION *session;
+	int ret;
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		testutil_die(ret, "conn.session");
+
+	if ((ret = session->rebalance(session, uri, NULL)) != 0)
+		if (ret != ENOENT && ret != EBUSY)
+			testutil_die(ret, "session.rebalance");
 
 	if ((ret = session->close(session, NULL)) != 0)
 		testutil_die(ret, "session.close");

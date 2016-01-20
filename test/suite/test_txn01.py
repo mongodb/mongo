@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -41,13 +41,6 @@ class test_txn01(wttest.WiredTigerTestCase):
         ('row-f', dict(uri='file:text_txn01',key_format='S',value_format='S')),
         ('row-t', dict(uri='table:text_txn01',key_format='S',value_format='S')),
     ])
-
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir, 'create,' +
-                ('error_prefix="%s: ",' % self.shortid()))
-        self.pr(`conn`)
-        return conn
 
     # Return the number of records visible to the cursor.
     def cursor_count(self, cursor):

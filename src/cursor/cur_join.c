@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -383,17 +383,14 @@ __curjoin_endpoint_init_key(WT_SESSION_IMPL *session,
 	allocbuf = NULL;
 	if ((cursor = endpoint->cursor) != NULL) {
 		if (entry->index != NULL) {
+			/* Extract and save the index's logical key. */
 			cindex = (WT_CURSOR_INDEX *)endpoint->cursor;
-			if (cindex->index->extractor == NULL) {
-				WT_ERR(__wt_struct_repack(session,
-				    cindex->child->key_format,
-				    entry->main->value_format,
-				    &cindex->child->key, &endpoint->key,
-				    &allocbuf));
-				if (allocbuf != NULL)
-					F_SET(endpoint, WT_CURJOIN_END_OWN_KEY);
-			} else
-				endpoint->key = cindex->child->key;
+			WT_ERR(__wt_struct_repack(session,
+			    cindex->child->key_format,
+			    cindex->iface.key_format,
+			    &cindex->child->key, &endpoint->key, &allocbuf));
+			if (allocbuf != NULL)
+				F_SET(endpoint, WT_CURJOIN_END_OWN_KEY);
 		} else {
 			k = &((WT_CURSOR_TABLE *)cursor)->cg_cursors[0]->key;
 			if (WT_CURSOR_RECNO(cursor)) {

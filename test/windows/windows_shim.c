@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -27,13 +27,6 @@
  */
 
 #include "windows_shim.h"
-
-int
-sched_yield(void)
-{
-	(void)SwitchToThread();
-	return (0);
-}
 
 int
 sleep(int seconds)

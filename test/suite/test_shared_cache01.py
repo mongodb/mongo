@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -72,7 +72,7 @@ class test_shared_cache01(wttest.WiredTigerTestCase):
         for name in connections:
             shutil.rmtree(name, True)
             os.mkdir(name)
-            next_conn =  wiredtiger.wiredtiger_open(
+            next_conn =  self.wiredtiger_open(
                 name,
                 'create,error_prefix="' + self.shortid() + ': "' +
                 pool_opts + extra_opts)

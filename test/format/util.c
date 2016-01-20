@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -50,7 +50,7 @@ dmalloc(size_t len)
  * dstrdup --
  *	Call strdup, dying on failure.
  */
-static char *
+char *
 dstrdup(const char *str)
 {
 	char *p;

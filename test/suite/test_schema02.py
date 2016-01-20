@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -98,6 +98,14 @@ class test_schema02(wttest.WiredTigerTestCase):
 
         # expect this to work
         self.session.create("colgroup:main:c1", "columns=(S1,i2)")
+
+        # exclusive: no error message
+        self.expect_failure_colgroup("main:c1", "columns=(S1,i2),exclusive",
+                                     "")
+
+        # exists with different config
+        self.expect_failure_colgroup("main:c1", "columns=(S1,i4)",
+                                     "/does not match existing configuration/")
 
         # colgroup not declared in initial create
         self.expect_failure_colgroup("main:c3", "columns=(S3,i4)",

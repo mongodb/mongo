@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -127,7 +127,7 @@ class test_config03(test_base03.test_base03):
             args = successargs
 
         self.verbose(3, 'wiredtiger_open with args: ' + args)
-        conn = wiredtiger.wiredtiger_open(dir, args)
+        conn = self.wiredtiger_open(dir, args)
         self.pr(`conn`)
         return conn
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -49,14 +49,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     ]
 
     scenarios = number_scenarios(uri)
-
-    # Override WiredTigerTestCase to enable statistics
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,' +
-            'statistics=(fast),' +
-            'error_prefix="%s: "' % self.shortid())
-        return conn
+    conn_config = 'statistics=(fast)'
 
     def openAndWalkStatCursor(self):
         c = self.session.open_cursor(

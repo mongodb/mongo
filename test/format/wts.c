@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -132,12 +132,12 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
 	int ret;
-	char config[4096], *end, *p;
+	char *config, *end, *p, helium_config[1024];
 
 	*connp = NULL;
 
-	p = config;
-	end = config + sizeof(config);
+	config = p = g.wiredtiger_open_config;
+	end = config + sizeof(g.wiredtiger_open_config);
 
 	p += snprintf(p, REMAIN(p, end),
 	    "create,checkpoint_sync=false,cache_size=%" PRIu32 "MB",
@@ -183,6 +183,9 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 #endif
 
 	p += snprintf(p, REMAIN(p, end), ",mmap=%d", g.c_mmap ? 1 : 0);
+
+	if (g.c_direct_io)
+		p += snprintf(p, REMAIN(p, end), ",direct_io=(data)");
 
 	if (g.c_data_extend)
 		p += snprintf(p, REMAIN(p, end), ",file_extend=(data=8MB)");
@@ -254,19 +257,33 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (DATASOURCE("helium")) {
 		if (g.helium_mount == NULL)
 			die(EINVAL, "no Helium mount point specified");
-		(void)snprintf(config, sizeof(config),
+		(void)snprintf(helium_config, sizeof(helium_config),
 		    "entry=wiredtiger_extension_init,config=["
 		    "helium_verbose=0,"
 		    "dev1=[helium_devices=\"he://./%s\","
 		    "helium_o_volume_truncate=1]]",
 		    g.helium_mount);
-		if ((ret =
-		    conn->load_extension(conn, HELIUM_PATH, config)) != 0)
+		if ((ret = conn->load_extension(
+		    conn, HELIUM_PATH, helium_config)) != 0)
 			die(ret,
 			   "WT_CONNECTION.load_extension: %s:%s",
-			   HELIUM_PATH, config);
+			   HELIUM_PATH, helium_config);
 	}
 	*connp = conn;
+}
+
+/*
+ * wts_reopen --
+ *	Re-open a connection to a WiredTiger database.
+ */
+void
+wts_reopen(void)
+{
+	int ret;
+
+	if ((ret = wiredtiger_open(g.home,
+	    &event_handler, g.wiredtiger_open_config, &g.wts_conn)) != 0)
+		die(ret, "wiredtiger_open: %s", g.home);
 }
 
 /*
@@ -449,6 +466,8 @@ wts_close(void)
 
 	if ((ret = conn->close(conn, config)) != 0)
 		die(ret, "connection.close");
+	g.wts_conn = NULL;
+	g.wt_api = NULL;
 }
 
 void

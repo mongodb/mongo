@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -477,8 +477,12 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	cursor->key_format = "S";
 	cursor->value_format = "S";
 
-	/* Open the file cursor for operations on the regular metadata */
-	WT_ERR(__wt_metadata_cursor(session, cfg[1], &mdc->file_cursor));
+	/*
+	 * Open the file cursor for operations on the regular metadata; don't
+	 * use the existing, cached session metadata cursor, the configuration
+	 * may not be the same.
+	 */
+	WT_ERR(__wt_metadata_cursor_open(session, cfg[1], &mdc->file_cursor));
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 

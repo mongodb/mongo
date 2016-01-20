@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -43,7 +43,7 @@ check(const char *fmt, ...)
 	assert(__wt_struct_sizev(NULL, &len, fmt, ap) == 0);
 	va_end(ap);
 
-	assert(len < sizeof(buf));
+	assert(len > 0 && len < sizeof(buf));
 
 	va_start(ap, fmt);
 	assert(__wt_struct_packv(NULL, buf, sizeof(buf), fmt, ap) == 0);
@@ -61,6 +61,7 @@ main(void)
 	check("iii", 0, 101, -99);
 	check("3i", 0, 101, -99);
 	check("iS", 42, "forty two");
+	check("s", "a big string");
 #if 0
 	/* TODO: need a WT_ITEM */
 	check("u", r"\x42" * 20)

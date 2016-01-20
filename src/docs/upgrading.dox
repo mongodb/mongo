@@ -1,5 +1,21 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_271 Upgrading to Version 2.7.1
+<dl>
+<dt>Column-store bulk-load cursors</dt>
+<dd>
+Historically, bulk-load of a column-store object ignored any key set in
+the cursor and automatically assigned each inserted row the next
+sequential record number for its key. In the 2.7.1 release, column-store
+objects match row-store behavior and require the cursor key be set
+before an insert. (This also allows allows sparse tables to be created
+in column-store objects, any skipped records are created as
+already-deleted rows.) To match the previous behavior, specify the
+\c append configuration string when opening the column-store bulk-load
+cursor; this causes the cursor's key to be ignored and each inserted row
+will be assigned the next record number.
+
+</dl><hr>
 @section version_270 Upgrading to Version 2.7.0
 
 <dl>

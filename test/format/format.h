@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -122,6 +122,8 @@ typedef struct {
 
 	char *helium_mount;			/* Helium volume */
 
+	char wiredtiger_open_config[8 * 1024];	/* Database open config */
+
 #ifdef HAVE_BERKELEY_DB
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
@@ -176,25 +178,26 @@ typedef struct {
 	uint32_t c_cache;
 	uint32_t c_compact;
 	uint32_t c_checkpoints;
-	char	*c_checksum;
+	char *c_checksum;
 	uint32_t c_chunk_size;
-	char	*c_compression;
-	char	*c_encryption;
-	char	*c_config_open;
+	char *c_compression;
+	char *c_encryption;
+	char *c_config_open;
 	uint32_t c_data_extend;
-	char	*c_data_source;
+	char *c_data_source;
 	uint32_t c_delete_pct;
 	uint32_t c_dictionary;
+	uint32_t c_direct_io;
 	uint32_t c_evict_max;
 	uint32_t c_firstfit;
-	char	*c_file_type;
+	char *c_file_type;
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;
 	uint32_t c_in_memory;
 	uint32_t c_insert_pct;
 	uint32_t c_internal_key_truncation;
 	uint32_t c_intl_page_max;
-	char	*c_isolation;
+	char *c_isolation;
 	uint32_t c_key_gap;
 	uint32_t c_key_max;
 	uint32_t c_key_min;
@@ -202,7 +205,7 @@ typedef struct {
 	uint32_t c_leak_memory;
 	uint32_t c_logging;
 	uint32_t c_logging_archive;
-	char	*c_logging_compression;
+	char *c_logging_compression;
 	uint32_t c_logging_prealloc;
 	uint32_t c_long_running_txn;
 	uint32_t c_lsm_worker_threads;
@@ -215,6 +218,7 @@ typedef struct {
 	uint32_t c_reverse;
 	uint32_t c_rows;
 	uint32_t c_runs;
+	uint32_t c_rebalance;
 	uint32_t c_salvage;
 	uint32_t c_split_pct;
 	uint32_t c_statistics;
@@ -308,6 +312,7 @@ void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
 void	*dmalloc(size_t);
+char	*dstrdup(const char *);
 void	 fclose_and_clear(FILE **);
 void	 key_gen(uint8_t *, size_t *, uint64_t);
 void	 key_gen_insert(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);
@@ -327,6 +332,8 @@ void	 wts_load(void);
 void	 wts_open(const char *, int, WT_CONNECTION **);
 void	 wts_ops(int);
 void	 wts_read_scan(void);
+void	 wts_rebalance(void);
+void	 wts_reopen(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);

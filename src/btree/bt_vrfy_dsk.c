@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -197,6 +197,8 @@ __verify_dsk_row(
 	WT_DECL_ITEM(current);
 	WT_DECL_ITEM(last_ovfl);
 	WT_DECL_ITEM(last_pfx);
+	WT_DECL_ITEM(tmp1);
+	WT_DECL_ITEM(tmp2);
 	WT_DECL_RET;
 	WT_ITEM *last;
 	enum { FIRST, WAS_KEY, WAS_VALUE } last_cell_type;
@@ -213,6 +215,8 @@ __verify_dsk_row(
 	WT_ERR(__wt_scr_alloc(session, 0, &current));
 	WT_ERR(__wt_scr_alloc(session, 0, &last_pfx));
 	WT_ERR(__wt_scr_alloc(session, 0, &last_ovfl));
+	WT_ERR(__wt_scr_alloc(session, 0, &tmp1));
+	WT_ERR(__wt_scr_alloc(session, 0, &tmp2));
 	last = last_ovfl;
 
 	end = (uint8_t *)dsk + dsk->mem_size;
@@ -402,8 +406,12 @@ key_compare:	/*
 			if (cmp >= 0)
 				WT_ERR_VRFY(session,
 				    "the %" PRIu32 " and %" PRIu32 " keys on "
-				    "page at %s are incorrectly sorted",
-				    cell_num - 2, cell_num, tag);
+				    "page at %s are incorrectly sorted: %s, %s",
+				    cell_num - 2, cell_num, tag,
+				    __wt_buf_set_printable(session,
+				    last->data, last->size, tmp1),
+				    __wt_buf_set_printable(session,
+				    current->data, current->size, tmp2));
 		}
 
 		/*
@@ -464,6 +472,8 @@ err:		if (ret == 0)
 	__wt_scr_free(session, &current);
 	__wt_scr_free(session, &last_pfx);
 	__wt_scr_free(session, &last_ovfl);
+	__wt_scr_free(session, &tmp1);
+	__wt_scr_free(session, &tmp2);
 	return (ret);
 }
 

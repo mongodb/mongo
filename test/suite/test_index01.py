@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -38,11 +38,6 @@ class test_index01(wttest.WiredTigerTestCase):
     indexbase = 'index:' + basename
     NUM_INDICES = 6
     index = ['%s:index%d' % (indexbase, i) for i in xrange(NUM_INDICES)]
-
-    def reopen(self):
-        self.conn.close()
-        self.conn = wiredtiger.wiredtiger_open('.', None)
-        self.session = self.conn.open_session()
 
     def create_table(self):
         self.pr('create table')
@@ -220,6 +215,21 @@ class test_index01(wttest.WiredTigerTestCase):
         self.check_exists('smith', 1, wiredtiger.WT_NOTFOUND)
         for i in xrange(self.NUM_INDICES):
             self.assertEqual(list(self.index_iter(i)), [])
+        self.drop_table()
+
+    def test_exclusive(self):
+        '''Create indices, then try to create another index exclusively'''
+        self.create_table()
+        # non-exclusive recreate is allowed
+        self.session.create(self.index[0], 'columns=(dept)')
+        # exclusive recreate
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.index[0],
+            'columns=(dept),exclusive'))
+        # non-exclusive create with differing configuration
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.index[0],
+            'columns=(salary)'), '/does not match existing configuration/')
         self.drop_table()
 
 if __name__ == '__main__':

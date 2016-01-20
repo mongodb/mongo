@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -236,6 +236,11 @@ main(int argc, char *argv[])
 			bdb_close();
 #endif
 		wts_close();
+
+		/*
+		 * Rebalance testing.
+		 */
+		wts_rebalance();
 
 		/*
 		 * If single-threaded, we can dump and compare the WiredTiger

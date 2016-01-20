@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -195,7 +195,7 @@ real_worker(void)
 			goto err;
 		}
 
-	for (i = 0; i < g.nops && g.running; ++i, sched_yield()) {
+	for (i = 0; i < g.nops && g.running; ++i, __wt_yield()) {
 		if ((ret = session->begin_transaction(session, NULL)) != 0) {
 			(void)log_print_err(
 			    "real_worker:begin_transaction", ret, 1);

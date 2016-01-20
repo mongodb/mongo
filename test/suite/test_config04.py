@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -76,7 +76,7 @@ class test_config04(wttest.WiredTigerTestCase):
         configarg = 'create,statistics=(fast)'
         if configextra != None:
             configarg += ',' + configextra
-        self.conn = wiredtiger.wiredtiger_open('.', configarg)
+        self.conn = self.wiredtiger_open('.', configarg)
         self.session = self.conn.open_session(None)
         self.populate_and_check()
 
@@ -89,7 +89,7 @@ class test_config04(wttest.WiredTigerTestCase):
     def test_bad_config(self):
         msg = '/unknown configuration key/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: wiredtiger.wiredtiger_open('.', 'not_valid,another_bad=10'),
+            lambda: self.wiredtiger_open('.', 'not_valid,another_bad=10'),
             msg)
 
     def test_cache_size_number(self):
@@ -123,14 +123,14 @@ class test_config04(wttest.WiredTigerTestCase):
 
     def test_cache_too_small(self):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: wiredtiger.wiredtiger_open('.', 'create,cache_size=900000'),
+            lambda: self.wiredtiger_open('.', 'create,cache_size=900000'),
             "/Value too small for key 'cache_size' the minimum is/")
 
     def test_cache_too_large(self):
         T11 = 11 * self.T  # 11 Terabytes
         configstr = 'create,cache_size=' + str(T11)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: wiredtiger.wiredtiger_open('.', configstr),
+            lambda: self.wiredtiger_open('.', configstr),
             "/Value too large for key 'cache_size' the maximum is/")
 
     def test_eviction(self):
@@ -139,19 +139,34 @@ class test_config04(wttest.WiredTigerTestCase):
 
     def test_eviction_bad(self):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-            wiredtiger.wiredtiger_open('.', 'create,eviction_target=91,' +
-                                       'eviction_trigger=81'),
+            self.wiredtiger_open('.', 'create,eviction_target=91,' +
+                                 'eviction_trigger=81'),
             "/eviction target must be lower than the eviction trigger/")
 
     def test_eviction_bad2(self):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-            wiredtiger.wiredtiger_open('.', 'create,eviction_target=86,' +
-                                       'eviction_trigger=86'),
+            self.wiredtiger_open('.', 'create,eviction_target=86,' +
+                                 'eviction_trigger=86'),
             "/eviction target must be lower than the eviction trigger/")
 
     def test_hazard_max(self):
         # Note: There isn't any direct way to know that this was set.
         self.common_test('hazard_max=50')
+
+    def test_invalid_config(self):
+        msg = '/Unbalanced brackets/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '}'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '{'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '{}}'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '(]}'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '(create=]}'), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.wiredtiger_open('.', '(create='), msg)
 
     def test_session_max(self):
         # Note: There isn't any direct way to know that this was set,

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -504,7 +504,7 @@ skip_insert:			if (col_update(tinfo,
 		 */
 		if (!insert) {
 			dir = (int)mmrand(&tinfo->rnd, 0, 1);
-			for (np = 0; np < mmrand(&tinfo->rnd, 1, 8); ++np) {
+			for (np = 0; np < mmrand(&tinfo->rnd, 1, 100); ++np) {
 				if (notfound)
 					break;
 				if (nextprev(cursor, dir, &notfound))
