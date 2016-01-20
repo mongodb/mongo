@@ -237,7 +237,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				continue;
 			}
 			if (STRING_MATCH("throttle", k.str, k.len)) {
-				workp->throttle = v.val;
+				workp->throttle = (uint64_t)v.val;
 				continue;
 			}
 			if (STRING_MATCH("insert", k.str, k.len) ||
