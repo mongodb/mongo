@@ -25,7 +25,8 @@ typedef struct {
 	char type;
 } WT_PACK_VALUE;
 
-#define	WT_PACK_VALUE_INIT  { { 0 }, 0, 0, 0 }
+/* Default to size = 1 if there is no size prefix. */
+#define	WT_PACK_VALUE_INIT  { { 0 }, 1, 0, 0 }
 #define	WT_DECL_PACK_VALUE(pv)  WT_PACK_VALUE pv = WT_PACK_VALUE_INIT
 
 typedef struct {
@@ -273,11 +274,10 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		return (s);
 	case 's':
 	case 'S':
-		if (pv->havesize)
+		if (pv->type == 's' || pv->havesize) {
 			s = pv->size;
-		else if (pv->type == 's')
-			s = 1;
-		else
+                        WT_ASSERT(session, s != 0);
+		} else
 			s = strlen(pv->u.s) + 1;
 		return (s);
 	case 'U':
@@ -332,11 +332,9 @@ __pack_write(
 		*pp += pv->size;
 		break;
 	case 's':
-		s = pv->havesize ? pv->size : 1;
-		WT_SIZE_CHECK_PACK(s, maxlen);
-		if (s > 0)
-			memcpy(*pp, pv->u.s, s);
-		*pp += s;
+		WT_SIZE_CHECK_PACK(pv->size, maxlen);
+		memcpy(*pp, pv->u.s, pv->size);
+		*pp += pv->size;
 		break;
 	case 'S':
 		s = strlen(pv->u.s);
@@ -471,11 +469,10 @@ __unpack_read(WT_SESSION_IMPL *session,
 		break;
 	case 's':
 	case 'S':
-		if (pv->havesize)
+		if (pv->type == 's' || pv->havesize) {
 			s = pv->size;
-		else if (pv->type == 's')
-			s = 1;
-		else
+                        WT_ASSERT(session, s != 0);
+                } else
 			s = strlen((const char *)*pp) + 1;
 		if (s > 0)
 			pv->u.s = (const char *)*pp;
@@ -680,7 +677,6 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 
 	if (fmt[0] != '\0' && fmt[1] == '\0') {
 		pv.type = fmt[0];
-		pv.size = 1;
 		if ((ret = __unpack_read(session, &pv, &p, size)) == 0)
 			WT_UNPACK_PUT(session, pv, ap);
 		return (0);

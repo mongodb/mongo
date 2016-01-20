@@ -80,8 +80,6 @@ class test_config06(wttest.WiredTigerTestCase):
         cursor[k] = v
         self.assertEquals(cursor[k], v)
 
-    '''
-    CURRENTLY DOES NOT WORK
     def test_format_string_s_default(self):
         k = self.key
         v = self.value
@@ -89,7 +87,6 @@ class test_config06(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None)
         cursor[k] = v
         self.assertEquals(cursor[k[:1]], v[:1])
-    '''
 
 
 if __name__ == '__main__':
