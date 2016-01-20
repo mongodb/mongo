@@ -20,7 +20,13 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/mman.h>
+
+#ifdef __GLIBC__
 #include <gnu/libc-version.h>
+#else
+#define gnu_get_libc_version(x) "musl libc"
+#endif
+
 #include <sys/utsname.h>
 
 #include "processinfo.h"
@@ -299,6 +305,7 @@ namespace mongo {
             paths.push_back( "/etc/debian_release" );
             paths.push_back( "/etc/slackware-version" );
             paths.push_back( "/etc/centos-release" );
+            paths.push_back("/etc/alpine-release");
             paths.push_back( "/etc/os-release" );
         
             for ( i = paths.begin(); i != paths.end(); ++i ) {
