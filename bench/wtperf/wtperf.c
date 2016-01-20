@@ -727,8 +727,8 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 			op = thread->workload->ops;
 
 		/*
-		 * Decrement throttle tickets and check if needed check if we
-		 * should sleep and then get more tickets to perform more work.
+		 * Decrement throttle ops and check if we should sleep
+		 * and then get more work to perform.
 		 */
 		if (--thread->throttle_cfg.ops_count == 0)
 			worker_throttle(thread);

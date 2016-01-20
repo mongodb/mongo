@@ -41,7 +41,7 @@ setup_throttle(CONFIG_THREAD *thread)
 	/*
 	 * Setup how the number of operations to run each interval in order to
 	 * meet our desired max throughput.
-	 * - If we have a very small number of then we can look to do one op
+	 * - If we have a very small number of them we can do one op
 	 *   on a larger increment. Given there is overhead in throttle logic
 	 *   we want to avoid running the throttle check regularly.
 	 * - For most workloads, we aim to do 100 ops per interval and adjust
@@ -51,7 +51,7 @@ setup_throttle(CONFIG_THREAD *thread)
 	 */
 
 	if (thread->workload->throttle < THROTTLE_OPS) {
-		/* If the interval is very small, we do laps of 1 */
+		/* If the interval is very small, we do one operation */
 		throttle_cfg->usecs_increment =
 		    USEC_PER_SEC / thread->workload->throttle;
 		throttle_cfg->ops_per_increment = 1;
@@ -66,7 +66,7 @@ setup_throttle(CONFIG_THREAD *thread)
 		    thread->workload->throttle / THROTTLE_OPS;
 	}
 
-	/* Give the queue some initial tickets to work with */
+	/* Give the queue some initial operations to work with */
 	throttle_cfg->ops_count = throttle_cfg->ops_per_increment;
 
 	/* Set the first timestamp of when we incremented */
@@ -75,8 +75,8 @@ setup_throttle(CONFIG_THREAD *thread)
 }
 
 /*
- * Run the throttle function. Will sleep if needed and then reload the counter
- * to perform more operations.
+ * Run the throttle function.  We will sleep if needed and then reload the
+ * counter to perform more operations.
  */
 int
 worker_throttle(CONFIG_THREAD *thread)
@@ -91,7 +91,7 @@ worker_throttle(CONFIG_THREAD *thread)
 
 	/*
 	 * If we did enough operations in the current interval, sleep for
-	 * the rest of the interval. Then add more tickets to the queue.
+	 * the rest of the interval. Then add more operations to the queue.
 	 */
 	usecs_delta = WT_TIMEDIFF_US(now, throttle_cfg->last_increment);
 	if (usecs_delta < throttle_cfg->usecs_increment) {
@@ -111,7 +111,9 @@ worker_throttle(CONFIG_THREAD *thread)
 		throttle_cfg->last_increment = now;
 	}
 
-	/* Don't over-fill the queue */
+	/*
+	 * Take the minimum so we don't overfill the queue.
+	 */ 
 	throttle_cfg->ops_count =
 	    WT_MIN(throttle_cfg->ops_count, thread->workload->throttle);
 

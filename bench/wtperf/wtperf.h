@@ -91,10 +91,10 @@ typedef struct {
 	int64_t insert;			/* Insert ratio */
 	int64_t read;			/* Read ratio */
 	int64_t update;			/* Update ratio */
+	uint64_t throttle;              /* Maximum operations/second */
 		/* Number of operations per transaction. Zero for autocommit */
 	int64_t ops_per_txn;
 	int64_t truncate;		/* Truncate ratio */
-	uint64_t throttle;              /* Maximum operations/second */
 	uint64_t truncate_pct;		/* Truncate Percent */
 	uint64_t truncate_count;	/* Truncate Count */
 
@@ -301,8 +301,8 @@ void	 latency_print(CONFIG *);
 int	 run_truncate(
     CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(CONFIG *);
-int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
 int	 setup_throttle(CONFIG_THREAD*);
+int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
 uint64_t sum_ckpt_ops(CONFIG *);
 uint64_t sum_insert_ops(CONFIG *);
 uint64_t sum_pop_ops(CONFIG *);
