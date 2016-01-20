@@ -595,8 +595,11 @@ __create_table(WT_SESSION_IMPL *session,
 		return (EINVAL);
 
 	if ((ret = __wt_schema_get_table(session,
-	    tablename, strlen(tablename), false, &table)) == 0)
+	    tablename, strlen(tablename), false, &table)) == 0) {
+		if (exclusive)
+			WT_ERR(EEXIST);
 		exists = true;
+	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	WT_ERR(__wt_config_gets(session, cfg, "colgroups", &cval));
