@@ -162,12 +162,12 @@ void endQueryOp(OperationContext* txn,
         collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
     }
 
-    const logger::LogComponent queryLogComponent = logger::LogComponent::kQuery;
+    const logger::LogComponent commandLogComponent = logger::LogComponent::kCommand;
     const logger::LogSeverity logLevelOne = logger::LogSeverity::Debug(1);
 
     // Set debug information for consumption by the profiler and slow query log.
     if (dbProfilingLevel > 0 || curop->elapsedMillis() > serverGlobalParams.slowMS ||
-        logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
+        logger::globalLogDomain()->shouldLog(commandLogComponent, logLevelOne)) {
         // Generate plan summary string.
         stdx::lock_guard<Client>(*txn->getClient());
         curop->setPlanSummary_inlock(Explain::getPlanSummary(&exec));

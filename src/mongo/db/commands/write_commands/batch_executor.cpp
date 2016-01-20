@@ -560,7 +560,7 @@ static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
     if (opError)
         logCurOpError(currentOp, opError);
 
-    bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kWrite,
+    bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kCommand,
                                                        logger::LogSeverity::Debug(1));
     bool logSlow = executionTime > (serverGlobalParams.slowMS + currentOp->getExpectedLatencyMs());
 
