@@ -391,8 +391,8 @@ namespace mongo {
 
     void ProcessInfo::getExtraInfo( BSONObjBuilder& info ) {
         // [dm] i don't think mallinfo works. (64 bit.)  ??
-        struct mallinfo malloc_info = mallinfo(); // structure has same name as function that returns it. (see malloc.h)
-        info.append("heap_usage_bytes", malloc_info.uordblks/*main arena*/ + malloc_info.hblkhd/*mmap blocks*/);
+//        struct mallinfo malloc_info = mallinfo(); // structure has same name as function that returns it. (see malloc.h)
+//        info.append("heap_usage_bytes", malloc_info.uordblks/*main arena*/ + malloc_info.hblkhd/*mmap blocks*/);
         //docs claim hblkhd is included in uordblks but it isn't
 
         LinuxProc p(_pid);
