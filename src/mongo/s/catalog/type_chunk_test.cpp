@@ -40,6 +40,7 @@ namespace {
 using namespace mongo;
 
 using std::string;
+using unittest::assertGet;
 
 TEST(ChunkType, MissingRequiredFields) {
     ChunkVersion chunkVersion(1, 2, OID::gen());
@@ -131,6 +132,25 @@ TEST(ChunkType, CorrectContents) {
     ASSERT_EQUALS(chunk.getVersion().epoch(), chunkVersion.epoch());
     ASSERT_EQUALS(chunk.getShard(), "shard0001");
     ASSERT_OK(chunk.validate());
+}
+
+TEST(ChunkType, Pre22Format) {
+    ChunkType chunk = assertGet(
+        ChunkType::fromBSON(BSON("_id"
+                                 << "test.mycol-a_MinKey"
+                                 << "lastmod" << Date_t::fromMillisSinceEpoch(1) << "ns"
+                                 << "test.mycol"
+                                 << "min" << BSON("a" << 10) << "max" << BSON("a" << 20) << "shard"
+                                 << "shard0001")));
+
+    ASSERT_OK(chunk.validate());
+    ASSERT_EQUALS(chunk.getName(), "test.mycol-a_MinKey");
+    ASSERT_EQUALS(chunk.getNS(), "test.mycol");
+    ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
+    ASSERT_EQUALS(chunk.getMax(), BSON("a" << 20));
+    ASSERT_EQUALS(chunk.getVersion().toLong(), 1);
+    ASSERT(!chunk.getVersion().epoch().isSet());
+    ASSERT_EQUALS(chunk.getShard(), "shard0001");
 }
 
 TEST(ChunkType, BadType) {

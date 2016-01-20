@@ -61,7 +61,6 @@ public:
     static const BSONField<Date_t> DEPRECATED_lastmod;
     static const BSONField<OID> DEPRECATED_epoch;
 
-
     /**
      * Constructs a new ChunkType object from BSON.
      * Also does validation of the contents.
