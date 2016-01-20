@@ -414,7 +414,7 @@ class CheckReplDBHash(CustomBehavior):
         collection on the secondary, if any.
         """
 
-        codec_options = bson.CodecOptions(document_class=bson.SON)
+        codec_options = bson.CodecOptions(document_class=TypeSensitiveSON)
 
         primary_coll = primary_db.get_collection(coll_name, codec_options=codec_options)
         secondary_coll = secondary_db.get_collection(coll_name, codec_options=codec_options)
@@ -575,6 +575,32 @@ class CheckReplDBHash(CustomBehavior):
         else:
             sb.append("No documents in %s.%s." % (database.name, coll_name))
 
+class TypeSensitiveSON(bson.SON):
+    """
+    Extends bson.SON to perform additional type-checking of document values
+    to differentiate BSON types.
+    """
+
+    def items_with_types(self):
+        """
+        Returns a list of triples. Each triple consists of a field name, a
+        field value, and a field type for each field in the document.
+        """
+
+        return [(key, self[key], type(self[key])) for key in self]
+
+    def __eq__(self, other):
+        """
+        Comparison to another TypeSensitiveSON is order-sensitive and
+        type-sensitive while comparison to a regular dictionary ignores order
+        and type mismatches.
+        """
+
+        if isinstance(other, TypeSensitiveSON):
+            return (len(self) == len(other) and
+                    self.items_with_types() == other.items_with_types())
+
+        raise TypeError("TypeSensitiveSON objects cannot be compared to other types")
 
 class ValidateCollections(CustomBehavior):
     """
