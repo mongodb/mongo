@@ -276,7 +276,7 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 	case 'S':
 		if (pv->type == 's' || pv->havesize) {
 			s = pv->size;
-                        WT_ASSERT(session, s != 0);
+			WT_ASSERT(session, s != 0);
 		} else
 			s = strlen(pv->u.s) + 1;
 		return (s);
@@ -471,8 +471,8 @@ __unpack_read(WT_SESSION_IMPL *session,
 	case 'S':
 		if (pv->type == 's' || pv->havesize) {
 			s = pv->size;
-                        WT_ASSERT(session, s != 0);
-                } else
+			WT_ASSERT(session, s != 0);
+		} else
 			s = strlen((const char *)*pp) + 1;
 		if (s > 0)
 			pv->u.s = (const char *)*pp;
