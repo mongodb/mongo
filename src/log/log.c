@@ -1970,6 +1970,13 @@ err:
 	    myslot.slot != NULL)
 		ret = myslot.slot->slot_error;
 
+	/*
+	 * If one of the sync flags is set, assert the proper LSN has moved to match.
+	 */
+	WT_ASSERT(session, !LF_ISSET(WT_LOG_FLUSH) ||
+	    __wt_log_cmp(&log->write_lsn, &lsn) >= 0);
+	WT_ASSERT(session,
+	    !LF_ISSET(WT_LOG_FSYNC) || __wt_log_cmp(&log->sync_lsn, &lsn) >= 0);
 	return (ret);
 }
 
