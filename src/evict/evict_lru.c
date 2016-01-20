@@ -858,9 +858,8 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
-	WT_EVICT_ENTRY *evict;
 	uint64_t cutoff;
-	uint32_t base, candidates, entries, i;
+	uint32_t candidates, entries;
 
 	cache = S2C(session)->cache;
 
@@ -877,6 +876,14 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 
 	while (entries > 0 && cache->evict_queue[entries - 1].ref == NULL)
 		--entries;
+
+	/*
+	 * If we have more entries than the maximum tracked between walks,
+	 * clear them.  Do this before figuring out how many of the entries are
+	 * candidates so we never end up with more candidates than entries.
+	 */
+	while (entries > WT_EVICT_WALK_BASE)
+		__evict_list_clear(session, &cache->evict_queue[--entries]);
 
 	cache->evict_entries = entries;
 
@@ -920,21 +927,6 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 			    &cache->evict_queue[candidates]) > cutoff)
 				break;
 		cache->evict_candidates = candidates;
-	}
-
-	/*
-	 * Clear anything more than the maximum tracked number of entries (but
-	 * don't clear past the number of candidates for eviction). This sets
-	 * the base of where new entries are added to the array and checking
-	 * against the candidate count avoids operating in the same space as
-	 * threads removing entries from the array.
-	 */
-	base = WT_MAX(cache->evict_candidates, WT_EVICT_WALK_BASE);
-	if (cache->evict_entries > base) {
-		for (i = base, evict = cache->evict_queue + i;
-		    i < cache->evict_entries; i++, evict++)
-			__evict_list_clear(session, evict);
-		cache->evict_entries = base;
 	}
 
 	cache->evict_current = cache->evict_queue;
@@ -1391,17 +1383,9 @@ __evict_get_ref(
 	if (is_server && candidates > 1)
 		candidates /= 2;
 
-	/*
-	 * Get the next page queued for eviction: check both the WT_REF and the
-	 * page's flag: they're not set atomically and the page's flag's atomic
-	 * set is the action used to publish the other structure elements. (To
-	 * be clear, we're not supposed to race, the server adding new elements
-	 * to the array isn't supposed to be operating in the same part of the
-	 * array as the threads removing elements, but paranoia is healthy.)
-	 */
+	/* Get the next page queued for eviction. */
 	while ((evict = cache->evict_current) != NULL &&
-	    evict < cache->evict_queue + candidates && evict->ref != NULL &&
-	    F_ISSET_ATOMIC(evict->ref->page, WT_PAGE_EVICT_LRU)) {
+	    evict < cache->evict_queue + candidates && evict->ref != NULL) {
 		WT_ASSERT(session, evict->btree != NULL);
 
 		/* Move to the next item. */
