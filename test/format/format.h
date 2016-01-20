@@ -122,7 +122,7 @@ typedef struct {
 
 	char *helium_mount;			/* Helium volume */
 
-	char *wiredtiger_open_config;		/* Database open config */
+	char wiredtiger_open_config[8 * 1024];	/* Database open config */
 
 #ifdef HAVE_BERKELEY_DB
 	void *bdb;				/* BDB comparison handle */

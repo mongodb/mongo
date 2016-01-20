@@ -136,12 +136,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 
 	*connp = NULL;
 
-#define	WIREDTIGER_OPEN_CONFIG_LEN	(4 * 1024)
-	if ((g.wiredtiger_open_config =
-	    calloc(WIREDTIGER_OPEN_CONFIG_LEN, sizeof(char))) == NULL)
-		die(ENOMEM, "calloc");
 	config = p = g.wiredtiger_open_config;
-	end = config + WIREDTIGER_OPEN_CONFIG_LEN;
+	end = config + sizeof(g.wiredtiger_open_config);
 
 	p += snprintf(p, REMAIN(p, end),
 	    "create,checkpoint_sync=false,cache_size=%" PRIu32 "MB",
