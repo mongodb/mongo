@@ -237,8 +237,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				continue;
 			}
 			if (STRING_MATCH("throttle", k.str, k.len)) {
-				if ((workp->throttle = v.val) < 0)
-					goto err;
+				workp->throttle = v.val;
 				continue;
 			}
 			if (STRING_MATCH("insert", k.str, k.len) ||
