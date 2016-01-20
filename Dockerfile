@@ -6,8 +6,13 @@ WORKDIR /code
 
 RUN apk add --no-cache curl tar scons g++ openssl-dev
 
-RUN scons all -j$(getconf _NPROCESSORS_ONLN) --disable-warnings-as-errors \
-    && scons --prefix=/opt/mongo install
+RUN scons mongod -j$(getconf _NPROCESSORS_ONLN) --ssl --disable-warnings-as-errors
+RUN scons mongo -j$(getconf _NPROCESSORS_ONLN) --ssl --disable-warnings-as-errors
+RUN scons mongos-j$(getconf _NPROCESSORS_ONLN) --ssl --disable-warnings-as-errors
+RUN scons dbtest -j$(getconf _NPROCESSORS_ONLN) --ssl --disable-warnings-as-errors
+RUN scons unittests -j$(getconf _NPROCESSORS_ONLN) --ssl --disable-warnings-as-errors
+
+RUN scons --prefix=/opt/mongo install
 
 VOLUME /data/db
 
