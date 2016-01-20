@@ -875,9 +875,9 @@ struct DistinctNode : public QuerySolutionNode {
  * Some count queries reduce to counting how many keys are between two entries in a
  * Btree.
  */
-struct CountNode : public QuerySolutionNode {
-    CountNode() {}
-    virtual ~CountNode() {}
+struct CountScanNode : public QuerySolutionNode {
+    CountScanNode() {}
+    virtual ~CountScanNode() {}
 
     virtual StageType getType() const {
         return STAGE_COUNT_SCAN;

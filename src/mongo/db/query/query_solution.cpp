@@ -888,10 +888,10 @@ QuerySolutionNode* DistinctNode::clone() const {
 }
 
 //
-// CountNode
+// CountScanNode
 //
 
-void CountNode::appendToString(mongoutils::str::stream* ss, int indent) const {
+void CountScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "COUNT\n";
     addIndent(ss, indent + 1);
@@ -902,8 +902,8 @@ void CountNode::appendToString(mongoutils::str::stream* ss, int indent) const {
     *ss << "endKey = " << endKey << '\n';
 }
 
-QuerySolutionNode* CountNode::clone() const {
-    CountNode* copy = new CountNode();
+QuerySolutionNode* CountScanNode::clone() const {
+    CountScanNode* copy = new CountScanNode();
     cloneBaseData(copy);
 
     copy->sorts = this->sorts;

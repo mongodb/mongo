@@ -315,12 +315,12 @@ Status prepareExecution(OperationContext* opCtx,
         Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs, &qs);
 
         if (status.isOK()) {
-            verify(StageBuilder::build(opCtx, collection, *canonicalQuery, *qs, ws, rootOut));
             if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) &&
                 turnIxscanIntoCount(qs)) {
-                LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
-                       << ", planSummary: " << Explain::getPlanSummary(*rootOut);
+                LOG(2) << "Using fast count: " << canonicalQuery->toStringShort();
             }
+
+            verify(StageBuilder::build(opCtx, collection, *canonicalQuery, *qs, ws, rootOut));
 
             // Add a CachedPlanStage on top of the previous root.
             //
@@ -1015,14 +1015,14 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     }
 
     // Make the count node that we replace the fetch + ixscan with.
-    CountNode* cn = new CountNode();
-    cn->indexKeyPattern = isn->indexKeyPattern;
-    cn->startKey = startKey;
-    cn->startKeyInclusive = startKeyInclusive;
-    cn->endKey = endKey;
-    cn->endKeyInclusive = endKeyInclusive;
+    CountScanNode* csn = new CountScanNode();
+    csn->indexKeyPattern = isn->indexKeyPattern;
+    csn->startKey = startKey;
+    csn->startKeyInclusive = startKeyInclusive;
+    csn->endKey = endKey;
+    csn->endKeyInclusive = endKeyInclusive;
     // Takes ownership of 'cn' and deletes the old root.
-    soln->root.reset(cn);
+    soln->root.reset(csn);
     return true;
 }
 

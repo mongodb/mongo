@@ -396,13 +396,6 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
             writeConflictsInARow = 0;
 
         if (PlanStage::ADVANCED == code) {
-            // Fast count.
-            if (WorkingSet::INVALID_ID == id) {
-                invariant(NULL == objOut);
-                invariant(NULL == dlOut);
-                return PlanExecutor::ADVANCED;
-            }
-
             WorkingSetMember* member = _workingSet->get(id);
             bool hasRequestedData = true;
 

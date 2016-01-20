@@ -309,7 +309,7 @@ PlanStage* buildStages(OperationContext* txn,
         params.fieldNo = dn->fieldNo;
         return new DistinctScan(txn, params, ws);
     } else if (STAGE_COUNT_SCAN == root->getType()) {
-        const CountNode* cn = static_cast<const CountNode*>(root);
+        const CountScanNode* csn = static_cast<const CountScanNode*>(root);
 
         if (NULL == collection) {
             warning() << "Can't fast-count null namespace (collection null)";
@@ -319,11 +319,11 @@ PlanStage* buildStages(OperationContext* txn,
         CountScanParams params;
 
         params.descriptor =
-            collection->getIndexCatalog()->findIndexByKeyPattern(txn, cn->indexKeyPattern);
-        params.startKey = cn->startKey;
-        params.startKeyInclusive = cn->startKeyInclusive;
-        params.endKey = cn->endKey;
-        params.endKeyInclusive = cn->endKeyInclusive;
+            collection->getIndexCatalog()->findIndexByKeyPattern(txn, csn->indexKeyPattern);
+        params.startKey = csn->startKey;
+        params.startKeyInclusive = csn->startKeyInclusive;
+        params.endKey = csn->endKey;
+        params.endKeyInclusive = csn->endKeyInclusive;
 
         return new CountScan(txn, params, ws);
     } else if (STAGE_ENSURE_SORTED == root->getType()) {
