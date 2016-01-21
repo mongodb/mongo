@@ -57,6 +57,8 @@ static const CONFIG default_cfg = {
 	0,				/* thread error */
 	0,				/* notify threads to stop */
 	0,				/* in warmup phase */
+	NULL,				/* Thread ID of idle cycle thread */
+	0,				/* Signal idle cycle thread */
 	0,				/* total seconds running */
 	0,				/* has truncate */
 	{NULL, NULL},			/* the truncate queue */
@@ -1371,6 +1373,10 @@ execute_populate(CONFIG *cfg)
 	    " populate thread(s) for %" PRIu32 " items",
 	    cfg->populate_threads, cfg->icount);
 
+	/* Start cycling idle tables if configured. */
+	if ((ret = start_idle_table_cycle(cfg)) != 0)
+		return (ret);
+
 	cfg->insert_key = 0;
 
 	cfg->popthreads = dcalloc(cfg->populate_threads, sizeof(CONFIG_THREAD));
@@ -1498,6 +1504,11 @@ execute_populate(CONFIG *cfg)
 		    (uint64_t)(WT_TIMEDIFF_SEC(stop, start)));
 		assert(tables == 0);
 	}
+
+	/* Stop cycling idle tables. */
+	if ((ret = stop_idle_table_cycle(cfg)) != 0)
+		return (ret);
+
 	return (0);
 }
 
@@ -1561,6 +1572,10 @@ execute_workload(CONFIG *cfg)
 	last_ckpts = last_inserts = last_reads = last_truncates = 0;
 	last_updates = 0;
 	ret = 0;
+
+	/* Start cycling idle tables. */
+	if ((ret = start_idle_table_cycle(cfg)) != 0)
+		return (ret);
 
 	if (cfg->warmup != 0)
 		cfg->in_warmup = 1;
@@ -1656,6 +1671,10 @@ execute_workload(CONFIG *cfg)
 
 	/* Notify the worker threads they are done. */
 err:	cfg->stop = 1;
+
+	/* Stop cycling idle tables. */
+	if ((ret = stop_idle_table_cycle(cfg)) != 0)
+		return (ret);
 
 	if ((t_ret = stop_threads(
 	    cfg, (u_int)cfg->workers_cnt, cfg->workers)) != 0 && ret == 0)
