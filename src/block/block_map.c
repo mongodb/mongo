@@ -25,6 +25,9 @@ __wt_block_map(
 	 * The underlying objects are little-endian, mapping objects isn't
 	 * currently supported on big-endian systems.
 	 */
+	WT_UNUSED(session);
+	WT_UNUSED(block);
+	WT_UNUSED(mappingcookie);
 #else
 	/* Map support is configurable. */
 	if (!S2C(session)->mmap)
