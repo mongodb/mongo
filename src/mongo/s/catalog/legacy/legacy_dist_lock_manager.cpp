@@ -49,17 +49,20 @@ const stdx::chrono::seconds kDefaultSocketTimeout(30);
 const milliseconds kDefaultPingInterval(30 * 1000);
 }  // unnamed namespace
 
+bool LegacyDistLockManager::_pingerEnabled = true;
+
 LegacyDistLockManager::LegacyDistLockManager(ConnectionString configServer,
                                              const std::string& processId)
-    : _configServer(std::move(configServer)),
-      _processId(processId),
-      _isStopped(false),
-      _pingerEnabled(true) {}
+    : _configServer(std::move(configServer)), _processId(processId), _isStopped(false) {}
 
 void LegacyDistLockManager::startUp() {
     stdx::lock_guard<stdx::mutex> sl(_mutex);
     invariant(!_pinger);
     _pinger = stdx::make_unique<LegacyDistLockPinger>();
+
+    if (_pingerEnabled) {
+        uassertStatusOK(_pinger->startup(_configServer, _processId, kDefaultPingInterval));
+    }
 }
 
 void LegacyDistLockManager::shutDown(OperationContext* txn, bool allowNetworking) {
@@ -92,13 +95,6 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
 
         if (_isStopped) {
             return Status(ErrorCodes::LockBusy, "legacy distlock manager is stopped");
-        }
-
-        if (_pingerEnabled) {
-            auto pingStatus = _pinger->startPing(*(distLock.get()), kDefaultPingInterval);
-            if (!pingStatus.isOK()) {
-                return pingStatus;
-            }
         }
     }
 
@@ -225,11 +221,6 @@ Status LegacyDistLockManager::checkStatus(OperationContext* txn, const DistLockH
     }
 
     return distLock->checkStatus(durationCount<Seconds>(kDefaultSocketTimeout));
-}
-
-void LegacyDistLockManager::enablePinger(bool enable) {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
-    _pingerEnabled = enable;
 }
 
 void LegacyDistLockManager::unlockAll(OperationContext* txn, const std::string& processID) {

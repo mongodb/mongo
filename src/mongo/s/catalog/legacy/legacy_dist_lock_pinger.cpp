@@ -220,11 +220,10 @@ void LegacyDistLockPinger::distLockPingThread(ConnectionString addr,
     }
 }
 
-Status LegacyDistLockPinger::startPing(const DistributedLock& lock,
-                                       stdx::chrono::milliseconds sleepTime) {
-    const ConnectionString& conn = lock.getRemoteConnection();
-    const string& processId = lock.getProcessId();
-    string pingID = pingThreadId(conn, processId);
+Status LegacyDistLockPinger::startup(const ConnectionString& configServerConnectionString,
+                                     const std::string& processID,
+                                     Milliseconds sleepTime) {
+    string pingID = pingThreadId(configServerConnectionString, processID);
 
     {
         // Make sure we don't start multiple threads for a process id.
@@ -239,22 +238,11 @@ Status LegacyDistLockPinger::startPing(const DistributedLock& lock,
             return Status::OK();
         }
 
-        // Check the config server clock skew.
-        if (lock.isRemoteTimeSkewed()) {
-            return Status(ErrorCodes::DistributedClockSkewed,
-                          str::stream() << "clock skew of the cluster " << conn.toString()
-                                        << " is too far out of bounds "
-                                        << "to allow distributed locking.");
-        }
-    }
-
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
         stdx::thread thread(stdx::bind(&LegacyDistLockPinger::distLockPingThread,
                                        this,
-                                       conn,
+                                       configServerConnectionString,
                                        getJSTimeVirtualThreadSkew(),
-                                       processId,
+                                       processID,
                                        sleepTime));
         _pingThreads.insert(std::make_pair(pingID, std::move(thread)));
 

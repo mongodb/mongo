@@ -50,11 +50,13 @@ public:
     LegacyDistLockPinger() = default;
 
     /**
-     * Starts pinging the process id for the given lock.
-     * Note: this pinger does not support calling startPing on a lock that has previously
-     * been stopped by a call to stopPing on its underlying processId.
+     * Starts the pinger thread for a given processID.
+     * Note: this pinger does not support being started up after it was stopped, either by a call
+     * to stopPing or shutdown.
      */
-    Status startPing(const DistributedLock& lock, Milliseconds sleepTime);
+    Status startup(const ConnectionString& configServerConnectionString,
+                   const std::string& processID,
+                   Milliseconds sleepTime);
 
     /**
      * Adds a distributed lock that has the given id to the unlock list. The unlock list

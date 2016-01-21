@@ -63,8 +63,10 @@ public:
 
     virtual void unlockAll(OperationContext* txn, const std::string& processID) override;
 
-    // For testing only.
-    void enablePinger(bool enable);
+    // For testing only.  Must be called before any calls to startUp().
+    static void disablePinger() {
+        _pingerEnabled = false;
+    }
 
 protected:
     virtual void unlock(OperationContext* txn,
@@ -85,8 +87,6 @@ private:
     std::unique_ptr<LegacyDistLockPinger> _pinger;
 
     bool _isStopped;
-
-    // For testing only.
-    bool _pingerEnabled;
+    static bool _pingerEnabled;
 };
 }
