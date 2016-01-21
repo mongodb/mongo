@@ -64,6 +64,7 @@ selector:
     - jstests/sharding/top_chunk_autosplit.js
     - jstests/sharding/count_config_servers.js
     - jstests/sharding/conf_server_write_concern.js
+    - jstests/sharding/split_large_key.js
     # No retries on direct writes to the config/admin databases on the config servers
     - jstests/sharding/listDatabases.js
     - jstests/sharding/bulk_insert.js
