@@ -4,6 +4,8 @@ ADD . /code
 
 WORKDIR /code
 
+RUN ldd --version || true
+
 RUN apk add --no-cache curl tar scons g++ openssl-dev
 
 RUN scons mongod -j$(getconf _NPROCESSORS_ONLN) --ssl --disable-warnings-as-errors
