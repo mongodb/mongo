@@ -166,19 +166,8 @@ void MongoFile::closeAllFiles(stringstream& message) {
     return total;
 }
 
-void nullFunc() {}
-
-// callback notifications
-void (*MongoFile::notifyPreFlush)() = nullFunc;
-void (*MongoFile::notifyPostFlush)() = nullFunc;
-
 /*static*/ int MongoFile::flushAll(bool sync) {
-    if (sync)
-        notifyPreFlush();
-    int x = _flushAll(sync);
-    if (sync)
-        notifyPostFlush();
-    return x;
+    return _flushAll(sync);
 }
 
 /*static*/ int MongoFile::_flushAll(bool sync) {

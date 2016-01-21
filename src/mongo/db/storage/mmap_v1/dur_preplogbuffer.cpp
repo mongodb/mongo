@@ -175,7 +175,7 @@ static void _PREPLOGBUFFER(JSectHeader& h, AlignedBuilder& bb) {
 
     // Invalidate the total length, we will fill it in later.
     h.setSectionLen(0xffffffff);
-    h.seqNumber = getLastDataFileFlushTime();
+    h.seqNumber = generateNextSeqNumber();
     h.fileId = j.curFileId();
 
     // Ops other than basic writes (DurOp's) go first
