@@ -124,6 +124,11 @@ Status addMongoShellOptions(moe::OptionSection* options) {
                                moe::Switch,
                                "disable the Javascript Just In Time compiler");
 
+    options->addOptionChaining("enableJavaScriptProtection",
+                               "enableJavaScriptProtection",
+                               moe::Switch,
+                               "disable automatic JavaScript function marshalling");
+
     Status ret = Status::OK();
 #ifdef MONGO_CONFIG_SSL
     ret = addSSLClientOptions(options);
@@ -259,6 +264,9 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
     if (params.count("nodb")) {
         shellGlobalParams.nodb = true;
+    }
+    if (params.count("enableJavaScriptProtection")) {
+        shellGlobalParams.javascriptProtection = true;
     }
     if (params.count("norc")) {
         shellGlobalParams.norc = true;

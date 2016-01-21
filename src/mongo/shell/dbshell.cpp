@@ -683,6 +683,7 @@ int _main(int argc, char* argv[], char** envp) {
     mongo::ScriptEngine::setup();
     mongo::globalScriptEngine->setScopeInitCallback(mongo::shell_utils::initScope);
     mongo::globalScriptEngine->enableJIT(!shellGlobalParams.nojit);
+    mongo::globalScriptEngine->enableJavaScriptProtection(shellGlobalParams.javascriptProtection);
 
     auto poolGuard = MakeGuard([] { ScriptEngine::dropScopeCache(); });
 

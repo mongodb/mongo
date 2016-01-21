@@ -34,6 +34,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/mozjs/bindata.h"
 #include "mongo/scripting/mozjs/bson.h"
+#include "mongo/scripting/mozjs/code.h"
 #include "mongo/scripting/mozjs/countdownlatch.h"
 #include "mongo/scripting/mozjs/cursor.h"
 #include "mongo/scripting/mozjs/cursor_handle.h"
@@ -105,6 +106,8 @@ public:
     bool hasOutOfMemoryException() override;
 
     void gc() override;
+
+    bool isJavaScriptProtectionEnabled() const;
 
     double getNumber(const char* field) override;
     int getNumberInt(const char* field) override;
@@ -262,6 +265,12 @@ public:
     }
 
     template <typename T>
+    typename std::enable_if<std::is_same<T, CodeInfo>::value, WrapType<T>&>::type
+    getProto() {
+        return _codeProto;
+    }
+
+    template <typename T>
     typename std::enable_if<std::is_same<T, ObjectInfo>::value, WrapType<T>&>::type getProto() {
         return _objectProto;
     }
@@ -369,6 +378,7 @@ private:
 
     WrapType<BinDataInfo> _binDataProto;
     WrapType<BSONInfo> _bsonProto;
+    WrapType<CodeInfo> _codeProto;
     WrapType<CountDownLatchInfo> _countDownLatchProto;
     WrapType<CursorInfo> _cursorProto;
     WrapType<CursorHandleInfo> _cursorHandleProto;
