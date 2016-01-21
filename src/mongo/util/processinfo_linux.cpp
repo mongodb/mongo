@@ -428,10 +428,12 @@ double ProcessInfo::getSystemMemoryPressurePercentage() {
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
     // [dm] i don't think mallinfo works. (64 bit.)  ??
-    struct mallinfo malloc_info =
-        mallinfo();  // structure has same name as function that returns it. (see malloc.h)
-    info.append("heap_usage_bytes",
-                malloc_info.uordblks /*main arena*/ + malloc_info.hblkhd /*mmap blocks*/);
+    #if defined(__GNU_LIBRARY__) || defined(_WIN32)
+        struct mallinfo malloc_info =
+            mallinfo();  // structure has same name as function that returns it. (see malloc.h)
+        info.append("heap_usage_bytes",
+                    malloc_info.uordblks /*main arena*/ + malloc_info.hblkhd /*mmap blocks*/);
+    #endif
     // docs claim hblkhd is included in uordblks but it isn't
 
     LinuxProc p(_pid);
