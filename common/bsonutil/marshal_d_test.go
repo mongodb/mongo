@@ -102,3 +102,23 @@ func TestFindValueByKey(t *testing.T) {
 		})
 	})
 }
+
+func TestEscapedKey(t *testing.T) {
+	Convey("Given a bson.D document with a key that requires escaping", t, func() {
+		document := bson.D{
+			bson.DocElem{`foo"bar`, "a"},
+		}
+		Convey("it can be marshaled without error", func() {
+			asJSON, err := json.Marshal(MarshalD(document))
+			So(err, ShouldBeNil)
+			Convey("and subsequently unmarshaled without error", func() {
+				var asMap bson.M
+				err := json.Unmarshal(asJSON, &asMap)
+				So(err, ShouldBeNil)
+				Convey("with the original value being correctly found with the unescaped key", func() {
+					So(asMap[`foo"bar`], ShouldEqual, "a")
+				})
+			})
+		})
+	})
+}
