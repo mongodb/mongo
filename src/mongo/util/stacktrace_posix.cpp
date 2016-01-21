@@ -50,6 +50,10 @@
 #include <ucontext.h>
 #endif
 
+#ifndef __ELF_NATIVE_CLASS
+#define __ELF_NATIVE_CLASS 64
+#endif
+
 namespace mongo {
 
 namespace {
