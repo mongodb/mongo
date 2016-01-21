@@ -2200,9 +2200,10 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             // E.g: sum(a, b, sum(c, d), e) => sum(a, b, c, d, e)
             ExpressionNary* nary = dynamic_cast<ExpressionNary*>(operand.get());
             if (nary && str::equals(nary->getOpName(), getOpName()) && nary->isAssociative()) {
-                vpOperand.erase(vpOperand.begin() + i);
+                invariant(!nary->vpOperand.empty());
+                vpOperand[i] = std::move(nary->vpOperand[0]);
                 vpOperand.insert(
-                    vpOperand.begin() + i, nary->vpOperand.begin(), nary->vpOperand.end());
+                    vpOperand.begin() + i + 1, nary->vpOperand.begin() + 1, nary->vpOperand.end());
                 continue;
             }
 
@@ -2229,6 +2230,7 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             optimizedOperands.push_back(operand);
             ++i;
         }
+
         if (constExpressions.size() > 1) {
             vpOperand = std::move(constExpressions);
             Variables emptyVars;
