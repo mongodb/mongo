@@ -53,6 +53,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/dur.h"
+#include "mongo/db/dur_journal.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
@@ -549,7 +550,9 @@ namespace mongo {
                 }
 
                 Date_t start = jsTime();
+                dur::notifyPreDataFileFlush();
                 int numFiles = MemoryMappedFile::flushAll( true );
+                dur::notifyPostDataFileFlush();
                 time_flushing = (int) (jsTime() - start);
 
                 _flushed(time_flushing);

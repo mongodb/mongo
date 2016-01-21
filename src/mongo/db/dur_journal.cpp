@@ -187,9 +187,10 @@ namespace mongo {
             _nextFileNumber = 0;
             _curLogFile = 0;
             _curFileId = 0;
-            _preFlushTime = 0;
-            _lastFlushTime = 0;
-            _writeToLSNNeeded = false;
+            _lastSeqNumberWrittenToSharedView.store(0);
+            _preFlushTime.store(0);
+            _lastFlushTime.store(0);
+            _writeToLSNNeeded.store(false);
         }
 
         boost::filesystem::path Journal::getFilePathFor(int filenumber) const {
@@ -545,12 +546,9 @@ namespace mongo {
 
         void Journal::init() {
             verify( _curLogFile == 0 );
-            MongoFile::notifyPreFlush = preFlush;
-            MongoFile::notifyPostFlush = postFlush;
         }
 
         void Journal::open() {
-            verify( MongoFile::notifyPreFlush == preFlush );
             SimpleMutex::scoped_lock lk(_curLogFileMutex);
             _open();
         }
@@ -603,48 +601,78 @@ namespace mongo {
             return 0;
         }
 
-        unsigned long long getLastDataFileFlushTime() {
-            return j.lastFlushTime();
-        }
-
         /** remember "last sequence number" to speed recoveries
             concurrency: called by durThread only.
         */
-        void Journal::updateLSNFile() {
+        void Journal::updateLSNFile(unsigned long long lsnOfCurrentJournalEntry) {
             RACECHECK
-            if( !_writeToLSNNeeded )
+            if (!_writeToLSNNeeded.load())
                 return;
-            _writeToLSNNeeded = false;
+            _writeToLSNNeeded.store(false);
             try {
+                // Don't read from _lastFlushTime again in this function since it may change.
+                const uint64_t copyOfLastFlushTime = _lastFlushTime.load();
+
+                // Only write an LSN that is older than the journal entry we are in the middle of writing.
+                // If this trips, it means that _lastFlushTime got ahead of what is actually in the data
+                // files because lsnOfCurrentJournalEntry includes data that hasn't yet been written to the
+                // data files.
+                if (copyOfLastFlushTime >= lsnOfCurrentJournalEntry) {
+                    severe() << "Attempting to update LSNFile to " << copyOfLastFlushTime
+                             << " which is not older than the current journal sequence number "
+                             << lsnOfCurrentJournalEntry;
+                    fassertFailed(34370);
+                }
+
                 // os can flush as it likes.  if it flushes slowly, we will just do extra work on recovery.
                 // however, given we actually close the file, that seems unlikely.
                 File f;
                 f.open(lsnPath().string().c_str());
-                if( !f.is_open() ) { 
+                if (!f.is_open()) {
                     // can get 0 if an i/o error
                     log() << "warning: open of lsn file failed" << endl;
                     return;
                 }
-                LOG(1) << "lsn set " << _lastFlushTime << endl;
+                LOG(1) << "lsn set " << copyOfLastFlushTime << endl;
                 LSNFile lsnf;
-                lsnf.set(_lastFlushTime);
+                lsnf.set(copyOfLastFlushTime);
                 f.write(0, (char*)&lsnf, sizeof(lsnf));
                 // do we want to fsync here? if we do it probably needs to be async so the durthread
                 // is not delayed.
-            }
-            catch(std::exception& e) {
+            } catch (std::exception& e) {
                 log() << "warning: write to lsn file failed " << e.what() << endl;
                 // keep running (ignore the error). recovery will be slow.
             }
         }
 
-        void Journal::preFlush() {
-            j._preFlushTime = Listener::getElapsedTimeMillis();
+        namespace {
+            SimpleMutex lastGeneratedSeqNumberMutex("lastGeneratedSeqNumberMutex");
+            uint64_t lastGeneratedSeqNumber = 0;
         }
 
-        void Journal::postFlush() {
-            j._lastFlushTime = j._preFlushTime;
-            j._writeToLSNNeeded = true;
+        uint64_t generateNextSeqNumber() {
+            const uint64_t now = Listener::getElapsedTimeMillis();
+            SimpleMutex::scoped_lock lock(lastGeneratedSeqNumberMutex);
+            if (now > lastGeneratedSeqNumber) {
+                lastGeneratedSeqNumber = now;
+            } else {
+                // Make sure we return unique monotonically increasing numbers.
+                lastGeneratedSeqNumber++;
+            }
+            return lastGeneratedSeqNumber;
+        }
+
+        void setLastSeqNumberWrittenToSharedView(uint64_t seqNumber) {
+            j._lastSeqNumberWrittenToSharedView.store(seqNumber);
+        }
+
+        void notifyPreDataFileFlush() {
+            j._preFlushTime.store(j._lastSeqNumberWrittenToSharedView.load());
+        }
+
+        void notifyPostDataFileFlush() {
+            j._lastFlushTime.store(j._preFlushTime.load());
+            j._writeToLSNNeeded.store(true);
         }
 
         // call from within _curLogFileMutex
@@ -654,7 +682,7 @@ namespace mongo {
 
             JFile jf;
             jf.filename = _curLogFile->_name;
-            jf.lastEventTimeMs = Listener::getElapsedTimeMillis();
+            jf.lastEventTimeMs = generateNextSeqNumber();
             _oldJournalFiles.push_back(jf);
 
             delete _curLogFile; // close
@@ -669,11 +697,11 @@ namespace mongo {
             while( !_oldJournalFiles.empty() ) {
                 JFile f = _oldJournalFiles.front();
 
-                    // 'f.lastEventTimeMs' is the timestamp of the last thing in the journal file.
-                    // '_lastFlushTime' is the start time of the last successful flush of the data
-                    // files to disk. We can't delete this journal file until the last successful
-                    // flush time is at least 10 seconds after 'f.lastEventTimeMs'.
-                    if (f.lastEventTimeMs + ExtraKeepTimeMs < _lastFlushTime) {
+                // 'f.lastEventTimeMs' is the timestamp of the last thing in the journal file.
+                // '_lastFlushTime' is the start time of the last successful flush of the data
+                // files to disk. We can't delete this journal file until the last successful
+                // flush time is at least 10 seconds after 'f.lastEventTimeMs'.
+                if (f.lastEventTimeMs + ExtraKeepTimeMs < _lastFlushTime.load()) {
                     // eligible for deletion
                     boost::filesystem::path p( f.filename );
                     log() << "old journal file will be removed: " << f.filename << endl;
@@ -687,7 +715,7 @@ namespace mongo {
             }
         }
 
-        void Journal::_rotate() {
+        void Journal::_rotate(unsigned long long lsnOfCurrentJournalEntry) {
 
             RACECHECK;
 
@@ -696,7 +724,7 @@ namespace mongo {
             if ( inShutdown() || !_curLogFile )
                 return;
 
-            j.updateLSNFile();
+            j.updateLSNFile(lsnOfCurrentJournalEntry);
 
             if( _curLogFile && _written < DataLimitPerJournalFile )
                 return;
@@ -785,7 +813,7 @@ namespace mongo {
                 verify( w <= L );
                 stats.curr->_journaledBytes += L;
                 _curLogFile->synchronousAppend((const void *) b.buf(), L);
-                _rotate();
+                _rotate(h.seqNumber);
             }
             catch(std::exception& e) {
                 log() << "error exception in dur::journal " << e.what() << endl;

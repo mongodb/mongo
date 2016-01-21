@@ -31,6 +31,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/dur_commitjob.h"
+#include "mongo/db/dur_journal.h"
 #include "mongo/db/dur_recover.h"
 #include "mongo/db/dur_stats.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -100,6 +101,7 @@ namespace mongo {
             WRITETODATAFILES_Impl1(h, uncompressed);
             unsigned long long m = t.micros();
             stats.curr->_writeToDataFilesMicros += m;
+            setLastSeqNumberWrittenToSharedView(h.seqNumber);
             LOG(2) << "journal WRITETODATAFILES " << m / 1000.0 << "ms" << endl;
         }
 

@@ -168,7 +168,7 @@ namespace mongo {
             bb.reset();
 
             h.setSectionLen(0xffffffff);  // total length, will fill in later
-            h.seqNumber = getLastDataFileFlushTime();
+            h.seqNumber = generateNextSeqNumber();
             h.fileId = j.curFileId();
         }
 

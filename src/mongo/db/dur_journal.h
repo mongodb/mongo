@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <mongo/platform/cstdint.h>
+
 namespace mongo {
     class AlignedBuilder;
 
@@ -49,12 +51,17 @@ namespace mongo {
         /** assure journal/ dir exists. throws */
         void journalMakeDir();
 
-        /** check if time to rotate files; assure a file is open.
-             done separately from the journal() call as we can do this part
-             outside of lock.
-            only called by durThread.
+        /**
+         * Generates the next sequence number for use in the journal, guaranteed to be greater than all
+         * prior sequence numbers.
          */
-        void journalRotate();
+        uint64_t generateNextSeqNumber();
+
+        /**
+         * Informs the journaling system that all writes on or before the passed in sequence number have
+         * been written to the data files' shared mmap view.
+         */
+        void setLastSeqNumberWrittenToSharedView(uint64_t seqNumber);
 
         /** flag that something has gone wrong during writing to the journal
             (not for recovery mode)
@@ -63,8 +70,6 @@ namespace mongo {
 
         /** read lsn from disk from the last run before doing recovery */
         unsigned long long journalReadLSN();
-
-        unsigned long long getLastDataFileFlushTime();
 
         /** never throws.
             @param anyFiles by default we only look at j._* files. If anyFiles is true, return true
@@ -79,5 +84,11 @@ namespace mongo {
 
         const unsigned JournalCommitIntervalDefault = 100;
 
+        /**
+         * Call these before (pre) and after (post) the datafiles are flushed to disk by the DataFileSync
+         * thread. These should not be called for any other flushes.
+         */
+        void notifyPreDataFileFlush();
+        void notifyPostDataFileFlush();
     }
 }

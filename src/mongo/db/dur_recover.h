@@ -57,7 +57,11 @@ namespace mongo {
             } last;        
         public:
             RecoveryJob() : _lastDataSyncedFromLastRun(0), 
-                _mx("recovery"), _recovering(false) { _lastSeqMentionedInConsoleLog = 1; }
+                _lastSeqSkipped(0),
+                _appliedAnySections(false),
+                _mx("recovery"),
+                _recovering(false) {}
+
             void go(vector<boost::filesystem::path>& files);
             ~RecoveryJob();
 
@@ -79,7 +83,8 @@ namespace mongo {
             list<boost::shared_ptr<DurableMappedFile> > _mmfs;
 
             unsigned long long _lastDataSyncedFromLastRun;
-            unsigned long long _lastSeqMentionedInConsoleLog;
+            unsigned long long _lastSeqSkipped;
+            bool _appliedAnySections;
         public:
             mongo::mutex _mx; // protects _mmfs
         private:
