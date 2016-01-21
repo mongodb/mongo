@@ -148,7 +148,7 @@ TEST(ChunkType, Pre22Format) {
     ASSERT_EQUALS(chunk.getNS(), "test.mycol");
     ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
     ASSERT_EQUALS(chunk.getMax(), BSON("a" << 20));
-    ASSERT_EQUALS(chunk.getVersion().toLong(), 1);
+    ASSERT_EQUALS(chunk.getVersion().toLong(), 1ULL);
     ASSERT(!chunk.getVersion().epoch().isSet());
     ASSERT_EQUALS(chunk.getShard(), "shard0001");
 }
