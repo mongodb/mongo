@@ -64,7 +64,7 @@ functions:
           # create all resources and instances
           ./setup-cluster.sh
           echo "EC2 Cluster CREATED."
-          tar -czvf cluster_config.tgz ips.sh terraform.tfstate.backup terraform.tfstate
+          tar -czvf cluster_config.tgz ips.sh terraform.tfstate.backup terraform.tfstate cluster.tf terraform.tfvars variables.tf
     - command: s3.put
       params:
         aws_key: ${aws_key}
