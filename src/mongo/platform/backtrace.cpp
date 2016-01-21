@@ -16,6 +16,10 @@
 #if !defined(_WIN32)
 #if defined(__sunos__) || !defined(MONGO_HAVE_EXECINFO_BACKTRACE)
 
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+
 #include "mongo/platform/backtrace.h"
 
 #include <boost/smart_ptr/scoped_array.hpp>
@@ -30,6 +34,8 @@
 
 using std::string;
 using std::vector;
+
+typedef Dl_info Dl_info_t;
 
 namespace mongo {
 namespace pal {
