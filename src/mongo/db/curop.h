@@ -64,7 +64,6 @@ public:
     enum { TOO_BIG_SENTINEL = 1 };
 
     CachedBSONObj() {
-        _size = (int*)_buf;
         reset();
     }
 
@@ -85,7 +84,7 @@ public:
     }
 
     int size() const {
-        return *_size;
+        return ConstDataView(_buf).read<LittleEndian<int>>();
     }
     bool have() const {
         return size() > 0;
@@ -118,11 +117,10 @@ private:
 
     /** you have to be locked when you call this */
     void _reset(int sz) {
-        _size[0] = sz;
+        DataView(_buf).write<LittleEndian<int>>(sz);
     }
 
     mutable SpinLock _lock;
-    int* _size;
     char _buf[BUFFER_SIZE];
 };
 
