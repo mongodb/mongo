@@ -1605,6 +1605,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "mutex",		WT_VERB_MUTEX },
 		{ "overflow",		WT_VERB_OVERFLOW },
 		{ "read",		WT_VERB_READ },
+		{ "rebalance",		WT_VERB_REBALANCE },
 		{ "reconcile",		WT_VERB_RECONCILE },
 		{ "recovery",		WT_VERB_RECOVERY },
 		{ "salvage",		WT_VERB_SALVAGE },
@@ -1749,7 +1750,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Flush the handle and rename the file into place. */
-	ret = __wt_sync_and_rename_fp(
+	ret = __wt_sync_fp_and_rename(
 	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG);
 
 	if (0) {

@@ -255,6 +255,7 @@ RNG
 RPC
 RUNDIR
 Radu
+Rebalance
 RedHat
 Redistributions
 Resize
@@ -548,6 +549,7 @@ dsrc
 dst
 dstlen
 dstrdup
+dstrndup
 dsync
 dumpcmp
 dumpfile
@@ -871,6 +873,8 @@ readlock
 readonly
 readunlock
 realloc
+rebalance
+rebalanced
 rebalancing
 recno
 recnos

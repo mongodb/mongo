@@ -31,13 +31,12 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage)
 			return (WT_NOTFOUND);
 
 	/*
-	 * This code looks different from the cursor-previous code.  The append
-	 * list appears on the last page of the tree, but it may be preceded by
-	 * other rows, which means the cursor's recno will be set to a value and
-	 * we simply want to increment it.  If the cursor's recno is NOT set,
-	 * we're starting our iteration in a tree that has only appended items.
-	 * In that case, recno will be 0 and happily enough the increment will
-	 * set it to 1, which is correct.
+	 * This code looks different from the cursor-previous code. The append
+	 * list may be preceded by other rows, which means the cursor's recno
+	 * will be set to a value and we simply want to increment it. If the
+	 * cursor's recno is NOT set, we're starting an iteration in a tree with
+	 * only appended items. In that case, recno will be 0 and happily enough
+	 * the increment will set it to 1, which is correct.
 	 */
 	__cursor_set_recno(cbt, cbt->recno + 1);
 
@@ -428,18 +427,14 @@ __cursor_key_order_check_row(
 		    cbt->lastkey, cbt->iface.key.data, cbt->iface.key.size));
 
 	WT_ERR(__wt_scr_alloc(session, 512, &a));
-	WT_ERR(__wt_buf_set_printable(
-	    session, a, cbt->lastkey->data, cbt->lastkey->size));
-
 	WT_ERR(__wt_scr_alloc(session, 512, &b));
-	WT_ERR(__wt_buf_set_printable(session, b, key->data, key->size));
 
 	WT_PANIC_ERR(session, EINVAL,
-	    "WT_CURSOR.%s out-of-order returns: returned key %.*s then "
-	    "key %.*s",
+	    "WT_CURSOR.%s out-of-order returns: returned key %s then key %s",
 	    next ? "next" : "prev",
-	    (int)a->size, (const char *)a->data,
-	    (int)b->size, (const char *)b->data);
+	    __wt_buf_set_printable(
+	    session, cbt->lastkey->data, cbt->lastkey->size, a),
+	    __wt_buf_set_printable(session, key->data, key->size, b));
 
 err:	__wt_scr_free(session, &a);
 	__wt_scr_free(session, &b);
@@ -610,7 +605,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 	 */
 	for (newpage = false;; newpage = true) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
-		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
 
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
 			switch (page->type) {
@@ -644,9 +638,9 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 				break;
 
 			/*
-			 * The last page in a column-store has appended entries.
-			 * We handle it separately from the usual cursor code:
-			 * it's only that one page and it's in a simple format.
+			 * Column-store pages may have appended entries. Handle
+			 * it separately from the usual cursor code, it's in a
+			 * simple format.
 			 */
 			if (page->type != WT_PAGE_ROW_LEAF &&
 			    (cbt->ins_head = WT_COL_APPEND(page)) != NULL) {

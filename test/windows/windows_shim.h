@@ -70,11 +70,6 @@ struct timeval {
 int gettimeofday(struct timeval* tp, void* tzp);
 
 /*
- * Emulate <sched.h>
- */
-int sched_yield(void);
-
-/*
  * Emulate <unistd.h>
  */
 typedef uint32_t useconds_t;

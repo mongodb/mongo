@@ -176,6 +176,14 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		if (force && (bm == NULL || !bm->is_mapped(bm, session))) {
 			F_SET(session->dhandle, WT_DHANDLE_DEAD);
+
+			/*
+			 * Reset the tree's eviction priority, and the tree is
+			 * evictable by definition.
+			 */
+			__wt_evict_priority_clear(session);
+			F_CLR(S2BT(session), WT_BTREE_NO_EVICTION);
+
 			marked_dead = true;
 		}
 		if (!marked_dead || final)

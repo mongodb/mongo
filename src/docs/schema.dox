@@ -89,6 +89,10 @@ struct module to describe the types of columns in a table:
 The \c 'r' type is used for record number keys in column stores.  It is
 otherwise identical to the \c 'Q' type.
 
+The \c 's' type is used for fixed-length strings.  If it is preceded by
+a size, that indicates the number of bytes to store; the default is a
+length of 1 byte.
+
 The \c 'S' type is encoded as a C language string terminated by a
 NUL character.
 @m_if{java}

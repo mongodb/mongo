@@ -47,7 +47,7 @@ __wt_log_flush_lsn(WT_SESSION_IMPL *session, WT_LSN *lsn, bool start)
 	conn = S2C(session);
 	log = conn->log;
 	WT_RET(__wt_log_force_write(session, 1));
-	WT_RET(__wt_log_wrlsn(session));
+	WT_RET(__wt_log_wrlsn(session, NULL));
 	if (start)
 		*lsn = log->write_start_lsn;
 	else
@@ -775,7 +775,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	while (log->log_close_fh != NULL) {
 		WT_STAT_FAST_CONN_INCR(session, log_close_yields);
-		WT_RET(__wt_log_wrlsn(session));
+		WT_RET(__wt_log_wrlsn(session, NULL));
 		if (++yield_cnt > 10000)
 			return (EBUSY);
 		__wt_yield();
@@ -1976,6 +1976,14 @@ err:
 	    myslot.slot != NULL)
 		ret = myslot.slot->slot_error;
 
+	/*
+	 * If one of the sync flags is set, assert the proper LSN has moved to
+	 * match.
+	 */
+	WT_ASSERT(session, !LF_ISSET(WT_LOG_FLUSH) ||
+	    __wt_log_cmp(&log->write_lsn, &lsn) >= 0);
+	WT_ASSERT(session,
+	    !LF_ISSET(WT_LOG_FSYNC) || __wt_log_cmp(&log->sync_lsn, &lsn) >= 0);
 	return (ret);
 }
 

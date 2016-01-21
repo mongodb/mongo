@@ -673,6 +673,10 @@ session_ops(WT_SESSION *session)
 	ret = session->compact(session, "table:mytable", NULL);
 	/*! [Compact a table] */
 
+	/*! [Rebalance a table] */
+	ret = session->rebalance(session, "table:mytable", NULL);
+	/*! [Rebalance a table] */
+
 	/*! [Rename a table] */
 	ret = session->rename(session, "table:old", "table:new", NULL);
 	/*! [Rename a table] */

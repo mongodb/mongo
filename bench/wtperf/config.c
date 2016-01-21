@@ -237,8 +237,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				continue;
 			}
 			if (STRING_MATCH("throttle", k.str, k.len)) {
-				if ((workp->throttle = v.val) < 0)
-					goto err;
+				workp->throttle = (uint64_t)v.val;
 				continue;
 			}
 			if (STRING_MATCH("insert", k.str, k.len) ||
@@ -442,7 +441,11 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		}
 		strp = (char **)valueloc;
 		free(*strp);
-		newstr = dstrdup(v->str);
+		/*
+		 * We duplicate the string to len rather than len+1 as we want
+		 * to truncate the trailing quotation mark.
+		 */
+		newstr = dstrndup(v->str,  v->len);
 		*strp = newstr;
 		break;
 	}
