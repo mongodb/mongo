@@ -741,6 +741,12 @@ __log_server(void *arg)
 			 * Perform log pre-allocation.
 			 */
 			if (conn->log_prealloc > 0) {
+				/*
+				 * Log file pre-allocation is disabled when a
+				 * hot backup cursor is open because we have
+				 * agreed not to rename or remove any files in
+				 * the database directory.
+				 */
 				WT_ERR(__wt_readlock(
 				    session, conn->hot_backup_lock));
 				locked = true;
