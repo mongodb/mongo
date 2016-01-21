@@ -95,7 +95,8 @@ private:
     bool _recovering;
 
     unsigned long long _lastDataSyncedFromLastRun;
-    unsigned long long _lastSeqMentionedInConsoleLog;
+    unsigned long long _lastSeqSkipped;
+    bool _appliedAnySections;
 
 
     static RecoveryJob& _instance;

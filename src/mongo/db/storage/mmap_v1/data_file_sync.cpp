@@ -35,6 +35,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/exit.h"
@@ -80,7 +81,9 @@ void DataFileSync::run() {
 
         Date_t start = jsTime();
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        dur::notifyPreDataFileFlush();
         int numFiles = storageEngine->flushAllFiles(true);
+        dur::notifyPostDataFileFlush();
         time_flushing = (int)(jsTime() - start);
 
         _flushed(time_flushing);
