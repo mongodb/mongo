@@ -206,7 +206,6 @@ Status CatalogManagerLegacy::init(const ConnectionString& configDBCS,
 
     _distLockManager =
         stdx::make_unique<LegacyDistLockManager>(_configServerConnectionString, distLockProcessId);
-    _distLockManager->startUp();
 
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -223,17 +222,14 @@ Status CatalogManagerLegacy::startup(OperationContext* txn, bool allowNetworking
         return Status::OK();
     }
 
-    if (!allowNetworking) {
-        // Config servers shouldn't call dbHash on themselves and shards don't need to
-        // run the checker.
-        _started = true;
-        return Status::OK();
+    if (allowNetworking) {
+        Status status = _startConfigServerChecker();
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
-    Status status = _startConfigServerChecker();
-    if (!status.isOK()) {
-        return status;
-    }
+    _distLockManager->startUp();
 
     _started = true;
     return Status::OK();
