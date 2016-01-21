@@ -678,7 +678,8 @@ __log_wrlsn_server(void *arg)
 		if (yield++ < WT_THOUSAND)
 			__wt_yield();
 		else
-			WT_ERR(__wt_cond_wait(session, conn->log_wrlsn_cond, 10000));
+			WT_ERR(__wt_cond_wait(
+			    session, conn->log_wrlsn_cond, 10000));
 	}
 	/*
 	 * On close we need to do this one more time because there could
