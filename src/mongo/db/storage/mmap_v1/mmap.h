@@ -129,10 +129,6 @@ public:
      */
     static std::set<MongoFile*>& getAllFiles();
 
-    // callbacks if you need them
-    static void (*notifyPreFlush)();
-    static void (*notifyPostFlush)();
-
     static int flushAll(bool sync);  // returns n flushed
     static long long totalMappedLength();
     static void closeAllFiles(std::stringstream& message);

@@ -30,8 +30,13 @@
 
 #pragma once
 
+#include <boost/filesystem/path.hpp>
+
+#include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/db/storage/mmap_v1/logfile.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 namespace dur {
@@ -59,9 +64,6 @@ public:
 
     boost::filesystem::path getFilePathFor(int filenumber) const;
 
-    unsigned long long lastFlushTime() const {
-        return _lastFlushTime;
-    }
     void cleanup(bool log);  // closes and removes journal files
 
     unsigned long long curFileId() const {
@@ -81,14 +83,14 @@ private:
     /** check if time to rotate files.  assure a file is open.
      *  internally called with every commit
      */
-    void _rotate();
+    void _rotate(unsigned long long lsnOfCurrentJournalEntry);
 
     void _open();
     void closeCurrentJournalFile();
     void removeUnneededJournalFiles();
 
-    unsigned long long _written;  // bytes written so far to the current journal (log) file
-    unsigned _nextFileNumber;
+    unsigned long long _written = 0;  // bytes written so far to the current journal (log) file
+    unsigned _nextFileNumber = 0;
 
     SimpleMutex _curLogFileMutex;
 
@@ -105,13 +107,17 @@ private:
     std::list<JFile> _oldJournalFiles;  // use _curLogFileMutex
 
     // lsn related
-    static void preFlush();
-    static void postFlush();
-    unsigned long long _preFlushTime;
-    // data < this time is fsynced in the datafiles (unless hard drive controller is caching)
-    unsigned long long _lastFlushTime;
-    bool _writeToLSNNeeded;
-    void updateLSNFile();
+    friend void setLastSeqNumberWrittenToSharedView(uint64_t seqNumber);
+    friend void notifyPreDataFileFlush();
+    friend void notifyPostDataFileFlush();
+    void updateLSNFile(unsigned long long lsnOfCurrentJournalEntry);
+    // data <= this time is in the shared view
+    AtomicUInt64 _lastSeqNumberWrittenToSharedView;
+    // data <= this time was in the shared view when the last flush to start started
+    AtomicUInt64 _preFlushTime;
+    // data <= this time is fsynced in the datafiles (unless hard drive controller is caching)
+    AtomicUInt64 _lastFlushTime;
+    AtomicWord<bool> _writeToLSNNeeded;
 };
 }
 }

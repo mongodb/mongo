@@ -253,7 +253,10 @@ static string fileName(const char* dbName, int fileNo) {
 
 
 RecoveryJob::RecoveryJob()
-    : _recovering(false), _lastDataSyncedFromLastRun(0), _lastSeqMentionedInConsoleLog(1) {}
+    : _recovering(false),
+      _lastDataSyncedFromLastRun(0),
+      _lastSeqSkipped(0),
+      _appliedAnySections(false) {}
 
 RecoveryJob::~RecoveryJob() {
     DESTRUCTOR_GUARD(if (!_mmfs.empty()) {} close();)
@@ -382,27 +385,46 @@ void RecoveryJob::processSection(const JSectHeader* h,
     LockMongoFilesShared lkFiles;  // for RecoveryJob::Last
     stdx::lock_guard<stdx::mutex> lk(_mx);
 
-    // Check the footer checksum before doing anything else.
     if (_recovering) {
+        // Check the footer checksum before doing anything else.
         verify(((const char*)h) + sizeof(JSectHeader) == p);
         if (!f->checkHash(h, len + sizeof(JSectHeader))) {
             log() << "journal section checksum doesn't match";
             throw JournalSectionCorruptException();
         }
-    }
 
-    if (_recovering && _lastDataSyncedFromLastRun > h->seqNumber + ExtraKeepTimeMs) {
-        if (h->seqNumber != _lastSeqMentionedInConsoleLog) {
-            static int n;
-            if (++n < 10) {
+        static uint64_t numJournalSegmentsSkipped = 0;
+        static const uint64_t kMaxSkippedSectionsToLog = 10;
+        if (_lastDataSyncedFromLastRun > h->seqNumber + ExtraKeepTimeMs) {
+            if (_appliedAnySections) {
+                severe() << "Journal section sequence number " << h->seqNumber
+                         << " is lower than the threshold for applying ("
+                         << h->seqNumber + ExtraKeepTimeMs
+                         << ") but we have already applied some journal sections. This implies a "
+                         << "corrupt journal file.";
+                fassertFailed(34369);
+            }
+
+            if (++numJournalSegmentsSkipped < kMaxSkippedSectionsToLog) {
                 log() << "recover skipping application of section seq:" << h->seqNumber
                       << " < lsn:" << _lastDataSyncedFromLastRun << endl;
-            } else if (n == 10) {
+            } else if (numJournalSegmentsSkipped == kMaxSkippedSectionsToLog) {
                 log() << "recover skipping application of section more..." << endl;
             }
-            _lastSeqMentionedInConsoleLog = h->seqNumber;
+            _lastSeqSkipped = h->seqNumber;
+            return;
         }
-        return;
+
+        if (!_appliedAnySections) {
+            _appliedAnySections = true;
+            if (numJournalSegmentsSkipped >= kMaxSkippedSectionsToLog) {
+                // Log the last skipped section's sequence number if it hasn't been logged before.
+                log() << "recover final skipped journal section had sequence number "
+                      << _lastSeqSkipped;
+            }
+            log() << "recover applying initial journal section with sequence number "
+                  << h->seqNumber;
+        }
     }
 
     unique_ptr<JournalSectionIterator> i;
@@ -549,6 +571,12 @@ void RecoveryJob::go(vector<boost::filesystem::path>& files) {
             close();
             uasserted(13535, "recover abrupt journal file end");
         }
+    }
+
+    if (_lastSeqSkipped && !_appliedAnySections) {
+        log() << "recover journal replay completed without applying any sections. "
+              << "This can happen if there were no writes after the last fsync of the data files. "
+              << "Last skipped sections had sequence number " << _lastSeqSkipped;
     }
 
     close();

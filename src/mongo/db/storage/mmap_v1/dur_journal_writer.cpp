@@ -64,6 +64,8 @@ void WRITETODATAFILES(const JSectHeader& h, const AlignedBuilder& uncompressed) 
     const long long m = t.micros();
     stats.curr()->_writeToDataFilesMicros += m;
 
+    setLastSeqNumberWrittenToSharedView(h.seqNumber);
+
     LOG(4) << "journal WRITETODATAFILES " << m / 1000.0 << "ms";
 }
 
