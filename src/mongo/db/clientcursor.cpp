@@ -160,7 +160,7 @@ namespace mongo {
     void yieldOrSleepFor1Microsecond() {
 #ifdef _WIN32
         SwitchToThread();
-#elif defined(__linux__)
+#elif defined(__GNU_LIBRARY__)
         pthread_yield();
 #else
         sleepmicros(1);
