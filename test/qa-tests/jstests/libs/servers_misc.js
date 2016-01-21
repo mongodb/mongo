@@ -107,7 +107,7 @@ ToolTest.prototype.runTool = function(){
     var a = [ "mongo" + arguments[0] ];
 
     var hasdbpath = false;
-    
+
     for ( var i=1; i<arguments.length; i++ ){
         a.push( arguments[i] );
         if ( arguments[i] == "--dbpath" )
@@ -154,7 +154,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
 
     if ( ! extra.oplogSize )
         extra.oplogSize = "40";
-        
+
     var a = []
     if ( putBinaryFirst )
         a.push( "mongod" )
@@ -165,7 +165,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
 
     a.push( "--dbpath" );
     a.push( this.getPath( master ) );
-    
+
     if( jsTestOptions().noJournal ) a.push( "--nojournal" )
     if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
     if( jsTestOptions().keyFile ) {
@@ -174,21 +174,21 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     }
 
     if( jsTestOptions().useSSL ) {
-        if (!a.contains("--sslMode")) {
+        if (!Array.contains(a, "--sslMode")) {
             a.push( "--sslMode" )
             a.push( "requireSSL" )
         }
-        if (!a.contains("--sslPEMKeyFile")) {
+        if (!Array.contains(a, "--sslPEMKeyFile")) {
             a.push( "--sslPEMKeyFile" )
             a.push( "jstests/libs/server.pem" )
         }
-        if (!a.contains("--sslCAFile")) {
+        if (!Array.contains(a, "--sslCAFile")) {
             a.push( "--sslCAFile" )
             a.push( "jstests/libs/ca.pem" )
         }
         a.push( "--sslWeakCertificateValidation" )
     }
-    if( jsTestOptions().useX509 && !a.contains("--clusterAuthMode")) {
+    if( jsTestOptions().useX509 && !Array.contains(a, "--clusterAuthMode")) {
         a.push( "--clusterAuthMode" )
         a.push( "x509" )
     }
@@ -203,13 +203,13 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
             a.push( "127.0.0.1:" + this.ports[0] );
         }
     }
-    
+
     for ( var k in extra ){
         var v = extra[k];
         if( k in MongoRunner.logicalOptions ) continue
         a.push( "--" + k );
         if ( v != null && v !== "")
-            a.push( v );                    
+            a.push( v );
     }
 
     return a;
@@ -271,11 +271,11 @@ if(typeof allocatePort == 'function'){
 SyncCCTest = function( testName , extraMongodOptions ){
     this._testName = testName;
     this._connections = [];
-    
+
     for ( var i=0; i<3; i++ ){
         this._connections.push( startMongodTest( 30000 + i , testName + i , false, extraMongodOptions ) );
     }
-    
+
     this.url = this._connections.map( function(z){ return z.name; } ).join( "," );
     this.conn = new Mongo( this.url );
 }
@@ -319,14 +319,14 @@ function startParallelShell( jsCode, port, noConnect ){
     // Convert function into call-string
     if (typeof(jsCode) == "function") {
         var id = Math.floor(Math.random() * 100000);
-        jsCode = "var f" + id + " = " + jsCode.toString() + ";f" + id + "();"; 
+        jsCode = "var f" + id + " = " + jsCode.toString() + ";f" + id + "();";
     }
     else if(typeof(jsCode) == "string") {}
         // do nothing
     else {
         throw Error("bad first argument to startParallelShell");
     }
-    
+
     if (noConnect) {
         args.push("--nodb");
     } else if (typeof(db) == "object") {
