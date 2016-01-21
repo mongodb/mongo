@@ -169,6 +169,10 @@ OperationContext* MozJSImplScope::getOpContext() const {
     return _opCtx;
 }
 
+bool MozJSImplScope::isJavaScriptProtectionEnabled() const {
+    return _engine->isJavaScriptProtectionEnabled();
+}
+
 bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     auto scope = getScope(cx);
 
@@ -300,6 +304,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _hasOutOfMemoryException(false),
       _binDataProto(_context),
       _bsonProto(_context),
+      _codeProto(_context),
       _countDownLatchProto(_context),
       _cursorProto(_context),
       _cursorHandleProto(_context),
@@ -738,6 +743,7 @@ void MozJSImplScope::reset() {
 void MozJSImplScope::installBSONTypes() {
     _binDataProto.install(_global);
     _bsonProto.install(_global);
+    _codeProto.install(_global);
     _dbPointerProto.install(_global);
     _dbRefProto.install(_global);
     _errorProto.install(_global);

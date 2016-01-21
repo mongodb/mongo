@@ -1155,7 +1155,12 @@ DB.prototype.getQueryOptions = function() {
 DB.prototype.loadServerScripts = function(){
     var global = Function('return this')();
     this.system.js.find().forEach(function(u) {
-        global[u._id] = u.value;
+        if (u.value.constructor === Code) {
+            global[u._id] = eval("(" + u.value.code + ")");
+        }
+        else {
+            global[u._id] = u.value;
+        }
     });
 };
 

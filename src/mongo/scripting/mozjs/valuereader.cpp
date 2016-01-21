@@ -53,13 +53,35 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
     switch (elem.type()) {
         case mongo::Code:
-            scope->newFunction(elem.valueStringData(), _value);
+            // javascriptProtection prevents Code and CodeWScope BSON types from
+            // being automatically marshalled into executable functions.
+            if (scope->isJavaScriptProtectionEnabled()) {
+                JS::AutoValueArray<1> args(_context);
+                ValueReader(_context, args[0]).fromStringData(elem.valueStringData());
+
+                JS::RootedObject obj(_context);
+                scope->getProto<CodeInfo>().newInstance(args, _value);
+            }
+            else {
+                scope->newFunction(elem.valueStringData(), _value);
+            }
             return;
         case mongo::CodeWScope:
-            if (!elem.codeWScopeObject().isEmpty())
-                warning() << "CodeWScope doesn't transfer to db.eval";
-            scope->newFunction(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1),
-                               _value);
+            if (scope->isJavaScriptProtectionEnabled()) {
+                JS::AutoValueArray<2> args(_context);
+
+                ValueReader(_context, args[0]).fromStringData(elem.valueStringData());
+                ValueReader(_context, args[1]).fromBSON(elem.codeWScopeObject(),
+                                                        nullptr, readOnly);
+
+                scope->getProto<CodeInfo>().newInstance(args, _value);
+            }
+            else {
+                if (!elem.codeWScopeObject().isEmpty())
+                    warning() << "CodeWScope doesn't transfer to db.eval";
+                scope->newFunction(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1),
+                                   _value);
+            }
             return;
         case mongo::Symbol:
         case mongo::String:

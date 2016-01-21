@@ -107,6 +107,7 @@ if usemozjs:
             'mozjs/base.cpp',
             'mozjs/bindata.cpp',
             'mozjs/bson.cpp',
+            'mozjs/code.cpp',
             'mozjs/countdownlatch.cpp',
             'mozjs/cursor.cpp',
             'mozjs/cursor_handle.cpp',

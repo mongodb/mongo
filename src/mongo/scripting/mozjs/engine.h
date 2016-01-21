@@ -66,6 +66,9 @@ public:
     void enableJIT(bool value) override;
     bool isJITEnabled() const override;
 
+    void enableJavaScriptProtection(bool value) override;
+    bool isJavaScriptProtectionEnabled() const override;
+
     void registerOperation(OperationContext* ctx, MozJSImplScope* scope);
     void unregisterOperation(unsigned int opId);
 

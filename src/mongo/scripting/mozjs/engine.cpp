@@ -47,6 +47,7 @@ namespace mongo {
 namespace {
 
 MONGO_EXPORT_SERVER_PARAMETER(disableJavaScriptJIT, bool, false);
+MONGO_EXPORT_SERVER_PARAMETER(javascriptProtection, bool, false);
 
 }  // namespace
 
@@ -124,6 +125,14 @@ void MozJSScriptEngine::enableJIT(bool value) {
 
 bool MozJSScriptEngine::isJITEnabled() const {
     return !disableJavaScriptJIT.load();
+}
+
+void MozJSScriptEngine::enableJavaScriptProtection(bool value) {
+    javascriptProtection.store(value);
+}
+
+bool MozJSScriptEngine::isJavaScriptProtectionEnabled() const {
+    return javascriptProtection.load();
 }
 
 void MozJSScriptEngine::registerOperation(OperationContext* txn, MozJSImplScope* scope) {
