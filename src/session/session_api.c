@@ -637,10 +637,22 @@ int
 __wt_session_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_DECL_RET;
+	WT_CONFIG_ITEM cval;
+	bool lock_wait;
+
+	WT_RET(__wt_config_gets_def(session, cfg, "lock_wait", 1, &cval));
+	lock_wait = cval.val != 0 || F_ISSET(session, WT_SESSION_LOCK_NO_WAIT);
+
+	if (!lock_wait)
+		F_SET(session, WT_SESSION_LOCK_NO_WAIT);
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    WT_WITH_TABLE_LOCK(session,
 		ret = __wt_schema_drop(session, uri, cfg)));
+
+	if (!lock_wait)
+		F_CLR(session, WT_SESSION_LOCK_NO_WAIT);
+
 	return (ret);
 }
 

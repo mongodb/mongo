@@ -83,8 +83,16 @@ struct __wt_table {
  *	Acquire a lock, perform an operation, drop the lock.
  */
 #define	WT_WITH_LOCK(session, lock, flag, op) do {			\
+	ret = 0;							\
 	if (F_ISSET(session, (flag))) {					\
 		op;							\
+	} else if (F_ISSET(session, WT_SESSION_LOCK_NO_WAIT)) {		\
+		if ((ret = __wt_spin_trylock(session, (lock))) == 0) {	\
+			F_SET(session, (flag));				\
+			op;						\
+			F_CLR(session, (flag));				\
+			__wt_spin_unlock(session, (lock));		\
+		}							\
 	} else {							\
 		__wt_spin_lock(session, (lock));			\
 		F_SET(session, (flag));					\

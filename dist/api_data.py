@@ -771,6 +771,9 @@ methods = {
     Config('remove_files', 'true', r'''
         should the underlying files be removed?''',
         type='boolean'),
+    Config('lock_wait', 'true', r'''
+        wait for locks, if false will return \c EBUSY instead of blocking''',
+        type='boolean'),
 ]),
 
 'WT_SESSION.join' : Method([
