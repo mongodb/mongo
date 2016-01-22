@@ -53,7 +53,10 @@ bool LegacyDistLockManager::_pingerEnabled = true;
 
 LegacyDistLockManager::LegacyDistLockManager(ConnectionString configServer,
                                              const std::string& processId)
-    : _configServer(std::move(configServer)), _processId(processId), _isStopped(false) {}
+    : _configServer(std::move(configServer)),
+      _processId(processId),
+      _isStopped(false),
+      _checkedForSkew(false) {}
 
 void LegacyDistLockManager::startUp() {
     stdx::lock_guard<stdx::mutex> sl(_mutex);
@@ -95,6 +98,18 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
 
         if (_isStopped) {
             return Status(ErrorCodes::LockBusy, "legacy distlock manager is stopped");
+        }
+
+        if (!_checkedForSkew && _pingerEnabled) {
+            // Check for clock skew the first time this DistLockManager takes a lock.
+            if (distLock->isRemoteTimeSkewed()) {
+                return Status(ErrorCodes::DistributedClockSkewed,
+                              str::stream() << "clock skew of the cluster "
+                                            << _configServer.toString()
+                                            << " is too far out of bounds "
+                                            << "to allow distributed locking.");
+            }
+            _checkedForSkew = true;
         }
     }
 

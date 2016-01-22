@@ -212,11 +212,16 @@ public:
         bool errors = false;
         BSONObj lockObj;
         while (keepGoing.loadRelaxed()) {
-            Status pingStatus = pinger->startPing(
-                *myLock, stdx::chrono::milliseconds(takeoverMS / LOCK_SKEW_FACTOR));
+            Status pingStatus = pinger->startup(
+                hostConn, threadName, stdx::chrono::milliseconds(takeoverMS / LOCK_SKEW_FACTOR));
 
             if (!pingStatus.isOK()) {
                 log() << "**** Not good for pinging: " << pingStatus;
+                break;
+            }
+
+            if (lock->isRemoteTimeSkewed()) {
+                log() << "**** Too skewed for locking";
                 break;
             }
 

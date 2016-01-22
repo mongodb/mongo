@@ -87,6 +87,7 @@ private:
     std::unique_ptr<LegacyDistLockPinger> _pinger;
 
     bool _isStopped;
+    bool _checkedForSkew;
     static bool _pingerEnabled;
 };
 }
