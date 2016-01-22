@@ -1860,6 +1860,9 @@ def doConfigure(myenv):
     if conf.CheckFunc('strnlen'):
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_STRNLEN")
 
+    if conf.CheckFunc('mallinfo'):
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_MALLINFO")
+
     conf.Finish()
 
     # If we are using libstdc++, check to see if we are using a libstdc++ that is older than
