@@ -314,6 +314,7 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
 
     // Repair all databases first, so that we do not try to open them if they are in bad shape
     if (storageGlobalParams.repair) {
+        invariant(!storageGlobalParams.readOnly);
         for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
             const string dbName = *i;
             LOG(1) << "    Repairing database: " << dbName << endl;

@@ -657,6 +657,27 @@ Status validateMongodOptions(const moe::Environment& params) {
     }
 #endif
 
+    if (params.count("storage.readOnly")) {
+        // Command line options that are disallowed when --readOnly is specified.
+        for (const auto& disallowedOption : {"replSet",
+                                             "configSvr",
+                                             "upgrade",
+                                             "repair",
+                                             "profile",
+                                             "master",
+                                             "slave",
+                                             "source",
+                                             "only",
+                                             "slavedelay",
+                                             "autoresync",
+                                             "fastsync"}) {
+            if (params.count(disallowedOption)) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "Cannot specify both --readOnly and --"
+                                            << disallowedOption);
+            }
+        }
+    }
     return Status::OK();
 }
 
