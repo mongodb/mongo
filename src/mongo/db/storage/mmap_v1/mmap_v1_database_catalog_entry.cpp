@@ -450,16 +450,32 @@ void MMAPV1DatabaseCatalogEntry::_ensureSystemCollection(OperationContext* txn, 
     if (details) {
         return;
     }
+
+    if (storageGlobalParams.readOnly) {
+        severe() << "Missing system collection '" << ns << "' for database '" << name() << "'";
+        fassertFailed(34372);
+    }
+
     _namespaceIndex.add_ns(txn, ns, DiskLoc(), false);
 }
 
 void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
-    WriteUnitOfWork wunit(txn);
+    // We wrap the WUOW in an optional as we can't create it if we are in RO mode.
+    boost::optional<WriteUnitOfWork> wunit;
+    if (!storageGlobalParams.readOnly) {
+        wunit.emplace(txn);
+    }
 
     // Upgrade freelist
     const NamespaceString oldFreeList(name(), "$freelist");
     NamespaceDetails* freeListDetails = _namespaceIndex.details(oldFreeList.ns());
     if (freeListDetails) {
+        if (storageGlobalParams.readOnly) {
+            severe() << "Legacy storage format detected, but server was started with the "
+                        "--readOnly command line parameter.";
+            fassertFailedNoTrace(34373);
+        }
+
         if (!freeListDetails->firstExtent.isNull()) {
             _extentManager.freeExtents(
                 txn, freeListDetails->firstExtent, freeListDetails->lastExtent);
@@ -470,6 +486,12 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
 
     DataFileVersion version = _extentManager.getFileFormat(txn);
     if (version.isCompatibleWithCurrentCode() && !version.mayHave28Freelist()) {
+        if (storageGlobalParams.readOnly) {
+            severe() << "Legacy storage format detected, but server was started with the "
+                        "--readOnly command line parameter.";
+            fassertFailedNoTrace(34374);
+        }
+
         // Any DB that can be opened and written to gets this flag set.
         version.setMayHave28Freelist();
         _extentManager.setFileFormat(txn, version);
@@ -485,9 +507,11 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
     _ensureSystemCollection(txn, nsi.toString());
 
     if (isSystemNamespacesGoingToBeNew) {
+        invariant(!storageGlobalParams.readOnly);
         txn->recoveryUnit()->registerChange(new EntryInsertion(nsn.toString(), this));
     }
     if (isSystemIndexesGoingToBeNew) {
+        invariant(!storageGlobalParams.readOnly);
         txn->recoveryUnit()->registerChange(new EntryInsertion(nsi.toString(), this));
     }
 
@@ -546,7 +570,9 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
                                                        this));
     }
 
-    wunit.commit();
+    if (!storageGlobalParams.readOnly) {
+        wunit->commit();
+    }
 
     // Now put everything in the cache of namespaces. None of the operations below do any
     // transactional operations.

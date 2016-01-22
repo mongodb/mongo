@@ -547,7 +547,9 @@ static void _initAndListen(int listenPort) {
         snmpInit();
     }
 
-    boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
+    if (!storageGlobalParams.readOnly) {
+        boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
+    }
 
     if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalRecoverOnly)
         return;
@@ -612,27 +614,29 @@ static void _initAndListen(int listenPort) {
             exitCleanly(EXIT_NEED_UPGRADE);
         }
 
-        getDeleter()->startWorkers();
+        if (!storageGlobalParams.readOnly) {
+            getDeleter()->startWorkers();
 
-        restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
+            restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
 
-        repl::getGlobalReplicationCoordinator()->startReplication(startupOpCtx.get());
+            repl::getGlobalReplicationCoordinator()->startReplication(startupOpCtx.get());
 
-        const unsigned long long missingRepl =
-            checkIfReplMissingFromCommandLine(startupOpCtx.get());
-        if (missingRepl) {
-            log() << startupWarningsLog;
-            log() << "** WARNING: mongod started without --replSet yet " << missingRepl
-                  << " documents are present in local.system.replset" << startupWarningsLog;
-            log() << "**          Restart with --replSet unless you are doing maintenance and "
-                  << " no other clients are connected." << startupWarningsLog;
-            log() << "**          The TTL collection monitor will not start because of this."
-                  << startupWarningsLog;
-            log() << "**         ";
-            log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
-            log() << startupWarningsLog;
-        } else {
-            startTTLBackgroundJob();
+            const unsigned long long missingRepl =
+                checkIfReplMissingFromCommandLine(startupOpCtx.get());
+            if (missingRepl) {
+                log() << startupWarningsLog;
+                log() << "** WARNING: mongod started without --replSet yet " << missingRepl
+                      << " documents are present in local.system.replset" << startupWarningsLog;
+                log() << "**          Restart with --replSet unless you are doing maintenance and "
+                      << " no other clients are connected." << startupWarningsLog;
+                log() << "**          The TTL collection monitor will not start because of this."
+                      << startupWarningsLog;
+                log() << "**         ";
+                log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
+                log() << startupWarningsLog;
+            } else {
+                startTTLBackgroundJob();
+            }
         }
     }
 
@@ -642,13 +646,15 @@ static void _initAndListen(int listenPort) {
 
     HostnameCanonicalizationWorker::start(getGlobalServiceContext());
 
-    startFTDC();
+    if (!storageGlobalParams.readOnly) {
+        startFTDC();
 
-    if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
-        uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
+        if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
+            uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
+        }
+
+        logStartup(startupOpCtx.get());
     }
-
-    logStartup(startupOpCtx.get());
 
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
