@@ -772,7 +772,8 @@ methods = {
         should the underlying files be removed?''',
         type='boolean'),
     Config('lock_wait', 'true', r'''
-        wait for locks, if false will return \c EBUSY instead of blocking''',
+        wait for locks, if \c lock_wait=false, fail if any required locks are
+        not available immediately''',
         type='boolean'),
 ]),
 
