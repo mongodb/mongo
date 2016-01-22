@@ -1237,6 +1237,9 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist., a
 	 * boolean flag; default \c false.}
+	 * @config{lock_wait, wait for locks\, if \c lock_wait=false\, fail if
+	 * any required locks are not available immediately., a boolean flag;
+	 * default \c true.}
 	 * @config{remove_files, should the underlying files be removed?., a
 	 * boolean flag; default \c true.}
 	 * @configend
