@@ -368,24 +368,21 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
 	 * sure it's referenced to stop other internal code dropping the handle
 	 * (e.g in LSM when cleaning up obsolete chunks).
 	 */
-	ret = __wt_session_get_btree(session,
-	    dhandle->name, dhandle->checkpoint, NULL, 0);
-	if (ret == 0) {
-		WT_SAVE_DHANDLE(session,
-		    ret = func(session, cfg));
-		if (WT_META_TRACKING(session))
-			WT_TRET(__wt_meta_track_handle_lock(session, false));
-		else
-			WT_TRET(__wt_session_release_btree(session));
-	} else if (ret == EBUSY)
-		ret = __wt_conn_btree_apply_single(session, dhandle->name,
-		    dhandle->checkpoint, func, cfg);
+	if ((ret = __wt_session_get_btree(session,
+	    dhandle->name, dhandle->checkpoint, NULL, 0)) != 0)
+		return (ret == EBUSY ? 0 : ret);
+
+	WT_SAVE_DHANDLE(session, ret = func(session, cfg));
+	if (WT_META_TRACKING(session))
+		WT_TRET(__wt_meta_track_handle_lock(session, false));
+	else
+		WT_TRET(__wt_session_release_btree(session));
 	return (ret);
 }
 
 /*
  * __wt_conn_btree_apply --
- *	Apply a function to all open btree handles apart from the metadata.
+ *	Apply a function to all open btree handles with the given URI.
  */
 int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
@@ -425,98 +422,6 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 				WT_RET(__conn_btree_apply_internal(
 				    session, dhandle, func, cfg));
 	}
-
-	return (0);
-}
-
-/*
- * __wt_conn_btree_apply_single_ckpt --
- *	Decode any checkpoint information from the configuration string then
- *	call btree apply single.
- */
-int
-__wt_conn_btree_apply_single_ckpt(WT_SESSION_IMPL *session,
-    const char *uri,
-    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
-{
-	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
-	const char *checkpoint;
-
-	checkpoint = NULL;
-
-	/*
-	 * This function exists to handle checkpoint configuration.  Callers
-	 * that never open a checkpoint call the underlying function directly.
-	 */
-	WT_RET_NOTFOUND_OK(
-	    __wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
-	if (cval.len != 0) {
-		/*
-		 * The internal checkpoint name is special, find the last
-		 * unnamed checkpoint of the object.
-		 */
-		if (WT_STRING_MATCH(WT_CHECKPOINT, cval.str, cval.len)) {
-			WT_RET(__wt_meta_checkpoint_last_name(
-			    session, uri, &checkpoint));
-		} else
-			WT_RET(__wt_strndup(
-			    session, cval.str, cval.len, &checkpoint));
-	}
-
-	ret = __wt_conn_btree_apply_single(session, uri, checkpoint, func, cfg);
-
-	__wt_free(session, checkpoint);
-
-	return (ret);
-}
-
-/*
- * __wt_conn_btree_apply_single --
- *	Apply a function to a single btree handle that couldn't be locked
- * (attempting to get the handle returned EBUSY).
- */
-int
-__wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
-    const char *uri, const char *checkpoint,
-    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle;
-	WT_DECL_RET;
-	uint64_t bucket, hash;
-
-	conn = S2C(session);
-
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
-
-	hash = __wt_hash_city64(uri, strlen(uri));
-	bucket = hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq)
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-		    !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
-		    (hash == dhandle->name_hash &&
-		     strcmp(uri, dhandle->name) == 0) &&
-		    ((dhandle->checkpoint == NULL && checkpoint == NULL) ||
-		    (dhandle->checkpoint != NULL && checkpoint != NULL &&
-		    strcmp(dhandle->checkpoint, checkpoint) == 0))) {
-			/*
-			 * We're holding the handle list lock which locks out
-			 * handle open (which might change the state of the
-			 * underlying object).  However, closing a handle
-			 * doesn't require the handle list lock, lock out
-			 * closing the handle and then confirm the handle is
-			 * still open.
-			 */
-			__wt_spin_lock(session, &dhandle->close_lock);
-			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-			    !F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
-				WT_WITH_DHANDLE(session, dhandle,
-				    ret = func(session, cfg));
-			}
-			__wt_spin_unlock(session, &dhandle->close_lock);
-			WT_RET(ret);
-		}
 
 	return (0);
 }

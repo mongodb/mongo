@@ -109,6 +109,15 @@ struct __wt_table {
 #define	WT_WITH_HANDLE_LIST_LOCK(session, op)				\
 	WT_WITH_LOCK(session,						\
 	    &S2C(session)->dhandle_lock, WT_SESSION_LOCKED_HANDLE_LIST, op)
+
+/*
+ * WT_WITH_METADATA_LOCK --
+ *	Acquire the metadata lock, perform an operation, drop the lock.
+ */
+#define	WT_WITH_METADATA_LOCK(session, op)				\
+	WT_WITH_LOCK(session,						\
+	    &S2C(session)->metadata_lock, WT_SESSION_LOCKED_METADATA, op)
+
 /*
  * WT_WITH_SCHEMA_LOCK --
  *	Acquire the schema lock, perform an operation, drop the lock.
