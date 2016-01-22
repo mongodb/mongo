@@ -316,24 +316,6 @@ functions:
           git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
           git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
     - command: shell.exec
-      params:
-        working_dir: src/jstestfuzz
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs"
-          else
-            export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin"
-          fi
-
-          npm install
-    - command: shell.exec
       type: test
       params:
         working_dir: src/jstestfuzz
