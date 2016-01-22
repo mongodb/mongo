@@ -58,7 +58,7 @@ static const CONFIG default_cfg = {
 	0,				/* notify threads to stop */
 	0,				/* in warmup phase */
 	NULL,				/* Thread ID of idle cycle thread */
-	0,				/* Signal idle cycle thread */
+	false,				/* Signal for idle cycle thread */
 	0,				/* total seconds running */
 	0,				/* has truncate */
 	{NULL, NULL},			/* the truncate queue */
