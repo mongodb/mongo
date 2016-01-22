@@ -80,7 +80,7 @@ cycle_idle_tables(void *arg)
 		return (NULL);
 	}
 
-	for (cycle_count = 0; cfg->idle_cycle_run == 1; ++cycle_count) {
+	for (cycle_count = 0; cfg->idle_cycle_run; ++cycle_count) {
 		snprintf(uri, 512, "%s_cycle%07d", cfg->uris[0], cycle_count);
 		/* Don't busy cycle in this loop. */
 		__wt_sleep(1, 0);
@@ -96,6 +96,8 @@ cycle_idle_tables(void *arg)
 		/* Create a table. */
 		if ((ret = session->create(
 		    session, uri, cfg->table_config)) != 0) {
+			if (ret == EBUSY)
+				continue;
 			lprintf(cfg, ret, 0,
 			     "Table create failed in cycle_idle_tables.");
 			cfg->error = ret;
@@ -123,8 +125,14 @@ cycle_idle_tables(void *arg)
 			return (NULL);
 		start = stop;
 
-		/* Drop the table. */
-		if ((ret = session->drop(session, uri, NULL)) != 0) {
+		/*
+		 * Drop the table. Keep retrying on EBUSY failure - it is an
+		 * expected return when checkpoints are happening.
+		 */
+		while ((ret = session->drop(session, uri, "force")) == EBUSY)
+			__wt_sleep(1, 0);
+
+		if (ret != 0 && ret != EBUSY) {
 			lprintf(cfg, ret, 0,
 			     "Table drop failed in cycle_idle_tables.");
 			cfg->error = ret;
@@ -146,12 +154,12 @@ start_idle_table_cycle(CONFIG *cfg)
 	if (cfg->idle_table_cycle == 0)
 		return (0);
 
-	cfg->idle_cycle_run = 1;
+	cfg->idle_cycle_run = true;
 	if ((ret = pthread_create(
 	    &thread_id, NULL, cycle_idle_tables, cfg)) != 0) {
 		lprintf(
 		    cfg, ret, 0, "Error creating idle table cycle thread.");
-		cfg->idle_cycle_run = 0;
+		cfg->idle_cycle_run = false;
 		return (ret);
 	}
 	cfg->idle_table_cycle_thread = thread_id;
@@ -164,10 +172,10 @@ stop_idle_table_cycle(CONFIG *cfg)
 {
 	int ret;
 
-	if (cfg->idle_table_cycle == 0 || cfg->idle_cycle_run == 0)
+	if (cfg->idle_table_cycle == 0 || !cfg->idle_cycle_run)
 		return (0);
 
-	cfg->idle_cycle_run = 0;
+	cfg->idle_cycle_run = false;
 	if ((ret = pthread_join(cfg->idle_table_cycle_thread, NULL)) != 0) {
 		lprintf(
 		    cfg, ret, 0, "Error joining idle table cycle thread.");

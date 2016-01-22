@@ -188,7 +188,7 @@ struct __config {			/* Configuration structure */
 	volatile int in_warmup;		/* Running warmup phase */
 
 	pthread_t idle_table_cycle_thread; /* Thread ID of idle cycle thread */
-	volatile int idle_cycle_run;	/* Signal idle cycle thread */
+	volatile bool idle_cycle_run;	/* Signal idle cycle thread */
 
 	volatile uint32_t totalsec;	/* total seconds running */
 
