@@ -145,8 +145,15 @@ cycle_idle_tables(void *arg)
 	return (NULL);
 }
 
+/*
+ * Start a thread the creates and drops tables regularly.
+ * TODO: Currently accepts a pthread_t as a parameter, since it is not
+ * possible to portably staticially initialize it in the global configuration
+ * structure. Should reshuffle the configuration structure so explicit static
+ * initializers aren't necessary.
+ */
 int
-start_idle_table_cycle(CONFIG *cfg)
+start_idle_table_cycle(CONFIG *cfg, pthread_t *idle_table_cycle_thread)
 {
 	pthread_t thread_id;
 	int ret;
@@ -162,13 +169,13 @@ start_idle_table_cycle(CONFIG *cfg)
 		cfg->idle_cycle_run = false;
 		return (ret);
 	}
-	cfg->idle_table_cycle_thread = thread_id;
+	*idle_table_cycle_thread = thread_id;
 
 	return (0);
 }
 
 int
-stop_idle_table_cycle(CONFIG *cfg)
+stop_idle_table_cycle(CONFIG *cfg, pthread_t idle_table_cycle_thread)
 {
 	int ret;
 
@@ -176,7 +183,7 @@ stop_idle_table_cycle(CONFIG *cfg)
 		return (0);
 
 	cfg->idle_cycle_run = false;
-	if ((ret = pthread_join(cfg->idle_table_cycle_thread, NULL)) != 0) {
+	if ((ret = pthread_join(idle_table_cycle_thread, NULL)) != 0) {
 		lprintf(
 		    cfg, ret, 0, "Error joining idle table cycle thread.");
 		return (ret);

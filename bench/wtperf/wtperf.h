@@ -187,7 +187,6 @@ struct __config {			/* Configuration structure */
 	volatile int stop;		/* notify threads to stop */
 	volatile int in_warmup;		/* Running warmup phase */
 
-	pthread_t idle_table_cycle_thread; /* Thread ID of idle cycle thread */
 	volatile bool idle_cycle_run;	/* Signal for idle cycle thread */
 
 	volatile uint32_t totalsec;	/* total seconds running */
@@ -306,8 +305,8 @@ int	 run_truncate(
 int	 setup_log_file(CONFIG *);
 int	 setup_throttle(CONFIG_THREAD*);
 int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
-int	 start_idle_table_cycle(CONFIG *);
-int	 stop_idle_table_cycle(CONFIG *);
+int	 start_idle_table_cycle(CONFIG *, pthread_t *);
+int	 stop_idle_table_cycle(CONFIG *, pthread_t);
 uint64_t sum_ckpt_ops(CONFIG *);
 uint64_t sum_insert_ops(CONFIG *);
 uint64_t sum_pop_ops(CONFIG *);

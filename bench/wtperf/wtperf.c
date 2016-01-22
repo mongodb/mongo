@@ -57,7 +57,6 @@ static const CONFIG default_cfg = {
 	0,				/* thread error */
 	0,				/* notify threads to stop */
 	0,				/* in warmup phase */
-	NULL,				/* Thread ID of idle cycle thread */
 	false,				/* Signal for idle cycle thread */
 	0,				/* total seconds running */
 	0,				/* has truncate */
@@ -1361,6 +1360,7 @@ execute_populate(CONFIG *cfg)
 	struct timespec start, stop;
 	CONFIG_THREAD *popth;
 	WT_ASYNC_OP *asyncop;
+	pthread_t idle_table_cycle_thread;
 	size_t i;
 	uint64_t last_ops, msecs, print_ops_sec;
 	uint32_t interval, tables;
@@ -1374,7 +1374,7 @@ execute_populate(CONFIG *cfg)
 	    cfg->populate_threads, cfg->icount);
 
 	/* Start cycling idle tables if configured. */
-	if ((ret = start_idle_table_cycle(cfg)) != 0)
+	if ((ret = start_idle_table_cycle(cfg, &idle_table_cycle_thread)) != 0)
 		return (ret);
 
 	cfg->insert_key = 0;
@@ -1506,7 +1506,7 @@ execute_populate(CONFIG *cfg)
 	}
 
 	/* Stop cycling idle tables. */
-	if ((ret = stop_idle_table_cycle(cfg)) != 0)
+	if ((ret = stop_idle_table_cycle(cfg, idle_table_cycle_thread)) != 0)
 		return (ret);
 
 	return (0);
@@ -1558,6 +1558,7 @@ execute_workload(CONFIG *cfg)
 {
 	CONFIG_THREAD *threads;
 	WORKLOAD *workp;
+	pthread_t idle_table_cycle_thread;
 	uint64_t last_ckpts, last_inserts, last_reads, last_truncates;
 	uint64_t last_updates;
 	uint32_t interval, run_ops, run_time;
@@ -1574,7 +1575,7 @@ execute_workload(CONFIG *cfg)
 	ret = 0;
 
 	/* Start cycling idle tables. */
-	if ((ret = start_idle_table_cycle(cfg)) != 0)
+	if ((ret = start_idle_table_cycle(cfg, &idle_table_cycle_thread)) != 0)
 		return (ret);
 
 	if (cfg->warmup != 0)
@@ -1673,7 +1674,7 @@ execute_workload(CONFIG *cfg)
 err:	cfg->stop = 1;
 
 	/* Stop cycling idle tables. */
-	if ((ret = stop_idle_table_cycle(cfg)) != 0)
+	if ((ret = stop_idle_table_cycle(cfg, idle_table_cycle_thread)) != 0)
 		return (ret);
 
 	if ((t_ret = stop_threads(
