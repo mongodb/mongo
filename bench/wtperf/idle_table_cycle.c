@@ -67,8 +67,8 @@ cycle_idle_tables(void *arg)
 	CONFIG *cfg;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	char uri[512];
 	int cycle_count, ret;
+	char uri[512];
 
 	cfg = (CONFIG *)arg;
 	cycle_count = 0;
@@ -148,9 +148,9 @@ cycle_idle_tables(void *arg)
 /*
  * Start a thread the creates and drops tables regularly.
  * TODO: Currently accepts a pthread_t as a parameter, since it is not
- * possible to portably staticially initialize it in the global configuration
+ * possible to portably statically initialize it in the global configuration
  * structure. Should reshuffle the configuration structure so explicit static
- * initializers aren't necessary.
+ * initialization isn't necessary.
  */
 int
 start_idle_table_cycle(CONFIG *cfg, pthread_t *idle_table_cycle_thread)
