@@ -58,9 +58,6 @@ class test_bug006(wttest.WiredTigerTestCase):
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.salvage(uri, None))
         self.assertRaises(
-            wiredtiger.WiredTigerError,
-            lambda: self.session.truncate(uri, None, None, None))
-        self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.upgrade(uri, None))
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.verify(uri, None))
