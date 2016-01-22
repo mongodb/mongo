@@ -791,9 +791,10 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	WT_FULL_BARRIER();
 	/*
 	 * If we're pre-allocating log files, look for one.  If there aren't any
-	 * or we're not pre-allocating, then create one.
+	 * or we're not pre-allocating, or a backup cursor is open, then
+	 * create one.
 	 */
-	if (conn->log_prealloc > 0) {
+	if (conn->log_prealloc > 0 && !conn->hot_backup) {
 		ret = __log_alloc_prealloc(session, log->fileid);
 		/*
 		 * If ret is 0 it means we found a pre-allocated file.
