@@ -1889,8 +1889,7 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * we don't waste space when we write).
 	 */
 	a = maxpagesize;			/* Don't overflow. */
-	split_size = (uint32_t)
-	    WT_ALIGN((a * (u_int)btree->split_pct) / 100, btree->allocsize);
+	split_size = (uint32_t)((a * (u_int)btree->split_pct) / 100);
 
 	/*
 	 * If the result of that calculation is the same as the allocation unit
@@ -3286,6 +3285,16 @@ supd_check_complete:
 		}
 	}
 
+	bnd->entries = r->entries;
+	/* Output a verbose message if we create a page without many entries */
+	if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT) && r->entries < 6)
+		WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+		    "Reconciling page with memory footprint %" PRIu64
+		    ", %" PRIu32 " th page has"
+		    " %" PRIu32 " entries, %s, split state: %d\n",
+		    r->page->memory_footprint, r->bnd_next, r->entries,
+		    F_ISSET(r, WT_EVICTING) ? "evict" : "checkpoint",
+		    r->bnd_state));
 	WT_ERR(__wt_bt_write(session,
 	    buf, addr, &addr_size, false, bnd->already_compressed));
 	WT_ERR(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
