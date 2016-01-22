@@ -1120,7 +1120,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * Start logging at the beginning of the next log file, no matter
 	 * where the previous log file ends.
 	 */
-	WT_WITH_SLOT_LOCK(session, log,
+	WT_WITH_SLOT_LOCK(session, log, ret,
 	    ret = __log_newfile(session, true, NULL));
 	WT_ERR(ret);
 

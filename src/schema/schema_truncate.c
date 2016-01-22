@@ -34,7 +34,7 @@ __truncate_file(WT_SESSION_IMPL *session, const char *uri)
 	WT_RET(__wt_session_release_btree(session));
 
 	/* Close any btree handles in the file. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_conn_dhandle_close_all(session, uri, false));
 	WT_RET(ret);
 

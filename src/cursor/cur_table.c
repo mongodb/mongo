@@ -778,7 +778,7 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 	/* If the table is incomplete, wait on the table lock and recheck. */
 	complete = table->cg_complete;
 	if (!complete) {
-		WT_WITH_TABLE_LOCK(session, complete = table->cg_complete);
+		WT_WITH_TABLE_LOCK(session, ret, complete = table->cg_complete);
 		WT_RET(ret);
 	}
 	if (!complete)
