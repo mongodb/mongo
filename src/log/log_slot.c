@@ -187,7 +187,7 @@ __wt_log_slot_switch(
 	 * because we are responsible for setting up the new slot.
 	 */
 	do {
-		WT_WITH_SLOT_LOCK(session, log,
+		WT_WITH_SLOT_LOCK(session, log, ret,
 		    ret = __log_slot_switch_internal(session, myslot, forced));
 		if (ret == EBUSY) {
 			WT_STAT_FAST_CONN_INCR(session, log_slot_switch_busy);

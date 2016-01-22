@@ -291,6 +291,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_create[] = {
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_drop[] = {
 	{ "force", "boolean", NULL, NULL, NULL, 0 },
+	{ "lock_wait", "boolean", NULL, NULL, NULL, 0 },
 	{ "remove_files", "boolean", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -904,8 +905,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_create, 40
 	},
 	{ "WT_SESSION.drop",
-	  "force=0,remove_files=",
-	  confchk_WT_SESSION_drop, 2
+	  "force=0,lock_wait=,remove_files=",
+	  confchk_WT_SESSION_drop, 3
 	},
 	{ "WT_SESSION.join",
 	  "bloom_bit_count=16,bloom_hash_count=8,compare=\"eq\",count=,"

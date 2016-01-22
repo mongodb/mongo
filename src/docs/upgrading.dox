@@ -14,6 +14,18 @@ already-deleted rows.) To match the previous behavior, specify the
 \c append configuration string when opening the column-store bulk-load
 cursor; this causes the cursor's key to be ignored and each inserted row
 will be assigned the next record number.
+</dd>
+
+<dt>Change to WT_SESSION::truncate with URI</dt>
+<dd>
+If using the WT_SESSION::truncate API with a file: URI for a full table
+truncate, underlying algorithmic changes result in some visible differences.
+This call can now return WT_ROLLBACK.  Applications should be prepared to
+handle this error.  This method no longer requires exclusive access to the
+table.  Also the underlying disk space may not be immediately
+reclaimed when the call returns.  The performance of this API may differ
+from earlier releases.
+</dd>
 
 </dl><hr>
 @section version_270 Upgrading to Version 2.7.0
