@@ -127,7 +127,7 @@ var st;
     jsTest.log("Adding non-voting members to csrs set: " + tojson(csrsConfig));
     assert.commandWorked(csrs[0].adminCommand({replSetReconfig: csrsConfig}));
 
-    waitUntilAllNodesCaughtUp(csrs);
+    waitUntilAllNodesCaughtUp(csrs, 60000);
 
     jsTest.log("Starting long-running chunk migration");
     var joinParallelShell = startParallelShell(
