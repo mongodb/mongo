@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/config.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/geo/hash.h"
