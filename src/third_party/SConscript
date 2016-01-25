@@ -7,6 +7,7 @@ snappySuffix = '-1.1.2'
 zlibSuffix = '-1.2.8'
 pcreSuffix = "-8.37"
 mozjsSuffix = '-38'
+yamlSuffix = '-0.5.3'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
@@ -66,7 +67,7 @@ if wiredtiger and not use_system_version_of_library('wiredtiger'):
 
 if not use_system_version_of_library('yaml'):
     thirdPartyIncludePathList.append(
-        ('yaml', '#/src/third_party/yaml-cpp-0.5.1/include'))
+        ('yaml', '#/src/third_party/yaml-cpp' + yamlSuffix + '/include'))
 
 if not use_system_version_of_library('asio'):
     thirdPartyIncludePathList.append(
@@ -265,10 +266,10 @@ if use_system_version_of_library("yaml"):
 else:
     yamlEnv = env.Clone()
     yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml', 'boost'])
-    yamlEnv.SConscript('yaml-cpp-0.5.1/SConscript', exports={ 'env' : yamlEnv })
+    yamlEnv.SConscript('yaml-cpp' + yamlSuffix + '/SConscript', exports={ 'env' : yamlEnv })
     yamlEnv = yamlEnv.Clone(
         LIBDEPS=[
-            'yaml-cpp-0.5.1/yaml',
+            'yaml-cpp' + yamlSuffix + '/yaml',
         ])
 
 yamlEnv.Library(

@@ -34,6 +34,7 @@
 #include <cerrno>
 #include <fstream>
 #include <stdio.h>
+#include <yaml-cpp/yaml.h>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
@@ -46,7 +47,6 @@
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/scopeguard.h"
-#include "third_party/yaml-cpp-0.5.1/include/yaml-cpp/yaml.h"
 
 namespace mongo {
 namespace optionenvironment {
