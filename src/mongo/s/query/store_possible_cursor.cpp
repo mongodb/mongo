@@ -65,9 +65,12 @@ StatusWith<BSONObj> storePossibleCursor(const HostAndPort& server,
                                       incomingCursorResponse.getValue().getNSS(),
                                       ClusterCursorManager::CursorType::NamespaceNotSharded,
                                       ClusterCursorManager::CursorLifetime::Mortal);
+    if (!clusterCursorId.isOK()) {
+        return clusterCursorId.getStatus();
+    }
 
     CursorResponse outgoingCursorResponse(incomingCursorResponse.getValue().getNSS(),
-                                          clusterCursorId,
+                                          clusterCursorId.getValue(),
                                           incomingCursorResponse.getValue().getBatch());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }

@@ -171,9 +171,9 @@ void ShardingState::shutDown(OperationContext* txn) {
                    "Sharding state unavailable because the system is shutting down"));
     }
 
-    auto catalogMgr = grid.catalogManager(txn);
-    if (catalogMgr) {
-        catalogMgr->shutDown(txn);
+    if (_getInitializationState() == InitializationState::kInitialized) {
+        grid.shardRegistry()->shutdown();
+        grid.catalogManager(txn)->shutDown(txn);
     }
 }
 
