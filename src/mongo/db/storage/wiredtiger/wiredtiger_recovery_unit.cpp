@@ -176,8 +176,6 @@ void WiredTigerRecoveryUnit::assertInActiveTxn() const {
 }
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSession(OperationContext* opCtx) {
-    _ensureSession();
-
     if (!_active) {
         _txnOpen(opCtx);
     }
@@ -346,6 +344,7 @@ void WiredTigerRecoveryUnit::_getTicket(OperationContext* opCtx) {
 void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
     invariant(!_active);
     _getTicket(opCtx);
+    _ensureSession();
 
     WT_SESSION* s = _session->getSession();
 
