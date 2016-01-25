@@ -538,10 +538,15 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
     verify(registry.countHandleForPid(pid));
     HANDLE h = registry.getHandleForPid(pid);
 
-    if (block) {
-        if (WaitForSingleObject(h, INFINITE)) {
-            log() << "WaitForSingleObject failed: " << errnoWithDescription();
-        }
+    // wait until the process object is signaled before getting its
+    // exit code. do this even when block is false to ensure that all
+    // file handles open in the process have been closed.
+
+    DWORD ret = WaitForSingleObject(h, (block ? INFINITE : 0));
+    if (ret == WAIT_TIMEOUT) {
+        return false;
+    } else if (ret != WAIT_OBJECT_0) {
+        log() << "wait_for_pid: WaitForSingleObject failed: " << errnoWithDescription();
     }
 
     DWORD tmp;
