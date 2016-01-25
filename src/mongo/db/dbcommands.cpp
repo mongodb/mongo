@@ -341,26 +341,32 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        // Needs to be locked exclusively, because creates the system.profile collection
-        // in the local database.
-        ScopedTransaction transaction(txn, MODE_IX);
-        AutoGetDb ctx(txn, dbname, MODE_X);
+        BSONElement firstElement = cmdObj.firstElement();
+        int profilingLevel = firstElement.numberInt();
+
+        // If profilingLevel is 0, 1, or 2, needs to be locked exclusively,
+        // because creates the system.profile collection in the local database.
+
+        const bool readOnly = (profilingLevel < 0 || profilingLevel > 2);
+        const LockMode dbMode = readOnly ? MODE_S : MODE_X;
+        const LockMode transactionMode = readOnly ? MODE_IS : MODE_IX;
+
+        Status status = Status::OK();
+
+        ScopedTransaction transaction(txn, transactionMode);
+        AutoGetDb ctx(txn, dbname, dbMode);
         Database* db = ctx.getDb();
 
-        BSONElement e = cmdObj.firstElement();
         result.append("was", db ? db->getProfilingLevel() : serverGlobalParams.defaultProfile);
         result.append("slowms", serverGlobalParams.slowMS);
 
-        int p = (int)e.number();
-        Status status = Status::OK();
-
-        if (p >= 0 && p <= 2) {
+        if (!readOnly) {
             if (!db) {
                 // When setting the profiling level, create the database if it didn't already exist.
                 // When just reading the profiling level, we do not create the database.
                 db = dbHolder().openDb(txn, dbname);
             }
-            status = db->setProfilingLevel(txn, p);
+            status = db->setProfilingLevel(txn, profilingLevel);
         }
 
         const BSONElement slow = cmdObj["slowms"];
