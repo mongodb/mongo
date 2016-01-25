@@ -218,6 +218,8 @@ struct __wt_lsm_worker_args;
     typedef struct __wt_lsm_worker_args WT_LSM_WORKER_ARGS;
 struct __wt_lsm_worker_cookie;
     typedef struct __wt_lsm_worker_cookie WT_LSM_WORKER_COOKIE;
+struct __wt_lsn;
+    typedef struct __wt_lsn WT_LSN;
 struct __wt_multi;
     typedef struct __wt_multi WT_MULTI;
 struct __wt_myslot;

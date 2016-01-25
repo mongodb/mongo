@@ -6,6 +6,27 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * WT_LSN --
+ *	A log sequence number, representing a position in the transaction log.
+ */
+struct __wt_lsn {
+	union {
+		struct {
+#ifdef	WORDS_BIGENDIAN
+			uint32_t file;
+			uint32_t offset;
+#else
+			uint32_t offset;
+			uint32_t file;
+#endif
+		} l;
+		uint64_t file_offset;
+	} u;
+};
+#define	lsn_file	u.l.file
+#define	lsn_offset	u.l.offset
+
 #define	WT_LOG_FILENAME	"WiredTigerLog"		/* Log file name */
 #define	WT_LOG_PREPNAME	"WiredTigerPreplog"	/* Log pre-allocated name */
 #define	WT_LOG_TMPNAME	"WiredTigerTmplog"	/* Log temporary name */
@@ -13,32 +34,43 @@
 /* Logging subsystem declarations. */
 #define	WT_LOG_ALIGN			128
 
+/*
+ * Atomically set the two components of the LSN.
+ */
+#define	lsn_file		u.l.file
+#define	lsn_offset		u.l.offset
+#define	WT_SET_LSN(l, f, o) (l)->u.file_offset = (((uint64_t)(f) << 32) + (o))
+#define	WT_SET_LSN_FILE(l, f)	WT_SET_LSN((l), (f), (l)->lsn_offset)
+#define	WT_SET_LSN_OFFSET(l, o)	WT_SET_LSN((l), (l)->lsn_file, (o))
+
 #define	WT_INIT_LSN(l)	do {						\
-	(l)->file = 1;							\
-	(l)->offset = 0;						\
+	WT_SET_LSN((l), 1, 0);						\
 } while (0)
 
 #define	WT_MAX_LSN(l)	do {						\
-	(l)->file = UINT32_MAX;						\
-	(l)->offset = INT64_MAX;					\
+	WT_SET_LSN((l), UINT32_MAX, INT32_MAX);			\
 } while (0)
 
 #define	WT_ZERO_LSN(l)	do {						\
-	(l)->file = 0;							\
-	(l)->offset = 0;						\
+	WT_SET_LSN((l), 0, 0);						\
 } while (0)
 
-#define	WT_IS_INIT_LSN(l)						\
-	((l)->file == 1 && (l)->offset == 0)
+/*
+ * Initialize LSN is (1,0).  We only need to shift the 1 for comparison.
+ */
+#define	WT_IS_INIT_LSN(l)	((l)->u.file_offset == ((uint64_t)1 << 32))
+/*
+ * XXX Original tested INT32_MAX.
+ */
 #define	WT_IS_MAX_LSN(l)						\
-	((l)->file == UINT32_MAX && (l)->offset == INT64_MAX)
+	((l)->lsn_file == UINT32_MAX && (l)->lsn_offset == INT32_MAX)
 
 /*
  * Both of the macros below need to change if the content of __wt_lsn
  * ever changes.  The value is the following:
  * txnid, record type, operation type, file id, operation key, operation value
  */
-#define	WT_LOGC_KEY_FORMAT	WT_UNCHECKED_STRING(IqI)
+#define	WT_LOGC_KEY_FORMAT	WT_UNCHECKED_STRING(III)
 #define	WT_LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
 #define	WT_LOG_SKIP_HEADER(data)					\
