@@ -1,0 +1,11 @@
+selector:
+  js_test:
+    roots:
+      - jstests/readonly/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+        nodb: ""

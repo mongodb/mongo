@@ -1728,6 +1728,15 @@ tasks:
       resmoke_args: --suites=decimal --storageEngine=wiredTiger
       run_multiple_jobs: true
 
+- <<: *task_template
+  name: read_only
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=read_only
+      run_multiple_jobs: true
+
 - name: push
   patchable: false
   depends_on:
@@ -2246,6 +2255,7 @@ buildvariants:
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
   - name: read_concern_majority_passthrough_WT
+  - name: read_only
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -3918,6 +3928,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: read_concern_majority_passthrough_WT
+  - name: read_only
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_WT_ese
@@ -5445,6 +5456,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: read_concern_majority_passthrough_WT
+  - name: read_only
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_WT_ese
