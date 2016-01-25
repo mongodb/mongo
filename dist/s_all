@@ -88,7 +88,13 @@ COMMANDS="
 2>&1 ./s_win > ${t_pfx}s_win
 2>&1 ./s_docs > ${t_pfx}s_docs"
 
-echo "$COMMANDS" | xargs -P 20 -I{} /bin/sh -c {}
+# Parallelize if possible.
+xp=""
+echo date | xargs -P 20 >/dev/null 2>&1
+if test $? -eq 0; then
+	xp="-P 20"
+fi
+echo "$COMMANDS" | xargs $xp -I{} /bin/sh -c {}
 
 for f in `find . -name ${t_pfx}\*`; do
 	if ! `test -s $f`; then
