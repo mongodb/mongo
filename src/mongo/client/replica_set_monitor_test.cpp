@@ -100,6 +100,8 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSNotInitiated) {
     ASSERT_EQUALS(imr.hidden, false);
     ASSERT_EQUALS(imr.secondary, false);
     ASSERT_EQUALS(imr.isMaster, false);
+    ASSERT_EQUALS(imr.configVersion, 0);
+    ASSERT(!imr.electionId.isSet());
     ASSERT(imr.primary.empty());
     ASSERT(imr.normalHosts.empty());
     ASSERT(imr.tags.isEmpty());
@@ -108,8 +110,9 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSNotInitiated) {
 TEST(ReplicaSetMonitor, IsMasterReplyRSPrimary) {
     BSONObj ismaster = BSON("setName"
                             << "test"
-                            << "setVersion" << 1 << "ismaster" << true << "secondary" << false
-                            << "hosts" << BSON_ARRAY("mongo.example:3000") << "primary"
+                            << "setVersion" << 1 << "electionId" << OID("7fffffff0000000000000001")
+                            << "ismaster" << true << "secondary" << false << "hosts"
+                            << BSON_ARRAY("mongo.example:3000") << "primary"
                             << "mongo.example:3000"
                             << "me"
                             << "mongo.example:3000"
@@ -122,6 +125,8 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSPrimary) {
     ASSERT_EQUALS(imr.ok, true);
     ASSERT_EQUALS(imr.host.toString(), HostAndPort("mongo.example:3000").toString());
     ASSERT_EQUALS(imr.setName, "test");
+    ASSERT_EQUALS(imr.configVersion, 1);
+    ASSERT_EQUALS(imr.electionId, OID("7fffffff0000000000000001"));
     ASSERT_EQUALS(imr.hidden, false);
     ASSERT_EQUALS(imr.secondary, false);
     ASSERT_EQUALS(imr.isMaster, true);
@@ -133,8 +138,9 @@ TEST(ReplicaSetMonitor, IsMasterReplyRSPrimary) {
 TEST(ReplicaSetMonitor, IsMasterReplyPassiveSecondary) {
     BSONObj ismaster = BSON("setName"
                             << "test"
-                            << "setVersion" << 1 << "ismaster" << false << "secondary" << true
-                            << "hosts" << BSON_ARRAY("mongo.example:3000") << "passives"
+                            << "setVersion" << 2 << "electionId" << OID("7fffffff0000000000000001")
+                            << "ismaster" << false << "secondary" << true << "hosts"
+                            << BSON_ARRAY("mongo.example:3000") << "passives"
                             << BSON_ARRAY("mongo.example:3001") << "primary"
                             << "mongo.example:3000"
                             << "passive" << true << "me"
@@ -148,6 +154,7 @@ TEST(ReplicaSetMonitor, IsMasterReplyPassiveSecondary) {
     ASSERT_EQUALS(imr.ok, true);
     ASSERT_EQUALS(imr.host.toString(), HostAndPort("mongo.example:3001").toString());
     ASSERT_EQUALS(imr.setName, "test");
+    ASSERT_EQUALS(imr.configVersion, 2);
     ASSERT_EQUALS(imr.hidden, false);
     ASSERT_EQUALS(imr.secondary, true);
     ASSERT_EQUALS(imr.isMaster, false);
@@ -155,13 +162,15 @@ TEST(ReplicaSetMonitor, IsMasterReplyPassiveSecondary) {
     ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
     ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3001")));
     ASSERT(imr.tags.isEmpty());
+    ASSERT(!imr.electionId.isSet());
 }
 
 TEST(ReplicaSetMonitor, IsMasterReplyHiddenSecondary) {
     BSONObj ismaster = BSON("setName"
                             << "test"
-                            << "setVersion" << 1 << "ismaster" << false << "secondary" << true
-                            << "hosts" << BSON_ARRAY("mongo.example:3000") << "primary"
+                            << "setVersion" << 2 << "electionId" << OID("7fffffff0000000000000001")
+                            << "ismaster" << false << "secondary" << true << "hosts"
+                            << BSON_ARRAY("mongo.example:3000") << "primary"
                             << "mongo.example:3000"
                             << "passive" << true << "hidden" << true << "me"
                             << "mongo.example:3001"
@@ -174,20 +183,23 @@ TEST(ReplicaSetMonitor, IsMasterReplyHiddenSecondary) {
     ASSERT_EQUALS(imr.ok, true);
     ASSERT_EQUALS(imr.host.toString(), HostAndPort("mongo.example:3001").toString());
     ASSERT_EQUALS(imr.setName, "test");
+    ASSERT_EQUALS(imr.configVersion, 2);
     ASSERT_EQUALS(imr.hidden, true);
     ASSERT_EQUALS(imr.secondary, true);
     ASSERT_EQUALS(imr.isMaster, false);
     ASSERT_EQUALS(imr.primary.toString(), HostAndPort("mongo.example:3000").toString());
     ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3000")));
     ASSERT(imr.tags.isEmpty());
+    ASSERT(!imr.electionId.isSet());
 }
 
 TEST(ReplicaSetMonitor, IsMasterSecondaryWithTags) {
     BSONObj ismaster = BSON("setName"
                             << "test"
-                            << "setVersion" << 1 << "ismaster" << false << "secondary" << true
-                            << "hosts" << BSON_ARRAY("mongo.example:3000"
-                                                     << "mongo.example:3001") << "primary"
+                            << "setVersion" << 2 << "electionId" << OID("7fffffff0000000000000001")
+                            << "ismaster" << false << "secondary" << true << "hosts"
+                            << BSON_ARRAY("mongo.example:3000"
+                                          << "mongo.example:3001") << "primary"
                             << "mongo.example:3000"
                             << "me"
                             << "mongo.example:3001"
@@ -204,6 +216,7 @@ TEST(ReplicaSetMonitor, IsMasterSecondaryWithTags) {
     ASSERT_EQUALS(imr.ok, true);
     ASSERT_EQUALS(imr.host.toString(), HostAndPort("mongo.example:3001").toString());
     ASSERT_EQUALS(imr.setName, "test");
+    ASSERT_EQUALS(imr.configVersion, 2);
     ASSERT_EQUALS(imr.hidden, false);
     ASSERT_EQUALS(imr.secondary, true);
     ASSERT_EQUALS(imr.isMaster, false);
@@ -212,6 +225,7 @@ TEST(ReplicaSetMonitor, IsMasterSecondaryWithTags) {
     ASSERT(imr.normalHosts.count(HostAndPort("mongo.example:3001")));
     ASSERT(imr.tags.hasElement("dc"));
     ASSERT(imr.tags.hasElement("use"));
+    ASSERT(!imr.electionId.isSet());
     ASSERT_EQUALS(imr.tags["dc"].str(), "nyc");
     ASSERT_EQUALS(imr.tags["use"].str(), "production");
 }
@@ -888,10 +902,10 @@ TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
                                    BSON("setName"
                                         << "name"
                                         << "ismaster" << true << "secondary" << false
-                                        << "electionId" << secondElectionId << "hosts"
-                                        << BSON_ARRAY("a"
-                                                      << "b"
-                                                      << "c") << "ok" << true));
+                                        << "setVersion" << 1 << "electionId" << secondElectionId
+                                        << "hosts" << BSON_ARRAY("a"
+                                                                 << "b"
+                                                                 << "c") << "ok" << true));
 
         Node* node = state->findNode(ns.host);
         ASSERT(node);
@@ -966,6 +980,88 @@ TEST(ReplicaSetMonitor, PrimaryIsUpCheck) {
     state->nodes.front().isMaster = true;
     ReplicaSetMonitor rsm(state);
     ASSERT_TRUE(rsm.isKnownToHaveGoodPrimary());
+}
+
+/**
+ * Repl protocol verion 0 and 1 compatibility checking.
+ */
+TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasNewerConfigVersion) {
+    SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
+    Refresher refresher(state);
+
+    auto ns = refresher.getNextStep();
+    ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
+    ASSERT(basicSeedsSet.count(ns.host));
+
+    refresher.receivedIsMaster(ns.host,
+                               -1,
+                               BSON("setName"
+                                    << "name"
+                                    << "ismaster" << true << "secondary" << false << "setVersion"
+                                    << 1 << "electionId" << OID("7fffffff0000000000000001")
+                                    << "hosts" << BSON_ARRAY("a"
+                                                             << "b"
+                                                             << "c") << "ok" << true));
+
+    // check that the SetState's maxElectionId == primary's electionId
+    ASSERT_EQUALS(state->maxElectionId, OID("7fffffff0000000000000001"));
+    ASSERT_EQUALS(state->configVersion, 1);
+
+    const OID primaryElectionId = OID::gen();
+
+    // Newer setVersion, no election id
+    refresher.receivedIsMaster(ns.host,
+                               -1,
+                               BSON("setName"
+                                    << "name"
+                                    << "ismaster" << true << "secondary" << false << "setVersion"
+                                    << 2 << "electionId" << primaryElectionId << "hosts"
+                                    << BSON_ARRAY("a"
+                                                  << "b"
+                                                  << "c") << "ok" << true));
+
+    ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
+    ASSERT_EQUALS(state->configVersion, 2);
+}
+
+/**
+ * Repl protocol verion 0 and 1 compatibility checking.
+ */
+TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasOlderConfigVersion) {
+    SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
+    Refresher refresher(state);
+
+    auto ns = refresher.getNextStep();
+    ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
+    ASSERT(basicSeedsSet.count(ns.host));
+
+    const OID primaryElectionId = OID::gen();
+    refresher.receivedIsMaster(ns.host,
+                               -1,
+                               BSON("setName"
+                                    << "name"
+                                    << "ismaster" << true << "secondary" << false << "electionId"
+                                    << primaryElectionId << "setVersion" << 2 << "hosts"
+                                    << BSON_ARRAY("a"
+                                                  << "b"
+                                                  << "c") << "ok" << true));
+
+    ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
+    ASSERT_EQUALS(state->configVersion, 2);
+
+    // Older setVersion, but election id > previous election id. Newer setVersion should win.
+    refresher.receivedIsMaster(ns.host,
+                               -1,
+                               BSON("setName"
+                                    << "name"
+                                    << "ismaster" << true << "secondary" << false << "setVersion"
+                                    << 1 << "electionId" << OID("7fffffff0000000000000001")
+                                    << "hosts" << BSON_ARRAY("a"
+                                                             << "b"
+                                                             << "c") << "ok" << true));
+
+    ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
+    ASSERT_EQUALS(state->configVersion, 2);
 }
 
 }  // namespace
