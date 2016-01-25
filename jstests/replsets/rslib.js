@@ -160,8 +160,10 @@ awaitOpTime = function (node, opTime) {
 /**
  * Uses the results of running replSetGetStatus against an arbitrary replset node to wait until
  * all nodes in the set are replicated through the same optime.
+ * 'rs' is an array of connections to replica set nodes.  This function is useful when you
+ * don't have a ReplSetTest object to use, otherwise ReplSetTest.awaitReplication is preferred.
  */
-waitUntilAllNodesCaughtUp = function(rs) {
+waitUntilAllNodesCaughtUp = function(rs, timeout) {
     var rsStatus;
     var firstConflictingIndex;
     var ot;
@@ -185,7 +187,7 @@ waitUntilAllNodesCaughtUp = function(rs) {
     }, function () {
         return "Optimes of members 0 (" + tojson(ot) + ") and " + firstConflictingIndex + " (" +
             tojson(otherOt) + ") are different in " + tojson(rsStatus);
-    });
+    }, timeout);
 };
 
 /**
