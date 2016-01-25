@@ -593,11 +593,11 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
     }
 
     if (reply.isMaster) {
-        const bool stalePrimary = !receivedIsMasterFromMaster(reply);
-        if (stalePrimary) {
+        if (!receivedIsMasterFromMaster(reply)) {
             log() << "node " << from << " believes it is primary, but its election id of "
-                  << reply.electionId << " is older than the most recent election id"
-                  << " for this set, " << _set->maxElectionId;
+                  << reply.electionId << " and config version of " << reply.configVersion
+                  << " is older than the most recent election id " << _set->maxElectionId
+                  << " and config version of " << _set->configVersion;
             failedHost(from);
             return;
         }
@@ -672,12 +672,25 @@ ScanStatePtr Refresher::startNewScan(const SetState* set) {
 bool Refresher::receivedIsMasterFromMaster(const IsMasterReply& reply) {
     invariant(reply.isMaster);
 
+    // Reject if config version is older. This is for backwards compatibility with nodes in pv0
+    // since they don't have the same ordering with pv1 electionId.
+    if (reply.configVersion < _set->configVersion) {
+        return false;
+    }
+
     if (reply.electionId.isSet()) {
-        if (_set->maxElectionId.isSet() && _set->maxElectionId.compare(reply.electionId) > 0) {
+        // ElectionIds are only comparable if they are of the same protocol version. However, since
+        // isMaster has no protocol version field, we use the configVersion instead. This works
+        // because configVersion needs to be incremented whenever the protocol version is changed.
+        if (reply.configVersion == _set->configVersion && _set->maxElectionId.isSet() &&
+            _set->maxElectionId.compare(reply.electionId) > 0) {
             return false;
         }
+
         _set->maxElectionId = reply.electionId;
     }
+
+    _set->configVersion = reply.configVersion;
 
     // Mark all nodes as not master. We will mark ourself as master before releasing the lock.
     // NOTE: we use a "last-wins" policy if multiple hosts claim to be master.
@@ -850,6 +863,8 @@ void IsMasterReply::parse(const BSONObj& obj) {
         if (isMaster && raw.hasField("electionId")) {
             electionId = raw["electionId"].OID();
         }
+
+        configVersion = raw["setVersion"].numberInt();
 
         const string primaryString = raw["primary"].str();
         primary = primaryString.empty() ? HostAndPort() : HostAndPort(primaryString);
