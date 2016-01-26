@@ -68,8 +68,11 @@ public:
      * Initializes this ReplicaSetConfig from the contents of "cfg".
      * The default protocol version is 0 to keep backward-compatibility.
      * If usePV1ByDefault is true, the protocol version will be 1 when it's not specified in "cfg".
+     * Sets _replicaSetId to "defaultReplicaSetId" if a replica set ID is not specified in "cfg".
      */
-    Status initialize(const BSONObj& cfg, bool usePV1ByDefault = false);
+    Status initialize(const BSONObj& cfg,
+                      bool usePV1ByDefault = false,
+                      OID defaultReplicaSetId = OID());
 
     /**
      * Same as the generic initialize() above except will default "configsvr" setting to the value
@@ -294,6 +297,22 @@ public:
     }
 
     /**
+     * Returns true if this configuration contains a valid replica set ID.
+     * This ID is set at creation and is used to disambiguate replica set configurations that may
+     * have the same replica set name (_id field) but meant for different replica set instances.
+     */
+    bool hasReplicaSetId() const {
+        return _replicaSetId.isSet();
+    }
+
+    /**
+     * Returns replica set ID.
+     */
+    OID getReplicaSetId() const {
+        return _replicaSetId;
+    }
+
+    /**
      * Returns the duration to wait before running for election when this node (indicated by
      * "memberIdx") sees that it has higher priority than the current primary.
      */
@@ -320,7 +339,14 @@ private:
      */
     void _addInternalWriteConcernModes();
 
-    Status _initialize(const BSONObj& cfg, bool forInitiate, bool usePV1ByDefault);
+    /**
+     * Sets replica set ID to 'defaultReplicaSetId' if forInitiate is false and 'cfg' does not
+     * contain an ID.
+     */
+    Status _initialize(const BSONObj& cfg,
+                       bool forInitiate,
+                       bool usePV1ByDefault,
+                       OID defaultReplicaSetId);
 
     bool _isInitialized = false;
     long long _version = 1;
@@ -339,6 +365,7 @@ private:
     StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
     long long _protocolVersion = 0;
     bool _configServer = false;
+    OID _replicaSetId;
 };
 
 

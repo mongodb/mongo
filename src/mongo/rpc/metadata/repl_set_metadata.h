@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/bson/oid.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
@@ -55,6 +56,7 @@ public:
                     repl::OpTime committedOpTime,
                     repl::OpTime visibleOpTime,
                     long long configVersion,
+                    OID replicaSetId,
                     int currentPrimaryIndex,
                     int currentSyncSourceIndex);
 
@@ -65,6 +67,7 @@ public:
      *     lastOpCommitted: {ts: Timestamp(0, 0), term: 0},
      *     lastOpVisible: {ts: Timestamp(0, 0), term: 0},
      *     configVersion: 0,
+     *     replicaSetId: ObjectId("..."), // Only present in certain versions and above.
      *     primaryIndex: 0,
      *     syncSourceIndex: 0
      * }
@@ -91,6 +94,20 @@ public:
      */
     long long getConfigVersion() const {
         return _configVersion;
+    }
+
+    /**
+     * Returns true if the sender has a replica set ID.
+     */
+    bool hasReplicaSetId() const {
+        return _replicaSetId.isSet();
+    }
+
+    /**
+     * Returns the replica set ID of the sender.
+     */
+    OID getReplicaSetId() const {
+        return _replicaSetId;
     }
 
     /**
@@ -121,6 +138,7 @@ private:
     repl::OpTime _lastOpVisible = repl::OpTime(Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
     long long _currentTerm = -1;
     long long _configVersion = -1;
+    OID _replicaSetId;
     int _currentPrimaryIndex = kNoPrimary;
     int _currentSyncSourceIndex = -1;
 };

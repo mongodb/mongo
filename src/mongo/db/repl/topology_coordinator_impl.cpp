@@ -2363,6 +2363,7 @@ void TopologyCoordinatorImpl::prepareReplResponseMetadata(rpc::ReplSetMetadata* 
                              lastCommittedOpTime,
                              lastVisibleOpTime,
                              _rsConfig.getConfigVersion(),
+                             _rsConfig.getReplicaSetId(),
                              _currentPrimaryIndex,
                              _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()));
 }

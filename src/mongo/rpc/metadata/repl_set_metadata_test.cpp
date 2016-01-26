@@ -36,23 +36,30 @@ namespace {
 
 using repl::OpTime;
 
+TEST(ReplResponseMetadataTest, ReplicaSetIdNotSet) {
+    ASSERT_FALSE(ReplSetMetadata(3, OpTime(), OpTime(), 6, OID(), 12, -1).hasReplicaSetId());
+}
+
 TEST(ReplResponseMetadataTest, Roundtrip) {
     OpTime opTime(Timestamp(1234, 100), 5);
     OpTime opTime2(Timestamp(7777, 100), 6);
-    ReplSetMetadata metadata(3, opTime, opTime2, 6, 12, -1);
+    ReplSetMetadata metadata(3, opTime, opTime2, 6, OID::gen(), 12, -1);
 
     ASSERT_EQ(opTime, metadata.getLastOpCommitted());
     ASSERT_EQ(opTime2, metadata.getLastOpVisible());
+    ASSERT_TRUE(metadata.hasReplicaSetId());
 
     BSONObjBuilder builder;
     metadata.writeToMetadata(&builder);
 
-    BSONObj expectedObj(BSON(
-        kReplSetMetadataFieldName << BSON(
-            "term" << 3 << "lastOpCommitted" << BSON("ts" << opTime.getTimestamp() << "t"
-                                                          << opTime.getTerm()) << "lastOpVisible"
-                   << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
-                   << "configVersion" << 6 << "primaryIndex" << 12 << "syncSourceIndex" << -1)));
+    BSONObj expectedObj(
+        BSON(kReplSetMetadataFieldName
+             << BSON("term" << 3 << "lastOpCommitted"
+                            << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())
+                            << "lastOpVisible"
+                            << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
+                            << "configVersion" << 6 << "replicaSetId" << metadata.getReplicaSetId()
+                            << "primaryIndex" << 12 << "syncSourceIndex" << -1)));
 
     BSONObj serializedObj = builder.obj();
     ASSERT_EQ(expectedObj, serializedObj);
@@ -63,6 +70,8 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     const auto& clonedMetadata = cloneStatus.getValue();
     ASSERT_EQ(opTime, clonedMetadata.getLastOpCommitted());
     ASSERT_EQ(opTime2, clonedMetadata.getLastOpVisible());
+    ASSERT_EQ(metadata.getConfigVersion(), clonedMetadata.getConfigVersion());
+    ASSERT_EQ(metadata.getReplicaSetId(), clonedMetadata.getReplicaSetId());
 
     BSONObjBuilder clonedBuilder;
     clonedMetadata.writeToMetadata(&clonedBuilder);
