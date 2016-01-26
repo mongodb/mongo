@@ -33,6 +33,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/near.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -44,59 +45,6 @@ using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
-
-/**
- * Stage which takes in an array of BSONObjs and returns them.
- * If the BSONObj is in the form of a Status, returns the Status as a FAILURE.
- */
-class MockStage final : public PlanStage {
-public:
-    MockStage(const vector<BSONObj>& data, WorkingSet* workingSet)
-        : PlanStage("MOCK_STAGE", nullptr), _data(data), _pos(0), _workingSet(workingSet) {}
-
-    StageState doWork(WorkingSetID* out) final {
-        if (isEOF())
-            return PlanStage::IS_EOF;
-
-        BSONObj next = _data[_pos++];
-
-        if (WorkingSetCommon::isValidStatusMemberObject(next)) {
-            Status status = WorkingSetCommon::getMemberObjectStatus(next);
-            *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
-            return PlanStage::FAILURE;
-        }
-
-        *out = _workingSet->allocate();
-        WorkingSetMember* member = _workingSet->get(*out);
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), next);
-        member->transitionToOwnedObj();
-
-        return PlanStage::ADVANCED;
-    }
-
-    bool isEOF() final {
-        return _pos == static_cast<int>(_data.size());
-    }
-
-    StageType stageType() const final {
-        return STAGE_UNKNOWN;
-    }
-
-    unique_ptr<PlanStageStats> getStats() final {
-        return make_unique<PlanStageStats>(_commonStats, STAGE_UNKNOWN);
-    }
-
-    const SpecificStats* getSpecificStats() const final {
-        return NULL;
-    }
-
-private:
-    vector<BSONObj> _data;
-    int _pos;
-
-    // Not owned here
-    WorkingSet* const _workingSet;
-};
 
 /**
  * Stage which implements a basic distance search, and interprets the "distance" field of
@@ -129,7 +77,19 @@ public:
         const MockInterval& interval = *_intervals.vector()[_pos++];
 
         bool lastInterval = _pos == static_cast<int>(_intervals.vector().size());
-        _children.emplace_back(new MockStage(interval.data, workingSet));
+
+        auto queuedStage = make_unique<QueuedDataStage>(txn, workingSet);
+
+        for (unsigned int i = 0; i < interval.data.size(); i++) {
+            // Add all documents from the lastInterval into the QueuedDataStage.
+            const WorkingSetID id = workingSet->allocate();
+            WorkingSetMember* member = workingSet->get(id);
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), interval.data[i]);
+            workingSet->transitionToOwnedObj(id);
+            queuedStage->pushBack(id);
+        }
+
+        _children.push_back(std::move(queuedStage));
         return StatusWith<CoveredInterval*>(new CoveredInterval(
             _children.back().get(), true, interval.min, interval.max, lastInterval));
     }
