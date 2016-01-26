@@ -40,6 +40,7 @@
 namespace mongo {
 
 class DatabaseCatalogEntry;
+class JournalListener;
 class OperationContext;
 class RecoveryUnit;
 class SnapshotManager;
@@ -266,6 +267,12 @@ public:
     virtual SnapshotManager* getSnapshotManager() const {
         return nullptr;
     }
+
+    /**
+     * Sets a new JournalListener, which is used by the storage engine to alert the rest of the
+     * system about journaled write progress.
+     */
+    virtual void setJournalListener(JournalListener* jl) = 0;
 
 protected:
     /**

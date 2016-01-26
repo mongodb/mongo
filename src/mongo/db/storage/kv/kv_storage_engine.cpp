@@ -287,4 +287,8 @@ Status KVStorageEngine::repairRecordStore(OperationContext* txn, const std::stri
     _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(txn, ns);
     return Status::OK();
 }
+
+void KVStorageEngine::setJournalListener(JournalListener* jl) {
+    _engine->setJournalListener(jl);
+}
 }

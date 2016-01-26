@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/storage/journal_listener.h"
 
 namespace mongo {
 
@@ -41,7 +42,6 @@ namespace dur {
 
 // a smaller limit is likely better on 32 bit
 const unsigned UncommittedBytesLimit = (sizeof(void*) == 4) ? 50 * 1024 * 1024 : 512 * 1024 * 1024;
-
 
 class DurableInterface {
     MONGO_DISALLOW_COPYING(DurableInterface);
@@ -147,6 +147,13 @@ private:
  * Does nothing if storageGlobalParams.dur is false
  */
 void startup();
+
+// Sets a new JournalListener, which is used to alert the rest of the system about
+// journaled write progress.
+void setJournalListener(JournalListener* jl);
+
+// Expose the JournalListener, needed for the journal writer thread.
+JournalListener* getJournalListener();
 
 }  // namespace dur
 

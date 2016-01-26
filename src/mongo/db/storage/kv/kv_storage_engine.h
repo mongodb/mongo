@@ -33,6 +33,7 @@
 #include <map>
 #include <string>
 
+#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -94,6 +95,8 @@ public:
     virtual void cleanShutdown();
 
     SnapshotManager* getSnapshotManager() const final;
+
+    void setJournalListener(JournalListener* jl) final;
 
     // ------ kv ------
 

@@ -36,6 +36,7 @@ env.Library(
         'logfile',
         'compress',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/storage/journal_listener',
         '$BUILD_DIR/mongo/db/storage/paths',
     ],
     LIBDEPS_TAGS=[

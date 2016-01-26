@@ -33,6 +33,7 @@
 #include "mongo/db/storage/mmap_v1/dur_journal_writer.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
@@ -236,7 +237,8 @@ void JournalWriter::_journalWriterThread() {
             WRITETOJOURNAL(buffer->_header, buffer->_builder);
 
             // Data is now persisted in the journal, which is sufficient for acknowledging
-            // getLastError
+            // durability.
+            dur::getJournalListener()->onDurable(buffer->journalListenerToken);
             _commitNotify->notifyAll(buffer->_commitNumber);
 
             // Apply the journal entries on top of the shared view so that when flush is

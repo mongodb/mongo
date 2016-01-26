@@ -53,6 +53,7 @@
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/server_parameters.h"
@@ -108,6 +109,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
         _snapshotThread = SnapshotThread::start(getGlobalServiceContext());
     }
     _startedThreads = true;
+    getGlobalServiceContext()->getGlobalStorageEngine()->setJournalListener(this);
 }
 
 void ReplicationCoordinatorExternalStateImpl::startMasterSlave(OperationContext* txn) {
@@ -428,6 +430,14 @@ bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageE
     // This should never be called if the storage engine has not been initialized.
     invariant(storageEngine);
     return storageEngine->getSnapshotManager();
+}
+
+JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {
+    return repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();
+}
+
+void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& token) {
+    repl::getGlobalReplicationCoordinator()->setMyLastDurableOpTimeForward(token);
 }
 
 }  // namespace repl

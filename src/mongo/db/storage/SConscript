@@ -12,6 +12,15 @@ env.SConscript(
 
 
 env.Library(
+    target='journal_listener',
+    source=[
+        'journal_listener.cpp',
+        ],
+    LIBDEPS=[
+        ],
+    )
+
+env.Library(
     target='index_entry_comparison',
     source=[
         'index_entry_comparison.cpp',

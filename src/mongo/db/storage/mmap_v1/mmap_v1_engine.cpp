@@ -359,4 +359,8 @@ void MMAPV1Engine::cleanShutdown() {
     MemoryMappedFile::closeAllFiles(ss3);
     log() << ss3.str() << endl;
 }
+
+void MMAPV1Engine::setJournalListener(JournalListener* jl) {
+    dur::setJournalListener(jl);
+}
 }

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/stdx/thread.h"
@@ -67,6 +68,8 @@ public:
         void setNoop() {
             _isNoop = true;
         }
+
+        JournalListener::Token journalListenerToken;
 
     private:
         friend class BufferGuard;

@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+class JournalListener;
+
 class EphemeralForTestEngine : public KVEngine {
 public:
     virtual RecoveryUnit* newRecoveryUnit();
@@ -95,6 +97,8 @@ public:
     }
 
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const;
+
+    void setJournalListener(JournalListener* jl) final {}
 
 private:
     typedef StringMap<std::shared_ptr<void>> DataMap;

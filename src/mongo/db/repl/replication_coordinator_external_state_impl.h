@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/sync_source_feedback.h"
+#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -43,7 +44,8 @@ namespace repl {
 
 class SnapshotThread;
 
-class ReplicationCoordinatorExternalStateImpl : public ReplicationCoordinatorExternalState {
+class ReplicationCoordinatorExternalStateImpl : public ReplicationCoordinatorExternalState,
+                                                public JournalListener {
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
 
 public:
@@ -83,6 +85,10 @@ public:
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const;
 
     std::string getNextOpContextThreadName();
+
+    // Methods from JournalListener.
+    virtual JournalListener::Token getToken();
+    virtual void onDurable(const JournalListener::Token& token);
 
 private:
     // Guards starting threads and setting _startedThreads

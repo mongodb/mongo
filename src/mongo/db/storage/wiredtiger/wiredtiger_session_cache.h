@@ -37,6 +37,7 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <wiredtiger.h>
 
+#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
@@ -171,6 +172,8 @@ public:
         return _snapshotManager;
     }
 
+    void setJournalListener(JournalListener* jl);
+
 private:
     WiredTigerKVEngine* _engine;  // not owned, might be NULL
     WT_CONNECTION* _conn;         // not owned
@@ -192,5 +195,10 @@ private:
     // Counter and critical section mutex for waitUntilDurable
     AtomicUInt32 _lastSyncTime;
     stdx::mutex _lastSyncMutex;
+
+    // Notified when we commit to the journal.
+    JournalListener* _journalListener = &NoOpJournalListener::instance;
+    // Protects _journalListener.
+    stdx::mutex _journalListenerMutex;
 };
 }  // namespace

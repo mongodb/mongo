@@ -40,6 +40,7 @@
 namespace mongo {
 
 class IndexDescriptor;
+class JournalListener;
 class OperationContext;
 class RecordStore;
 class RecoveryUnit;
@@ -159,6 +160,12 @@ public:
     virtual SnapshotManager* getSnapshotManager() const {
         return nullptr;
     }
+
+    /**
+     * Sets a new JournalListener, which is used to alert the rest of the
+     * system about journaled write progress.
+     */
+    virtual void setJournalListener(JournalListener* jl) = 0;
 
     /**
      * The destructor will never be called from mongod, but may be called from tests.
