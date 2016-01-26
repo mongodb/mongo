@@ -45,6 +45,7 @@
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -315,10 +316,19 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             // We pass the SometimesCache option to the MPS because the SubplanStage currently does
             // not use the CachedPlanStage's eviction mechanism. We therefore are more conservative
             // about putting a potentially bad plan into the cache in the subplan path.
-            MultiPlanStage multiPlanStage(getOpCtx(),
-                                          _collection,
-                                          branchResult->canonicalQuery.get(),
-                                          MultiPlanStage::CachingMode::SometimesCache);
+            // We temporarily add the MPS to _children to ensure that we pass down all
+            // save/restore/invalidate messages that can be generated if pickBestPlan yields.
+            invariant(_children.empty());
+            _children.emplace_back(
+                stdx::make_unique<MultiPlanStage>(getOpCtx(),
+                                                  _collection,
+                                                  branchResult->canonicalQuery.get(),
+                                                  MultiPlanStage::CachingMode::SometimesCache));
+            ON_BLOCK_EXIT([&] {
+                invariant(_children.size() == 1);  // Make sure nothing else was added to _children.
+                _children.pop_back();
+            });
+            MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
             // Dump all the solutions into the MPS.
             for (size_t ix = 0; ix < branchResult->solutions.size(); ++ix) {
@@ -331,22 +341,22 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
                                               &nextPlanRoot));
 
                 // Takes ownership of solution with index 'ix' and 'nextPlanRoot'.
-                multiPlanStage.addPlan(branchResult->solutions.releaseAt(ix), nextPlanRoot, _ws);
+                multiPlanStage->addPlan(branchResult->solutions.releaseAt(ix), nextPlanRoot, _ws);
             }
 
-            Status planSelectStat = multiPlanStage.pickBestPlan(yieldPolicy);
+            Status planSelectStat = multiPlanStage->pickBestPlan(yieldPolicy);
             if (!planSelectStat.isOK()) {
                 return planSelectStat;
             }
 
-            if (!multiPlanStage.bestPlanChosen()) {
+            if (!multiPlanStage->bestPlanChosen()) {
                 mongoutils::str::stream ss;
                 ss << "Failed to pick best plan for subchild "
                    << branchResult->canonicalQuery->toString();
                 return Status(ErrorCodes::BadValue, ss);
             }
 
-            QuerySolution* bestSoln = multiPlanStage.bestSolution();
+            QuerySolution* bestSoln = multiPlanStage->bestSolution();
 
             // Check that we have good cache data. For example, we don't cache things
             // for 2d indices.
