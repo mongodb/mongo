@@ -4388,6 +4388,7 @@ buildvariants:
   batchtime: 2880 # 2 days
   stepback: false
   expansions:
+    tooltags: -gccgoflags '-static-libgo'
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1504 --release -j8 CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium"
     num_jobs_available: 4
     test_flags: --continueOnFailure --excludeWithAnyTags=requires_ssl_mongo_tools
