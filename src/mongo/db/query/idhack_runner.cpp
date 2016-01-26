@@ -146,6 +146,14 @@ namespace {
                             _done = true;
                             return Runner::RUNNER_DEAD;
                         }
+
+                        // Even if we're not dead due to something like a db or collection drop, the
+                        // document we're looking for may have already been deleted out from under
+                        // us.
+                        if (_locFetching.isNull()) {
+                            _done = true;
+                            return Runner::RUNNER_EOF;
+                        }
                     }
                 }
 
@@ -233,7 +241,6 @@ namespace {
         if (_done || _killed) { return; }
         if (_locFetching == dl && (type == INVALIDATION_DELETION)) {
             _locFetching = DiskLoc();
-            _killed = true;
         }
     }
 
