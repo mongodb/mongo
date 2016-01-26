@@ -117,7 +117,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionExisting) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, 30, -1);
+        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -179,7 +179,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, 30, -1);
+        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -505,7 +505,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, 30, -1);
+        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -1017,7 +1017,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsNoDb) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, 30, -1);
+        ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -2297,7 +2297,7 @@ TEST_F(CatalogManagerReplSetTest, BasicReadAfterOpTime) {
             ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
             checkReadConcern(request.cmdObj, lastOpTime.getTimestamp(), lastOpTime.getTerm());
 
-            ReplSetMetadata metadata(10, repl::OpTime(), newOpTime, 100, 30, -1);
+            ReplSetMetadata metadata(10, repl::OpTime(), newOpTime, 100, OID(), 30, -1);
             BSONObjBuilder builder;
             metadata.writeToMetadata(&builder);
 
@@ -2332,7 +2332,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
         ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
         checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-        ReplSetMetadata metadata(10, repl::OpTime(), newOpTime, 100, 30, -1);
+        ReplSetMetadata metadata(10, repl::OpTime(), newOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -2360,7 +2360,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
         ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
         checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-        ReplSetMetadata metadata(10, repl::OpTime(), oldOpTime, 100, 30, -1);
+        ReplSetMetadata metadata(10, repl::OpTime(), oldOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -2384,7 +2384,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
         ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
         checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-        ReplSetMetadata metadata(10, repl::OpTime(), oldOpTime, 100, 30, -1);
+        ReplSetMetadata metadata(10, repl::OpTime(), oldOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -2409,7 +2409,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeFindThenCmd) {
             ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
             checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-            ReplSetMetadata metadata(10, repl::OpTime(), newOpTime, 100, 30, -1);
+            ReplSetMetadata metadata(10, repl::OpTime(), newOpTime, 100, OID(), 30, -1);
             BSONObjBuilder builder;
             metadata.writeToMetadata(&builder);
 
@@ -2468,7 +2468,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
         ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
         checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-        ReplSetMetadata metadata(10, repl::OpTime(), newOpTime, 100, 30, -1);
+        ReplSetMetadata metadata(10, repl::OpTime(), newOpTime, 100, OID(), 30, -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 

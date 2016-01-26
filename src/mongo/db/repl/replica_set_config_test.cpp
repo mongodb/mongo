@@ -952,7 +952,8 @@ bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
         a.isConfigServer() == b.isConfigServer() &&
         a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
         a.getDefaultWriteConcern().wMode == b.getDefaultWriteConcern().wMode &&
-        a.getProtocolVersion() == b.getProtocolVersion();
+        a.getProtocolVersion() == b.getProtocolVersion() &&
+        a.getReplicaSetId() == b.getReplicaSetId();
 }
 
 TEST(ReplicaSetConfig, toBSONRoundTripAbility) {
@@ -964,7 +965,8 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbility) {
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")) << "settings"
                                       << BSON("heartbeatIntervalMillis"
-                                              << 5000 << "heartbeatTimeoutSecs" << 20))));
+                                              << 5000 << "heartbeatTimeoutSecs" << 20
+                                              << "replicaSetId" << OID::gen()))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_TRUE(configA == configB);
 }
@@ -1252,6 +1254,91 @@ TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
     ASSERT_EQUALS(Milliseconds(3000), configB.getPriorityTakeoverDelay(2));
     ASSERT_EQUALS(Milliseconds(1000), configB.getPriorityTakeoverDelay(3));
     ASSERT_EQUALS(Milliseconds(1000), configB.getPriorityTakeoverDelay(4));
+}
+
+TEST(ReplicaSetConfig, ReplSetId) {
+    // Uninitialized configuration has no ID.
+    ASSERT_FALSE(ReplicaSetConfig().hasReplicaSetId());
+
+    // Cannot provide replica set ID in configuration document when initialized from
+    // replSetInitiate.
+    auto status =
+        ReplicaSetConfig().initializeForInitiate(BSON("_id"
+                                                      << "rs0"
+                                                      << "version" << 1 << "members"
+                                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                               << "localhost:12345"
+                                                                               << "priority" << 1))
+                                                      << "settings"
+                                                      << BSON("replicaSetId" << OID::gen())));
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "replica set configuration cannot contain 'replicaSetId' field when "
+                           "called from replSetInitiate");
+
+
+    // Configuration created by replSetInitiate should generate replica set ID.
+    ReplicaSetConfig configInitiate;
+    ASSERT_OK(
+        configInitiate.initializeForInitiate(BSON("_id"
+                                                  << "rs0"
+                                                  << "version" << 1 << "members"
+                                                  << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                           << "localhost:12345"
+                                                                           << "priority" << 1)))));
+    ASSERT_OK(configInitiate.validate());
+    ASSERT_TRUE(configInitiate.hasReplicaSetId());
+    OID replicaSetId = configInitiate.getReplicaSetId();
+
+    // Configuration initialized from local database can contain ID.
+    ReplicaSetConfig configLocal;
+    ASSERT_OK(configLocal.initialize(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "localhost:12345"
+                                                                   << "priority" << 1))
+                                          << "settings" << BSON("replicaSetId" << replicaSetId))));
+    ASSERT_OK(configLocal.validate());
+    ASSERT_TRUE(configLocal.hasReplicaSetId());
+    ASSERT_EQUALS(replicaSetId, configLocal.getReplicaSetId());
+
+    // When reconfiguring, we can provide an default ID if the configuration does not contain one.
+    OID defaultReplicaSetId = OID::gen();
+    ASSERT_OK(configLocal.initialize(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                   << "localhost:12345"
+                                                                   << "priority" << 1))),
+                                     true,
+                                     defaultReplicaSetId));
+    ASSERT_OK(configLocal.validate());
+    ASSERT_TRUE(configLocal.hasReplicaSetId());
+    ASSERT_EQUALS(defaultReplicaSetId, configLocal.getReplicaSetId());
+
+    // 'replicaSetId' field cannot be null.
+    status = configLocal.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345"
+                                                                  << "priority" << 1)) << "settings"
+                                         << BSON("replicaSetId" << OID())));
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "replicaSetId field value cannot be null");
+
+    // 'replicaSetId' field must be an OID.
+    status = configLocal.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345"
+                                                                  << "priority" << 1)) << "settings"
+                                         << BSON("replicaSetId" << 12345)));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "\"replicaSetId\" had the wrong type. Expected OID, found NumberInt32");
 }
 
 }  // namespace

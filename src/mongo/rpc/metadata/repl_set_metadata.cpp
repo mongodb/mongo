@@ -45,6 +45,7 @@ namespace {
 const char kLastOpCommittedFieldName[] = "lastOpCommitted";
 const char kLastOpVisibleFieldName[] = "lastOpVisible";
 const char kConfigVersionFieldName[] = "configVersion";
+const char kReplicaSetIdFieldName[] = "replicaSetId";
 const char kPrimaryIndexFieldName[] = "primaryIndex";
 const char kSyncSourceIndexFieldName[] = "syncSourceIndex";
 const char kTermFieldName[] = "term";
@@ -59,12 +60,14 @@ ReplSetMetadata::ReplSetMetadata(long long term,
                                  OpTime committedOpTime,
                                  OpTime visibleOpTime,
                                  long long configVersion,
+                                 OID id,
                                  int currentPrimaryIndex,
                                  int currentSyncSourceIndex)
     : _lastOpCommitted(std::move(committedOpTime)),
       _lastOpVisible(std::move(visibleOpTime)),
       _currentTerm(term),
       _configVersion(configVersion),
+      _replicaSetId(id),
       _currentPrimaryIndex(currentPrimaryIndex),
       _currentSyncSourceIndex(currentSyncSourceIndex) {}
 
@@ -79,6 +82,11 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
 
     long long configVersion;
     status = bsonExtractIntegerField(replMetadataObj, kConfigVersionFieldName, &configVersion);
+    if (!status.isOK())
+        return status;
+
+    OID id;
+    status = bsonExtractOIDFieldWithDefault(replMetadataObj, kReplicaSetIdFieldName, OID(), &id);
     if (!status.isOK())
         return status;
 
@@ -108,7 +116,7 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
         return status;
 
     return ReplSetMetadata(
-        term, lastOpCommitted, lastOpVisible, configVersion, primaryIndex, syncSourceIndex);
+        term, lastOpCommitted, lastOpVisible, configVersion, id, primaryIndex, syncSourceIndex);
 }
 
 Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
@@ -117,6 +125,7 @@ Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     _lastOpCommitted.append(&replMetadataBuilder, kLastOpCommittedFieldName);
     _lastOpVisible.append(&replMetadataBuilder, kLastOpVisibleFieldName);
     replMetadataBuilder.append(kConfigVersionFieldName, _configVersion);
+    replMetadataBuilder.append(kReplicaSetIdFieldName, _replicaSetId);
     replMetadataBuilder.append(kPrimaryIndexFieldName, _currentPrimaryIndex);
     replMetadataBuilder.append(kSyncSourceIndexFieldName, _currentSyncSourceIndex);
     replMetadataBuilder.doneFast();
