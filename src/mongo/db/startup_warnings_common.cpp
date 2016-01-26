@@ -35,8 +35,6 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
-#include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
@@ -46,7 +44,7 @@ namespace mongo {
 //
 // system warnings
 //
-void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
+void logCommonStartupWarnings() {
     // each message adds a leading and a trailing newline
 
     bool warned = false;
@@ -60,20 +58,6 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
             log() << "**       Not recommended for production." << startupWarningsLog;
             warned = true;
         }
-    }
-
-    if ((getGlobalAuthorizationManager()->isAuthEnabled() ||
-         serverParams.clusterAuthMode.load() != ServerGlobalParams::ClusterAuthMode_undefined) &&
-        (serverParams.rest || serverParams.isHttpInterfaceEnabled || serverParams.jsonp)) {
-        log() << startupWarningsLog;
-        log()
-            << "** WARNING: The server is started with the web server interface and access control."
-            << startupWarningsLog;
-        log() << "**          The web interfaces (rest, httpinterface and/or jsonp) are insecure "
-              << startupWarningsLog;
-        log() << "**          and should be disabled unless required for backward compatability."
-              << startupWarningsLog;
-        warned = true;
     }
 
 #if defined(_WIN32) && !defined(_WIN64)

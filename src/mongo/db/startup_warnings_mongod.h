@@ -32,7 +32,6 @@
 namespace mongo {
 
 struct StorageGlobalParams;
-struct ServerGlobalParams;
 
 class StartupWarningsMongod {
 private:
@@ -55,6 +54,5 @@ public:
 
 // Checks various startup conditions and logs any necessary warnings that
 // are specific to the mongod process.
-void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
-                              const ServerGlobalParams& serverParams);
+void logMongodStartupWarnings(const StorageGlobalParams& params);
 }  // namespace mongo
