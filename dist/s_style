@@ -4,6 +4,13 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
+# Parallelize if possible.
+xp=""
+echo date | xargs -P 20 >/dev/null 2>&1
+if test $? -eq 0; then
+	xp="-P 20"
+fi
+
 # s_style is re-entrant, when run with no parameters it calls itself
 # again for each file that needs checking.
 if [ $# -ne 1 ]; then
@@ -12,7 +19,7 @@ if [ $# -ne 1 ]; then
 	find bench examples ext src test \
 	    -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
 	sed -e '/Makefile.in/d' -e '/build_win\/wiredtiger_config.h/d' |
-	xargs -P 20 -n 1 -I{} sh ./dist/s_style {}
+	xargs $xp -n 1 -I{} sh ./dist/s_style {}
 else
 	# General style correction and cleanup for a single file
 	f=$1
