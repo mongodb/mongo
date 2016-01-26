@@ -184,7 +184,7 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 			    session->ckpt_handle[i].dhandle,
 			    ret = (*op)(session, cfg));
 		else
-			WT_WITH_HANDLE_LIST_LOCK(session,
+			WT_WITH_HANDLE_LIST_LOCK(session, ret,
 			    ret = __wt_conn_btree_apply_single(session,
 			    session->ckpt_handle[i].name, NULL, op, cfg));
 		WT_RET(ret);
@@ -385,9 +385,9 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Get a list of handles we want to flush; this may pull closed objects
 	 * into the session cache, but we're going to do that eventually anyway.
 	 */
-	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_TABLE_LOCK(session,
-		WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_SCHEMA_LOCK(session, ret,
+	    WT_WITH_TABLE_LOCK(session, ret,
+		WT_WITH_HANDLE_LIST_LOCK(session, ret,
 		    ret = __checkpoint_apply_all(
 		    session, cfg, __wt_checkpoint_list, NULL))));
 	WT_ERR(ret);
@@ -666,7 +666,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
 
-	WT_WITH_CHECKPOINT_LOCK(session, ret = __txn_checkpoint(session, cfg));
+	WT_WITH_CHECKPOINT_LOCK(session, ret,
+	    ret = __txn_checkpoint(session, cfg));
 
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
 

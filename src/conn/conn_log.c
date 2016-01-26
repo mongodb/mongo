@@ -705,12 +705,12 @@ __log_server(void *arg)
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 	int freq_per_sec;
-	bool signalled;
+	bool locked, signalled;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	signalled = false;
+	locked = signalled = false;
 
 	/*
 	 * Set this to the number of times per second we want to force out the
@@ -751,8 +751,22 @@ __log_server(void *arg)
 			/*
 			 * Perform log pre-allocation.
 			 */
-			if (conn->log_prealloc > 0)
-				WT_ERR(__log_prealloc_once(session));
+			if (conn->log_prealloc > 0) {
+				/*
+				 * Log file pre-allocation is disabled when a
+				 * hot backup cursor is open because we have
+				 * agreed not to rename or remove any files in
+				 * the database directory.
+				 */
+				WT_ERR(__wt_readlock(
+				    session, conn->hot_backup_lock));
+				locked = true;
+				if (!conn->hot_backup)
+					WT_ERR(__log_prealloc_once(session));
+				WT_ERR(__wt_readunlock(
+				    session, conn->hot_backup_lock));
+				locked = false;
+			}
 
 			/*
 			 * Perform the archive.
@@ -779,6 +793,9 @@ __log_server(void *arg)
 
 	if (0) {
 err:		__wt_err(session, ret, "log server error");
+		if (locked)
+			WT_TRET(__wt_readunlock(
+			    session, conn->hot_backup_lock));
 	}
 	return (WT_THREAD_RET_VALUE);
 }

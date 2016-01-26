@@ -206,7 +206,7 @@ __wt_metadata_update(
 	    __metadata_turtle(key) ? "" : "not "));
 
 	if (__metadata_turtle(key)) {
-		WT_WITH_TURTLE_LOCK(session,
+		WT_WITH_TURTLE_LOCK(session, ret,
 		    ret = __wt_turtle_update(session, key, value));
 		return (ret);
 	}

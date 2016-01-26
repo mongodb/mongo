@@ -206,14 +206,11 @@ public class PackOutputStream {
         } else {
             stringLen = value.length();
         }
-        if (havesize) {
+        if (havesize || fieldFormat == 's') {
             size = format.getLengthFromFormat(true);
             if (stringLen > size) {
                 stringLen = size;
             }
-        } else if (fieldFormat == 's') {
-            havesize = true;
-            size = 1;
         }
 
         if (fieldFormat == 'S' && !havesize) {
