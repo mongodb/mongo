@@ -400,6 +400,11 @@ void remapPrivateViewImpl(double fraction) {
 DurableImpl durableImpl;
 NonDurableImpl nonDurableImpl;
 
+// Notified when we commit to the journal.
+static JournalListener* journalListener = &NoOpJournalListener::instance;
+// Protects journalListener.
+static stdx::mutex journalListenerMutex;
+
 }  // namespace
 
 
@@ -730,6 +735,7 @@ static void durThread() {
                 // writes (hasWritten == false).
                 JournalWriter::Buffer* const buffer = journalWriter.newBuffer();
                 buffer->setNoop();
+                buffer->journalListenerToken = getJournalListener()->getToken();
 
                 journalWriter.writeBuffer(buffer, commitNumber);
             } else {
@@ -794,6 +800,7 @@ static void durThread() {
                     autoFlushLock.release();
                 }
 
+                buffer->journalListenerToken = getJournalListener()->getToken();
                 // Request async I/O to the journal. This may block.
                 journalWriter.writeBuffer(buffer, commitNumber);
 
@@ -884,6 +891,16 @@ void startup() {
 
     durableImpl.start();
     DurableInterface::_impl = &durableImpl;
+}
+
+void setJournalListener(JournalListener* jl) {
+    stdx::unique_lock<stdx::mutex> lk(journalListenerMutex);
+    journalListener = jl;
+}
+
+JournalListener* getJournalListener() {
+    stdx::unique_lock<stdx::mutex> lk(journalListenerMutex);
+    return journalListener;
 }
 
 }  // namespace dur

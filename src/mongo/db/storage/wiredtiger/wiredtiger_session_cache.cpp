@@ -34,6 +34,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/memory.h"
@@ -166,7 +167,12 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
         WiredTigerSession* session = getSession();
         ON_BLOCK_EXIT([this, session] { releaseSession(session); });
         WT_SESSION* s = session->getSession();
-        invariantWTOK(s->checkpoint(s, NULL));
+        {
+            stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
+            JournalListener::Token token = _journalListener->getToken();
+            invariantWTOK(s->checkpoint(s, NULL));
+            _journalListener->onDurable(token);
+        }
         LOG(4) << "created checkpoint (forced)";
         return;
     }
@@ -189,7 +195,12 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
 
     // Use the journal when available, or a checkpoint otherwise.
     if (_engine->isDurable()) {
-        invariantWTOK(s->log_flush(s, "sync=on"));
+        {
+            stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
+            JournalListener::Token token = _journalListener->getToken();
+            invariantWTOK(s->log_flush(s, "sync=on"));
+            _journalListener->onDurable(token);
+        }
         LOG(4) << "flushed journal";
     } else {
         invariantWTOK(s->checkpoint(s, NULL));
@@ -277,5 +288,10 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
 
     if (_engine && _engine->haveDropsQueued())
         _engine->dropAllQueued();
+}
+
+void WiredTigerSessionCache::setJournalListener(JournalListener* jl) {
+    stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
+    _journalListener = jl;
 }
 }

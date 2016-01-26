@@ -51,6 +51,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
@@ -690,5 +691,9 @@ void WiredTigerKVEngine::_checkIdentPath(StringData ident) {
 
         start = idx + 1;
     }
+}
+
+void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
+    return _sessionCache->setJournalListener(jl);
 }
 }

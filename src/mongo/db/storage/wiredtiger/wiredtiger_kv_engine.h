@@ -44,6 +44,7 @@
 
 namespace mongo {
 
+class JournalListener;
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 
@@ -120,6 +121,8 @@ public:
     SnapshotManager* getSnapshotManager() const final {
         return &_sessionCache->snapshotManager();
     }
+
+    void setJournalListener(JournalListener* jl) final;
 
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION

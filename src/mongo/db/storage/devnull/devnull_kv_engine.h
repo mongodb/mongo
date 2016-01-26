@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+class JournalListener;
+
 class DevNullKVEngine : public KVEngine {
 public:
     virtual ~DevNullKVEngine() {}
@@ -99,6 +101,8 @@ public:
     }
 
     virtual void cleanShutdown(){};
+
+    void setJournalListener(JournalListener* jl) final {}
 
 private:
     std::shared_ptr<void> _catalogInfo;
