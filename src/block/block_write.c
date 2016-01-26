@@ -263,7 +263,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * of whether a block is useful and to give us a test so we don't lose
 	 * the first WT_BLOCK_COMPRESS_SKIP bytes without noticing.
 	 *
-	 * Checksum a little-endian version of the header, and write everything          * in little-endian format. The checksum is (potentially) returned in a
+	 * Checksum a little-endian version of the header, and write everything
+	 * in little-endian format. The checksum is (potentially) returned in a
 	 * big-endian format, swap it into place in a separate step.
 	 */
 	blk->flags = 0;
