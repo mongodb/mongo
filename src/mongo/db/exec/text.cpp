@@ -64,6 +64,7 @@ TextStage::TextStage(OperationContext* txn,
     _specificStats.indexPrefix = _params.indexPrefix;
     _specificStats.indexName = _params.index->indexName();
     _specificStats.parsedTextQuery = _params.query.toBSON();
+    _specificStats.textIndexVersion = _params.index->infoObj()["textIndexVersion"].numberInt();
 }
 
 bool TextStage::isEOF() {

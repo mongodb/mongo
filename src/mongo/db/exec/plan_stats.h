@@ -551,9 +551,8 @@ struct IntervalStats {
     bool inclusiveMaxDistanceAllowed = false;
 };
 
-class NearStats : public SpecificStats {
-public:
-    NearStats() {}
+struct NearStats : public SpecificStats {
+    NearStats() : indexVersion(0) {}
 
     SpecificStats* clone() const final {
         return new NearStats(*this);
@@ -561,6 +560,8 @@ public:
 
     std::vector<IntervalStats> intervalStats;
     std::string indexName;
+    // btree index version, not geo index version
+    int indexVersion;
     BSONObj keyPattern;
 };
 
@@ -610,7 +611,7 @@ struct UpdateStats : public SpecificStats {
 };
 
 struct TextStats : public SpecificStats {
-    TextStats() : parsedTextQuery() {}
+    TextStats() : parsedTextQuery(), textIndexVersion(0) {}
 
     SpecificStats* clone() const final {
         TextStats* specific = new TextStats(*this);
@@ -621,6 +622,8 @@ struct TextStats : public SpecificStats {
 
     // Human-readable form of the FTSQuery associated with the text stage.
     BSONObj parsedTextQuery;
+
+    int textIndexVersion;
 
     // Index keys that precede the "text" index key.
     BSONObj indexPrefix;

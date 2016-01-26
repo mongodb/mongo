@@ -16,6 +16,7 @@ if ("SINGLE_SHARD" === stage.stage) {
     stage = stage.shards[0].executionStages;
 }
 assert.eq(stage.stage, "TEXT");
+assert.gte(stage.textIndexVersion, 1, "textIndexVersion incorrect or missing.");
 assert.eq(stage.inputStage.stage, "TEXT_MATCH");
 assert.eq(stage.inputStage.inputStage.stage, "TEXT_OR");
 assert.eq(stage.parsedTextQuery.terms, ["a"]);

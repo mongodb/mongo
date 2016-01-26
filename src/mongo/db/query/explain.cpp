@@ -333,6 +333,7 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 
         bob->append("keyPattern", spec->keyPattern);
         bob->append("indexName", spec->indexName);
+        bob->append("indexVersion", spec->indexVersion);
 
         if (verbosity >= ExplainCommon::EXEC_STATS) {
             BSONArrayBuilder intervalsBob(bob->subarrayStart("searchIntervals"));
@@ -433,6 +434,7 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->append("indexPrefix", spec->indexPrefix);
         bob->append("indexName", spec->indexName);
         bob->append("parsedTextQuery", spec->parsedTextQuery);
+        bob->append("textIndexVersion", spec->textIndexVersion);
     } else if (STAGE_TEXT_MATCH == stats.stageType) {
         TextMatchStats* spec = static_cast<TextMatchStats*>(stats.specific.get());
 
