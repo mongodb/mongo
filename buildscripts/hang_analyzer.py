@@ -432,11 +432,11 @@ def main():
             sys.stdout.write("Ignoring process %d of %s\n" % (process[0], process[1]))
     else:
         # Dump all other processes first since signaling the python script interrupts it
-        for process in [a for a in processes if a[1] != "python"]:
+        for process in [a for a in processes if not a[1].startswith("python")]:
             sys.stdout.write("Dumping process %d of %s\n" % (process[0], process[1]))
             dbg.dump_info(process[0], sys.stdout)
 
-        for process in [a for a in processes if a[1] == "python"]:
+        for process in [a for a in processes if a[1].startswith("python")]:
             signal_process(process[0])
 
             dbg.dump_info(process[0], sys.stdout)
