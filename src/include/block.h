@@ -289,17 +289,31 @@ struct __wt_block_desc {
 #define	WT_BLOCK_DESC_SIZE		16
 
 /*
+ * __wt_block_desc_byteswap_copy --
+ *	Handle big- and little-endian transformation of a description block,
+ * copying from a source to a target.
+ */
+static inline void
+__wt_block_desc_byteswap_copy(WT_BLOCK_DESC *from, WT_BLOCK_DESC *to)
+{
+	*to = *from;
+#ifdef WORDS_BIGENDIAN
+	to->magic = __wt_bswap32(from->magic);
+	to->majorv = __wt_bswap16(from->majorv);
+	to->minorv = __wt_bswap16(from->minorv);
+	to->cksum = __wt_bswap32(from->cksum);
+#endif
+}
+
+/*
  * __wt_block_desc_byteswap --
- *	Handle big- and little-endian transformation of the description block.
+ *	Handle big- and little-endian transformation of a description block.
  */
 static inline void
 __wt_block_desc_byteswap(WT_BLOCK_DESC *desc)
 {
 #ifdef WORDS_BIGENDIAN
-	desc->magic = __wt_bswap32(desc->magic);
-	desc->majorv = __wt_bswap16(desc->majorv);
-	desc->minorv = __wt_bswap16(desc->minorv);
-	desc->cksum = __wt_bswap32(desc->cksum);
+	__wt_block_desc_byteswap_copy(desc, desc);
 #else
 	WT_UNUSED(desc);
 #endif
@@ -348,15 +362,29 @@ struct __wt_block_header {
 #define	WT_BLOCK_HEADER_SIZE		12
 
 /*
+ * __wt_block_header_byteswap_copy --
+ *	Handle big- and little-endian transformation of a header block,
+ * copying from a source to a target.
+ */
+static inline void
+__wt_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to)
+{
+	*to = *from;
+#ifdef WORDS_BIGENDIAN
+	to->disk_size = __wt_bswap32(from->disk_size);
+	to->cksum = __wt_bswap32(from->cksum);
+#endif
+}
+
+/*
  * __wt_block_header_byteswap --
- *	Handle big- and little-endian transformation of the header block.
+ *	Handle big- and little-endian transformation of a header block.
  */
 static inline void
 __wt_block_header_byteswap(WT_BLOCK_HEADER *blk)
 {
 #ifdef WORDS_BIGENDIAN
-	blk->disk_size = __wt_bswap32(blk->disk_size);
-	blk->cksum = __wt_bswap32(blk->cksum);
+	__wt_block_header_byteswap_copy(blk, blk);
 #else
 	WT_UNUSED(blk);
 #endif

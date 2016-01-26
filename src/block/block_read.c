@@ -164,7 +164,7 @@ int
 __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_ITEM *buf, wt_off_t offset, uint32_t size, uint32_t cksum)
 {
-	WT_BLOCK_HEADER *blk;
+	WT_BLOCK_HEADER *blk, swap;
 	size_t bufsize;
 	uint32_t page_cksum;
 
@@ -195,11 +195,11 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	buf->size = size;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
-	__wt_block_header_byteswap(blk);
-	if (blk->cksum == cksum) {
+	__wt_block_header_byteswap_copy(blk, &swap);
+	if (swap.cksum == cksum) {
 		blk->cksum = 0;
 		page_cksum = __wt_cksum(buf->mem,
-		    F_ISSET(blk, WT_BLOCK_DATA_CKSUM) ?
+		    F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ?
 		    size : WT_BLOCK_COMPRESS_SKIP);
 		if (page_cksum == cksum) {
 			/*
@@ -224,7 +224,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			    "offset %" PRIuMAX ": block header checksum "
 			    "of %" PRIu32 " doesn't match expected checksum "
 			    "of %" PRIu32,
-			    size, (uintmax_t)offset, blk->cksum, cksum);
+			    size, (uintmax_t)offset, swap.cksum, cksum);
 
 	/* Panic if a checksum fails during an ordinary read. */
 	return (block->verify ||

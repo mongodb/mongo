@@ -262,14 +262,18 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * because they're not compressed, both to give salvage a quick test
 	 * of whether a block is useful and to give us a test so we don't lose
 	 * the first WT_BLOCK_COMPRESS_SKIP bytes without noticing.
+	 *
+	 * Checksum a little-endian version of the header, and write everything          * in little-endian format. The checksum is (potentially) returned in a
+	 * big-endian format, swap it into place in a separate step.
 	 */
 	blk->flags = 0;
 	if (data_cksum)
 		F_SET(blk, WT_BLOCK_DATA_CKSUM);
 	blk->cksum = 0;
-	blk->cksum = cksum = __wt_cksum(
-	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
 	__wt_block_header_byteswap(blk);
+	cksum = __wt_cksum(
+	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
+	blk->cksum = __wt_bswap32(cksum);
 
 	/* Pre-allocate some number of extension structures. */
 	WT_RET(__wt_block_ext_prealloc(session, 5));

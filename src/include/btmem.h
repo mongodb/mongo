@@ -63,7 +63,7 @@ struct __wt_page_header {
 
 /*
  * __wt_page_header_byteswap --
- *	Handle big- and little-endian transformation of the page header.
+ *	Handle big- and little-endian transformation of a page header.
  */
 static inline void
 __wt_page_header_byteswap(WT_PAGE_HEADER *dsk)

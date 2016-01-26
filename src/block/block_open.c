@@ -329,16 +329,19 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 	WT_RET(__wt_scr_alloc(session, allocsize, &buf));
 	memset(buf->mem, 0, allocsize);
 
+	/*
+	 * Checksum a little-endian version of the header, and write everything
+	 * in little-endian format. The checksum is (potentially) returned in a
+	 * big-endian format, swap it into place in a separate step.
+	 */
 	desc = buf->mem;
 	desc->magic = WT_BLOCK_MAGIC;
 	desc->majorv = WT_BLOCK_MAJOR_VERSION;
 	desc->minorv = WT_BLOCK_MINOR_VERSION;
-
-	/* Update the checksum. */
 	desc->cksum = 0;
-	desc->cksum = __wt_cksum(desc, allocsize);
-
 	__wt_block_desc_byteswap(desc);
+	desc->cksum = __wt_bswap32(__wt_cksum(desc, allocsize));
+
 	ret = __wt_write(session, fh, (wt_off_t)0, (size_t)allocsize, desc);
 
 	__wt_scr_free(session, &buf);
@@ -352,7 +355,7 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 static int
 __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_BLOCK_DESC *desc;
+	WT_BLOCK_DESC *desc, swap;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	uint32_t cksum;
@@ -365,15 +368,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	    block->fh, (wt_off_t)0, (size_t)block->allocsize, buf->mem));
 
 	desc = buf->mem;
-	__wt_block_desc_byteswap(desc);
-
-	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
-	    "%s: magic %" PRIu32
-	    ", major/minor: %" PRIu32 "/%" PRIu32
-	    ", checksum %#" PRIx32,
-	    block->name, desc->magic,
-	    desc->majorv, desc->minorv,
-	    desc->cksum));
+	__wt_block_desc_byteswap_copy(desc, &swap);
 
 	/*
 	 * We fail the open if the checksum fails, or the magic number is wrong
@@ -384,22 +379,29 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * may have entered the wrong file name, and is now frantically pounding
 	 * their interrupt key.
 	 */
-	cksum = desc->cksum;
 	desc->cksum = 0;
-	if (desc->magic != WT_BLOCK_MAGIC ||
-	    cksum != __wt_cksum(desc, block->allocsize))
+	if (swap.magic != WT_BLOCK_MAGIC ||
+	    swap.cksum != __wt_cksum(desc, block->allocsize))
 		WT_ERR_MSG(session, WT_ERROR,
 		    "%s does not appear to be a WiredTiger file", block->name);
 
-	if (desc->majorv > WT_BLOCK_MAJOR_VERSION ||
-	    (desc->majorv == WT_BLOCK_MAJOR_VERSION &&
-	    desc->minorv > WT_BLOCK_MINOR_VERSION))
+	if (swap.majorv > WT_BLOCK_MAJOR_VERSION ||
+	    (swap.majorv == WT_BLOCK_MAJOR_VERSION &&
+	    swap.minorv > WT_BLOCK_MINOR_VERSION))
 		WT_ERR_MSG(session, WT_ERROR,
 		    "unsupported WiredTiger file version: this build only "
 		    "supports major/minor versions up to %d/%d, and the file "
 		    "is version %d/%d",
 		    WT_BLOCK_MAJOR_VERSION, WT_BLOCK_MINOR_VERSION,
-		    desc->majorv, desc->minorv);
+		    swap.majorv, swap.minorv);
+
+	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
+	    "%s: magic %" PRIu32
+	    ", major/minor: %" PRIu32 "/%" PRIu32
+	    ", checksum %#" PRIx32,
+	    block->name, swap.magic,
+	    swap.majorv, swap.minorv,
+	    swap.cksum));
 
 err:	__wt_scr_free(session, &buf);
 	return (ret);
