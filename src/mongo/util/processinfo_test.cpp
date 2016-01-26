@@ -48,4 +48,10 @@ TEST(ProcessInfo, NonZeroPageSize) {
         ASSERT_GREATER_THAN(ProcessInfo::getPageSize(), 0u);
     }
 }
+
+TEST(ProcessInfo, GetNumCoresReturnsNonZeroNumberOfProcessors) {
+    ProcessInfo processInfo;
+    ProcessInfo::initializeSystemInfo();
+    ASSERT_GREATER_THAN((int)processInfo.getNumCores(), 0);
+}
 }
