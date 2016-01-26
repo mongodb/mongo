@@ -178,7 +178,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		    ",encryption=(name=%s)", encryptor(g.c_encryption_flag));
 
 	/* Miscellaneous. */
-#ifndef _WIN32
+#ifdef HAVE_POSIX_MEMALIGN
 	p += snprintf(p, REMAIN(p, end), ",buffer_alignment=512");
 #endif
 
