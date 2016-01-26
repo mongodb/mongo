@@ -49,9 +49,15 @@ var $config = (function() {
                 assertWhenOwnColl.neq(null, doc);
                 assertWhenOwnColl(doc.hasOwnProperty('arr'),
                                   'doc should have contained a field named "arr": ' + tojson(doc));
-                assertWhenOwnColl.contains(value, doc.arr,
-                                           "doc.arr doesn't contain value (" + value +
-                                           ') after $push: ' + tojson(doc.arr));
+
+                // If the document was invalidated during a yield, then we may not have updated
+                // anything. The $push operator always modifies the matched document, so if we
+                // matched something, then we must have updated it.
+                if (res.nMatched > 0) {
+                    assertWhenOwnColl.contains(value, doc.arr,
+                                               "doc.arr doesn't contain value (" + value +
+                                               ') after $push: ' + tojson(doc.arr));
+                }
             });
         }
 
@@ -65,9 +71,16 @@ var $config = (function() {
             var doc = db[collName].findOne({ _id: docIndex });
             assertWhenOwnColl(function() {
                 assertWhenOwnColl.neq(null, doc);
-                assertWhenOwnColl.eq(-1, doc.arr.indexOf(value),
-                                     'doc.arr contains removed value (' + value +
-                                     ') after $pull: ' + tojson(doc.arr));
+
+                // If the document was invalidated during a yield, then we may not have updated
+                // anything. If the update matched a document, then the $pull operator would have
+                // removed all occurrences of 'value' from the array (meaning that there should be
+                // none left).
+                if (res.nMatched > 0) {
+                    assertWhenOwnColl.eq(-1, doc.arr.indexOf(value),
+                                         'doc.arr contains removed value (' + value +
+                                         ') after $pull: ' + tojson(doc.arr));
+                }
             });
         }
 

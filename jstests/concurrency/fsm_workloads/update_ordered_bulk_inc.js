@@ -54,7 +54,10 @@ var $config = (function() {
             }
 
             docs.forEach(function(doc) {
-                assertWhenOwnColl.lte(doc[this.fieldName], this.count);
+                // If the document hasn't been updated at all, then the field won't exist.
+                if (doc.hasOwnProperty(this.fieldName)) {
+                    assertWhenOwnColl.lte(doc[this.fieldName], this.count);
+                }
                 assertWhenOwnColl.lt(doc._id, this.docCount);
             }, this);
         }
