@@ -202,10 +202,12 @@ var st;
 
     jsTest.log("Ensure that leftover distributed locks don't prevent future migrations");
     // Remove slave delay so that the migration can finish in a reasonable amount of time.
+    st.rs0.nodes.map(m=>m.getDB("admin").setLogLevel(2,"replication")); // BF-1637
+    st.rs1.nodes.map(m=>m.getDB("admin").setLogLevel(2,"replication")); // BF-1637
     setSlaveDelay(st.rs0, false);
     setSlaveDelay(st.rs1, false);
-    st.rs0.awaitReplication();
-    st.rs1.awaitReplication();
+    st.rs0.awaitReplication(60000);
+    st.rs1.awaitReplication(60000);
 
     // Due to SERVER-20290 the recipient shard may not immediately realize that the migration that
     // was going on during the upgrade has been aborted, so we need to wait until it notices this
