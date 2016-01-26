@@ -307,8 +307,10 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 	desc->minorv = WT_BLOCK_MINOR_VERSION;
 	desc->cksum = 0;
 	__wt_block_desc_byteswap(desc);
-	desc->cksum = __wt_bswap32(__wt_cksum(desc, allocsize));
-
+	desc->cksum = __wt_cksum(desc, allocsize);
+#ifdef WORDS_BIGENDIAN
+	desc->cksum = __wt_bswap32(desc->cksum);
+#endif
 	ret = __wt_write(session, fh, (wt_off_t)0, (size_t)allocsize, desc);
 
 	__wt_scr_free(session, &buf);

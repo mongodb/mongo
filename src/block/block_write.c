@@ -272,9 +272,11 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		F_SET(blk, WT_BLOCK_DATA_CKSUM);
 	blk->cksum = 0;
 	__wt_block_header_byteswap(blk);
-	cksum = __wt_cksum(
+	blk->cksum = cksum = __wt_cksum(
 	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
-	blk->cksum = __wt_bswap32(cksum);
+#ifdef WORDS_BIGENDIAN
+	blk->cksum = __wt_bswap32(blk->cksum);
+#endif
 
 	/* Pre-allocate some number of extension structures. */
 	WT_RET(__wt_block_ext_prealloc(session, 5));
