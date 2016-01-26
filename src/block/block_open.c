@@ -325,7 +325,6 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_BLOCK_DESC *desc, swap;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	uint32_t cksum;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
 	WT_RET(__wt_scr_alloc(session, block->allocsize, &buf));
