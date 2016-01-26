@@ -146,7 +146,12 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
     }
 
     if (this._batchSize) {
-        cmd["batchSize"] = this._batchSize;
+        if (this._batchSize < 0) {
+          cmd["batchSize"] = -this._batchSize;
+          cmd["singleBatch"] = true;
+        } else {
+          cmd["batchSize"] = this._batchSize;
+        }
     }
 
     if (this._limit) {

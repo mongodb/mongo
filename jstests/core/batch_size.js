@@ -32,6 +32,11 @@ assert.eq(2, t.find().sort({a: 1}).limit(2).itcount(), 'D');
 assert.eq(4, t.find().batchSize(2).itcount(), 'E');
 assert.eq(4, t.find().sort({a: 1}).batchSize(2).itcount(), 'F');
 
+// With negative batchSize. A negative batchSize value instructs the server
+// to return just a single batch of results.
+assert.eq(1, t.find().batchSize(-1).itcount(), 'G');
+assert.eq(2, t.find().batchSize(-2).itcount(), 'H');
+
 // Run the tests with the index twice in order to double check plan caching.
 t.ensureIndex({a: 1});
 for (var i = 0; i < 2; i++) {
