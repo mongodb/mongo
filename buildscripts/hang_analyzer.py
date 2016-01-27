@@ -25,6 +25,9 @@ import time
 from distutils import spawn
 from optparse import OptionParser
 
+if sys.platform == "win32":
+    import win32process
+
 def call(a = []):
     sys.stdout.write(str(a) + "\n")
     sys.stdout.flush()
@@ -354,7 +357,13 @@ def signal_process(pid):
 
 def timeout_protector():
     print "Script timeout has been hit, terminating"
-    os.kill(os.getpid(), signal.SIGKILL)
+    if sys.platform == "win32":
+        # Have the process exit with code 9 when it terminates itself to closely match the exit code
+        # of the process when it sends itself a SIGKILL.
+        handle = win32process.GetCurrentProcess()
+        win32process.TerminateProcess(handle, 9)
+    else:
+        os.kill(os.getpid(), signal.SIGKILL)
 
 
 # Basic procedure
