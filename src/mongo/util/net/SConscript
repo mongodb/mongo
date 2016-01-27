@@ -22,14 +22,23 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
+networkEnv = env.Clone();
+
+networkEnv.InjectThirdPartyIncludePaths(libraries=[
+    'asio',
+])
+
+networkEnv.Library(
     target='network',
     source=[
+        "asio_message_port.cpp",
+        "asio_ssl_context.cpp",
         "hostname_canonicalization.cpp",
         "httpclient.cpp",
         "listen.cpp",
         "message.cpp",
         "message_port.cpp",
+        "message_port_startup_param.cpp",
         "sock.cpp",
         "sockaddr.cpp",
         'socket_exception.cpp',
@@ -40,24 +49,16 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/third_party/shim_asio',
         'hostandport',
     ],
-)
-
-env.CppUnitTest(
-    target='listen_test',
-    source=[
-        'listen_test.cpp',
-    ],
-    LIBDEPS=[
-        'network',
-    ],
-    NO_CRUTCH = True,
 )
 
 env.Library(

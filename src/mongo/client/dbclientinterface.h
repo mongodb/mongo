@@ -41,8 +41,8 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/message_port.h"
 
 namespace mongo {
 
@@ -1187,7 +1187,7 @@ public:
         return _maxWireVersion;
     }
 
-    MessagingPort& port() {
+    AbstractMessagingPort& port() {
         verify(_port);
         return *_port;
     }
@@ -1246,7 +1246,7 @@ protected:
 
     virtual void _auth(const BSONObj& params);
 
-    std::unique_ptr<MessagingPort> _port;
+    std::unique_ptr<AbstractMessagingPort> _port;
 
     bool _failed;
     const bool autoReconnect;

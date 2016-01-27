@@ -38,6 +38,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
@@ -86,7 +87,7 @@ struct SSLConfiguration {
     bool hasCA = false;
 };
 
-class SSLManagerInterface {
+class SSLManagerInterface : public Decorable<SSLManagerInterface> {
 public:
     static std::unique_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
 

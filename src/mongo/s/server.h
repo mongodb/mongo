@@ -31,12 +31,14 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
+
+class AbstractMessagingPort;
+class Message;
 
 extern OID serverID;
 
 // from request.cpp
-void processRequest(Message& m, MessagingPort& p);
+void processRequest(Message& m, AbstractMessagingPort& p);
 }

@@ -61,14 +61,6 @@ namespace mongo {
 using std::shared_ptr;
 using std::string;
 
-// if you want trace output:
-#define mmm(x)
-
-void AbstractMessagingPort::setConnectionId(long long connectionId) {
-    verify(_connectionId == 0);
-    _connectionId = connectionId;
-}
-
 /* messagingport -------------------------------------------------------------- */
 
 class Ports {
@@ -77,10 +69,10 @@ class Ports {
 
 public:
     Ports() : ports() {}
-    void closeAll(unsigned skip_mask) {
+    void closeAll(AbstractMessagingPort::Tag skip_mask) {
         stdx::lock_guard<stdx::mutex> bl(m);
         for (std::set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++) {
-            if ((*i)->tag & skip_mask) {
+            if ((*i)->getTag() & skip_mask) {
                 LOG(3) << "Skip closing connection # " << (*i)->connectionId();
                 continue;
             }
@@ -102,8 +94,8 @@ public:
 // are being destructed during termination.
 Ports& ports = *(new Ports());
 
-void MessagingPort::closeAllSockets(unsigned mask) {
-    ports.closeAll(mask);
+void MessagingPort::closeSockets(AbstractMessagingPort::Tag skipMask) {
+    ports.closeAll(skipMask);
 }
 
 MessagingPort::MessagingPort(int fd, const SockAddr& remote)
@@ -112,18 +104,20 @@ MessagingPort::MessagingPort(int fd, const SockAddr& remote)
 MessagingPort::MessagingPort(double timeout, logger::LogSeverity ll)
     : MessagingPort(std::make_shared<Socket>(timeout, ll)) {}
 
-MessagingPort::MessagingPort(std::shared_ptr<Socket> sock) : psock(std::move(sock)) {
-    SockAddr sa = psock->remoteAddr();
+MessagingPort::MessagingPort(std::shared_ptr<Socket> sock)
+    : _x509SubjectName(), _connectionId(), _tag(), _psock(std::move(sock)) {
+    SockAddr sa = _psock->remoteAddr();
     _remoteParsed = HostAndPort(sa.getAddr(), sa.getPort());
     ports.insert(this);
 }
 
-void MessagingPort::setSocketTimeout(double timeout) {
-    psock->setTimeout(timeout);
+void MessagingPort::setTimeout(Milliseconds millis) {
+    double timeout = double(millis.count()) / 1000;
+    _psock->setTimeout(timeout);
 }
 
 void MessagingPort::shutdown() {
-    psock->close();
+    _psock->close();
 }
 
 MessagingPort::~MessagingPort() {
@@ -136,10 +130,9 @@ bool MessagingPort::recv(Message& m) {
 #ifdef MONGO_CONFIG_SSL
     again:
 #endif
-        // mmm( log() << "*  recv() sock:" << this->sock << endl; )
         MSGHEADER::Value header;
         int headerLen = sizeof(MSGHEADER::Value);
-        psock->recv((char*)&header, headerLen);
+        _psock->recv((char*)&header, headerLen);
         int len = header.constView().getMessageLength();
 
         if (len == 542393671) {
@@ -147,7 +140,7 @@ bool MessagingPort::recv(Message& m) {
             string msg =
                 "It looks like you are trying to access MongoDB over HTTP on the native driver "
                 "port.\n";
-            LOG(psock->getLogLevel()) << msg;
+            LOG(_psock->getLogLevel()) << msg;
             std::stringstream ss;
             ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: "
                   "text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
@@ -156,7 +149,7 @@ bool MessagingPort::recv(Message& m) {
             return false;
         }
         // If responseTo is not 0 or -1 for first packet assume SSL
-        else if (psock->isAwaitingHandshake()) {
+        else if (_psock->isAwaitingHandshake()) {
 #ifndef MONGO_CONFIG_SSL
             if (header.constView().getResponseToMsgId() != 0 &&
                 header.constView().getResponseToMsgId() != -1) {
@@ -170,8 +163,8 @@ bool MessagingPort::recv(Message& m) {
                         "SSL handshake received but server is started without SSL support",
                         sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
                 setX509SubjectName(
-                    psock->doSSLHandshake(reinterpret_cast<const char*>(&header), sizeof(header)));
-                psock->setHandshakeReceived();
+                    _psock->doSSLHandshake(reinterpret_cast<const char*>(&header), sizeof(header)));
+                _psock->setHandshakeReceived();
                 goto again;
             }
             uassert(17189,
@@ -186,7 +179,7 @@ bool MessagingPort::recv(Message& m) {
             return false;
         }
 
-        psock->setHandshakeReceived();
+        _psock->setHandshakeReceived();
         int z = (len + 1023) & 0xfffffc00;
         verify(z >= len);
         MsgData::View md = reinterpret_cast<char*>(mongoMalloc(z));
@@ -196,14 +189,14 @@ bool MessagingPort::recv(Message& m) {
         memcpy(md.view2ptr(), &header, headerLen);
         int left = len - headerLen;
 
-        psock->recv(md.data(), left);
+        _psock->recv(md.data(), left);
 
         guard.Dismiss();
         m.setData(md.view2ptr(), true);
         return true;
 
     } catch (const SocketException& e) {
-        logger::LogSeverity severity = psock->getLogLevel();
+        logger::LogSeverity severity = _psock->getLogLevel();
         if (!e.shouldPrint())
             severity = severity.lessSevere();
         LOG(severity) << "SocketException: remote: " << remote() << " error: " << e;
@@ -221,38 +214,27 @@ void MessagingPort::reply(Message& received, Message& response, int32_t response
 }
 
 bool MessagingPort::call(Message& toSend, Message& response) {
-    mmm(log() << "*call()" << endl;) say(toSend);
-    return recv(toSend, response);
-}
-
-bool MessagingPort::recv(const Message& toSend, Message& response) {
-    while (1) {
-        bool ok = recv(response);
-        if (!ok) {
-            mmm(log() << "recv not ok" << endl;) return false;
+    say(toSend);
+    bool success = recv(response);
+    if (success) {
+        if (response.header().getResponseToMsgId() != toSend.header().getId()) {
+            response.reset();
+            uasserted(40134, "Response ID did not match the sent message ID.");
         }
-        // log() << "got response: " << response.data->responseTo << endl;
-        if (response.header().getResponseToMsgId() == toSend.header().getId())
-            break;
-        error() << "MessagingPort::call() wrong id got:" << std::hex
-                << response.header().getResponseToMsgId() << " expect:" << toSend.header().getId()
-                << '\n' << std::dec << "  toSend op: " << (unsigned)toSend.operation() << '\n'
-                << "  response msgid:" << (unsigned)response.header().getId() << '\n'
-                << "  response len:  " << (unsigned)response.header().getLen() << '\n'
-                << "  response op:  " << static_cast<int>(response.operation()) << '\n'
-                << "  remote: " << psock->remoteString();
-        verify(false);
-        response.reset();
     }
-    mmm(log() << "*call() end" << endl;) return true;
+    return success;
 }
 
 void MessagingPort::say(Message& toSend, int responseTo) {
     verify(!toSend.empty());
-    mmm(log() << "*  say()  thr:" << GetCurrentThreadId() << endl;)
-        toSend.header().setId(nextMessageId());
+    toSend.header().setId(nextMessageId());
     toSend.header().setResponseToMsgId(responseTo);
-    toSend.send(*this, "say");
+    auto buf = toSend.buf();
+    if (buf) {
+        send(buf, MsgData::ConstView(buf).getLen(), "say");
+    } else {
+        send(toSend.dataBuffers(), "say");
+    }
 }
 
 HostAndPort MessagingPort::remote() const {
@@ -260,11 +242,35 @@ HostAndPort MessagingPort::remote() const {
 }
 
 SockAddr MessagingPort::remoteAddr() const {
-    return psock->remoteAddr();
+    return _psock->remoteAddr();
 }
 
 SockAddr MessagingPort::localAddr() const {
-    return psock->localAddr();
+    return _psock->localAddr();
+}
+
+void MessagingPort::setX509SubjectName(const std::string& x509SubjectName) {
+    _x509SubjectName = x509SubjectName;
+}
+
+std::string MessagingPort::getX509SubjectName() const {
+    return _x509SubjectName;
+}
+
+void MessagingPort::setConnectionId(const long long connectionId) {
+    _connectionId = connectionId;
+}
+
+long long MessagingPort::connectionId() const {
+    return _connectionId;
+}
+
+void MessagingPort::setTag(const AbstractMessagingPort::Tag tag) {
+    _tag = tag;
+}
+
+AbstractMessagingPort::Tag MessagingPort::getTag() const {
+    return _tag;
 }
 
 }  // namespace mongo

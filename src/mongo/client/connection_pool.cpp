@@ -185,7 +185,7 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
 
     uassertStatusOK(conn->connect(target));
-    conn->port().tag |= _messagingPortTags;
+    conn->port().setTag(conn->port().getTag() | _messagingPortTags);
 
     if (isInternalAuthSet()) {
         conn->auth(getInternalUserAuthParamsWithFallback());

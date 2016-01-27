@@ -40,6 +40,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -48,9 +49,9 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/message_port.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -72,24 +73,7 @@ using std::endl;
 
 namespace {
 
-class MessagingPortWithHandler : public MessagingPort {
-    MONGO_DISALLOW_COPYING(MessagingPortWithHandler);
-
-public:
-    MessagingPortWithHandler(const std::shared_ptr<Socket>& socket,
-                             const std::shared_ptr<MessageHandler> handler,
-                             long long connectionId)
-        : MessagingPort(socket), _handler(handler) {
-        setConnectionId(connectionId);
-    }
-
-    const std::shared_ptr<MessageHandler> getHandler() const {
-        return _handler;
-    }
-
-private:
-    const std::shared_ptr<MessageHandler> _handler;
-};
+using MessagingPortWithHandler = std::pair<AbstractMessagingPort*, std::shared_ptr<MessageHandler>>;
 
 }  // namespace
 
@@ -104,10 +88,9 @@ public:
     PortMessageServer(const MessageServer::Options& opts, std::shared_ptr<MessageHandler> handler)
         : Listener("", opts.ipList, opts.port), _handler(std::move(handler)) {}
 
-    virtual void accepted(std::shared_ptr<Socket> psocket, long long connectionId) {
+    virtual void accepted(AbstractMessagingPort* mp) {
         ScopeGuard sleepAfterClosingPort = MakeGuard(sleepmillis, 2);
-        std::unique_ptr<MessagingPortWithHandler> portWithHandler(
-            new MessagingPortWithHandler(psocket, _handler, connectionId));
+        auto portWithHandler = stdx::make_unique<MessagingPortWithHandler>(mp, _handler);
 
         if (!Listener::globalTicketHolder.tryAcquire()) {
             log() << "connection refused because too many open connections: "
@@ -201,34 +184,34 @@ private:
         invariant(arg);
         unique_ptr<MessagingPortWithHandler> portWithHandler(
             static_cast<MessagingPortWithHandler*>(arg));
-        const std::shared_ptr<MessageHandler> handler = portWithHandler->getHandler();
+        auto mp = portWithHandler->first;
+        auto handler = portWithHandler->second;
 
-        setThreadName(std::string(str::stream() << "conn" << portWithHandler->connectionId()));
-        portWithHandler->psock->setLogLevel(logger::LogSeverity::Debug(1));
+        setThreadName(std::string(str::stream() << "conn" << mp->connectionId()));
+        mp->setLogLevel(logger::LogSeverity::Debug(1));
 
         Message m;
         int64_t counter = 0;
         try {
-            handler->connected(portWithHandler.get());
+            handler->connected(mp);
             ON_BLOCK_EXIT([handler]() { handler->close(); });
 
             while (!inShutdown()) {
                 m.reset();
-                portWithHandler->psock->clearCounters();
+                mp->clearCounters();
 
-                if (!portWithHandler->recv(m)) {
+                if (!mp->recv(m)) {
                     if (!serverGlobalParams.quiet) {
                         int conns = Listener::globalTicketHolder.used() - 1;
                         const char* word = (conns == 1 ? " connection" : " connections");
-                        log() << "end connection " << portWithHandler->psock->remoteString() << " ("
-                              << conns << word << " now open)" << endl;
+                        log() << "end connection " << mp->remote().toString() << " (" << conns
+                              << word << " now open)" << endl;
                     }
                     break;
                 }
 
-                handler->process(m, portWithHandler.get());
-                networkCounter.hit(portWithHandler->psock->getBytesIn(),
-                                   portWithHandler->psock->getBytesOut());
+                handler->process(m, mp);
+                networkCounter.hit(mp->getBytesIn(), mp->getBytesOut());
 
                 // Occasionally we want to see if we're using too much memory.
                 if ((counter++ & 0xf) == 0) {
@@ -247,7 +230,7 @@ private:
             error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
             quickExit(EXIT_UNCAUGHT);
         }
-        portWithHandler->shutdown();
+        mp->shutdown();
 
         return NULL;
     }

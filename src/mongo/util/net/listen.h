@@ -38,13 +38,12 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
 
 const int DEFAULT_MAX_CONN = 1000000;
-
-class MessagingPort;
 
 class Listener {
     MONGO_DISALLOW_COPYING(Listener);
@@ -57,8 +56,7 @@ public:
     void initAndListen();  // never returns unless error (start a thread)
 
     /* spawn a thread, etc., then return */
-    virtual void accepted(std::shared_ptr<Socket> psocket, long long connectionId);
-    virtual void acceptedMP(MessagingPort* mp);
+    virtual void accepted(AbstractMessagingPort* mp) = 0;
 
     const int _port;
 
@@ -122,6 +120,9 @@ private:
     // Boolean that indicates whether this Listener is ready to accept incoming network requests
     bool _ready;
 
+
+    virtual void _accepted(const std::shared_ptr<Socket>& psocket, long long connectionId);
+
 #ifdef MONGO_CONFIG_SSL
     SSLManagerInterface* _ssl;
 #endif
@@ -143,6 +144,13 @@ public:
 
     /** makes sure user input is sane */
     static void checkTicketNumbers();
+
+    /**
+     * This will close implementations of AbstractMessagingPort, skipping any that have tags
+     * matching `skipMask`.
+     */
+    static void closeMessagingPorts(
+        AbstractMessagingPort::Tag skipMask = AbstractMessagingPort::kSkipAllMask);
 };
 
 class ListeningSockets {

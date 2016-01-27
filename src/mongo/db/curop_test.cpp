@@ -49,7 +49,7 @@ const long long intervalShort = 10 * 1000;   // 10ms in micros
 class TestListener : public Listener {
 public:
     TestListener() : Listener("test", "", 0) {}  // port 0 => any available high port
-    virtual void acceptedMP(MessagingPort* mp) {}
+    void accepted(AbstractMessagingPort* mp) override {}
 };
 
 AtomicUInt32 threadInitialized(0);

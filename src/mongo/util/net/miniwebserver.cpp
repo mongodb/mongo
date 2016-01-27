@@ -36,6 +36,7 @@
 #include <pcrecpp.h>
 
 #include "mongo/config.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_exception.h"
@@ -129,7 +130,7 @@ bool MiniWebServer::fullReceive(const char* buf) {
     return false;
 }
 
-void MiniWebServer::accepted(std::shared_ptr<Socket> psock, long long connectionId) {
+void MiniWebServer::_accepted(const std::shared_ptr<Socket>& psock, long long connectionId) {
     char buf[4096];
     int len = 0;
     try {
@@ -200,6 +201,10 @@ void MiniWebServer::accepted(std::shared_ptr<Socket> psock, long long connection
     } catch (SocketException& e) {
         LOG(1) << "couldn't send data to http client: " << e << endl;
     }
+}
+
+void MiniWebServer::accepted(AbstractMessagingPort* mp) {
+    MONGO_UNREACHABLE;
 }
 
 string MiniWebServer::getHeader(const char* req, const std::string& wanted) {

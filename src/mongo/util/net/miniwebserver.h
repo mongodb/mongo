@@ -35,7 +35,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/message_port.h"
 
 namespace mongo {
 
@@ -67,8 +66,11 @@ public:
         return urlDecode(s.c_str());
     }
 
+    // This is not currently used for the MiniWebServer. See SERVER-24200
+    void accepted(AbstractMessagingPort* mp) override;
+
 private:
-    void accepted(std::shared_ptr<Socket> psocket, long long connectionId);
+    void _accepted(const std::shared_ptr<Socket>& psocket, long long connectionId) override;
     static bool fullReceive(const char* buf);
 };
 

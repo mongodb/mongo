@@ -773,14 +773,14 @@ public:
         AbstractMessagingPort* mp = txn->getClient()->port();
         unsigned originalTag = 0;
         if (mp) {
-            originalTag = mp->tag;
-            mp->tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
+            originalTag = mp->getTag();
+            mp->setTag(originalTag | executor::NetworkInterface::kMessagingPortKeepOpen);
         }
 
         // Unset the tag on block exit
         ON_BLOCK_EXIT([mp, originalTag]() {
             if (mp) {
-                mp->tag = originalTag;
+                mp->setTag(originalTag);
             }
         });
 

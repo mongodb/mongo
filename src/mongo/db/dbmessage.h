@@ -34,8 +34,8 @@
 #include "mongo/client/constants.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/message_port.h"
 
 namespace mongo {
 
