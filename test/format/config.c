@@ -244,15 +244,17 @@ config_compression(const char *conf_name)
 	const char *cstr;
 	char confbuf[128];
 
+	if (config_is_perm(conf_name))
+		return;
+
 	/*
-	 * Compression: choose something if compression wasn't specified,
-	 * otherwise confirm the appropriate shared library is available.
-	 * We used to verify that the libraries existed but that's no longer
-	 * robust, since it's possible to build compression libraries into
-	 * the WiredTiger library.
+	 * Compression: choose something if compression wasn't specified. We
+	 * used to verify the shared libraries existed but that's no longer
+	 * robust, since it's possible to build compression libraries into the
+	 * WiredTiger library.
 	 */
-	if (!config_is_perm(conf_name)) {
-		cstr = "none";
+	cstr = "none";
+	if (strcmp(conf_name, "logging_compression") != 0 || g.c_logging != 0)
 		switch (mmrand(NULL, 1, 20)) {
 		case 1: case 2: case 3: case 4:		/* 20% no compression */
 			break;
@@ -279,10 +281,8 @@ config_compression(const char *conf_name)
 			break;
 		}
 
-		(void)snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name,
-		    cstr);
-		config_single(confbuf, 0);
-	}
+	(void)snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr);
+	config_single(confbuf, 0);
 }
 
 /*
