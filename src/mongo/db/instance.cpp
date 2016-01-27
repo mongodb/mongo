@@ -723,7 +723,8 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
                 UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
 
                 // for getlasterror
-                LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
+                size_t nMatchedOrInserted = res.upserted.isEmpty() ? res.numMatched : 1U;
+                LastError::get(client).recordUpdate(res.existing, nMatchedOrInserted, res.upserted);
 
                 if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                     // If this operation has already generated a new lastOp, don't bother setting it
@@ -784,7 +785,8 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
 
         UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
 
-        LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
+        size_t nMatchedOrInserted = res.upserted.isEmpty() ? res.numMatched : 1U;
+        LastError::get(client).recordUpdate(res.existing, nMatchedOrInserted, res.upserted);
 
         if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
             // If this operation has already generated a new lastOp, don't bother setting it

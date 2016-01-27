@@ -231,7 +231,7 @@ void ReplSource::save(OperationContext* txn) {
         UpdateResult res = update(txn, ctx.db(), request, &debug);
 
         verify(!res.modifiers);
-        verify(res.numMatched == 1);
+        verify(res.numMatched == 1 || !res.upserted.isEmpty());
     }
 }
 

@@ -1033,32 +1033,16 @@ void UpdateStage::fillOutOpDebug(const UpdateStats* updateStats,
     opDebug->fastmodinsert = updateStats->fastmodinsert;
     opDebug->fastmod = updateStats->fastmod;
 
-    // Historically, 'opDebug' considers 'nMatched' and 'nModified' to be 1 (rather than 0)
-    // if there is an upsert that inserts a document. The UpdateStage does not participate
-    // in this madness in order to have saner stats reporting for explain. This means that
-    // we have to set these values "manually" in the case of an insert.
-    if (updateStats->inserted) {
-        opDebug->nMatched = 1;
-        opDebug->nModified = 1;
-    }
-
     // Copy summary information about the plan into OpDebug.
     opDebug->keysExamined = summaryStats->totalKeysExamined;
     opDebug->docsExamined = summaryStats->totalDocsExamined;
 }
 
 UpdateResult UpdateStage::makeUpdateResult(const UpdateStats* updateStats) {
-    // Historically, UpdateResult considers 'nMatched' and 'nModified' to be 1 (rather than 0) if
-    // there is an upsert that inserts a document. The UpdateStage does not participate in this
-    // madness in order to have saner stats reporting for explain. This means that we have to set
-    // these values "manually" in the case of an insert.
-    size_t nMatched = updateStats->inserted ? 1U : updateStats->nMatched;
-    size_t nModified = updateStats->inserted ? 1U : updateStats->nModified;
-
     return UpdateResult(updateStats->nMatched > 0 /* Did we update at least one obj? */,
                         !updateStats->isDocReplacement /* $mod or obj replacement */,
-                        nModified /* number of modified docs, no no-ops */,
-                        nMatched /* # of docs matched/updated, even no-ops */,
+                        updateStats->nModified /* number of modified docs, no no-ops */,
+                        updateStats->nMatched /* # of docs matched/updated, even no-ops */,
                         updateStats->objInserted);
 };
 

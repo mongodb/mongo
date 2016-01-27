@@ -855,7 +855,7 @@ Status applyOperation_inlock(OperationContext* txn,
                 request.setLifecycle(&updateLifecycle);
 
                 UpdateResult res = update(txn, db, request, &debug);
-                if (res.numMatched == 0) {
+                if (res.numMatched == 0 && res.upserted.isEmpty()) {
                     error() << "No document was updated even though we got a DuplicateKey "
                                "error when inserting";
                     fassertFailedNoTrace(28750);
@@ -887,7 +887,7 @@ Status applyOperation_inlock(OperationContext* txn,
 
         UpdateResult ur = update(txn, db, request, &debug);
 
-        if (ur.numMatched == 0) {
+        if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
             if (ur.modifiers) {
                 if (updateCriteria.nFields() == 1) {
                     // was a simple { _id : ... } update criteria

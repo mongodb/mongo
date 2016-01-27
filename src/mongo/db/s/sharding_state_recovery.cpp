@@ -200,7 +200,7 @@ Status modifyRecoveryDocument(OperationContext* txn,
         updateReq.setLifecycle(&updateLifecycle);
 
         UpdateResult result = update(txn, autoGetOrCreateDb->getDb(), updateReq, &opDebug);
-        invariant(result.numDocsModified == 1);
+        invariant(result.numDocsModified == 1 || !result.upserted.isEmpty());
         invariant(result.numMatched <= 1);
 
         // Wait until the majority write concern has been satisfied, but do it outside of lock

@@ -1240,7 +1240,7 @@ static void multiUpdate(OperationContext* txn,
             // We have an _id from an insert
             const bool didInsert = !resUpsertedID.isEmpty();
 
-            result->getStats().nModified = didInsert ? 0 : numDocsModified;
+            result->getStats().nModified = numDocsModified;
             result->getStats().n = didInsert ? 1 : numMatched;
             result->getStats().upsertedID = resUpsertedID;
 
