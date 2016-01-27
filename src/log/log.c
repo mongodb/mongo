@@ -679,8 +679,7 @@ __log_openfile(WT_SESSION_IMPL *session,
 	 * check that the magic number and versions are correct.
 	 */
 	if (!ok_create) {
-		__wt_scr_free(session, &buf);
-		WT_ERR(__wt_scr_alloc(session, allocsize, &buf));
+		WT_ERR(__wt_buf_grow(session, buf, allocsize));
 		memset(buf->mem, 0, allocsize);
 		WT_ERR(__wt_read(session, *fh, 0, allocsize, buf->mem));
 		logrec = (WT_LOG_RECORD *)buf->mem;
