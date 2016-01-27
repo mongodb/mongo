@@ -6,14 +6,29 @@
  * Does updates that replace an entire document.
  * The collection has indexes on some but not all fields.
  */
+load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+
 var $config = (function() {
 
     // explicitly pass db to avoid accidentally using the global `db`
     function assertResult(db, res) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
-        assertWhenOwnColl.eq(1, res.nMatched,  tojson(res));
+
+        if (isMongod(db) && !isMMAPv1(db)) {
+            // For non-MMAPv1 storage engines we can make a stong assertion that exactly one
+            // document was matched.
+            assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
+        } else {
+            // It's possible to match zero documents with MMAPv1 because the update can skip a
+            // document that was invalidated during a yield.
+            assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
+        }
+
         if (db.getMongo().writeMode() === 'commands') {
+            // It's possible that we replaced the document with its current contents, making the
+            // update a no-op.
             assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
+            assertAlways.lte(res.nModified, res.nMatched, tojson(res));
         }
     }
 
