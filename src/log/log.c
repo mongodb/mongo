@@ -615,7 +615,7 @@ __log_file_header(
 	logrec->checksum = 0;
 	__wt_log_record_byteswap(logrec);
 	logrec->checksum = __wt_cksum(logrec, log->allocsize);
-#if WORDS_BIGENDIAN
+#ifdef WORDS_BIGENDIAN
 	logrec->checksum = __wt_bswap32(logrec->checksum);
 #endif
 
