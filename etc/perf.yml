@@ -60,7 +60,7 @@ functions:
           chmod +x mongo
           git clone https://github.com/mongodb/mongo-perf perf
           cd perf
-          git checkout r20150814
+          git checkout r20160127
     - command: shell.exec
       params:
         background: true
