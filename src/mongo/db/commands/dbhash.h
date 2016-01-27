@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+class NamespaceString;
+
 void logOpForDbHash(OperationContext* txn, const char* ns);
 
 class DBHashCmd : public Command {
@@ -58,7 +60,7 @@ public:
                      std::string& errmsg,
                      BSONObjBuilder& result);
 
-    void wipeCacheForCollection(OperationContext* txn, StringData ns);
+    void wipeCacheForCollection(OperationContext* txn, const NamespaceString& ns);
 
 private:
     /**
@@ -66,14 +68,14 @@ private:
      */
     class DBHashLogOpHandler;
 
-    bool isCachable(StringData ns) const;
+    bool isCachable(const NamespaceString& ns) const;
 
     std::string hashCollection(OperationContext* opCtx,
                                Database* db,
                                const std::string& fullCollectionName,
                                bool* fromCache);
 
-    std::map<std::string, std::string> _cachedHashed;
+    std::map<std::string, std::map<std::string, std::string>> _cachedHashed;
     stdx::mutex _cachedHashedMutex;
 };
 }

@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
@@ -57,7 +58,8 @@ DBHashCmd dbhashCmd;
 
 
 void logOpForDbHash(OperationContext* txn, const char* ns) {
-    dbhashCmd.wipeCacheForCollection(txn, ns);
+    NamespaceString nsString(ns);
+    dbhashCmd.wipeCacheForCollection(txn, nsString);
 }
 
 // ----
@@ -78,9 +80,11 @@ std::string DBHashCmd::hashCollection(OperationContext* opCtx,
                                       bool* fromCache) {
     stdx::unique_lock<stdx::mutex> cachedHashedLock(_cachedHashedMutex, stdx::defer_lock);
 
-    if (isCachable(fullCollectionName)) {
+    NamespaceString ns(fullCollectionName);
+
+    if (isCachable(ns)) {
         cachedHashedLock.lock();
-        string hash = _cachedHashed[fullCollectionName];
+        string hash = _cachedHashed[ns.db().toString()][ns.coll().toString()];
         if (hash.size() > 0) {
             *fromCache = true;
             return hash;
@@ -132,7 +136,7 @@ std::string DBHashCmd::hashCollection(OperationContext* opCtx,
     string hash = digestToString(d);
 
     if (cachedHashedLock.owns_lock()) {
-        _cachedHashed[fullCollectionName] = hash;
+        _cachedHashed[ns.db().toString()][ns.coll().toString()] = hash;
     }
 
     return hash;
@@ -217,18 +221,26 @@ bool DBHashCmd::run(OperationContext* txn,
     return 1;
 }
 
-void DBHashCmd::wipeCacheForCollection(OperationContext* txn, StringData ns) {
+void DBHashCmd::wipeCacheForCollection(OperationContext* txn, const NamespaceString& ns) {
     if (!isCachable(ns))
         return;
 
-    std::string nsOwned = ns.toString();
-    txn->recoveryUnit()->onCommit([this, txn, nsOwned] {
+    txn->recoveryUnit()->onCommit([this, txn, ns] {
         stdx::lock_guard<stdx::mutex> lk(_cachedHashedMutex);
-        _cachedHashed.erase(nsOwned);
+        if (ns.isCommand()) {
+            // The <dbName>.$cmd namespace can represent a command that
+            // modifies the entire database, e.g. dropDatabase, so we remove
+            // the cached entries for all collections in the database.
+            _cachedHashed.erase(ns.db().toString());
+        } else {
+            _cachedHashed[ns.db().toString()].erase(ns.coll().toString());
+        }
+
+
     });
 }
 
-bool DBHashCmd::isCachable(StringData ns) const {
-    return ns.startsWith("config.");
+bool DBHashCmd::isCachable(const NamespaceString& ns) const {
+    return ns.isConfigDB();
 }
 }
