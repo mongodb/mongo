@@ -1,0 +1,128 @@
+/* tabs styles, based on http://www.alistapart.com/articles/slidingdoors */
+
+div.navigation {
+	display:block;
+	float:left;
+	clear:both;
+	width:100%;
+	padding-top:10px;
+	padding-bottom:30px;
+	border-bottom:1px dotted #E0E0E0;
+	height: 60px;
+	background:url(background_navigation.png);
+}
+
+div.contents {
+	float:left;
+	clear:both;
+	
+}
+
+address {
+	display:none;
+}
+
+DIV.tabs
+{
+   float            : left;
+   width            : 100%;
+   margin-bottom    : 4px;
+}
+
+DIV.tabs UL
+{
+   margin           : 0px;
+   padding-left     : 0px;
+   list-style       : none;
+}
+
+DIV.tabs LI, DIV.tabs FORM
+{
+   display          : inline;
+   margin           : 0px;
+   padding          : 0px;
+	background-color:#FFFFFF;
+}
+
+DIV.tabs FORM
+{
+   float            : right;
+}
+
+DIV.tabs A
+{
+   float            : left;
+   font-size        : 80%;
+   font-weight      : bold;
+   text-decoration  : none;
+}
+
+DIV.tabs A:hover
+{
+   background-position: 100% -150px;
+}
+
+DIV.tabs A:link, DIV.tabs A:visited,
+DIV.tabs A:active, DIV.tabs A:hover
+{
+       color: #1A419D;
+}
+
+DIV.tabs SPAN
+{
+   float            : left;
+   display          : block;
+   padding          : 5px 9px;
+   white-space      : nowrap;
+	border-top:1px dotted #E0E0E0;
+	border-bottom:1px dotted #E0E0E0;
+}
+
+DIV.tabs #MSearchBox
+{
+   float            : right;
+   display          : inline;
+   font-size        : 1em;
+}
+
+DIV.tabs TD
+{
+   font-size        : 80%;
+   font-weight      : bold;
+   text-decoration  : none;
+}
+
+
+
+/* Commented Backslash Hack hides rule from IE5-Mac \*/
+DIV.tabs SPAN {float : none;}
+/* End IE5-Mac hack */
+
+DIV.tabs A:hover SPAN
+{
+   background-position: 0% -150px;
+}
+
+DIV.tabs LI.current A
+{
+   background-position: 100% -150px;
+   border-width     : 0px;
+	background-color:	#F0F0F0;
+	background: #F0F0F0 url(img_downArrow.png) center bottom no-repeat;
+}
+
+DIV.tabs LI.current SPAN
+{
+   background-position: 0% -150px;
+   padding-bottom   : 6px;
+}
+
+DIV.navpath
+{
+   background       : none;
+   border           : none;
+   border-bottom    : 1px solid #84B0C7;
+   text-align       : center;
+   margin           : 2px;
+   padding          : 2px;
+}

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -11,36 +11,13 @@
 static int __desc_read(WT_SESSION_IMPL *, WT_BLOCK *);
 
 /*
- * __wt_block_manager_truncate --
- *	Truncate a file.
+ * __wt_block_manager_drop --
+ *	Drop a file.
  */
 int
-__wt_block_manager_truncate(
-    WT_SESSION_IMPL *session, const char *filename, uint32_t allocsize)
+__wt_block_manager_drop(WT_SESSION_IMPL *session, const char *filename)
 {
-	WT_DECL_RET;
-	WT_FH *fh;
-
-	/* Open the underlying file handle. */
-	WT_RET(__wt_open(
-	    session, filename, false, false, WT_FILE_TYPE_DATA, &fh));
-
-	/* Truncate the file. */
-	WT_ERR(__wt_block_truncate(session, fh, (wt_off_t)0));
-
-	/* Write out the file's meta-data. */
-	WT_ERR(__wt_desc_init(session, fh, allocsize));
-
-	/*
-	 * Ensure the truncated file has made it to disk, then the upper-level
-	 * is never surprised.
-	 */
-	WT_ERR(__wt_fsync(session, fh));
-
-	/* Close the file handle. */
-err:	WT_TRET(__wt_close(session, &fh));
-
-	return (ret);
+	 return (__wt_remove_if_exists(session, filename));
 }
 
 /*

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -84,12 +84,12 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	 */
 	WT_CURSOR	*las_cursor;	/* Lookaside table cursor */
 
-	WT_DATA_HANDLE *meta_dhandle;	/* Metadata file */
-	void	*meta_track;		/* Metadata operation tracking */
-	void	*meta_track_next;	/* Current position */
-	void	*meta_track_sub;	/* Child transaction / save point */
-	size_t	 meta_track_alloc;	/* Currently allocated */
-	int	 meta_track_nest;	/* Nesting level of meta transaction */
+	WT_CURSOR *meta_cursor;		/* Metadata file */
+	void	  *meta_track;		/* Metadata operation tracking */
+	void	  *meta_track_next;	/* Current position */
+	void	  *meta_track_sub;	/* Child transaction / save point */
+	size_t	   meta_track_alloc;	/* Currently allocated */
+	int	   meta_track_nest;	/* Nesting level of meta transaction */
 #define	WT_META_TRACKING(session)	(session->meta_track_next != NULL)
 
 	/*

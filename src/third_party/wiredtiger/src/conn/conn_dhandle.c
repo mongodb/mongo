@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -119,28 +119,6 @@ __wt_conn_dhandle_find(
 }
 
 /*
- * __conn_dhandle_mark_dead --
- *	Mark a data handle dead.
- */
-static int
-__conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
-{
-	bool evict_reset;
-
-	/*
-	 * Handle forced discard (e.g., when dropping a file).
-	 *
-	 * We need exclusive access to the file -- disable ordinary
-	 * eviction and drain any blocks already queued.
-	 */
-	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
-	F_SET(session->dhandle, WT_DHANDLE_DEAD);
-	if (evict_reset)
-		__wt_evict_file_exclusive_off(session);
-	return (0);
-}
-
-/*
  * __wt_conn_btree_sync_and_close --
  *	Sync and close the underlying btree handle.
  */
@@ -151,7 +129,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	bool marked_dead, no_schema_lock;
+	bool evict_reset, marked_dead, no_schema_lock;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -160,6 +138,9 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
+
+	/* Ensure that we aren't racing with the eviction server */
+	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
 
 	/*
 	 * If we don't already have the schema lock, make it an error to try
@@ -194,7 +175,15 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		if (force && (bm == NULL || !bm->is_mapped(bm, session))) {
-			WT_ERR(__conn_dhandle_mark_dead(session));
+			F_SET(session->dhandle, WT_DHANDLE_DEAD);
+
+			/*
+			 * Reset the tree's eviction priority, and the tree is
+			 * evictable by definition.
+			 */
+			__wt_evict_priority_clear(session);
+			F_CLR(S2BT(session), WT_BTREE_NO_EVICTION);
+
 			marked_dead = true;
 		}
 		if (!marked_dead || final)
@@ -216,6 +205,9 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	    !F_ISSET(dhandle, WT_DHANDLE_OPEN));
 
 err:	__wt_spin_unlock(session, &dhandle->close_lock);
+
+	if (evict_reset)
+		__wt_evict_file_exclusive_off(session);
 
 	if (no_schema_lock)
 		F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);
@@ -652,8 +644,9 @@ __wt_conn_dhandle_discard_single(
 		F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
 
 	/* Try to remove the handle, protected by the data handle lock. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
-	    WT_TRET(__conn_dhandle_remove(session, final)));
+	WT_WITH_HANDLE_LIST_LOCK(session, tret,
+	    tret = __conn_dhandle_remove(session, final));
+	WT_TRET(tret);
 
 	/*
 	 * After successfully removing the handle, clean it up.
@@ -710,6 +703,15 @@ restart:
 	 */
 	__wt_session_close_cache(session);
 	F_SET(session, WT_SESSION_NO_DATA_HANDLES);
+
+	/*
+	 * The connection may have an open metadata cursor handle. We cannot
+	 * close it before now because it's potentially used when discarding
+	 * other open data handles. Close it before discarding the underlying
+	 * metadata handle.
+	 */
+	if (session->meta_cursor != NULL)
+		WT_TRET(session->meta_cursor->close(session->meta_cursor));
 
 	/* Close the metadata file handle. */
 	while ((dhandle = TAILQ_FIRST(&conn->dhqh)) != NULL)

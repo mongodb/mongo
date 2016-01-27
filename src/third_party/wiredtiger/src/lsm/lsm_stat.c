@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -33,7 +33,7 @@ __curstat_lsm_init(
 	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = false;
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_lsm_tree_get(session, uri, false, &lsm_tree));
 	WT_RET(ret);
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
@@ -176,7 +176,7 @@ __wt_curstat_lsm_init(
 	 * Grab the schema lock because we will be locking the LSM tree and we
 	 * may need to open some files.
 	 */
-	WT_WITH_SCHEMA_LOCK(session,
+	WT_WITH_SCHEMA_LOCK(session, ret,
 	    ret = __curstat_lsm_init(session, uri, cst));
 
 	return (ret);

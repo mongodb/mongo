@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -31,13 +31,12 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage)
 			return (WT_NOTFOUND);
 
 	/*
-	 * This code looks different from the cursor-previous code.  The append
-	 * list appears on the last page of the tree, but it may be preceded by
-	 * other rows, which means the cursor's recno will be set to a value and
-	 * we simply want to increment it.  If the cursor's recno is NOT set,
-	 * we're starting our iteration in a tree that has only appended items.
-	 * In that case, recno will be 0 and happily enough the increment will
-	 * set it to 1, which is correct.
+	 * This code looks different from the cursor-previous code. The append
+	 * list may be preceded by other rows, which means the cursor's recno
+	 * will be set to a value and we simply want to increment it. If the
+	 * cursor's recno is NOT set, we're starting an iteration in a tree with
+	 * only appended items. In that case, recno will be 0 and happily enough
+	 * the increment will set it to 1, which is correct.
 	 */
 	__cursor_set_recno(cbt, cbt->recno + 1);
 
@@ -368,76 +367,6 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 	/* NOTREACHED */
 }
 
-/*
- * __wt_btcur_iterate_setup --
- *	Initialize a cursor for iteration, usually based on a search.
- */
-void
-__wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt)
-{
-	WT_PAGE *page;
-
-	/*
-	 * We don't currently have to do any setup when we switch between next
-	 * and prev calls, but I'm sure we will someday -- I'm leaving support
-	 * here for both flags for that reason.
-	 */
-	F_SET(cbt, WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
-
-	/*
-	 * Clear the count of deleted items on the page.
-	 */
-	cbt->page_deleted_count = 0;
-
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * If starting a new iteration, clear the last-key returned, it doesn't
-	 * apply.
-	 */
-	cbt->lastkey->size = 0;
-	cbt->lastrecno = WT_RECNO_OOB;
-#endif
-	/*
-	 * If we don't have a search page, then we're done, we're starting at
-	 * the beginning or end of the tree, not as a result of a search.
-	 */
-	if (cbt->ref == NULL)
-		return;
-	page = cbt->ref->page;
-
-	if (page->type == WT_PAGE_ROW_LEAF) {
-		/*
-		 * For row-store pages, we need a single item that tells us the
-		 * part of the page we're walking (otherwise switching from next
-		 * to prev and vice-versa is just too complicated), so we map
-		 * the WT_ROW and WT_INSERT_HEAD insert array slots into a
-		 * single name space: slot 1 is the "smallest key insert list",
-		 * slot 2 is WT_ROW[0], slot 3 is WT_INSERT_HEAD[0], and so on.
-		 * This means WT_INSERT lists are odd-numbered slots, and WT_ROW
-		 * array slots are even-numbered slots.
-		 */
-		cbt->row_iteration_slot = (cbt->slot + 1) * 2;
-		if (cbt->ins_head != NULL) {
-			if (cbt->ins_head == WT_ROW_INSERT_SMALLEST(page))
-				cbt->row_iteration_slot = 1;
-			else
-				cbt->row_iteration_slot += 1;
-		}
-	} else {
-		/*
-		 * For column-store pages, calculate the largest record on the
-		 * page.
-		 */
-		cbt->last_standard_recno = page->type == WT_PAGE_COL_VAR ?
-		    __col_var_last_recno(page) : __col_fix_last_recno(page);
-
-		/* If we're traversing the append list, set the reference. */
-		if (cbt->ins_head != NULL &&
-		    cbt->ins_head == WT_COL_APPEND(page))
-			F_SET(cbt, WT_CBT_ITERATE_APPEND);
-	}
-}
-
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __cursor_key_order_check_col --
@@ -494,22 +423,18 @@ __cursor_key_order_check_row(
 		    session, btree->collator, cbt->lastkey, key, &cmp));
 
 	if (cbt->lastkey->size == 0 || (next && cmp < 0) || (!next && cmp > 0))
-		return (__wt_buf_set(session, cbt->lastkey,
-		    cbt->iface.key.data, cbt->iface.key.size));
+		return (__wt_buf_set(session,
+		    cbt->lastkey, cbt->iface.key.data, cbt->iface.key.size));
 
 	WT_ERR(__wt_scr_alloc(session, 512, &a));
-	WT_ERR(__wt_buf_set_printable(
-	    session, a, cbt->lastkey->data, cbt->lastkey->size));
-
 	WT_ERR(__wt_scr_alloc(session, 512, &b));
-	WT_ERR(__wt_buf_set_printable(session, b, key->data, key->size));
 
 	WT_PANIC_ERR(session, EINVAL,
-	    "WT_CURSOR.%s out-of-order returns: returned key %.*s then "
-	    "key %.*s",
+	    "WT_CURSOR.%s out-of-order returns: returned key %s then key %s",
 	    next ? "next" : "prev",
-	    (int)a->size, (const char *)a->data,
-	    (int)b->size, (const char *)b->data);
+	    __wt_buf_set_printable(
+	    session, cbt->lastkey->data, cbt->lastkey->size, a),
+	    __wt_buf_set_printable(session, key->data, key->size, b));
 
 err:	__wt_scr_free(session, &a);
 	__wt_scr_free(session, &b);
@@ -533,8 +458,114 @@ __wt_cursor_key_order_check(
 		return (__cursor_key_order_check_row(session, cbt, next));
 	WT_ILLEGAL_VALUE(session);
 	}
+	/* NOTREACHED */
+}
+
+/*
+ * __wt_cursor_key_order_init --
+ *	Initialize key ordering checks for cursor movements after a successful
+ * search.
+ */
+int
+__wt_cursor_key_order_init(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+	/*
+	 * Cursor searches set the position for cursor movements, set the
+	 * last-key value for diagnostic checking.
+	 */
+	switch (cbt->ref->page->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+		cbt->lastrecno = cbt->recno;
+		return (0);
+	case WT_PAGE_ROW_LEAF:
+		return (__wt_buf_set(session,
+		    cbt->lastkey, cbt->iface.key.data, cbt->iface.key.size));
+	WT_ILLEGAL_VALUE(session);
+	}
+	/* NOTREACHED */
+}
+
+/*
+ * __wt_cursor_key_order_reset --
+ *	Turn off key ordering checks for cursor movements.
+ */
+void
+__wt_cursor_key_order_reset(WT_CURSOR_BTREE *cbt)
+{
+	/*
+	 * Clear the last-key returned, it doesn't apply.
+	 */
+	cbt->lastkey->size = 0;
+	cbt->lastrecno = WT_RECNO_OOB;
 }
 #endif
+
+/*
+ * __wt_btcur_iterate_setup --
+ *	Initialize a cursor for iteration, usually based on a search.
+ */
+void
+__wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt)
+{
+	WT_PAGE *page;
+
+	/*
+	 * We don't currently have to do any setup when we switch between next
+	 * and prev calls, but I'm sure we will someday -- I'm leaving support
+	 * here for both flags for that reason.
+	 */
+	F_SET(cbt, WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
+
+	/*
+	 * Clear the count of deleted items on the page.
+	 */
+	cbt->page_deleted_count = 0;
+
+	/*
+	 * If we don't have a search page, then we're done, we're starting at
+	 * the beginning or end of the tree, not as a result of a search.
+	 */
+	if (cbt->ref == NULL) {
+#ifdef HAVE_DIAGNOSTIC
+		__wt_cursor_key_order_reset(cbt);
+#endif
+		return;
+	}
+
+	page = cbt->ref->page;
+	if (page->type == WT_PAGE_ROW_LEAF) {
+		/*
+		 * For row-store pages, we need a single item that tells us the
+		 * part of the page we're walking (otherwise switching from next
+		 * to prev and vice-versa is just too complicated), so we map
+		 * the WT_ROW and WT_INSERT_HEAD insert array slots into a
+		 * single name space: slot 1 is the "smallest key insert list",
+		 * slot 2 is WT_ROW[0], slot 3 is WT_INSERT_HEAD[0], and so on.
+		 * This means WT_INSERT lists are odd-numbered slots, and WT_ROW
+		 * array slots are even-numbered slots.
+		 */
+		cbt->row_iteration_slot = (cbt->slot + 1) * 2;
+		if (cbt->ins_head != NULL) {
+			if (cbt->ins_head == WT_ROW_INSERT_SMALLEST(page))
+				cbt->row_iteration_slot = 1;
+			else
+				cbt->row_iteration_slot += 1;
+		}
+	} else {
+		/*
+		 * For column-store pages, calculate the largest record on the
+		 * page.
+		 */
+		cbt->last_standard_recno = page->type == WT_PAGE_COL_VAR ?
+		    __col_var_last_recno(page) : __col_fix_last_recno(page);
+
+		/* If we're traversing the append list, set the reference. */
+		if (cbt->ins_head != NULL &&
+		    cbt->ins_head == WT_COL_APPEND(page))
+			F_SET(cbt, WT_CBT_ITERATE_APPEND);
+	}
+}
 
 /*
  * __wt_btcur_next --
@@ -574,7 +605,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 	 */
 	for (newpage = false;; newpage = true) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
-		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
 
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
 			switch (page->type) {
@@ -608,9 +638,9 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 				break;
 
 			/*
-			 * The last page in a column-store has appended entries.
-			 * We handle it separately from the usual cursor code:
-			 * it's only that one page and it's in a simple format.
+			 * Column-store pages may have appended entries. Handle
+			 * it separately from the usual cursor code, it's in a
+			 * simple format.
 			 */
 			if (page->type != WT_PAGE_ROW_LEAF &&
 			    (cbt->ins_head = WT_COL_APPEND(page)) != NULL) {

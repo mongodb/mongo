@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -173,7 +173,7 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		WT_ERR(__wt_txn_checkpoint(session, checkpoint_cfg));
 
 		session->compact_state = WT_COMPACT_RUNNING;
-		WT_WITH_SCHEMA_LOCK(session,
+		WT_WITH_SCHEMA_LOCK(session, ret,
 		    ret = __wt_schema_worker(
 		    session, uri, __wt_compact, NULL, cfg, 0));
 		WT_ERR(ret);
@@ -228,7 +228,8 @@ __wt_session_compact(
 	session->compact->max_time = (uint64_t)cval.val;
 
 	/* Find the types of data sources are being compacted. */
-	WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_worker(
+	WT_WITH_SCHEMA_LOCK(session, ret,
+	    ret = __wt_schema_worker(
 	    session, uri, NULL, __wt_compact_uri_analyze, cfg, 0));
 	WT_ERR(ret);
 

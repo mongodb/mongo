@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -291,7 +291,7 @@ __schema_open_index(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, tmp, "index:%s:", tablename));
 
 	/* Find matching indices. */
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_ERR(__wt_metadata_cursor(session, &cursor));
 	cursor->set_key(cursor, tmp->data);
 	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
 		ret = cursor->next(cursor);
@@ -379,10 +379,10 @@ __schema_open_index(WT_SESSION_IMPL *session,
 		table->idx_complete = true;
 	}
 
-err:	__wt_scr_free(session, &tmp);
+err:	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 	WT_TRET(__wt_schema_destroy_index(session, &idx));
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
+
+	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -438,7 +438,7 @@ __schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, buf, "table:%.*s", (int)namelen, name));
 	WT_ERR(__wt_strndup(session, buf->data, buf->size, &tablename));
 
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_ERR(__wt_metadata_cursor(session, &cursor));
 	cursor->set_key(cursor, tablename);
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &tconfig));
@@ -508,8 +508,7 @@ __schema_open_table(WT_SESSION_IMPL *session,
 	if (0) {
 err:		WT_TRET(__wt_schema_destroy_table(session, &table));
 	}
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
+	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 
 	__wt_free(session, tablename);
 	__wt_scr_free(session, &buf);

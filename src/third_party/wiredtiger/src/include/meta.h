@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -43,9 +43,9 @@
  * WT_WITH_TURTLE_LOCK --
  *	Acquire the turtle file lock, perform an operation, drop the lock.
  */
-#define	WT_WITH_TURTLE_LOCK(session, op) do {				\
+#define	WT_WITH_TURTLE_LOCK(session, ret, op) do {			\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_TURTLE));\
-	WT_WITH_LOCK(session,						\
+	WT_WITH_LOCK(session, ret,					\
 	    &S2C(session)->turtle_lock, WT_SESSION_LOCKED_TURTLE, op);	\
 } while (0)
 

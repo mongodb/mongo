@@ -1,5 +1,8 @@
 #! /bin/sh
 
+# Only run when building a release
+test -z "$WT_RELEASE_BUILD" && exit 0
+
 # Check the copyrights.
 
 c1=__wt.copyright.1
@@ -95,6 +98,13 @@ cat > $c5 <<ENDOFTEXT
  * are met:
 ENDOFTEXT
 
+# Parallelize if possible.
+xp=""
+echo date | xargs -P 20 >/dev/null 2>&1
+if test $? -eq 0; then
+	xp="-P 20"
+fi
+
 # Search for files, skipping some well-known 3rd party directories.
 (cd .. && find [a-z]* -name '*.[chi]' \
 	-o -name '*.cxx' \
@@ -111,7 +121,7 @@ ENDOFTEXT
 	-e '/\/node_modules\//d' \
 	-e '/dist\/__/d' \
 	-e 's/^\.\///' |
-    xargs -P 20 -n 1 -I{} sh dist/s_copyright {})
+    xargs $xp -n 1 -I{} sh dist/s_copyright {})
 
 # A few special cases: LICENSE, documentation, wt utility, some of which have
 # more than one copyright notice in the file. For files that have only a single

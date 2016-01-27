@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -29,7 +29,7 @@ __drop_file(
 		return (EINVAL);
 
 	/* Close all btree handles associated with this file. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_conn_dhandle_close_all(session, uri, force));
 	WT_RET(ret);
 

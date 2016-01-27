@@ -1,0 +1,108 @@
+/*! @page build-windows Building and installing WiredTiger on Windows
+
+@section windows_github Building using Git and GitHub
+
+Skip this step if you are building from a WiredTiger release package,
+and proceed with @ref windows_building
+
+First, clone the repository:
+
+@code
+git clone git://github.com/wiredtiger/wiredtiger.git
+@endcode
+
+Now proceed with @ref windows_building
+
+@section windows_building Building on Windows
+
+Building WiredTiger on Windows requires
+<a href="http://www.scons.org">SCons</a> as well as the Microsoft Visual
+C++ compiler in Microsoft Visual Studio.
+
+Change directory to the top-level directory, then build the software:
+
+@code
+cd wiredtiger
+scons
+@endcode
+
+To rebuild from scratch, discard any previous configuration by cleaning
+out the build area:
+
+@code
+scons -c
+@endcode
+
+To see additional configuration options, run:
+
+@code
+scons --help
+@endcode
+
+To build the python language support, a 64-bit version of Python is
+required.  The required version is referred to as x86-64 on
+<a href="www.python.org">Python.org</a> or x64 on
+<a href="http://www.activestate.com/activepython/downloads">
+ActiveState Python</a>.
+
+@section windows_installing Installing WiredTiger
+
+The WiredTiger software consists of a library and a single standalone
+utility.
+
+WiredTiger's distribution follows the GNU Coding Standards installation
+guidelines, and by default WiredTiger builds and installs a static library
+and dll version of the library.
+
+@code
+file <root directory>/package/bin/
+wt.exe:			x64 standalone executable
+wiredtiger.dll:		x64 dynamically linked library
+
+file <root directory>/package/lib/
+libwiredtiger.lib:	x64 static library
+wiredtiger.lib:		x64 import library for dll
+@endcode
+
+To install WiredTiger:
+
+@code
+scons install
+@endcode
+
+To install WiredTiger's libraries or binaries into alternate locations,
+you can use the --prefix configuration option.
+
+@code
+scons --prefix=c:\wiredtiger install
+@endcode
+
+@section windows_configure Configuring WiredTiger
+
+The WiredTiger software supports some additional configuration options:
+
+@par \c --enable-attach
+Configure WiredTiger to sleep and wait for a debugger to attach on failure.
+<b>DO NOT</b> configure this option in production environments.
+
+@par \c --enable-diagnostic
+Configure WiredTiger to perform various run-time diagnostic tests.
+<b>DO NOT</b> configure this option in production environments.
+
+@par \c --enable-python
+Build the WiredTiger <a href="http://www.python.org">Python</a> API,
+requires path to swig.exe on Windows.
+
+@par \c --enable-snappy
+Configure WiredTiger for <a href="http://code.google.com/p/snappy/">snappy</a>
+compression; see @ref compression for more information.
+
+@par \c --enable-verbose
+Configure WiredTiger to support the \c verbose configuration string to
+::wiredtiger_open.
+
+@par \c --enable-zlib
+Configure WiredTiger for <a href="http://www.zlib.net/">zlib</a>
+compression; see @ref compression for more information.
+
+ */

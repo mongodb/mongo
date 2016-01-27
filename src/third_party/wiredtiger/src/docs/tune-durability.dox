@@ -1,0 +1,119 @@
+/*! @class doc_tune_durability_group_commit
+
+WiredTiger automatically groups the flush operations for threads that
+commit concurrently into single calls.  This usually means
+multi-threaded workloads will achieve higher throughput than
+single-threaded workloads because the operating system can flush data
+more efficiently to the disk.  No application-level configuration is
+required for this feature.
+
+ */
+
+/*! @class doc_tune_durability_flush_config
+
+By default, log records are written to an in-memory buffer before
+WT_SESSION::commit_transaction returns, giving highest performance but
+not ensuring durability.  The durability guarantees can be stricter but
+will impact performance.
+
+If \c transaction_sync=(enabled=false) is configured to ::wiredtiger_open,
+log records may be buffered in memory, and only flushed to disk by
+checkpoints, when log files switch or calls to WT_SESSION::commit_transaction
+with \c sync=on.  (Note that any call to WT_SESSION::commit_transaction
+with \c sync=on will flush the log records for all committed transactions,
+not just the transaction where the configuration is set.)  This provides the
+minimal guarantees, but will be significantly faster than other configurations.
+
+If \c transaction_sync=(enabled=true), \c transaction_sync=(method)
+further configures the method used to flush log records to disk.  By
+default, the configured value is \c fsync, which calls the operating
+system's \c fsync call (of \c fdatasync if available) as each commit completes.
+
+If the value is set to \c dsync, the \c O_DSYNC or \c O_SYNC
+flag to the operating system's \c open call will be specified when the
+file is opened.  (The durability guarantee of the \c fsync and \c dsync
+configurations are the same, and in our experience the \c open flags are
+slower, this configuration is only included for systems where that may
+not be the case.)
+
+If the value is set to \c none, the operating system's \c write call
+will be called as each commit completes but does not flush to disk.
+This setting gives durability at the application level but not at
+the system level.
+
+When a log file fills and the system moves to the next log file, the
+previous log file will always be flushed to disk prior to close.  So
+when running in a durability mode that does not flush to disk, the risk
+is bounded by the most recent log file change.
+
+Here is the expected performance of durability modes, in order from the
+fastest to the slowest (and from the fewest durability guarantees to the
+most durability guarantees).
+
+<table>
+@hrow{Durability Mode, Notes}
+@row{<code>log=(enabled=false)</code>, checkpoint-level durability}
+@row{<code>log=(enabled)\,transaction_sync=(enabled=false)</code>,
+	in-memory buffered logging configured; updates durable after
+	checkpoint or after \c sync is set in WT_SESSION::begin_transaction}
+@row{<code>log=(enabled)\,transaction_sync=(enabled=true\,method=none)</code>,
+	logging configured; updates durable after application failure\,
+	but not after system failure}
+@row{<code>log=(enabled)\,transaction_sync=(enabled=true\,method=fsync)</code>,
+	logging configured; updates durable on application or system
+	failure}
+@row{<code>log=(enabled)\,transaction_sync=(enabled=true\,method=dsync)</code>,
+	logging configured; updates durable on application or system
+	failure}
+</table>
+
+The durability setting can also be controlled directly on a per-transaction
+basis via the WT_SESSION::commit_transaction method.
+The WT_SESSION::commit_transaction supports several durability modes with
+the \c sync configuration that override the connection level settings.
+
+If \c sync=on is configured then this commit operation will wait for its
+log records, and all earlier ones, to be durable to the extent specified
+by the \c transaction_sync=(method) setting before returning.
+
+If \c sync=off is configured then this commit operation will write its
+records into the in-memory buffer and return immediately.
+
+If \c sync=background is configured then this commit operation will write
+its record to an in-memory buffer, and will return.  Prior to returning it
+will signal an internal WiredTiger worker thread to synchronize this log
+record.  The caller may then check the status of that background
+synchronization with the WT_SESSION::transaction_sync method.
+
+The durability of the write-ahead log can be controlled independently
+as well via the WT_SESSION::log_flush method.
+The WT_SESSION::log_flush supports several durability modes with
+the \c sync configuration that immediately act upon the log.
+
+If \c sync=on is configured then this flush will force the current
+log and all earlier records to be durable on disk before returning.
+This method call overrides the \c transaction_sync setting and
+forces the data out via \c fsync.
+
+If \c sync=off is configured then this flush operation will force the
+logging subsystem to write any outstanding in-memory buffers to the
+file system before returning.
+
+If \c sync=background is configured then this flush operation will force
+the signalling of a background synchronization operation.
+The caller may then check the status of that background
+synchronization with the WT_SESSION::transaction_sync method.
+ */
+
+/*! @page tune_durability Commit-level durability
+
+There are some considerations when configuring commit-level durability
+that can affect performance.
+
+@section tune_durability_group_commit Group commit
+@copydoc doc_tune_durability_group_commit
+
+@section tune_durability_flush_config Flush call configuration
+@copydoc doc_tune_durability_flush_config
+
+ */

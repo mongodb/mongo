@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -110,6 +110,10 @@ DEF_OPT_AS_UINT32(drop_tables, 0,
 DEF_OPT_AS_UINT32(icount, 5000,
     "number of records to initially populate. If multiple tables are "
     "configured the count is spread evenly across all tables.")
+DEF_OPT_AS_UINT32(idle_table_cycle, 0,
+    "Enable regular create and drop of idle tables, value is the maximum "
+    "number of seconds a create or drop is allowed before flagging an error. "
+    "Default 0 which means disabled.")
 DEF_OPT_AS_BOOL(index, 0,
     "Whether to create an index on the value field.")
 DEF_OPT_AS_BOOL(insert_rmw, 0,

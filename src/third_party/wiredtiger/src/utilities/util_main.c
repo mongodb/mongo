@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -159,6 +159,8 @@ main(int argc, char *argv[])
 	case 'r':
 		if (strcmp(command, "read") == 0)
 			func = util_read;
+		else if (strcmp(command, "rebalance") == 0)
+			func = util_rebalance;
 		else if (strcmp(command, "rename") == 0)
 			func = util_rename;
 		break;
@@ -259,9 +261,10 @@ usage(void)
 	    "\t" "dump\t  dump an object\n"
 	    "\t" "list\t  list database objects\n"
 	    "\t" "load\t  load an object\n"
-	    "\t" "loadtext\t  load an object from a text file\n"
+	    "\t" "loadtext  load an object from a text file\n"
 	    "\t" "printlog  display the database log\n"
 	    "\t" "read\t  read values from an object\n"
+	    "\t" "rebalance rebalance an object\n"
 	    "\t" "rename\t  rename an object\n"
 	    "\t" "salvage\t  salvage a file\n"
 	    "\t" "stat\t  display statistics for an object\n"

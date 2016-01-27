@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -758,6 +758,7 @@ err:	API_END_RET(session, ret);
 static int
 __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
 	WT_CURSOR **cp;
@@ -776,8 +777,10 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 
 	/* If the table is incomplete, wait on the table lock and recheck. */
 	complete = table->cg_complete;
-	if (!complete)
-		WT_WITH_TABLE_LOCK(session, complete = table->cg_complete);
+	if (!complete) {
+		WT_WITH_TABLE_LOCK(session, ret, complete = table->cg_complete);
+		WT_RET(ret);
+	}
 	if (!complete)
 		WT_RET_MSG(session, EINVAL,
 		    "Can't use '%s' until all column groups are created",

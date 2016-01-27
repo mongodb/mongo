@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -530,7 +530,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_REF **child_refp, *ref, **root_refp;
 	WT_SPLIT_ERROR_PHASE complete;
 	size_t child_incr, root_decr, root_incr, size;
-	uint64_t split_gen;
+	uint64_t recno, split_gen;
 	uint32_t children, chunk, i, j, remain;
 	uint32_t slots;
 	void *p;
@@ -593,8 +593,11 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	for (root_refp = pindex->index,
 	    alloc_refp = alloc_index->index, i = 0; i < children; ++i) {
 		slots = i == children - 1 ? remain : chunk;
+
+		recno = root->type == WT_PAGE_COL_INT ?
+		    (*root_refp)->key.recno : WT_RECNO_OOB;
 		WT_ERR(__wt_page_alloc(
-		    session, root->type, 0, slots, false, &child));
+		    session, root->type, recno, slots, false, &child));
 
 		/*
 		 * Initialize the page's child reference; we need a copy of the
@@ -609,12 +612,10 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 			WT_ERR(__wt_row_ikey(session, 0, p, size, ref));
 			root_incr += sizeof(WT_IKEY) + size;
 		} else
-			ref->key.recno = (*root_refp)->key.recno;
+			ref->key.recno = recno;
 		ref->state = WT_REF_MEM;
 
 		/* Initialize the child page. */
-		if (root->type == WT_PAGE_COL_INT)
-			child->pg_intl_recno = (*root_refp)->key.recno;
 		child->pg_intl_parent_ref = ref;
 
 		/* Mark it dirty. */
@@ -1004,7 +1005,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_REF **child_refp, *page_ref, **page_refp, *ref;
 	WT_SPLIT_ERROR_PHASE complete;
 	size_t child_incr, page_decr, page_incr, parent_incr, size;
-	uint64_t split_gen;
+	uint64_t recno, split_gen;
 	uint32_t children, chunk, i, j, remain;
 	uint32_t slots;
 	void *p;
@@ -1088,8 +1089,11 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_ASSERT(session, page_refp == pindex->index + chunk);
 	for (alloc_refp = alloc_index->index + 1, i = 1; i < children; ++i) {
 		slots = i == children - 1 ? remain : chunk;
+
+		recno = page->type == WT_PAGE_COL_INT ?
+		    (*page_refp)->key.recno : WT_RECNO_OOB;
 		WT_ERR(__wt_page_alloc(
-		    session, page->type, 0, slots, false, &child));
+		    session, page->type, recno, slots, false, &child));
 
 		/*
 		 * Initialize the page's child reference; we need a copy of the
@@ -1104,12 +1108,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 			WT_ERR(__wt_row_ikey(session, 0, p, size, ref));
 			parent_incr += sizeof(WT_IKEY) + size;
 		} else
-			ref->key.recno = (*page_refp)->key.recno;
+			ref->key.recno = recno;
 		ref->state = WT_REF_MEM;
 
 		/* Initialize the child page. */
-		if (page->type == WT_PAGE_COL_INT)
-			child->pg_intl_recno = (*page_refp)->key.recno;
 		child->pg_intl_parent_ref = ref;
 
 		/* Mark it dirty. */
@@ -1661,10 +1663,11 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_DECL_RET;
 	WT_DECL_ITEM(key);
 	WT_INSERT *ins, **insp, *moved_ins, *prev_ins;
-	WT_INSERT_HEAD *ins_head;
+	WT_INSERT_HEAD *ins_head, *tmp_ins_head;
 	WT_PAGE *page, *right;
 	WT_REF *child, *split_ref[2] = { NULL, NULL };
 	size_t page_decr, parent_incr, right_incr;
+	uint8_t type;
 	int i;
 
 	WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
@@ -1673,6 +1676,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	page = ref->page;
 	right = NULL;
 	page_decr = parent_incr = right_incr = 0;
+	type = page->type;
 
 	/*
 	 * Assert splitting makes sense; specifically assert the page is dirty,
@@ -1686,9 +1690,12 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
 	/* Find the last item on the page. */
-	ins_head = page->pg_row_entries == 0 ?
-	    WT_ROW_INSERT_SMALLEST(page) :
-	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+	if (type == WT_PAGE_ROW_LEAF)
+		ins_head = page->pg_row_entries == 0 ?
+		    WT_ROW_INSERT_SMALLEST(page) :
+		    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+	else
+		ins_head = WT_COL_APPEND(page);
 	moved_ins = WT_SKIP_LAST(ins_head);
 
 	/*
@@ -1699,14 +1706,12 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * The new WT_REF is not quite identical: we have to instantiate a key,
 	 * and the new reference is visible to readers once the split completes.
 	 *
-	 * The key-instantiation code checks for races, leave the key fields
-	 * zeroed we don't trigger them.
-	 *
 	 * Don't copy any deleted page state: we may be splitting a page that
 	 * was instantiated after a truncate and that history should not be
 	 * carried onto these new child pages.
 	 */
 	WT_ERR(__wt_calloc_one(session, &split_ref[0]));
+	parent_incr += sizeof(WT_REF);
 	child = split_ref[0];
 	child->page = ref->page;
 	child->home = ref->home;
@@ -1720,49 +1725,82 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	ref->addr = NULL;
 
-	/*
-	 * Copy the first key from the original page into first ref in the new
-	 * parent.  Pages created in memory always have a "smallest" insert
-	 * list, so look there first.  If we don't find one, get the first key
-	 * from the disk image.
-	 *
-	 * We can't just use the key from the original ref: it may have been
-	 * suffix-compressed, and after the split the truncated key may not be
-	 * valid.
-	 */
-	WT_ERR(__wt_scr_alloc(session, 0, &key));
-	if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL) {
-		key->data = WT_INSERT_KEY(ins);
-		key->size = WT_INSERT_KEY_SIZE(ins);
+	if (type == WT_PAGE_ROW_LEAF) {
+		/*
+		 * Copy the first key from the original page into first ref in
+		 * the new parent. Pages created in memory always have a
+		 * "smallest" insert list, so look there first.  If we don't
+		 * find one, get the first key from the disk image.
+		 *
+		 * We can't just use the key from the original ref: it may have
+		 * been suffix-compressed, and after the split the truncated key
+		 * may not be valid.
+		 */
+		WT_ERR(__wt_scr_alloc(session, 0, &key));
+		if ((ins =
+		    WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL) {
+			key->data = WT_INSERT_KEY(ins);
+			key->size = WT_INSERT_KEY_SIZE(ins);
+		} else
+			WT_ERR(__wt_row_leaf_key(
+			    session, page, &page->pg_row_d[0], key, true));
+		WT_ERR(__wt_row_ikey(session, 0, key->data, key->size, child));
+		parent_incr += sizeof(WT_IKEY) + key->size;
+		__wt_scr_free(session, &key);
 	} else
-		WT_ERR(__wt_row_leaf_key(
-		    session, page, &page->pg_row_d[0], key, true));
-	WT_ERR(__wt_row_ikey(session, 0, key->data, key->size, child));
-	parent_incr += sizeof(WT_REF) + sizeof(WT_IKEY) + key->size;
-	__wt_scr_free(session, &key);
+		child->key.recno = ref->key.recno;
 
 	/*
 	 * The second page in the split is a new WT_REF/page pair.
 	 */
-	WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, false, &right));
-	WT_ERR(__wt_calloc_one(session, &right->pg_row_ins));
-	WT_ERR(__wt_calloc_one(session, &right->pg_row_ins[0]));
+	if (type == WT_PAGE_ROW_LEAF)
+		WT_ERR(__wt_page_alloc(session,
+		    type, WT_RECNO_OOB, 0, false, &right));
+	else
+		WT_ERR(__wt_page_alloc(session,
+		    type, WT_INSERT_RECNO(moved_ins), 0, false, &right));
+
+	/*
+	 * The new page is dirty by definition, column-store splits update the
+	 * page-modify structure, so create it now.
+	 */
+	WT_ERR(__wt_page_modify_init(session, right));
+	__wt_page_modify_set(session, right);
+
+	if (type == WT_PAGE_ROW_LEAF) {
+		WT_ERR(__wt_calloc_one(session, &right->pg_row_ins));
+		WT_ERR(__wt_calloc_one(session, &right->pg_row_ins[0]));
+	} else {
+		WT_ERR(__wt_calloc_one(session, &right->modify->mod_append));
+		WT_ERR(__wt_calloc_one(session, &right->modify->mod_append[0]));
+	}
 	right_incr += sizeof(WT_INSERT_HEAD);
 	right_incr += sizeof(WT_INSERT_HEAD *);
 
 	WT_ERR(__wt_calloc_one(session, &split_ref[1]));
+	parent_incr += sizeof(WT_REF);
 	child = split_ref[1];
 	child->page = right;
 	child->state = WT_REF_MEM;
-	WT_ERR(__wt_row_ikey(session, 0,
-	    WT_INSERT_KEY(moved_ins), WT_INSERT_KEY_SIZE(moved_ins),
-	    child));
-	parent_incr +=
-	    sizeof(WT_REF) + sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(moved_ins);
 
-	/* The new page is dirty by definition. */
-	WT_ERR(__wt_page_modify_init(session, right));
-	__wt_page_modify_set(session, right);
+	if (type == WT_PAGE_ROW_LEAF) {
+		WT_ERR(__wt_row_ikey(session, 0,
+		    WT_INSERT_KEY(moved_ins), WT_INSERT_KEY_SIZE(moved_ins),
+		    child));
+		parent_incr += sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(moved_ins);
+	} else
+		child->key.recno = WT_INSERT_RECNO(moved_ins);
+
+	/*
+	 * Allocation operations completed, we're going to split.
+	 *
+	 * Record the split column-store page record, used in reconciliation.
+	 */
+	if (type != WT_PAGE_ROW_LEAF) {
+		WT_ASSERT(session,
+		    page->modify->mod_split_recno == WT_RECNO_OOB);
+		page->modify->mod_split_recno = child->key.recno;
+	}
 
 	/*
 	 * We modified the page above, which will have set the first dirty
@@ -1786,15 +1824,16 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	    page_decr, right_incr, __wt_update_list_memsize(moved_ins->upd));
 
 	/*
-	 * Allocation operations completed, move the last insert list item from
-	 * the original page to the new page.
+	 * Move the last insert list item from the original page to the new
+	 * page.
 	 *
 	 * First, update the item to the new child page. (Just append the entry
 	 * for simplicity, the previous skip list pointers originally allocated
 	 * can be ignored.)
 	 */
-	right->pg_row_ins[0]->head[0] =
-	    right->pg_row_ins[0]->tail[0] = moved_ins;
+	tmp_ins_head = type == WT_PAGE_ROW_LEAF ?
+	    right->pg_row_ins[0] : right->modify->mod_append[0];
+	tmp_ins_head->head[0] = tmp_ins_head->tail[0] = moved_ins;
 
 	/*
 	 * Remove the entry from the orig page (i.e truncate the skip list).
@@ -1879,34 +1918,40 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_cache_page_inmem_incr(session, right, right_incr);
 
 	/*
-	 * Split into the parent.  After this, the original page is no
+	 * Split into the parent. On successful return, the original page is no
 	 * longer locked, so we cannot safely look at it.
 	 */
 	page = NULL;
 	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, parent_incr, false, true)) != 0) {
-		/*
-		 * Move the insert list element back to the original page list.
-		 * For simplicity, the previous skip list pointers originally
-		 * allocated can be ignored, just append the entry to the end of
-		 * the level 0 list. As before, we depend on the list having
-		 * multiple elements and ignore the edge cases small lists have.
-		 */
+	    session, ref, split_ref, 2, parent_incr, false, true)) == 0)
+		return (0);
+
+	/*
+	 * Failure.
+	 *
+	 * Reset the split column-store page record.
+	 */
+	page->modify->mod_split_recno = WT_RECNO_OOB;
+
+	/*
+	 * Clear the allocated page's reference to the moved insert list element
+	 * so it's not freed when we discard the page.
+	 *
+	 * Move the element back to the original page list. For simplicity, the
+	 * previous skip list pointers originally allocated can be ignored, just
+	 * append the entry to the end of the level 0 list. As before, we depend
+	 * on the list having multiple elements and ignore the edge cases small
+	 * lists have.
+	 */
+	if (type == WT_PAGE_ROW_LEAF)
 		right->pg_row_ins[0]->head[0] =
 		    right->pg_row_ins[0]->tail[0] = NULL;
-		ins_head->tail[0]->next[0] = moved_ins;
-		ins_head->tail[0] = moved_ins;
+	else
+		right->modify->mod_append[0]->head[0] =
+		    right->modify->mod_append[0]->tail[0] = NULL;
 
-		/*
-		 * We marked the new page dirty; we're going to discard it, but
-		 * first mark it clean and fix up the cache statistics.
-		 */
-		__wt_page_modify_clear(session, right);
-
-		WT_ERR(ret);
-	}
-
-	return (0);
+	ins_head->tail[0]->next[0] = moved_ins;
+	ins_head->tail[0] = moved_ins;
 
 err:	if (split_ref[0] != NULL) {
 		/*
@@ -1914,15 +1959,23 @@ err:	if (split_ref[0] != NULL) {
 		 */
 		ref->addr = split_ref[0]->addr;
 
-		__wt_free(session, split_ref[0]->key.ikey);
+		if (type == WT_PAGE_ROW_LEAF)
+			__wt_free(session, split_ref[0]->key.ikey);
 		__wt_free(session, split_ref[0]);
 	}
 	if (split_ref[1] != NULL) {
-		__wt_free(session, split_ref[1]->key.ikey);
+		if (type == WT_PAGE_ROW_LEAF)
+			__wt_free(session, split_ref[1]->key.ikey);
 		__wt_free(session, split_ref[1]);
 	}
-	if (right != NULL)
+	if (right != NULL) {
+		/*
+		 * We marked the new page dirty; we're going to discard it,
+		 * but first mark it clean and fix up the cache statistics.
+		 */
+		__wt_page_modify_clear(session, right);
 		__wt_page_out(session, &right);
+	}
 	__wt_scr_free(session, &key);
 	return (ret);
 }

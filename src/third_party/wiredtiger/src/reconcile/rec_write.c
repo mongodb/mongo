@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -630,12 +630,12 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, false, &next));
+		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT,
+		    1, mod->mod_multi_entries, false, &next));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, false, &next));
+		WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT,
+		    WT_RECNO_OOB, mod->mod_multi_entries, false, &next));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -3952,16 +3952,49 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	r->recno += entry;
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_RET(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
-		if (upd == NULL)
-			continue;
+	for (ins =
+	    WT_SKIP_FIRST(WT_COL_APPEND(page));; ins = WT_SKIP_NEXT(ins)) {
+		if (ins == NULL) {
+			/*
+			 * If the page split, instantiate any missing records in
+			 * the page's name space. (Imagine record 98 is
+			 * transactionally visible, 99 wasn't created or is not
+			 * yet visible, 100 is visible. Then the page splits and
+			 * record 100 moves to another page. When we reconcile
+			 * the original page, we write record 98, then we don't
+			 * see record 99 for whatever reason. If we've moved
+			 * record 1000, we don't know to write a deleted record
+			 * 99 on the page.)
+			 *
+			 * The record number recorded during the split is the
+			 * first key on the split page, that is, one larger than
+			 * the last key on this page, we have to decrement it.
+			 */
+			if ((recno =
+			    page->modify->mod_split_recno) == WT_RECNO_OOB)
+				break;
+			recno -= 1;
+
+			/*
+			 * The following loop assumes records to write, and the
+			 * previous key might have been visible.
+			 */
+			if (r->recno > recno)
+				break;
+			upd = NULL;
+		} else {
+			WT_RET(
+			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
+			if (upd == NULL)
+				continue;
+			recno = WT_INSERT_RECNO(ins);
+		}
 		for (;;) {
 			/*
 			 * The application may have inserted records which left
 			 * gaps in the name space.
 			 */
-			for (recno = WT_INSERT_RECNO(ins);
+			for (;
 			    nrecs > 0 && r->recno < recno;
 			    --nrecs, ++entry, ++r->recno)
 				__bit_setv(
@@ -3969,6 +4002,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 			if (nrecs > 0) {
 				__bit_setv(r->first_free, entry, btree->bitcnt,
+				    upd == NULL ? 0 :
 				    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
 				--nrecs;
 				++entry;
@@ -3990,6 +4024,13 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			entry = 0;
 			nrecs = WT_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
 		}
+
+		/*
+		 * Execute this loop once without an insert item to catch any
+		 * missing records due to a split, then quit.
+		 */
+		if (ins == NULL)
+			break;
 	}
 
 	/* Update the counters. */
@@ -4470,11 +4511,36 @@ compare:		/*
 	}
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_ERR(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
-		if (upd == NULL)
-			continue;
-		for (n = WT_INSERT_RECNO(ins); src_recno <= n;) {
+	for (ins =
+	    WT_SKIP_FIRST(WT_COL_APPEND(page));; ins = WT_SKIP_NEXT(ins)) {
+		if (ins == NULL) {
+			/*
+			 * If the page split, instantiate any missing records in
+			 * the page's name space. (Imagine record 98 is
+			 * transactionally visible, 99 wasn't created or is not
+			 * yet visible, 100 is visible. Then the page splits and
+			 * record 100 moves to another page. When we reconcile
+			 * the original page, we write record 98, then we don't
+			 * see record 99 for whatever reason. If we've moved
+			 * record 1000, we don't know to write a deleted record
+			 * 99 on the page.)
+			 *
+			 * The record number recorded during the split is the
+			 * first key on the split page, that is, one larger than
+			 * the last key on this page, we have to decrement it.
+			 */
+			if ((n = page->modify->mod_split_recno) == WT_RECNO_OOB)
+				break;
+			n -= 1;
+			upd = NULL;
+		} else {
+			WT_ERR(
+			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
+			if (upd == NULL)
+				continue;
+			n = WT_INSERT_RECNO(ins);
+		}
+		while (src_recno <= n) {
 			/*
 			 * The application may have inserted records which left
 			 * gaps in the name space, and these gaps can be huge.
@@ -4497,7 +4563,8 @@ compare:		/*
 					src_recno += skip;
 				}
 			} else {
-				deleted = WT_UPDATE_DELETED_ISSET(upd);
+				deleted = upd == NULL ||
+				    WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
 					data = WT_UPDATE_DATA(upd);
 					size = upd->size;
@@ -4543,6 +4610,13 @@ next:			if (src_recno == UINT64_MAX)
 				break;
 			++src_recno;
 		}
+
+		/*
+		 * Execute this loop once without an insert item to catch any
+		 * missing records due to a split, then quit.
+		 */
+		if (ins == NULL)
+			break;
 	}
 
 	/* If we were tracking a record, write it. */
@@ -5381,11 +5455,10 @@ __rec_split_dump_keys(WT_SESSION_IMPL *session, WT_PAGE *page, WT_RECONCILE *r)
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			WT_ERR(__wt_buf_set_printable(
-			    session, tkey, bnd->key.data, bnd->key.size));
 			WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-			    "starting key %.*s",
-			    (int)tkey->size, (const char *)tkey->data));
+			    "starting key %s",
+			    __wt_buf_set_printable(
+			    session, bnd->key.data, bnd->key.size, tkey)));
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:

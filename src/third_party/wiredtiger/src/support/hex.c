@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -83,10 +83,6 @@ __wt_raw_to_esc_hex(
 	 */
 	WT_RET(__wt_buf_init(session, to, size * 3 + 1));
 
-	/*
-	 * In the worst case, every character takes up 3 spaces, plus a
-	 * trailing nul byte.
-	 */
 	for (p = from, t = to->mem, i = size; i > 0; --i, ++p)
 		if (isprint((int)*p)) {
 			if (*p == '\\')

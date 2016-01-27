@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -41,7 +41,7 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	WORKLOAD *workload;
 	WT_CURSOR *cursor;
-	char *key, *truncate_key;
+	char *key;
 	int ret;
 	uint64_t end_point, final_stone_gap, i, start_point;
 
@@ -102,23 +102,14 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	if (trunc_cfg->stone_gap != 0) {
 		trunc_cfg->expected_total = (end_point - start_point);
 		for (i = 1; i <= trunc_cfg->needed_stones; i++) {
-			truncate_key = calloc(cfg->key_sz, 1);
-			if (truncate_key == NULL) {
-				ret = enomem(cfg);
-				goto err;
-			}
-			truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
-			if (truncate_item == NULL) {
-				free(truncate_key);
-				ret = enomem(cfg);
-				goto err;
-			}
+			truncate_item =
+			    dcalloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
+			truncate_item->key = dcalloc(cfg->key_sz, 1);
 			generate_key(
-			    cfg, truncate_key, trunc_cfg->stone_gap * i);
-			truncate_item->key = truncate_key;
+			    cfg, truncate_item->key, trunc_cfg->stone_gap * i);
 			truncate_item->diff =
 			    (trunc_cfg->stone_gap * i) - trunc_cfg->last_key;
-			TAILQ_INSERT_TAIL( &cfg->stone_head, truncate_item, q);
+			TAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
 			trunc_cfg->last_key = trunc_cfg->stone_gap * i;
 			trunc_cfg->num_stones++;
 		}
@@ -137,7 +128,6 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 
 	TRUNCATE_CONFIG *trunc_cfg;
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
-	char *truncate_key;
 	int ret, t_ret;
 	uint64_t used_stone_gap;
 
@@ -178,21 +168,9 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 
 	while (trunc_cfg->num_stones < trunc_cfg->needed_stones) {
 		trunc_cfg->last_key += used_stone_gap;
-		truncate_key = calloc(cfg->key_sz, 1);
-		if (truncate_key == NULL) {
-			lprintf(cfg, ENOMEM, 0,
-			    "truncate: couldn't allocate key array");
-			return (ENOMEM);
-		}
-		truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
-		if (truncate_item == NULL) {
-			free(truncate_key);
-			lprintf(cfg, ENOMEM, 0,
-			    "truncate: couldn't allocate item");
-			return (ENOMEM);
-		}
-		generate_key(cfg, truncate_key, trunc_cfg->last_key);
-		truncate_item->key = truncate_key;
+		truncate_item = dcalloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
+		truncate_item->key = dcalloc(cfg->key_sz, 1);
+		generate_key(cfg, truncate_item->key, trunc_cfg->last_key);
 		truncate_item->diff = used_stone_gap;
 		TAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
 		trunc_cfg->num_stones++;

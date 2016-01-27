@@ -1,0 +1,137 @@
+#
+# This file defines the tasks and platforms for WiredTiger in the
+# MongoDB continuous integration system (see https://mci.mongodb.com).
+#
+
+functions:
+  "fetch source" :
+    command: git.get_project
+    params:
+      directory: wiredtiger
+
+pre:
+  - command: shell.exec
+    params:
+      script: |
+        rm -rf "wiredtiger"
+post:
+  - command: shell.exec
+    params:
+      script: |
+        rm -rf "wiredtiger"
+
+tasks:
+  - name: compile-posix
+    commands:
+      - func: "fetch source"
+      - command: git.apply_patch
+        params:
+          directory: wiredtiger
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ./build_posix/reconf
+            ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib
+            ${make_command|make} ${smp_command|}
+            ${make_command|make} check
+
+            ${test_env_vars|} python ./test/suite/run.py -v 2
+  - name: compile-windows
+    commands:
+      - func: "fetch source"
+      - command: git.apply_patch
+        params:
+          directory: wiredtiger
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe ${smp_command|}
+
+            ${test_env_vars|} python ./test/suite/run.py -v 2
+
+  - name: compile-windows-alt
+    commands:
+      - func: "fetch source"
+      - command: git.apply_patch
+        params:
+          directory: wiredtiger
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            scons.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100" wiredtiger.dll libwiredtiger.lib
+
+  - name: fops-windows
+    commands:
+      - func: "fetch source"
+      - command: git.apply_patch
+        params:
+          directory: wiredtiger
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe ${smp_command|}
+
+            cmd.exe /c t_fops.exe
+
+buildvariants:
+- name: ubuntu1404
+  display_name: Ubuntu 14.04
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    test_env_vars: LD_LIBRARY_PATH=.libs
+    smp_command: -j$(grep -c ^processor /proc/cpuinfo)
+    configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
+  tasks:
+    - name: compile-posix
+
+- name: solaris
+  display_name: Solaris
+  run_on:
+  - solaris
+  expansions:
+    make_command: PATH=/opt/mongodbtoolchain/bin:$PATH gmake
+    test_env_vars: LD_LIBRARY_PATH=.libs
+    smp_command: -j$(kstat cpu | sort -u | grep -c "^module")
+    configure_env_vars: PATH=/opt/mongodbtoolchain/bin:$PATH CFLAGS="-m64"
+  tasks:
+    - name: compile-posix
+
+- name: windows-64
+  display_name: Windows 64-bit
+  run_on:
+  - windows-64-vs2013-test
+  expansions:
+    smp_command: -j$(grep -c ^processor /proc/cpuinfo)
+  tasks:
+    - name: compile-windows
+    - name: compile-windows-alt
+    - name: fops-windows
+
+- name: osx-108
+  display_name: OS X 10.8
+  run_on:
+  - osx-108
+  expansions:
+    smp_command: -j$(sysctl -n hw.logicalcpu)
+    configure_env_vars: PATH=/opt/local/bin:$PATH
+    make_command: PATH=/opt/local/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
+    test_env_vars: DYLD_LIBRARY_PATH=.libs
+  tasks:
+    - name: compile-posix

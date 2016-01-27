@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -55,29 +55,25 @@ int
 config_assign(CONFIG *dest, const CONFIG *src)
 {
 	CONFIG_QUEUE_ENTRY *conf_line, *tmp_line;
-	size_t i, len;
+	size_t i;
 	char *newstr, **pstr;
 
 	config_free(dest);
 	memcpy(dest, src, sizeof(CONFIG));
 
 	if (src->uris != NULL) {
-		dest->uris = calloc(src->table_count, sizeof(char *));
-		if (dest->uris == NULL)
-			return (enomem(dest));
+		dest->uris = dcalloc(src->table_count, sizeof(char *));
 		for (i = 0; i < src->table_count; i++)
-			dest->uris[i] = strdup(src->uris[i]);
+			dest->uris[i] = dstrdup(src->uris[i]);
 	}
 	dest->ckptthreads = NULL;
 	dest->popthreads = NULL;
 	dest->workers = NULL;
 
 	if (src->base_uri != NULL)
-		dest->base_uri = strdup(src->base_uri);
+		dest->base_uri = dstrdup(src->base_uri);
 	if (src->workload != NULL) {
-		dest->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD));
-		if (dest->workload == NULL)
-			return (enomem(dest));
+		dest->workload = dcalloc(WORKLOAD_MAX, sizeof(WORKLOAD));
 		memcpy(dest->workload,
 		    src->workload, WORKLOAD_MAX * sizeof(WORKLOAD));
 	}
@@ -88,10 +84,7 @@ config_assign(CONFIG *dest, const CONFIG *src)
 			pstr = (char **)
 			    ((u_char *)dest + config_opts[i].offset);
 			if (*pstr != NULL) {
-				len = strlen(*pstr) + 1;
-				if ((newstr = malloc(len)) == NULL)
-					return (enomem(src));
-				strncpy(newstr, *pstr, len);
+				newstr = dstrdup(*pstr);
 				*pstr = newstr;
 			}
 		}
@@ -101,12 +94,8 @@ config_assign(CONFIG *dest, const CONFIG *src)
 
 	/* Clone the config string information into the new cfg object */
 	TAILQ_FOREACH(conf_line, &src->config_head, c) {
-		len = strlen(conf_line->string);
-		if ((tmp_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1)) == NULL)
-			return (enomem(src));
-		if ((tmp_line->string = calloc(len + 1, 1)) == NULL)
-			return (enomem(src));
-		strncpy(tmp_line->string, conf_line->string, len);
+		tmp_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
+		tmp_line->string = dstrdup(conf_line->string);
 		TAILQ_INSERT_TAIL(&dest->config_head, tmp_line, c);
 	}
 	return (0);
@@ -212,8 +201,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		cfg->workers_cnt = 0;
 	}
 	/* Allocate the workload array. */
-	if ((cfg->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD))) == NULL)
-		return (enomem(cfg));
+	cfg->workload = dcalloc(WORKLOAD_MAX, sizeof(WORKLOAD));
 	cfg->workload_cnt = 0;
 
 	/*
@@ -249,8 +237,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				continue;
 			}
 			if (STRING_MATCH("throttle", k.str, k.len)) {
-				if ((workp->throttle = v.val) < 0)
-					goto err;
+				workp->throttle = (uint64_t)v.val;
 				continue;
 			}
 			if (STRING_MATCH("insert", k.str, k.len) ||
@@ -426,13 +413,10 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		strp = (char **)valueloc;
 		newlen = v->len + 1;
 		if (*strp == NULL) {
-			if ((newstr = calloc(newlen, sizeof(char))) == NULL)
-				return (enomem(cfg));
-			strncpy(newstr, v->str, v->len);
+			newstr = dstrdup(v->str);
 		} else {
 			newlen += (strlen(*strp) + 1);
-			if ((newstr = calloc(newlen, sizeof(char))) == NULL)
-				return (enomem(cfg));
+			newstr = dcalloc(newlen, sizeof(char));
 			snprintf(newstr, newlen,
 			    "%s,%*s", *strp, (int)v->len, v->str);
 			/* Free the old value now we've copied it. */
@@ -457,10 +441,11 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		}
 		strp = (char **)valueloc;
 		free(*strp);
-		if ((newstr = malloc(v->len + 1)) == NULL)
-			return (enomem(cfg));
-		strncpy(newstr, v->str, v->len);
-		newstr[v->len] = '\0';
+		/*
+		 * We duplicate the string to len rather than len+1 as we want
+		 * to truncate the trailing quotation mark.
+		 */
+		newstr = dstrndup(v->str,  v->len);
 		*strp = newstr;
 		break;
 	}
@@ -495,11 +480,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		goto err;
 	}
 	buf_size = (size_t)sb.st_size;
-	file_buf = calloc(buf_size + 2, 1);
-	if (file_buf == NULL) {
-		ret = ENOMEM;
-		goto err;
-	}
+	file_buf = dcalloc(buf_size + 2, 1);
 	read_size = read(fd, file_buf, buf_size);
 	if (read_size == -1
 #ifndef _WIN32
@@ -595,7 +576,6 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 	WT_CONFIG_PARSER *scan;
 	size_t len;
 	int ret, t_ret;
-	char *string_copy;
 
 	len = strlen(optstr);
 	if ((ret = wiredtiger_config_parser_open(
@@ -610,12 +590,8 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 	 * any parsed from the original config. We allocate len + 1 to allow for
 	 * a null byte to be added.
 	 */
-	if ((string_copy = calloc(len + 1, 1)) == NULL)
-		return (enomem(cfg));
-
-	strncpy(string_copy, optstr, len);
-	config_line = calloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
-	config_line->string = string_copy;
+	config_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
+	config_line->string = dstrdup(optstr);
 	TAILQ_INSERT_TAIL(&cfg->config_head, config_line, c);
 
 	while (ret == 0) {
@@ -647,8 +623,7 @@ config_opt_str(CONFIG *cfg, const char *name, const char *value)
 	char *optstr;
 
 							/* name="value" */
-	if ((optstr = malloc(strlen(name) + strlen(value) + 4)) == NULL)
-		return (enomem(cfg));
+	optstr = dmalloc(strlen(name) + strlen(value) + 4);
 	sprintf(optstr, "%s=\"%s\"", name, value);
 	ret = config_opt_line(cfg, optstr);
 	free(optstr);
@@ -747,13 +722,9 @@ config_to_file(CONFIG *cfg)
 	fp = NULL;
 
 	/* Backup the config */
-	req_len = strlen(cfg->home) + 100;
-	if ((path = calloc(req_len, 1)) == NULL) {
-		(void)enomem(cfg);
-		goto err;
-	}
-
-	snprintf(path, req_len + 14, "%s/CONFIG.wtperf", cfg->home);
+	req_len = strlen(cfg->home) + strlen("/CONFIG.wtperf") + 1;
+	path = dcalloc(req_len, 1);
+	snprintf(path, req_len, "%s/CONFIG.wtperf", cfg->home);
 	if ((fp = fopen(path, "w")) == NULL) {
 		lprintf(cfg, errno, 0, "%s", path);
 		goto err;

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -27,8 +27,11 @@ static int  __evict_server_work(WT_SESSION_IMPL *);
 static inline uint64_t
 __evict_read_gen(const WT_EVICT_ENTRY *entry)
 {
+	WT_BTREE *btree;
 	WT_PAGE *page;
 	uint64_t read_gen;
+
+	btree = entry->btree;
 
 	/* Never prioritize empty slots. */
 	if (entry->ref == NULL)
@@ -40,15 +43,23 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 	if (page->read_gen == WT_READGEN_OLDEST)
 		return (WT_READGEN_OLDEST);
 
+	/*
+	 * Any leaf page from a dead tree is a great choice (not internal pages,
+	 * they may have children and are not yet evictable).
+	 */
+	if (!WT_PAGE_IS_INTERNAL(page) &&
+	    F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
+		return (WT_READGEN_OLDEST);
+
 	/* Any empty page (leaf or internal), is a good choice. */
 	if (__wt_page_is_empty(page))
 		return (WT_READGEN_OLDEST);
 
 	/*
-	 * Skew the read generation for internal pages, we prefer to evict leaf
-	 * pages.
+	 * The base read-generation is skewed by the eviction priority.
+	 * Internal pages are also adjusted, we prefer to evict leaf pages.
 	 */
-	read_gen = page->read_gen + entry->btree->evict_priority;
+	read_gen = page->read_gen + btree->evict_priority;
 	if (WT_PAGE_IS_INTERNAL(page))
 		read_gen += WT_EVICT_INT_SKEW;
 
@@ -858,9 +869,8 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
-	WT_EVICT_ENTRY *evict;
 	uint64_t cutoff;
-	uint32_t candidates, entries, i;
+	uint32_t candidates, entries;
 
 	cache = S2C(session)->cache;
 
@@ -877,6 +887,14 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 
 	while (entries > 0 && cache->evict_queue[entries - 1].ref == NULL)
 		--entries;
+
+	/*
+	 * If we have more entries than the maximum tracked between walks,
+	 * clear them.  Do this before figuring out how many of the entries are
+	 * candidates so we never end up with more candidates than entries.
+	 */
+	while (entries > WT_EVICT_WALK_BASE)
+		__evict_list_clear(session, &cache->evict_queue[--entries]);
 
 	cache->evict_entries = entries;
 
@@ -920,15 +938,6 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 			    &cache->evict_queue[candidates]) > cutoff)
 				break;
 		cache->evict_candidates = candidates;
-	}
-
-	/* If we have more than the minimum number of entries, clear them. */
-	if (cache->evict_entries > WT_EVICT_WALK_BASE) {
-		for (i = WT_EVICT_WALK_BASE, evict = cache->evict_queue + i;
-		    i < cache->evict_entries;
-		    i++, evict++)
-			__evict_list_clear(session, evict);
-		cache->evict_entries = WT_EVICT_WALK_BASE;
 	}
 
 	cache->evict_current = cache->evict_queue;
@@ -988,6 +997,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
+	btree = NULL;
 	dhandle = NULL;
 	dhandle_locked = incr = false;
 	retries = 0;
@@ -1047,6 +1057,7 @@ retry:	while (slot < max_entries && ret == 0) {
 				(void)__wt_atomic_subi32(
 				    &dhandle->session_inuse, 1);
 				incr = false;
+				cache->evict_file_next = NULL;
 			}
 			dhandle = TAILQ_NEXT(dhandle, q);
 		}
@@ -1102,6 +1113,9 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * exclusive access when a handle is being closed.
 		 */
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+			/* Remember the file to visit first, next loop. */
+			cache->evict_file_next = dhandle;
+
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __evict_walk_file(session, &slot));
 			WT_ASSERT(session, session->split_gen == 0);
@@ -1121,9 +1135,6 @@ retry:	while (slot < max_entries && ret == 0) {
 	}
 
 	if (incr) {
-		/* Remember the file we should visit first, next loop. */
-		cache->evict_file_next = dhandle;
-
 		WT_ASSERT(session, dhandle->session_inuse > 0);
 		(void)__wt_atomic_subi32(&dhandle->session_inuse, 1);
 		incr = false;
@@ -1176,7 +1187,7 @@ __evict_init_candidate(
 	evict->ref = ref;
 	evict->btree = S2BT(session);
 
-	/* Mark the page on the list */
+	/* Mark the page on the list; set last to flush the other updates. */
 	F_SET_ATOMIC(ref->page, WT_PAGE_EVICT_LRU);
 }
 
@@ -1203,15 +1214,17 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	conn = S2C(session);
 	btree = S2BT(session);
 	cache = conn->cache;
-	start = cache->evict_queue + *slotp;
-	end = WT_MIN(start + WT_EVICT_WALK_PER_FILE,
-	    cache->evict_queue + cache->evict_slots);
 	internal_pages = restarts = 0;
 	enough = false;
 
-	walk_flags = WT_READ_CACHE | WT_READ_NO_EVICT |
-	    WT_READ_NO_GEN | WT_READ_NO_WAIT;
+	start = cache->evict_queue + *slotp;
+	end = start + WT_EVICT_WALK_PER_FILE;
+	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
+	    end > cache->evict_queue + cache->evict_slots)
+		end = cache->evict_queue + cache->evict_slots;
 
+	walk_flags =
+	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
 	if (F_ISSET(cache, WT_CACHE_WALK_REVERSE))
 		walk_flags |= WT_READ_PREV;
 
@@ -1253,7 +1266,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			continue;
 
 		/* Pages we no longer need (clean or dirty), are found money. */
-		if (__wt_page_is_empty(page))
+		if (__wt_page_is_empty(page) ||
+		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 			goto fast;
 
 		/* Skip clean pages if appropriate. */
@@ -1514,8 +1528,8 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 	if (txn_busy && pct_full < 100)
 		return (0);
 
-	if (busy == 1)
-		txn_busy = 1;
+	if (busy)
+		txn_busy = true;
 
 	/* Wake the eviction server if we need to do work. */
 	WT_RET(__wt_evict_server_wake(session));
@@ -1574,6 +1588,26 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 			txn_busy = true;
 	}
 	/* NOTREACHED */
+}
+
+/*
+ * __wt_evict_priority_set --
+ *	Set a tree's eviction priority.
+ */
+void
+__wt_evict_priority_set(WT_SESSION_IMPL *session, uint64_t v)
+{
+	S2BT(session)->evict_priority = v;
+}
+
+/*
+ * __wt_evict_priority_clear --
+ *	Clear a tree's eviction priority.
+ */
+void
+__wt_evict_priority_clear(WT_SESSION_IMPL *session)
+{
+	S2BT(session)->evict_priority = 0;
 }
 
 #ifdef HAVE_DIAGNOSTIC

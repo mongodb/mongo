@@ -1,0 +1,13 @@
+/*! @page tune_close Connection close
+
+Closing a WT_CONNECTION:: handle can be expensive, in part because of
+the cost of freeing memory (for example, the memory allocated for a
+large cache).  If the process is exiting regardless, configuring
+WT_CONNECTION::close to leak memory on close can significantly speed up
+the close.
+
+An example of configuring WT_CONNECTION::close to leak memory:
+
+@snippet ex_all.c Connection close leaking memory
+
+ */

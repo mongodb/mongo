@@ -1,0 +1,269 @@
+/*! @page wtperf Simulating workloads with wtperf
+
+The WiredTiger distribution includes a tool that can be used to simulate
+workloads in WiredTiger, in the directory \c bench/wtperf.
+
+The \c wtperf utility generally has two phases, the populate phase which
+creates a database and then populates an object in that database, and a
+workload phase, that does some set of operations on the object.
+
+For example, the following configuration uses a single thread to
+populate a file object with 500,000 records in a 500MB cache.  The
+workload phase consists of 8 threads running for two minutes, all
+reading from the file.
+
+@code
+conn_config="cache_size=500MB"
+table_config="type=file"
+icount=500000
+run_time=120
+populate_threads=1
+threads=((count=8,reads=1))
+@endcode
+
+In most cases, where the workload is the only interesting phase, the
+populate phase can be performed once and the workload phase run
+repeatedly (for more information, see the wtperf \c create configuration
+variable).
+
+The \c conn_config configuration supports setting any WiredTiger
+connection configuration value.  This is commonly used to configure
+statistics with regular reports, to obtain more information from the
+run:
+
+@code
+conn_config="cache_size=20G,statistics=(fast,clear),statistics_log=(wait=600)"
+report_interval=5
+@endcode
+
+Note quoting must be used when passing values to Wiredtiger
+configuration, as opposed to configuring the \c wtperf utility itself.
+
+The \c table_config configuration supports setting any WiredTiger object
+creation configuration value, for example, the above test can be
+converted to using an LSM store instead of a B+tree store, with
+additional LSM configuration, by changing \c conn_config to:
+
+@code
+table_config="lsm=(chunk_size=5MB),type=lsm,os_cache_dirty_max=16MB"
+@endcode
+
+More complex workloads can be configured by creating more threads doing
+inserts and updates as well as reads.  For example, to configure two
+inserting threads two threads doing a mixture of inserts, reads and
+updates:
+
+@code
+threads=((count=2,inserts=1),(count=2,inserts=1,reads=1,updates=1))
+@endcode
+
+Example \c wtperf configuration files can be found in the
+\c bench/wtperf/runners/ directory.
+
+There are also a number of command line arguments that can be passed
+to \c wtperf:
+@par <code>-C config</code>
+Specify configuration strings for the ::wiredtiger_open function.
+This argument is additive to the \c conn_config parameter in the
+configuration file.
+@par <code>-h directory</code>
+Specify a database home directory.  The default is \c ./WT_TEST.
+@par <code>-m monitor_directory</code>
+Specify a directory for all monitoring related files.
+The default is the database home directory.
+@par <code>-O config_file</code>
+Specify the configuration file to run.
+@par <code>-o config</code>
+Specify configuration strings for the \c wtperf program.
+This argument will override settings in the configuration file.
+@par <code>-T config</code>
+Specify configuration strings for the WT_SESSION::create function.
+This argument is additive to the \c table_config parameter in the
+configuration file.
+
+@section monitor Monitoring wtperf
+
+Like all WiredTiger applications, the \c wtperf command can be configured
+with statistics logging, and the resulting output displayed using the
+\c wtstats visualization tool.  For more information, see @ref wtstats.
+
+In addition to statistics logging, \c wtperf can monitor performance and
+operation latency times.  Monitoring is enabled using the \c sample_interval
+configuration.  For example to record information every 10 seconds, set the
+following on the command line or add it to the \c wtperf configuration file:
+
+@code
+sample_interval=10
+@endcode
+
+Enabling monitoring causes \c wtperf to create a file \c monitor in the
+database home directory (or another directory as specified using the
+\c -m option to \c wtperf).
+
+The same visualization tool, \c wtstats, can be used to view a combined
+chart with both the \c monitor output and the statistics logging output
+at the same time.
+
+The following example shows how to run the \c medium-btree.wtperf configuration
+with monitoring enabled, and then generate a graph.
+
+@code
+# Change into the WiredTiger directory.
+cd wiredtiger
+
+# Configure and build WiredTiger if not already built.
+./configure && make
+
+# Remove and re-create the run directory.
+rm -rf WTPERF_RUN && mkdir WTPERF_RUN
+
+# Run the medium-btree.wtperf workload, sampling performance every 5 seconds.
+bench/wtperf/wtperf \
+    -h WTPERF_RUN \
+    -o sample_interval=5 \
+    -O bench/wtperf/runners/medium-btree.wtperf
+
+# Use the visualization tool to create HTML graph output; the output file is
+# named wtstats.html.
+python tools/wtstats/wtstats.py WTPERF_RUN/monitor
+
+# Possible alternatives if statistics logging also enabled:
+# python tools/wtstats/wtstats.py WTPERF_RUN/monitor WTPERF_RUN/WiredTigerStat*
+# python tools/wtstats/wtstats.py WTPERF_RUN
+@endcode
+
+The python command creates a file named \c wtstats.html in the current
+working directory.  You can open the generated HTML document in your browser
+and see the generated statistics.
+
+@section config Wtperf configuration options
+
+The following is a list of the currently available \c wtperf
+configuration options:
+
+\if START_AUTO_GENERATED_WTPERF_CONFIGURATION
+DO NOT EDIT: THIS PART OF THE FILE IS GENERATED BY dist/s_docs.
+\endif
+
+@par async_threads (unsigned int, default=0)
+number of async worker threads
+@par checkpoint_interval (unsigned int, default=120)
+checkpoint every interval seconds during the workload phase.
+@par checkpoint_stress_rate (unsigned int, default=0)
+checkpoint every rate operations during the populate phase in the
+populate thread(s), 0 to disable
+@par checkpoint_threads (unsigned int, default=0)
+number of checkpoint threads
+@par conn_config (string, default=create)
+connection configuration string
+@par compact (boolean, default=false)
+post-populate compact for LSM merging activity
+@par compression (string, default=none)
+compression extension.  Allowed configuration values are: 'none',
+'bzip', 'lz4', 'snappy', 'zlib'
+@par create (boolean, default=true)
+do population phase; false to use existing database
+@par database_count (unsigned int, default=1)
+number of WiredTiger databases to use. Each database will execute the
+workload using a separate home directory and complete set of worker
+threads
+@par drop_tables (unsigned int, default=0)
+Whether to drop all tables at the end of the run, and report time
+taken to do the drop.
+@par icount (unsigned int, default=5000)
+number of records to initially populate. If multiple tables are
+configured the count is spread evenly across all tables.
+@par idle_table_cycle (unsigned int, default=0)
+Enable regular create and drop of idle tables, value is the maximum
+number of seconds a create or drop is allowed before flagging an
+error. Default 0 which means disabled.
+@par index (boolean, default=false)
+Whether to create an index on the value field.
+@par insert_rmw (boolean, default=false)
+execute a read prior to each insert in workload phase
+@par key_sz (unsigned int, default=20)
+key size
+@par log_partial (boolean, default=false)
+perform partial logging on first table only.
+@par min_throughput (unsigned int, default=0)
+notify if any throughput measured is less than this amount. Aborts or
+prints warning based on min_throughput_fatal setting. Requires
+sample_interval to be configured
+@par min_throughput_fatal (boolean, default=false)
+print warning (false) or abort (true) of min_throughput failure.
+@par max_latency (unsigned int, default=0)
+notify if any latency measured exceeds this number of
+milliseconds.Aborts or prints warning based on min_throughput_fatal
+setting. Requires sample_interval to be configured
+@par max_latency_fatal (boolean, default=false)
+print warning (false) or abort (true) of max_latency failure.
+@par pareto (unsigned int, default=0)
+use pareto distribution for random numbers. Zero to disable, otherwise
+a percentage indicating how aggressive the distribution should be.
+@par populate_ops_per_txn (unsigned int, default=0)
+number of operations to group into each transaction in the populate
+phase, zero for auto-commit
+@par populate_threads (unsigned int, default=1)
+number of populate threads, 1 for bulk load
+@par random_range (unsigned int, default=0)
+if non zero choose a value from within this range as the key for
+insert operations
+@par random_value (boolean, default=false)
+generate random content for the value
+@par read_range (unsigned int, default=0)
+scan a range of keys after each search
+@par reopen_connection (boolean, default=true)
+close and reopen the connection between populate and workload phases
+@par report_interval (unsigned int, default=2)
+output throughput information every interval seconds, 0 to disable
+@par run_ops (unsigned int, default=0)
+total read, insert and update workload operations
+@par run_time (unsigned int, default=0)
+total workload seconds
+@par sample_interval (unsigned int, default=0)
+performance logging every interval seconds, 0 to disable
+@par sample_rate (unsigned int, default=50)
+how often the latency of operations is measured. One for every
+operation,two for every second operation, three for every third
+operation etc.
+@par sess_config (string, default=)
+session configuration string
+@par table_config (string, default=key_format=S,value_format=S,type=lsm,exclusive=true,allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb,split_pct=100)
+table configuration string
+@par table_count (unsigned int, default=1)
+number of tables to run operations over. Keys are divided evenly over
+the tables. Cursors are held open on all tables. Default 1, maximum
+99999.
+@par table_count_idle (unsigned int, default=0)
+number of tables to create, that won't be populated. Default 0.
+@par threads (string, default=)
+workload configuration: each 'count' entry is the total number of
+threads, and the 'insert', 'read' and 'update' entries are the ratios
+of insert, read and update operations done by each worker thread; If a
+throttle value is provided each thread will do a maximum of that
+number of operations per second; multiple workload configurations may
+be specified per threads configuration; for example, a more complex
+threads configuration might be
+'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))'
+which would create 2 threads doing nothing but reads and 8 threads
+each doing 50% inserts and 25% reads and updates.  Allowed
+configuration values are 'count', 'throttle', 'reads', 'inserts',
+'updates', 'truncate', 'truncate_pct' and 'truncate_count'. There are
+also behavior modifiers, supported modifiers are 'ops_per_txn'
+@par transaction_config (string, default=)
+transaction configuration string, relevant when populate_opts_per_txn
+is nonzero
+@par table_name (string, default=test)
+table name
+@par value_sz (unsigned int, default=100)
+value size
+@par verbose (unsigned int, default=1)
+verbosity
+@par warmup (unsigned int, default=0)
+How long to run the workload phase before starting measurements
+
+\if STOP_AUTO_GENERATED_WTPERF_CONFIGURATION
+DO NOT EDIT: THIS PART OF THE FILE IS GENERATED BY dist/s_docs.
+\endif
+
+*/

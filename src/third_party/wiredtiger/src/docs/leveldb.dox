@@ -1,0 +1,54 @@
+/*!
+@page leveldb Building and installing the LevelDB compatibility API
+
+WiredTiger includes an implementation of the LevelDB API to ease integration and performance testing with existing applications.
+
+@section leveldb_build Building and using WiredTiger's LevelDB API
+
+Here are the steps to build and run an existing application against WiredTiger's LevelDB API:
+
+<ol>
+<li> choose an installation directory for WiredTiger.  The default is:
+
+   <code>
+   WT_INSTALL=/usr/local
+   </code>
+
+   but anywhere is fine.
+
+<li> build WiredTiger with LevelDB support:
+
+   <code>
+   ./configure --enable-leveldb --with-builtins=snappy --prefix=$WT_INSTALL
+   make install
+   </code>
+
+   Change the above to \c --enable-leveldb=basho to build a version of
+   the LevelDB API compatible with Basho's Riak product, or
+   \c --enable-leveldb=hyper to build a version of the LevelDB API
+   compatible with the HyperDex product, or
+   \c --enable-leveldb=rocksdb to build a version of the LevelDB API
+   compatible with applications using Facebook's RocksDB engine.
+
+<li> compile and link the application against WiredTiger's LevelDB API:
+
+   <code>
+   ./configure CPPFLAGS="-I$WT_INSTALL/include/wiredtiger" LDFLAGS="-L$WT_INSTALL/lib/wiredtiger" ... && make
+   </code>
+
+<li> start the application:
+
+   <code>
+   LD_LIBRARY_PATH=$WT_INSTALL/lib/wiredtiger \<normal start command\>
+   </code>
+</ol>
+
+@section leveldb_caveats Caveats
+
+The core LevelDB features are well supported, though some configuration options may be ignored.  In the extended versions of the API, some rarely used features have not been implemented, and will cause either build or runtime errors.
+
+The WiredTiger on-disk format is not compatible with LevelDB.  Data will need to be dumped and reloaded by the application.
+
+The WiredTiger LevelDB API is not guaranteed to be binary compatible with LevelDB.  We do not support using \c LD_PRELOAD to switch an existing binary built with stock LevelDB to WiredTiger without compiling against the installed include files.
+
+ */

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -676,8 +676,12 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", evict-lru");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS))
 		__dmsg(ds, ", overflow-keys");
+	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
+		__dmsg(ds, ", split-block");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
 		__dmsg(ds, ", split-insert");
+	if (F_ISSET_ATOMIC(page, WT_PAGE_UPDATE_IGNORE))
+		__dmsg(ds, ", update-ignore");
 
 	if (mod != NULL)
 		switch (mod->rec_result) {

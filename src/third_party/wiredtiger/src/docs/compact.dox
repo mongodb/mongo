@@ -1,0 +1,12 @@
+/*! @m_page{{c,java},compact,Compaction}
+
+The WT_SESSION::compact method can be used to compact data sources.
+
+The data source does not have to be quiescent, compaction may be
+performed on an active data source.
+
+Because checkpoints named by the application are not discarded until
+explicitly removed or replaced, they may prevent WT_SESSION::compact
+from accomplishing anything.
+
+ */

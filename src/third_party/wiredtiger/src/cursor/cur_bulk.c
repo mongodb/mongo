@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -204,16 +204,13 @@ __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
 	WT_ERR(__wt_scr_alloc(session, 512, &a));
 	WT_ERR(__wt_scr_alloc(session, 512, &b));
 
-	WT_ERR(__wt_buf_set_printable(
-	    session, a, cursor->key.data, cursor->key.size));
-	WT_ERR(__wt_buf_set_printable(
-	    session, b, cbulk->last.data, cbulk->last.size));
-
 	WT_ERR_MSG(session, EINVAL,
-	    "bulk-load presented with out-of-order keys: %.*s compares smaller "
-	    "than previously inserted key %.*s",
-	    (int)a->size, (const char *)a->data,
-	    (int)b->size, (const char *)b->data);
+	    "bulk-load presented with out-of-order keys: %s compares smaller "
+	    "than previously inserted key %s",
+	    __wt_buf_set_printable(
+	    session, cursor->key.data, cursor->key.size, a),
+	    __wt_buf_set_printable(
+	    session, cbulk->last.data, cbulk->last.size, b));
 
 err:	__wt_scr_free(session, &a);
 	__wt_scr_free(session, &b);

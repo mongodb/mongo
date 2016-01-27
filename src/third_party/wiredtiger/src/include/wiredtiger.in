@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -566,20 +566,21 @@ struct __wt_cursor {
 	 */
 	const char *internal_uri;
 
-#define	WT_CURSTD_APPEND	0x0001
-#define	WT_CURSTD_BULK		0x0002
-#define	WT_CURSTD_DUMP_HEX	0x0004
-#define	WT_CURSTD_DUMP_JSON	0x0008
-#define	WT_CURSTD_DUMP_PRINT	0x0010
-#define	WT_CURSTD_KEY_EXT	0x0020	/* Key points out of the tree. */
-#define	WT_CURSTD_KEY_INT	0x0040	/* Key points into the tree. */
+#define	WT_CURSTD_APPEND	0x00001
+#define	WT_CURSTD_BULK		0x00002
+#define	WT_CURSTD_DUMP_HEX	0x00004
+#define	WT_CURSTD_DUMP_JSON	0x00008
+#define	WT_CURSTD_DUMP_PRINT	0x00010
+#define	WT_CURSTD_JOINED	0x00020
+#define	WT_CURSTD_KEY_EXT	0x00040	/* Key points out of the tree. */
+#define	WT_CURSTD_KEY_INT	0x00080	/* Key points into the tree. */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
-#define	WT_CURSTD_JOINED	0x0080
-#define	WT_CURSTD_OPEN		0x0100
-#define	WT_CURSTD_OVERWRITE	0x0200
-#define	WT_CURSTD_RAW		0x0400
-#define	WT_CURSTD_VALUE_EXT	0x0800	/* Value points out of the tree. */
-#define	WT_CURSTD_VALUE_INT	0x1000	/* Value points into the tree. */
+#define	WT_CURSTD_META_INUSE	0x00100
+#define	WT_CURSTD_OPEN		0x00200
+#define	WT_CURSTD_OVERWRITE	0x00400
+#define	WT_CURSTD_RAW		0x00800
+#define	WT_CURSTD_VALUE_EXT	0x01000	/* Value points out of the tree. */
+#define	WT_CURSTD_VALUE_INT	0x02000	/* Value points into the tree. */
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
 	uint32_t flags;
 #endif
@@ -1236,6 +1237,9 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist., a
 	 * boolean flag; default \c false.}
+	 * @config{lock_wait, wait for locks\, if \c lock_wait=false\, fail if
+	 * any required locks are not available immediately., a boolean flag;
+	 * default \c true.}
 	 * @config{remove_files, should the underlying files be removed?., a
 	 * boolean flag; default \c true.}
 	 * @configend
@@ -1327,6 +1331,19 @@ struct __wt_session {
 	 * @errors
 	 */
 	int __F(log_printf)(WT_SESSION *session, const char *fmt, ...);
+
+	/*!
+	 * Rebalance a table, see @ref rebalance.
+	 *
+	 * @snippet ex_all.c Rebalance a table
+	 *
+	 * @param session the session handle
+	 * @param uri the current URI of the object, such as \c "table:mytable"
+	 * @configempty{WT_SESSION.rebalance, see dist/api_data.py}
+	 * @ebusy_errors
+	 */
+	int __F(rebalance)(
+	    WT_SESSION *session, const char *uri, const char *config);
 
 	/*!
 	 * Rename an object.
@@ -1920,9 +1937,10 @@ struct __wt_connection {
 	 * "block"\, \c "checkpoint"\, \c "compact"\, \c "evict"\, \c
 	 * "evictserver"\, \c "fileops"\, \c "log"\, \c "lsm"\, \c
 	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
-	 * "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
-	 * "shared_cache"\, \c "split"\, \c "temporary"\, \c "transaction"\, \c
-	 * "verify"\, \c "version"\, \c "write"; default empty.}
+	 * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
+	 * "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c
+	 * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default
+	 * empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -2405,9 +2423,9 @@ struct __wt_connection {
  * values chosen from the following options: \c "api"\, \c "block"\, \c
  * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\,
  * \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c
- * "overflow"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
- * "shared_cache"\, \c "split"\, \c "temporary"\, \c "transaction"\, \c
- * "verify"\, \c "version"\, \c "write"; default empty.}
+ * "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
+ * "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c
+ * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to
  * files.  Ignored on non-Windows systems.  Options are given as a list\, such
  * as <code>"write_through=[data]"</code>. Configuring \c write_through requires

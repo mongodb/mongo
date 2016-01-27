@@ -1,0 +1,17 @@
+/*! @page tune_mutex Mutexes
+
+The performance of WiredTiger applications can be sensitive to type of
+mutex used for serialization.  WiredTiger can be configured, using the
+\c --with-spinlock argument during configuration to use one of three
+different mutex types: \c gcc, \c pthread and \c pthread_adaptive mutexes.
+
+The \c gcc option configures GCC compiler (or compatible compilers such
+as clang), mutexes; the \c pthread option configures POSIX 1003.1c
+pthread mutexes; the \c pthread_adaptive option configures POSIX 1003.1c
+pthread mutexes with adaptive behavior (where that behavior is
+supported, for example, most Linux platforms).
+
+By default, WiredTiger is configured to use \c pthread, that is,
+non-adaptive POSIX 1003.1c pthread mutexes.
+
+ */

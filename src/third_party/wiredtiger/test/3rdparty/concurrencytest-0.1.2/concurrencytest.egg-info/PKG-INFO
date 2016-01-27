@@ -1,0 +1,22 @@
+Metadata-Version: 1.1
+Name: concurrencytest
+Version: 0.1.2
+Summary: testtools extension for running unittest suites concurrently
+Home-page: https://github.com/cgoldberg/concurrencytest
+Author: Corey Goldberg
+Author-email: cgoldberg _at_ gmail.com
+License: GNU GPLv3
+Download-URL: http://pypi.python.org/pypi/concurrencytest
+Description: UNKNOWN
+Keywords: test,testtools,unittest,concurrency,parallel
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: GNU General Public License v3 (GPLv3)
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: Unix
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Software Development :: Testing

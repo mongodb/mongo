@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -89,18 +89,6 @@ static inline int
 __wt_buf_setstr(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *s)
 {
 	return (__wt_buf_set(session, buf, s, strlen(s) + 1));
-}
-
-/*
- * __wt_buf_set_printable --
- *	Set the contents of the buffer to a printable representation of a
- * byte string.
- */
-static inline int
-__wt_buf_set_printable(
-    WT_SESSION_IMPL *session, WT_ITEM *buf, const void *from_arg, size_t size)
-{
-	return (__wt_raw_to_esc_hex(session, from_arg, size, buf));
 }
 
 /*

@@ -1,0 +1,11 @@
+/*! @page signals Signal handling
+
+WiredTiger has no signal handlers and does not modify process signal handler behavior in any way.
+
+WiredTiger restarts any system calls interrupted by a signal.
+
+WiredTiger applications exiting as a result of a signal should exit WiredTiger gracefully, closing any open WiredTiger handles, before terminating the process.
+
+WiredTiger is not re-entrant, and applications using WiredTiger should not make WiredTiger API calls from signal handlers.
+
+*/

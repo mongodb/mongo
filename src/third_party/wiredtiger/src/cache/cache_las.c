@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -140,18 +140,27 @@ __wt_las_is_written(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_las_cursor_create --
+ * __wt_las_cursor_open --
  *	Open a new lookaside table cursor.
  */
 int
-__wt_las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
+__wt_las_cursor_open(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	const char *open_cursor_cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
 
-	WT_RET(__wt_open_cursor(
+	WT_WITHOUT_DHANDLE(session, ret = __wt_open_cursor(
 	    session, WT_LAS_URI, NULL, open_cursor_cfg, cursorp));
+	WT_RET(ret);
+
+	/*
+	 * Retrieve the btree from the cursor, rather than the session because
+	 * we don't always switch the LAS handle in to the session before
+	 * entering this function.
+	 */
+	btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
 
 	/*
 	 * Set special flags for the lookaside table: the lookaside flag (used,
@@ -162,7 +171,6 @@ __wt_las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	 * opens (the first update is safe because it's single-threaded from
 	 * wiredtiger_open).
 	 */
-	btree = S2BT(session);
 	if (!F_ISSET(btree, WT_BTREE_LOOKASIDE))
 		F_SET(btree, WT_BTREE_LOOKASIDE);
 	if (!F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))

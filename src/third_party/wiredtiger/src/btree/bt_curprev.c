@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -139,10 +139,20 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 		if ((cbt->ins = WT_SKIP_LAST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
 	} else {
+		/* Move to the previous record in the append list, if any. */
+		if (cbt->ins != NULL &&
+		    cbt->recno <= WT_INSERT_RECNO(cbt->ins))
+			WT_RET(__cursor_skip_prev(cbt));
+
 		/*
 		 * Handle the special case of leading implicit records, that is,
-		 * there aren't any records in the tree not on the append list,
-		 * and the first record on the append list isn't record 1.
+		 * there aren't any records in the page not on the append list,
+		 * and the append list's first record isn't the first record on
+		 * the page. (Although implemented as a test of the page values,
+		 * this is really a test for a tree where the first inserted
+		 * record wasn't record 1, any other page with only an append
+		 * list will have a first page record number matching the first
+		 * record in the append list.)
 		 *
 		 * The "right" place to handle this is probably in our caller.
 		 * The high-level cursor-previous routine would:
@@ -156,27 +166,26 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 		 * into our caller.  Anyway, if this code breaks for any reason,
 		 * that's the way I'd go.
 		 *
-		 * If we're not pointing to a WT_INSERT entry, or we can't find
-		 * a WT_INSERT record that precedes our record name-space, check
-		 * if there are any records on the page.  If there aren't, then
-		 * we're in the magic zone, keep going until we get to a record
-		 * number of 1.
+		 * If we're not pointing to a WT_INSERT entry (we didn't find a
+		 * WT_INSERT record preceding our record name-space), check if
+		 * we've reached the beginning of this page, a possibility if a
+		 * page had a large number of items appended, and then split.
+		 * If not, check if there are any records on the page. If there
+		 * aren't, then we're in the magic zone, keep going until we get
+		 * to a record number matching the first record on the page.
 		 */
-		if (cbt->ins != NULL &&
-		    cbt->recno <= WT_INSERT_RECNO(cbt->ins))
-			WT_RET(__cursor_skip_prev(cbt));
 		if (cbt->ins == NULL &&
-		    (cbt->recno == 1 || __col_fix_last_recno(page) != 0))
+		    (cbt->recno == page->pg_fix_recno ||
+		    __col_fix_last_recno(page) != 0))
 			return (WT_NOTFOUND);
 	}
 
 	/*
-	 * This code looks different from the cursor-next code.  The append
-	 * list appears on the last page of the tree and contains the last
-	 * records in the tree.  If we're iterating through the tree, starting
-	 * at the last record in the tree, by definition we're starting a new
-	 * iteration and we set the record number to the last record found in
-	 * the tree.  Otherwise, decrement the record.
+	 * This code looks different from the cursor-next code. The append list
+	 * may be preceded by other rows. If we're iterating through the tree,
+	 * starting at the last record in the tree, by definition we're starting
+	 * a new iteration and we set the record number to the last record found
+	 * on the page. Otherwise, decrement the record.
 	 */
 	if (newpage)
 		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
@@ -556,12 +565,11 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 	 */
 	for (newpage = false;; newpage = true) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
-		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
 
 		/*
-		 * The last page in a column-store has appended entries.
-		 * We handle it separately from the usual cursor code:
-		 * it's only that one page and it's in a simple format.
+		 * Column-store pages may have appended entries. Handle it
+		 * separately from the usual cursor code, it's in a simple
+		 * format.
 		 */
 		if (newpage && page != NULL && page->type != WT_PAGE_ROW_LEAF &&
 		    (cbt->ins_head = WT_COL_APPEND(page)) != NULL)

@@ -1,0 +1,151 @@
+/*! @m_page{{c,java},transactions,Transactions}
+
+@section transactions_acid ACID properties
+
+Transactions provide a powerful abstraction for multiple threads to
+operate on data concurrently because they have the following properties:
+
+- Atomicity: all or none of a transaction is completed.
+- Consistency: if each transaction maintains some property when considered
+  separately, then the combined effect of executing the transactions
+  concurrently will maintain the same property.
+- Isolation: developers can reason about transactions as if they run
+  single-threaded.
+- Durability: once a transaction commits, its updates cannot be lost.
+
+WiredTiger supports transactions with the following caveats to the ACID
+properties:
+
+- the maximum level of isolation supported is snapshot isolation.
+  See @ref transaction_isolation for more details.
+- transactional updates are made durable by a combination of checkpoints
+  and logging.  See @ref checkpoint for information on checkpoint durability
+  and @ref durability for information on commit-level durability.
+- each transaction's uncommitted changes must fit in memory: for
+  efficiency, WiredTiger does not write to the log until a transaction
+  commits.
+
+@section transactions_api Transactional API
+
+In WiredTiger, transaction operations are methods off the WT_SESSION
+class.
+
+Applications call WT_SESSION::begin_transaction to start a new transaction.
+Operations subsequently performed using that WT_SESSION handle, including
+operations on any cursors open in that WT_SESSION handle (whether opened
+before or after the WT_SESSION::begin_transaction call), are part of the
+transaction and their effects committed by calling
+WT_SESSION::commit_transaction, or discarded by calling
+WT_SESSION::rollback_transaction.
+
+If WT_SESSION::commit_transaction returns an error for any reason, the
+transaction was rolled back, not committed.
+
+When transactions are used, data operations can encounter a conflict and
+fail with the ::WT_ROLLBACK error.  If this error occurs, transactions
+should be rolled back with WT_SESSION::rollback_transaction and the
+operation retried.
+
+The WT_SESSION::rollback_transaction method implicitly resets all
+cursors in the session as if the WT_CURSOR::reset method was called,
+discarding any cursor position as well as any key and value.
+
+@snippet ex_all.c transaction commit/rollback
+
+@section transactions_implicit Implicit transactions
+
+If a cursor is used when no explicit transaction is active in a session,
+reads are performed at the isolation level of the session, set with the
+\c isolation key to WT_CONNECTION::open_session, and successful updates
+are automatically committed before the update operation returns.
+
+Any operation consisting of multiple related updates should be enclosed
+in an explicit transaction to ensure the updates are applied atomically.
+
+If an implicit transaction successfully commits, the cursors in the
+WT_SESSION remain positioned.  If an implicit transaction fails, all
+cursors in the WT_SESSION are reset, as if WT_CURSOR::reset were called,
+discarding any position or key/value information they may have.
+
+See @ref cursors_transactions for more information.
+
+@section transactions_concurrency Concurrency control
+
+WiredTiger uses optimistic concurrency control algorithms.  This avoids
+the bottleneck of a centralized lock manager and ensures transactional
+operations do not block: reads do not block writes, and vice versa.
+
+Further, writes do not block writes, although concurrent transactions
+updating the same value will fail with ::WT_ROLLBACK.  Some applications
+may benefit from application-level synchronization to avoid repeated
+attempts to rollback and update the same value.
+
+Operations in transactions may also fail with the ::WT_ROLLBACK error if
+some resource cannot be allocated after repeated attempts.  For example, if
+the cache is not large enough to hold the updates required to satisfy
+transactional readers, an operation may fail and return ::WT_ROLLBACK.
+
+@section transaction_isolation Isolation levels
+
+WiredTiger supports <code>read-uncommitted</code>,
+<code>read-committed</code> and  <code>snapshot</code> isolation levels;
+the default isolation level is <code>read-committed</code>.
+
+- <code>read-uncommitted</code>:
+Transactions can see changes made by other transactions before those
+transactions are committed.  Dirty reads, non-repeatable reads and
+phantoms are possible.
+
+- <code>read-committed</code>:
+Transactions cannot see changes made by other transactions before those
+transactions are committed.  Dirty reads are not possible;
+non-repeatable reads and phantoms are possible.  Committed changes from
+concurrent transactions become visible when no cursor is positioned in
+the read-committed transaction.
+
+- <code>snapshot</code>:
+Transactions read the versions of records committed before the transaction
+started.  Dirty reads and non-repeatable reads are not possible; phantoms
+are possible.<br><br>
+Snapshot isolation is a strong guarantee, but not equivalent to a
+single-threaded execution of the transactions, known as serializable
+isolation.  Concurrent transactions T1 and T2 running under snapshot
+isolation may both commit and produce a state that neither (T1 followed
+by T2) nor (T2 followed by T1) could have produced, if there is overlap
+between T1's reads and T2's writes, and between T1's writes and T2's
+reads.
+
+The transaction isolation level can be configured on a per-transaction
+basis:
+
+@snippet ex_all.c transaction isolation
+
+Additionally, the default transaction isolation can be configured and
+re-configured on a per-session basis:
+
+@snippet ex_all.c session isolation configuration
+
+@snippet ex_all.c session isolation re-configuration
+
+@section transaction_named_snapshots Named Snapshots
+
+Applications can create named snapshots by calling WT_SESSION::snapshot
+with a configuration that includes <code>"name=foo"</code>.
+This configuration creates a new named snapshot, as if a snapshot isolation
+transaction were started at the time of the WT_SESSION::snapshot call.
+
+Subsequent transactions can be started "as of" that snapshot by calling
+WT_SESSION::begin_transaction with a configuration that includes
+<code>snapshot=foo</code>.  That transaction will run at snapshot isolation
+as if the transaction started at the time of the WT_SESSION::snapshot
+call that created the snapshot.
+
+Named snapshots keep data pinned in cache as if a real transaction were
+running for the time that the named transaction is active.  The resources
+associated with named snapshots should be released by calling
+WT_SESSION::snapshot with a configuration that includes
+<code>"drop="</code>. See WT_SESSION::snapshot documentation for details of
+the semantics supported by the drop configuration.
+
+Named snapshots are not durable: they do not survive WT_CONNECTION::close.
+ */

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -214,9 +214,9 @@ __col_var_last_recno(WT_PAGE *page)
 	WT_COL_RLE *repeat;
 
 	/*
-	 * If there's an append list (the last page), then there may be more
-	 * records on the page.  This function ignores those records, so our
-	 * callers have to handle that explicitly, if they care.
+	 * If there's an append list, there may be more records on the page.
+	 * This function ignores those records, our callers must handle that
+	 * explicitly, if they care.
 	 */
 	if (page->pg_var_nrepeats == 0)
 		return (page->pg_var_entries == 0 ? 0 :
@@ -235,9 +235,9 @@ static inline uint64_t
 __col_fix_last_recno(WT_PAGE *page)
 {
 	/*
-	 * If there's an append list (the last page), then there may be more
-	 * records on the page.  This function ignores those records, so our
-	 * callers have to handle that explicitly, if they care.
+	 * If there's an append list, there may be more records on the page.
+	 * This function ignores those records, our callers must handle that
+	 * explicitly, if they care.
 	 */
 	return (page->pg_fix_entries == 0 ? 0 :
 	    page->pg_fix_recno + (page->pg_fix_entries - 1));

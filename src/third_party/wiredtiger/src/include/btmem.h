@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -305,7 +305,7 @@ struct __wt_page_modify {
 	struct {
 		/*
 		 * Appended items to column-stores: there is only a single one
-		 * of these per column-store tree.
+		 * of these active at a time per column-store tree.
 		 */
 		WT_INSERT_HEAD **append;
 
@@ -319,9 +319,18 @@ struct __wt_page_modify {
 		 * huge.
 		 */
 		WT_INSERT_HEAD **update;
+
+		/*
+		 * Split-saved last column-store page record. If a column-store
+		 * page is split, we save the first record number moved so that
+		 * during reconciliation we know the page's last record and can
+		 * write any implicitly created deleted records for the page.
+		 */
+		uint64_t split_recno;
 	} leaf;
 #define	mod_append		u2.leaf.append
 #define	mod_update		u2.leaf.update
+#define	mod_split_recno		u2.leaf.split_recno
 	} u2;
 
 	/*
@@ -544,8 +553,8 @@ struct __wt_page {
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 #define	WT_PAGE_OVERFLOW_KEYS	0x10	/* Page has overflow keys */
-#define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
-#define	WT_PAGE_SPLIT_BLOCK	0x40	/* Split blocking eviction and splits */
+#define	WT_PAGE_SPLIT_BLOCK	0x20	/* Split blocking eviction and splits */
+#define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
 #define	WT_PAGE_UPDATE_IGNORE	0x80	/* Ignore updates on page discard */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 

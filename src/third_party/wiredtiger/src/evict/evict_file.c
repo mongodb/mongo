@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -85,7 +85,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			WT_ASSERT(session,
 			    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
 			    __wt_page_can_evict(session, ref, NULL));
-			__wt_evict_page_clean_update(session, ref, true);
+			__wt_ref_out(session, ref);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}

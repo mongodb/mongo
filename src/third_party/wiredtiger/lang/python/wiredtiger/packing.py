@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -70,6 +70,8 @@ def __unpack_iter_fmt(fmt):
             size = (size * 10) + int(char)
             havesize = 1
         else:
+            if not havesize:
+                size = 1
             yield offset, havesize, size, char
             size = 0
             havesize = 0
@@ -83,14 +85,12 @@ def unpack(fmt, s):
     result = []
     for offset, havesize, size, f in __unpack_iter_fmt(fmt):
         if f == 'x':
-            if not havesize:
-                size = 1
             s = s[size:]
             # Note: no value, don't increment i
         elif f in 'SsUu':
             if not havesize:
                 if f == 's':
-                    size = 1
+                    pass
                 elif f == 'S':
                     size = s.find('\0')
                 elif f == 'u' and offset == len(fmt) - 1:
@@ -106,14 +106,10 @@ def unpack(fmt, s):
             s = s[size:]
         elif f in 't':
             # bit type, size is number of bits
-            if not havesize:
-                size = 1
             result.append(ord(s[0:1]))
             s = s[1:]
         elif f in 'Bb':
             # byte type
-            if not havesize:
-                size = 1
             for i in xrange(size):
                 v = ord(s[0:1])
                 if f != 'B':
@@ -122,8 +118,6 @@ def unpack(fmt, s):
                 s = s[1:]
         else:
             # integral type
-            if not havesize:
-                size = 1
             for j in xrange(size):
                 v, s = unpack_int(s)
                 result.append(v)
@@ -164,11 +158,9 @@ def pack(fmt, *values):
                 l = val.find('\0')
             else:
                 l = len(val)
-            if havesize:
+            if havesize or f == 's':
                 if l > size:
                     l = size
-            elif f == 's':
-                havesize = size = 1
             elif (f == 'u' and offset != len(fmt) - 1) or f == 'U':
                 result += pack_int(l)
             if type(val) is unicode and f in 'Ss':

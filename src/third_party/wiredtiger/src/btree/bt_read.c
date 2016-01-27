@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -379,7 +379,9 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 
-		WT_ERR(__wt_btree_new_leaf_page(session, &page));
+		WT_ERR(__wt_btree_new_leaf_page(session,
+		    btree->type == BTREE_ROW ? WT_RECNO_OOB : ref->key.recno,
+		    &page));
 		ref->page = page;
 		goto done;
 	}

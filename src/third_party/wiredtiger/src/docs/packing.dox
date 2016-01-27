@@ -1,0 +1,44 @@
+/*! @m_page{{c,java},packing,Packing and Unpacking Data}
+
+WiredTiger's data packing uses format strings similar to those specified in the
+Python struct module:
+  http://docs.python.org/library/struct
+
+The first character of the format string can be used to indicate the byte
+order, size and alignment of the packed data, according to the following
+table:
+
+<table>
+@hrow{Character, Byte order, Size, Alignment}
+@row{<tt>.</tt>, big-endian, packed, none}
+@row{<tt>&gt;</tt>, big-endian, standard, none}
+@row{<tt>&lt;</tt>, little-endian, standard, none}
+@row{<tt>\@</tt>, native, native, native}
+</table>
+
+If the first character is not one of these, '.' (big-endian, packed) is
+assumed: it naturally sorts in lexicographic order, and the packed format
+uses variable-sized encoding of values to reduce the data size.
+
+@notyet{little-endian format}
+Only the default big-endian, packed format is currently supported.
+
+The remaining characters in the format string specify the type of each field
+to be packed into or unpacked from a byte array.  See @ref schema_column_types
+for the list of supported types.
+
+@m_if{c}
+@todo Describe the variable-length integer packing in sufficient detail that it can be re-implemented in other programming languages or in network clients.
+
+@section config_examples Code samples
+
+The code below is taken from the complete example program @ex_ref{ex_pack.c}.  It demonstrates how to pack three integer values into a buffer and then unpack them again.
+
+@snippet ex_pack.c packing
+@m_else
+In Java, data is packed and unpacked using cursor put* and get* operations,
+for example:
+@snippet ex_schema.c Insert and list records
+@m_endif
+
+ */
