@@ -224,7 +224,7 @@ public:
             // This does mongod-specific stuff like creating the input PlanExecutor and adding
             // it to the front of the pipeline if needed.
             std::shared_ptr<PlanExecutor> input =
-                PipelineD::prepareCursorSource(txn, collection, pPipeline, pCtx);
+                PipelineD::prepareCursorSource(txn, collection, nss, pPipeline, pCtx);
             pPipeline->stitch();
 
             if (collection && input) {

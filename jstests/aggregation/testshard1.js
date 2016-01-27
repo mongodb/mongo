@@ -1,4 +1,5 @@
 load('jstests/aggregation/extras/utils.js');
+load('jstests/libs/analyze_plan.js'); // For planHasStage.
 
 // Use this for aggregations that only have arrays or results of specified order.
 // It will check that cursors return the same results as non-cursors.
@@ -265,6 +266,16 @@ for (var shardName in res.shards) {
     assert("host" in res.shards[shardName]);
     assert("stages" in res.shards[shardName]);
 }
+
+(function() {
+    jsTestLog("Do a sharded explain from a mongod, not mongos, to ensure that it does not have " +
+              "a SHARDING_FILTER stage.");
+    var shardDb = shardedAggTest.shard0.getDB('aggShard');
+    var res = shardDb.ts1.aggregate([{$match: {}}], {explain: true});
+    printjson(res);
+    assert.commandWorked(res);
+    assert(!planHasStage(res.stages[0].$cursor.queryPlanner.winningPlan, "SHARDING_FILTER"));
+}());
 
 (function() {
     jsTestLog('Testing a $match stage on the shard key.');

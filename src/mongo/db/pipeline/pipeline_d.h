@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 class Collection;
@@ -79,6 +80,7 @@ public:
     static std::shared_ptr<PlanExecutor> prepareCursorSource(
         OperationContext* txn,
         Collection* collection,
+        const NamespaceString& nss,
         const boost::intrusive_ptr<Pipeline>& pPipeline,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
@@ -97,6 +99,7 @@ private:
     static std::shared_ptr<PlanExecutor> prepareExecutor(
         OperationContext* txn,
         Collection* collection,
+        const NamespaceString& nss,
         const boost::intrusive_ptr<Pipeline>& pipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
