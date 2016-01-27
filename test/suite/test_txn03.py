@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -45,13 +45,6 @@ class test_txn03(wttest.WiredTigerTestCase):
     scenarios = check_scenarios([
         ('var', dict(create_params = "key_format=S,value_format=S")),
     ])
-
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir, 'create,' +
-                ('error_prefix="%s: ",' % self.shortid()))
-        self.pr(`conn`)
-        return conn
 
     def test_ops(self):
         self.session.create(self.uri1, self.create_params)

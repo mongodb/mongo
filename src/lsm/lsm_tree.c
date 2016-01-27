@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -243,7 +243,7 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 
 	WT_RET(__wt_exist(session, uri + strlen("file:"), &exists));
 	if (exists)
-		WT_WITH_SCHEMA_LOCK(session,
+		WT_WITH_SCHEMA_LOCK(session, ret,
 		    ret = __wt_schema_drop(session, uri, cfg));
 	return (ret);
 }
@@ -315,7 +315,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	char *tmpconfig;
 
 	/* If the tree is open, it already exists. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_lsm_tree_get(session, uri, false, &lsm_tree));
 	if (ret == 0) {
 		__wt_lsm_tree_release(session, lsm_tree);
@@ -447,7 +447,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 * tracking macros handle cleaning up on failure.
 	 */
 	if (ret == 0)
-		WT_WITH_HANDLE_LIST_LOCK(session,
+		WT_WITH_HANDLE_LIST_LOCK(session, ret,
 		    ret = __lsm_tree_open(session, uri, true, &lsm_tree));
 	if (ret == 0)
 		__wt_lsm_tree_release(session, lsm_tree);
@@ -954,13 +954,14 @@ __wt_lsm_tree_drop(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
+	int tret;
 	u_int i;
 	bool locked;
 
 	locked = false;
 
 	/* Get the LSM tree. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_lsm_tree_get(session, name, true, &lsm_tree));
 	WT_RET(ret);
 
@@ -996,8 +997,9 @@ __wt_lsm_tree_drop(
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
-	WT_WITH_HANDLE_LIST_LOCK(session,
-	    WT_TRET(__lsm_tree_discard(session, lsm_tree, false)));
+	WT_WITH_HANDLE_LIST_LOCK(session, tret,
+	    tret = __lsm_tree_discard(session, lsm_tree, false));
+	WT_TRET(tret);
 	return (ret);
 }
 
@@ -1013,6 +1015,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	const char *old;
+	int tret;
 	u_int i;
 	bool locked;
 
@@ -1020,7 +1023,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	locked = false;
 
 	/* Get the LSM tree. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_lsm_tree_get(session, olduri, true, &lsm_tree));
 	WT_RET(ret);
 
@@ -1070,8 +1073,9 @@ err:	if (locked)
 	 * Discard this LSM tree structure. The first operation on the renamed
 	 * tree will create a new one.
 	 */
-	WT_WITH_HANDLE_LIST_LOCK(session,
-	    WT_TRET(__lsm_tree_discard(session, lsm_tree, false)));
+	WT_WITH_HANDLE_LIST_LOCK(session, tret,
+	    tret = __lsm_tree_discard(session, lsm_tree, false));
+	WT_TRET(tret);
 	return (ret);
 }
 
@@ -1086,6 +1090,7 @@ __wt_lsm_tree_truncate(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
+	int tret;
 	bool locked;
 
 	WT_UNUSED(cfg);
@@ -1093,7 +1098,7 @@ __wt_lsm_tree_truncate(
 	locked = false;
 
 	/* Get the LSM tree. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_lsm_tree_get(session, name, true, &lsm_tree));
 	WT_RET(ret);
 
@@ -1132,8 +1137,9 @@ err:	if (locked)
 		 * the last good version of the metadata will be used, resulting
 		 * in a valid (not truncated) tree.
 		 */
-		WT_WITH_HANDLE_LIST_LOCK(session,
-		    WT_TRET(__lsm_tree_discard(session, lsm_tree, false)));
+		WT_WITH_HANDLE_LIST_LOCK(session, tret,
+		    tret = __lsm_tree_discard(session, lsm_tree, false));
+		WT_TRET(tret);
 	}
 	return (ret);
 }
@@ -1231,7 +1237,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
 	/* Tell __wt_schema_worker not to look inside the LSM tree. */
 	*skipp = true;
 
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_lsm_tree_get(session, name, false, &lsm_tree));
 	WT_RET(ret);
 
@@ -1429,7 +1435,7 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 
 	locked = false;
 	exclusive = FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE);
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_lsm_tree_get(session, uri, exclusive, &lsm_tree));
 	WT_RET(ret);
 

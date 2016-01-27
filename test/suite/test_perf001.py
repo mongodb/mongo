@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -44,12 +44,7 @@ class test_perf001(wttest.WiredTigerTestCase):
         #('lsm-file', dict(tabletype='lsm',indextype='file')),
         #('lsm-lsm', dict(tabletype='lsm',indextype='lsm')),
     ])
-
-    def setUpConnectionOpen(self, dir):
-        wtopen_args = 'create,cache_size=512M'
-        conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
-        self.pr(`conn`)
-        return conn
+    conn_config = 'cache_size=512M'
 
     def test_performance_of_indices(self):
         uri = 'table:' + self.table_name

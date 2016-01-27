@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -246,8 +246,12 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	if (reenter)
+	if (reenter) {
+#ifdef HAVE_DIAGNOSTIC
+		__wt_cursor_key_order_reset(cbt);
+#endif
 		WT_RET(__curfile_leave(cbt));
+	}
 
 	/*
 	 * Any old insert position is now invalid.  We rely on this being

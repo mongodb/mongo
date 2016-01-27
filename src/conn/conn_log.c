@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -511,7 +511,7 @@ typedef struct {
  *	write_lsn in LSN order after the buffer is written to the log file.
  */
 int
-__wt_log_wrlsn(WT_SESSION_IMPL *session)
+__wt_log_wrlsn(WT_SESSION_IMPL *session, int *yield)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -550,6 +550,8 @@ restart:
 	 * based on the release LSN, and then look for them in order.
 	 */
 	if (written_i > 0) {
+		if (yield != NULL)
+			*yield = 0;
 		WT_INSERTION_SORT(written, written_i,
 		    WT_LOG_WRLSN_ENTRY, WT_WRLSN_ENTRY_CMP_LT);
 		/*
@@ -660,22 +662,31 @@ __log_wrlsn_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int yield;
 
 	session = arg;
 	conn = S2C(session);
+	yield = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Write out any log record buffers.
 		 */
-		WT_ERR(__wt_log_wrlsn(session));
-		WT_ERR(__wt_cond_wait(session, conn->log_wrlsn_cond, 10000));
+		WT_ERR(__wt_log_wrlsn(session, &yield));
+		/*
+		 * If __wt_log_wrlsn did work we want to yield instead of sleep.
+		 */
+		if (yield++ < WT_THOUSAND)
+			__wt_yield();
+		else
+			WT_ERR(__wt_cond_wait(
+			    session, conn->log_wrlsn_cond, 10000));
 	}
 	/*
 	 * On close we need to do this one more time because there could
 	 * be straggling log writes that need to be written.
 	 */
 	WT_ERR(__wt_log_force_write(session, 1));
-	WT_ERR(__wt_log_wrlsn(session));
+	WT_ERR(__wt_log_wrlsn(session, NULL));
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
 	}
@@ -694,12 +705,12 @@ __log_server(void *arg)
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 	int freq_per_sec;
-	bool signalled;
+	bool locked, signalled;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	signalled = false;
+	locked = signalled = false;
 
 	/*
 	 * Set this to the number of times per second we want to force out the
@@ -740,8 +751,22 @@ __log_server(void *arg)
 			/*
 			 * Perform log pre-allocation.
 			 */
-			if (conn->log_prealloc > 0)
-				WT_ERR(__log_prealloc_once(session));
+			if (conn->log_prealloc > 0) {
+				/*
+				 * Log file pre-allocation is disabled when a
+				 * hot backup cursor is open because we have
+				 * agreed not to rename or remove any files in
+				 * the database directory.
+				 */
+				WT_ERR(__wt_readlock(
+				    session, conn->hot_backup_lock));
+				locked = true;
+				if (!conn->hot_backup)
+					WT_ERR(__log_prealloc_once(session));
+				WT_ERR(__wt_readunlock(
+				    session, conn->hot_backup_lock));
+				locked = false;
+			}
 
 			/*
 			 * Perform the archive.
@@ -768,6 +793,9 @@ __log_server(void *arg)
 
 	if (0) {
 err:		__wt_err(session, ret, "log server error");
+		if (locked)
+			WT_TRET(__wt_readunlock(
+			    session, conn->hot_backup_lock));
 	}
 	return (WT_THREAD_RET_VALUE);
 }

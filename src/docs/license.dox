@@ -13,6 +13,19 @@ WARRANTY; without even the implied warranty of MERCHANTABILITY or
 FITNESS FOR A PARTICULAR PURPOSE.  See the
 <b>GNU General Public License</b></a> for details.
 
+Additionally, portions of the WiredTiger distribution are distributed
+under the terms of the
+<a href="http://www.opensource.org/licenses/BSD-3-Clause">
+BSD-3-Clause License</a>.  These files have
+<a href="http://www.opensource.org/licenses/BSD-3-Clause">
+BSD-3-Clause License</a>
+copyright notices, and may be freely used and redistributed under the
+terms of that notice.
+
+Additionally, portions of the WiredTiger distribution are public domain
+software. Public domain files have notices releasing the software into
+the public domain and may be freely used and redistributed.
+
 For a license to use the WiredTiger software under conditions other than
 those described above, or for technical support for this software, please
 contact MongoDB, Inc. at
@@ -28,7 +41,7 @@ of the WiredTiger library should comply with these copyrights.
 @hrow{Distribution Files, Copyright Holder, License}
 @row{\c src/include/bitstring.i, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 @row{\c src/include/queue.h, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
-@row{\c src/os_posix/getopt.c, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c src/os_posix/os_getopt.c, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 @row{\c src/support/hash_city.c, Google\, Inc., <a href="http://www.opensource.org/licenses/MIT">The MIT License</a>}
 @row{\c src/support/hash_fnv.c, Authors, Public Domain}
 </table>
@@ -62,11 +75,5 @@ software distribution for inclusion in other packages, or redistribute
 selected portions of the WiredTiger sources, please review the copyright
 notices and LICENSE files included in the WiredTiger distribution for
 the terms and conditions of such redistribution.
-
-@section license_public_domain Public domain software
-
-Many portions of the WiredTiger distribution are public domain software.
-Public domain files have notices releasing the software into the public
-domain and may be freely used and redistributed.
 
 */

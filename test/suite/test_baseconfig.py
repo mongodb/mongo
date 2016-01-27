@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -35,7 +35,7 @@ class test_baseconfig(wttest.WiredTigerTestCase):
     def test_baseconfig(self):
         # Open up another database and modify the baseconfig
         os.mkdir("A")
-        conn = wiredtiger.wiredtiger_open("A", 'create')
+        conn = self.wiredtiger_open("A", 'create')
         self.assertTrue(os.path.exists("A/WiredTiger.basecfg"))
         with open("A/WiredTiger.basecfg", "a") as basecfg_file:
             basecfg_file.write("foo!")
@@ -44,10 +44,10 @@ class test_baseconfig(wttest.WiredTigerTestCase):
         # Open a database, we should assert here as the basecfg is invalid
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError,
-            lambda: wiredtiger.wiredtiger_open("A", ''),
+            lambda: self.wiredtiger_open("A", ''),
             '/unknown configuration key/')
 
-        conn = wiredtiger.wiredtiger_open("A", "create,config_base=false")
+        conn = self.wiredtiger_open("A", "create,config_base=false")
         conn.close()
 
 if __name__ == '__main__':

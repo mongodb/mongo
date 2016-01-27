@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -42,6 +42,7 @@ char	*util_name(WT_SESSION *, const char *, const char *);
 int	 util_printlog(WT_SESSION *, int, char *[]);
 int	 util_read(WT_SESSION *, int, char *[]);
 int	 util_read_line(WT_SESSION *, ULINE *, bool, bool *);
+int	 util_rebalance(WT_SESSION *, int, char *[]);
 int	 util_rename(WT_SESSION *, int, char *[]);
 int	 util_salvage(WT_SESSION *, int, char *[]);
 int	 util_stat(WT_SESSION *, int, char *[]);

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -263,8 +263,12 @@ static CONFIG c[] = {
 	  "the number of runs",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_runs, NULL },
 
+	{ "rebalance",
+	  "rebalance testing",					/* 100% */
+	  C_BOOL, 100, 1, 0, &g.c_rebalance, NULL },
+
 	{ "salvage",
-	  "verify integrity via salvage",			/* 100% */
+	  "salvage testing",					/* 100% */
 	  C_BOOL, 100, 1, 0, &g.c_salvage, NULL },
 
 	{ "split_pct",

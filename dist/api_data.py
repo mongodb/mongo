@@ -564,6 +564,7 @@ connection_runtime_config = [
             'mutex',
             'overflow',
             'read',
+            'rebalance',
             'reconcile',
             'recovery',
             'salvage',
@@ -770,6 +771,10 @@ methods = {
     Config('remove_files', 'true', r'''
         should the underlying files be removed?''',
         type='boolean'),
+    Config('lock_wait', 'true', r'''
+        wait for locks, if \c lock_wait=false, fail if any required locks are
+        not available immediately''',
+        type='boolean'),
 ]),
 
 'WT_SESSION.join' : Method([
@@ -892,6 +897,7 @@ methods = {
         type='list'),
 ]),
 
+'WT_SESSION.rebalance' : Method([]),
 'WT_SESSION.rename' : Method([]),
 'WT_SESSION.reset' : Method([]),
 'WT_SESSION.salvage' : Method([

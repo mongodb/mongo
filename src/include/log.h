@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -160,9 +160,9 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
 
 #define	WT_SLOT_INIT_FLAGS	0
 
-#define	WT_WITH_SLOT_LOCK(session, log, op) do {			\
+#define	WT_WITH_SLOT_LOCK(session, log, ret, op) do {			\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));	\
-	WT_WITH_LOCK(session,						\
+	WT_WITH_LOCK(session, ret,					\
 	    &log->log_slot_lock, WT_SESSION_LOCKED_SLOT, op);		\
 } while (0)
 
@@ -265,6 +265,11 @@ struct __wt_log_desc {
 	uint16_t	minorv;		/* 06-07: Minor version */
 	uint64_t	log_size;	/* 08-15: Log file size */
 };
+
+/*
+ * Flags for __wt_txn_op_printlog.
+ */
+#define	WT_TXN_PRINTLOG_HEX	0x0001	/* Add hex output */
 
 /*
  * WT_LOG_REC_DESC --

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -340,8 +340,8 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	 * any that match the list of object sources.
 	 */
 	if (conn->stat_sources != NULL) {
-		WT_WITH_HANDLE_LIST_LOCK(session, ret =
-		    __wt_conn_btree_apply(
+		WT_WITH_HANDLE_LIST_LOCK(session, ret,
+		    ret = __wt_conn_btree_apply(
 		    session, false, NULL, __statlog_apply, NULL));
 		WT_RET(ret);
 	}

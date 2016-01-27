@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -68,11 +68,6 @@ struct timeval {
 };
 
 int gettimeofday(struct timeval* tp, void* tzp);
-
-/*
- * Emulate <sched.h>
- */
-int sched_yield(void);
 
 /*
  * Emulate <unistd.h>

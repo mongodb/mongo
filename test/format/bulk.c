@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -52,23 +52,17 @@ wts_load(void)
 	/*
 	 * No bulk load with data-sources.
 	 *
-	 * XXX
-	 * No bulk load with in-memory configurations (currently, WiredTiger
-	 * fails in the column-store case unless you specify the key).
-	 *
 	 * No bulk load with custom collators, the order of insertion will not
 	 * match the collation order.
 	 */
 	is_bulk = true;
 	if (DATASOURCE("kvsbdb") && DATASOURCE("helium"))
 		is_bulk = false;
-	if (g.c_in_memory)
-		is_bulk = false;
 	if (g.c_reverse)
 		is_bulk = false;
 
 	if ((ret = session->open_cursor(session, g.uri, NULL,
-	    is_bulk ? "bulk" : NULL, &cursor)) != 0)
+	    is_bulk ? "bulk,append" : NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Set up the key/value buffers. */

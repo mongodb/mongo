@@ -15,8 +15,12 @@ WT_CURSOR::close methods.  Bulk load inserts are non-transactional: they
 cannot be rolled back and ignore the transactional state of the WT_SESSION
 in which they are opened.
 
-When bulk-loading row-store objects, keys must be loaded in sorted
-order.
+When doing a bulk-load insert, keys must be inserted in sorted order.
+When doing a bulk-load insert into a column-store object, any skipped
+records will be created as already-deleted rows. If a column-store
+bulk-load cursor is configured with \c append, the cursor key will be
+ignored and each inserted row will be assigned the next sequential
+record number.
 
 When using the \c sort utility on a Linux or other POSIX-like system to
 pre-sort keys, the locale specified by the environment affects the sort

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -98,7 +98,7 @@ real_checkpointer(void)
 		    "Checkpoint thread started stopped\n", EINVAL, 1));
 
 	while (g.ntables > g.ntables_created)
-		sched_yield();
+		__wt_yield();
 
 	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0)
 		return (log_print_err("conn.open_session", ret, 1));

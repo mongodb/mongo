@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -32,6 +32,10 @@
 #define	WT_DHANDLE_INACTIVE(dhandle)					\
 	(F_ISSET(dhandle, WT_DHANDLE_DEAD) ||				\
 	!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN))
+
+/* The metadata cursor's data handle. */
+#define	WT_SESSION_META_DHANDLE(s)					\
+	(((WT_CURSOR_BTREE *)((s)->meta_cursor))->btree->dhandle)
 
 /*
  * WT_DATA_HANDLE --

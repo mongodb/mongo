@@ -173,6 +173,10 @@ taken to do the drop.
 @par icount (unsigned int, default=5000)
 number of records to initially populate. If multiple tables are
 configured the count is spread evenly across all tables.
+@par idle_table_cycle (unsigned int, default=0)
+Enable regular create and drop of idle tables, value is the maximum
+number of seconds a create or drop is allowed before flagging an
+error. Default 0 which means disabled.
 @par index (boolean, default=false)
 Whether to create an index on the value field.
 @par insert_rmw (boolean, default=false)
@@ -182,11 +186,17 @@ key size
 @par log_partial (boolean, default=false)
 perform partial logging on first table only.
 @par min_throughput (unsigned int, default=0)
-abort if any throughput measured is less than this amount.  Requires
+notify if any throughput measured is less than this amount. Aborts or
+prints warning based on min_throughput_fatal setting. Requires
 sample_interval to be configured
+@par min_throughput_fatal (boolean, default=false)
+print warning (false) or abort (true) of min_throughput failure.
 @par max_latency (unsigned int, default=0)
-abort if any latency measured exceeds this number of
-milliseconds.Requires sample_interval to be configured
+notify if any latency measured exceeds this number of
+milliseconds.Aborts or prints warning based on min_throughput_fatal
+setting. Requires sample_interval to be configured
+@par max_latency_fatal (boolean, default=false)
+print warning (false) or abort (true) of max_latency failure.
 @par pareto (unsigned int, default=0)
 use pareto distribution for random numbers. Zero to disable, otherwise
 a percentage indicating how aggressive the distribution should be.
@@ -200,6 +210,8 @@ if non zero choose a value from within this range as the key for
 insert operations
 @par random_value (boolean, default=false)
 generate random content for the value
+@par read_range (unsigned int, default=0)
+scan a range of keys after each search
 @par reopen_connection (boolean, default=true)
 close and reopen the connection between populate and workload phases
 @par report_interval (unsigned int, default=2)
@@ -230,8 +242,9 @@ threads, and the 'insert', 'read' and 'update' entries are the ratios
 of insert, read and update operations done by each worker thread; If a
 throttle value is provided each thread will do a maximum of that
 number of operations per second; multiple workload configurations may
-be specified; for example, a more complex threads configuration might
-be 'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))'
+be specified per threads configuration; for example, a more complex
+threads configuration might be
+'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))'
 which would create 2 threads doing nothing but reads and 8 threads
 each doing 50% inserts and 25% reads and updates.  Allowed
 configuration values are 'count', 'throttle', 'reads', 'inserts',

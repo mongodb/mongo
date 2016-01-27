@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -39,6 +39,7 @@ typedef struct {
 	int create_unique;			/* session.create of new file */
 	int cursor;				/* session.open_cursor */
 	int drop;				/* session.drop */
+	int rebalance;				/* session.rebalance */
 	int upgrade;				/* session.upgrade */
 	int verify;				/* session.verify */
 } STATS;
@@ -102,12 +103,12 @@ fop(void *arg)
 	u_int i;
 
 	id = (uintptr_t)arg;
-	sched_yield();		/* Get all the threads created. */
+	__wt_yield();		/* Get all the threads created. */
 
 	s = &run_stats[id];
 	__wt_random_init(&rnd);
 
-	for (i = 0; i < nops; ++i, sched_yield())
+	for (i = 0; i < nops; ++i, __wt_yield())
 		switch (__wt_random(&rnd) % 9) {
 		case 0:
 			++s->bulk;
@@ -134,14 +135,18 @@ fop(void *arg)
 			obj_upgrade();
 			break;
 		case 6:
+			++s->rebalance;
+			obj_rebalance();
+			break;
+		case 7:
 			++s->verify;
 			obj_verify();
 			break;
-		case 7:
+		case 8:
 			++s->bulk_unique;
 			obj_bulk_unique(__wt_random(&rnd) & 1);
 			break;
-		case 8:
+		case 9:
 			++s->create_unique;
 			obj_create_unique(__wt_random(&rnd) & 1);
 			break;
@@ -163,9 +168,10 @@ print_stats(u_int nthreads)
 	s = run_stats;
 	for (id = 0; id < nthreads; ++id, ++s)
 		printf(
-		    "%2d: bulk %3d, ckpt %3d, create %3d, cursor %3d, "
-		    "drop %3d, upg %3d, vrfy %3d\n",
+		    "%2d:"
+		    "\t" "bulk %3d, checkpoint %3d, create %3d, cursor %3d,\n"
+		    "\t" "drop %3d, rebalance %3d, upgrade %3d, verify %3d\n",
 		    id, s->bulk + s->bulk_unique, s->ckpt,
 		    s->create + s->create_unique, s->cursor,
-		    s->drop, s->upgrade, s->verify);
+		    s->drop, s->rebalance, s->upgrade, s->verify);
 }

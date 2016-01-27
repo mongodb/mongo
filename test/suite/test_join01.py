@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -40,12 +40,8 @@ class test_join01(wttest.WiredTigerTestCase):
         ('table', dict(ref='table')),
         ('index', dict(ref='index'))
     ]
-
-    # Override WiredTigerTestCase, we have statistics tests.
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,statistics=(all),' + 'error_prefix="%s: "' % self.shortid())
-        return conn
+    # We need statistics for these tests.
+    conn_config = 'statistics=(all)'
 
     def gen_key(self, i):
         return [ i + 1 ]
@@ -245,10 +241,22 @@ class test_join01(wttest.WiredTigerTestCase):
         # Joining a non positioned cursor
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.join(jc, ic0, 'compare=ge'),
-            '/requires key be set/')
+            '/requires reference cursor be positioned/')
+        ic0.set_key('val1')
+        # Joining a non positioned cursor (no search or next has been done)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.join(jc, ic0, 'compare=ge'),
+            '/requires reference cursor be positioned/')
+        ic0.set_key('valXX')
+        self.assertEqual(ic0.search(), wiredtiger.WT_NOTFOUND)
+        # Joining a non positioned cursor after failed search
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.join(jc, ic0, 'compare=ge'),
+            '/requires reference cursor be positioned/')
 
-        # minimally position the cursors now
-        ic0.next()
+        # position the cursors now
+        ic0.set_key('val1')
+        ic0.search()
         ic0again.next()
         icB.next()
 
@@ -260,7 +268,7 @@ class test_join01(wttest.WiredTigerTestCase):
         # The cursor must be positioned
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.join(jc, ic1, 'compare=ge'),
-            '/requires key be set/')
+            '/requires reference cursor be positioned/')
         ic1.next()
 
         # The first cursor joined cannot be bloom

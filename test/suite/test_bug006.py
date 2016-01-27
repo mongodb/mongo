@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -57,9 +57,6 @@ class test_bug006(wttest.WiredTigerTestCase):
             lambda: self.session.rename(uri, self.uri + "new", None))
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.salvage(uri, None))
-        self.assertRaises(
-            wiredtiger.WiredTigerError,
-            lambda: self.session.truncate(uri, None, None, None))
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.upgrade(uri, None))
         self.assertRaises(

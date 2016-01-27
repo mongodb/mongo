@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -32,7 +32,6 @@
 
 import shutil, os
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios
 import wttest
 
@@ -78,7 +77,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
                 'create,error_prefix="%s: ",' % self.shortid() + \
                 'transaction_sync="%s",' % self.txn_sync
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
-        conn = wiredtiger_open(dir, conn_params)
+        conn = self.wiredtiger_open(dir, conn_params)
         self.pr(`conn`)
         self.session2 = conn.open_session()
         return conn
@@ -124,7 +123,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(cmd.split())
         self.exception='false'
         backup_conn_params = 'log=(enabled,file_max=%s)' % self.logmax
-        backup_conn = wiredtiger_open(self.backup_dir, backup_conn_params)
+        backup_conn = self.wiredtiger_open(self.backup_dir, backup_conn_params)
         try:
             self.check(backup_conn.open_session(), None, committed)
         except:

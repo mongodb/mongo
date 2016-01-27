@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2014-2016 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -672,6 +672,10 @@ session_ops(WT_SESSION *session)
 	/*! [Compact a table] */
 	ret = session->compact(session, "table:mytable", NULL);
 	/*! [Compact a table] */
+
+	/*! [Rebalance a table] */
+	ret = session->rebalance(session, "table:mytable", NULL);
+	/*! [Rebalance a table] */
 
 	/*! [Rename a table] */
 	ret = session->rename(session, "table:old", "table:new", NULL);

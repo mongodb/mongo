@@ -8,10 +8,11 @@ l=`(cd .. &&
     find bench/wtperf examples ext src test -name '*.[chisy]' &&
     find dist -name '*.py' &&
     find src -name '*.in') |
-    sed -e '/include\/extern\.h/d'\
-	-e '/support\/stat\.c/d'`
+    sed -e '/dist\/stat_data\.py/d' \
+        -e '/support\/stat\.c/d' \
+        -e '/include\/extern\.h/d'`
 
 for f in $l ; do
 	expand -t8 < ../$f | awk -- \
-		"{if(length(\$0) > 80) printf(\"%s:%d\\n\", \"$f\", NR)}"
+	    "{if(length(\$0) > 80) printf(\"%s:%d\\n\", \"$f\", NR)}"
 done

@@ -45,6 +45,7 @@ JAVA_JUNIT = \
 		$(JAVATEST)/AutoCloseTest.java \
 		$(JAVATEST)/AsyncTest.java \
 		$(JAVATEST)/BackupCursorTest.java \
+		$(JAVATEST)/ConfigTest.java \
 		$(JAVATEST)/CursorTest.java \
 		$(JAVATEST)/CursorTest02.java \
 		$(JAVATEST)/ExceptionTest.java \

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2015 MongoDB, Inc.
+# Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -35,7 +35,6 @@
 
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 from helper import copy_wiredtiger_home
 import wttest

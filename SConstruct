@@ -290,6 +290,7 @@ wtbin = env.Program("wt", [
     "src/utilities/util_misc.c",
     "src/utilities/util_printlog.c",
     "src/utilities/util_read.c",
+    "src/utilities/util_rebalance.c",
     "src/utilities/util_rename.c",
     "src/utilities/util_salvage.c",
     "src/utilities/util_stat.c",
@@ -458,6 +459,7 @@ t = env.Program("wtperf", [
     "bench/wtperf/misc.c",
     "bench/wtperf/track.c",
     "bench/wtperf/wtperf.c",
+    "bench/wtperf/wtperf_throttle.c",
     "bench/wtperf/wtperf_truncate.c",
     ],
     LIBS=[wtlib, shim]  + wtlibs)
