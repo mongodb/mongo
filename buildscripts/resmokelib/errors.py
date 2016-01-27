@@ -18,6 +18,14 @@ class StopExecution(ResmokeError):
     pass
 
 
+class UserInterrupt(StopExecution):
+    """
+    Exception that is raised when a user signals resmoke.py to
+    unconditionally stop executing tests.
+    """
+    pass
+
+
 class TestFailure(ResmokeError):
     """
     Exception that is raised by a hook in the after_test method if it
