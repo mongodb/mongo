@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/index_key_validate.h"
 
+#include <cmath>
 #include <limits>
 
 #include "mongo/db/field_ref.h"
@@ -61,8 +62,19 @@ Status validateKeyPattern(const BSONObj& key) {
     while (it.more()) {
         BSONElement keyElement = it.next();
 
-        if (keyElement.type() == Object || keyElement.type() == Array)
-            return Status(code, "Index keys cannot be Objects or Arrays.");
+        if (keyElement.isNumber()) {
+            double value = keyElement.number();
+            if (std::isnan(value)) {
+                return {code, "Values in the index key pattern cannot be NaN."};
+            } else if (value == 0.0) {
+                return {code, "Values in the index key pattern cannot be 0."};
+            }
+        } else if (keyElement.type() != String) {
+            return {code,
+                    str::stream() << "Values in index key pattern cannot be of type "
+                                  << typeName(keyElement.type())
+                                  << ". Only numbers > 0, numbers < 0, and strings are allowed."};
+        }
 
         if (keyElement.type() == String && pluginName != keyElement.str()) {
             return Status(code, "Can't use more than one index plugin for a single index.");

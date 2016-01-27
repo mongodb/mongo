@@ -30,6 +30,8 @@
 
 #include "mongo/db/catalog/index_key_validate.h"
 
+#include <limits>
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"
@@ -48,8 +50,20 @@ TEST(IndexKeyValidateTest, KeyElementValueOfSmallNegativeIntSucceeds) {
     ASSERT_OK(validateKeyPattern(BSON("x" << -5)));
 }
 
-TEST(IndexKeyValidateTest, KeyElementValueOfZeroSucceeds) {
-    ASSERT_OK(validateKeyPattern(BSON("x" << 0)));
+TEST(IndexKeyValidateTest, KeyElementValueOfZeroFails) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << 0)));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << 0.0)));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << -0.0)));
+}
+
+TEST(IndexKeyValidateTest, KeyElementValueOfNaNFails) {
+    if (std::numeric_limits<double>::has_quiet_NaN) {
+        double nan = std::numeric_limits<double>::quiet_NaN();
+        ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << nan)));
+        ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+                  validateKeyPattern(BSON("a" << nan << "b"
+                                              << "2d")));
+    }
 }
 
 TEST(IndexKeyValidateTest, KeyElementValuePositiveFloatingPointSucceeds) {
@@ -67,9 +81,47 @@ TEST(IndexKeyValidateTest, KeyElementValueOfBadPluginStringFails) {
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
 }
 
-TEST(IndexKeyValidateTest, KeyElementBooleanValueSucceeds) {
-    ASSERT_OK(validateKeyPattern(BSON("x" << true)));
-    ASSERT_OK(validateKeyPattern(BSON("x" << false)));
+TEST(IndexKeyValidateTest, KeyElementBooleanValueFails) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << true)));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << false)));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("a"
+                                      << "2dsphere"
+                                      << "b" << true)));
+}
+
+TEST(IndexKeyValidateTest, KeyElementNullValueFails) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << BSONNULL)));
+}
+
+TEST(IndexKeyValidateTest, KeyElementUndefinedValueFails) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << BSONUndefined)));
+}
+
+TEST(IndexKeyValidateTest, KeyElementMinKeyValueFails) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << MINKEY)));
+}
+
+TEST(IndexKeyValidateTest, KeyElementMaxKeyValueFails) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << MAXKEY)));
+}
+
+TEST(IndexKeyValidateTest, KeyElementObjectValueFails) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << BSON("y" << 1))));
+}
+
+TEST(IndexKeyValidateTest, KeyElementArrayValueFails) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << BSON_ARRAY(1))));
+}
+
+TEST(IndexKeyValidateTest, CompoundKeySucceedsOn2dGeoIndex) {
+    ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "b"
+                                          << "2d")));
+}
+
+TEST(IndexKeyValidateTest, CompoundKeySucceedsOn2dsphereGeoIndex) {
+    ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "b"
+                                          << "2dsphere")));
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameTextFailsOnNonTextIndex) {
