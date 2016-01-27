@@ -194,6 +194,11 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
 	buf->size = size;
 
+	/*
+	 * We incrementally read through the structure before doing a checksum,
+	 * do little- to big-endian handling early on, and then select from the
+	 * original or swapped structure as needed.
+	 */
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	__wt_block_header_byteswap_copy(blk, &swap);
 	if (swap.cksum == cksum) {
