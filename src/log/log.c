@@ -536,9 +536,7 @@ __log_fill(WT_SESSION_IMPL *session,
     WT_MYSLOT *myslot, bool force, WT_ITEM *record, WT_LSN *lsnp)
 {
 	WT_DECL_RET;
-	WT_LOG_RECORD *logrec;
 
-	logrec = (WT_LOG_RECORD *)record->mem;
 	/*
 	 * Call __wt_write or copy into the buffer.  For now the offset is the
 	 * real byte offset.  If the offset becomes a unit of WT_LOG_ALIGN this
@@ -547,16 +545,16 @@ __log_fill(WT_SESSION_IMPL *session,
 	 */
 	if (!force && !F_ISSET(myslot, WT_MYSLOT_UNBUFFERED))
 		memcpy((char *)myslot->slot->slot_buf.mem + myslot->offset,
-		    logrec, logrec->len);
+		    record->mem, record->size);
 	else
 		/*
 		 * If this is a force or unbuffered write, write it now.
 		 */
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 		    myslot->offset + myslot->slot->slot_start_offset,
-		    (size_t)logrec->len, (void *)logrec));
+		    record->size, record->mem));
 
-	WT_STAT_FAST_CONN_INCRV(session, log_bytes_written, logrec->len);
+	WT_STAT_FAST_CONN_INCRV(session, log_bytes_written, record->size);
 	if (lsnp != NULL) {
 		*lsnp = myslot->slot->slot_start_lsn;
 		lsnp->offset += (wt_off_t)myslot->offset;
@@ -618,6 +616,7 @@ __log_file_header(
 #ifdef WORDS_BIGENDIAN
 	logrec->checksum = __wt_bswap32(logrec->checksum);
 #endif
+	buf->size = log->allocsize;
 
 	WT_CLEAR(tmp);
 	memset(&myslot, 0, sizeof(myslot));
@@ -634,7 +633,7 @@ __log_file_header(
 		tmp.slot_fh = fh;
 	} else {
 		WT_ASSERT(session, fh == NULL);
-		WT_ERR(__wt_log_acquire(session, logrec->len, &tmp));
+		WT_ERR(__wt_log_acquire(session, log->allocsize, &tmp));
 	}
 	WT_ERR(__log_fill(session, &myslot, true, buf, NULL));
 	/*
