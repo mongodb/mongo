@@ -10,6 +10,8 @@
  *
  * This workload was designed to reproduce SERVER-15892.
  */
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
+
 var $config = (function() {
 
     var states = {
@@ -22,20 +24,41 @@ var $config = (function() {
         update: function update(db, collName) {
             var updateDoc = { $inc: {} };
             updateDoc.$inc[this.fieldName] = 1;
-            db[collName].findAndModify({
+
+            var res = db.runCommand({
+                findAndModify: collName,
                 query: { _id: 'findAndModify_inc' },
                 update: updateDoc
             });
-            ++this.count;
+            assertAlways.commandWorked(res);
+
+            // If the document was invalidated during a yield, then we wouldn't have modified it.
+            // The "findAndModify" command returns a null value in this case. See SERVER-22002 for
+            // more details.
+            if (isMongod(db) && !isMMAPv1(db)) {
+                // For storage engines other than MMAPv1, if the document is modified by another
+                // thread during a yield, then the operation is retried internally. We never expect
+                // to see a null value returned by the "findAndModify" command when it is known that
+                // a matching document exists in the collection.
+                assertWhenOwnColl(res.value !== null, 'query spec should have matched a document');
+            }
+
+            if (res.value !== null) {
+                ++this.count;
+            }
         },
 
         find: function find(db, collName) {
             var docs = db[collName].find().toArray();
             assertWhenOwnColl.eq(1, docs.length);
-            assertWhenOwnColl((function() {
+            assertWhenOwnColl(() => {
                 var doc = docs[0];
-                assertWhenOwnColl.eq(this.count, doc[this.fieldName]);
-            }).bind(this));
+                if (doc.hasOwnProperty(this.fieldName)) {
+                    assertWhenOwnColl.eq(this.count, doc[this.fieldName]);
+                } else {
+                    assertWhenOwnColl.eq(this.count, 0);
+                }
+            });
         }
 
     };
