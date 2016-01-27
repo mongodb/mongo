@@ -703,12 +703,12 @@ TEST(SafeNumType, getSafeNum) {
     mmb::Element t0 = doc.makeElementInt("t0", 1234567890);
     ASSERT_EQUALS(1234567890, t0.getValueInt());
     mongo::SafeNum num = t0.getValueSafeNum();
-    ASSERT_EQUALS(num, 1234567890);
+    ASSERT_EQUALS(num, static_cast<int64_t>(1234567890));
 
     t0.setValueLong(1234567890LL);
     ASSERT_EQUALS(1234567890LL, t0.getValueLong());
     num = t0.getValueSafeNum();
-    ASSERT_EQUALS(num, 1234567890LL);
+    ASSERT_EQUALS(num, static_cast<int64_t>(1234567890LL));
 
     t0.setValueDouble(123.456789);
     ASSERT_EQUALS(123.456789, t0.getValueDouble());
@@ -751,11 +751,11 @@ TEST(SafeNumType, appendElement) {
     mmb::Document doc;
 
     mmb::Element t0 = doc.makeElementObject("e0");
-    t0.appendSafeNum("a timestamp field", mongo::SafeNum(1352151971LL));
+    t0.appendSafeNum("a timestamp field", mongo::SafeNum(static_cast<int64_t>(1352151971LL)));
 
     mmb::Element it = findFirstChildNamed(t0, "a timestamp field");
     ASSERT_TRUE(it.ok());
-    ASSERT_EQUALS(mongo::SafeNum(1352151971LL), it.getValueSafeNum());
+    ASSERT_EQUALS(mongo::SafeNum(static_cast<int64_t>(1352151971LL)), it.getValueSafeNum());
 }
 
 TEST(OIDType, getOidValue) {

@@ -161,7 +161,7 @@ Status ModifierInc::prepare(mutablebson::Element root,
         // always yield a zero of the same type of operand that the user provided
         // (e.g. double).
         if (_mode == MODE_MUL)
-            _preparedState->newValue *= SafeNum(static_cast<int>(0));
+            _preparedState->newValue *= SafeNum(static_cast<int32_t>(0));
 
         return Status::OK();
     }

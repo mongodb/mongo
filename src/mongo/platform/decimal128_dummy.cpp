@@ -37,7 +37,7 @@ Decimal128::Decimal128(int32_t int32Value) {
     invariant(false);
 }
 
-Decimal128::Decimal128(long long int64Value) {
+Decimal128::Decimal128(int64_t int64Value) {
     invariant(false);
 }
 

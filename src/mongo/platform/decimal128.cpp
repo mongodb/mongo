@@ -108,7 +108,7 @@ BID_UINT128 quantizeTo15DecimalDigits(BID_UINT128 value,
 Decimal128::Decimal128(std::int32_t int32Value)
     : _value(libraryTypeToValue(bid128_from_int32(int32Value))) {}
 
-Decimal128::Decimal128(long long int64Value)
+Decimal128::Decimal128(std::int64_t int64Value)
     : _value(libraryTypeToValue(bid128_from_int64(int64Value))) {}
 
 /**

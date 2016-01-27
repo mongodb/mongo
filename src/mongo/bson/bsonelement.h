@@ -699,7 +699,7 @@ inline Decimal128 BSONElement::numberDecimal() const {
         case NumberInt:
             return Decimal128(_numberInt());
         case NumberLong:
-            return Decimal128(_numberLong());
+            return Decimal128(static_cast<int64_t>(_numberLong()));
         case NumberDecimal:
             return _numberDecimal();
         default:
@@ -780,11 +780,11 @@ inline long long BSONElement::safeNumberLong() const {
             if (d.isNaN()) {
                 return 0;
             }
-            if (d.isGreater(Decimal128(std::numeric_limits<long long>::max()))) {
-                return std::numeric_limits<long long>::max();
+            if (d.isGreater(Decimal128(std::numeric_limits<int64_t>::max()))) {
+                return static_cast<long long>(std::numeric_limits<int64_t>::max());
             }
-            if (d.isLess(Decimal128(std::numeric_limits<long long>::min()))) {
-                return std::numeric_limits<long long>::min();
+            if (d.isLess(Decimal128(std::numeric_limits<int64_t>::min()))) {
+                return static_cast<long long>(std::numeric_limits<int64_t>::min());
             }
             return numberLong();
         }

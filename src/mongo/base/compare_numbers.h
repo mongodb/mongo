@@ -140,7 +140,7 @@ inline int compareIntToDecimal(int lhs, Decimal128 rhs) {
 
 // Compare decimal and long
 inline int compareDecimalToLong(Decimal128 lhs, long long rhs) {
-    return compareDecimals(lhs, Decimal128(rhs));
+    return compareDecimals(lhs, Decimal128(static_cast<int64_t>(rhs)));
 }
 
 inline int compareLongToDecimal(long long lhs, Decimal128 rhs) {

@@ -116,7 +116,7 @@ bool SafeNum::isEquivalent(const SafeNum& rhs) const {
 
     // If none of the sides is a double, compare them as long's.
     if (_type != NumberDouble && rhs._type != NumberDouble) {
-        return getLongLong(*this) == getLongLong(rhs);
+        return getInt64(*this) == getInt64(rhs);
     }
 
     // If both sides are doubles, compare them as so.
@@ -158,7 +158,7 @@ bool SafeNum::isIdentical(const SafeNum& rhs) const {
     }
 }
 
-long long SafeNum::getLongLong(const SafeNum& snum) {
+int64_t SafeNum::getInt64(const SafeNum& snum) {
     switch (snum._type) {
         case NumberInt:
             return snum._value.int32Val;
@@ -201,7 +201,7 @@ Decimal128 SafeNum::getDecimal(const SafeNum& snum) {
 
 namespace {
 
-SafeNum addInt32Int32(int lInt32, int rInt32) {
+SafeNum addInt32Int32(int32_t lInt32, int32_t rInt32) {
     // NOTE: Please see "Secure Coding in C and C++", Second Edition, page 264-265 for
     // details on this algorithm (for an alternative resources, see
     //
@@ -211,29 +211,25 @@ SafeNum addInt32Int32(int lInt32, int rInt32) {
     //
     // We are using the "Downcast from a larger type" algorithm here. We always perform
     // the arithmetic in 64-bit mode, which can never overflow for 32-bit
-    // integers. Then, if we fall within the allowable range of int, we downcast,
+    // integers. Then, if we fall within the allowable range of int32_t, we downcast,
     // otherwise, we retain the 64-bit result.
+    const int64_t result = static_cast<int64_t>(lInt32) + static_cast<int64_t>(rInt32);
 
-    // This algorithm is only correct if sizeof(long long) > sizeof(int)
-    static_assert(sizeof(long long) > sizeof(int), "sizeof(long long) > sizeof(int)");
-
-    const long long int result =
-        static_cast<long long int>(lInt32) + static_cast<long long int>(rInt32);
-
-    if (result <= std::numeric_limits<int>::max() && result >= std::numeric_limits<int>::min()) {
-        return SafeNum(static_cast<int>(result));
+    if (result <= std::numeric_limits<int32_t>::max() &&
+        result >= std::numeric_limits<int32_t>::min()) {
+        return SafeNum(static_cast<int32_t>(result));
     }
 
     return SafeNum(result);
 }
 
-SafeNum addInt64Int64(long long lInt64, long long rInt64) {
+SafeNum addInt64Int64(int64_t lInt64, int64_t rInt64) {
     // NOTE: Please see notes in addInt32Int32 above for references. In this case, since we
     // have no larger integer size, if our precondition test detects overflow we must
     // return an invalid SafeNum. Otherwise, the operation is safely performed by standard
     // arithmetic.
-    if (((rInt64 > 0) && (lInt64 > (std::numeric_limits<long long>::max() - rInt64))) ||
-        ((rInt64 < 0) && (lInt64 < (std::numeric_limits<long long>::min() - rInt64)))) {
+    if (((rInt64 > 0) && (lInt64 > (std::numeric_limits<int64_t>::max() - rInt64))) ||
+        ((rInt64 < 0) && (lInt64 < (std::numeric_limits<int64_t>::min() - rInt64)))) {
         return SafeNum();
     }
 
@@ -249,7 +245,7 @@ SafeNum addDecimals(Decimal128 lDecimal, Decimal128 rDecimal) {
     return SafeNum(lDecimal.add(rDecimal));
 }
 
-SafeNum mulInt32Int32(int lInt32, int rInt32) {
+SafeNum mulInt32Int32(int32_t lInt32, int32_t rInt32) {
     // NOTE: Please see "Secure Coding in C and C++", Second Edition, page 264-265 for
     // details on this algorithm (for an alternative resources, see
     //
@@ -259,23 +255,19 @@ SafeNum mulInt32Int32(int lInt32, int rInt32) {
     //
     // We are using the "Downcast from a larger type" algorithm here. We always perform
     // the arithmetic in 64-bit mode, which can never overflow for 32-bit
-    // integers. Then, if we fall within the allowable range of int, we downcast,
+    // integers. Then, if we fall within the allowable range of int32_t, we downcast,
     // otherwise, we retain the 64-bit result.
+    const int64_t result = static_cast<int64_t>(lInt32) * static_cast<int64_t>(rInt32);
 
-    // This algorithm is only correct if sizeof(long long) >= (2 * sizeof(int))
-    static_assert(sizeof(long long) >= (2 * sizeof(int)), "sizeof(long long) >= (2 * sizeof(int))");
-
-    const long long int result =
-        static_cast<long long int>(lInt32) * static_cast<long long int>(rInt32);
-
-    if (result <= std::numeric_limits<int>::max() && result >= std::numeric_limits<int>::min()) {
-        return SafeNum(static_cast<int>(result));
+    if (result <= std::numeric_limits<int32_t>::max() &&
+        result >= std::numeric_limits<int32_t>::min()) {
+        return SafeNum(static_cast<int32_t>(result));
     }
 
     return SafeNum(result);
 }
 
-SafeNum mulInt64Int64(long long lInt64, long long rInt64) {
+SafeNum mulInt64Int64(int64_t lInt64, int64_t rInt64) {
     // NOTE: Please see notes in mulInt32Int32 above for references. In this case,
     // since we have no larger integer size, if our precondition test detects overflow
     // we must return an invalid SafeNum. Otherwise, the operation is safely performed
@@ -283,27 +275,27 @@ SafeNum mulInt64Int64(long long lInt64, long long rInt64) {
 
     if (lInt64 > 0) {
         if (rInt64 > 0) {
-            if (lInt64 > (std::numeric_limits<long long>::max() / rInt64)) {
+            if (lInt64 > (std::numeric_limits<int64_t>::max() / rInt64)) {
                 return SafeNum();
             }
         } else {
-            if (rInt64 < (std::numeric_limits<long long>::min() / lInt64)) {
+            if (rInt64 < (std::numeric_limits<int64_t>::min() / lInt64)) {
                 return SafeNum();
             }
         }
     } else {
         if (rInt64 > 0) {
-            if (lInt64 < (std::numeric_limits<long long>::min() / rInt64)) {
+            if (lInt64 < (std::numeric_limits<int64_t>::min() / rInt64)) {
                 return SafeNum();
             }
         } else {
-            if ((lInt64 != 0) && (rInt64 < (std::numeric_limits<long long>::max() / lInt64))) {
+            if ((lInt64 != 0) && (rInt64 < (std::numeric_limits<int64_t>::max() / lInt64))) {
                 return SafeNum();
             }
         }
     }
 
-    const long long result = lInt64 * rInt64;
+    const int64_t result = lInt64 * rInt64;
     return SafeNum(result);
 }
 
@@ -391,11 +383,11 @@ SafeNum SafeNum::andInternal(const SafeNum& lhs, const SafeNum& rhs) {
     }
 
     if (lType == NumberInt && rType == NumberLong) {
-        return (static_cast<long long int>(lhs._value.int32Val) & rhs._value.int64Val);
+        return (static_cast<int64_t>(lhs._value.int32Val) & rhs._value.int64Val);
     }
 
     if (lType == NumberLong && rType == NumberInt) {
-        return (lhs._value.int64Val & static_cast<long long int>(rhs._value.int32Val));
+        return (lhs._value.int64Val & static_cast<int64_t>(rhs._value.int32Val));
     }
 
     if (lType == NumberLong && rType == NumberLong) {
@@ -414,11 +406,11 @@ SafeNum SafeNum::orInternal(const SafeNum& lhs, const SafeNum& rhs) {
     }
 
     if (lType == NumberInt && rType == NumberLong) {
-        return (static_cast<long long int>(lhs._value.int32Val) | rhs._value.int64Val);
+        return (static_cast<int64_t>(lhs._value.int32Val) | rhs._value.int64Val);
     }
 
     if (lType == NumberLong && rType == NumberInt) {
-        return (lhs._value.int64Val | static_cast<long long int>(rhs._value.int32Val));
+        return (lhs._value.int64Val | static_cast<int64_t>(rhs._value.int32Val));
     }
 
     if (lType == NumberLong && rType == NumberLong) {
@@ -437,11 +429,11 @@ SafeNum SafeNum::xorInternal(const SafeNum& lhs, const SafeNum& rhs) {
     }
 
     if (lType == NumberInt && rType == NumberLong) {
-        return (static_cast<long long int>(lhs._value.int32Val) ^ rhs._value.int64Val);
+        return (static_cast<int64_t>(lhs._value.int32Val) ^ rhs._value.int64Val);
     }
 
     if (lType == NumberLong && rType == NumberInt) {
-        return (lhs._value.int64Val ^ static_cast<long long int>(rhs._value.int32Val));
+        return (lhs._value.int64Val ^ static_cast<int64_t>(rhs._value.int32Val));
     }
 
     if (lType == NumberLong && rType == NumberLong) {

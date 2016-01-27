@@ -253,9 +253,9 @@ Value Value::createIntOrLong(long long longValue) {
 Decimal128 Value::getDecimal() const {
     BSONType type = getType();
     if (type == NumberInt)
-        return Decimal128(_storage.intValue);
+        return Decimal128(static_cast<int32_t>(_storage.intValue));
     if (type == NumberLong)
-        return Decimal128(_storage.longValue);
+        return Decimal128(static_cast<int64_t>(_storage.longValue));
     if (type == NumberDouble)
         return Decimal128(_storage.doubleValue);
     invariant(type == NumberDecimal);
@@ -479,10 +479,10 @@ Decimal128 Value::coerceToDecimal() const {
             return _storage.getDecimal();
 
         case NumberInt:
-            return Decimal128(_storage.intValue);
+            return Decimal128(static_cast<int32_t>(_storage.intValue));
 
         case NumberLong:
-            return Decimal128(_storage.longValue);
+            return Decimal128(static_cast<int64_t>(_storage.longValue));
 
         case NumberDouble:
             return Decimal128(_storage.doubleValue);

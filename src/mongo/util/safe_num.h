@@ -78,12 +78,17 @@ public:
     SafeNum(const SafeNum& rhs);
     SafeNum& operator=(const SafeNum& rhs);
 
-    // Implicit conversions are allowed.
+    // These implicit conversions are allowed.
     SafeNum(const BSONElement& element);
-    SafeNum(int num);
-    SafeNum(long long int num);
+    SafeNum(int32_t num);
+    SafeNum(int64_t num);
     SafeNum(double num);
     SafeNum(Decimal128 num);
+
+    // Other/Implicit conversions are not allowed.
+    template <typename T>
+    SafeNum(T t) = delete;
+
     // TODO: add Paul's mutablebson::Element ctor
 
     //
@@ -170,7 +175,7 @@ public:
     // Maximum integer that can be converted accuratelly into a double, assuming a
     // double precission IEEE 754 representation.
     // TODO use numeric_limits to make this portable
-    static const long long maxIntInDouble = 9007199254740992LL;  // 2^53
+    static const int64_t maxIntInDouble = 9007199254740992LL;  // 2^53
 
 private:
     // One of the following: NumberInt, NumberLong, NumberDouble, NumberDecimal, or EOO.
@@ -178,8 +183,8 @@ private:
 
     // Value of the safe num. Indeterminate if _type is EOO.
     union {
-        int int32Val;
-        long long int int64Val;
+        int32_t int32Val;
+        int64_t int64Val;
         double doubleVal;
         Decimal128::Value decimalVal;
     } _value;
@@ -214,10 +219,10 @@ private:
     static SafeNum xorInternal(const SafeNum& lhs, const SafeNum& rhs);
 
     /**
-     * Extracts the value of 'snum' in a long format. It assumes 'snum' is an NumberInt
+     * Extracts the value of 'snum' in a int64_t format. It assumes 'snum' is an NumberInt
      * or a NumberLong.
      */
-    static long long getLongLong(const SafeNum& snum);
+    static int64_t getInt64(const SafeNum& snum);
 
     /**
      * Extracts the value of 'snum' in a double format. It assumes 'snum' is a valid

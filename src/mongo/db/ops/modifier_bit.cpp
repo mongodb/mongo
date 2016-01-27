@@ -183,7 +183,7 @@ Status ModifierBit::prepare(mutablebson::Element root,
     if (!_preparedState->elemFound.ok() || _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
         // If no target element exists, the value we will write is the result of applying
         // the operation to a zero-initialized integer element.
-        _preparedState->newValue = apply(SafeNum(static_cast<int>(0)));
+        _preparedState->newValue = apply(SafeNum(static_cast<int32_t>(0)));
         return Status::OK();
     }
 

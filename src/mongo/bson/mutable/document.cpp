@@ -1473,9 +1473,9 @@ const BSONElement Element::getValue() const {
 SafeNum Element::getValueSafeNum() const {
     switch (getType()) {
         case mongo::NumberInt:
-            return static_cast<int>(getValueInt());
+            return static_cast<int32_t>(getValueInt());
         case mongo::NumberLong:
-            return static_cast<long long int>(getValueLong());
+            return static_cast<int64_t>(getValueLong());
         case mongo::NumberDouble:
             return getValueDouble();
         case mongo::NumberDecimal:

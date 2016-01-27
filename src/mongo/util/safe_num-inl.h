@@ -41,11 +41,11 @@ inline SafeNum& SafeNum::operator=(const SafeNum& rhs) {
     return *this;
 }
 
-inline SafeNum::SafeNum(int num) : _type(NumberInt) {
+inline SafeNum::SafeNum(int32_t num) : _type(NumberInt) {
     _value.int32Val = num;
 }
 
-inline SafeNum::SafeNum(long long int num) : _type(NumberLong) {
+inline SafeNum::SafeNum(int64_t num) : _type(NumberLong) {
     _value.int64Val = num;
 }
 

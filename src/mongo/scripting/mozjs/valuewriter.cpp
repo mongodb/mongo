@@ -170,7 +170,7 @@ Decimal128 ValueWriter::toDecimal128() {
         return Decimal128(NumberIntInfo::ToNumberInt(_context, _value));
 
     if (getScope(_context)->getProto<NumberLongInfo>().instanceOf(_value))
-        return Decimal128(NumberLongInfo::ToNumberLong(_context, _value));
+        return Decimal128(static_cast<int64_t>(NumberLongInfo::ToNumberLong(_context, _value)));
 
     if (getScope(_context)->getProto<NumberDecimalInfo>().instanceOf(_value))
         return NumberDecimalInfo::ToNumberDecimal(_context, _value);

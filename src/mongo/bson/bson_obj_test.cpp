@@ -291,9 +291,9 @@ TEST(BSONObjCompare, NumberDecimalCompareLong) {
     if (Decimal128::enabled) {
         ASSERT_EQ(BSON("" << Decimal128(0.0)), BSON("" << 0ll));
         ASSERT_EQ(BSON("" << Decimal128(502.0)), BSON("" << 502ll));
-        ASSERT_EQ(BSON("" << Decimal128(std::numeric_limits<long long>::max())),
+        ASSERT_EQ(BSON("" << Decimal128(std::numeric_limits<int64_t>::max())),
                   BSON("" << std::numeric_limits<long long>::max()));
-        ASSERT_EQ(BSON("" << Decimal128(-std::numeric_limits<long long>::max())),
+        ASSERT_EQ(BSON("" << Decimal128(-std::numeric_limits<int64_t>::max())),
                   BSON("" << -std::numeric_limits<long long>::max()));
 
         ASSERT_LT(BSON("" << Decimal128::kNegativeNaN),

@@ -186,12 +186,17 @@ bool checkDoc(const Document& lhs, const Document& rhs) {
     return (primaryResult == 0);
 }
 
+std::ostream& operator<<(std::ostream& stream, const ConstElement& elt) {
+    stream << elt.toString();
+    return stream;
+}
+
 std::ostream& operator<<(std::ostream& stream, const Document& doc) {
     stream << doc.toString();
     return stream;
 }
 
-std::ostream& operator<<(std::ostream& stream, const ConstElement& elt) {
+std::ostream& operator<<(std::ostream& stream, const Element& elt) {
     stream << elt.toString();
     return stream;
 }
