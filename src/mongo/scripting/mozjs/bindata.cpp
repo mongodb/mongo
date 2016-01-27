@@ -32,6 +32,7 @@
 
 #include <iomanip>
 #include <cctype>
+#include <uuid/uuid.h>
 
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
@@ -111,18 +112,38 @@ void BinDataInfo::finalize(JSFreeOp* fop, JSObject* obj) {
         delete str;
     }
 }
+void uuidToBinData(JSContext* cx,
+                  int type,
+                  const char* uuid,
+                  JS::MutableHandleValue out) {
+    auto scope = getScope(cx);
 
+    std::string encoded = base64::encode(uuid, 16);
+    JS::AutoValueArray<2> args(cx);
+
+    args[0].setInt32(type);
+    ValueReader(cx, args[1]).fromStringData(encoded);
+    return scope->getProto<BinDataInfo>().newInstance(args, out);
+}
 void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
-    if (args.length() != 1)
-        uasserted(ErrorCodes::BadValue, "UUID needs 1 argument");
 
-    auto arg = args.get(0);
-    auto str = ValueWriter(cx, arg).toString();
+	if (args.length() == 0){
 
-    if (str.length() != 32)
-        uasserted(ErrorCodes::BadValue, "UUID string must have 32 characters");
+		uuid_t uuid;
+		uuid_generate_time(uuid);
+		const char *uuid_ptr = (const char*)uuid;
+		uuidToBinData(cx, bdtUUID, uuid_ptr, args.rval());
+    }
+	else{
+		auto arg = args.get(0);
+		auto str = ValueWriter(cx, arg).toString();
 
-    hexToBinData(cx, bdtUUID, arg, args.rval());
+		if (str.length() != 32)
+		        uasserted(ErrorCodes::BadValue, "UUID string must have 32 characters");
+
+		hexToBinData(cx, bdtUUID, arg, args.rval());
+	}
+
 }
 
 void BinDataInfo::Functions::MD5::call(JSContext* cx, JS::CallArgs args) {
