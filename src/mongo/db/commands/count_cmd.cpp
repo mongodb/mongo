@@ -165,6 +165,8 @@ public:
         if (collection) {
             collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
         }
+        CurOp::get(txn)->debug().fromMultiPlanner = summaryStats.fromMultiPlanner;
+        CurOp::get(txn)->debug().replanned = summaryStats.replanned;
 
         // Plan is done executing. We just need to pull the count out of the root stage.
         invariant(STAGE_COUNT == exec->getRootStage()->stageType());

@@ -183,11 +183,13 @@ struct AndSortedStats : public SpecificStats {
 };
 
 struct CachedPlanStats : public SpecificStats {
-    CachedPlanStats() {}
+    CachedPlanStats() : replanned(false) {}
 
     SpecificStats* clone() const final {
         return new CachedPlanStats(*this);
     }
+
+    bool replanned;
 };
 
 struct CollectionScanStats : public SpecificStats {

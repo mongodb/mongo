@@ -235,6 +235,8 @@ public:
                 PlanSummaryStats stats;
                 Explain::getSummaryStats(*input, &stats);
                 collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
+                CurOp::get(txn)->debug().fromMultiPlanner = stats.fromMultiPlanner;
+                CurOp::get(txn)->debug().replanned = stats.replanned;
             }
 
             // Create the PlanExecutor which returns results from the pipeline. The WorkingSet

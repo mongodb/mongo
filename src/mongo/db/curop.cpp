@@ -513,6 +513,8 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     OPDEBUG_TOSTRING_HELP(docsExamined);
     OPDEBUG_TOSTRING_HELP_BOOL(idhack);
     OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
+    OPDEBUG_TOSTRING_HELP_BOOL(fromMultiPlanner);
+    OPDEBUG_TOSTRING_HELP_BOOL(replanned);
     OPDEBUG_TOSTRING_HELP(nmoved);
     OPDEBUG_TOSTRING_HELP(nMatched);
     OPDEBUG_TOSTRING_HELP(nModified);
@@ -629,6 +631,8 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_NUMBER(docsExamined);
     OPDEBUG_APPEND_BOOL(idhack);
     OPDEBUG_APPEND_BOOL(hasSortStage);
+    OPDEBUG_APPEND_BOOL(fromMultiPlanner);
+    OPDEBUG_APPEND_BOOL(replanned);
     OPDEBUG_APPEND_BOOL(moved);
     OPDEBUG_APPEND_NUMBER(nmoved);
     OPDEBUG_APPEND_NUMBER(nMatched);

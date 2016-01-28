@@ -157,6 +157,8 @@ void endQueryOp(OperationContext* txn,
     curop->debug().keysExamined = summaryStats.totalKeysExamined;
     curop->debug().docsExamined = summaryStats.totalDocsExamined;
     curop->debug().idhack = summaryStats.isIdhack;
+    curop->debug().fromMultiPlanner = summaryStats.fromMultiPlanner;
+    curop->debug().replanned = summaryStats.replanned;
 
     if (collection) {
         collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);

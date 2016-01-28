@@ -1036,6 +1036,8 @@ void UpdateStage::fillOutOpDebug(const UpdateStats* updateStats,
     // Copy summary information about the plan into OpDebug.
     opDebug->keysExamined = summaryStats->totalKeysExamined;
     opDebug->docsExamined = summaryStats->totalDocsExamined;
+    opDebug->fromMultiPlanner = summaryStats->fromMultiPlanner;
+    opDebug->replanned = summaryStats->replanned;
 }
 
 UpdateResult UpdateStage::makeUpdateResult(const UpdateStats* updateStats) {

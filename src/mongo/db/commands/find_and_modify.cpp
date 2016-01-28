@@ -411,6 +411,8 @@ public:
                 if (collection) {
                     collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
                 }
+                CurOp::get(txn)->debug().fromMultiPlanner = summaryStats.fromMultiPlanner;
+                CurOp::get(txn)->debug().replanned = summaryStats.replanned;
 
                 // Fill out OpDebug with the number of deleted docs.
                 CurOp::get(txn)->debug().ndeleted = getDeleteStats(exec.get())->docsDeleted;

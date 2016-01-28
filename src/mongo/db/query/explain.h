@@ -46,34 +46,33 @@ class OperationContext;
  * other non-explain debug mechanisms may want to collect.
  */
 struct PlanSummaryStats {
-    PlanSummaryStats()
-        : nReturned(0),
-          totalKeysExamined(0),
-          totalDocsExamined(0),
-          executionTimeMillis(0),
-          isIdhack(false),
-          hasSortStage(false) {}
-
     // The number of results returned by the plan.
-    size_t nReturned;
+    size_t nReturned = 0U;
 
     // The total number of index keys examined by the plan.
-    size_t totalKeysExamined;
+    size_t totalKeysExamined = 0U;
 
     // The total number of documents examined by the plan.
-    size_t totalDocsExamined;
+    size_t totalDocsExamined = 0U;
 
     // The number of milliseconds spent inside the root stage's work() method.
-    long long executionTimeMillis;
+    long long executionTimeMillis = 0;
 
     // Did this plan use the fast path for key-value retrievals on the _id index?
-    bool isIdhack;
+    bool isIdhack = false;
 
     // Did this plan use an in-memory sort stage?
-    bool hasSortStage;
+    bool hasSortStage = false;
 
     // The names of each index used by the plan.
     std::set<std::string> indexesUsed;
+
+    // Was this plan a result of using the MultiPlanStage to select a winner among several
+    // candidates?
+    bool fromMultiPlanner = false;
+
+    // Was a replan triggered during the execution of this query?
+    bool replanned = false;
 };
 
 /**

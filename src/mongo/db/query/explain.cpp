@@ -31,6 +31,7 @@
 #include "mongo/db/query/explain.h"
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/count_scan.h"
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/idhack.h"
@@ -72,14 +73,15 @@ void flattenStatsTree(const PlanStageStats* root, vector<const PlanStageStats*>*
  * MultiPlanStage is encountered, only add the best plan and its children to 'flattened'.
  */
 void flattenExecTree(const PlanStage* root, vector<const PlanStage*>* flattened) {
+    flattened->push_back(root);
+
     if (root->stageType() == STAGE_MULTI_PLAN) {
-        // Only add the winning stage from a MultiPlanStage.
+        // Only add the winning plan from a MultiPlanStage.
         auto mps = static_cast<const MultiPlanStage*>(root);
         const PlanStage* winningStage = mps->getChildren()[mps->bestPlanIdx()].get();
         return flattenExecTree(winningStage, flattened);
     }
 
-    flattened->push_back(root);
     const auto& children = root->getChildren();
     for (size_t i = 0; i < children.size(); ++i) {
         flattenExecTree(children[i].get(), flattened);
@@ -785,6 +787,13 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
             const NearStats* nearStats =
                 static_cast<const NearStats*>(nearStage->getSpecificStats());
             statsOut->indexesUsed.insert(nearStats->indexName);
+        } else if (STAGE_CACHED_PLAN == stages[i]->stageType()) {
+            const CachedPlanStage* cachedPlan = static_cast<const CachedPlanStage*>(stages[i]);
+            const CachedPlanStats* cachedStats =
+                static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
+            statsOut->replanned = cachedStats->replanned;
+        } else if (STAGE_MULTI_PLAN == stages[i]->stageType()) {
+            statsOut->fromMultiPlanner = true;
         }
     }
 }

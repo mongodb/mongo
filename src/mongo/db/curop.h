@@ -169,6 +169,13 @@ public:
 
     bool hasSortStage{false};  // true if the query plan involves an in-memory sort
 
+    // True if the plan came from the multi-planner (not from the plan cache and not a query with a
+    // single solution).
+    bool fromMultiPlanner{false};
+
+    // True if a replan was triggered during the execution of this operation.
+    bool replanned{false};
+
     long long nMatched{-1};   // number of records that match the query
     long long nModified{-1};  // number of records written (no no-ops)
     long long nmoved{-1};     // updates resulted in a move (moves are expensive)

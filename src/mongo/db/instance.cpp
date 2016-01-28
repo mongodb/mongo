@@ -860,6 +860,8 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
             PlanSummaryStats summary;
             Explain::getSummaryStats(*exec, &summary);
             collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+            op.debug().fromMultiPlanner = summary.fromMultiPlanner;
+            op.debug().replanned = summary.replanned;
 
             if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
                 // If this operation has already generated a new lastOp, don't bother setting it

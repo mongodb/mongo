@@ -288,6 +288,8 @@ public:
         PlanSummaryStats summary;
         Explain::getSummaryStats(*exec, &summary);
         collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+        CurOp::get(txn)->debug().fromMultiPlanner = summary.fromMultiPlanner;
+        CurOp::get(txn)->debug().replanned = summary.replanned;
 
         stats.appendNumber("nscanned", summary.totalKeysExamined);
         stats.appendNumber("objectsLoaded", summary.totalDocsExamined);
