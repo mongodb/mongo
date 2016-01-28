@@ -256,19 +256,25 @@ config_compression(const char *conf_name)
 		switch (mmrand(NULL, 1, 20)) {
 		case 1: case 2: case 3: case 4:		/* 20% no compression */
 			break;
+#ifdef HAVE_BUILTIN_EXTENSION_LZ4
 		case 5: case 6: case 7: case 8:		/* 20% lz4 */
 			cstr = "lz4";
 			break;
 		case 9:					/* 5% lz4-no-raw */
 			cstr = "lz4-noraw";
 			break;
+#endif
+#ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
 		case 10: case 11: case 12: case 13:	/* 30% snappy */
 		case 14: case 15:
 			cstr = "snappy";
 			break;
+#endif
+#ifdef HAVE_BUILTIN_EXTENSION_ZLIB
 		case 16: case 17: case 18: case 19:	/* 20% zlib */
 			cstr = "zlib";
 			break;
+#endif
 		case 20:				/* 5% zlib-no-raw */
 			cstr = "zlib-noraw";
 			break;
