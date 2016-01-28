@@ -594,6 +594,8 @@ __log_file_header(
 	WT_ASSERT(session, sizeof(WT_LOG_DESC) < log->allocsize);
 	WT_RET(__wt_scr_alloc(session, log->allocsize, &buf));
 	memset(buf->mem, 0, log->allocsize);
+	buf->size = log->allocsize;
+
 	logrec = (WT_LOG_RECORD *)buf->mem;
 	desc = (WT_LOG_DESC *)logrec->record;
 	desc->log_magic = WT_LOG_MAGIC;
@@ -616,7 +618,6 @@ __log_file_header(
 #ifdef WORDS_BIGENDIAN
 	logrec->checksum = __wt_bswap32(logrec->checksum);
 #endif
-	buf->size = log->allocsize;
 
 	WT_CLEAR(tmp);
 	memset(&myslot, 0, sizeof(myslot));
