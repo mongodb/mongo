@@ -102,7 +102,10 @@ ElectionTimingTest.prototype._runTimingTest = function() {
             secondary = this.rst.getSecondary();
 
             jsTestLog("Starting test: " + this.name + " run: " + run + " cycle: " + cycle);
-            var oldElectionId = primary.getDB("admin").isMaster().electionId;
+            var isMasterResult = primary.getDB("admin").isMaster();
+            assert.commandWorked(isMasterResult, "isMaster() failed");
+            var oldElectionId = isMasterResult.electionId;
+            assert.neq(undefined, oldElectionId, "isMaster() failed to return a valid electionId");
 
             // Time the new election.
             var stepDownTime = Date.now();
@@ -131,7 +134,11 @@ ElectionTimingTest.prototype._runTimingTest = function() {
 
             // Verify we had an election and we have a new primary.
             var newPrimary = this.rst.getPrimary();
-            var newElectionId = newPrimary.getDB("admin").isMaster().electionId;
+            isMasterResult = newPrimary.getDB("admin").isMaster();
+            assert.commandWorked(isMasterResult, "isMaster() failed");
+            var newElectionId = isMasterResult.electionId;
+            assert.neq(undefined, newElectionId, "isMaster() failed to return a valid electionId");
+
             if (bsonWoCompare(oldElectionId, newElectionId) !== 0) {
                 this.testErrors.push({testRun: run,
                                       cycle: cycle,
