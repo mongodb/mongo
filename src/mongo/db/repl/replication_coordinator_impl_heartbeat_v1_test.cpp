@@ -361,6 +361,88 @@ TEST_F(ReplCoordHBV1Test, ArbiterRecordsCommittedOpTimeFromHeartbeatMetadata) {
     OpTime olderOpTime{Timestamp{2, 2}, 9};
     test(olderOpTime, committedOpTime);
 }
+
+TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotMatchOurs) {
+    // Tests that a secondary node will not update its committed optime from the heartbeat metadata
+    // if the replica set ID is inconsistent with the existing configuration.
+    HostAndPort host2("node2:12345");
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345")
+                                          << BSON("_id" << 2 << "host" << host2.toString()))
+                            << "settings" << BSON("replicaSetId" << OID::gen()) << "protocolVersion"
+                            << 1),
+                       HostAndPort("node1", 12345));
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto rsConfig = getReplCoord()->getConfig();
+
+    // Prepare heartbeat response.
+    OID unexpectedId = OID::gen();
+    OpTime opTime{Timestamp{10, 10}, 10};
+    ReplicationExecutor::ResponseStatus heartbeatResponse(ErrorCodes::InternalError,
+                                                          "not initialized");
+    {
+        ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName(rsConfig.getReplSetName());
+        hbResp.setState(MemberState::RS_PRIMARY);
+        hbResp.setConfigVersion(rsConfig.getConfigVersion());
+
+        BSONObjBuilder responseBuilder;
+        responseBuilder << "ok" << 1;
+        hbResp.addToBSON(&responseBuilder, true);
+
+        rpc::ReplSetMetadata metadata(
+            opTime.getTerm(), opTime, opTime, rsConfig.getConfigVersion(), unexpectedId, 1, -1);
+        BSONObjBuilder metadataBuilder;
+        metadata.writeToMetadata(&metadataBuilder);
+
+        heartbeatResponse = makeResponseStatus(responseBuilder.obj(), metadataBuilder.obj());
+    }
+
+    // process heartbeat
+    enterNetwork();
+    auto net = getNet();
+    while (net->hasReadyRequests()) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        if (request.target == host2 &&
+            request.cmdObj.firstElement().fieldNameStringData() == "replSetHeartbeat") {
+            log() << request.target.toString() << " processing " << request.cmdObj;
+            net->scheduleResponse(noi, net->now(), heartbeatResponse);
+        } else {
+            log() << "blackholing request to " << request.target.toString() << ": "
+                  << request.cmdObj;
+            net->blackHole(noi);
+        }
+        net->runReadyNetworkOperations();
+    }
+    exitNetwork();
+
+    ASSERT_NOT_EQUALS(opTime, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_NOT_EQUALS(opTime.getTerm(), getTopoCoord().getTerm());
+
+    BSONObjBuilder statusBuilder;
+    ASSERT_OK(getReplCoord()->processReplSetGetStatus(&statusBuilder));
+    auto statusObj = statusBuilder.obj();
+    unittest::log() << "replica set status = " << statusObj;
+
+    ASSERT_EQ(mongo::Array, statusObj["members"].type());
+    auto members = statusObj["members"].Array();
+    ASSERT_EQ(2U, members.size());
+    ASSERT_TRUE(members[1].isABSONObj());
+    auto member = members[1].Obj();
+    ASSERT_EQ(host2, HostAndPort(member["name"].String()));
+    ASSERT_EQ(MemberState(MemberState::RS_DOWN).toString(),
+              MemberState(member["state"].numberInt()).toString());
+    ASSERT_EQ(member["lastHeartbeatMessage"].String(),
+              std::string(str::stream()
+                          << "replica set IDs do not match, ours: " << rsConfig.getReplicaSetId()
+                          << "; remote node's: " << unexpectedId));
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

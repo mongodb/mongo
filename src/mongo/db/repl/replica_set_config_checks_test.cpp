@@ -193,6 +193,49 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
         validateConfigForReconfig(&externalState, newConfig, oldConfig, true).getStatus());
 }
 
+TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetId) {
+    ReplicationCoordinatorExternalStateMock externalState;
+    externalState.addSelf(HostAndPort("h1"));
+
+    ReplicaSetConfig oldConfig;
+    ReplicaSetConfig newConfig;
+
+    // Two configurations, compatible except for set ID.
+    ASSERT_OK(
+        oldConfig.initialize(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 1 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                           << "h1")
+                                                << BSON("_id" << 2 << "host"
+                                                              << "h2") << BSON("_id" << 3 << "host"
+                                                                                     << "h3"))
+                                  << "settings" << BSON("replicaSetId" << OID::gen()))));
+
+    ASSERT_OK(
+        newConfig.initialize(BSON("_id"
+                                  << "rs0"
+                                  << "version" << 3 << "members"
+                                  << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                           << "h1")
+                                                << BSON("_id" << 2 << "host"
+                                                              << "h2") << BSON("_id" << 3 << "host"
+                                                                                     << "h3"))
+                                  << "settings" << BSON("replicaSetId" << OID::gen()))));
+
+    ASSERT_OK(oldConfig.validate());
+    ASSERT_OK(newConfig.validate());
+    const auto status =
+        validateConfigForReconfig(&externalState, oldConfig, newConfig, false).getStatus();
+    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "New and old configurations differ in replica set ID");
+
+    // Forced reconfigs also do not allow this.
+    ASSERT_EQUALS(
+        ErrorCodes::NewReplicaSetConfigurationIncompatible,
+        validateConfigForReconfig(&externalState, newConfig, oldConfig, true).getStatus());
+}
+
 TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));

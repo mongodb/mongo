@@ -131,6 +131,24 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         responseStatus = hbResponse.initialize(resp, _topCoord->getTerm());
         StatusWith<rpc::ReplSetMetadata> replMetadata =
             rpc::ReplSetMetadata::readFromMetadata(cbData.response.getValue().metadata);
+
+        // Reject heartbeat responses (and metadata) from nodes with mismatched replica set IDs.
+        // It is problematic to perform this check in the heartbeat reconfiguring logic because it
+        // is possible for two mismatched replica sets to have the same replica set name and
+        // configuration version. A heartbeat reconfiguration would not take place in that case.
+        // Additionally, this is where we would stop further processing of the metadata from an
+        // unknown replica set.
+        if (replMetadata.isOK() && _rsConfig.isInitialized() && _rsConfig.hasReplicaSetId() &&
+            replMetadata.getValue().getReplicaSetId().isSet() &&
+            _rsConfig.getReplicaSetId() != replMetadata.getValue().getReplicaSetId()) {
+            responseStatus =
+                Status(ErrorCodes::InvalidReplicaSetConfig,
+                       str::stream()
+                           << "replica set IDs do not match, ours: " << _rsConfig.getReplicaSetId()
+                           << "; remote node's: " << replMetadata.getValue().getReplicaSetId());
+            // Ignore metadata.
+            replMetadata = responseStatus;
+        }
         if (replMetadata.isOK()) {
             // Asynchronous stepdown could happen, but it will be queued in executor after
             // this function, so we cannot and don't need to wait for it to finish.
