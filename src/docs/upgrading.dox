@@ -27,6 +27,13 @@ reclaimed when the call returns.  The performance of this API may differ
 from earlier releases.
 </dd>
 
+<dt>Bzip2 compression support</dt>
+<dd>
+Support for the bzip2 compression/decompression engine has been removed
+from the WiredTiger release; remaining compression engines include LZ4,
+snappy and zlib.
+</dd>
+
 </dl><hr>
 @section version_270 Upgrading to Version 2.7.0
 

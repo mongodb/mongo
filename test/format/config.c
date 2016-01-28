@@ -256,19 +256,14 @@ config_compression(const char *conf_name)
 		switch (mmrand(NULL, 1, 20)) {
 		case 1: case 2: case 3: case 4:		/* 20% no compression */
 			break;
-		case 5:					/* 5% bzip */
-			cstr = "bzip";
-			break;
-		case 6:					/* 5% bzip-raw */
-			cstr = "bzip-raw";
-			break;
-		case 7: case 8: case 9: case 10:	/* 20% lz4 */
+		case 5: case 6: case 7: case 8:		/* 20% lz4 */
 			cstr = "lz4";
 			break;
-		case 11:				/* 5% lz4-no-raw */
+		case 9:					/* 5% lz4-no-raw */
 			cstr = "lz4-noraw";
 			break;
-		case 12: case 13: case 14: case 15:	/* 20% snappy */
+		case 10: case 11: case 12: case 13:	/* 30% snappy */
+		case 14: case 15:
 			cstr = "snappy";
 			break;
 		case 16: case 17: case 18: case 19:	/* 20% zlib */
@@ -641,10 +636,6 @@ config_map_compression(const char *s, u_int *vp)
 {
 	if (strcmp(s, "none") == 0)
 		*vp = COMPRESS_NONE;
-	else if (strcmp(s, "bzip") == 0)
-		*vp = COMPRESS_BZIP;
-	else if (strcmp(s, "bzip-raw") == 0)
-		*vp = COMPRESS_BZIP_RAW;
 	else if (strcmp(s, "lz4") == 0)
 		*vp = COMPRESS_LZ4;
 	else if (strcmp(s, "lz4-noraw") == 0)

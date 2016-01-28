@@ -73,9 +73,6 @@ typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 #define	EXTPATH "../../ext/compressors/"		/* Extensions path */
 #define	BLKCMP_PFX	",block_compressor="
 
-#define	BZIP_BLK BLKCMP_PFX "bzip2"
-#define	BZIP_EXT							\
-	EXT_PFX EXTPATH "bzip2/.libs/libwiredtiger_bzip2.so" EXT_SFX
 #define	LZ4_BLK BLKCMP_PFX "lz4"
 #define	LZ4_EXT							\
 	EXT_PFX EXTPATH "lz4/.libs/libwiredtiger_lz4.so" EXT_SFX
