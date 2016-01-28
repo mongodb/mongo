@@ -1590,10 +1590,13 @@ advance:
 		if (reclen > allocsize) {
 			/*
 			 * The log file end could be the middle of this
-			 * log record.
+			 * log record.  If we have a partially written record
+			 * then this is considered the end of the log.
 			 */
-			if (rd_lsn.offset + rdup_len > log_size)
-				goto advance;
+			if (rd_lsn.offset + rdup_len > log_size) {
+				eol = true;
+				break;
+			}
 			/*
 			 * We need to round up and read in the full padded
 			 * record, especially for direct I/O.
