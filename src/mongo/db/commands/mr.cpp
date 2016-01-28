@@ -1470,6 +1470,8 @@ public:
                 PlanSummaryStats stats;
                 Explain::getSummaryStats(*exec, &stats);
                 coll->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
+                CurOp::get(txn)->debug().fromMultiPlanner = stats.fromMultiPlanner;
+                CurOp::get(txn)->debug().replanned = stats.replanned;
             }
             pm.finished();
 

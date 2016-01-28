@@ -201,6 +201,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
     _ws->clear();
     _children.clear();
 
+    _specificStats.replanned = true;
+
     // Use the query planning module to plan the whole query.
     std::vector<QuerySolution*> rawSolutions;
     Status status = QueryPlanner::plan(*_canonicalQuery, _plannerParams, &rawSolutions);

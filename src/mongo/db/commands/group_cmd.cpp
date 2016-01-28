@@ -172,6 +172,8 @@ private:
         if (coll) {
             coll->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
         }
+        CurOp::get(txn)->debug().fromMultiPlanner = summaryStats.fromMultiPlanner;
+        CurOp::get(txn)->debug().replanned = summaryStats.replanned;
 
         invariant(STAGE_GROUP == planExecutor->getRootStage()->stageType());
         GroupStage* groupStage = static_cast<GroupStage*>(planExecutor->getRootStage());
