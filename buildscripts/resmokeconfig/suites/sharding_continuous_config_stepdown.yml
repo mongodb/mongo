@@ -75,6 +75,7 @@ selector:
     - jstests/sharding/features3.js
     - jstests/sharding/in_memory_sort_limit.js
     - jstests/sharding/parallel.js
+    - jstests/sharding/migrateBig.js
     # Calls the config server primary directly (not through mongos)
     - jstests/sharding/moveprimary_ignore_sharded.js
     - jstests/sharding/min_optime_recovery.js
