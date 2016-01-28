@@ -535,19 +535,6 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	uint32_t slots;
 	void *p;
 
-	/*
-	 * A note on error handling: this function first allocates/initializes
-	 * new structures; failures during that period are handled by discarding
-	 * the memory and returning an error code, our caller knows the split
-	 * didn't happen and proceeds accordingly. Second, this function updates
-	 * the tree, and a failure in that period is catastrophic, any partial
-	 * update to the tree requires a panic, we can't recover. Third, once
-	 * the split is complete and the tree has been fully updated, we have to
-	 * ignore most errors because the split is complete and correct, callers
-	 * have to proceed accordingly.
-	 */
-	enum { ERR_RETURN, ERR_PANIC, ERR_IGNORE } complete;
-
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_deepen);
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
@@ -1022,19 +1009,6 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	uint32_t children, chunk, i, j, remain;
 	uint32_t slots;
 	void *p;
-
-	/*
-	 * A note on error handling: this function first allocates/initializes
-	 * new structures; failures during that period are handled by discarding
-	 * the memory and returning an error code, our caller knows the split
-	 * didn't happen and proceeds accordingly. Second, this function updates
-	 * the tree, and a failure in that period is catastrophic, any partial
-	 * update to the tree requires a panic, we can't recover. Third, once
-	 * the split is complete and the tree has been fully updated, we have to
-	 * ignore most errors because the split is complete and correct, callers
-	 * have to proceed accordingly.
-	 */
-	enum { ERR_RETURN, ERR_PANIC, ERR_IGNORE } complete;
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_internal);
