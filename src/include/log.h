@@ -254,8 +254,8 @@ struct __wt_log_record {
 
 /*
  * __wt_log_record_byteswap --
- *	Handle big- and little-endian transformation of the log file
- *	description block.
+ *	Handle big- and little-endian transformation of the log record
+ *	header block.
  */
 static inline void
 __wt_log_record_byteswap(WT_LOG_RECORD *record)
