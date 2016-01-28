@@ -39,6 +39,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -101,6 +102,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
         requests.push_back(RemoteCommandRequest(_rsConfig->getMemberAt(i).getHostAndPort(),
                                                 "admin",
                                                 hbRequest,
+                                                BSON(rpc::kReplSetMetadataFieldName << 1),
                                                 _rsConfig->getHeartbeatTimeoutPeriodMillis()));
     }
 
@@ -211,6 +213,20 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
             _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
             warning() << message;
             return;
+        }
+    }
+
+    if (_rsConfig->hasReplicaSetId()) {
+        StatusWith<rpc::ReplSetMetadata> replMetadata =
+            rpc::ReplSetMetadata::readFromMetadata(response.getValue().metadata);
+        if (replMetadata.isOK() && replMetadata.getValue().getReplicaSetId().isSet() &&
+            _rsConfig->getReplicaSetId() != replMetadata.getValue().getReplicaSetId()) {
+            std::string message = str::stream()
+                << "Our replica set ID of " << _rsConfig->getReplicaSetId()
+                << " did not match that of " << request.target.toString() << ", which is "
+                << replMetadata.getValue().getReplicaSetId();
+            _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
+            warning() << message;
         }
     }
 

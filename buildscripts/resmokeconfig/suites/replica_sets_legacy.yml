@@ -4,6 +4,8 @@ selector:
     - jstests/replsets/*.js
     exclude_files:
     - jstests/replsets/config_server_checks.js
+    - jstests/replsets/disallow_adding_initialized_node1.js
+    - jstests/replsets/disallow_adding_initialized_node2.js
     - jstests/replsets/last_op_visible.js
     - jstests/replsets/oplog_truncated_on_recovery.js
     - jstests/replsets/priority_takeover_cascading_priorities.js

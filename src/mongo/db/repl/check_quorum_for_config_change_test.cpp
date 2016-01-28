@@ -40,6 +40,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
@@ -377,6 +378,81 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetNameMismatch) {
     Status status = waitForQuorumCheck();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
     ASSERT_REASON_CONTAINS(status, "Our set name did not match");
+    ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
+    ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
+    ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
+    ASSERT_REASON_CONTAINS(status, "h4:1");
+    ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
+}
+
+TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
+    // In this test, "we" are host "h3:1".  All nodes respond
+    // successfully to their heartbeat requests, but quorum check fails because
+    // "h4" declares that the requested replica set ID was not what it expected.
+
+    const auto replicaSetId = OID::gen();
+    const ReplicaSetConfig rsConfig =
+        assertMakeRSConfig(BSON("_id"
+                                << "rs0"
+                                << "version" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                         << "h1:1")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "h2:1") << BSON("_id" << 3 << "host"
+                                                                                     << "h3:1")
+                                              << BSON("_id" << 4 << "host"
+                                                            << "h4:1") << BSON("_id" << 5 << "host"
+                                                                                     << "h5:1"))
+                                << "settings" << BSON("replicaSetId" << replicaSetId)));
+    const int myConfigIndex = 2;
+    const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+
+    startQuorumCheck(rsConfig, myConfigIndex);
+    const Date_t startDate = _net->now();
+    const int numCommandsExpected = rsConfig.getNumMembers() - 1;
+    unordered_set<HostAndPort> seenHosts;
+    _net->enterNetwork();
+    HostAndPort incompatibleHost("h4", 1);
+    OID unexpectedId = OID::gen();
+    for (int i = 0; i < numCommandsExpected; ++i) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = _net->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(hbRequest, request.cmdObj);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT(seenHosts.insert(request.target).second) << "Already saw "
+                                                        << request.target.toString();
+        if (request.target == incompatibleHost) {
+            OpTime opTime{Timestamp{10, 10}, 10};
+            rpc::ReplSetMetadata metadata(opTime.getTerm(),
+                                          opTime,
+                                          opTime,
+                                          rsConfig.getConfigVersion(),
+                                          unexpectedId,
+                                          rpc::ReplSetMetadata::kNoPrimary,
+                                          -1);
+            BSONObjBuilder metadataBuilder;
+            metadata.writeToMetadata(&metadataBuilder);
+
+            _net->scheduleResponse(noi,
+                                   startDate + Milliseconds(10),
+                                   ResponseStatus(RemoteCommandResponse(
+                                       BSON("ok" << 1), metadataBuilder.obj(), Milliseconds(8))));
+        } else {
+            _net->scheduleResponse(
+                noi,
+                startDate + Milliseconds(10),
+                ResponseStatus(RemoteCommandResponse(BSON("ok" << 1), BSONObj(), Milliseconds(8))));
+        }
+    }
+    _net->runUntil(startDate + Milliseconds(10));
+    _net->exitNetwork();
+    Status status = waitForQuorumCheck();
+    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
+    ASSERT_REASON_CONTAINS(status,
+                           str::stream() << "Our replica set ID of " << replicaSetId
+                                         << " did not match that of " << incompatibleHost.toString()
+                                         << ", which is " << unexpectedId);
     ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
     ASSERT_NOT_REASON_CONTAINS(status, "h3:1");

@@ -150,13 +150,19 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
                                     << newConfig.getReplSetName());
     }
 
+    if (oldConfig.getReplicaSetId() != newConfig.getReplicaSetId()) {
+        return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      str::stream() << "New and old configurations differ in replica set ID; "
+                                       "old was " << oldConfig.getReplicaSetId() << ", and new is "
+                                    << newConfig.getReplicaSetId());
+    }
+
     if (oldConfig.isConfigServer() && !newConfig.isConfigServer()) {
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       str::stream() << "Cannot remove \""
                                     << ReplicaSetConfig::kConfigServerFieldName
                                     << "\" from replica set configuration on reconfig");
     }
-
 
     //
     // For every member config mNew in newConfig, if there exists member config mOld

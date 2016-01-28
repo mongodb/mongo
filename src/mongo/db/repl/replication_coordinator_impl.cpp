@@ -2241,7 +2241,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
     if (args.force) {
         newConfigObj = incrementConfigVersionByRandom(newConfigObj);
     }
-    Status status = newConfig.initialize(newConfigObj, oldConfig.getProtocolVersion() == 1);
+    Status status = newConfig.initialize(
+        newConfigObj, oldConfig.getProtocolVersion() == 1, oldConfig.getReplicaSetId());
     if (!status.isOK()) {
         error() << "replSetReconfig got " << status << " while parsing " << newConfigObj;
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
