@@ -136,7 +136,10 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	wt_api = ((SNAPPY_COMPRESSOR *)compressor)->wt_api;
 
-	/* Retrieve the saved length, converting endian-ness as necessary. */
+	/*
+	 * Retrieve the saved length, handling little- to big-endian conversion
+	 * as necessary.
+	 */
 	snaplen = *(size_t *)src;
 #ifdef WORDS_BIGENDIAN
 	snaplen = __wt_bswap64(snaplen);

@@ -65,7 +65,7 @@ typedef struct {
 /*
  * lz4_prefix_swap --
  *	The additional information is written in little-endian format, handle
- * the the conversion.
+ * the conversion.
  */
 static inline void
 lz4_prefix_swap(LZ4_PREFIX *prefix)
@@ -75,6 +75,8 @@ lz4_prefix_swap(LZ4_PREFIX *prefix)
 	prefix->uncompressed_len = __wt_bswap32(prefix->uncompressed_len);
 	prefix->useful_len = __wt_bswap32(prefix->useful_len);
 	prefix->unused = __wt_bswap32(prefix->unused);
+#else
+	WT_UNUSED(prefix);
 #endif
 }
 
