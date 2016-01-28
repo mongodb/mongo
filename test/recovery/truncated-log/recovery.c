@@ -81,7 +81,7 @@ fill_db(void)
 	uint32_t i, max_key, min_key, units, unused;
 	int ret;
 	bool first;
-	uint8_t k[K_SIZE], v[V_SIZE];
+	char k[K_SIZE], v[V_SIZE];
 
 	/*
 	 * Run in the home directory so that the records file is in there too.
@@ -124,9 +124,9 @@ fill_db(void)
 	max_key = min_key * 2;
 	first = true;
 	for (i = 0; i < max_key; ++i) {
-		snprintf(k, sizeof(k), "key%03d", i);
+		snprintf(k, sizeof(k), "key%03d", (int)i);
 		snprintf(v, sizeof(v), "value%0*d",
-		    (int)(V_SIZE - strlen("value")), i);
+		    (int)(V_SIZE - strlen("value")), (int)i);
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
 		if ((ret = cursor->insert(cursor)) != 0)
