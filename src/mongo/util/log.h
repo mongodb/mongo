@@ -217,6 +217,7 @@ extern Tee* const warnings;            // Things put here go in serverStatus
 extern Tee* const startupWarningsLog;  // Things put here get reported in MMS
 
 std::string errnoWithDescription(int errorcode = -1);
+std::pair<int, std::string> errnoAndDescription();
 
 /**
  * Write the current context (backtrace), along with the optional "msg".

@@ -54,6 +54,11 @@ using namespace std;
 
 namespace mongo {
 
+namespace {
+const char kUnknownMsg[] = "Unknown error";
+const int kBuflen = 256;  // strerror strings in non-English locales can be large.
+}
+
 static logger::ExtraLogContextFn _appendExtraLogContext;
 
 Status logger::registerExtraLogContextFn(logger::ExtraLogContextFn contextFn) {
@@ -81,50 +86,69 @@ bool rotateLogs(bool renameFiles) {
     return result.empty();
 }
 
-string errnoWithDescription(int x) {
+string errnoWithDescription(int errNumber) {
 #if defined(_WIN32)
-    if (x < 0)
-        x = GetLastError();
+    if (errNumber < 0)
+        errNumber = GetLastError();
 #else
-    if (x < 0)
-        x = errno;
+    if (errNumber < 0)
+        errNumber = errno;
 #endif
-    stringstream s;
-    s << "errno:" << x << ' ';
 
-#if defined(_WIN32)
-    LPWSTR errorText = NULL;
+    char buf[kBuflen];
+    char* msg{nullptr};
+
+#if defined(__GNUC__) && defined(_GNU_SOURCE)
+    msg = strerror_r(errNumber, buf, kBuflen);
+#elif defined(_WIN32)
+
+    LPWSTR errorText = nullptr;
     FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER |
                        FORMAT_MESSAGE_IGNORE_INSERTS,
-                   NULL,
-                   x,
+                   nullptr,
+                   errNumber,
                    0,
                    reinterpret_cast<LPWSTR>(&errorText),  // output
                    0,                                     // minimum size for output buffer
-                   NULL);
+                   nullptr);
+
     if (errorText) {
-        string x = toUtf8String(errorText);
-        for (string::iterator i = x.begin(); i != x.end(); i++) {
-            if (*i == '\n' || *i == '\r')
-                break;
-            s << *i;
+        string utf8ErrorText = toUtf8String(errorText);
+        auto size = utf8ErrorText.find_first_of("\r\n");
+        if (size == string::npos) {  // not found
+            size = utf8ErrorText.length();
         }
+
+        if (size > kBuflen) {
+            size = kBuflen;
+        }
+
+        memcpy(buf, utf8ErrorText.c_str(), size);
+        msg = buf;
         LocalFree(errorText);
-    } else
-        s << strerror(x);
-/*
-DWORD n = FormatMessage(
-    FORMAT_MESSAGE_ALLOCATE_BUFFER |
-    FORMAT_MESSAGE_FROM_SYSTEM |
-    FORMAT_MESSAGE_IGNORE_INSERTS,
-    NULL, x,
-    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-    (LPTSTR) &lpMsgBuf, 0, NULL);
-*/
-#else
-    s << strerror(x);
+    } else if (strerror_s(buf, kBuflen, errNumber) != 0) {
+        msg = buf;
+    }
+#else /* XSI strerror_r */
+    if (strerror_r(errNumber, buf, kBuflen) == 0) {
+        msg = buf;
+    }
 #endif
-    return s.str();
+
+    if (!msg) {
+        return {kUnknownMsg};
+    }
+
+    return {msg};
+}
+
+std::pair<int, std::string> errnoAndDescription() {
+#if defined(_WIN32)
+    int errNumber = GetLastError();
+#else
+    int errNumber = errno;
+#endif
+    return {errNumber, errnoWithDescription(errNumber)};
 }
 
 void logContext(const char* errmsg) {

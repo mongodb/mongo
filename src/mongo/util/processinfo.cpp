@@ -58,6 +58,15 @@ public:
         path = p;
         ofstream out(path.c_str(), ios_base::out);
         out << ProcessId::getCurrent() << endl;
+        if (!out.good()) {
+            auto errAndStr = errnoAndDescription();
+            if (errAndStr.first == 0) {
+                log() << "ERROR: Cannot write pid file to " << path
+                      << ": Unable to determine OS error";
+            } else {
+                log() << "ERROR: Cannot write pid file to " << path << ": " << errAndStr.second;
+            }
+        }
         return out.good();
     }
 
@@ -65,11 +74,7 @@ public:
 } pidFileWiper;
 
 bool writePidFile(const string& path) {
-    bool e = pidFileWiper.write(path);
-    if (!e) {
-        log() << "ERROR: Cannot write pid file to " << path << ": " << strerror(errno);
-    }
-    return e;
+    return pidFileWiper.write(path);
 }
 
 ProcessInfo::SystemInfo* ProcessInfo::systemInfo = NULL;
