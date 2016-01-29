@@ -341,6 +341,16 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target="query_solution_test",
+    source=[
+        "query_solution_test.cpp",
+    ],
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
 # $text pulls in a lot of stuff so we test it here.
 env.CppUnitTest(
     target="query_planner_text_test",
