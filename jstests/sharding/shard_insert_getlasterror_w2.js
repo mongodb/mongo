@@ -8,6 +8,7 @@
     var baseName = "shard_insert_getlasterror_w2";
     var testDBName = baseName;
     var testCollName = 'coll';
+    var replNodes = 3;
 
     // ~1KB string
     var textString = '';
@@ -20,7 +21,7 @@
         name : baseName,
         mongos : 1,
         shards : 1,
-        rs : { nodes : 3 },
+        rs : { nodes : replNodes },
         other : { manualAddShard : true }
     };
     var shardingTest = new ShardingTest(shardingTestConfig);
@@ -34,7 +35,7 @@
     for (var i = 0; i < numDocs; i++) {
         bulk.insert({ x: i, text: textString });
     }
-    assert.writeOK(bulk.execute({ w: 2 }));
+    assert.writeOK(bulk.execute());
 
     // Get connection to mongos for the cluster
     var mongosConn = shardingTest.s;
@@ -60,7 +61,7 @@
     for (var i = numDocs; i < 2 * numDocs; i++) {
         bulk.insert({ x: i, text: textString });
     }
-    assert.writeOK(bulk.execute({ w: 2, wtimeout: 30000 }));
+    assert.writeOK(bulk.execute({ w: replNodes, wtimeout: 30000 }));
 
     // Take down two nodes and make sure slaveOk reads still work
     replSet1.stop(1);
