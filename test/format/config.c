@@ -277,7 +277,7 @@ config_compression(const char *conf_name)
 			break;
 #endif
 		case 17: case 18: case 19: case 20:	/* 20% no compression */
-		default:			
+		default:
 			cstr = "none";
 			break;
 		}
