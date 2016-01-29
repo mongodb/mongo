@@ -31,7 +31,7 @@ LT_INIT([pic-only])
 AC_SUBST([LIBTOOL_DEPS])
 
 AC_PROG_CC(cc gcc)
-# AC_PROG_CXX(c++ g++)
+AC_PROG_CXX(c++ g++)
 
 if test "$GCC" = "yes"; then
 	# The Solaris gcc compiler gets the additional -pthreads flag.
