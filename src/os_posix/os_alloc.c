@@ -90,12 +90,13 @@ __wt_malloc(WT_SESSION_IMPL *session, size_t bytes_to_allocate, void *retp)
 }
 
 /*
- * __wt_realloc --
+ * __realloc_func --
  *	ANSI realloc function.
  */
-int
-__wt_realloc(WT_SESSION_IMPL *session,
-    size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
+static int
+__realloc_func(WT_SESSION_IMPL *session,
+    size_t *bytes_allocated_ret, size_t bytes_to_allocate, bool clear_memory,
+    void *retp)
 {
 	void *p;
 	size_t bytes_allocated;
@@ -133,8 +134,9 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	 * Clear the allocated memory, parts of WiredTiger depend on allocated
 	 * memory being cleared.
 	 */
-	memset((uint8_t *)
-	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
+	if (clear_memory)
+		memset((uint8_t *)p + bytes_allocated,
+		    0, bytes_to_allocate - bytes_allocated);
 
 	/* Update caller's bytes allocated value. */
 	if (bytes_allocated_ret != NULL)
@@ -145,24 +147,42 @@ __wt_realloc(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_realloc_aligned --
- *	ANSI realloc function that aligns to buffer boundaries, configured with
- *	the "buffer_alignment" key to wiredtiger_open.
+ * __wt_realloc --
+ *	WiredTiger's realloc API.
  */
 int
-__wt_realloc_aligned(WT_SESSION_IMPL *session,
+__wt_realloc(WT_SESSION_IMPL *session,
     size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
-#if defined(HAVE_POSIX_MEMALIGN)
-	WT_DECL_RET;
+	return (__realloc_func(
+	    session, bytes_allocated_ret, bytes_to_allocate, true, retp));
+}
 
+/*
+ * __wt_realloc_item --
+ *	Allocate or reallocate memory for a WT_ITEM, optionally aligning to
+ * buffer boundaries (configured with "buffer_alignment" to wiredtiger_open).
+ */
+int
+__wt_realloc_item(
+    WT_SESSION_IMPL *session, WT_ITEM *buf, size_t bytes_to_allocate)
+{
+	size_t *bytes_allocated_ret;
+	void *retp;
+
+	bytes_allocated_ret = &buf->memsize;
+	retp = &buf->mem;
+
+#if defined(HAVE_POSIX_MEMALIGN)
 	/*
 	 * !!!
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
-	if (session != NULL && S2C(session)->buffer_alignment > 0) {
-		void *p, *newp;
+	if (F_ISSET(buf, WT_ITEM_ALIGNED) &&
+	    session != NULL && S2C(session)->buffer_alignment > 0) {
+		WT_DECL_RET;
 		size_t bytes_allocated;
+		void *p, *newp;
 
 		/*
 		 * Sometimes we're allocating memory and we don't care about the
@@ -203,13 +223,6 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		__wt_free(session, p);
 		p = newp;
 
-		/*
-		 * Clear the allocated memory, parts of WiredTiger depend on
-		 * allocated memory being cleared.
-		 */
-		memset((uint8_t *)p + bytes_allocated, 0,
-		    bytes_to_allocate - bytes_allocated);
-
 		/* Update caller's bytes allocated value. */
 		if (bytes_allocated_ret != NULL)
 			*bytes_allocated_ret = bytes_to_allocate;
@@ -222,11 +235,11 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 	 * If there is no posix_memalign function, or no alignment configured,
 	 * fall back to realloc.
 	 *
-	 * Windows note: Visual C CRT memalign does not match Posix behavior
-	 * and would also double each allocation so it is bad for memory use
+	 * Windows note: Visual C CRT memalign does not match POSIX behavior
+	 * and would also double each allocation so it is bad for memory use.
 	 */
-	return (__wt_realloc(
-	    session, bytes_allocated_ret, bytes_to_allocate, retp));
+	return (__realloc_func(
+	    session, bytes_allocated_ret, bytes_to_allocate, false, retp));
 }
 
 /*

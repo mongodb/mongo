@@ -40,14 +40,8 @@ __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 	 * This function is also used to ensure data is local to the buffer,
 	 * check to see if we actually need to grow anything.
 	 */
-	if (size > buf->memsize) {
-		if (F_ISSET(buf, WT_ITEM_ALIGNED))
-			WT_RET(__wt_realloc_aligned(
-			    session, &buf->memsize, size, &buf->mem));
-		else
-			WT_RET(__wt_realloc(
-			    session, &buf->memsize, size, &buf->mem));
-	}
+	if (size > buf->memsize)
+		WT_RET(__wt_realloc_item(session, buf, size));
 
 	if (buf->data == NULL) {
 		buf->data = buf->mem;

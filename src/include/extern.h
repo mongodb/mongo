@@ -482,7 +482,7 @@ extern void __wt_abort(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((nor
 extern int __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp);
 extern int __wt_malloc(WT_SESSION_IMPL *session, size_t bytes_to_allocate, void *retp);
 extern int __wt_realloc(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp);
-extern int __wt_realloc_aligned(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp);
+extern int __wt_realloc_item( WT_SESSION_IMPL *session, WT_ITEM *buf, size_t bytes_to_allocate);
 extern int __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp);
 extern void __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg);
 extern int __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix, uint32_t flags, char ***dirlist, u_int *countp);
