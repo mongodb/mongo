@@ -501,6 +501,16 @@ void IndexScanNode::computeProperties() {
             }
             equalityFields.insert(oil.name);
         }
+    } else {
+        BSONObjIterator keyIter(indexKeyPattern);
+        BSONObjIterator startIter(bounds.startKey);
+        BSONObjIterator endIter(bounds.endKey);
+        while (keyIter.more() && startIter.more() && endIter.more()) {
+            BSONElement key = keyIter.next();
+            if (startIter.next() == endIter.next()) {
+                equalityFields.insert(key.fieldName());
+            }
+        }
     }
 
     if (equalityFields.empty()) {
