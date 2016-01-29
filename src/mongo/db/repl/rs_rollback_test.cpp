@@ -844,10 +844,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     } rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})));
 
     _createCollection(_txn.get(), "test.t", CollectionOptions());
-    const auto opTime = getOpTimeFromOplogEntry(applyOpsOperation.first);
-    log() << "Now is " << opTime;
     ASSERT_OK(syncRollback(_txn.get(),
-                           opTime,
                            OplogInterfaceMock({applyOpsOperation, commonOperation}),
                            rollbackSource,
                            _coordinator,
