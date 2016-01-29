@@ -245,43 +245,45 @@ config_compression(const char *conf_name)
 	char confbuf[128];
 
 	/*
-	 * Compression: choose something if compression wasn't specified,
-	 * otherwise confirm the appropriate shared library is available.
-	 * We used to verify that the libraries existed but that's no longer
-	 * robust, since it's possible to build compression libraries into
-	 * the WiredTiger library.
+	 * Compression: If compression wasn't specified, select a compression
+	 * type from the list of built-in engines.
 	 */
 	if (!config_is_perm(conf_name)) {
-		cstr = "none";
+		/*
+		 * Listed percentages are only correct if all of the possible
+		 * engines are compiled in.
+		 */
 		switch (mmrand(NULL, 1, 20)) {
-		case 1: case 2: case 3: case 4:		/* 20% no compression */
-			break;
 #ifdef HAVE_BUILTIN_EXTENSION_LZ4
-		case 5: case 6: case 7: case 8:		/* 20% lz4 */
+		case 1: case 2: case 3: case 4:		/* 20% lz4 */
 			cstr = "lz4";
 			break;
-		case 9:					/* 5% lz4-no-raw */
+		case 5:					/* 5% lz4-no-raw */
 			cstr = "lz4-noraw";
 			break;
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
-		case 10: case 11: case 12: case 13:	/* 30% snappy */
-		case 14: case 15:
+		case 6: case 7: case 8: case 9:		/* 30% snappy */
+		case 10: case 11:
 			cstr = "snappy";
 			break;
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
-		case 16: case 17: case 18: case 19:	/* 20% zlib */
+		case 12: case 13: case 14: case 15:	/* 20% zlib */
 			cstr = "zlib";
 			break;
-#endif
-		case 20:				/* 5% zlib-no-raw */
+		case 16:				/* 5% zlib-no-raw */
 			cstr = "zlib-noraw";
+			break;
+#endif
+		case 17: case 18: case 19: case 20:	/* 20% no compression */
+		default:			
+			cstr = "none";
 			break;
 		}
 
-		(void)snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name,
-		    cstr);
+		(void)snprintf(
+		    confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr);
 		config_single(confbuf, 0);
 	}
 }
