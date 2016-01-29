@@ -47,23 +47,6 @@ AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
     [test "$wt_cv_with_builtin_extension_zlib" = "yes"])
 AC_MSG_RESULT($with_builtins)
 
-AC_MSG_CHECKING(if --enable-bzip2 option specified)
-AC_ARG_ENABLE(bzip2,
-	[AS_HELP_STRING([--enable-bzip2],
-	    [Build the bzip2 compressor extension.])], r=$enableval, r=no)
-case "$r" in
-no)	wt_cv_enable_bzip2=no;;
-*)	wt_cv_enable_bzip2=yes;;
-esac
-AC_MSG_RESULT($wt_cv_enable_bzip2)
-if test "$wt_cv_enable_bzip2" = "yes"; then
-	AC_CHECK_HEADER(bzlib.h,,
-	    [AC_MSG_ERROR([--enable-bzip2 requires bzlib.h])])
-	AC_CHECK_LIB(bz2, BZ2_bzCompress,,
-	    [AC_MSG_ERROR([--enable-bzip2 requires bz2 library])])
-fi
-AM_CONDITIONAL([BZIP2], [test "$wt_cv_enable_bzip2" = "yes"])
-
 AH_TEMPLATE(HAVE_DIAGNOSTIC, [Define to 1 for diagnostic tests.])
 AC_MSG_CHECKING(if --enable-diagnostic option specified)
 AC_ARG_ENABLE(diagnostic,

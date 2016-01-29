@@ -47,7 +47,6 @@ class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
         ('reopen', dict(reopen=True))
     ])
     compress = check_scenarios([
-        ('bzip2', dict(compress='bzip2')),
         ('nop', dict(compress='nop')),
         ('snappy', dict(compress='snappy')),
         ('zlib', dict(compress='zlib')),

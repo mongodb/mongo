@@ -1006,9 +1006,9 @@ struct __wt_session {
 	 * @config{block_compressor, configure a compressor for file blocks.
 	 * Permitted values are \c "none" or custom compression engine name
 	 * created with WT_CONNECTION::add_compressor.  If WiredTiger has
-	 * builtin support for \c "bzip2"\, \c "snappy"\, \c "lz4" or \c "zlib"
-	 * compression\, these names are also available.  See @ref compression
-	 * for more information., a string; default \c none.}
+	 * builtin support for \c "snappy"\, \c "lz4" or \c "zlib" compression\,
+	 * these names are also available.  See @ref compression for more
+	 * information., a string; default \c none.}
 	 * @config{cache_resident, do not ever evict the object's pages from
 	 * cache.  Not compatible with LSM tables; see @ref
 	 * tuning_cache_resident for more information., a boolean flag; default
@@ -1839,9 +1839,9 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor
 	 * for log records.  Permitted values are \c "none" or custom
 	 * compression engine name created with WT_CONNECTION::add_compressor.
-	 * If WiredTiger has builtin support for \c "bzip2"\, \c "snappy"\, \c
-	 * "lz4" or \c "zlib" compression\, these names are also available.  See
-	 * @ref compression for more information., a string; default \c none.}
+	 * If WiredTiger has builtin support for \c "snappy"\, \c "lz4" or \c
+	 * "zlib" compression\, these names are also available.  See @ref
+	 * compression for more information., a string; default \c none.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a
 	 * boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log
@@ -2308,11 +2308,11 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor for log
  * records.  Permitted values are \c "none" or custom compression engine name
  * created with WT_CONNECTION::add_compressor.  If WiredTiger has builtin
- * support for \c "bzip2"\, \c "snappy"\, \c "lz4" or \c "zlib" compression\,
- * these names are also available.  See @ref compression for more information.,
- * a string; default \c none.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable
- * logging subsystem., a boolean flag; default \c false.}
+ * support for \c "snappy"\, \c "lz4" or \c "zlib" compression\, these names are
+ * also available.  See @ref compression for more information., a string;
+ * default \c none.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging
+ * subsystem., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log files., an
  * integer between 100KB and 2GB; default \c 100MB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
