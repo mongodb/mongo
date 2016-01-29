@@ -591,13 +591,6 @@ session_ops(WT_SESSION *session)
 	 * the code snippets, use #ifdef's to avoid running it.
 	 */
 #ifdef MIGHT_NOT_RUN
-	/*! [Create a bzip2 compressed table] */
-	ret = session->create(session,
-	    "table:mytable",
-	    "block_compressor=bzip2,key_format=S,value_format=S");
-	/*! [Create a bzip2 compressed table] */
-	ret = session->drop(session, "table:mytable", NULL);
-
 	/*! [Create a lz4 compressed table] */
 	ret = session->create(session,
 	    "table:mytable",
@@ -1084,14 +1077,6 @@ main(void)
 	 * be installed, causing the open to fail.  The documentation requires
 	 * the code snippets, use #ifdef's to avoid running it.
 	 */
-	/*! [Configure bzip2 extension] */
-	ret = wiredtiger_open(home, NULL,
-	    "create,"
-	    "extensions=[/usr/local/lib/libwiredtiger_bzip2.so]", &conn);
-	/*! [Configure bzip2 extension] */
-	if (ret == 0)
-		(void)conn->close(conn, NULL);
-
 	/*! [Configure lz4 extension] */
 	ret = wiredtiger_open(home, NULL,
 	    "create,"

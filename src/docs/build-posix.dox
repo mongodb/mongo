@@ -116,10 +116,6 @@ The WiredTiger software supports some additional configuration options:
 Configure WiredTiger to sleep and wait for a debugger to attach on failure.
 <b>DO NOT</b> configure this option in production environments.
 
-@par \c --enable-bzip2
-Configure WiredTiger for <a href="http://www.bzip.org/">bzip2</a>
-compression; see @ref compression for more information.
-
 @par \c --enable-diagnostic
 Configure WiredTiger to perform various run-time diagnostic tests.
 <b>DO NOT</b> configure this option in production environments.

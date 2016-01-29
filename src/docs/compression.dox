@@ -1,36 +1,7 @@
 /*! @m_page{{c,java},compression,Compressors}
 
 This section explains how to configure WiredTiger's builtin support for
-the bzip2, lz4, snappy and zlib compression engines.
-
-@section compression_bzip2 Using bzip2 compression
-
-To use the builtin support for
-<a href="http://www.bzip.org/">Julian Seward's bzip2</a>
-compression, first check that bzip2 is installed in include and library
-directories searched by the compiler.  Once bzip2 is installed, you can
-enable bzip2 using the \c --enable-bzip2 option to configure.
-
-If bzip2 is installed in a location not normally searched by the
-compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
-to indicate these locations.  For example, with the bzip2 includes and
-libraries installed in \c /usr/local/include and \c /usr/local/lib, you
-would run configure with the following additional arguments:
-
-@code
---enable-bzip2 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
-@endcode
-
-When opening the WiredTiger database, load the bzip2 shared library as
-an extension.  For example, with the WiredTiger library installed in
-\c /usr/local/lib, you would use the following extension:
-
-@snippet ex_all.c Configure bzip2 extension
-
-Finally, when creating the WiredTiger object, set \c block_compressor
-to \c bzip2:
-
-@snippet ex_all.c Create a bzip2 compressed table
+the lz4, snappy and zlib compression engines.
 
 @section compression_lz4 Using LZ4 compression
 

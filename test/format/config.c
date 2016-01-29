@@ -248,41 +248,47 @@ config_compression(const char *conf_name)
 		return;
 
 	/*
-	 * Compression: choose something if compression wasn't specified. We
-	 * used to verify the shared libraries existed but that's no longer
-	 * robust, since it's possible to build compression libraries into the
-	 * WiredTiger library.
+	 * Compression: If compression wasn't specified, select a compression
+	 * type from the list of built-in engines.
 	 */
-	cstr = "none";
-	if (strcmp(conf_name, "logging_compression") != 0 || g.c_logging != 0)
+	if (!config_is_perm(conf_name)) {
+		/*
+		 * Listed percentages are only correct if all of the possible
+		 * engines are compiled in.
+		 */
 		switch (mmrand(NULL, 1, 20)) {
-		case 1: case 2: case 3: case 4:		/* 20% no compression */
-			break;
-		case 5:					/* 5% bzip */
-			cstr = "bzip";
-			break;
-		case 6:					/* 5% bzip-raw */
-			cstr = "bzip-raw";
-			break;
-		case 7: case 8: case 9: case 10:	/* 20% lz4 */
+#ifdef HAVE_BUILTIN_EXTENSION_LZ4
+		case 1: case 2: case 3: case 4:		/* 20% lz4 */
 			cstr = "lz4";
 			break;
-		case 11:				/* 5% lz4-no-raw */
+		case 5:					/* 5% lz4-no-raw */
 			cstr = "lz4-noraw";
 			break;
-		case 12: case 13: case 14: case 15:	/* 20% snappy */
+#endif
+#ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
+		case 6: case 7: case 8: case 9:		/* 30% snappy */
+		case 10: case 11:
 			cstr = "snappy";
 			break;
-		case 16: case 17: case 18: case 19:	/* 20% zlib */
+#endif
+#ifdef HAVE_BUILTIN_EXTENSION_ZLIB
+		case 12: case 13: case 14: case 15:	/* 20% zlib */
 			cstr = "zlib";
 			break;
-		case 20:				/* 5% zlib-no-raw */
+		case 16:				/* 5% zlib-no-raw */
 			cstr = "zlib-noraw";
+			break;
+#endif
+		case 17: case 18: case 19: case 20:	/* 20% no compression */
+		default:
+			cstr = "none";
 			break;
 		}
 
-	(void)snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr);
-	config_single(confbuf, 0);
+		(void)snprintf(
+		    confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr);
+		config_single(confbuf, 0);
+	}
 }
 
 /*
@@ -641,10 +647,6 @@ config_map_compression(const char *s, u_int *vp)
 {
 	if (strcmp(s, "none") == 0)
 		*vp = COMPRESS_NONE;
-	else if (strcmp(s, "bzip") == 0)
-		*vp = COMPRESS_BZIP;
-	else if (strcmp(s, "bzip-raw") == 0)
-		*vp = COMPRESS_BZIP_RAW;
 	else if (strcmp(s, "lz4") == 0)
 		*vp = COMPRESS_LZ4;
 	else if (strcmp(s, "lz4-noraw") == 0)
