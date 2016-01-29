@@ -328,9 +328,10 @@ functions:
             # Work around the issue by specifying a different %APPDATA% path.
             # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
             export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs"
+            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
           else
-            export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin"
+            export PATH="$PATH:/opt/node/bin" # OS X location
+            export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin" # Linux location
           fi
 
           # Run jstestfuzz self-tests; redirect to /dev/null to avoid polluting the logs.
@@ -3568,6 +3569,12 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -3656,6 +3663,12 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -3763,6 +3776,12 @@ buildvariants:
   - name: ese_WT
   - name: jsCore
   - name: jsCore_auth
+  - name: jstestfuzz
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded
+  - name: jstestfuzz_sharded_WT
   - name: mmap
   - name: replicasets_auth
   - name: sasl
