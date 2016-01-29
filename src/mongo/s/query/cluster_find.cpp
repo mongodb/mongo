@@ -212,7 +212,12 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         chunkManager->getShardIdsForQuery(txn, query.getParsed().getFilter(), &shardIds);
 
         for (auto id : shardIds) {
-            shards.emplace_back(shardRegistry->getShard(txn, id));
+            auto shard = shardRegistry->getShard(txn, id);
+            if (!shard) {
+                return {ErrorCodes::ShardNotFound,
+                        str::stream() << "Shard with id:  " << id << " is not found."};
+            }
+            shards.emplace_back(shard);
         }
     }
 
@@ -374,10 +379,11 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         }
         auto status = std::move(cursorId.getStatus());
 
-        if (!ErrorCodes::isStaleShardingError(status.code())) {
-            // Errors other than receiving a stale metadata message from MongoD are fatal to the
-            // operation. Network errors and replication retries happen at the level of the
-            // AsyncResultsMerger.
+        if (!ErrorCodes::isStaleShardingError(status.code()) &&
+            status != ErrorCodes::ShardNotFound) {
+            // Errors other than trying to reach a non existent shard or receiving a stale
+            // metadata message from MongoD are fatal to the operation. Network errors and
+            // replication retries happen at the level of the AsyncResultsMerger.
             return status;
         }
 
