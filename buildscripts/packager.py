@@ -42,7 +42,7 @@ import time
 import urlparse
 
 # The MongoDB names for the architectures we support.
-ARCH_CHOICES=["x86_64", "ppc64le"]
+ARCH_CHOICES=["x86_64"]
 
 # Made up names for the flavors of distribution we package for.
 DISTROS=["suse", "debian","redhat","ubuntu", "amazon"]
@@ -235,7 +235,7 @@ class Distro(object):
         for SUSE)"""
         # Community builds only support amd64
         if not arch == "x86_64":
-            raise Exception("BUG: unsupported architecture")
+            raise Exception("BUG: unsupported architecture (%s)" % arch)
 
         if re.search("(suse)", self.n):
             return [ "suse11", "suse12" ]
@@ -259,20 +259,20 @@ class Distro(object):
         else:
           return re.sub(r'^rh(el\d).*$', r'\1', build_os)
 
-def get_args(distros):
+def get_args(distros, arch_choices):
 
-    DISTRO_CHOICES=[]
+    distro_choices=[]
     for distro in distros:
-        for arch in ARCH_CHOICES:
-          DISTRO_CHOICES.extend(distro.build_os(arch))
+        for arch in arch_choices:
+          distro_choices.extend(distro.build_os(arch))
 
     parser = argparse.ArgumentParser(description='Build MongoDB Packages')
     parser.add_argument("-s", "--server-version", help="Server version to build (e.g. 2.7.8-rc0)", required=True)
     parser.add_argument("-m", "--metadata-gitspec", help="Gitspec to use for package metadata files", required=False)
     parser.add_argument("-r", "--release-number", help="RPM release number base", type=int, required=False)
-    parser.add_argument("-d", "--distros", help="Distros to build for", choices=DISTRO_CHOICES, required=False, default=[], action='append')
+    parser.add_argument("-d", "--distros", help="Distros to build for", choices=distro_choices, required=False, default=[], action='append')
     parser.add_argument("-p", "--prefix", help="Directory to build into", required=False)
-    parser.add_argument("-a", "--arches", help="Architecture to build", choices=ARCH_CHOICES, default=[], required=False, action='append')
+    parser.add_argument("-a", "--arches", help="Architecture to build", choices=arch_choices, default=[], required=False, action='append')
     parser.add_argument("-t", "--tarball", help="Local tarball to package instead of downloading (only valid with one distro/arch combination)", required=False, type=lambda x: is_valid_file(parser, x))
 
     args = parser.parse_args()
@@ -286,7 +286,7 @@ def main(argv):
 
     distros=[Distro(distro) for distro in DISTROS]
 
-    args = get_args(distros)
+    args = get_args(distros, ARCH_CHOICES)
 
     spec = Spec(args.server_version, args.metadata_gitspec, args.release_number)
 

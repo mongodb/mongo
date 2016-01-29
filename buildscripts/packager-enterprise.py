@@ -41,6 +41,9 @@ import tempfile
 import time
 import urlparse
 
+# The MongoDB names for the architectures we support.
+ARCH_CHOICES=["x86_64", "ppc64le"]
+
 # Made up names for the flavors of distribution we package for.
 DISTROS=["suse", "debian","redhat","ubuntu","amazon"]
 
@@ -121,7 +124,7 @@ def main(argv):
 
     distros=[EnterpriseDistro(distro) for distro in DISTROS]
 
-    args = packager.get_args(distros)
+    args = packager.get_args(distros, ARCH_CHOICES)
 
     spec = EnterpriseSpec(args.server_version, args.metadata_gitspec, args.release_number)
 
