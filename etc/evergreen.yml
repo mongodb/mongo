@@ -474,6 +474,9 @@ tasks:
       params:
         working_dir: src
         script: |
+          set -o errexit
+          set -o verbose
+
           if [ "${has_packages|}" = "true" ] ; then
             cd buildscripts
             ${python|python} ${packager_script} --prefix `pwd`/.. --distros ${packager_distro} --tarball `pwd`/../mongodb-binaries.tgz -s ${version} -m HEAD -a ${packager_arch}
