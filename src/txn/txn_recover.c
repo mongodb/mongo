@@ -93,7 +93,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	WT_ERR(__wt_verbose((session), WT_VERB_RECOVERY,		\
 	    "%s op %d to file %d at LSN %u/%u",				\
 	    (cursor == NULL) ? "Skipping" : "Applying",			\
-	    optype, fileid, lsnp->lsn_file, lsnp->lsn_offset));		\
+	    optype, fileid, lsnp->l.file, lsnp->l.offset));		\
 	if (cursor == NULL)						\
 		break
 
@@ -335,7 +335,7 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 
 	WT_RET(__wt_verbose(r->session, WT_VERB_RECOVERY,
 	    "Recovering %s with id %u @ (%" PRIu32 ", %" PRIu32 ")",
-	    uri, fileid, lsn.lsn_file, lsn.lsn_offset));
+	    uri, fileid, lsn.l.file, lsn.l.offset));
 
 	return (0);
 
@@ -485,7 +485,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	r.metadata_only = false;
 	WT_ERR(__wt_verbose(session, WT_VERB_RECOVERY,
 	    "Main recovery loop: starting at %u/%u",
-	    r.ckpt_lsn.lsn_file, r.ckpt_lsn.lsn_offset));
+	    r.ckpt_lsn.l.file, r.ckpt_lsn.l.offset));
 	WT_ERR(__wt_log_needs_recovery(session, &r.ckpt_lsn, &needs_rec));
 	/*
 	 * Check if the database was shut down cleanly.  If not

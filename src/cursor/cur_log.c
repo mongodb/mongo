@@ -187,13 +187,13 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	if (FLD_ISSET(cursor->flags, WT_CURSTD_RAW)) {
 		memset(&item, 0, sizeof(item));
 		WT_RET(wiredtiger_struct_size((WT_SESSION *)session,
-		    &item.size, WT_LOGC_KEY_FORMAT, cl->cur_lsn->lsn_file,
-		    cl->cur_lsn->lsn_offset, key_count));
+		    &item.size, WT_LOGC_KEY_FORMAT, cl->cur_lsn->l.file,
+		    cl->cur_lsn->l.offset, key_count));
 		WT_RET(__wt_realloc(session, NULL, item.size, &cl->packed_key));
 		item.data = cl->packed_key;
 		WT_RET(wiredtiger_struct_pack((WT_SESSION *)session,
 		    cl->packed_key, item.size, WT_LOGC_KEY_FORMAT,
-		    cl->cur_lsn->lsn_file, cl->cur_lsn->lsn_offset, key_count));
+		    cl->cur_lsn->l.file, cl->cur_lsn->l.offset, key_count));
 		__wt_cursor_set_key(cursor, &item);
 
 		WT_RET(wiredtiger_struct_size((WT_SESSION *)session,
@@ -208,8 +208,8 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 		    cl->opvalue));
 		__wt_cursor_set_value(cursor, &item);
 	} else {
-		__wt_cursor_set_key(cursor, cl->cur_lsn->lsn_file,
-		    cl->cur_lsn->lsn_offset, key_count);
+		__wt_cursor_set_key(cursor, cl->cur_lsn->l.file,
+		    cl->cur_lsn->l.offset, key_count);
 		__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, optype,
 		    fileid, cl->opkey, cl->opvalue);
 	}

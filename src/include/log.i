@@ -22,8 +22,8 @@ __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2)
 	 * Read LSNs into local variables so that we only read each field
 	 * once and all comparisons are on the same values.
 	 */
-	l1 = ((volatile WT_LSN *)lsn1)->u.file_offset;
-	l2 = ((volatile WT_LSN *)lsn2)->u.file_offset;
+	l1 = ((volatile WT_LSN *)lsn1)->file_offset;
+	l2 = ((volatile WT_LSN *)lsn2)->file_offset;
 
 	return (l1 < l2 ? -1 : (l1 > l2 ? 1 : 0));
 }

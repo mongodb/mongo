@@ -352,13 +352,13 @@ __wt_txn_checkpoint_log(
 
 		/* Write the checkpoint log record. */
 		WT_ERR(__wt_struct_size(session, &recsize, fmt,
-		    rectype, ckpt_lsn->lsn_file, ckpt_lsn->lsn_offset,
+		    rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
 		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		WT_ERR(__wt_logrec_alloc(session, recsize, &logrec));
 
 		WT_ERR(__wt_struct_pack(session,
 		    (uint8_t *)logrec->data + logrec->size, recsize, fmt,
-		    rectype, ckpt_lsn->lsn_file, ckpt_lsn->lsn_offset,
+		    rectype, ckpt_lsn->l.file, ckpt_lsn->l.offset,
 		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		logrec->size += (uint32_t)recsize;
 		WT_ERR(__wt_log_write(session, logrec, lsnp,
@@ -492,7 +492,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_fprintf(out,
 	    "  { \"lsn\" : [%" PRIu32 ",%" PRIu32 "],\n",
-	    lsnp->lsn_file, lsnp->lsn_offset));
+	    lsnp->l.file, lsnp->l.offset));
 	WT_RET(__wt_fprintf(out,
 	    "    \"hdr_flags\" : \"%s\",\n", compressed ? "compressed" : ""));
 	WT_RET(__wt_fprintf(out,

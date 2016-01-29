@@ -105,7 +105,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 	 * LSN has moved into a later log file and there should be a
 	 * log file ready to close.
 	 */
-	while (log->sync_lsn.lsn_file < min_lsn->lsn_file) {
+	while (log->sync_lsn.l.file < min_lsn->l.file) {
 		WT_ERR(__wt_cond_signal(session,
 		    S2C(session)->log_file_cond));
 		WT_ERR(__wt_cond_wait(session, log->log_sync_cond, 10000));
@@ -116,11 +116,11 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 	 * Sync the directory if the log file entry hasn't been written
 	 * into the directory.
 	 */
-	if (log->sync_dir_lsn.lsn_file < min_lsn->lsn_file) {
+	if (log->sync_dir_lsn.l.file < min_lsn->l.file) {
 		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 		    "log_force_sync: sync directory %s to LSN %d/%lu",
 		    log->log_dir_fh->name,
-		    min_lsn->lsn_file, min_lsn->lsn_offset));
+		    min_lsn->l.file, min_lsn->l.offset));
 		WT_ERR(__wt_directory_sync_fh(session, log->log_dir_fh));
 		log->sync_dir_lsn = *min_lsn;
 		WT_STAT_FAST_CONN_INCR(session, log_sync_dir);
@@ -131,7 +131,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 	if (__wt_log_cmp(&log->sync_lsn, min_lsn) < 0) {
 		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 		    "log_force_sync: sync %s to LSN %d/%lu",
-		    log->log_fh->name, min_lsn->lsn_file, min_lsn->lsn_offset));
+		    log->log_fh->name, min_lsn->l.file, min_lsn->l.offset));
 		WT_ERR(__wt_fsync(session, log->log_fh));
 		log->sync_lsn = *min_lsn;
 		WT_STAT_FAST_CONN_INCR(session, log_sync);
@@ -175,7 +175,7 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, bool *recp)
 	 * we can skip recovery.
 	 */
 	WT_RET(__wt_curlog_open(session, "log:", NULL, &c));
-	c->set_key(c, ckp_lsn->lsn_file, ckp_lsn->lsn_offset, 0);
+	c->set_key(c, ckp_lsn->l.file, ckp_lsn->l.offset, 0);
 	if ((ret = c->search(c)) == 0) {
 		while ((ret = c->next(c)) == 0) {
 			/*
@@ -279,7 +279,7 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	/* Filter out any files that are below the checkpoint LSN. */
 	for (max = 0, i = 0; i < count; ) {
 		WT_ERR(__wt_log_extract_lognum(session, files[i], &id));
-		if (active_only && id < log->ckpt_lsn.lsn_file) {
+		if (active_only && id < log->ckpt_lsn.l.file) {
 			__wt_free(session, files[i]);
 			files[i] = files[count - 1];
 			files[--count] = NULL;
@@ -460,8 +460,8 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 
 	conn = S2C(session);
 	log = conn->log;
-	return (lsn->lsn_offset == WT_LOG_FIRST_RECORD ||
-	    lsn->lsn_offset + (wt_off_t)recsize < conn->log_file_max);
+	return (lsn->l.offset == WT_LOG_FIRST_RECORD ||
+	    lsn->l.offset + (wt_off_t)recsize < conn->log_file_max);
 }
 
 /*
@@ -560,8 +560,7 @@ __log_fill(WT_SESSION_IMPL *session,
 	WT_STAT_FAST_CONN_INCRV(session, log_bytes_written, logrec->len);
 	if (lsnp != NULL) {
 		*lsnp = myslot->slot->slot_start_lsn;
-		WT_SET_LSN_OFFSET(lsnp,
-		    lsnp->lsn_offset + (uint32_t)myslot->offset);
+		lsnp->l.offset += (uint32_t)myslot->offset;
 	}
 err:
 	if (ret != 0 && myslot->slot->slot_error == 0)
@@ -892,7 +891,7 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 * Pre-allocate on the first real write into the log file, if it
 	 * was just created (i.e. not pre-allocated).
 	 */
-	if (log->alloc_lsn.lsn_offset == WT_LOG_FIRST_RECORD && created_log)
+	if (log->alloc_lsn.l.offset == WT_LOG_FIRST_RECORD && created_log)
 		WT_RET(__log_prealloc(session, log->log_fh));
 	/*
 	 * Initialize the slot for activation.
@@ -934,8 +933,8 @@ __log_truncate(WT_SESSION_IMPL *session,
 	 * Truncate the log file to the given LSN.
 	 */
 	WT_ERR(__log_openfile(session,
-	    false, &log_fh, file_prefix, lsn->lsn_file));
-	WT_ERR(__wt_ftruncate(session, log_fh, lsn->lsn_offset));
+	    false, &log_fh, file_prefix, lsn->l.file));
+	WT_ERR(__wt_ftruncate(session, log_fh, lsn->l.offset));
 	WT_ERR(__wt_fsync(session, log_fh));
 	WT_ERR(__wt_close(session, &log_fh));
 
@@ -949,8 +948,8 @@ __log_truncate(WT_SESSION_IMPL *session,
 	    WT_LOG_FILENAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
-		if (lognum > lsn->lsn_file &&
-		    lognum < log->trunc_lsn.lsn_file) {
+		if (lognum > lsn->l.file &&
+		    lognum < log->trunc_lsn.l.file) {
 			WT_ERR(__log_openfile(session,
 			    false, &log_fh, file_prefix, lognum));
 			/*
@@ -1348,7 +1347,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		 * sync operations.  The most recent one will set the LSN to the
 		 * beginning of our file.
 		 */
-		if (log->sync_lsn.lsn_file < slot->slot_end_lsn.lsn_file ||
+		if (log->sync_lsn.l.file < slot->slot_end_lsn.l.file ||
 		    __wt_spin_trylock(session, &log->log_sync_lock) != 0) {
 			WT_ERR(__wt_cond_wait(
 			    session, log->log_sync_cond, 10000));
@@ -1368,12 +1367,12 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		 * now if needed.
 		 */
 		if (F_ISSET(slot, WT_SLOT_SYNC_DIR) &&
-		    (log->sync_dir_lsn.lsn_file < sync_lsn.lsn_file)) {
+		    (log->sync_dir_lsn.l.file < sync_lsn.l.file)) {
 			WT_ASSERT(session, log->log_dir_fh != NULL);
 			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 			    "log_release: sync directory %s to LSN %u/%lu",
 			    log->log_dir_fh->name,
-			    sync_lsn.lsn_file, sync_lsn.lsn_offset));
+			    sync_lsn.l.file, sync_lsn.l.offset));
 			WT_ERR(__wt_directory_sync_fh(
 			    session, log->log_dir_fh));
 			log->sync_dir_lsn = sync_lsn;
@@ -1388,7 +1387,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 			    "log_release: sync log %s to LSN %u/%lu",
 			    log->log_fh->name,
-			    sync_lsn.lsn_file, sync_lsn.lsn_offset));
+			    sync_lsn.l.file, sync_lsn.l.offset));
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
 			WT_ERR(__wt_fsync(session, log->log_fh));
 			log->sync_lsn = sync_lsn;
@@ -1453,7 +1452,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	if (LF_ISSET(WT_LOGSCAN_RECOVER))
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "__wt_log_scan truncating to %u/%u",
-		    log->trunc_lsn.lsn_file, log->trunc_lsn.lsn_offset));
+		    log->trunc_lsn.l.file, log->trunc_lsn.l.offset));
 
 	if (log != NULL) {
 		allocsize = log->allocsize;
@@ -1471,8 +1470,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			    "choose either a start LSN or a start flag");
 
 			/* Offsets must be on allocation boundaries. */
-			if (lsnp->lsn_offset % allocsize != 0 ||
-			    lsnp->lsn_file > log->fileid)
+			if (lsnp->l.offset % allocsize != 0 ||
+			    lsnp->l.file > log->fileid)
 				return (WT_NOTFOUND);
 
 			/*
@@ -1518,7 +1517,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		logfiles = NULL;
 	}
 	WT_ERR(__log_openfile(
-	    session, false, &log_fh, WT_LOG_FILENAME, start_lsn.lsn_file));
+	    session, false, &log_fh, WT_LOG_FILENAME, start_lsn.l.file));
 	WT_ERR(__wt_filesize(session, log_fh, &log_size));
 	rd_lsn = start_lsn;
 
@@ -1526,7 +1525,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_ERR(__wt_scr_alloc(session, 0, &decryptitem));
 	WT_ERR(__wt_scr_alloc(session, 0, &uncitem));
 	for (;;) {
-		if (rd_lsn.lsn_offset + allocsize > log_size) {
+		if (rd_lsn.l.offset + allocsize > log_size) {
 advance:
 			/*
 			 * If we read the last record, go to the next file.
@@ -1540,15 +1539,15 @@ advance:
 			if (LF_ISSET(WT_LOGSCAN_RECOVER))
 				WT_ERR(__log_truncate(session,
 				    &rd_lsn, WT_LOG_FILENAME, 1));
-			WT_SET_LSN(&rd_lsn, rd_lsn.lsn_file + 1, 0);
+			WT_SET_LSN(&rd_lsn, rd_lsn.l.file + 1, 0);
 			/*
 			 * Avoid an error message when we reach end of log
 			 * by checking here.
 			 */
-			if (rd_lsn.lsn_file > end_lsn.lsn_file)
+			if (rd_lsn.l.file > end_lsn.l.file)
 				break;
 			WT_ERR(__log_openfile(session,
-			    false, &log_fh, WT_LOG_FILENAME, rd_lsn.lsn_file));
+			    false, &log_fh, WT_LOG_FILENAME, rd_lsn.l.file));
 			WT_ERR(__wt_filesize(session, log_fh, &log_size));
 			eol = false;
 			continue;
@@ -1558,7 +1557,7 @@ advance:
 		 */
 		WT_ASSERT(session, buf->memsize >= allocsize);
 		WT_ERR(__wt_read(session,
-		    log_fh, rd_lsn.lsn_offset, (size_t)allocsize, buf->mem));
+		    log_fh, rd_lsn.l.offset, (size_t)allocsize, buf->mem));
 		/*
 		 * First 4 bytes is the real record length.  See if we
 		 * need to read more than the allocation size.  We expect
@@ -1579,7 +1578,7 @@ advance:
 		 */
 		if (reclen == 0) {
 			WT_ERR(__log_has_hole(
-			    session, log_fh, rd_lsn.lsn_offset, &eol));
+			    session, log_fh, rd_lsn.l.offset, &eol));
 			if (eol)
 				/* Found a hole. This LSN is the end. */
 				break;
@@ -1593,7 +1592,7 @@ advance:
 			 * The log file end could be the middle of this
 			 * log record.
 			 */
-			if (rd_lsn.lsn_offset + rdup_len > log_size)
+			if (rd_lsn.l.offset + rdup_len > log_size)
 				goto advance;
 			/*
 			 * We need to round up and read in the full padded
@@ -1601,7 +1600,7 @@ advance:
 			 */
 			WT_ERR(__wt_buf_grow(session, buf, rdup_len));
 			WT_ERR(__wt_read(session, log_fh,
-			    rd_lsn.lsn_offset, (size_t)rdup_len, buf->mem));
+			    rd_lsn.l.offset, (size_t)rdup_len, buf->mem));
 			WT_STAT_FAST_CONN_INCR(session, log_scan_rereads);
 		}
 		/*
@@ -1637,9 +1636,8 @@ advance:
 		 */
 		WT_STAT_FAST_CONN_INCR(session, log_scan_records);
 		next_lsn = rd_lsn;
-		WT_SET_LSN_OFFSET(&next_lsn,
-		    next_lsn.lsn_offset + rdup_len);
-		if (rd_lsn.lsn_offset != 0) {
+		next_lsn.l.offset += rdup_len;
+		if (rd_lsn.l.offset != 0) {
 			/*
 			 * We need to manage the different buffers here.
 			 * Buf is the buffer this function uses to read from
@@ -2064,7 +2062,7 @@ __wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
 
 	WT_RET(__wt_verbose(session, WT_VERB_LOG,
 	    "log_flush: flags %d LSN %u/%lu",
-	    flags, lsn.lsn_file, lsn.lsn_offset));
+	    flags, lsn.l.file, lsn.l.offset));
 	/*
 	 * If the user wants write-no-sync, there is nothing more to do.
 	 * If the user wants background sync, set the LSN and we're done.
