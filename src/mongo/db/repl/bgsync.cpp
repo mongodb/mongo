@@ -639,14 +639,15 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
         return;
     }
 
-    // We fill in 'bob' to signal the fetcher to process with another getMore.
-    invariant(bob);
-    bob->append("getMore", queryResponse.cursorId);
-    bob->append("collection", queryResponse.nss.coll());
-    bob->append("maxTimeMS", durationCount<Milliseconds>(fetcherMaxTimeMS));
-    if (receivedMetadata) {
-        bob->append("term", _replCoord->getTerm());
-        _replCoord->getLastCommittedOpTime().append(bob, "lastKnownCommittedOpTime");
+    // We fill in 'bob' to signal the fetcher to process with another getMore, if needed.
+    if (bob) {
+        bob->append("getMore", queryResponse.cursorId);
+        bob->append("collection", queryResponse.nss.coll());
+        bob->append("maxTimeMS", durationCount<Milliseconds>(fetcherMaxTimeMS));
+        if (receivedMetadata) {
+            bob->append("term", _replCoord->getTerm());
+            _replCoord->getLastCommittedOpTime().append(bob, "lastKnownCommittedOpTime");
+        }
     }
 }
 
