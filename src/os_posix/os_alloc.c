@@ -24,16 +24,6 @@
 #endif
 
 /*
- * There's no malloc interface, WiredTiger never calls malloc.
- *
- * The problem is an application might allocate memory, write secret stuff in
- * it, free the memory, then WiredTiger allocates the memory and uses it for a
- * file page or log record, then writes it to disk, without having overwritten
- * it fully.  That results in the secret stuff being protected by WiredTiger's
- * permission mechanisms, potentially inappropriate for the secret stuff.
- */
-
-/*
  * __wt_calloc --
  *	ANSI calloc function.
  */
@@ -61,6 +51,39 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 		WT_RET_MSG(session, __wt_errno(),
 		    "memory allocation of %" WT_SIZET_FMT " bytes failed",
 		    size * number);
+
+	*(void **)retp = p;
+	return (0);
+}
+
+/*
+ * __wt_malloc --
+ *	ANSI malloc function.
+ */
+int
+__wt_malloc(WT_SESSION_IMPL *session, size_t bytes_to_allocate, void *retp)
+{
+	void *p;
+
+	/*
+	 * Defensive: if our caller doesn't handle errors correctly, ensure a
+	 * free won't fail.
+	 */
+	*(void **)retp = NULL;
+
+	/*
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
+	 */
+	WT_ASSERT(session, bytes_to_allocate != 0);
+
+	if (session != NULL)
+		WT_STAT_FAST_CONN_INCR(session, memory_allocation);
+
+	if ((p = malloc(bytes_to_allocate)) == NULL)
+		WT_RET_MSG(session, __wt_errno(),
+		    "memory allocation of %" WT_SIZET_FMT " bytes failed",
+		    bytes_to_allocate);
 
 	*(void **)retp = p;
 	return (0);
@@ -107,12 +130,8 @@ __wt_realloc(WT_SESSION_IMPL *session,
 		    bytes_to_allocate);
 
 	/*
-	 * Clear the allocated memory -- an application might: allocate memory,
-	 * write secret stuff into it, free the memory, then we re-allocate the
-	 * memory and use it for a file page or log record, and then write it to
-	 * disk.  That would result in the secret stuff being protected by the
-	 * WiredTiger permission mechanisms, potentially inappropriate for the
-	 * secret stuff.
+	 * Clear the allocated memory, parts of WiredTiger depend on allocated
+	 * memory being cleared.
 	 */
 	memset((uint8_t *)
 	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
@@ -184,7 +203,10 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		__wt_free(session, p);
 		p = newp;
 
-		/* Clear the allocated memory (see above). */
+		/*
+		 * Clear the allocated memory, parts of WiredTiger depend on
+		 * allocated memory being cleared.
+		 */
 		memset((uint8_t *)p + bytes_allocated, 0,
 		    bytes_to_allocate - bytes_allocated);
 
@@ -221,13 +243,14 @@ __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp)
 		return (0);
 	}
 
-	WT_RET(__wt_calloc(session, len + 1, 1, &p));
+	WT_RET(__wt_malloc(session, len + 1, &p));
 
 	/*
 	 * Don't change this to strncpy, we rely on this function to duplicate
 	 * "strings" that contain nul bytes.
 	 */
 	memcpy(p, str, len);
+	((uint8_t *)p)[len] = '\0';
 
 	*(void **)retp = p;
 	return (0);

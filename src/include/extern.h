@@ -480,6 +480,7 @@ extern int __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **va
 extern int __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value);
 extern void __wt_abort(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 extern int __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp);
+extern int __wt_malloc(WT_SESSION_IMPL *session, size_t bytes_to_allocate, void *retp);
 extern int __wt_realloc(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp);
 extern int __wt_realloc_aligned(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp);
 extern int __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp);
