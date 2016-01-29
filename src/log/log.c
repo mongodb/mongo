@@ -1429,7 +1429,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
 	u_int i, logcount;
 	int firstrecord;
-	bool eol;
+	bool eol, partial_record;
 	char **logfiles;
 
 	conn = S2C(session);
@@ -1526,6 +1526,15 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	for (;;) {
 		if (rd_lsn.offset + allocsize > log_size) {
 advance:
+			if (rd_lsn.offset == log_size)
+				partial_record = false;
+			else
+				/*
+				 * See if there is anything non-zero at the
+				 * end of this log file.
+				 */
+				WT_ERR(__log_has_hole(session,
+				    log_fh, rd_lsn.offset, &partial_record));
 			/*
 			 * If we read the last record, go to the next file.
 			 */
@@ -1538,6 +1547,15 @@ advance:
 			if (LF_ISSET(WT_LOGSCAN_RECOVER))
 				WT_ERR(__log_truncate(session,
 				    &rd_lsn, WT_LOG_FILENAME, 1));
+			/*
+			 * If we had a partial record, we'll want to break
+			 * now after closing and truncating.  Although for now
+			 * log_truncate does not modify the LSN passed in,
+			 * this code does not assume it is unmodified after that
+			 * call which is why it uses the boolean set earlier.
+			 */
+			if (partial_record)
+				break;
 			rd_lsn.file++;
 			rd_lsn.offset = 0;
 			/*
