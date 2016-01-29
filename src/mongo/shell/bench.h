@@ -60,41 +60,41 @@ enum class OpType {
 /**
  * Object representing one operation passed to benchRun
  */
- struct BenchRunOp {
- public:
-     int batchSize = 0;
-     BSONElement check;
-     BSONObj command;
-     BSONObj context;
-     int delay = 0;
-     BSONObj doc;
-     bool isDocAnArray = false;
-     int expected = -1;
-     bool handleError = false;
-     BSONObj key;
-     int limit = 0;
-     bool multi = false;
-     std::string ns;
-     OpType op = OpType::NONE;
-     int options = 0;
-     BSONObj projection;
-     BSONObj query;
-     bool safe = false;
-     int skip = 0;
-     bool showError = false;
-     bool showResult = false;
-     std::string target;
-     bool throwGLE = false;
-     BSONObj update;
-     bool upsert = false;
-     bool useCheck = false;
-     bool useReadCmd = false;
-     bool useWriteCmd = false;
-     BSONObj writeConcern;
-     BSONObj value;
+struct BenchRunOp {
+public:
+    int batchSize = 0;
+    BSONElement check;
+    BSONObj command;
+    BSONObj context;
+    int delay = 0;
+    BSONObj doc;
+    bool isDocAnArray = false;
+    int expected = -1;
+    bool handleError = false;
+    BSONObj key;
+    int limit = 0;
+    bool multi = false;
+    std::string ns;
+    OpType op = OpType::NONE;
+    int options = 0;
+    BSONObj projection;
+    BSONObj query;
+    bool safe = false;
+    int skip = 0;
+    bool showError = false;
+    bool showResult = false;
+    std::string target;
+    bool throwGLE = false;
+    BSONObj update;
+    bool upsert = false;
+    bool useCheck = false;
+    bool useReadCmd = false;
+    bool useWriteCmd = false;
+    BSONObj writeConcern;
+    BSONObj value;
 
-     // This is an owned copy of the raw operation. All unowned members point into this. 
-     BSONObj myBsonOp;
+    // This is an owned copy of the raw operation. All unowned members point into this.
+    BSONObj myBsonOp;
 };
 
 /**
