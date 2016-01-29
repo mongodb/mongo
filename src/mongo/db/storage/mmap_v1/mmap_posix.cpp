@@ -263,12 +263,12 @@ void* MemoryMappedFile::remapPrivateView(void* oldPrivateAddr) {
 }
 
 void MemoryMappedFile::flush(bool sync) {
-    if (views.empty() || fd == 0)
+    if (views.empty() || fd == 0 || !sync)
         return;
 
-    bool useFsync = sync && !ProcessInfo::preferMsyncOverFSync();
+    bool useFsync = !ProcessInfo::preferMsyncOverFSync();
 
-    if (useFsync ? fsync(fd) != 0 : msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC)) {
+    if (useFsync ? fsync(fd) != 0 : msync(viewForFlushing(), len, MS_SYNC) != 0) {
         // msync failed, this is very bad
         log() << (useFsync ? "fsync failed: " : "msync failed: ") << errnoWithDescription()
               << " file: " << filename() << endl;
