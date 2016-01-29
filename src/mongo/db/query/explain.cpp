@@ -602,37 +602,24 @@ void Explain::explainStages(PlanExecutor* exec,
                             ExplainCommon::Verbosity verbosity,
                             BSONObjBuilder* out) {
     //
-    // Step 1: run the stages as required by the verbosity level.
+    // Collect plan stats, running the plan if necessary. The stats also give the structure of the
+    // plan tree.
     //
 
-    // Inspect the tree to see if there is a MultiPlanStage.
+    // Inspect the tree to see if there is a MultiPlanStage. Plan selection has already happened at
+    // this point, since we have a PlanExecutor.
     MultiPlanStage* mps = getMultiPlanStage(exec->getRootStage());
 
-    // Get stats of the winning plan from the trial period, if the verbosity level
-    // is high enough and there was a runoff between multiple plans.
+    // Get stats of the winning plan from the trial period, if the verbosity level is high enough
+    // and there was a runoff between multiple plans.
     unique_ptr<PlanStageStats> winningStatsTrial;
     if (verbosity >= ExplainCommon::EXEC_ALL_PLANS && mps) {
         winningStatsTrial = std::move(mps->getStats()->children[mps->bestPlanIdx()]);
         invariant(winningStatsTrial.get());
     }
 
-    // If we need execution stats, then run the plan in order to gather the stats.
-    Status executePlanStatus = Status::OK();
-    if (verbosity >= ExplainCommon::EXEC_STATS) {
-        executePlanStatus = exec->executePlan();
-    }
-
-    //
-    // Step 2: collect plan stats (which also give the structure of the plan tree).
-    //
-
-    // Get stats for the winning plan. If there is only a single candidate plan, it is considered
-    // the winner.
-    unique_ptr<PlanStageStats> winningStats(
-        mps ? std::move(mps->getStats()->children[mps->bestPlanIdx()])
-            : std::move(exec->getStats()));
-
-    // Get stats for the rejected plans, if more than one plan was considered.
+    // If more than one plan was considered, get the stats from the trial period for the rejected
+    // plans.
     vector<unique_ptr<PlanStageStats>> allPlansStats;
     if (mps) {
         auto mpsStats = mps->getStats();
@@ -643,8 +630,21 @@ void Explain::explainStages(PlanExecutor* exec,
         }
     }
 
+    // If we need execution stats, then run the plan in order to gather the stats.
+    Status executePlanStatus = Status::OK();
+    if (verbosity >= ExplainCommon::EXEC_STATS) {
+        executePlanStatus = exec->executePlan();
+    }
+
+    // Get stats for the winning plan. If there is only a single candidate plan, it is considered
+    // the winner.
+    unique_ptr<PlanStageStats> winningStats(
+        mps ? std::move(mps->getStats()->children[mps->bestPlanIdx()])
+            : std::move(exec->getStats()));
+
+
     //
-    // Step 3: use the stats trees to produce explain BSON.
+    // Use the stats trees to produce explain BSON.
     //
 
     if (verbosity >= ExplainCommon::QUERY_PLANNER) {
