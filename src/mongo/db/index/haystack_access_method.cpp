@@ -34,6 +34,7 @@
 
 
 #include "mongo/base/status.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
@@ -112,8 +113,9 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
                                                                      true,  // endKeyInclusive
                                                                      PlanExecutor::YIELD_MANUAL));
             PlanExecutor::ExecState state;
+            BSONObj obj;
             RecordId loc;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &loc))) {
                 if (hopper.limitReached()) {
                     break;
                 }
@@ -126,6 +128,9 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
                     btreeMatches++;
                 }
             }
+
+            // Non-yielding collection scans from InternalPlanner will never error.
+            invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state);
         }
     }
 

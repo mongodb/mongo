@@ -93,9 +93,11 @@ public:
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         int count = 0;
-        for (RecordId dl; PlanExecutor::ADVANCED == exec->getNext(NULL, &dl);) {
+        PlanExecutor::ExecState state;
+        for (RecordId dl; PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &dl));) {
             ++count;
         }
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
 
         return count;
     }

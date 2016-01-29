@@ -39,6 +39,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/pipeline_proxy.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
@@ -90,12 +91,17 @@ static bool handleCursorCommand(OperationContext* txn,
     for (int objCount = 0; objCount < batchSize; objCount++) {
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
         // do it when batchSize is 0 since that indicates a desire for a fast return.
-        if (exec->getNext(&next, NULL) != PlanExecutor::ADVANCED) {
+        PlanExecutor::ExecState state;
+        if ((state = exec->getNext(&next, NULL)) != PlanExecutor::ADVANCED) {
             // make it an obvious error to use cursor or executor after this point
             cursor = NULL;
             exec = NULL;
             break;
         }
+
+        uassert(34426,
+                "Plan executor error during aggregation: " + WorkingSetCommon::toStatusString(next),
+                PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF);
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.

@@ -62,6 +62,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
@@ -684,6 +685,14 @@ public:
                 }
             }
 
+            if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::OperationFailed,
+                                                  str::stream()
+                                                      << "Executor error during filemd5 command: "
+                                                      << WorkingSetCommon::toStatusString(obj)));
+            }
+
             if (partialOk)
                 result.appendBinData("md5state", sizeof(st), BinDataGeneral, &st);
 
@@ -825,8 +834,9 @@ public:
         long long numObjects = 0;
 
         RecordId loc;
+        BSONObj obj;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &loc))) {
             if (estimate)
                 size += avgObjSize;
             else
@@ -840,8 +850,13 @@ public:
             }
         }
 
-        if (PlanExecutor::IS_EOF != state) {
+        if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             warning() << "Internal error while reading " << ns << endl;
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::OperationFailed,
+                       str::stream() << "Executor error while reading during dataSize command: "
+                                     << WorkingSetCommon::toStatusString(obj)));
         }
 
         ostringstream os;

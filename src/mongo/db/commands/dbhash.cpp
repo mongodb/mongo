@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/util/log.h"
@@ -130,6 +131,9 @@ std::string DBHashCmd::hashCollection(OperationContext* opCtx,
     }
     if (PlanExecutor::IS_EOF != state) {
         warning() << "error while hashing, db dropped? ns=" << fullCollectionName << endl;
+        uasserted(34371,
+                  "Plan executor error while running dbHash command: " +
+                      WorkingSetCommon::toStatusString(c));
     }
     md5digest d;
     md5_finish(&st, d);

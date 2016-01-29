@@ -70,9 +70,14 @@ StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
     BSONObj obj;
     RecordId recordId;
 
-    if (PlanExecutor::ADVANCED != _exec->getNext(&obj, &recordId)) {
+    PlanExecutor::ExecState state;
+    if (PlanExecutor::ADVANCED != (state = _exec->getNext(&obj, &recordId))) {
         return StatusWith<Value>(ErrorCodes::NoSuchKey, "no more operations in local oplog");
     }
+
+    // Non-yielding collection scans from InternalPlanner will never error.
+    invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state);
+
     return StatusWith<Value>(std::make_pair(obj, recordId));
 }
 

@@ -184,11 +184,12 @@ public:
         // Get all our results out.
         int results = 0;
         BSONObj obj;
-        while (PlanExecutor::ADVANCED == exec->getNext(&obj, NULL)) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
             ASSERT_EQUALS(obj["foo"].numberInt(), 7);
             ++results;
         }
-
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
         ASSERT_EQUALS(results, N / 10);
     }
 };

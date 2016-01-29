@@ -106,9 +106,11 @@ public:
 
         // Use the runner to count the number of objects scanned.
         int count = 0;
-        for (BSONObj obj; PlanExecutor::ADVANCED == exec->getNext(&obj, NULL);) {
+        PlanExecutor::ExecState state;
+        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL));) {
             ++count;
         }
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
         return count;
     }
 
@@ -220,12 +222,13 @@ public:
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         int count = 0;
-        for (BSONObj obj; PlanExecutor::ADVANCED == exec->getNext(&obj, NULL);) {
+        PlanExecutor::ExecState state;
+        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL));) {
             // Make sure we get the objects in the order we want
             ASSERT_EQUALS(count, obj["foo"].numberInt());
             ++count;
         }
-
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
         ASSERT_EQUALS(numObj(), count);
     }
 };
@@ -253,11 +256,12 @@ public:
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         int count = 0;
-        for (BSONObj obj; PlanExecutor::ADVANCED == exec->getNext(&obj, NULL);) {
+        PlanExecutor::ExecState state;
+        for (BSONObj obj; PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL));) {
             ++count;
             ASSERT_EQUALS(numObj() - count, obj["foo"].numberInt());
         }
-
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
         ASSERT_EQUALS(numObj(), count);
     }
 };

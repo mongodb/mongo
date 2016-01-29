@@ -44,6 +44,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
@@ -173,7 +174,8 @@ public:
 
         RecordId loc;
         BSONObj currKey;
-        while (PlanExecutor::ADVANCED == exec->getNext(&currKey, &loc)) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&currKey, &loc))) {
             // check that current key contains non missing elements for all fields in keyPattern
             BSONObjIterator i(currKey);
             for (int k = 0; k < keyPatternLength; k++) {
@@ -208,6 +210,14 @@ public:
                 errmsg = os.str();
                 return false;
             }
+        }
+
+        if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::OperationFailed,
+                       str::stream() << "Executor error while checking sharding index: "
+                                     << WorkingSetCommon::toStatusString(currKey)));
         }
 
         return true;
@@ -453,6 +463,14 @@ public:
                     }
 
                     state = exec->getNext(&currKey, NULL);
+                }
+
+                if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
+                    return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::OperationFailed,
+                               str::stream() << "Executor error during splitVector command: "
+                                             << WorkingSetCommon::toStatusString(currKey)));
                 }
 
                 if (!forceMedianSplit)
@@ -938,11 +956,16 @@ private:
                                                                  PlanExecutor::YIELD_MANUAL));
 
         // check if exactly one document found
-        if (PlanExecutor::ADVANCED == exec->getNext(NULL, NULL)) {
-            if (PlanExecutor::IS_EOF == exec->getNext(NULL, NULL)) {
+        PlanExecutor::ExecState state;
+        BSONObj obj;
+        if (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+            if (PlanExecutor::IS_EOF == (state = exec->getNext(&obj, NULL))) {
                 return true;
             }
         }
+
+        // Non-yielding collection scans from InternalPlanner will never error.
+        invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state);
 
         return false;
     }

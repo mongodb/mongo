@@ -147,10 +147,14 @@ RecordId Helpers::findOne(OperationContext* txn,
 
     unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
     PlanExecutor::ExecState state;
+    BSONObj obj;
     RecordId loc;
-    if (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
+    if (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &loc))) {
         return loc;
     }
+    massert(34427,
+            "Plan executor error: " + WorkingSetCommon::toStatusString(obj),
+            PlanExecutor::IS_EOF == state);
     return RecordId();
 }
 
@@ -203,10 +207,14 @@ bool Helpers::getSingleton(OperationContext* txn, const char* ns, BSONObj& resul
 
     CurOp::get(txn)->done();
 
+    // Non-yielding collection scans from InternalPlanner will never error.
+    invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state);
+
     if (PlanExecutor::ADVANCED == state) {
         result = result.getOwned();
         return true;
     }
+
     return false;
 }
 
@@ -216,10 +224,14 @@ bool Helpers::getLast(OperationContext* txn, const char* ns, BSONObj& result) {
         txn, ns, autoColl.getCollection(), PlanExecutor::YIELD_MANUAL, InternalPlanner::BACKWARD));
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
 
+    // Non-yielding collection scans from InternalPlanner will never error.
+    invariant(PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF == state);
+
     if (PlanExecutor::ADVANCED == state) {
         result = result.getOwned();
         return true;
     }
+
     return false;
 }
 

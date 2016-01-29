@@ -47,6 +47,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
@@ -1084,11 +1085,15 @@ void State::finalReduce(CurOp* op, ProgressMeterHolder& pm) {
         all.push_back(o);
 
         if (!exec->restoreState()) {
-            break;
+            uasserted(34375, "Plan executor killed during mapReduce final reduce");
         }
 
         _txn->checkForInterrupt();
     }
+
+    uassert(34428,
+            "Plan executor error during mapReduce command: " + WorkingSetCommon::toStatusString(o),
+            PlanExecutor::IS_EOF == state);
 
     ctx.reset();
     // reduce and finalize last array
@@ -1424,7 +1429,8 @@ public:
 
                 // go through each doc
                 BSONObj o;
-                while (PlanExecutor::ADVANCED == exec->getNext(&o, NULL)) {
+                PlanExecutor::ExecState execState;
+                while (PlanExecutor::ADVANCED == (execState = exec->getNext(&o, NULL))) {
                     // check to see if this is a new object we don't own yet
                     // because of a chunk migration
                     if (collMetadata) {
@@ -1484,6 +1490,14 @@ public:
 
                     if (config.limit && numInputs >= config.limit)
                         break;
+                }
+
+                if (PlanExecutor::DEAD == execState || PlanExecutor::FAILURE == execState) {
+                    return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::OperationFailed,
+                               str::stream() << "Executor error during mapReduce command: "
+                                             << WorkingSetCommon::toStatusString(o)));
                 }
 
                 // Record the indexes used by the PlanExecutor.

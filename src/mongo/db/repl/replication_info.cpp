@@ -35,6 +35,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context_impl.h"
@@ -94,6 +95,9 @@ void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int le
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 src.push_back(obj.getOwned());
             }
+
+            // Non-yielding collection scans from InternalPlanner will never error.
+            invariant(PlanExecutor::IS_EOF == state);
         }
 
         for (list<BSONObj>::const_iterator i = src.begin(); i != src.end(); i++) {

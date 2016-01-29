@@ -61,6 +61,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
@@ -392,9 +393,8 @@ static void repairDatabasesAndCheckVersion(OperationContext* txn) {
             }
         }
 
-        if (PlanExecutor::IS_EOF != state) {
-            warning() << "Internal error while reading collection " << systemIndexes;
-        }
+        // Non-yielding collection scans from InternalPlanner will never error.
+        invariant(PlanExecutor::IS_EOF == state);
 
         if (replSettings.usingReplSets()) {
             // We only care about the _id index if we are in a replset

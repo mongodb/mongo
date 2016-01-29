@@ -339,10 +339,13 @@ protected:
     void checkIds(int* expectedIds, PlanExecutor* exec) {
         BSONObj objOut;
         int idcount = 0;
-        while (PlanExecutor::ADVANCED == exec->getNext(&objOut, NULL)) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&objOut, NULL))) {
             ASSERT_EQUALS(expectedIds[idcount], objOut["_id"].numberInt());
             ++idcount;
         }
+
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
     }
 };
 

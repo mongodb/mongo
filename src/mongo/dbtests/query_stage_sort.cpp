@@ -176,7 +176,8 @@ public:
         int count = 1;
 
         BSONObj current;
-        while (PlanExecutor::ADVANCED == exec->getNext(&current, NULL)) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&current, NULL))) {
             int cmp = sgn(current.woSortOrder(last, params.pattern));
             // The next object should be equal to the previous or oriented according to the sort
             // pattern.
@@ -184,7 +185,7 @@ public:
             ++count;
             last = current.getOwned();
         }
-
+        ASSERT_EQUALS(PlanExecutor::IS_EOF, state);
         checkCount(count);
     }
 
