@@ -1,0 +1,28 @@
+/*! @m_page{{c,java},cursor_random,Cursor random}
+
+The \c next_random configuration to the WT_SESSION::open_cursor method
+configures the cursor to return a pseudo-random record from a row-store
+object (the \c next_random configuration is not supported on other types
+of objects).
+
+Applications should use the WT_CURSOR::next method to retrieve records
+from the object, most other cursor methods are not supported. For
+example, it's not possible to update using a cursor configured for
+random retrieval.
+
+By default, each returned record is pseudo-randomly selected from the
+underlying object as a whole. That can lead to skewed results when the
+underlying tree structure is unbalanced or records are not uniformly
+distributed. In such cases, the \c next_random_sample_size configuration
+can also be specified. Setting \c next_random_sample_size configures the
+number of samples the application expects to take using the cursor. A
+cursor configured using \c next_random_sample_size divides the object
+into \c next_random_sample_size pieces, and each subsequent retrieval
+returns a record from the next one of those pieces.
+
+For example, setting \c next_random_sample_percent to \c 10 would cause
+the cursor to sequentially return records from each tenth part of the
+object. Setting \c next_random_sample_percent to \c 1000 would cause the
+cursor to sequentially return records from each .1% of the object.
+
+ */

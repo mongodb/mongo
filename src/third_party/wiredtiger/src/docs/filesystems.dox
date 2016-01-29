@@ -1,0 +1,13 @@
+/*! @page filesystems Filesystems
+
+@section remote Remote file systems
+
+WiredTiger objects may be stored on remote file systems if the remote
+file system conforms to ISO/IEC 9945-1:1996 (POSIX.1).  In the case of
+read-only objects, multiple systems may access the objects
+simultaneously; objects which are written cannot be accessed by more
+than a single system.  Because remote file systems are often slower than
+local file systems, using a remote file system for storage may degrade
+performance.
+
+*/

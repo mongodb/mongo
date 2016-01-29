@@ -1,0 +1,39 @@
+/*! @m_page{{c,java},namespace,Name spaces}
+
+@section namespace_env Process' environment name space
+
+WiredTiger's environment variables begin with the string "WIREDTIGER".
+
+@m_if{c}
+@section namespace_c C language name space
+
+WiredTiger's public function names begin with the string "wiredtiger".
+
+WiredTiger's public \c \#define and structure \c typedef declarations
+begin with the string "WT_".
+
+WiredTiger's private function names begin with the string "__wt_".
+@m_endif
+
+@m_if{java}
+@section namespace_c Java language name space
+
+WiredTiger's public classes are in the \c com.wiredtiger.db package.
+
+The \c com.wiredtiger.db.wiredtiger class contains static methods
+and inherited constants.
+@m_endif
+
+@section namespace_filesystem File system name space
+
+WiredTiger's files begin with the string "WiredTiger"; applications
+should not create files in the WiredTiger file system name space.
+
+@m_if{c}
+@section namespace_error Error return name space
+
+WiredTiger reserves all values from -31,800 to -31,999 as possible error
+return values.
+@m_endif
+
+*/

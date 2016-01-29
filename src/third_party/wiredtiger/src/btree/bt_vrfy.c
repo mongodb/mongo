@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -30,8 +30,7 @@ typedef struct {
 
 	u_int depth, depth_internal[100], depth_leaf[100];
 
-	WT_ITEM *tmp1;				/* Temporary buffer */
-	WT_ITEM *tmp2;				/* Temporary buffer */
+	WT_ITEM *tmp1, *tmp2, *tmp3, *tmp4;	/* Temporary buffers */
 } WT_VSTUFF;
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
@@ -170,6 +169,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_addr));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp1));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
+	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp3));
+	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp4));
 
 	/* Check configuration strings. */
 	WT_ERR(__verify_config(session, cfg, vs));
@@ -251,6 +252,8 @@ err:	/* Inform the underlying block manager we're done. */
 	__wt_scr_free(session, &vs->max_addr);
 	__wt_scr_free(session, &vs->tmp1);
 	__wt_scr_free(session, &vs->tmp2);
+	__wt_scr_free(session, &vs->tmp3);
+	__wt_scr_free(session, &vs->tmp4);
 
 	return (ret);
 }
@@ -570,10 +573,14 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, WT_ERROR,
 		    "the internal key in entry %" PRIu32 " on the page at %s "
 		    "sorts before the last key appearing on page %s, earlier "
-		    "in the tree",
+		    "in the tree: %s, %s",
 		    entry,
 		    __wt_page_addr_string(session, ref, vs->tmp1),
-		    (char *)vs->max_addr->data);
+		    (char *)vs->max_addr->data,
+		    __wt_buf_set_printable(session,
+		    item.data, item.size, vs->tmp2),
+		    __wt_buf_set_printable(session,
+		    vs->max_key->data, vs->max_key->size, vs->tmp3));
 
 	/* Update the largest key we've seen to the key just checked. */
 	WT_RET(__wt_buf_set(session, vs->max_key, item.data, item.size));
@@ -628,11 +635,15 @@ __verify_row_leaf_key_order(
 		    btree->collator, vs->tmp1, (WT_ITEM *)vs->max_key, &cmp));
 		if (cmp < 0)
 			WT_RET_MSG(session, WT_ERROR,
-			    "the first key on the page at %s sorts equal to or "
-			    "less than a key appearing on the page at %s, "
-			    "earlier in the tree",
-			    __wt_page_addr_string(session, ref, vs->tmp1),
-				(char *)vs->max_addr->data);
+			    "the first key on the page at %s sorts equal to "
+			    "or less than the last key appearing on the page "
+			    "at %s, earlier in the tree: %s, %s",
+			    __wt_page_addr_string(session, ref, vs->tmp2),
+			    (char *)vs->max_addr->data,
+			    __wt_buf_set_printable(session,
+			    vs->tmp1->data, vs->tmp1->size, vs->tmp3),
+			    __wt_buf_set_printable(session,
+			    vs->max_key->data, vs->max_key->size, vs->tmp4));
 	}
 
 	/* Update the largest key we've seen to the last key on this page. */

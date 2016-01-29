@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -630,12 +630,12 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, false, &next));
+		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT,
+		    1, mod->mod_multi_entries, false, &next));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, false, &next));
+		WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT,
+		    WT_RECNO_OOB, mod->mod_multi_entries, false, &next));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -1276,6 +1276,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		for (upd = upd_list; upd->next != NULL; upd = upd->next)
 			;
 		upd->next = append;
+		__wt_cache_page_inmem_incr(
+		    session, page, WT_UPDATE_MEMSIZE(append));
 	}
 
 	/*
@@ -1756,7 +1758,7 @@ __rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
  *	Figure out the maximum leaf page size for the reconciliation.
  */
 static inline uint32_t
-__rec_leaf_page_max(WT_SESSION_IMPL *session,  WT_RECONCILE *r)
+__rec_leaf_page_max(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
@@ -3263,7 +3265,14 @@ supd_check_complete:
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
 		bnd->cksum = __wt_cksum(buf->data, buf->size);
 
-		if (mod->rec_result == WT_PM_REC_MULTIBLOCK &&
+		/*
+		 * One last check: don't reuse blocks if compacting, the reason
+		 * for compaction is to move blocks to different locations. We
+		 * do this check after calculating the checksums, hopefully the
+		 * next write can be skipped.
+		 */
+		if (session->compact_state == WT_COMPACT_NONE &&
+		    mod->rec_result == WT_PM_REC_MULTIBLOCK &&
 		    mod->mod_multi_entries > bnd_slot) {
 			multi = &mod->mod_multi[bnd_slot];
 			if (multi->size == bnd->size &&
@@ -3502,7 +3511,7 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 		break;
 	case BTREE_COL_VAR:
 		if (cbulk->rle != 0)
-			WT_RET(__wt_bulk_insert_var(session, cbulk));
+			WT_RET(__wt_bulk_insert_var(session, cbulk, false));
 		break;
 	case BTREE_ROW:
 		break;
@@ -3625,7 +3634,32 @@ __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
  *	Fixed-length column-store bulk insert.
  */
 int
-__wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
+__wt_bulk_insert_fix(
+    WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool deleted)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_RECONCILE *r;
+
+	r = cbulk->reconcile;
+	btree = S2BT(session);
+	cursor = &cbulk->cbt.iface;
+
+	WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
+	__bit_setv(r->first_free, cbulk->entry,
+	    btree->bitcnt, deleted ? 0 : ((uint8_t *)cursor->value.data)[0]);
+	++cbulk->entry;
+	++r->recno;
+
+	return (0);
+}
+
+/*
+ * __wt_bulk_insert_fix_bitmap --
+ *	Fixed-length column-store bulk insert.
+ */
+int
+__wt_bulk_insert_fix_bitmap(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
@@ -3637,34 +3671,22 @@ __wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	btree = S2BT(session);
 	cursor = &cbulk->cbt.iface;
 
-	if (cbulk->bitmap) {
-		if (((r->recno - 1) * btree->bitcnt) & 0x7)
-			WT_RET_MSG(session, EINVAL,
-			    "Bulk bitmap load not aligned on a byte boundary");
-		for (data = cursor->value.data,
-		    entries = (uint32_t)cursor->value.size;
-		    entries > 0;
-		    entries -= page_entries, data += page_size) {
-			WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
+	if (((r->recno - 1) * btree->bitcnt) & 0x7)
+		WT_RET_MSG(session, EINVAL,
+		    "Bulk bitmap load not aligned on a byte boundary");
+	for (data = cursor->value.data,
+	    entries = (uint32_t)cursor->value.size;
+	    entries > 0;
+	    entries -= page_entries, data += page_size) {
+		WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
 
-			page_entries =
-			    WT_MIN(entries, cbulk->nrecs - cbulk->entry);
-			page_size = __bitstr_size(page_entries * btree->bitcnt);
-			offset = __bitstr_size(cbulk->entry * btree->bitcnt);
-			memcpy(r->first_free + offset, data, page_size);
-			cbulk->entry += page_entries;
-			r->recno += page_entries;
-		}
-		return (0);
+		page_entries = WT_MIN(entries, cbulk->nrecs - cbulk->entry);
+		page_size = __bitstr_size(page_entries * btree->bitcnt);
+		offset = __bitstr_size(cbulk->entry * btree->bitcnt);
+		memcpy(r->first_free + offset, data, page_size);
+		cbulk->entry += page_entries;
+		r->recno += page_entries;
 	}
-
-	WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
-
-	__bit_setv(r->first_free,
-	    cbulk->entry, btree->bitcnt, ((uint8_t *)cursor->value.data)[0]);
-	++cbulk->entry;
-	++r->recno;
-
 	return (0);
 }
 
@@ -3673,7 +3695,8 @@ __wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
  *	Variable-length column-store bulk insert.
  */
 int
-__wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
+__wt_bulk_insert_var(
+    WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool deleted)
 {
 	WT_BTREE *btree;
 	WT_KV *val;
@@ -3682,14 +3705,20 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	r = cbulk->reconcile;
 	btree = S2BT(session);
 
-	/*
-	 * Store the bulk cursor's last buffer, not the current value, we're
-	 * creating a duplicate count, which means we want the previous value
-	 * seen, not the current value.
-	 */
 	val = &r->v;
-	WT_RET(__rec_cell_build_val(
-	    session, r, cbulk->last.data, cbulk->last.size, cbulk->rle));
+	if (deleted) {
+		val->cell_len = __wt_cell_pack_del(&val->cell, cbulk->rle);
+		val->buf.data = NULL;
+		val->buf.size = 0;
+		val->len = val->cell_len;
+	} else
+		/*
+		 * Store the bulk cursor's last buffer, not the current value,
+		 * we're tracking duplicates, which means we want the previous
+		 * value seen, not the current value.
+		 */
+		WT_RET(__rec_cell_build_val(session,
+		    r, cbulk->last.data, cbulk->last.size, cbulk->rle));
 
 	/* Boundary: split or write the page. */
 	if (val->len > r->space_avail)
@@ -3923,16 +3952,49 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	r->recno += entry;
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_RET(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
-		if (upd == NULL)
-			continue;
+	for (ins =
+	    WT_SKIP_FIRST(WT_COL_APPEND(page));; ins = WT_SKIP_NEXT(ins)) {
+		if (ins == NULL) {
+			/*
+			 * If the page split, instantiate any missing records in
+			 * the page's name space. (Imagine record 98 is
+			 * transactionally visible, 99 wasn't created or is not
+			 * yet visible, 100 is visible. Then the page splits and
+			 * record 100 moves to another page. When we reconcile
+			 * the original page, we write record 98, then we don't
+			 * see record 99 for whatever reason. If we've moved
+			 * record 1000, we don't know to write a deleted record
+			 * 99 on the page.)
+			 *
+			 * The record number recorded during the split is the
+			 * first key on the split page, that is, one larger than
+			 * the last key on this page, we have to decrement it.
+			 */
+			if ((recno =
+			    page->modify->mod_split_recno) == WT_RECNO_OOB)
+				break;
+			recno -= 1;
+
+			/*
+			 * The following loop assumes records to write, and the
+			 * previous key might have been visible.
+			 */
+			if (r->recno > recno)
+				break;
+			upd = NULL;
+		} else {
+			WT_RET(
+			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
+			if (upd == NULL)
+				continue;
+			recno = WT_INSERT_RECNO(ins);
+		}
 		for (;;) {
 			/*
 			 * The application may have inserted records which left
 			 * gaps in the name space.
 			 */
-			for (recno = WT_INSERT_RECNO(ins);
+			for (;
 			    nrecs > 0 && r->recno < recno;
 			    --nrecs, ++entry, ++r->recno)
 				__bit_setv(
@@ -3940,6 +4002,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 			if (nrecs > 0) {
 				__bit_setv(r->first_free, entry, btree->bitcnt,
+				    upd == NULL ? 0 :
 				    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
 				--nrecs;
 				++entry;
@@ -3961,6 +4024,13 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			entry = 0;
 			nrecs = WT_FIX_BYTES_TO_ENTRIES(btree, r->space_avail);
 		}
+
+		/*
+		 * Execute this loop once without an insert item to catch any
+		 * missing records due to a split, then quit.
+		 */
+		if (ins == NULL)
+			break;
 	}
 
 	/* Update the counters. */
@@ -4441,11 +4511,36 @@ compare:		/*
 	}
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_ERR(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
-		if (upd == NULL)
-			continue;
-		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
+	for (ins =
+	    WT_SKIP_FIRST(WT_COL_APPEND(page));; ins = WT_SKIP_NEXT(ins)) {
+		if (ins == NULL) {
+			/*
+			 * If the page split, instantiate any missing records in
+			 * the page's name space. (Imagine record 98 is
+			 * transactionally visible, 99 wasn't created or is not
+			 * yet visible, 100 is visible. Then the page splits and
+			 * record 100 moves to another page. When we reconcile
+			 * the original page, we write record 98, then we don't
+			 * see record 99 for whatever reason. If we've moved
+			 * record 1000, we don't know to write a deleted record
+			 * 99 on the page.)
+			 *
+			 * The record number recorded during the split is the
+			 * first key on the split page, that is, one larger than
+			 * the last key on this page, we have to decrement it.
+			 */
+			if ((n = page->modify->mod_split_recno) == WT_RECNO_OOB)
+				break;
+			n -= 1;
+			upd = NULL;
+		} else {
+			WT_ERR(
+			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
+			if (upd == NULL)
+				continue;
+			n = WT_INSERT_RECNO(ins);
+		}
+		while (src_recno <= n) {
 			/*
 			 * The application may have inserted records which left
 			 * gaps in the name space, and these gaps can be huge.
@@ -4468,7 +4563,8 @@ compare:		/*
 					src_recno += skip;
 				}
 			} else {
-				deleted = WT_UPDATE_DELETED_ISSET(upd);
+				deleted = upd == NULL ||
+				    WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
 					data = WT_UPDATE_DATA(upd);
 					size = upd->size;
@@ -4485,7 +4581,7 @@ compare:		/*
 				    last->size == size &&
 				    memcmp(last->data, data, size) == 0)) {
 					++rle;
-					continue;
+					goto next;
 				}
 				WT_ERR(__rec_col_var_helper(session, r,
 				    salvage, last, last_deleted, 0, rle));
@@ -4504,7 +4600,23 @@ compare:		/*
 			}
 			last_deleted = deleted;
 			rle = 1;
+
+			/*
+			 * Move to the next record. It's not a simple increment
+			 * because if it's the maximum record, incrementing it
+			 * wraps to 0 and this turns into an infinite loop.
+			 */
+next:			if (src_recno == UINT64_MAX)
+				break;
+			++src_recno;
 		}
+
+		/*
+		 * Execute this loop once without an insert item to catch any
+		 * missing records due to a split, then quit.
+		 */
+		if (ins == NULL)
+			break;
 	}
 
 	/* If we were tracking a record, write it. */
@@ -5343,11 +5455,10 @@ __rec_split_dump_keys(WT_SESSION_IMPL *session, WT_PAGE *page, WT_RECONCILE *r)
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			WT_ERR(__wt_buf_set_printable(
-			    session, tkey, bnd->key.data, bnd->key.size));
 			WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-			    "starting key %.*s",
-			    (int)tkey->size, (const char *)tkey->data));
+			    "starting key %s",
+			    __wt_buf_set_printable(
+			    session, bnd->key.data, bnd->key.size, tkey)));
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_INT:

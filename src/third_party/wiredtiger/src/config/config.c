@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -365,6 +365,9 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			    conf, "Unexpected character", EINVAL));
 
 		case A_DOWN:
+			if (conf->top == -1)
+				return (__config_err(
+				    conf, "Unbalanced brackets", EINVAL));
 			--conf->depth;
 			CAP(0);
 			break;
@@ -471,8 +474,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	if (conf->depth == 0)
 		return (WT_NOTFOUND);
 
-	return (__config_err(conf,
-	    "Closing brackets missing from config string", EINVAL));
+	return (__config_err(conf, "Unbalanced brackets", EINVAL));
 }
 
 /*

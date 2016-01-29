@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -254,7 +254,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
 			break;
 
-open:		WT_WITH_SCHEMA_LOCK(session,
+open:		WT_WITH_SCHEMA_LOCK(session, ret,
 		    ret = __clsm_open_cursors(clsm, update, 0, 0));
 		WT_RET(ret);
 	}
@@ -710,7 +710,7 @@ __wt_clsm_init_merge(
 		F_SET(clsm, WT_CLSM_MINOR_MERGE);
 	clsm->nchunks = nchunks;
 
-	WT_WITH_SCHEMA_LOCK(session,
+	WT_WITH_SCHEMA_LOCK(session, ret,
 	    ret = __clsm_open_cursors(clsm, false, start_chunk, start_id));
 	return (ret);
 }
@@ -1543,7 +1543,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	bulk = cval.val != 0;
 
 	/* Get the LSM tree. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session, ret,
 	    ret = __wt_lsm_tree_get(session, uri, bulk, &lsm_tree));
 	/*
 	 * Check whether the exclusive open for a bulk load succeeded, and

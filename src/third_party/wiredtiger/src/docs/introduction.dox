@@ -1,0 +1,62 @@
+/*! @mainpage Reference Guide
+
+WiredTiger is an high performance, scalable, production quality, NoSQL,
+Open Source extensible platform for data management.
+
+WiredTiger supports row-oriented storage (where all columns of a row are
+stored together), column-oriented storage (where columns are stored in
+groups, allowing for more efficient access and storage of column
+subsets) and log-structured merge trees (LSM), for sustained throughput
+under random insert workloads.
+
+WiredTiger includes ACID transactions with standard isolation levels and
+durability at both checkpoint and fine-grained granularity.
+
+WiredTiger can be used as a simple key/value store, but also has a
+complete schema layer, including indices and projections.
+
+WiredTiger should be generally portable to any 64-bit system supporting
+the ANSI C99, POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
+
+For more information on the WiredTiger architecture and why it might be
+right for your project, see:
+
+- @subpage architecture
+
+For more information about building and installing WiredTiger, see:
+
+- @subpage build-posix
+- @subpage build-windows
+- @subpage leveldb
+
+For more information about writing WiredTiger applications, see:
+
+- @subpage programming
+- @subpage programming_lang_java
+(The Java API is not available on Windows.)
+- @ref wt "WiredTiger API reference manual"
+
+For more information about administrating WiredTiger databases, see:
+
+- @subpage command_line
+- @subpage admin
+
+For release change logs and upgrading information, see:
+
+- @subpage md_changelog
+- @subpage upgrading
+
+WiredTiger is Open Source; for more information, see:
+
+- @subpage license
+
+WiredTiger releases are tested on Linux, FreeBSD and OS X; for more
+information, see:
+
+- @subpage testing
+
+To browse the WiredTiger source code repository or contact us, see:
+
+- @subpage community
+
+*/

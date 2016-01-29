@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -21,9 +21,9 @@ __schema_add_table(WT_SESSION_IMPL *session,
 	uint64_t bucket;
 
 	/* Make sure the metadata is open before getting other locks. */
-	WT_RET(__wt_metadata_open(session));
+	WT_RET(__wt_metadata_cursor(session, NULL));
 
-	WT_WITH_TABLE_LOCK(session,
+	WT_WITH_TABLE_LOCK(session, ret,
 	    ret = __wt_schema_open_table(
 	    session, name, namelen, ok_incomplete, &table));
 	WT_RET(ret);

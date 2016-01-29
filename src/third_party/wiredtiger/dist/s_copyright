@@ -1,11 +1,15 @@
 #! /bin/sh
 
+# Only run when building a release
+test -z "$WT_RELEASE_BUILD" && exit 0
+
 # Check the copyrights.
 
 c1=__wt.copyright.1
 c2=__wt.copyright.2
 c3=__wt.copyright.3
 c4=__wt.copyright.4
+c5=__wt.copyright.5
 
 check()
 {
@@ -32,6 +36,9 @@ check()
 		return;
 	fi
 	if `sed -e 1,3p -e 4q -e d $1 | diff - dist/$c4 > /dev/null` ; then
+		return;
+	fi
+	if `sed -e 2,7p -e 8q -e d $1 | diff - dist/$c5 > /dev/null` ; then
 		return;
 	fi
 
@@ -81,6 +88,23 @@ cat > $c4 <<ENDOFTEXT
 # This is free and unencumbered software released into the public domain.
 ENDOFTEXT
 
+cat > $c5 <<ENDOFTEXT
+ * Copyright (c) 2014-$year MongoDB, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ENDOFTEXT
+
+# Parallelize if possible.
+xp=""
+echo date | xargs -P 20 >/dev/null 2>&1
+if test $? -eq 0; then
+	xp="-P 20"
+fi
+
 # Search for files, skipping some well-known 3rd party directories.
 (cd .. && find [a-z]* -name '*.[chi]' \
 	-o -name '*.cxx' \
@@ -97,7 +121,7 @@ ENDOFTEXT
 	-e '/\/node_modules\//d' \
 	-e '/dist\/__/d' \
 	-e 's/^\.\///' |
-    xargs -P 20 -n 1 -I{} sh dist/s_copyright {})
+    xargs $xp -n 1 -I{} sh dist/s_copyright {})
 
 # A few special cases: LICENSE, documentation, wt utility, some of which have
 # more than one copyright notice in the file. For files that have only a single

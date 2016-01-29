@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -545,8 +545,8 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		 * failing with EBUSY due to a database-wide checkpoint.
 		 */
 		if (LF_ISSET(WT_DHANDLE_EXCLUSIVE))
-			WT_WITH_CHECKPOINT_LOCK(session, ret =
-			    __wt_session_get_btree_ckpt(
+			WT_WITH_CHECKPOINT_LOCK(session, ret,
+			    ret = __wt_session_get_btree_ckpt(
 			    session, uri, cfg, flags));
 		else
 			ret = __wt_session_get_btree_ckpt(

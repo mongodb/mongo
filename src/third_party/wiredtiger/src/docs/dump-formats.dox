@@ -1,0 +1,104 @@
+/*! @page dump_formats Dump Formats
+
+The @ref util_dump command produces a flat-text representation of a
+table that can be loaded by @ref util_load.  This page describes the
+output formats of the @ref util_dump command.
+
+@section dump_formats_json JSON dump format
+
+JSON (<a href="http://www.json.org">JavaScript Object Notation</a>)
+dump files use the standard JSON data-interchange format to specify
+the objects, and may be interpreted by any JSON reader.
+
+The format is a JSON object where each key is the URI passed to
+WT_SESSION::create and the corresponding value is a JSON array of two
+entries.  The first entry in this array is a JSON object composed of
+configuration information: the "config" key has the configuration
+string used with WT_SESSION::create, the "colgroups" and "indices"
+keys have values that are arrays of objects that are in turn composed
+of configuration information.  The second entry is a JSON array, with
+each entry an object representing a row of data.  If the columns were
+named in the configuration string used with WT_SESSION::create, those
+names are used for keys, otherwise predictable names (for example,
+"key0", "value0", "value1") are generated.  The values in this object
+are the values for each column in the record.
+
+Here is some sample output:
+
+@code
+{
+    "table:planets" : [
+        {
+            "config" : "columns=(id,name,distance),key_format=i,value_format=Si",
+            "colgroups" : [],
+            "indices" : [
+                {
+                    "uri" : "index:planets:names",
+                    "config" : "columns=(name),key_format=Si,source=\"file:astronomy.wt\",type=file"
+                }
+            ]
+        },
+        [
+            {
+"id" : 1,
+"name" : "Mercury",
+"distance" : 57910000
+            },
+            {
+"id" : 2,
+"name" : "Venus",
+"distance" : 108200000
+            },
+            ...
+       ]
+   ]
+}
+@endcode
+
+@section dump_formats_text Text dump format
+
+Text dump files have three parts, a prefix, a header and a body.
+
+The dump prefix includes basic information about the dump including the
+WiredTiger version that created the dump and the dump format.  The dump
+format consists of a line beginning with \c "Format=", and contains the
+following information:
+
+<table>
+@hrow{String, Meaning}
+@row{hex, the dumped data is in a hexadecimal dump format}
+@row{print, the dumped data is in a printable format}
+</table>
+
+The dump header follows a single \c "Header" line in the file and
+consists of paired key and value lines, where the key is the URI passed
+to WT_SESSION::create and the value is corresponding configuration
+string.  The table or file can be recreated by calling
+WT_SESSION::create for each pair of lines in the header.
+
+The dump body follows a single \c "Data" line in the file and consists
+of a text representation of the records in the table.  Each record is a
+represented by a pair of lines: the first line is the key and the second
+line is the value.  These lines are encoded in one of two formats: a
+printable format and a hexadecimal format.
+
+The printable format consists of literal printable characters, and
+hexadecimal encoded non-printable characters.  Encoded characters are
+written as three separate characters: a backslash character followed by
+two hexadecimal characters (first the high nibble and then the low
+nibble).  For example, a newline character in the ASCII character set
+would be encoded as \c "\0a" and an escape character would be encoded
+as \c "\1b".  Backslash characters which do not precede a hexadecimal
+encoding are paired, that is, the characters \c "\\" should be
+interpreted as a single backslash character.
+
+The hexadecimal format consists of encoded characters, where each
+literal character is written as a pair of characters (first the
+high-nibble and then the low-nibble).  For example, "0a" would be an
+ASCII newline character and "1b" would be an ASCII escape character.
+
+Because the definition of "printable" may depend on the application's
+locale, dump files in the printable output format may be less portable
+than dump files in the hexadecimal output format.
+
+ */

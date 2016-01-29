@@ -1,0 +1,8 @@
+wiredtiger for Debian
+---------------------
+
+This is a package of the WiredTiger database library for Debian based
+systems. For more information on WiredTiger please visit:
+http://www.wiredtiger.com or contact us at info@wiredtiger.com
+
+ -- Alex <alexg@wiredtiger.com>  Tue, 01 Apr 2014 15:50:02 +1100

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -7,43 +7,6 @@
  */
 
 #include "wt_internal.h"
-
-/*
- * __truncate_file --
- *	WT_SESSION::truncate for a file.
- */
-static int
-__truncate_file(WT_SESSION_IMPL *session, const char *uri)
-{
-	WT_DECL_RET;
-	const char *filename;
-	uint32_t allocsize;
-
-	filename = uri;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		return (EINVAL);
-
-	/* Open and lock the file. */
-	WT_RET(__wt_session_get_btree(
-	    session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
-	WT_STAT_FAST_DATA_INCR(session, cursor_truncate);
-
-	/* Get the allocation size. */
-	allocsize = S2BT(session)->allocsize;
-
-	WT_RET(__wt_session_release_btree(session));
-
-	/* Close any btree handles in the file. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
-	    ret = __wt_conn_dhandle_close_all(session, uri, false));
-	WT_RET(ret);
-
-	/* Delete the root address and truncate the file. */
-	WT_RET(__wt_meta_checkpoint_clear(session, uri));
-	WT_RET(__wt_block_manager_truncate(session, filename, allocsize));
-
-	return (0);
-}
 
 /*
  * __truncate_table --
@@ -112,9 +75,12 @@ __wt_schema_truncate(
 
 	tablename = uri;
 
-	if (WT_PREFIX_MATCH(uri, "file:")) {
-		ret = __truncate_file(session, uri);
-	} else if (WT_PREFIX_MATCH(uri, "lsm:"))
+	if (WT_PREFIX_MATCH(uri, "file:"))
+		/*
+		 * File truncate translates into a range truncate.
+		 */
+		ret = __wt_session_range_truncate(session, uri, NULL, NULL);
+	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_truncate(session, uri, cfg);
 	else if (WT_PREFIX_SKIP(tablename, "table:"))
 		ret = __truncate_table(session, tablename, cfg);

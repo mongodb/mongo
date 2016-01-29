@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -141,7 +141,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		    ret = bm->checkpoint_resolve(bm, session));
 		break;
 	case WT_ST_DROP_COMMIT:
-		if ((ret = __wt_remove_if_exists(session, trk->a)) != 0)
+		if ((ret = __wt_block_manager_drop(session, trk->a)) != 0)
 			__wt_err(session, ret,
 			    "metadata remove dropped file %s", trk->a);
 		break;
@@ -189,7 +189,7 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		 * For removes, b is NULL.
 		 */
 		if (trk->a != NULL && trk->b != NULL &&
-		    (ret = __wt_rename(session,
+		    (ret = __wt_rename_and_sync_directory(session,
 		    trk->b + strlen("file:"), trk->a + strlen("file:"))) != 0)
 			__wt_err(session, ret,
 			    "metadata unroll rename %s to %s", trk->b, trk->a);
@@ -262,16 +262,17 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 	}
 
 	/*
-	 * If we don't have the metadata handle (e.g, we're in the process of
+	 * If we don't have the metadata cursor (e.g, we're in the process of
 	 * creating the metadata), we can't sync it.
 	 */
-	if (!need_sync || session->meta_dhandle == NULL ||
+	if (!need_sync || session->meta_cursor == NULL ||
 	    F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
 		goto done;
 
 	/* If we're logging, make sure the metadata update was flushed. */
 	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED)) {
-		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		WT_WITH_DHANDLE(session,
+		    WT_SESSION_META_DHANDLE(session),
 		    ret = __wt_txn_checkpoint_log(
 			session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
 		WT_RET(ret);
@@ -284,12 +285,14 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 		 */
 		ckpt_session->txn.id = session->txn.id;
 		F_SET(ckpt_session, WT_SESSION_LOCKED_SCHEMA);
-		WT_WITH_DHANDLE(ckpt_session, session->meta_dhandle, ret =
-		    __wt_checkpoint(ckpt_session, NULL));
+		WT_WITH_DHANDLE(ckpt_session,
+		    WT_SESSION_META_DHANDLE(session),
+		    ret = __wt_checkpoint(ckpt_session, NULL));
 		F_CLR(ckpt_session, WT_SESSION_LOCKED_SCHEMA);
 		ckpt_session->txn.id = WT_TXN_NONE;
 		WT_RET(ret);
-		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		WT_WITH_DHANDLE(session,
+		    WT_SESSION_META_DHANDLE(session),
 		    ret = __wt_checkpoint_sync(session, NULL));
 		WT_RET(ret);
 	}

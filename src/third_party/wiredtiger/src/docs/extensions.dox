@@ -1,0 +1,60 @@
+/*! @page extensions Extending WiredTiger
+
+WiredTiger can be extended in various ways, including:
+
+- adding @ref compression_custom, @ref encryption_custom,
+- @ref custom_data_sources, and
+- @ref WT_COLLATOR "by implementing the WT_COLLATOR interface".
+- @ref WT_EXTRACTOR "by implementing the WT_EXTRACTOR interface".
+
+Code that implements these interfaces can use the @ref wt_ext.
+
+@section extensions_loadable Loadable extensions
+
+Loadable extensions, also known as modules, are libraries of code that can
+be loaded at runtime to add functionality to WiredTiger.  To build a
+loadable extension, use <code>gcc -shared ...</code> or
+<code>libtool -module ...</code>, or the equivalent for your system.
+
+Extensions can be loaded on an open connection by calling
+WT_CONNECTION::load_extension.
+
+Extensions can be loaded during ::wiredtiger_open by passing the
+\c extensions configuration when the database is created.  When used this
+way, the extensions will be loaded each time the database is opened,
+whether by your application or the @ref command_line.
+
+The extension entry point, which defaults to ::wiredtiger_extension_init,
+is called for each loadable module.  Applications must supply this entry
+point, which in turn usually calls WT_CONNECTION::add_data_source,
+WT_CONNECTION::add_encryptor, WT_CONNECTION::add_collator and/or
+WT_CONNECTION::add_compressor to add functionality to WiredTiger.
+
+@section extensions_recovery Extensions and recovery
+
+Some extensions, in particular WT_COLLATOR and WT_COMPRESSOR, are required
+in order to run recovery if \c logging is enabled.  This means that they
+must be loaded using the \c extensions keyword to ::wiredtiger_open,
+because recovery runs before ::wiredtiger_open returns the WT_CONNECTION
+handle to the application.
+
+@section extensions_local Local extensions
+
+If it is not feasible to separate application logic into a loadable
+extension separate from the executable, applications can use the reserved
+name \c local as a path in the \c extensions list.  This will search for
+the entry point in the running application, and should usually override the
+\c entry symbol.
+
+Here is an example of a local entry point:
+
+<code>
+wiredtiger_open(path, NULL,
+    "create,extensions=[local=(entry=my_extension_init)]")
+</code>
+
+Note that databases created in this way can only be opened by applications
+that include the specified entry point.  In particular, <b>they cannot be
+accessed using the @ref command_line</b>.
+
+ */

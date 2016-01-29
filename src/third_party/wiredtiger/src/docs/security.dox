@@ -1,0 +1,25 @@
+/*! @page security Security
+
+@section directory_permissions Database directory permissions
+
+All WiredTiger files are stored in the database home directory, and the
+WiredTiger database directory should have its permissions set to ensure
+database objects are not accessible to users without appropriate
+permissions.  See @ref home for more information.
+
+@section file_permissions File permissions
+
+WiredTiger creates file system objects readable and writable by the
+process owner, group and user, as modified by the process' umask value.
+The group ownership of created file system objects may vary depending
+on the system, and is not controlled by WiredTiger.
+
+@section environment_variables Environment variables
+
+Consider security when configuring WiredTiger to use the WIREDTIGER_HOME
+environment variable, especially in applications which run with
+permissions other than the user's.  Such applications are potentially
+vulnerable to allowing users access to databases they could not
+otherwise access.  See @ref home for more information.
+
+*/

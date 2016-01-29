@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -75,12 +75,13 @@ __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
  *	Flush a directory to ensure a file creation is durable.
  */
 int
-__wt_directory_sync(WT_SESSION_IMPL *session, char *path)
+__wt_directory_sync(WT_SESSION_IMPL *session, const char *path)
 {
 #ifdef __linux__
 	WT_DECL_RET;
 	int fd, tret;
-	char *dir;
+	const char *dir;
+	char *copy;
 
 	/*
 	 * POSIX 1003.1 does not require that fsync of a file handle ensures the
@@ -88,15 +89,22 @@ __wt_directory_sync(WT_SESSION_IMPL *session, char *path)
 	 * there are historic Linux filesystems requiring this), do an explicit
 	 * fsync on a file descriptor for the directory to be sure.
 	 */
-	if (path == NULL || (dir = strrchr(path, '/')) == NULL) {
-		dir = NULL;
-		path = (char *)S2C(session)->home;
-	} else
-		*dir = '\0';
+	copy = NULL;
+	if (path == NULL || (dir = strrchr(path, '/')) == NULL)
+		path = S2C(session)->home;
+	else {
+		/*
+		 * Copy the directory name, leaving the trailing slash in place,
+		 * so a path of "/foo" doesn't result in an empty string.
+		 */
+		WT_RET(__wt_strndup(
+		    session, path, (size_t)(dir - path) + 1, &copy));
+		path = copy;
+	}
+
 	WT_SYSCALL_RETRY(((fd =
 	    open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
-	if (dir != NULL)
-		*dir = '/';
+	__wt_free(session, copy);
 	if (ret != 0)
 		WT_RET_MSG(session, ret, "%s: open", path);
 

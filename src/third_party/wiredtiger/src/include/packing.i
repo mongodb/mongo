@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -25,7 +25,8 @@ typedef struct {
 	char type;
 } WT_PACK_VALUE;
 
-#define	WT_PACK_VALUE_INIT  { { 0 }, 0, 0, 0 }
+/* Default to size = 1 if there is no size prefix. */
+#define	WT_PACK_VALUE_INIT  { { 0 }, 1, 0, 0 }
 #define	WT_DECL_PACK_VALUE(pv)  WT_PACK_VALUE pv = WT_PACK_VALUE_INIT
 
 typedef struct {
@@ -151,7 +152,14 @@ next:	if (pack->cur == pack->end)
 
 	switch (pv->type) {
 	case 'S':
+		return (0);
 	case 's':
+		if (pv->size < 1)
+			WT_RET_MSG(pack->session, EINVAL,
+			    "Fixed length strings must be at least 1 byte "
+			    "in format '%.*s'",
+			    (int)(pack->end - pack->orig), pack->orig);
+		return (0);
 	case 'x':
 		return (0);
 	case 't':
@@ -266,9 +274,10 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		return (s);
 	case 's':
 	case 'S':
-		if (pv->type == 's' || pv->havesize)
+		if (pv->type == 's' || pv->havesize) {
 			s = pv->size;
-		else
+			WT_ASSERT(session, s != 0);
+		} else
 			s = strlen(pv->u.s) + 1;
 		return (s);
 	case 'U':
@@ -460,9 +469,10 @@ __unpack_read(WT_SESSION_IMPL *session,
 		break;
 	case 's':
 	case 'S':
-		if (pv->type == 's' || pv->havesize)
+		if (pv->type == 's' || pv->havesize) {
 			s = pv->size;
-		else
+			WT_ASSERT(session, s != 0);
+		} else
 			s = strlen((const char *)*pp) + 1;
 		if (s > 0)
 			pv->u.s = (const char *)*pp;
@@ -667,7 +677,6 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 
 	if (fmt[0] != '\0' && fmt[1] == '\0') {
 		pv.type = fmt[0];
-		pv.size = 1;
 		if ((ret = __unpack_read(session, &pv, &p, size)) == 0)
 			WT_UNPACK_PUT(session, pv, ap);
 		return (0);

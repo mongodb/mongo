@@ -1,0 +1,97 @@
+/*! @page tune_cache Cache and eviction tuning
+
+@section tuning_cache_size Cache size
+
+The size of the cache is the single most important tuning knob for a
+WiredTiger application.  Ideally the cache should be configured to be
+large enough to hold an application's working set.
+
+The cache size for the database is normally configured by setting the
+\c cache_size configuration string when calling the ::wiredtiger_open
+function.  The cache size can be adjusted after the open call with
+WT_CONNECTION::reconfigure.
+
+An example of setting a cache size to 500MB:
+
+@snippet ex_config.c configure cache size
+
+The effectiveness of the chosen cache size can be measured by reviewing
+the page eviction statistics for the database.
+
+@section tuning_cache_resident Cache resident objects
+
+Objects can be created as cache resident - that is their contents will
+remain in cache and never be considered for the purposes of cache
+eviction. Cache residence can be configured with the WT_SESSION::create
+"cache_resident" configuration string. LSM tree objects do not support
+the "cache_resident" setting.
+
+Configuring a cache resident object has several effects:
+
+- Once the object's pages have been created or instantiated in memory
+  no further I/O cost is ever paid for object access, minimizing
+  potential latency.
+- Cache resident objects can be accessed faster than objects tracked for
+  potential eviction.
+- If cache resident objects require a significant proportion of the
+  configured cache size then non cache-resident objects can incur
+  significantly higher I/O churn.
+- If cache resident objects require more space than the configured cache
+  size, then further operations will either return error or stall until
+  space is made available by closing objects.
+
+An example of configuring a cache-resident object:
+
+@snippet ex_all.c Create a cache-resident object
+
+@section cache_eviction Eviction tuning
+
+When an application approaches the maximum cache size, WiredTiger begins
+eviction to stop memory use from growing too large, approximating a
+least-recently-used algorithm.
+
+WiredTiger provides several configuration options for tuning how pages
+are evicted from the cache. Different settings will improve performance
+depending on an application's particular workload.  Customizing the
+eviction configuration settings can reduce latency spikes in
+application threads and can improve throughput in some applications.
+
+WiredTiger eviction tuning options can be configured when first opening
+a database via ::wiredtiger_open, or changed after open with
+WT_CONNECTION::reconfigure.
+
+The \c eviction_trigger configuration value is the occupied percentage
+of the total cache size that causes eviction to start.  By default,
+WiredTiger begins evicting pages when the cache is 95% full. An
+application concerned about a latency spike as the cache becomes full
+might want to begin eviction earlier.
+
+The \c eviction_target configuration value is the overall target for
+eviction, expressed as a percentage of total cache size; that is, once
+eviction begins, it will proceed until the target percentage of bytes
+in the cache is reached.  Note the \c eviction_target configuration
+value is ignored until eviction is triggered.
+
+The \c eviction_dirty_target configuration value is the overall dirty
+byte target for eviction, expressed as a percentage of total cache size;
+that is, once eviction begins, it will proceed until the target
+percentage of dirty bytes in the cache is reached.  Note the
+\c eviction_dirty_target configuration value is ignored until eviction
+is triggered.
+
+@snippet ex_all.c Eviction configuration
+
+By default, WiredTiger cache eviction is handled by a single, separate
+thread.  In a large, busy cache, a single thread will be insufficient
+(especially when the eviction thread must wait for I/O).  The
+\c eviction=(threads_min) and \c eviction=(threads_max) configuration
+values can be used to configure the minimum and maximum number of
+additional threads WiredTiger will create to keep up with the
+application eviction load.  Finally, if the Wiredtiger eviction threads
+are unable to keep up with application demand for cache space,
+application threads will be tasked with eviction as well, potentially
+resulting in latency spikes.
+
+@snippet ex_all.c Eviction worker configuration
+
+ */

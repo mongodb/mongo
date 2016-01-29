@@ -31,6 +31,7 @@ src/btree/bt_misc.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c
 src/btree/bt_read.c
+src/btree/bt_rebalance.c
 src/btree/bt_ret.c
 src/btree/bt_slvg.c
 src/btree/bt_split.c
@@ -121,6 +122,7 @@ src/os_win/os_map.c
 src/os_win/os_mtx_cond.c
 src/os_win/os_once.c
 src/os_win/os_open.c
+src/os_win/os_pagesize.c
 src/os_win/os_path.c
 src/os_win/os_priv.c
 src/os_win/os_remove.c

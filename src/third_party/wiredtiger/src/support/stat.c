@@ -250,19 +250,24 @@ __wt_stat_dsrc_aggregate_single(
 	to->block_alloc += from->block_alloc;
 	to->block_free += from->block_free;
 	to->block_checkpoint_size += from->block_checkpoint_size;
-	to->allocation_size = from->allocation_size;
+	if (from->allocation_size > to->allocation_size)
+		to->allocation_size = from->allocation_size;
 	to->block_reuse_bytes += from->block_reuse_bytes;
-	to->block_magic = from->block_magic;
-	to->block_major = from->block_major;
+	if (from->block_magic > to->block_magic)
+		to->block_magic = from->block_magic;
+	if (from->block_major > to->block_major)
+		to->block_major = from->block_major;
 	to->block_size += from->block_size;
-	to->block_minor = from->block_minor;
+	if (from->block_minor > to->block_minor)
+		to->block_minor = from->block_minor;
 	to->btree_checkpoint_generation += from->btree_checkpoint_generation;
 	to->btree_column_fix += from->btree_column_fix;
 	to->btree_column_internal += from->btree_column_internal;
 	to->btree_column_deleted += from->btree_column_deleted;
 	to->btree_column_variable += from->btree_column_variable;
 	to->btree_column_rle += from->btree_column_rle;
-	to->btree_fixed_len = from->btree_fixed_len;
+	if (from->btree_fixed_len > to->btree_fixed_len)
+		to->btree_fixed_len = from->btree_fixed_len;
 	if (from->btree_maxintlkey > to->btree_maxintlkey)
 		to->btree_maxintlkey = from->btree_maxintlkey;
 	if (from->btree_maxintlpage > to->btree_maxintlpage)
@@ -367,12 +372,16 @@ __wt_stat_dsrc_aggregate(
 	to->block_free += WT_STAT_READ(from, block_free);
 	to->block_checkpoint_size +=
 	    WT_STAT_READ(from, block_checkpoint_size);
-	to->allocation_size = from[0]->allocation_size;
+	if ((v = WT_STAT_READ(from, allocation_size)) > to->allocation_size)
+		to->allocation_size = v;
 	to->block_reuse_bytes += WT_STAT_READ(from, block_reuse_bytes);
-	to->block_magic = from[0]->block_magic;
-	to->block_major = from[0]->block_major;
+	if ((v = WT_STAT_READ(from, block_magic)) > to->block_magic)
+		to->block_magic = v;
+	if ((v = WT_STAT_READ(from, block_major)) > to->block_major)
+		to->block_major = v;
 	to->block_size += WT_STAT_READ(from, block_size);
-	to->block_minor = from[0]->block_minor;
+	if ((v = WT_STAT_READ(from, block_minor)) > to->block_minor)
+		to->block_minor = v;
 	to->btree_checkpoint_generation +=
 	    WT_STAT_READ(from, btree_checkpoint_generation);
 	to->btree_column_fix += WT_STAT_READ(from, btree_column_fix);
@@ -382,15 +391,14 @@ __wt_stat_dsrc_aggregate(
 	to->btree_column_variable +=
 	    WT_STAT_READ(from, btree_column_variable);
 	to->btree_column_rle += WT_STAT_READ(from, btree_column_rle);
-	to->btree_fixed_len = from[0]->btree_fixed_len;
-	if ((v = WT_STAT_READ(from, btree_maxintlkey)) >
-	    to->btree_maxintlkey)
+	if ((v = WT_STAT_READ(from, btree_fixed_len)) > to->btree_fixed_len)
+		to->btree_fixed_len = v;
+	if ((v = WT_STAT_READ(from, btree_maxintlkey)) > to->btree_maxintlkey)
 		to->btree_maxintlkey = v;
 	if ((v = WT_STAT_READ(from, btree_maxintlpage)) >
 	    to->btree_maxintlpage)
 		to->btree_maxintlpage = v;
-	if ((v = WT_STAT_READ(from, btree_maxleafkey)) >
-	    to->btree_maxleafkey)
+	if ((v = WT_STAT_READ(from, btree_maxleafkey)) > to->btree_maxleafkey)
 		to->btree_maxleafkey = v;
 	if ((v = WT_STAT_READ(from, btree_maxleafpage)) >
 	    to->btree_maxleafpage)

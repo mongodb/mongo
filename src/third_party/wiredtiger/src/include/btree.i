@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2015 MongoDB, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -1046,15 +1046,16 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * do it without making the appending threads wait. See if it's worth
 	 * doing a split to let the threads continue before doing eviction.
 	 *
-	 * Ignore anything other than large, dirty row-store leaf pages. The
-	 * split code only supports row-store pages, and we depend on the page
-	 * being dirty for correctness (the page must be reconciled again
+	 * Ignore anything other than large, dirty leaf pages. We depend on the
+	 * page being dirty for correctness (the page must be reconciled again
 	 * before being evicted after the split, information from a previous
 	 * reconciliation will be wrong, so we can't evict immediately).
 	 */
-	if (page->type != WT_PAGE_ROW_LEAF ||
-	    page->memory_footprint < btree->splitmempage ||
-	    !__wt_page_is_modified(page))
+	if (page->memory_footprint < btree->splitmempage)
+		return (false);
+	if (WT_PAGE_IS_INTERNAL(page))
+		return (false);
+	if (!__wt_page_is_modified(page))
 		return (false);
 
 	/*
@@ -1071,9 +1072,11 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 #define	WT_MIN_SPLIT_COUNT	30
 #define	WT_MIN_SPLIT_MULTIPLIER 16      /* At level 2, we see 1/16th entries */
 
-	ins_head = page->pg_row_entries == 0 ?
+	ins_head = page->type == WT_PAGE_ROW_LEAF ?
+	    (page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
-	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
+	    WT_COL_APPEND(page);
 	if (ins_head == NULL)
 		return (false);
 	for (count = 0, size = 0, ins = ins_head->head[WT_MIN_SPLIT_DEPTH];
@@ -1280,8 +1283,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
  * coupling up/down the tree.
  */
 static inline int
-__wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
-    WT_REF *want, uint32_t flags
+__wt_page_swap_func(
+    WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -1310,20 +1313,40 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
 #endif
 	    );
 
-	/* Expected failures: page not found or restart. */
-	if (ret == WT_NOTFOUND || ret == WT_RESTART)
-		return (ret);
+	/*
+	 * Expected failures: page not found or restart. Our callers list the
+	 * errors they're expecting to handle.
+	 */
+	if (LF_ISSET(WT_READ_NOTFOUND_OK) && ret == WT_NOTFOUND)
+		return (WT_NOTFOUND);
+	if (LF_ISSET(WT_READ_RESTART_OK) && ret == WT_RESTART)
+		return (WT_RESTART);
 
-	/* Discard the original held page. */
+	/* Discard the original held page on either success or error. */
 	acquired = ret == 0;
 	WT_TRET(__wt_page_release(session, held, flags));
 
+	/* Fast-path expected success. */
+	if (ret == 0)
+		return (0);
+
 	/*
-	 * If there was an error discarding the original held page, discard
-	 * the acquired page too, keeping it is never useful.
+	 * If there was an error at any point that our caller isn't prepared to
+	 * handle, discard any page we acquired.
 	 */
-	if (acquired && ret != 0)
+	if (acquired)
 		WT_TRET(__wt_page_release(session, want, flags));
+
+	/*
+	 * If we're returning an error, don't let it be one our caller expects
+	 * to handle as returned by page-in: the expectation includes the held
+	 * page not having been released, and that's not the case.
+	 */
+	if (LF_ISSET(WT_READ_NOTFOUND_OK) && ret == WT_NOTFOUND)
+		return (EINVAL);
+	if (LF_ISSET(WT_READ_RESTART_OK) && ret == WT_RESTART)
+		return (EINVAL);
+
 	return (ret);
 }
 
@@ -1437,17 +1460,54 @@ __wt_split_intl_race(
 	 *
 	 * There's a page-split race when we walk the tree: if we're splitting
 	 * an internal page into its parent, we update the parent's page index
-	 * and then update the page being split, and it's not an atomic update.
-	 * A thread could read the parent page's original page index, and then
-	 * read the page's replacement index. Because internal page splits work
-	 * by replacing the original page with the initial part of the original
-	 * page, the result of this race is we will have a key that's past the
-	 * end of the current page, and the parent's page index will have moved.
+	 * before updating the split page's page index, and it's not an atomic
+	 * update. A thread can read the parent page's original page index and
+	 * then read the split page's replacement index.
 	 *
-	 * It's also possible a thread could read the parent page's replacement
-	 * page index, and then read the page's original index. Because internal
-	 * splits work by truncating the original page, the original page's old
-	 * content is compatible, this isn't a problem and we ignore this race.
+	 * Because internal page splits work by truncating the original page to
+	 * the initial part of the original page, the result of this race is we
+	 * will have a search key that points past the end of the current page.
+	 * This is only an issue when we search past the end of the page, if we
+	 * find a WT_REF in the page with the namespace we're searching for, we
+	 * don't care if the WT_REF moved or not while we were searching, we
+	 * have the correct page.
+	 *
+	 * For example, imagine an internal page with 3 child pages, with the
+	 * namespaces a-f, g-h and i-j; the first child page splits. The parent
+	 * starts out with the following page-index:
+	 *
+	 *	| ... | a | g | i | ... |
+	 *
+	 * which changes to this:
+	 *
+	 *	| ... | a | c | e | g | i | ... |
+	 *
+	 * The child starts out with the following page-index:
+	 *
+	 *	| a | b | c | d | e | f |
+	 *
+	 * which changes to this:
+	 *
+	 *	| a | b |
+	 *
+	 * The thread searches the original parent page index for the key "cat",
+	 * it couples to the "a" child page; if it uses the replacement child
+	 * page index, it will search past the end of the page and couple to the
+	 * "b" page, which is wrong.
+	 *
+	 * To detect the problem, we remember the parent page's page index used
+	 * to descend the tree. Whenever we search past the end of a page, we
+	 * check to see if the parent's page index has changed since our use of
+	 * it during descent. As the problem only appears if we read the split
+	 * page's replacement index, the parent page's index must already have
+	 * changed, ensuring we detect the problem.
+	 *
+	 * It's possible for the opposite race to happen (a thread could read
+	 * the parent page's replacement page index and then read the split
+	 * page's original index). This isn't a problem because internal splits
+	 * work by truncating the split page, so the split page search is for
+	 * content the split page retains after the split, and we ignore this
+	 * race.
 	 */
 	WT_INTL_INDEX_GET(session, parent, pindex);
 	return (pindex != saved_pindex);
