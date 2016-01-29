@@ -99,13 +99,28 @@ class MoveLimitBeforeProject : public Base {
     }
 };
 
-class MoveMulitipleSkipsAndLimitsBeforeProject : public Base {
+class MoveMultipleSkipsAndLimitsBeforeProject : public Base {
     string inputPipeJson() override {
         return "[{$project: {a : 1}}, {$limit : 5}, {$skip : 3}]";
     }
 
     string outputPipeJson() override {
         return "[{$limit : 5}, {$skip : 3}, {$project: {a : true}}]";
+    }
+};
+
+class SkipSkipLimitBecomesLimitSkip : public Base {
+    string inputPipeJson() override {
+        return "[{$skip : 3}"
+               ",{$skip : 5}"
+               ",{$limit: 5}"
+               "]";
+    }
+
+    string outputPipeJson() override {
+        return "[{$limit: 13}"
+               ",{$skip :  8}"
+               "]";
     }
 };
 
@@ -179,6 +194,16 @@ class DoNotRemoveNonEmptyMatch : public Base {
     }
 };
 
+class MoveMatchBeforeSort : public Base {
+    string inputPipeJson() override {
+        return "[{$sort: {b: 1}}, {$match: {a: 2}}]";
+    }
+
+    string outputPipeJson() override {
+        return "[{$match: {a: 2}}, {$sort: {sortKey: {b: 1}}}]";
+    }
+};
+
 class LookupShouldCoalesceWithUnwindOnAs : public Base {
     string inputPipeJson() {
         return "[{$lookup: {from : 'coll2', as : 'same', localField: 'left', foreignField: "
@@ -231,6 +256,15 @@ class LookupShouldNotCoalesceWithUnwindNotOnAs : public Base {
                "'right'}}"
                ",{$unwind: {path: '$from'}}"
                "]";
+    }
+};
+
+class MatchShouldDuplicateItselfBeforeRedact : public Base {
+    string inputPipeJson() {
+        return "[{$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {a: 1, b:12}}, {$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
     }
 };
 
@@ -600,16 +634,19 @@ public:
         add<Optimizations::Local::RemoveSkipZero>();
         add<Optimizations::Local::MoveLimitBeforeProject>();
         add<Optimizations::Local::MoveSkipBeforeProject>();
-        add<Optimizations::Local::MoveMulitipleSkipsAndLimitsBeforeProject>();
+        add<Optimizations::Local::MoveMultipleSkipsAndLimitsBeforeProject>();
+        add<Optimizations::Local::SkipSkipLimitBecomesLimitSkip>();
         add<Optimizations::Local::SortMatchProjSkipLimBecomesMatchTopKSortSkipProj>();
         add<Optimizations::Local::DoNotRemoveSkipOne>();
         add<Optimizations::Local::RemoveEmptyMatch>();
         add<Optimizations::Local::RemoveMultipleEmptyMatches>();
+        add<Optimizations::Local::MoveMatchBeforeSort>();
         add<Optimizations::Local::DoNotRemoveNonEmptyMatch>();
         add<Optimizations::Local::LookupShouldCoalesceWithUnwindOnAs>();
         add<Optimizations::Local::LookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty>();
         add<Optimizations::Local::LookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex>();
         add<Optimizations::Local::LookupShouldNotCoalesceWithUnwindNotOnAs>();
+        add<Optimizations::Local::MatchShouldDuplicateItselfBeforeRedact>();
         add<Optimizations::Sharded::Empty>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::ShouldCoalesceUnwindOnAs>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::

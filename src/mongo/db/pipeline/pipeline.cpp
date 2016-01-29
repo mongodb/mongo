@@ -173,151 +173,28 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
         }
     }
 
-    // The order in which optimizations are applied can have significant impact on the
-    // efficiency of the final pipeline. Be Careful!
-    Optimizations::Local::moveMatchBeforeSort(pPipeline.get());
-    Optimizations::Local::moveSkipAndLimitBeforeProject(pPipeline.get());
-    Optimizations::Local::moveLimitBeforeSkip(pPipeline.get());
-    Optimizations::Local::coalesceAdjacent(pPipeline.get());
-    Optimizations::Local::optimizeEachDocumentSource(pPipeline.get());
-    Optimizations::Local::duplicateMatchBeforeInitalRedact(pPipeline.get());
+    pPipeline->optimizePipeline();
 
     return pPipeline;
 }
 
-void Pipeline::Optimizations::Local::moveMatchBeforeSort(Pipeline* pipeline) {
-    // TODO Keep moving matches across multiple sorts as moveLimitBeforeSkip does below.
-    // TODO Check sort for limit. Not an issue currently due to order optimizations are applied,
-    // but should be fixed.
-    SourceContainer& sources = pipeline->sources;
-    for (size_t srcn = sources.size(), srci = 1; srci < srcn; ++srci) {
-        intrusive_ptr<DocumentSource>& pSource = sources[srci];
-        DocumentSourceMatch* match = dynamic_cast<DocumentSourceMatch*>(pSource.get());
-        if (match && !match->isTextQuery()) {
-            intrusive_ptr<DocumentSource>& pPrevious = sources[srci - 1];
-            if (dynamic_cast<DocumentSourceSort*>(pPrevious.get())) {
-                /* swap this item with the previous */
-                intrusive_ptr<DocumentSource> pTemp(pPrevious);
-                pPrevious = pSource;
-                pSource = pTemp;
-            }
+void Pipeline::optimizePipeline() {
+    SourceContainer optimizedSources;
+
+    SourceContainer::iterator itr = sources.begin();
+
+    while (itr != sources.end() && std::next(itr) != sources.end()) {
+        invariant((*itr).get());
+        itr = (*itr).get()->optimizeAt(itr, &sources);
+    }
+
+    // Once we have reached our final number of stages, optimize each individually.
+    for (auto&& source : sources) {
+        if (auto out = source->optimize()) {
+            optimizedSources.push_back(out);
         }
     }
-}
-
-void Pipeline::Optimizations::Local::moveSkipAndLimitBeforeProject(Pipeline* pipeline) {
-    SourceContainer& sources = pipeline->sources;
-    if (sources.empty())
-        return;
-
-    for (int i = sources.size() - 1; i >= 1 /* not looking at 0 */; i--) {
-        // This optimization only applies when a $project comes before a $skip or $limit.
-        auto project = dynamic_cast<DocumentSourceProject*>(sources[i - 1].get());
-        if (!project)
-            continue;
-
-        auto skip = dynamic_cast<DocumentSourceSkip*>(sources[i].get());
-        auto limit = dynamic_cast<DocumentSourceLimit*>(sources[i].get());
-        if (!(skip || limit))
-            continue;
-
-        swap(sources[i], sources[i - 1]);
-
-        // Start at back again. This is needed to handle cases with more than 1 $skip or
-        // $limit (S means skip, L means limit, P means project)
-        //
-        // These would work without second pass (assuming back to front ordering)
-        // PS  -> SP
-        // PL  -> LP
-        // PPL -> LPP
-        // PPS -> SPP
-        //
-        // The following cases need a second pass to handle the second skip or limit
-        // PLL  -> LLP
-        // PPLL -> LLPP
-        // PLPL -> LLPP
-        i = sources.size();  // decremented before next pass
-    }
-}
-
-void Pipeline::Optimizations::Local::moveLimitBeforeSkip(Pipeline* pipeline) {
-    SourceContainer& sources = pipeline->sources;
-    if (sources.empty())
-        return;
-
-    for (int i = sources.size() - 1; i >= 1 /* not looking at 0 */; i--) {
-        DocumentSourceLimit* limit = dynamic_cast<DocumentSourceLimit*>(sources[i].get());
-        DocumentSourceSkip* skip = dynamic_cast<DocumentSourceSkip*>(sources[i - 1].get());
-        if (limit && skip) {
-            // Increase limit by skip since the skipped docs now pass through the $limit
-            limit->setLimit(limit->getLimit() + skip->getSkip());
-            swap(sources[i], sources[i - 1]);
-
-            // Start at back again. This is needed to handle cases with more than 1 $limit
-            // (S means skip, L means limit)
-            //
-            // These two would work without second pass (assuming back to front ordering)
-            // SL   -> LS
-            // SSL  -> LSS
-            //
-            // The following cases need a second pass to handle the second limit
-            // SLL  -> LLS
-            // SSLL -> LLSS
-            // SLSL -> LLSS
-            i = sources.size();  // decremented before next pass
-        }
-    }
-}
-
-void Pipeline::Optimizations::Local::coalesceAdjacent(Pipeline* pipeline) {
-    SourceContainer& sources = pipeline->sources;
-    if (sources.empty())
-        return;
-
-    // move all sources to a temporary list
-    SourceContainer tempSources;
-    sources.swap(tempSources);
-
-    // move the first one to the final list
-    sources.push_back(tempSources[0]);
-
-    // run through the sources, coalescing them or keeping them
-    for (size_t tempn = tempSources.size(), tempi = 1; tempi < tempn; ++tempi) {
-        // If we can't coalesce the source with the last, then move it
-        // to the final list, and make it the new last.  (If we succeeded,
-        // then we're still on the same last, and there's no need to move
-        // or do anything with the source -- the destruction of tempSources
-        // will take care of the rest.)
-        intrusive_ptr<DocumentSource>& pLastSource = sources.back();
-        intrusive_ptr<DocumentSource>& pTemp = tempSources[tempi];
-        verify(pTemp && pLastSource);
-        if (!pLastSource->coalesce(pTemp))
-            sources.push_back(pTemp);
-    }
-}
-
-void Pipeline::Optimizations::Local::optimizeEachDocumentSource(Pipeline* pipeline) {
-    SourceContainer& sources = pipeline->sources;
-    SourceContainer newSources;
-    for (SourceContainer::iterator it(sources.begin()); it != sources.end(); ++it) {
-        if (auto out = (*it)->optimize()) {
-            newSources.push_back(std::move(out));
-        }
-    }
-    pipeline->sources = std::move(newSources);
-}
-
-void Pipeline::Optimizations::Local::duplicateMatchBeforeInitalRedact(Pipeline* pipeline) {
-    SourceContainer& sources = pipeline->sources;
-    if (sources.size() >= 2 && dynamic_cast<DocumentSourceRedact*>(sources[0].get())) {
-        if (DocumentSourceMatch* match = dynamic_cast<DocumentSourceMatch*>(sources[1].get())) {
-            const BSONObj redactSafePortion = match->redactSafePortion();
-            if (!redactSafePortion.isEmpty()) {
-                sources.push_front(DocumentSourceMatch::createFromBson(
-                    BSON("$match" << redactSafePortion).firstElement(), pipeline->pCtx));
-            }
-        }
-    }
+    sources.swap(optimizedSources);
 }
 
 Status Pipeline::checkAuthForCommand(ClientBasic* client,
@@ -447,12 +324,11 @@ void Pipeline::Optimizations::Sharded::limitFieldsSentFromShardsToMerger(Pipelin
     //    objects even though only a subset of fields are needed.
     // 2) Optimization IS NOT applied immediately following a $project or $group since it would
     //    add an unnecessary project (and therefore a deep-copy).
-    for (size_t i = 0; i < shardPipe->sources.size(); i++) {
-        DepsTracker dt;  // ignored
-        if (shardPipe->sources[i]->getDependencies(&dt) & DocumentSource::EXHAUSTIVE_FIELDS)
+    for (auto&& source : shardPipe->sources) {
+        DepsTracker dt;
+        if (source->getDependencies(&dt) & DocumentSource::EXHAUSTIVE_FIELDS)
             return;
     }
-
     // if we get here, add the project.
     shardPipe->sources.push_back(DocumentSourceProject::createFromBson(
         BSON("$project" << mergeDeps.toProjection()).firstElement(), shardPipe->pCtx));
@@ -522,8 +398,7 @@ void Pipeline::stitch() {
 
     /* chain together the sources we found */
     DocumentSource* prevSource = sources.front().get();
-    for (SourceContainer::iterator iter(sources.begin() + 1), listEnd(sources.end());
-         iter != listEnd;
+    for (SourceContainer::iterator iter(++sources.begin()), listEnd(sources.end()); iter != listEnd;
          ++iter) {
         intrusive_ptr<DocumentSource> pTemp(*iter);
         pTemp->setSource(prevSource);
@@ -571,9 +446,9 @@ DepsTracker Pipeline::getDependencies(const BSONObj& initialQuery) const {
     DepsTracker deps;
     bool knowAllFields = false;
     bool knowAllMeta = false;
-    for (size_t i = 0; i < sources.size() && !(knowAllFields && knowAllMeta); i++) {
+    for (auto&& source : sources) {
         DepsTracker localDeps;
-        DocumentSource::GetDepsReturn status = sources[i]->getDependencies(&localDeps);
+        DocumentSource::GetDepsReturn status = source->getDependencies(&localDeps);
 
         if (status == DocumentSource::NOT_SUPPORTED) {
             // Assume this stage needs everything. We may still know something about our
@@ -594,6 +469,10 @@ DepsTracker Pipeline::getDependencies(const BSONObj& initialQuery) const {
                 deps.needTextScore = true;
 
             knowAllMeta = status & DocumentSource::EXHAUSTIVE_META;
+        }
+
+        if (knowAllMeta && knowAllFields) {
+            break;
         }
     }
 

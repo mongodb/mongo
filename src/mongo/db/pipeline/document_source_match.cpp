@@ -74,32 +74,22 @@ boost::optional<Document> DocumentSourceMatch::getNext() {
     return boost::none;
 }
 
-bool DocumentSourceMatch::coalesce(const intrusive_ptr<DocumentSource>& nextSource) {
-    DocumentSourceMatch* otherMatch = dynamic_cast<DocumentSourceMatch*>(nextSource.get());
-    if (!otherMatch)
-        return false;
+Pipeline::SourceContainer::iterator DocumentSourceMatch::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
 
-    if (otherMatch->_isTextQuery) {
-        // Non-initial text queries are disallowed (enforced by setSource below). This prevents
-        // "hiding" a non-initial text query by combining it with another match.
-        return false;
+    auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
 
-        // The rest of this block is for once we support non-initial text queries.
-
-        if (_isTextQuery) {
-            // The score should only come from the last $match. We can't combine since then this
-            // match's score would impact otherMatch's.
-            return false;
-        }
-
-        _isTextQuery = true;
+    // Since a text search must use an index, it must be the first stage in the pipeline. We cannot
+    // combine a non-text stage with a text stage, as that may turn an invalid pipeline into a
+    // valid one, unbeknownst to the user.
+    if (nextMatch && !nextMatch->_isTextQuery) {
+        matcher.reset(new Matcher(BSON("$and" << BSON_ARRAY(getQuery() << nextMatch->getQuery())),
+                                  ExtensionsCallbackNoop()));
+        container->erase(std::next(itr));
+        return itr;
     }
-
-    // Replace our matcher with the $and of ours and theirs.
-    matcher.reset(new Matcher(BSON("$and" << BSON_ARRAY(getQuery() << otherMatch->getQuery())),
-                              ExtensionsCallbackNoop()));
-
-    return true;
+    return std::next(itr);
 }
 
 namespace {

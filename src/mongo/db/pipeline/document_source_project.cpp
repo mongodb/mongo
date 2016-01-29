@@ -83,6 +83,22 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::optimize() {
     return this;
 }
 
+Pipeline::SourceContainer::iterator DocumentSourceProject::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
+    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
+
+    if (nextSkip || nextLimit) {
+        // Swap the $limit/$skip before ourselves, thus reducing the number of documents that
+        // pass through the $project.
+        std::swap(*itr, *std::next(itr));
+        return itr == container->begin() ? itr : std::prev(itr);
+    }
+    return std::next(itr);
+}
+
 Value DocumentSourceProject::serialize(bool explain) const {
     return Value(DOC(getSourceName() << pEO->serialize(explain)));
 }

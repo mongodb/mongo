@@ -101,15 +101,6 @@ long long DocumentSourceSort::getLimit() const {
     return limitSrc ? limitSrc->getLimit() : -1;
 }
 
-bool DocumentSourceSort::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {
-    if (!limitSrc) {
-        limitSrc = dynamic_cast<DocumentSourceLimit*>(pNextSource.get());
-        return limitSrc.get();  // false if next is not a $limit
-    } else {
-        return limitSrc->coalesce(pNextSource);
-    }
-}
-
 void DocumentSourceSort::addKey(const string& fieldPath, bool ascending) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
@@ -137,6 +128,27 @@ Document DocumentSourceSort::serializeSortKey(bool explain) const {
         }
     }
     return keyObj.freeze();
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceSort::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
+    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
+
+    if (nextLimit) {
+        // If the following stage is a $limit, we can combine it with ourselves.
+        setLimitSrc(nextLimit);
+        container->erase(std::next(itr));
+        return itr;
+    } else if (nextMatch && !nextMatch->isTextQuery()) {
+        // Swap the $match before the $sort, thus reducing the number of documents that pass into
+        // this stage.
+        std::swap(*itr, *std::next(itr));
+        return itr == container->begin() ? itr : std::prev(itr);
+    }
+    return std::next(itr);
 }
 
 DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(DepsTracker* deps) const {
@@ -201,9 +213,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     uassert(15976, "$sort stage must have at least one sort key", !pSort->vSortKey.empty());
 
     if (limit > 0) {
-        bool coalesced = pSort->coalesce(DocumentSourceLimit::create(pExpCtx, limit));
-        verify(coalesced);  // should always coalesce
-        verify(pSort->getLimit() == limit);
+        pSort->setLimitSrc(DocumentSourceLimit::create(pExpCtx, limit));
     }
 
     return pSort;

@@ -48,18 +48,6 @@ const char* DocumentSourceSkip::getSourceName() const {
     return "$skip";
 }
 
-bool DocumentSourceSkip::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {
-    DocumentSourceSkip* pSkip = dynamic_cast<DocumentSourceSkip*>(pNextSource.get());
-
-    /* if it's not another $skip, we can't coalesce */
-    if (!pSkip)
-        return false;
-
-    /* we need to skip over the sum of the two consecutive $skips */
-    _skip += pSkip->_skip;
-    return true;
-}
-
 boost::optional<Document> DocumentSourceSkip::getNext() {
     pExpCtx->checkForInterrupt();
 
@@ -80,6 +68,27 @@ Value DocumentSourceSkip::serialize(bool explain) const {
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {
     return _skip == 0 ? nullptr : this;
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceSkip::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
+    auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
+
+    if (nextLimit) {
+        // Swap the $limit before this stage, allowing a top-k sort to be possible, provided there
+        // is a $sort stage.
+        nextLimit->setLimit(nextLimit->getLimit() + _skip);
+        std::swap(*itr, *std::next(itr));
+        return itr == container->begin() ? itr : std::prev(itr);
+    } else if (nextSkip) {
+        _skip += nextSkip->getSkip();
+        container->erase(std::next(itr));
+        return itr;
+    }
+    return std::next(itr);
 }
 
 intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(

@@ -83,10 +83,6 @@ void DocumentSource::setSource(DocumentSource* pTheSource) {
     pSource = pTheSource;
 }
 
-bool DocumentSource::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {
-    return false;
-}
-
 intrusive_ptr<DocumentSource> DocumentSource::optimize() {
     return this;
 }

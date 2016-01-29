@@ -49,17 +49,18 @@ const char* DocumentSourceLimit::getSourceName() const {
     return "$limit";
 }
 
-bool DocumentSourceLimit::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {
-    DocumentSourceLimit* pLimit = dynamic_cast<DocumentSourceLimit*>(pNextSource.get());
+Pipeline::SourceContainer::iterator DocumentSourceLimit::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
 
-    /* if it's not another $limit, we can't coalesce */
-    if (!pLimit)
-        return false;
+    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
 
-    /* we need to limit by the minimum of the two limits */
-    if (pLimit->limit < limit)
-        limit = pLimit->limit;
-    return true;
+    if (nextLimit) {
+        limit = std::min(limit, nextLimit->limit);
+        container->erase(std::next(itr));
+        return itr;
+    }
+    return std::next(itr);
 }
 
 boost::optional<Document> DocumentSourceLimit::getNext() {

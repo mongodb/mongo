@@ -68,6 +68,32 @@ boost::optional<Document> DocumentSourceRedact::getNext() {
     return boost::none;
 }
 
+Pipeline::SourceContainer::iterator DocumentSourceRedact::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
+
+    if (nextMatch) {
+        const BSONObj redactSafePortion = nextMatch->redactSafePortion();
+
+        if (!redactSafePortion.isEmpty()) {
+            // Because R-M turns into M-R-M without modifying the original $match, we cannot step
+            // backwards and optimize from before the $redact, otherwise this will just loop and
+            // create an infinite number of $matches.
+            Pipeline::SourceContainer::iterator returnItr = std::next(itr);
+
+            container->insert(
+                itr,
+                DocumentSourceMatch::createFromBson(
+                    BSON("$match" << redactSafePortion).firstElement(), this->pExpCtx));
+
+            return returnItr;
+        }
+    }
+    return std::next(itr);
+}
+
 Value DocumentSourceRedact::redactValue(const Value& in) {
     const BSONType valueType = in.getType();
     if (valueType == Object) {

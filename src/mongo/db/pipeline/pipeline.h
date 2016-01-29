@@ -52,6 +52,8 @@ class Privilege;
     */
 class Pipeline : public IntrusiveCounterUnsigned {
 public:
+    typedef std::list<boost::intrusive_ptr<DocumentSource>> SourceContainer;
+
     /**
      * Create a pipeline from the command.
      *
@@ -64,7 +66,7 @@ public:
         const BSONObj& cmdObj,
         const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
-    /// Helper to implement Command::checkAuthForCommand
+    // Helper to implement Command::checkAuthForCommand
     static Status checkAuthForCommand(ClientBasic* client,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj);
@@ -93,6 +95,11 @@ public:
      * Returns whether or not any DocumentSource in the pipeline needs the primary shard.
      */
     bool needsPrimaryShardMerger() const;
+
+    /**
+     * Modifies the pipeline, optimizing it by combining and swapping stages.
+     */
+    void optimizePipeline();
 
     /**
      * Returns any other collections involved in the pipeline in addition to the collection the
@@ -189,7 +196,6 @@ private:
 
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
-    typedef std::deque<boost::intrusive_ptr<DocumentSource>> SourceContainer;
     SourceContainer sources;
     bool explain;
 

@@ -37,67 +37,6 @@
 
 namespace mongo {
 /**
- * This class holds optimizations applied to a single Pipeline.
- *
- * Each function has the same signature and takes a Pipeline as an in/out parameter.
- */
-class Pipeline::Optimizations::Local {
-public:
-    /**
-     * Moves matches before any adjacent sort phases.
-     *
-     * This means we sort fewer items.  Neither sorts, nor matches (excluding $text)
-     * change the documents in the stream, so this transformation shouldn't affect
-     * the result.
-     */
-    static void moveMatchBeforeSort(Pipeline* pipeline);
-
-    /**
-     * Moves skip and limit before any adjacent project phases.
-     *
-     * While this is performance-neutral on its own, it enables other optimizations
-     * such as combining sort and limit.
-     */
-    static void moveSkipAndLimitBeforeProject(Pipeline* pipeline);
-
-    /**
-     * Moves limits before any adjacent skip phases.
-     *
-     * This is more optimal for sharding since currently, we can only split
-     * the pipeline at a single source and it is better to limit the results
-     * coming from each shard. This also enables other optimizations like
-     * coalescing the limit into a sort.
-     */
-    static void moveLimitBeforeSkip(Pipeline* pipeline);
-
-    /**
-     * Runs through the DocumentSources, and give each one the opportunity
-     * to coalesce with its successor. If successful, remove the successor.
-     *
-     * This should generally be run after optimizations that reorder stages
-     * to be most effective.
-     *
-     * NOTE: uses the DocumentSource::coalesce() method
-     */
-    static void coalesceAdjacent(Pipeline* pipeline);
-
-    /**
-     * Gives each DocumentSource the opportunity to optimize itself.
-     *
-     * NOTE: uses the DocumentSource::optimize() method
-     */
-    static void optimizeEachDocumentSource(Pipeline* pipeline);
-
-    /**
-     * Optimizes [$redact, $match] to [$match, $redact, $match] if possible.
-     *
-     * This gives us the ability to use indexes and reduce the number of
-     * BSONObjs converted to Documents.
-     */
-    static void duplicateMatchBeforeInitalRedact(Pipeline* pipeline);
-};
-
-/**
  * This class holds optimizations applied to a shard Pipeline and a merger Pipeline.
  *
  * Each function has the same signature and takes two Pipelines, both as an in/out parameters.

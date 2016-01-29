@@ -139,20 +139,25 @@ long long DocumentSourceCursor::getLimit() const {
     return _limit ? _limit->getLimit() : -1;
 }
 
-bool DocumentSourceCursor::coalesce(const intrusive_ptr<DocumentSource>& nextSource) {
-    // Note: Currently we assume the $limit is logically after any $sort or
-    // $match. If we ever pull in $match or $sort using this method, we
-    // will need to keep track of the order of the sub-stages.
+Pipeline::SourceContainer::iterator DocumentSourceCursor::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
 
-    if (!_limit) {
-        _limit = dynamic_cast<DocumentSourceLimit*>(nextSource.get());
-        return _limit.get();  // false if next is not a $limit
-    } else {
-        return _limit->coalesce(nextSource);
+    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
+
+    if (nextLimit) {
+        if (_limit) {
+            // We already have an internal limit, set it to the more restrictive of the two.
+            _limit->setLimit(std::min(_limit->getLimit(), nextLimit->getLimit()));
+        } else {
+            _limit = nextLimit;
+        }
+        container->erase(std::next(itr));
+        return itr;
     }
-
-    return false;
+    return std::next(itr);
 }
+
 
 Value DocumentSourceCursor::serialize(bool explain) const {
     // we never parse a documentSourceCursor, so we only serialize for explain

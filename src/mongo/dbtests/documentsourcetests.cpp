@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/dbtests/dbtests.h"
 namespace DocumentSourceCursorTests {
@@ -219,16 +220,25 @@ public:
         client.insert(nss.ns(), BSON("a" << 3));
         createSource();
 
+        Pipeline::SourceContainer container;
+        container.push_back(source());
+        container.push_back(mkLimit(10));
+        source()->optimizeAt(container.begin(), &container);
+
         // initial limit becomes limit of cursor
-        ASSERT(source()->coalesce(mkLimit(10)));
+        ASSERT_EQUALS(container.size(), 1);
         ASSERT_EQUALS(source()->getLimit(), 10);
 
+        container.push_back(mkLimit(2));
+        source()->optimizeAt(container.begin(), &container);
         // smaller limit lowers cursor limit
-        ASSERT(source()->coalesce(mkLimit(2)));
+        ASSERT_EQUALS(container.size(), 1);
         ASSERT_EQUALS(source()->getLimit(), 2);
 
+        container.push_back(mkLimit(3));
+        source()->optimizeAt(container.begin(), &container);
         // higher limit doesn't effect cursor limit
-        ASSERT(source()->coalesce(mkLimit(3)));
+        ASSERT_EQUALS(container.size(), 1);
         ASSERT_EQUALS(source()->getLimit(), 2);
 
         // The cursor allows exactly 2 documents through

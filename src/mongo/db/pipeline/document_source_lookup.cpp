@@ -92,18 +92,21 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
     return output.freeze();
 }
 
-bool DocumentSourceLookUp::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {
-    if (_handlingUnwind) {
-        return false;
-    }
+Pipeline::SourceContainer::iterator DocumentSourceLookUp::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
 
-    auto unwindSrc = dynamic_cast<DocumentSourceUnwind*>(pNextSource.get());
-    if (!unwindSrc || unwindSrc->getUnwindPath() != _as.getPath(false)) {
-        return false;
+    auto nextUnwind = dynamic_cast<DocumentSourceUnwind*>((*std::next(itr)).get());
+
+    // If we are not already handling an $unwind stage internally, we can combine with the
+    // following $unwind stage.
+    if (nextUnwind && !_handlingUnwind && nextUnwind->getUnwindPath() == _as.getPath(false)) {
+        _unwindSrc = std::move(nextUnwind);
+        _handlingUnwind = true;
+        container->erase(std::next(itr));
+        return itr;
     }
-    _unwindSrc = std::move(unwindSrc);
-    _handlingUnwind = true;
-    return true;
+    return std::next(itr);
 }
 
 void DocumentSourceLookUp::dispose() {

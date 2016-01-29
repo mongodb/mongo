@@ -37,9 +37,10 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::min;
 
 REGISTER_DOCUMENT_SOURCE(geoNear, DocumentSourceGeoNear::createFromBson);
+
+const long long DocumentSourceGeoNear::kDefaultLimit = 100;
 
 const char* DocumentSourceGeoNear::getSourceName() const {
     return "$geoNear";
@@ -66,14 +67,19 @@ boost::optional<Document> DocumentSourceGeoNear::getNext() {
     return output.freeze();
 }
 
-bool DocumentSourceGeoNear::coalesce(const intrusive_ptr<DocumentSource>& pNextSource) {
-    DocumentSourceLimit* limitSrc = dynamic_cast<DocumentSourceLimit*>(pNextSource.get());
-    if (limitSrc) {
-        limit = min(limit, limitSrc->getLimit());
-        return true;
-    }
+Pipeline::SourceContainer::iterator DocumentSourceGeoNear::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
 
-    return false;
+    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
+
+    if (nextLimit) {
+        // If the next stage is a $limit, we can combine it with ourselves.
+        limit = std::min(limit, nextLimit->getLimit());
+        container->erase(std::next(itr));
+        return itr;
+    }
+    return std::next(itr);
 }
 
 // This command is sent as-is to the shards.
@@ -219,7 +225,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx),
       coordsIsArray(false),
-      limit(100),
+      limit(DocumentSourceGeoNear::kDefaultLimit),
       maxDistance(-1.0),
       minDistance(-1.0),
       spherical(false),

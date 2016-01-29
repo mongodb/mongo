@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/stdx/functional.h"
@@ -62,6 +63,7 @@ class Expression;
 class ExpressionFieldPath;
 class ExpressionObject;
 class DocumentSourceLimit;
+class DocumentSourceSort;
 class PlanExecutor;
 class RecordCursor;
 
@@ -126,26 +128,10 @@ public:
     virtual void setSource(DocumentSource* pSource);
 
     /**
-      Attempt to coalesce this DocumentSource with its successor in the
-      document processing pipeline.  If successful, the successor
-      DocumentSource should be removed from the pipeline and discarded.
-
-      If successful, this operation can be applied repeatedly, in an
-      attempt to coalesce several sources together.
-
-      The default implementation is to do nothing, and return false.
-
-      @param pNextSource the next source in the document processing chain.
-      @returns whether or not the attempt to coalesce was successful or not;
-        if the attempt was not successful, nothing has been changed
-     */
-    virtual bool coalesce(const boost::intrusive_ptr<DocumentSource>& pNextSource);
-
-    /**
      * Returns an optimized DocumentSource that is semantically equivalent to this one, or
      * nullptr if this stage is a no-op. Implementations are allowed to modify themselves
-     * in-place and return a pointer to themselves. For best results, first coalesce compatible
-     * sources using coalesce().
+     * in-place and return a pointer to themselves. For best results, first optimize the pipeline
+     * with the optimizePipeline() method defined in pipeline.cpp.
      *
      * This is intended for any operations that include expressions, and provides a hook for
      * those to optimize those operations.
@@ -153,6 +139,22 @@ public:
      * The default implementation is to do nothing and return yourself.
      */
     virtual boost::intrusive_ptr<DocumentSource> optimize();
+
+    /**
+     * Attempt to perform an optimization with the following source in the pipeline. 'container'
+     * refers to the entire pipeline, and 'itr' points to this stage within the pipeline.
+     *
+     * The return value is an iterator over the same container which points to the first location
+     * in the container at which an optimization may be possible.
+     *
+     * For example, if a swap takes place, the returned iterator should just be the position
+     * directly preceding 'itr', if such a position exists, since the stage at that position may be
+     * able to perform further optimizations with its new neighbor.
+     */
+    virtual Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                           Pipeline::SourceContainer* container) {
+        return std::next(itr);
+    };
 
     enum GetDepsReturn {
         NOT_SUPPORTED = 0x0,      // The full object and all metadata may be required
@@ -321,8 +323,12 @@ public:
     ~DocumentSourceCursor() final;
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
+    /**
+     * Attempts to combine with any subsequent $limit stages by setting the internal '_limit' field.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
     Value serialize(bool explain = false) const final;
-    bool coalesce(const boost::intrusive_ptr<DocumentSource>& nextSource) final;
     bool isValidInitialSource() const final {
         return true;
     }
@@ -561,9 +567,14 @@ public:
     // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
-    bool coalesce(const boost::intrusive_ptr<DocumentSource>& nextSource) final;
     Value serialize(bool explain = false) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
+    /**
+     * Attempts to combine with any subsequent $match stages, joining the query objects with a
+     * $and.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
     void setSource(DocumentSource* Source) final;
 
     /**
@@ -750,6 +761,12 @@ public:
     // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
+    /**
+     * Attempt to move a subsequent $skip or $limit stage before the $project, thus reducing the
+     * number of documents that pass through this stage.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     Value serialize(bool explain = false) const final;
 
@@ -789,6 +806,13 @@ public:
     const char* getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
+    /**
+     * Attempts to duplicate the redact-safe portion of a subsequent $match before the $redact
+     * stage.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -807,13 +831,158 @@ private:
     boost::intrusive_ptr<Expression> _expression;
 };
 
+class DocumentSourceSample final : public DocumentSource, public SplittableDocumentSource {
+public:
+    boost::optional<Document> getNext() final;
+    const char* getSourceName() const final;
+    Value serialize(bool explain = false) const final;
+
+    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+        return SEE_NEXT;
+    }
+
+    boost::intrusive_ptr<DocumentSource> getShardSource() final;
+    boost::intrusive_ptr<DocumentSource> getMergeSource() final;
+
+    long long getSampleSize() const {
+        return _size;
+    }
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+private:
+    explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    long long _size;
+
+    // Uses a $sort stage to randomly sort the documents.
+    boost::intrusive_ptr<DocumentSourceSort> _sortStage;
+};
+
+/**
+ * This class is not a registered stage, it is only used as an optimized replacement for $sample
+ * when the storage engine allows us to use a random cursor.
+ */
+class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
+public:
+    boost::optional<Document> getNext() final;
+    const char* getSourceName() const final;
+    Value serialize(bool explain = false) const final;
+    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+
+    static boost::intrusive_ptr<DocumentSourceSampleFromRandomCursor> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        long long size,
+        std::string idField,
+        long long collectionSize);
+
+private:
+    DocumentSourceSampleFromRandomCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         long long size,
+                                         std::string idField,
+                                         long long collectionSize);
+
+    /**
+     * Keep asking for documents from the random cursor until it yields a new document. Errors if a
+     * a document is encountered without a value for '_idField', or if the random cursor keeps
+     * returning duplicate elements.
+     */
+    boost::optional<Document> getNextNonDuplicateDocument();
+
+    long long _size;
+
+    // The field to use as the id of a document. Usually '_id', but 'ts' for the oplog.
+    std::string _idField;
+
+    // Keeps track of the documents that have been returned, since a random cursor is allowed to
+    // return duplicates.
+    ValueSet _seenDocs;
+
+    // The approximate number of documents in the collection (includes orphans).
+    const long long _nDocsInColl;
+
+    // The value to be assigned to the randMetaField of outcoming documents. Each call to getNext()
+    // will decrement this value by an amount scaled by _nDocsInColl as an attempt to appear as if
+    // the documents were produced by a top-k random sort.
+    double _randMetaFieldVal = 1.0;
+};
+
+class DocumentSourceLimit final : public DocumentSource, public SplittableDocumentSource {
+public:
+    // virtuals from DocumentSource
+    boost::optional<Document> getNext() final;
+    const char* getSourceName() const final;
+    /**
+     * Attempts to combine with a subsequent $limit stage, setting 'limit' appropriately.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
+    Value serialize(bool explain = false) const final;
+
+    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+        return SEE_NEXT;  // This doesn't affect needed fields
+    }
+
+    /**
+      Create a new limiting DocumentSource.
+
+      @param pExpCtx the expression context for the pipeline
+      @returns the DocumentSource
+     */
+    static boost::intrusive_ptr<DocumentSourceLimit> create(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
+
+    // Virtuals for SplittableDocumentSource
+    // Need to run on rounter. Running on shard as well is an optimization.
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return this;
+    }
+    boost::intrusive_ptr<DocumentSource> getMergeSource() final {
+        return this;
+    }
+
+    long long getLimit() const {
+        return limit;
+    }
+    void setLimit(long long newLimit) {
+        limit = newLimit;
+    }
+
+    /**
+      Create a limiting DocumentSource from BSON.
+
+      This is a convenience method that uses the above, and operates on
+      a BSONElement that has been deteremined to be an Object with an
+      element named $limit.
+
+      @param pBsonElement the BSONELement that defines the limit
+      @param pExpCtx the expression context
+      @returns the grouping DocumentSource
+     */
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    DocumentSourceLimit(const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
+
+    long long limit;
+    long long count;
+};
+
 class DocumentSourceSort final : public DocumentSource, public SplittableDocumentSource {
 public:
     // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
     void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
-    bool coalesce(const boost::intrusive_ptr<DocumentSource>& pNextSource) final;
+    /**
+     * Attempts to move a subsequent $match stage before the $sort, reducing the number of
+     * documents that pass through the stage. Also attempts to absorb a subsequent $limit stage so
+     * that it an perform a top-k sort.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
     void dispose() final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
@@ -920,6 +1089,16 @@ private:
 
     typedef Sorter<Value, Document> MySorter;
 
+    /**
+     * Absorbs 'limit', enabling a top-k sort. It is safe to call this multiple times, it will keep
+     * the smallest limit.
+     */
+    void setLimitSrc(boost::intrusive_ptr<DocumentSourceLimit> limit) {
+        if (!limitSrc || limit->getLimit() < limitSrc->getLimit()) {
+            limitSrc = limit;
+        }
+    }
+
     // For MySorter
     class Comparator {
     public:
@@ -940,147 +1119,17 @@ private:
     std::unique_ptr<MySorter::Iterator> _output;
 };
 
-class DocumentSourceSample final : public DocumentSource, public SplittableDocumentSource {
-public:
-    boost::optional<Document> getNext() final;
-    const char* getSourceName() const final;
-    Value serialize(bool explain = false) const final;
-
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        return SEE_NEXT;
-    }
-
-    boost::intrusive_ptr<DocumentSource> getShardSource() final;
-    boost::intrusive_ptr<DocumentSource> getMergeSource() final;
-
-    long long getSampleSize() const {
-        return _size;
-    }
-
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-private:
-    explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    long long _size;
-
-    // Uses a $sort stage to randomly sort the documents.
-    boost::intrusive_ptr<DocumentSourceSort> _sortStage;
-};
-
-/**
- * This class is not a registered stage, it is only used as an optimized replacement for $sample
- * when the storage engine allows us to use a random cursor.
- */
-class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
-public:
-    boost::optional<Document> getNext() final;
-    const char* getSourceName() const final;
-    Value serialize(bool explain = false) const final;
-    GetDepsReturn getDependencies(DepsTracker* deps) const final;
-
-    static boost::intrusive_ptr<DocumentSourceSampleFromRandomCursor> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        long long size,
-        std::string idField,
-        long long collectionSize);
-
-private:
-    DocumentSourceSampleFromRandomCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         long long size,
-                                         std::string idField,
-                                         long long collectionSize);
-
-    /**
-     * Keep asking for documents from the random cursor until it yields a new document. Errors if a
-     * a document is encountered without a value for '_idField', or if the random cursor keeps
-     * returning duplicate elements.
-     */
-    boost::optional<Document> getNextNonDuplicateDocument();
-
-    long long _size;
-
-    // The field to use as the id of a document. Usually '_id', but 'ts' for the oplog.
-    std::string _idField;
-
-    // Keeps track of the documents that have been returned, since a random cursor is allowed to
-    // return duplicates.
-    ValueSet _seenDocs;
-
-    // The approximate number of documents in the collection (includes orphans).
-    const long long _nDocsInColl;
-
-    // The value to be assigned to the randMetaField of outcoming documents. Each call to getNext()
-    // will decrement this value by an amount scaled by _nDocsInColl as an attempt to appear as if
-    // the documents were produced by a top-k random sort.
-    double _randMetaFieldVal = 1.0;
-};
-
-class DocumentSourceLimit final : public DocumentSource, public SplittableDocumentSource {
-public:
-    // virtuals from DocumentSource
-    boost::optional<Document> getNext() final;
-    const char* getSourceName() const final;
-    bool coalesce(const boost::intrusive_ptr<DocumentSource>& pNextSource) final;
-    Value serialize(bool explain = false) const final;
-
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        return SEE_NEXT;  // This doesn't affect needed fields
-    }
-
-    /**
-      Create a new limiting DocumentSource.
-
-      @param pExpCtx the expression context for the pipeline
-      @returns the DocumentSource
-     */
-    static boost::intrusive_ptr<DocumentSourceLimit> create(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
-
-    // Virtuals for SplittableDocumentSource
-    // Need to run on rounter. Running on shard as well is an optimization.
-    boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return this;
-    }
-    boost::intrusive_ptr<DocumentSource> getMergeSource() final {
-        return this;
-    }
-
-    long long getLimit() const {
-        return limit;
-    }
-    void setLimit(long long newLimit) {
-        limit = newLimit;
-    }
-
-    /**
-      Create a limiting DocumentSource from BSON.
-
-      This is a convenience method that uses the above, and operates on
-      a BSONElement that has been deteremined to be an Object with an
-      element named $limit.
-
-      @param pBsonElement the BSONELement that defines the limit
-      @param pExpCtx the expression context
-      @returns the grouping DocumentSource
-     */
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-private:
-    DocumentSourceLimit(const boost::intrusive_ptr<ExpressionContext>& pExpCtx, long long limit);
-
-    long long limit;
-    long long count;
-};
-
 class DocumentSourceSkip final : public DocumentSource, public SplittableDocumentSource {
 public:
     // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
-    bool coalesce(const boost::intrusive_ptr<DocumentSource>& pNextSource) final;
+    /**
+     * Attempts to move a subsequent $limit before the skip, potentially allowing for forther
+     * optimizations earlier in the pipeline.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
     Value serialize(bool explain = false) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
@@ -1192,10 +1241,17 @@ class DocumentSourceGeoNear : public DocumentSource,
                               public SplittableDocumentSource,
                               public DocumentSourceNeedsMongod {
 public:
+    static const long long kDefaultLimit;
+
     // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
-    bool coalesce(const boost::intrusive_ptr<DocumentSource>& pNextSource) final;
+    /**
+     * Attempts to combine with a subsequent limit stage, setting the internal limit field
+     * as a result.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
     bool isValidInitialSource() const final {
         return true;
     }
@@ -1253,8 +1309,13 @@ class DocumentSourceLookUp final : public DocumentSource,
 public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
-    bool coalesce(const boost::intrusive_ptr<DocumentSource>& pNextSource) final;
     void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
+    /**
+     * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwindSrc'
+     * field.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     void dispose() final;
 
