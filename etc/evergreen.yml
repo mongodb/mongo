@@ -53,7 +53,7 @@ variables:
 # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
 - &jstestfuzz_template
   name: jstestfuzz_template
-  exec_timeout_secs: 7200 # Time out the task if it runs for more than 2 hours.
+  exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
   depends_on:
   - name: compile
   commands:
