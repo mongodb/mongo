@@ -19,6 +19,9 @@
     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
     var primary = replSet.getPrimary();
 
+    replSet.awaitSecondaryNodes();
+    replSet.awaitReplication();
+
     // Primary should step down long enough for election to occur on secondary.
     var config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
     var electionTimeoutMillis = config.settings.electionTimeoutMillis;
