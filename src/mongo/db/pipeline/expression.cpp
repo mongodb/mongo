@@ -2240,6 +2240,7 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             optimizedOperands.insert(
                 optimizedOperands.end(), constExpressions.begin(), constExpressions.end());
         }
+
         vpOperand = std::move(optimizedOperands);
     }
     return this;
