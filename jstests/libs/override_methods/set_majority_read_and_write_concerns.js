@@ -30,6 +30,7 @@
 
         // These commands directly support a writeConcern argument.
         var commandsToForceWriteConcern = [
+            "authSchemaUpgrade",
             "createRole",
             "createUser",
             "delete",
