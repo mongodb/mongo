@@ -7,7 +7,7 @@
  */
 
 #ifndef __WT_INTERNAL_H
-#define __WT_INTERNAL_H
+#define	__WT_INTERNAL_H
 
 #if defined(__cplusplus)
 extern "C" {
@@ -371,4 +371,4 @@ union __wt_rand_state;
 #if defined(__cplusplus)
 }
 #endif
-#endif					/* !__WT_INTERNAL_H */ 
+#endif					/* !__WT_INTERNAL_H */
