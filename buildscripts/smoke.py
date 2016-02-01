@@ -577,8 +577,6 @@ def runTest(test, result):
                      'TestData.wiredTigerEngineConfigString = "' + ternary( wiredtiger_engine_config_string, wiredtiger_engine_config_string, "" ) + '";' + \
                      'TestData.wiredTigerCollectionConfigString = "' + ternary( wiredtiger_collection_config_string, wiredtiger_collection_config_string, "" ) + '";' + \
                      'TestData.wiredTigerIndexConfigString = "' + ternary( wiredtiger_index_config_string, wiredtiger_index_config_string, "" ) + '";' + \
-                     'TestData.testPath = "' + path + '";' + \
-                     'TestData.testFile = "' + os.path.basename( path ) + '";' + \
                      'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + \
                      'TestData.setParameters = "' + ternary( set_parameters, set_parameters, "" )  + '";' + \
                      'TestData.setParametersMongos = "' + ternary( set_parameters_mongos, set_parameters_mongos, "" )  + '";' + \

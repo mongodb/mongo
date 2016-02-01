@@ -161,16 +161,6 @@ jsTestName = function(){
     return "__unknown_name__"
 }
 
-jsTestFile = function(){
-    if( TestData ) return TestData.testFile
-    return "__unknown_file__"
-}
-
-jsTestPath = function(){
-    if( TestData ) return TestData.testPath
-    return "__unknown_path__"
-}
-
 var _jsTestOptions = { enableTestCommands : true }; // Test commands should be enabled by default
 
 jsTestOptions = function(){
@@ -219,18 +209,12 @@ jsTestLog = function(msg){
 jsTest = {}
 
 jsTest.name = jsTestName
-jsTest.file = jsTestFile
-jsTest.path = jsTestPath
 jsTest.options = jsTestOptions
 jsTest.setOption = setJsTestOption
 jsTest.log = jsTestLog
 jsTest.readOnlyUserRoles = ["read"]
 jsTest.basicUserRoles = ["dbOwner"]
 jsTest.adminUserRoles = ["root"]
-
-jsTest.dir = function(){
-    return jsTest.path().replace( /\/[^\/]+$/, "/" )
-}
 
 jsTest.authenticate = function(conn) {
     if (!jsTest.options().auth && !jsTest.options().keyFile) {
