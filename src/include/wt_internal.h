@@ -284,6 +284,8 @@ struct __wt_txn_state;
     typedef struct __wt_txn_state WT_TXN_STATE;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
+union __wt_lsn;
+    typedef union __wt_lsn WT_LSN;
 union __wt_rand_state;
     typedef union __wt_rand_state WT_RAND_STATE;
 /*

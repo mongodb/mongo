@@ -72,7 +72,6 @@ struct __wt_event_handler;  typedef struct __wt_event_handler WT_EVENT_HANDLER;
 struct __wt_extension_api;  typedef struct __wt_extension_api WT_EXTENSION_API;
 struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
 struct __wt_item;	    typedef struct __wt_item WT_ITEM;
-struct __wt_lsn;	    typedef struct __wt_lsn WT_LSN;
 struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 
 #if defined(SWIGJAVA)
@@ -124,22 +123,6 @@ struct __wt_item {
 	/*! Managed memory size (internal use). */
 	size_t memsize;
 #endif
-};
-
-/*
- * We rely on this structure being aligned at 64 bits by the compiler,
- * if we were paranoid we could add an unused field to ensure the padding
- * is correct.
- *
- * NOTE:  If you change the contents of this structure you must also update
- * the macros in log.h.
- */
-/*!
- * A log sequence number, representing a position in the transaction log.
- */
-struct __wt_lsn {
-	uint32_t        file;           /*!< Log file number */
-	wt_off_t        offset;         /*!< Log file offset */
 };
 
 /*!
