@@ -48,7 +48,7 @@ TEST(QuerySolutionTest, SimpleRangeAllEqual) {
     node.computeProperties();
 
     // Expected sort orders
-    ASSERT_EQUALS(node.getSort().size(), 10U);
+    ASSERT_EQUALS(node.getSort().size(), 9U);
     ASSERT(node.getSort().count(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1)));
     ASSERT(node.getSort().count(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1)));
     ASSERT(node.getSort().count(BSON("a" << 1 << "b" << 1 << "c" << 1)));
@@ -58,7 +58,6 @@ TEST(QuerySolutionTest, SimpleRangeAllEqual) {
     ASSERT(node.getSort().count(BSON("c" << 1 << "d" << 1 << "e" << 1)));
     ASSERT(node.getSort().count(BSON("d" << 1 << "e" << 1)));
     ASSERT(node.getSort().count(BSON("e" << 1)));
-    ASSERT(node.getSort().count(BSONObj{}));
 }
 
 // Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
@@ -139,7 +138,7 @@ TEST(QuerySolutionTest, IntervalListAllPoints) {
     node.computeProperties();
 
     // Expected sort orders
-    ASSERT_EQUALS(node.getSort().size(), 10U);
+    ASSERT_EQUALS(node.getSort().size(), 9U);
     ASSERT(node.getSort().count(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1 << "e" << 1)));
     ASSERT(node.getSort().count(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1)));
     ASSERT(node.getSort().count(BSON("a" << 1 << "b" << 1 << "c" << 1)));
@@ -149,7 +148,6 @@ TEST(QuerySolutionTest, IntervalListAllPoints) {
     ASSERT(node.getSort().count(BSON("c" << 1 << "d" << 1 << "e" << 1)));
     ASSERT(node.getSort().count(BSON("d" << 1 << "e" << 1)));
     ASSERT(node.getSort().count(BSON("e" << 1)));
-    ASSERT(node.getSort().count(BSONObj{}));
 }
 
 

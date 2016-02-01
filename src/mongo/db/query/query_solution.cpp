@@ -543,6 +543,10 @@ void IndexScanNode::computeProperties() {
         // We add the sort obtained by dropping 'elt' and all preceding elements from the index
         // key pattern.
         BSONObjIterator droppedPrefixIt = it;
+        if (!droppedPrefixIt.more()) {
+            // Do not insert an empty sort order.
+            break;
+        }
         BSONObjBuilder droppedPrefixBob;
         while (droppedPrefixIt.more()) {
             droppedPrefixBob.append(droppedPrefixIt.next());
