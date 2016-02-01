@@ -1443,7 +1443,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	uint32_t cksum_calculate, cksum_tmp;
 	u_int i, logcount;
 	int firstrecord;
-	bool eol;
+	bool eol, partial_record;
 	char **logfiles;
 
 	conn = S2C(session);
@@ -1539,6 +1539,15 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	for (;;) {
 		if (rd_lsn.l.offset + allocsize > log_size) {
 advance:
+			if (rd_lsn.l.offset == log_size)
+				partial_record = false;
+			else
+				/*
+				 * See if there is anything non-zero at the
+				 * end of this log file.
+				 */
+				WT_ERR(__log_has_hole(session, log_fh,
+				    rd_lsn.l.offset, &partial_record));
 			/*
 			 * If we read the last record, go to the next file.
 			 */
@@ -1551,6 +1560,15 @@ advance:
 			if (LF_ISSET(WT_LOGSCAN_RECOVER))
 				WT_ERR(__log_truncate(session,
 				    &rd_lsn, WT_LOG_FILENAME, 1));
+			/*
+			 * If we had a partial record, we'll want to break
+			 * now after closing and truncating.  Although for now
+			 * log_truncate does not modify the LSN passed in,
+			 * this code does not assume it is unmodified after that
+			 * call which is why it uses the boolean set earlier.
+			 */
+			if (partial_record)
+				break;
 			WT_SET_LSN(&rd_lsn, rd_lsn.l.file + 1, 0);
 			/*
 			 * Avoid an error message when we reach end of log
@@ -1604,10 +1622,13 @@ advance:
 		if (reclen > allocsize) {
 			/*
 			 * The log file end could be the middle of this
-			 * log record.
+			 * log record.  If we have a partially written record
+			 * then this is considered the end of the log.
 			 */
-			if (rd_lsn.l.offset + rdup_len > log_size)
-				goto advance;
+			if (rd_lsn.l.offset + rdup_len > log_size) {
+				eol = true;
+				break;
+			}
 			/*
 			 * We need to round up and read in the full padded
 			 * record, especially for direct I/O.
