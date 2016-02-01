@@ -184,7 +184,7 @@ public:
     int consecutiveFailedScans;
     std::set<HostAndPort> seedNodes;  // updated whenever a master reports set membership changes
     OID maxElectionId;                // largest election id observed by this ReplicaSetMonitor
-    int configVersion{0};            // version number of the replica set config.
+    int configVersion{0};             // version number of the replica set config.
     HostAndPort lastSeenMaster;  // empty if we have never seen a master. can be same as current
     Nodes nodes;                 // maintained sorted and unique by host
     ScanStatePtr currentScan;    // NULL if no scan in progress
