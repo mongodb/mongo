@@ -3963,7 +3963,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * record 100 moves to another page. When we reconcile
 			 * the original page, we write record 98, then we don't
 			 * see record 99 for whatever reason. If we've moved
-			 * record 1000, we don't know to write a deleted record
+			 * record 100, we don't know to write a deleted record
 			 * 99 on the page.)
 			 *
 			 * The record number recorded during the split is the
@@ -4522,7 +4522,7 @@ compare:		/*
 			 * record 100 moves to another page. When we reconcile
 			 * the original page, we write record 98, then we don't
 			 * see record 99 for whatever reason. If we've moved
-			 * record 1000, we don't know to write a deleted record
+			 * record 100, we don't know to write a deleted record
 			 * 99 on the page.)
 			 *
 			 * The record number recorded during the split is the
