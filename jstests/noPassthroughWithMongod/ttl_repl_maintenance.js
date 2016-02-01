@@ -43,7 +43,7 @@ var restartWithoutConfig = function() {
 
     assert.soon(function() {
         return conn.getDB("test").foo.count() < 100;
-    }, "never deleted", 65000);
+    }, "never deleted", 75000);
 
     MongoRunner.stopMongod(conn.port, 15);
 };
