@@ -11,9 +11,7 @@
 #error "Only x64 is supported with MSVC"
 #endif
 
-#if (!defined (__cplusplus) && (!defined (inline)))
 #define	inline __inline
-#endif
 
 #define	WT_SIZET_FMT	"Iu"			/* size_t format string */
 
