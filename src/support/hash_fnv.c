@@ -83,8 +83,8 @@
  * Share and Enjoy!	:-)
  */
 
-#include <stdlib.h>
 #include "wt_internal.h"
+#include <stdlib.h>
 
 /*
  * This file contains a 64 bit hash implementation of the FNV 1a 64 bit hash
