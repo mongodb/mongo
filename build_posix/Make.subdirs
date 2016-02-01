@@ -31,7 +31,6 @@ test/fops
 test/format
 test/huge
 test/packing
-test/recovery/random-abort
-test/recovery/truncated-log
+test/recovery
 test/salvage
 test/thread
