@@ -55,3 +55,4 @@ WT_WITH_LOCK
 __F
 __WIREDTIGER_EXT_H_
 __WIREDTIGER_H_
+__wt_bswap16

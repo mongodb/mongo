@@ -72,7 +72,8 @@ __session_find_dhandle(WT_SESSION_IMPL *session,
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 retry:	TAILQ_FOREACH(dhandle_cache, &session->dhhash[bucket], hashq) {
 		dhandle = dhandle_cache->dhandle;
-		if (WT_DHANDLE_INACTIVE(dhandle) && !WT_IS_METADATA(dhandle)) {
+		if (WT_DHANDLE_INACTIVE(dhandle) &&
+		    !WT_IS_METADATA(session, dhandle)) {
 			__session_discard_dhandle(session, dhandle_cache);
 			/* We deleted our entry, retry from the start. */
 			goto retry;
@@ -407,7 +408,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		    difftime(now, dhandle->timeofdeath) >
 		    conn->sweep_idle_time))) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
-			WT_ASSERT(session, !WT_IS_METADATA(dhandle));
+			WT_ASSERT(session, !WT_IS_METADATA(session, dhandle));
 			__session_discard_dhandle(session, dhandle_cache);
 		}
 		dhandle_cache = dhandle_cache_next;

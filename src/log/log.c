@@ -537,9 +537,7 @@ __log_fill(WT_SESSION_IMPL *session,
     WT_MYSLOT *myslot, bool force, WT_ITEM *record, WT_LSN *lsnp)
 {
 	WT_DECL_RET;
-	WT_LOG_RECORD *logrec;
 
-	logrec = (WT_LOG_RECORD *)record->mem;
 	/*
 	 * Call __wt_write or copy into the buffer.  For now the offset is the
 	 * real byte offset.  If the offset becomes a unit of WT_LOG_ALIGN this
@@ -548,16 +546,16 @@ __log_fill(WT_SESSION_IMPL *session,
 	 */
 	if (!force && !F_ISSET(myslot, WT_MYSLOT_UNBUFFERED))
 		memcpy((char *)myslot->slot->slot_buf.mem + myslot->offset,
-		    logrec, logrec->len);
+		    record->mem, record->size);
 	else
 		/*
 		 * If this is a force or unbuffered write, write it now.
 		 */
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 		    myslot->offset + myslot->slot->slot_start_offset,
-		    (size_t)logrec->len, (void *)logrec));
+		    record->size, record->mem));
 
-	WT_STAT_FAST_CONN_INCRV(session, log_bytes_written, logrec->len);
+	WT_STAT_FAST_CONN_INCRV(session, log_bytes_written, record->size);
 	if (lsnp != NULL) {
 		*lsnp = myslot->slot->slot_start_lsn;
 		lsnp->l.offset += (uint32_t)myslot->offset;
@@ -597,19 +595,31 @@ __log_file_header(
 	WT_ASSERT(session, sizeof(WT_LOG_DESC) < log->allocsize);
 	WT_RET(__wt_scr_alloc(session, log->allocsize, &buf));
 	memset(buf->mem, 0, log->allocsize);
+	buf->size = log->allocsize;
+
 	logrec = (WT_LOG_RECORD *)buf->mem;
 	desc = (WT_LOG_DESC *)logrec->record;
 	desc->log_magic = WT_LOG_MAGIC;
 	desc->majorv = WT_LOG_MAJOR_VERSION;
 	desc->minorv = WT_LOG_MINOR_VERSION;
 	desc->log_size = (uint64_t)conn->log_file_max;
+	__wt_log_desc_byteswap(desc);
 
 	/*
 	 * Now that the record is set up, initialize the record header.
+	 *
+	 * Checksum a little-endian version of the header, and write everything
+	 * in little-endian format. The checksum is (potentially) returned in a
+	 * big-endian format, swap it into place in a separate step.
 	 */
 	logrec->len = log->allocsize;
 	logrec->checksum = 0;
+	__wt_log_record_byteswap(logrec);
 	logrec->checksum = __wt_cksum(logrec, log->allocsize);
+#ifdef WORDS_BIGENDIAN
+	logrec->checksum = __wt_bswap32(logrec->checksum);
+#endif
+
 	WT_CLEAR(tmp);
 	memset(&myslot, 0, sizeof(myslot));
 	myslot.slot = &tmp;
@@ -625,7 +635,7 @@ __log_file_header(
 		tmp.slot_fh = fh;
 	} else {
 		WT_ASSERT(session, fh == NULL);
-		WT_ERR(__wt_log_acquire(session, logrec->len, &tmp));
+		WT_ERR(__wt_log_acquire(session, log->allocsize, &tmp));
 	}
 	WT_ERR(__log_fill(session, &myslot, true, buf, NULL));
 	/*
@@ -674,7 +684,9 @@ __log_openfile(WT_SESSION_IMPL *session,
 		memset(buf->mem, 0, allocsize);
 		WT_ERR(__wt_read(session, *fh, 0, allocsize, buf->mem));
 		logrec = (WT_LOG_RECORD *)buf->mem;
+		__wt_log_record_byteswap(logrec);
 		desc = (WT_LOG_DESC *)logrec->record;
+		__wt_log_desc_byteswap(desc);
 		if (desc->log_magic != WT_LOG_MAGIC)
 			WT_PANIC_RET(session, WT_ERROR,
 			   "log file %s corrupted: Bad magic number %" PRIu32,
@@ -1427,7 +1439,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, next_lsn, rd_lsn, start_lsn;
 	wt_off_t log_size;
-	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
+	uint32_t allocsize, firstlog, lastlog, lognum, rdup_len, reclen;
+	uint32_t cksum_calculate, cksum_tmp;
 	u_int i, logcount;
 	int firstrecord;
 	bool eol;
@@ -1558,12 +1571,14 @@ advance:
 		WT_ERR(__wt_read(session,
 		    log_fh, rd_lsn.l.offset, (size_t)allocsize, buf->mem));
 		/*
-		 * First 4 bytes is the real record length.  See if we
-		 * need to read more than the allocation size.  We expect
-		 * that we rarely will have to read more.  Most log records
-		 * will be fairly small.
+		 * See if we need to read more than the allocation size. We
+		 * expect that we rarely will have to read more. Most log
+		 * records will be fairly small.
 		 */
-		reclen = *(uint32_t *)buf->mem;
+		reclen = ((WT_LOG_RECORD *)buf->mem)->len;
+#ifdef WORDS_BIGENDIAN
+		reclen = __wt_bswap32(reclen);
+#endif
 		/*
 		 * Log files are pre-allocated.  We need to detect the
 		 * difference between a hole in the file (where this location
@@ -1604,13 +1619,22 @@ advance:
 		}
 		/*
 		 * We read in the record, verify checksum.
+		 *
+		 * Handle little- and big-endian objects. Objects are written
+		 * in little-endian format: save the header checksum, and
+		 * calculate the checksum for the header in its little-endian
+		 * form. Then, restore the header's checksum, and byte-swap
+		 * the whole thing as necessary, leaving us with a calculated
+		 * checksum that should match the checksum in the header.
 		 */
 		buf->size = reclen;
 		logrec = (WT_LOG_RECORD *)buf->mem;
-		cksum = logrec->checksum;
+		cksum_tmp = logrec->checksum;
 		logrec->checksum = 0;
-		logrec->checksum = __wt_cksum(logrec, logrec->len);
-		if (logrec->checksum != cksum) {
+		cksum_calculate = __wt_cksum(logrec, reclen);
+		logrec->checksum = cksum_tmp;
+		__wt_log_record_byteswap(logrec);
+		if (logrec->checksum != cksum_calculate) {
 			/*
 			 * A checksum mismatch means we have reached the end of
 			 * the useful part of the log.  This should be found on
@@ -1889,10 +1913,19 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		    rdup_len - record->size);
 		record->size = rdup_len;
 	}
+	/*
+	 * Checksum a little-endian version of the header, and write everything
+	 * in little-endian format. The checksum is (potentially) returned in a
+	 * big-endian format, swap it into place in a separate step.
+	 */
 	logrec = (WT_LOG_RECORD *)record->mem;
 	logrec->len = (uint32_t)record->size;
 	logrec->checksum = 0;
+	__wt_log_record_byteswap(logrec);
 	logrec->checksum = __wt_cksum(logrec, record->size);
+#ifdef WORDS_BIGENDIAN
+	logrec->checksum = __wt_bswap32(logrec->checksum);
+#endif
 
 	WT_STAT_FAST_CONN_INCR(session, log_writes);
 

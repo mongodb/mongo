@@ -304,6 +304,7 @@ union __wt_rand_state;
 #include "msvc.h"
 #endif
 #include "hardware.h"
+#include "swap.h"
 
 #include "queue.h"
 
@@ -326,8 +327,8 @@ union __wt_rand_state;
 #include "btmem.h"
 #include "btree.h"
 #include "cache.h"
-#include "config.h"
 #include "compact.h"
+#include "config.h"
 #include "cursor.h"
 #include "dlh.h"
 #include "error.h"

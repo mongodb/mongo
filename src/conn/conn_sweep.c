@@ -26,7 +26,7 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 	conn = S2C(session);
 
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
-		if (WT_IS_METADATA(dhandle))
+		if (WT_IS_METADATA(session, dhandle))
 			continue;
 
 		/*
@@ -124,7 +124,7 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 		if (conn->open_btree_count < conn->sweep_handles_min)
 			break;
 
-		if (WT_IS_METADATA(dhandle) ||
+		if (WT_IS_METADATA(session, dhandle) ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
 		    dhandle->session_inuse != 0 ||
 		    dhandle->timeofdeath == 0 ||
@@ -230,7 +230,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 	    dhandle != NULL;
 	    dhandle = dhandle_next) {
 		dhandle_next = TAILQ_NEXT(dhandle, q);
-		if (WT_IS_METADATA(dhandle))
+		if (WT_IS_METADATA(session, dhandle))
 			continue;
 		if (!WT_DHANDLE_CAN_DISCARD(dhandle))
 			continue;

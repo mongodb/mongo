@@ -139,11 +139,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "create,checkpoint_sync=false,cache_size=%" PRIu32 "MB",
 	    g.c_cache);
 
-#ifdef _WIN32
-	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"t_format.exe\"");
-#else
 	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"%s\"", g.progname);
-#endif
 
 	/* In-memory configuration. */
 	if (g.c_in_memory != 0)
@@ -174,7 +170,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		    ",encryption=(name=%s)", encryptor(g.c_encryption_flag));
 
 	/* Miscellaneous. */
-#ifndef _WIN32
+#ifdef HAVE_POSIX_MEMALIGN
 	p += snprintf(p, REMAIN(p, end), ",buffer_alignment=512");
 #endif
 
