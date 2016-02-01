@@ -42,10 +42,14 @@
 #include <valgrind/valgrind.h>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
@@ -58,6 +62,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
@@ -112,6 +117,55 @@ private:
     WiredTigerSessionCache* _sessionCache;
     std::atomic<bool> _shuttingDown{false};  // NOLINT
 };
+
+namespace {
+
+class TicketServerParameter : public ServerParameter {
+    MONGO_DISALLOW_COPYING(TicketServerParameter);
+
+public:
+    TicketServerParameter(TicketHolder* holder, const std::string& name)
+        : ServerParameter(ServerParameterSet::getGlobal(), name, true, true), _holder(holder) {}
+
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+        b.append(name, _holder->outof());
+    }
+
+    virtual Status set(const BSONElement& newValueElement) {
+        if (!newValueElement.isNumber())
+            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a number");
+        return _set(newValueElement.numberInt());
+    }
+
+    virtual Status setFromString(const std::string& str) {
+        int num = 0;
+        Status status = parseNumberFromString(str, &num);
+        if (!status.isOK())
+            return status;
+        return _set(num);
+    }
+
+    Status _set(int newNum) {
+        if (newNum <= 0) {
+            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be > 0");
+        }
+
+        return _holder->resize(newNum);
+    }
+
+private:
+    TicketHolder* _holder;
+};
+
+TicketHolder openWriteTransaction(128);
+TicketServerParameter openWriteTransactionParam(&openWriteTransaction,
+                                                "wiredTigerConcurrentWriteTransactions");
+
+TicketHolder openReadTransaction(128);
+TicketServerParameter openReadTransactionParam(&openReadTransaction,
+                                               "wiredTigerConcurrentReadTransactions");
+
+}  // namespace
 
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        const std::string& path,
@@ -208,6 +262,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         _sizeStorer.reset(new WiredTigerSizeStorer(_conn, _sizeStorerUri));
         _sizeStorer->fillCache();
     }
+
+    Locker::setGlobalThrottling(&openReadTransaction, &openWriteTransaction);
 }
 
 
@@ -217,6 +273,25 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
     }
 
     _sessionCache.reset(NULL);
+}
+
+void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
+    BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
+    {
+        BSONObjBuilder bbb(bb.subobjStart("write"));
+        bbb.append("out", openWriteTransaction.used());
+        bbb.append("available", openWriteTransaction.available());
+        bbb.append("totalTickets", openWriteTransaction.outof());
+        bbb.done();
+    }
+    {
+        BSONObjBuilder bbb(bb.subobjStart("read"));
+        bbb.append("out", openReadTransaction.used());
+        bbb.append("available", openReadTransaction.available());
+        bbb.append("totalTickets", openReadTransaction.outof());
+        bbb.done();
+    }
+    bb.done();
 }
 
 void WiredTigerKVEngine::cleanShutdown() {

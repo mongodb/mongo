@@ -142,6 +142,8 @@ public:
      */
     static bool initRsOplogBackgroundThread(StringData ns);
 
+    static void appendGlobalStats(BSONObjBuilder& b);
+
 private:
     class WiredTigerJournalFlusher;
 

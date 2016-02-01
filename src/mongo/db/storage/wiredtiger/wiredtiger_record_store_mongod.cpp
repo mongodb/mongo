@@ -78,7 +78,6 @@ public:
         }
 
         OperationContextImpl txn;
-        checked_cast<WiredTigerRecoveryUnit*>(txn.recoveryUnit())->markNoTicketRequired();
 
         try {
             ScopedTransaction transaction(&txn, MODE_IX);

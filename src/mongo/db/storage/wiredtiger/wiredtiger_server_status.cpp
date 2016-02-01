@@ -74,7 +74,7 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* txn,
         bob.append("reason", status.reason());
     }
 
-    WiredTigerRecoveryUnit::appendGlobalStats(bob);
+    WiredTigerKVEngine::appendGlobalStats(bob);
 
     return bob.obj();
 }
