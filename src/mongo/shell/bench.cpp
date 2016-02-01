@@ -378,7 +378,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
                     opType == "let");
             BSONObjBuilder valBuilder;
             valBuilder.append(arg);
-            myOp.value = valBuilder.done();
+            myOp.value = valBuilder.obj();
         } else {
             uassert(34394, str::stream() << "Benchrun op has unsupported field: " << name, false);
         }
