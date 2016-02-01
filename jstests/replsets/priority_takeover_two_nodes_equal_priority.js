@@ -37,7 +37,7 @@ assert.soon(
 );
 
 try {
-    assert.commandWorked(primary.getDB('admin').runCommand({replSetStepDown: 30}));
+    assert.commandWorked(primary.getDB('admin').runCommand({replSetStepDown: 90}));
 } catch (x) {
     // expected
 }
