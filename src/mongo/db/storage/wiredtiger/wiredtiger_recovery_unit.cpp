@@ -33,8 +33,6 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -53,8 +51,7 @@ WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
       _inUnitOfWork(false),
       _active(false),
       _myTransactionCount(1),
-      _everStartedWrite(false),
-      _noTicketNeeded(false) {}
+      _everStartedWrite(false) {}
 
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork);
@@ -69,7 +66,6 @@ void WiredTigerRecoveryUnit::reportState(BSONObjBuilder* b) const {
     b->append("wt_inUnitOfWork", _inUnitOfWork);
     b->append("wt_active", _active);
     b->append("wt_everStartedWrite", _everStartedWrite);
-    b->append("wt_hasTicket", _ticket.hasTicket());
     b->appendNumber("wt_myTransactionCount", static_cast<long long>(_myTransactionCount));
     if (_active)
         b->append("wt_millisSinceCommit", _timer.millis());
@@ -128,7 +124,6 @@ void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     invariant(!_inUnitOfWork);
     _inUnitOfWork = true;
     _everStartedWrite = true;
-    _getTicket(opCtx);
 }
 
 void WiredTigerRecoveryUnit::commitUnitOfWork() {
@@ -205,74 +200,6 @@ void WiredTigerRecoveryUnit::setOplogReadTill(const RecordId& id) {
     _oplogReadTill = id;
 }
 
-namespace {
-
-class TicketServerParameter : public ServerParameter {
-    MONGO_DISALLOW_COPYING(TicketServerParameter);
-
-public:
-    TicketServerParameter(TicketHolder* holder, const std::string& name)
-        : ServerParameter(ServerParameterSet::getGlobal(), name, true, true), _holder(holder) {}
-
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-        b.append(name, _holder->outof());
-    }
-
-    virtual Status set(const BSONElement& newValueElement) {
-        if (!newValueElement.isNumber())
-            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a number");
-        return _set(newValueElement.numberInt());
-    }
-
-    virtual Status setFromString(const std::string& str) {
-        int num = 0;
-        Status status = parseNumberFromString(str, &num);
-        if (!status.isOK())
-            return status;
-        return _set(num);
-    }
-
-    Status _set(int newNum) {
-        if (newNum <= 0) {
-            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be > 0");
-        }
-
-        return _holder->resize(newNum);
-    }
-
-private:
-    TicketHolder* _holder;
-};
-
-TicketHolder openWriteTransaction(128);
-TicketServerParameter openWriteTransactionParam(&openWriteTransaction,
-                                                "wiredTigerConcurrentWriteTransactions");
-
-TicketHolder openReadTransaction(128);
-TicketServerParameter openReadTransactionParam(&openReadTransaction,
-                                               "wiredTigerConcurrentReadTransactions");
-
-}  // namespace
-
-void WiredTigerRecoveryUnit::appendGlobalStats(BSONObjBuilder& b) {
-    BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
-    {
-        BSONObjBuilder bbb(bb.subobjStart("write"));
-        bbb.append("out", openWriteTransaction.used());
-        bbb.append("available", openWriteTransaction.available());
-        bbb.append("totalTickets", openWriteTransaction.outof());
-        bbb.done();
-    }
-    {
-        BSONObjBuilder bbb(bb.subobjStart("read"));
-        bbb.append("out", openReadTransaction.used());
-        bbb.append("available", openReadTransaction.available());
-        bbb.append("totalTickets", openReadTransaction.outof());
-        bbb.done();
-    }
-    bb.done();
-}
-
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_active);
     WT_SESSION* s = _session->getSession();
@@ -285,7 +212,6 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     }
     _active = false;
     _myTransactionCount++;
-    _ticket.reset(NULL);
 }
 
 SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
@@ -311,39 +237,8 @@ boost::optional<SnapshotName> WiredTigerRecoveryUnit::getMajorityCommittedSnapsh
     return _majorityCommittedSnapshot;
 }
 
-void WiredTigerRecoveryUnit::markNoTicketRequired() {
-    invariant(!_ticket.hasTicket());
-    _noTicketNeeded = true;
-}
-
-void WiredTigerRecoveryUnit::_getTicket(OperationContext* opCtx) {
-    // already have a ticket
-    if (_ticket.hasTicket())
-        return;
-
-    if (_noTicketNeeded)
-        return;
-
-    bool writeLocked;
-
-    // If we have a strong lock, waiting for a ticket can cause a deadlock.
-    if (opCtx != NULL && opCtx->lockState() != NULL) {
-        if (opCtx->lockState()->hasStrongLocks())
-            return;
-        writeLocked = opCtx->lockState()->isWriteLocked();
-    } else {
-        writeLocked = _everStartedWrite;
-    }
-
-    TicketHolder* holder = writeLocked ? &openWriteTransaction : &openReadTransaction;
-
-    holder->waitForTicket();
-    _ticket.reset(holder);
-}
-
 void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
     invariant(!_active);
-    _getTicket(opCtx);
     _ensureSession();
 
     WT_SESSION* s = _session->getSession();

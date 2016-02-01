@@ -107,8 +107,6 @@ public:
         return _oplogReadTill;
     }
 
-    void markNoTicketRequired();
-
     static WiredTigerRecoveryUnit* get(OperationContext* txn);
 
     static void appendGlobalStats(BSONObjBuilder& b);
@@ -143,10 +141,6 @@ private:
 
     typedef OwnedPointerVector<Change> Changes;
     Changes _changes;
-
-    bool _noTicketNeeded;
-    void _getTicket(OperationContext* opCtx);
-    TicketHolderReleaser _ticket;
 };
 
 /**

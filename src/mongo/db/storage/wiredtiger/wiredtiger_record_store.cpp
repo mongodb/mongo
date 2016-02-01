@@ -1062,7 +1062,6 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn
     OperationContext::RecoveryUnitState const realRUstate =
         txn->setRecoveryUnit(new WiredTigerRecoveryUnit(sc), OperationContext::kNotInUnitOfWork);
 
-    WiredTigerRecoveryUnit::get(txn)->markNoTicketRequired();  // realRecoveryUnit already has
     WT_SESSION* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn)->getSession();
 
     int64_t dataSize = _dataSize.load();
@@ -1220,7 +1219,6 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* txn) {
                << " records totaling to " << stone->bytes << " bytes";
 
         WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get(txn);
-        ru->markNoTicketRequired();  // No ticket is needed for internal operations.
         WT_SESSION* session = ru->getSession(txn)->getSession();
 
         try {

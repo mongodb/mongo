@@ -214,6 +214,8 @@ private:
     int _wuowNestingLevel;
     std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
 
+    // Mode for which the Locker acquired a ticket, or MODE_NONE if no ticket was acquired.
+    LockMode _modeForTicket = MODE_NONE;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //
