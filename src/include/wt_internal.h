@@ -284,6 +284,8 @@ struct __wt_txn_state;
     typedef struct __wt_txn_state WT_TXN_STATE;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
+union __wt_lsn;
+    typedef union __wt_lsn WT_LSN;
 union __wt_rand_state;
     typedef union __wt_rand_state WT_RAND_STATE;
 /*
@@ -302,6 +304,7 @@ union __wt_rand_state;
 #include "msvc.h"
 #endif
 #include "hardware.h"
+#include "swap.h"
 
 #include "queue.h"
 
@@ -324,8 +327,8 @@ union __wt_rand_state;
 #include "btmem.h"
 #include "btree.h"
 #include "cache.h"
-#include "config.h"
 #include "compact.h"
+#include "config.h"
 #include "cursor.h"
 #include "dlh.h"
 #include "error.h"

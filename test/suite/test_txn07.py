@@ -64,7 +64,6 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
     ]
     txn1s = [('t1c', dict(txn1='commit')), ('t1r', dict(txn1='rollback'))]
     compress = [
-        ('bzip2', dict(compress='bzip2')),
         ('nop', dict(compress='nop')),
         ('snappy', dict(compress='snappy')),
         ('zlib', dict(compress='zlib')),

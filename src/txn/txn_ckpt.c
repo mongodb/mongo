@@ -812,7 +812,7 @@ __checkpoint_worker(WT_SESSION_IMPL *session,
 	 *  - On connection close when we know there can't be any races.
 	 */
 	WT_ASSERT(session, !need_tracking ||
-	    WT_IS_METADATA(dhandle) || WT_META_TRACKING(session));
+	    WT_IS_METADATA(session, dhandle) || WT_META_TRACKING(session));
 
 	/*
 	 * Set the checkpoint LSN to the maximum LSN so that if logging is
@@ -1135,7 +1135,7 @@ fake:	/*
 	 * recovery and open a checkpoint that isn't yet durable.
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
-	    (WT_IS_METADATA(dhandle) ||
+	    (WT_IS_METADATA(session, dhandle) ||
 	    !F_ISSET(&session->txn, WT_TXN_RUNNING)))
 		WT_ERR(__wt_checkpoint_sync(session, NULL));
 

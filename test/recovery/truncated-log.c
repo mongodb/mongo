@@ -108,7 +108,7 @@ fill_db(void)
 	 * Set to no buffering.
 	 */
 	setvbuf(fp, NULL, _IONBF, 0);
-	save_lsn.file = 0;
+	save_lsn.l.file = 0;
 
 	/*
 	 * Write data into the table until we move to log file 2.
@@ -136,25 +136,25 @@ fill_db(void)
 			if ((ret = session->open_cursor(
 			    session, "log:", NULL, NULL, &logc)) != 0)
 				testutil_die(ret, "open_cursor: log");
-			if (save_lsn.file != 0) {
-				logc->set_key(logc, save_lsn.file,
-				    save_lsn.offset, 0);
+			if (save_lsn.l.file != 0) {
+				logc->set_key(logc,
+				    save_lsn.l.file, save_lsn.l.offset, 0);
 				if ((ret = logc->search(logc)) != 0)
 					testutil_die(errno, "search");
 			}
 			while ((ret = logc->next(logc)) == 0) {
 				if ((ret = logc->get_key(logc,
-				    &lsn.file, &lsn.offset, &unused)) != 0)
+				    &lsn.l.file, &lsn.l.offset, &unused)) != 0)
 					testutil_die(errno, "get_key");
-				if (lsn.file < 2)
+				if (lsn.l.file < 2)
 					save_lsn = lsn;
 				else {
 					if (first)
 						testutil_die(EINVAL,
 						    "min_key too high");
 					if (fprintf(fp,
-					    "%" PRIu64 " %" PRIu32 "\n",
-					    save_lsn.offset, i - 1) == -1)
+					    "%" PRIu32 " %" PRIu32 "\n",
+					    save_lsn.l.offset, i - 1) == -1)
 						testutil_die(errno, "fprintf");
 					fclose(fp);
 					abort();

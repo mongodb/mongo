@@ -45,10 +45,14 @@ main(int argc, char *argv[])
 
 	config = NULL;
 
+#ifdef _WIN32
+	g.progname = "t_format.exe";
+#else
 	if ((g.progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		g.progname = argv[0];
 	else
 		++g.progname;
+#endif
 
 #if 0
 	/* Configure the GNU malloc for debugging. */

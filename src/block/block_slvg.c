@@ -126,6 +126,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_read(
 		    session, fh, offset, (size_t)allocsize, tmp->mem));
 		blk = WT_BLOCK_HEADER_REF(tmp->mem);
+		__wt_block_header_byteswap(blk);
 		size = blk->disk_size;
 		cksum = blk->cksum;
 

@@ -69,18 +69,6 @@ __bm_checkpoint(WT_BM *bm,
 }
 
 /*
- * __bm_sync --
- *	Flush a file to disk.
- */
-static int
-__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool async)
-{
-	return (async ?
-	    __wt_fsync_async(session, bm->block->fh) :
-	    __wt_fsync(session, bm->block->fh));
-}
-
-/*
  * __bm_checkpoint_load --
  *	Load a checkpoint.
  */
@@ -89,10 +77,6 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
     const uint8_t *addr, size_t addr_size,
     uint8_t *root_addr, size_t *root_addr_sizep, bool checkpoint)
 {
-	WT_CONNECTION_IMPL *conn;
-
-	conn = S2C(session);
-
 	/* If not opening a checkpoint, we're opening the live system. */
 	bm->is_live = !checkpoint;
 	WT_RET(__wt_block_checkpoint_load(session, bm->block,
@@ -103,9 +87,8 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
 		 * Read-only objects are optionally mapped into memory instead
 		 * of being read into cache buffers.
 		 */
-		if (conn->mmap)
-			WT_RET(__wt_block_map(session, bm->block,
-			    &bm->map, &bm->maplen, &bm->mappingcookie));
+		WT_RET(__wt_block_map(session,
+		    bm->block, &bm->map, &bm->maplen, &bm->mappingcookie));
 
 		/*
 		 * If this handle is for a checkpoint, that is, read-only, there
@@ -168,13 +151,13 @@ __bm_close(WT_BM *bm, WT_SESSION_IMPL *session)
 }
 
 /*
- * __bm_compact_start --
- *	Start a block manager compaction.
+ * __bm_compact_end --
+ *	End a block manager compaction.
  */
 static int
-__bm_compact_start(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_compact_end(WT_BM *bm, WT_SESSION_IMPL *session)
 {
-	return (__wt_block_compact_start(session, bm->block));
+	return (__wt_block_compact_end(session, bm->block));
 }
 
 /*
@@ -200,13 +183,13 @@ __bm_compact_skip(WT_BM *bm, WT_SESSION_IMPL *session, bool *skipp)
 }
 
 /*
- * __bm_compact_end --
- *	End a block manager compaction.
+ * __bm_compact_start --
+ *	Start a block manager compaction.
  */
 static int
-__bm_compact_end(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_compact_start(WT_BM *bm, WT_SESSION_IMPL *session)
 {
-	return (__wt_block_compact_end(session, bm->block));
+	return (__wt_block_compact_start(session, bm->block));
 }
 
 /*
@@ -233,36 +216,25 @@ __bm_is_mapped(WT_BM *bm, WT_SESSION_IMPL *session)
 }
 
 /*
- * __bm_stat --
- *	Block-manager statistics.
+ * __bm_salvage_end --
+ *	End a block manager salvage.
  */
 static int
-__bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
+__bm_salvage_end(WT_BM *bm, WT_SESSION_IMPL *session)
 {
-	__wt_block_stat(session, bm->block, stats);
-	return (0);
+	return (__wt_block_salvage_end(session, bm->block));
 }
 
 /*
- * __bm_write --
- *	Write a buffer into a block, returning the block's address cookie.
+ * __bm_salvage_next --
+ *	Return the next block from the file.
  */
 static int
-__bm_write(WT_BM *bm, WT_SESSION_IMPL *session,
-    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, bool data_cksum)
+__bm_salvage_next(WT_BM *bm,
+    WT_SESSION_IMPL *session, uint8_t *addr, size_t *addr_sizep, bool *eofp)
 {
-	return (__wt_block_write(
-	    session, bm->block, buf, addr, addr_sizep, data_cksum));
-}
-
-/*
- * __bm_write_size --
- *	Return the buffer size required to write a block.
- */
-static int
-__bm_write_size(WT_BM *bm, WT_SESSION_IMPL *session, size_t *sizep)
-{
-	return (__wt_block_write_size(session, bm->block, sizep));
+	return (__wt_block_salvage_next(
+	    session, bm->block, addr, addr_sizep, eofp));
 }
 
 /*
@@ -288,36 +260,26 @@ __bm_salvage_valid(WT_BM *bm,
 }
 
 /*
- * __bm_salvage_next --
- *	Return the next block from the file.
+ * __bm_stat --
+ *	Block-manager statistics.
  */
 static int
-__bm_salvage_next(WT_BM *bm,
-    WT_SESSION_IMPL *session, uint8_t *addr, size_t *addr_sizep, bool *eofp)
+__bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
 {
-	return (__wt_block_salvage_next(
-	    session, bm->block, addr, addr_sizep, eofp));
+	__wt_block_stat(session, bm->block, stats);
+	return (0);
 }
 
 /*
- * __bm_salvage_end --
- *	End a block manager salvage.
+ * __bm_sync --
+ *	Flush a file to disk.
  */
 static int
-__bm_salvage_end(WT_BM *bm, WT_SESSION_IMPL *session)
+__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool async)
 {
-	return (__wt_block_salvage_end(session, bm->block));
-}
-
-/*
- * __bm_verify_start --
- *	Start a block manager verify.
- */
-static int
-__bm_verify_start(WT_BM *bm,
-    WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
-{
-	return (__wt_block_verify_start(session, bm->block, ckptbase, cfg));
+	return (async ?
+	    __wt_fsync_async(session, bm->block->fh) :
+	    __wt_fsync(session, bm->block->fh));
 }
 
 /*
@@ -339,6 +301,39 @@ static int
 __bm_verify_end(WT_BM *bm, WT_SESSION_IMPL *session)
 {
 	return (__wt_block_verify_end(session, bm->block));
+}
+
+/*
+ * __bm_verify_start --
+ *	Start a block manager verify.
+ */
+static int
+__bm_verify_start(WT_BM *bm,
+    WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
+{
+	return (__wt_block_verify_start(session, bm->block, ckptbase, cfg));
+}
+
+/*
+ * __bm_write --
+ *	Write a buffer into a block, returning the block's address cookie.
+ */
+static int
+__bm_write(WT_BM *bm, WT_SESSION_IMPL *session,
+    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, bool data_cksum)
+{
+	return (__wt_block_write(
+	    session, bm->block, buf, addr, addr_sizep, data_cksum));
+}
+
+/*
+ * __bm_write_size --
+ *	Return the buffer size required to write a block.
+ */
+static int
+__bm_write_size(WT_BM *bm, WT_SESSION_IMPL *session, size_t *sizep)
+{
+	return (__wt_block_write_size(session, bm->block, sizep));
 }
 
 /*

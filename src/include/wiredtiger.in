@@ -72,7 +72,6 @@ struct __wt_event_handler;  typedef struct __wt_event_handler WT_EVENT_HANDLER;
 struct __wt_extension_api;  typedef struct __wt_extension_api WT_EXTENSION_API;
 struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
 struct __wt_item;	    typedef struct __wt_item WT_ITEM;
-struct __wt_lsn;	    typedef struct __wt_lsn WT_LSN;
 struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 
 #if defined(SWIGJAVA)
@@ -124,22 +123,6 @@ struct __wt_item {
 	/*! Managed memory size (internal use). */
 	size_t memsize;
 #endif
-};
-
-/*
- * We rely on this structure being aligned at 64 bits by the compiler,
- * if we were paranoid we could add an unused field to ensure the padding
- * is correct.
- *
- * NOTE:  If you change the contents of this structure you must also update
- * the macros in log.h.
- */
-/*!
- * A log sequence number, representing a position in the transaction log.
- */
-struct __wt_lsn {
-	uint32_t        file;           /*!< Log file number */
-	wt_off_t        offset;         /*!< Log file offset */
 };
 
 /*!
@@ -1006,9 +989,9 @@ struct __wt_session {
 	 * @config{block_compressor, configure a compressor for file blocks.
 	 * Permitted values are \c "none" or custom compression engine name
 	 * created with WT_CONNECTION::add_compressor.  If WiredTiger has
-	 * builtin support for \c "bzip2"\, \c "snappy"\, \c "lz4" or \c "zlib"
-	 * compression\, these names are also available.  See @ref compression
-	 * for more information., a string; default \c none.}
+	 * builtin support for \c "snappy"\, \c "lz4" or \c "zlib" compression\,
+	 * these names are also available.  See @ref compression for more
+	 * information., a string; default \c none.}
 	 * @config{cache_resident, do not ever evict the object's pages from
 	 * cache.  Not compatible with LSM tables; see @ref
 	 * tuning_cache_resident for more information., a boolean flag; default
@@ -1839,9 +1822,9 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor
 	 * for log records.  Permitted values are \c "none" or custom
 	 * compression engine name created with WT_CONNECTION::add_compressor.
-	 * If WiredTiger has builtin support for \c "bzip2"\, \c "snappy"\, \c
-	 * "lz4" or \c "zlib" compression\, these names are also available.  See
-	 * @ref compression for more information., a string; default \c none.}
+	 * If WiredTiger has builtin support for \c "snappy"\, \c "lz4" or \c
+	 * "zlib" compression\, these names are also available.  See @ref
+	 * compression for more information., a string; default \c none.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a
 	 * boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log
@@ -2308,11 +2291,11 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor for log
  * records.  Permitted values are \c "none" or custom compression engine name
  * created with WT_CONNECTION::add_compressor.  If WiredTiger has builtin
- * support for \c "bzip2"\, \c "snappy"\, \c "lz4" or \c "zlib" compression\,
- * these names are also available.  See @ref compression for more information.,
- * a string; default \c none.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable
- * logging subsystem., a boolean flag; default \c false.}
+ * support for \c "snappy"\, \c "lz4" or \c "zlib" compression\, these names are
+ * also available.  See @ref compression for more information., a string;
+ * default \c none.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging
+ * subsystem., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log files., an
  * integer between 100KB and 2GB; default \c 100MB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
