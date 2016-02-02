@@ -1312,7 +1312,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     Seconds uptimeSecs(10);
     Date_t curTime = heartbeatTime + uptimeSecs;
     Timestamp electionTime(1, 2);
-    OpTime oplogProgress(Timestamp(3, 4), 0);
+    OpTime oplogProgress(Timestamp(3, 4), 2);
+    OpTime lastCommittedOpTime(Timestamp(2, 3), 6);
     std::string setName = "mySet";
 
     ReplSetHeartbeatResponse hb;
@@ -1363,6 +1364,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
                                          curTime,
                                          durationCount<Seconds>(uptimeSecs),
                                          oplogProgress,
+                                         lastCommittedOpTime,
                                          &statusBuilder,
                                          &resultStatus);
     ASSERT_OK(resultStatus);
@@ -1371,6 +1373,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // Test results for all non-self members
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_EQUALS(curTime.asInt64(), rsStatus["date"].Date().asInt64());
+    ASSERT_EQUALS(lastCommittedOpTime.toBSON(), rsStatus["lastCommittedOpTime"].Obj());
     std::vector<BSONElement> memberArray = rsStatus["members"].Array();
     ASSERT_EQUALS(4U, memberArray.size());
     BSONObj member0Status = memberArray[0].Obj();
@@ -1385,7 +1388,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS("(not reachable/healthy)", member0Status["stateStr"].str());
     ASSERT_EQUALS(0, member0Status["uptime"].numberInt());
     ASSERT_EQUALS(Timestamp(), Timestamp(member0Status["optime"]["ts"].timestampValue()));
-    ASSERT_EQUALS(0LL, member0Status["optime"]["term"].numberLong());
+    ASSERT_EQUALS(-1LL, member0Status["optime"]["t"].numberLong());
     ASSERT_TRUE(member0Status.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(Timestamp().getSecs() * 1000ULL),
                   member0Status["optimeDate"].Date());
@@ -1400,9 +1403,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
                   member1Status["stateStr"].String());
     ASSERT_EQUALS(durationCount<Seconds>(uptimeSecs), member1Status["uptime"].numberInt());
-    ASSERT_EQUALS(oplogProgress.getTimestamp(),
-                  Timestamp(member1Status["optime"]["ts"].timestampValue()));
-    ASSERT_EQUALS(0LL, member1Status["optime"]["term"].numberLong());
+    ASSERT_EQUALS(oplogProgress.toBSON(), member1Status["optime"].Obj());
     ASSERT_TRUE(member1Status.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   member1Status["optimeDate"].Date());
@@ -1432,9 +1433,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].numberInt());
     ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(), selfStatus["stateStr"].str());
     ASSERT_EQUALS(durationCount<Seconds>(uptimeSecs), selfStatus["uptime"].numberInt());
-    ASSERT_EQUALS(oplogProgress.getTimestamp(),
-                  Timestamp(selfStatus["optime"]["ts"].timestampValue()));
-    ASSERT_EQUALS(0LL, selfStatus["optime"]["term"].numberLong());
+    ASSERT_EQUALS(oplogProgress.toBSON(), selfStatus["optime"].Obj());
     ASSERT_TRUE(selfStatus.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   selfStatus["optimeDate"].Date());
@@ -1470,6 +1469,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhe
                                          curTime,
                                          durationCount<Seconds>(uptimeSecs),
                                          oplogProgress,
+                                         OpTime(),
                                          &statusBuilder,
                                          &resultStatus);
     ASSERT_NOT_OK(resultStatus);
@@ -1526,7 +1526,8 @@ TEST_F(ShutdownInProgressTest, NodeReturnsShutdownInProgressWhenSyncFromCallback
 TEST_F(ShutdownInProgressTest, NodeReturnsShutDownInProgressWhenGetReplSetStatusCallbackCanceled) {
     Status result = Status::OK();
     BSONObjBuilder response;
-    getTopoCoord().prepareStatusResponse(cbData(), Date_t(), 0, OpTime(), &response, &result);
+    getTopoCoord().prepareStatusResponse(
+        cbData(), Date_t(), 0, OpTime(), OpTime(), &response, &result);
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
     ASSERT_TRUE(response.obj().isEmpty());
 }
@@ -4033,6 +4034,7 @@ public:
                                              _firstRequestDate + Milliseconds(4000),
                                              10,
                                              OpTime(Timestamp(100, 0), 0),
+                                             OpTime(),
                                              &statusBuilder,
                                              &resultStatus);
         ASSERT_OK(resultStatus);
@@ -4042,6 +4044,10 @@ public:
 
         ASSERT_EQUALS(1, member1Status["_id"].Int());
         ASSERT_EQUALS(1, member1Status["health"].Double());
+
+        ASSERT_EQUALS(Timestamp(0, 0),
+                      Timestamp(rsStatus["lastCommittedOpTime"]["ts"].timestampValue()));
+        ASSERT_EQUALS(-1LL, rsStatus["lastCommittedOpTime"]["t"].numberLong());
     }
 
     Date_t firstRequestDate() {
@@ -4108,6 +4114,7 @@ public:
                                              firstRequestDate() + Seconds(4),
                                              10,
                                              OpTime(Timestamp(100, 0), 0),
+                                             OpTime(),
                                              &statusBuilder,
                                              &resultStatus);
         ASSERT_OK(resultStatus);
@@ -4153,6 +4160,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, NodeDoesNotRetryHeartbeatsAfterFailing
                                          firstRequestDate() + Milliseconds(4900),
                                          10,
                                          OpTime(Timestamp(100, 0), 0),
+                                         OpTime(),
                                          &statusBuilder,
                                          &resultStatus);
     ASSERT_OK(resultStatus);
@@ -4210,6 +4218,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
                                          firstRequestDate() + Milliseconds(7000),
                                          600,
                                          OpTime(Timestamp(100, 0), 0),
+                                         OpTime(),
                                          &statusBuilder,
                                          &resultStatus);
     ASSERT_OK(resultStatus);

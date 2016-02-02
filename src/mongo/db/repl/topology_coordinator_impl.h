@@ -193,6 +193,7 @@ public:
                                        Date_t now,
                                        unsigned uptime,
                                        const OpTime& lastOpApplied,
+                                       const OpTime& lastCommittedOpTime,
                                        BSONObjBuilder* response,
                                        Status* result);
     virtual void fillIsMasterForReplSet(IsMasterResponse* response);

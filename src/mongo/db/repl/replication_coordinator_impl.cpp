@@ -1645,21 +1645,15 @@ bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(BSONObjBuil
 
 Status ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* response) {
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
-    CBHStatus cbh =
-        _replExecutor.scheduleWork(stdx::bind(&TopologyCoordinator::prepareStatusResponse,
-                                              _topCoord.get(),
-                                              stdx::placeholders::_1,
-                                              _replExecutor.now(),
-                                              time(0) - serverGlobalParams.started,
-                                              getMyLastOptime(),
-                                              response,
-                                              &result));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
-    }
-    fassert(18640, cbh.getStatus());
-    _replExecutor.wait(cbh.getValue());
-
+    _scheduleWorkAndWaitForCompletion(stdx::bind(&TopologyCoordinator::prepareStatusResponse,
+                                                 _topCoord.get(),
+                                                 stdx::placeholders::_1,
+                                                 _replExecutor.now(),
+                                                 time(0) - serverGlobalParams.started,
+                                                 getMyLastOptime(),
+                                                 getLastCommittedOpTime(),
+                                                 response,
+                                                 &result));
     return result;
 }
 

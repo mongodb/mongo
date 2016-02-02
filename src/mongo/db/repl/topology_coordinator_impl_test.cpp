@@ -1320,6 +1320,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     Date_t curTime = heartbeatTime + uptimeSecs;
     Timestamp electionTime(1, 2);
     OpTime oplogProgress(Timestamp(3, 4), 0);
+    OpTime lastCommittedOpTime(Timestamp(2, 3), -1);
     std::string setName = "mySet";
 
     ReplSetHeartbeatResponse hb;
@@ -1370,6 +1371,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
                                          curTime,
                                          durationCount<Seconds>(uptimeSecs),
                                          oplogProgress,
+                                         lastCommittedOpTime,
                                          &statusBuilder,
                                          &resultStatus);
     ASSERT_OK(resultStatus);
@@ -1378,6 +1380,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // Test results for all non-self members
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_EQUALS(curTime.asInt64(), rsStatus["date"].Date().asInt64());
+    ASSERT_EQUALS(lastCommittedOpTime.toBSON(), rsStatus["lastCommittedOpTime"].Obj());
     std::vector<BSONElement> memberArray = rsStatus["members"].Array();
     ASSERT_EQUALS(4U, memberArray.size());
     BSONObj member0Status = memberArray[0].Obj();
@@ -1473,6 +1476,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhe
                                          curTime,
                                          durationCount<Seconds>(uptimeSecs),
                                          oplogProgress,
+                                         OpTime(),
                                          &statusBuilder,
                                          &resultStatus);
     ASSERT_NOT_OK(resultStatus);
@@ -2167,6 +2171,7 @@ public:
                                              _firstRequestDate + Milliseconds(4000),
                                              10,
                                              OpTime(Timestamp(100, 0), 0),
+                                             OpTime(),
                                              &statusBuilder,
                                              &resultStatus);
         ASSERT_OK(resultStatus);
@@ -2176,6 +2181,10 @@ public:
 
         ASSERT_EQUALS(1, member1Status["_id"].Int());
         ASSERT_EQUALS(1, member1Status["health"].Double());
+
+        ASSERT_EQUALS(Timestamp(0, 0),
+                      Timestamp(rsStatus["lastCommittedOpTime"]["ts"].timestampValue()));
+        ASSERT_EQUALS(-1LL, rsStatus["lastCommittedOpTime"]["t"].numberLong());
     }
 
     Date_t firstRequestDate() {
@@ -2222,6 +2231,7 @@ public:
                                              firstRequestDate() + Seconds(4),
                                              10,
                                              OpTime(Timestamp(100, 0), 0),
+                                             OpTime(),
                                              &statusBuilder,
                                              &resultStatus);
         ASSERT_OK(resultStatus);
@@ -2535,6 +2545,7 @@ TEST_F(HeartbeatResponseTestTwoRetries, NodeDoesNotRetryHeartbeatsAfterFailingTw
                                          firstRequestDate() + Milliseconds(4900),
                                          10,
                                          OpTime(Timestamp(100, 0), 0),
+                                         OpTime(),
                                          &statusBuilder,
                                          &resultStatus);
     ASSERT_OK(resultStatus);
@@ -2773,6 +2784,7 @@ TEST_F(HeartbeatResponseTestTwoRetries,
                                          firstRequestDate() + Milliseconds(7000),
                                          600,
                                          OpTime(Timestamp(100, 0), 0),
+                                         OpTime(),
                                          &statusBuilder,
                                          &resultStatus);
     ASSERT_OK(resultStatus);
@@ -4220,7 +4232,8 @@ TEST_F(ShutdownInProgressTest, NodeReturnsShutdownInProgressWhenSyncFromCallback
 TEST_F(ShutdownInProgressTest, NodeReturnsShutDownInProgressWhenGetReplSetStatusCallbackCanceled) {
     Status result = Status::OK();
     BSONObjBuilder response;
-    getTopoCoord().prepareStatusResponse(cbData(), Date_t(), 0, OpTime(), &response, &result);
+    getTopoCoord().prepareStatusResponse(
+        cbData(), Date_t(), 0, OpTime(), OpTime(), &response, &result);
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
     ASSERT_TRUE(response.obj().isEmpty());
 }

@@ -1489,6 +1489,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
                                                     Date_t now,
                                                     unsigned selfUptime,
                                                     const OpTime& lastOpApplied,
+                                                    const OpTime& lastCommittedOpTime,
                                                     BSONObjBuilder* response,
                                                     Status* result) {
     if (data.status == ErrorCodes::CallbackCanceled) {
@@ -1655,6 +1656,8 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
 
     response->append("heartbeatIntervalMillis",
                      durationCount<Milliseconds>(_rsConfig.getHeartbeatInterval()));
+
+    lastCommittedOpTime.append(response, "lastCommittedOpTime");
 
     response->append("members", membersOut);
     *result = Status::OK();
