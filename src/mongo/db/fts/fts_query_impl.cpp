@@ -75,6 +75,13 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
             if (inPhrase && inNegation) {
                 // don't add term
             } else {
+                // A negation should only continue until the next whitespace character. For example,
+                // "-foo" should negate "foo", "- foo" should not negate "foo", and "-foo-bar"
+                // should negate both "foo" and "bar".
+                if (inNegation && t.previousWhiteSpace) {
+                    inNegation = false;
+                }
+
                 if (inNegation) {
                     negativeTermSentence.append(s);
                     negativeTermSentence.push_back(' ');
@@ -83,9 +90,6 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
                     positiveTermSentence.push_back(' ');
                 }
             }
-
-            if (inNegation && !inPhrase)
-                inNegation = false;
         } else if (t.type == QueryToken::DELIMITER) {
             char c = t.data[0];
             if (c == '-') {
@@ -105,11 +109,20 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
                     } else {
                         _positivePhrases.push_back(phrase.toString());
                     }
-                    inNegation = false;
+
+                    // Do not reset 'inNegation' here, since a negation should continue until the
+                    // next whitespace character. For example, '-"foo bar"-"baz quux"' should negate
+                    // both the phrase "foo bar" and the phrase "baz quux".
+
                     inPhrase = false;
                 } else {
                     // start of a phrase
                     inPhrase = true;
+                    // A "-" should only be treated as a negation if there is no whitespace between
+                    // the "-" and the start of the phrase.
+                    if (inNegation && t.previousWhiteSpace) {
+                        inNegation = false;
+                    }
                     quoteOffset = t.offset;
                 }
             }

@@ -67,8 +67,25 @@ public:
 
     std::string toString() const;
 
+    /**
+     * Returns a string with the following format:
+     * <positive terms>||<negative terms>||<positive phrases>||<negative phrases>
+     *
+     * Each set of terms or phrases is separated by '|' characters. For example, if we had positive
+     * terms 'foo' and 'bar', negative term 'baz', and no phrases, the debug string would be
+     * 'foo|bar||baz||||'.
+     */
     std::string debugString() const;
 
+    /**
+     * Returns a BSON object with the following format:
+     * {
+     *   terms: <array of positive terms>,
+     *   negatedTerms: <array of negative terms>,
+     *   phrases: <array of positive phrases>,
+     *   negatedPhrases: <array of negative phrases>
+     * }
+     */
     BSONObj toBSON() const;
 
 private:
