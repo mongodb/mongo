@@ -154,11 +154,13 @@ public:
             scan = createCollScan(expression.get(), ws.get());
         }
 
-        CountStage countStage(&_txn, _coll, request, ws.get(), scan);
+        const bool useRecordStoreCount = false;
+        CountStageParams params(request, useRecordStoreCount);
+        CountStage countStage(&_txn, _coll, std::move(params), ws.get(), scan);
 
         const CountStats* stats = runCount(countStage);
 
-        ASSERT_FALSE(stats->trivialCount);
+        ASSERT_FALSE(stats->recordStoreCount);
         ASSERT_EQUALS(stats->nCounted, expected_n);
         ASSERT_EQUALS(stats->nSkipped, request.getSkip());
     }

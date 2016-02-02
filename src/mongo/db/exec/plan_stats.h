@@ -209,7 +209,7 @@ struct CollectionScanStats : public SpecificStats {
 };
 
 struct CountStats : public SpecificStats {
-    CountStats() : nCounted(0), nSkipped(0), trivialCount(false) {}
+    CountStats() : nCounted(0), nSkipped(0), recordStoreCount(false) {}
 
     SpecificStats* clone() const final {
         CountStats* specific = new CountStats(*this);
@@ -222,9 +222,8 @@ struct CountStats : public SpecificStats {
     // The number of results we skipped over.
     long long nSkipped;
 
-    // A "trivial count" is one that we can answer by calling numRecords() on the
-    // collection, without actually going through any query logic.
-    bool trivialCount;
+    // True if we computed the count via Collection::numRecords().
+    bool recordStoreCount;
 };
 
 struct CountScanStats : public SpecificStats {
