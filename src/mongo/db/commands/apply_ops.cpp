@@ -53,7 +53,9 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -109,7 +111,24 @@ public:
             }
         }
 
-        return appendCommandStatus(result, applyOps(txn, dbname, cmdObj, &result));
+        StatusWith<WriteConcernOptions> wcResult = extractWriteConcern(txn, cmdObj, dbname);
+        if (!wcResult.isOK()) {
+            return appendCommandStatus(result, wcResult.getStatus());
+        }
+        txn->setWriteConcern(wcResult.getValue());
+        setupSynchronousCommit(txn);
+
+        auto applyOpsStatus = appendCommandStatus(result, applyOps(txn, dbname, cmdObj, &result));
+
+        WriteConcernResult res;
+        auto waitForWCStatus =
+            waitForWriteConcern(txn,
+                                repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+                                txn->getWriteConcern(),
+                                &res);
+        appendCommandWCStatus(result, waitForWCStatus);
+
+        return applyOpsStatus;
     }
 
 private:
