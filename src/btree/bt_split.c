@@ -1941,7 +1941,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 *
 	 * Reset the split column-store page record.
 	 */
-	page->modify->mod_split_recno = WT_RECNO_OOB;
+	if (type != WT_PAGE_ROW_LEAF)
+		page->modify->mod_split_recno = WT_RECNO_OOB;
 
 	/*
 	 * Clear the allocated page's reference to the moved insert list element
