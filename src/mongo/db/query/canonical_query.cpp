@@ -519,15 +519,17 @@ Status CanonicalQuery::isValid(MatchExpression* root, const LiteParsedQuery& par
     }
 
     // NEAR cannot have a $natural sort or $natural hint.
+    const BSONObj& sortObj = parsed.getSort();
+    BSONElement sortNaturalElt = sortObj["$natural"];
+    const BSONObj& hintObj = parsed.getHint();
+    BSONElement hintNaturalElt = hintObj["$natural"];
     if (numGeoNear > 0) {
-        BSONObj sortObj = parsed.getSort();
-        if (!sortObj["$natural"].eoo()) {
+        if (sortNaturalElt) {
             return Status(ErrorCodes::BadValue,
                           "geoNear expression not allowed with $natural sort order");
         }
 
-        BSONObj hintObj = parsed.getHint();
-        if (!hintObj["$natural"].eoo()) {
+        if (hintNaturalElt) {
             return Status(ErrorCodes::BadValue,
                           "geoNear expression not allowed with $natural hint");
         }
@@ -539,20 +541,12 @@ Status CanonicalQuery::isValid(MatchExpression* root, const LiteParsedQuery& par
     }
 
     // TEXT and {$natural: ...} sort order cannot both be in the query.
-    if (numText > 0) {
-        const BSONObj& sortObj = parsed.getSort();
-        BSONObjIterator it(sortObj);
-        while (it.more()) {
-            BSONElement elt = it.next();
-            if (str::equals("$natural", elt.fieldName())) {
-                return Status(ErrorCodes::BadValue,
-                              "text expression not allowed with $natural sort order");
-            }
-        }
+    if (numText > 0 && sortNaturalElt) {
+        return Status(ErrorCodes::BadValue, "text expression not allowed with $natural sort order");
     }
 
     // TEXT and hint cannot both be in the query.
-    if (numText > 0 && !parsed.getHint().isEmpty()) {
+    if (numText > 0 && !hintObj.isEmpty()) {
         return Status(ErrorCodes::BadValue, "text and hint not allowed in same query");
     }
 
