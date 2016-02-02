@@ -58,7 +58,6 @@
  */
 
 #include "wt_internal.h"
-#include <string.h>
 
 /*
  * Google City Hash implementation. Based on source code from:
