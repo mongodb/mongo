@@ -531,7 +531,8 @@ bool WiredTigerKVEngine::_drop(StringData ident) {
 
     WiredTigerSession session(_conn);
 
-    int ret = session.getSession()->drop(session.getSession(), uri.c_str(), "force");
+    int ret =
+        session.getSession()->drop(session.getSession(), uri.c_str(), "force,lock_wait=false");
     LOG(1) << "WT drop of  " << uri << " res " << ret;
 
     if (ret == 0) {
@@ -585,7 +586,8 @@ void WiredTigerKVEngine::dropAllQueued() {
         WiredTigerSession session(_conn);
         for (set<string>::const_iterator it = mine.begin(); it != mine.end(); ++it) {
             string uri = *it;
-            int ret = session.getSession()->drop(session.getSession(), uri.c_str(), "force");
+            int ret = session.getSession()->drop(
+                session.getSession(), uri.c_str(), "force,lock_wait=false");
             LOG(1) << "WT queued drop of  " << uri << " res " << ret;
 
             if (ret == 0) {
