@@ -986,13 +986,6 @@ void insertMultiVector(OperationContext* txn,
                        CurOp& op,
                        vector<BSONObj>::iterator begin,
                        vector<BSONObj>::iterator end) {
-    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
-        StatusWith<BSONObj> fixed = fixDocumentForInsert(*it);
-        uassertStatusOK(fixed.getStatus());
-        if (!fixed.getValue().isEmpty())
-            *it = fixed.getValue();
-    }
-
     try {
         WriteUnitOfWork wunit(txn);
         Collection* collection = ctx.db()->getCollection(ns);
@@ -1027,6 +1020,13 @@ NOINLINE_DECL void insertMulti(OperationContext* txn,
     vector<BSONObj>::iterator chunkBegin = docs.begin();
     int64_t chunkCount = 0;
     int64_t chunkSize = 0;
+
+    for (vector<BSONObj>::iterator it = docs.begin(); it != docs.end(); it++) {
+        StatusWith<BSONObj> fixed = fixDocumentForInsert(*it);
+        uassertStatusOK(fixed.getStatus());
+        if (!fixed.getValue().isEmpty())
+            *it = fixed.getValue();
+    }
 
     for (vector<BSONObj>::iterator it = docs.begin(); it != docs.end(); it++) {
         chunkSize += (*it).objsize();
