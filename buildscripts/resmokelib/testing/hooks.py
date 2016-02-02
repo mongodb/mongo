@@ -160,14 +160,16 @@ class CheckReplDBHash(CustomBehavior):
                 CustomBehavior.start_dynamic_test(self.test_case, test_report)
                 self.started = True
 
+            primary = self.fixture.get_primary()
+            primary_conn = utils.new_mongo_client(port=primary.port)
+
+            CheckReplDBHash._invalidate_dbhash_cache(primary_conn)
+
             # Wait until all operations have replicated.
             self.fixture.await_repl()
 
             success = True
             sb = []  # String builder.
-
-            primary = self.fixture.get_primary()
-            primary_conn = utils.new_mongo_client(port=primary.port)
 
             for secondary in self.fixture.get_secondaries():
                 read_preference = pymongo.ReadPreference.SECONDARY
@@ -220,6 +222,20 @@ class CheckReplDBHash(CustomBehavior):
             test_report.stopTest(self.test_case)
 
         self.started = False
+
+    @staticmethod
+    def _invalidate_dbhash_cache(primary_conn):
+        """
+        dbHash values for collections in the "config" database are cached and may be stale due to
+        SERVER-22156. We insert a document into each of these collections to invalidate
+        the potentially stale cache entries.
+        """
+        db_names = primary_conn.database_names()
+        if "config" in db_names:
+            config_db = primary_conn["config"]
+            for coll_name in config_db.collection_names():
+                coll = config_db.get_collection(coll_name)
+                coll.insert_one({"invalidate": "cache"})
 
     @staticmethod
     def _check_all_db_hashes(primary_conn, secondary_conn, sb):
