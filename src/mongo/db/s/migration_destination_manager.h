@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/s/migration_session_id.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -64,7 +65,7 @@ public:
     State getState() const;
     void setState(State newState);
 
-    bool getActive() const;
+    bool isActive() const;
 
     /**
      * Reports the state of the migration manager as a BSON document.
@@ -75,6 +76,7 @@ public:
      * Returns OK if migration started successfully.
      */
     Status start(const std::string& ns,
+                 const MigrationSessionId& sessionId,
                  const std::string& fromShard,
                  const BSONObj& min,
                  const BSONObj& max,
@@ -84,13 +86,14 @@ public:
 
     void abort();
 
-    bool startCommit();
+    bool startCommit(const MigrationSessionId& sessionId);
 
 private:
     /**
      * Thread which drives the migration apply process on the recipient side.
      */
     void _migrateThread(std::string ns,
+                        MigrationSessionId sessionId,
                         BSONObj min,
                         BSONObj max,
                         BSONObj shardKeyPattern,
@@ -100,6 +103,7 @@ private:
 
     void _migrateDriver(OperationContext* txn,
                         const std::string& ns,
+                        const MigrationSessionId& sessionId,
                         const BSONObj& min,
                         const BSONObj& max,
                         const BSONObj& shardKeyPattern,
@@ -125,9 +129,10 @@ private:
     // Mutex to guard all fields
     mutable stdx::mutex _mutex;
 
-    // Whether the prepare method has been called along with a condition variable on which to wait
-    // for prepare to be called
-    bool _active;
+    // Migration session ID uniquely identifies the migration and indicates whether the prepare
+    // method has been called.
+    boost::optional<MigrationSessionId> _sessionId{boost::none};
+    // A condition variable on which to wait for the prepare method to be called.
     stdx::condition_variable _isActiveCV;
 
     stdx::thread _migrateThreadHandle;
@@ -139,12 +144,12 @@ private:
     BSONObj _max;
     BSONObj _shardKeyPattern;
 
-    long long _numCloned;
-    long long _clonedBytes;
-    long long _numCatchup;
-    long long _numSteady;
+    long long _numCloned{0};
+    long long _clonedBytes{0};
+    long long _numCatchup{0};
+    long long _numSteady{0};
 
-    State _state;
+    State _state{READY};
     std::string _errmsg;
 };
 

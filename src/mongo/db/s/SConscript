@@ -20,6 +20,17 @@ env.Library(
 )
 
 env.Library(
+    target='migration_types',
+    source=[
+        'migration_session_id.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+    ],
+)
+
+env.Library(
     target='sharding',
     source=[
         'migration_destination_manager.cpp',
@@ -34,6 +45,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/s/sharding_initialization',
+        'migration_types',
     ],
     LIBDEPS_TAGS=[
         # Depends on symbols defined in files in serverOnlyFiles, and has
@@ -59,6 +71,16 @@ env.Library(
         # Depends on getDeleter, defined in s/serveronly, which would be circular.
         'incomplete',
     ],
+)
+
+env.CppUnitTest(
+    target='migration_types_test',
+    source=[
+        'migration_session_id_test.cpp',
+    ],
+    LIBDEPS=[
+        'migration_types',
+    ]
 )
 
 env.CppUnitTest(

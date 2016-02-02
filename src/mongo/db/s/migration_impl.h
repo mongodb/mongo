@@ -42,6 +42,7 @@
 namespace mongo {
 
 class CollectionMetadata;
+class MigrationSessionId;
 class OperationContext;
 template <typename T>
 class StatusWith;
@@ -114,7 +115,7 @@ public:
     /**
      * Starts the move chunk operation.
      */
-    Status start(BSONObj shardKeyPattern);
+    Status start(const MigrationSessionId& sessionId, const BSONObj& shardKeyPattern);
 
     /**
      * Implements the migration critical section. Needs to be invoked after all data has been moved
@@ -125,7 +126,7 @@ public:
      * Since some migration failures are non-recoverable, it may also shut down the server on
      * certain errors.
      */
-    Status commitMigration();
+    Status commitMigration(const MigrationSessionId& sessionId);
 
     const NamespaceString& getNss() const {
         return _nss;

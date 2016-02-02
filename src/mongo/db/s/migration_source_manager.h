@@ -35,11 +35,11 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/migration_session_id.h"
 #include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
 
-class BSONObj;
 class Database;
 class OperationContext;
 class PlanExecutor;
@@ -57,6 +57,7 @@ public:
      * already an existing migration in progress.
      */
     bool start(OperationContext* txn,
+               const MigrationSessionId& sessionId,
                const std::string& ns,
                const BSONObj& min,
                const BSONObj& max,
@@ -104,7 +105,10 @@ public:
      * Called from the source of a migration process, this method transfers the accummulated local
      * mods from source to destination.
      */
-    bool transferMods(OperationContext* txn, std::string& errmsg, BSONObjBuilder& b);
+    bool transferMods(OperationContext* txn,
+                      const MigrationSessionId& sessionId,
+                      std::string& errmsg,
+                      BSONObjBuilder& b);
 
     /**
      * Get the disklocs that belong to the chunk migrated and sort them in _cloneLocs (to avoid
@@ -121,7 +125,10 @@ public:
                           std::string& errmsg,
                           BSONObjBuilder& result);
 
-    bool clone(OperationContext* txn, std::string& errmsg, BSONObjBuilder& result);
+    bool clone(OperationContext* txn,
+               const MigrationSessionId& sessionId,
+               std::string& errmsg,
+               BSONObjBuilder& result);
 
     void aboutToDelete(const RecordId& dl);
 
@@ -193,8 +200,8 @@ private:
     // Bytes in _reload + _deleted
     long long _memoryUsed{0};  // (M)
 
-    // If a migration is currently active.
-    bool _active{false};  // (MG)
+    // Uniquely identifies a migration and indicates a migration is active when set.
+    boost::optional<MigrationSessionId> _sessionId{boost::none};  // (MG)
 
     NamespaceString _nss;      // (MG)
     BSONObj _min;              // (MG)
