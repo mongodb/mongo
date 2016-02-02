@@ -555,6 +555,19 @@ Status CanonicalQuery::isValid(MatchExpression* root, const LiteParsedQuery& par
         return Status(ErrorCodes::BadValue, "text and snapshot not allowed in same query");
     }
 
+    // $natural sort order must agree with hint.
+    if (sortNaturalElt) {
+        if (!hintObj.isEmpty() && !hintNaturalElt) {
+            return Status(ErrorCodes::BadValue, "index hint not allowed with $natural sort order");
+        }
+        if (hintNaturalElt) {
+            if (hintNaturalElt.numberInt() != sortNaturalElt.numberInt()) {
+                return Status(ErrorCodes::BadValue,
+                              "$natural hint must be in the same direction as $natural sort order");
+            }
+        }
+    }
+
     return Status::OK();
 }
 

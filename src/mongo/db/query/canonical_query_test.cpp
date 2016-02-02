@@ -425,6 +425,33 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
     }
 }
 
+TEST(CanonicalQueryTest, IsValidNaturalSortIndexHint) {
+    const bool isExplain = false;
+    auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(
+        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {a: 1}}"), isExplain));
+
+    // Invalid: {$natural: 1} sort order and index hint.
+    ASSERT_NOT_OK(isValid("{}", *lpq));
+}
+
+TEST(CanonicalQueryTest, IsValidNaturalSortNaturalHint) {
+    const bool isExplain = false;
+    auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(
+        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: 1}}"), isExplain));
+
+    // Valid: {$natural: 1} sort order and {$natural: 1} hint.
+    ASSERT_OK(isValid("{}", *lpq));
+}
+
+TEST(CanonicalQueryTest, IsValidNaturalSortNaturalHintDifferentDirections) {
+    const bool isExplain = false;
+    auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(
+        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: -1}}"), isExplain));
+
+    // Invalid: {$natural: 1} sort order and {$natural: -1} hint.
+    ASSERT_NOT_OK(isValid("{}", *lpq));
+}
+
 //
 // Tests for CanonicalQuery::sortTree
 //
