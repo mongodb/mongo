@@ -57,7 +57,6 @@
  * compromising on hash quality.
  */
 
-#include <string.h>
 #include "wt_internal.h"
 
 /*

@@ -29,6 +29,8 @@
 #ifndef	HAVE_WTPERF_H
 #define	HAVE_WTPERF_H
 
+#include <wt_internal.h>
+
 #ifndef _WIN32
 #include <sys/time.h>
 #endif
@@ -55,8 +57,6 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-
-#include <wt_internal.h>
 
 #ifdef _WIN32
 #include "windows_shim.h"
