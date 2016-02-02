@@ -162,6 +162,7 @@ MigrationSourceManager::MigrationSourceManager() = default;
 MigrationSourceManager::~MigrationSourceManager() = default;
 
 bool MigrationSourceManager::start(OperationContext* txn,
+                                   const MigrationSessionId& sessionId,
                                    const std::string& ns,
                                    const BSONObj& min,
                                    const BSONObj& max,
@@ -176,7 +177,7 @@ bool MigrationSourceManager::start(OperationContext* txn,
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    if (_active) {
+    if (_sessionId) {
         return false;
     }
 
@@ -189,7 +190,7 @@ bool MigrationSourceManager::start(OperationContext* txn,
     invariant(_reload.size() == 0);
     invariant(_memoryUsed == 0);
 
-    _active = true;
+    _sessionId = sessionId;
 
     stdx::lock_guard<stdx::mutex> tLock(_cloneLocsMutex);
     invariant(_cloneLocs.size() == 0);
@@ -206,7 +207,7 @@ void MigrationSourceManager::done(OperationContext* txn) {
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    _active = false;
+    _sessionId = boost::none;
     _deleteNotifyExec.reset(NULL);
     _inCriticalSection = false;
     _inCriticalSectionCV.notify_all();
@@ -241,7 +242,7 @@ void MigrationSourceManager::logOp(OperationContext* txn,
 
     dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
 
-    if (!_active)
+    if (!_sessionId)
         return;
 
     if (_nss != ns)
@@ -289,7 +290,7 @@ void MigrationSourceManager::logOp(OperationContext* txn,
 }
 
 bool MigrationSourceManager::isInMigratingChunk(const NamespaceString& ns, const BSONObj& doc) {
-    if (!_active)
+    if (!_sessionId)
         return false;
     if (ns != _nss)
         return false;
@@ -297,6 +298,7 @@ bool MigrationSourceManager::isInMigratingChunk(const NamespaceString& ns, const
 }
 
 bool MigrationSourceManager::transferMods(OperationContext* txn,
+                                          const MigrationSessionId& sessionId,
                                           string& errmsg,
                                           BSONObjBuilder& b) {
     long long size = 0;
@@ -305,8 +307,16 @@ bool MigrationSourceManager::transferMods(OperationContext* txn,
         AutoGetCollectionForRead ctx(txn, _getNS());
 
         stdx::lock_guard<stdx::mutex> sl(_mutex);
-        if (!_active) {
+
+        if (!_sessionId) {
             errmsg = "no active migration!";
+            return false;
+        }
+
+        if (!_sessionId->matches(sessionId)) {
+            errmsg = str::stream() << "requested migration session id " << sessionId.toString()
+                                   << " does not match active session id "
+                                   << _sessionId->toString();
             return false;
         }
 
@@ -442,7 +452,10 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
     return true;
 }
 
-bool MigrationSourceManager::clone(OperationContext* txn, string& errmsg, BSONObjBuilder& result) {
+bool MigrationSourceManager::clone(OperationContext* txn,
+                                   const MigrationSessionId& sessionId,
+                                   string& errmsg,
+                                   BSONObjBuilder& result) {
     ElapsedTracker tracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS);
 
     int allocSize = 0;
@@ -451,8 +464,16 @@ bool MigrationSourceManager::clone(OperationContext* txn, string& errmsg, BSONOb
         AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
 
         stdx::lock_guard<stdx::mutex> sl(_mutex);
-        if (!_active) {
+
+        if (!_sessionId) {
             errmsg = "not active";
+            return false;
+        }
+
+        if (!_sessionId->matches(sessionId)) {
+            errmsg = str::stream() << "requested migration session id " << sessionId.toString()
+                                   << " does not match active session id "
+                                   << _sessionId->toString();
             return false;
         }
 
@@ -473,8 +494,16 @@ bool MigrationSourceManager::clone(OperationContext* txn, string& errmsg, BSONOb
         AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
 
         stdx::lock_guard<stdx::mutex> sl(_mutex);
-        if (!_active) {
+
+        if (!_sessionId) {
             errmsg = "not active";
+            return false;
+        }
+
+        if (!_sessionId->matches(sessionId)) {
+            errmsg = str::stream() << "migration session id changed from " << sessionId.toString()
+                                   << " to " << _sessionId->toString()
+                                   << " while initial clone was active";
             return false;
         }
 
@@ -569,7 +598,7 @@ bool MigrationSourceManager::waitTillNotInCriticalSection(int maxSecondsToWait) 
 
 bool MigrationSourceManager::isActive() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _active;
+    return _sessionId.is_initialized();
 }
 
 void MigrationSourceManager::_xfer(OperationContext* txn,

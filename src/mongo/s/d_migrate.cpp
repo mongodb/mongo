@@ -96,7 +96,10 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        return ShardingState::get(txn)->migrationSourceManager()->transferMods(txn, errmsg, result);
+        const MigrationSessionId migrationSessionid(
+            uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
+        return ShardingState::get(txn)->migrationSourceManager()->transferMods(
+            txn, migrationSessionid, errmsg, result);
     }
 
 } transferModsCommand;
@@ -135,7 +138,10 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        return ShardingState::get(txn)->migrationSourceManager()->clone(txn, errmsg, result);
+        const MigrationSessionId migrationSessionid(
+            uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
+        return ShardingState::get(txn)->migrationSourceManager()->clone(
+            txn, migrationSessionid, errmsg, result);
     }
 
 } initialCloneCommand;
@@ -210,7 +216,7 @@ public:
 
         // Active state of TO-side migrations (MigrateStatus) is serialized by distributed
         // collection lock.
-        if (shardingState->migrationDestinationManager()->getActive()) {
+        if (shardingState->migrationDestinationManager()->isActive()) {
             errmsg = "migrate already in progress";
             return false;
         }
@@ -293,9 +299,18 @@ public:
 
         const string fromShard(cmdObj["from"].String());
 
-        Status startStatus = shardingState->migrationDestinationManager()->start(
-            ns, fromShard, min, max, shardKeyPattern, currentVersion.epoch(), writeConcern);
+        const MigrationSessionId migrationSessionId(
+            uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 
+        Status startStatus =
+            shardingState->migrationDestinationManager()->start(ns,
+                                                                migrationSessionId,
+                                                                fromShard,
+                                                                min,
+                                                                max,
+                                                                shardKeyPattern,
+                                                                currentVersion.epoch(),
+                                                                writeConcern);
         if (!startStatus.isOK()) {
             return appendCommandStatus(result, startStatus);
         }
@@ -341,7 +356,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         ShardingState::get(txn)->migrationDestinationManager()->report(result);
-        return 1;
+        return true;
     }
 
 } recvChunkStatusCommand;
@@ -380,7 +395,11 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        bool ok = ShardingState::get(txn)->migrationDestinationManager()->startCommit();
+        const MigrationSessionId migrationSessionid(
+            uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
+        const bool ok =
+            ShardingState::get(txn)->migrationDestinationManager()->startCommit(migrationSessionid);
+
         ShardingState::get(txn)->migrationDestinationManager()->report(result);
         return ok;
     }

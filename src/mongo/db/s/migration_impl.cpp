@@ -80,6 +80,13 @@ WriteConcernOptions getDefaultWriteConcernForMigration() {
     return WriteConcernOptions(1, WriteConcernOptions::NONE, 0);
 }
 
+BSONObj createRecvChunkCommitRequest(const MigrationSessionId& sessionId) {
+    BSONObjBuilder builder;
+    builder.append("_recvChunkCommit", 1);
+    sessionId.append(&builder);
+    return builder.obj();
+}
+
 MONGO_FP_DECLARE(failMigrationCommit);
 MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
 MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
@@ -276,7 +283,7 @@ ChunkMoveOperationState::acquireMoveMetadata() {
     return &_distLockStatus->getValue();
 }
 
-Status ChunkMoveOperationState::commitMigration() {
+Status ChunkMoveOperationState::commitMigration(const MigrationSessionId& sessionId) {
     invariant(_distLockStatus.is_initialized());
     invariant(_distLockStatus->isOK());
 
@@ -321,7 +328,7 @@ Status ChunkMoveOperationState::commitMigration() {
 
     try {
         ScopedDbConnection connTo(_toShardCS, 35.0);
-        connTo->runCommand("admin", BSON("_recvChunkCommit" << 1), res);
+        connTo->runCommand("admin", createRecvChunkCommitRequest(sessionId), res);
         connTo.done();
         recvChunkCommitStatus = getStatusFromCommandResult(res);
     } catch (const DBException& e) {
@@ -578,9 +585,11 @@ std::shared_ptr<CollectionMetadata> ChunkMoveOperationState::getCollMetadata() c
     return _collMetadata;
 }
 
-Status ChunkMoveOperationState::start(BSONObj shardKeyPattern) {
+Status ChunkMoveOperationState::start(const MigrationSessionId& sessionId,
+                                      const BSONObj& shardKeyPattern) {
     auto migrationSourceManager = ShardingState::get(_txn)->migrationSourceManager();
-    if (!migrationSourceManager->start(_txn, _nss.ns(), _minKey, _maxKey, shardKeyPattern)) {
+    if (!migrationSourceManager->start(
+            _txn, sessionId, _nss.ns(), _minKey, _maxKey, shardKeyPattern)) {
         return {ErrorCodes::ConflictingOperationInProgress,
                 "Not starting chunk migration because another migration is already in progress "
                 "from this shard"};
