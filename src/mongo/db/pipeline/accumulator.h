@@ -99,7 +99,11 @@ public:
      */
     static Factory getFactory(StringData name);
 
-    virtual bool isAssociativeAndCommutative() const {
+    virtual bool isAssociative() const {
+        return false;
+    }
+
+    virtual bool isCommutative() const {
         return false;
     }
 
@@ -123,7 +127,11 @@ public:
 
     static boost::intrusive_ptr<Accumulator> create();
 
-    bool isAssociativeAndCommutative() const final {
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 
@@ -177,7 +185,11 @@ public:
 
     static boost::intrusive_ptr<Accumulator> create();
 
-    bool isAssociativeAndCommutative() const final {
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 
@@ -202,7 +214,11 @@ public:
     const char* getOpName() const final;
     void reset() final;
 
-    bool isAssociativeAndCommutative() const final {
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 
