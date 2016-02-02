@@ -236,7 +236,7 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 	int len;
 	char msg[128];
 
-	if (!g.track || tag == NULL)
+	if (g.c_quiet || tag == NULL)
 		return;
 
 	if (tinfo == NULL && cnt == 0)
