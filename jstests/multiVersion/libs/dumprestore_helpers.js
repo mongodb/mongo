@@ -55,8 +55,7 @@ function multiVersionDumpRestoreTest(configObj) {
             sync: true, // Mixed version clusters can't use replsets for config servers
             name : testBaseName + "_sharded_source",
             mongos : [{ binVersion : configObj.serverSourceVersion }],
-            shards : [{ binVersion : configObj.serverSourceVersion,
-                        setParameter : "textSearchEnabled=true" }],
+            shards : [{ binVersion : configObj.serverSourceVersion }],
             config : [{ binVersion : configObj.serverSourceVersion }]
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
@@ -64,7 +63,6 @@ function multiVersionDumpRestoreTest(configObj) {
     }
     else {
         var serverSource = MongoRunner.runMongod({ binVersion : configObj.serverSourceVersion,
-                                                   setParameter : "textSearchEnabled=true",
                                                    dbpath : configObj.testDbpath });
     }
     var sourceDB = serverSource.getDB(testBaseName);
@@ -102,8 +100,7 @@ function multiVersionDumpRestoreTest(configObj) {
 
     // Restore using the specified version of mongorestore
     if (configObj.restoreType === "mongod") {
-        var serverDest = MongoRunner.runMongod({ binVersion : configObj.serverDestVersion,
-                                                 setParameter : "textSearchEnabled=true" });
+        var serverDest = MongoRunner.runMongod({ binVersion : configObj.serverDestVersion });
 
         MongoRunner.runMongoTool("mongorestore", { dir : configObj.dumpDir + "/" + testBaseName,
                                                    binVersion : configObj.mongoRestoreVersion,
@@ -115,8 +112,7 @@ function multiVersionDumpRestoreTest(configObj) {
             sync: true, // Mixed version clusters can't use replsets for config servers
             name : testBaseName + "_sharded_dest",
             mongos : [{ binVersion : configObj.serverDestVersion }],
-            shards : [{ binVersion : configObj.serverDestVersion,
-                        setParameter : "textSearchEnabled=true" }],
+            shards : [{ binVersion : configObj.serverDestVersion }],
             config : [{ binVersion : configObj.serverDestVersion }]
         };
         var shardingTest = new ShardingTest(shardingTestConfig);

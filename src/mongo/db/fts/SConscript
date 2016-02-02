@@ -69,7 +69,6 @@ env.Library(
 )
 
 env.Library( 'server_common', [
-             'fts_enabled.cpp'
              ],
              LIBDEPS=[
                  '$BUILD_DIR/mongo/base',
