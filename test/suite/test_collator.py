@@ -97,7 +97,7 @@ class test_collator(wttest.WiredTigerTestCase):
 
     def expected_main_value(self, i):
         return ','.join([str((i*j)%100) for j in range(0, self.nindices)])
-        
+
     # We split the population into two phases
     # (in anticipation of future tests that create
     # indices between the two population steps).

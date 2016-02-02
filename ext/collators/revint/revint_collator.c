@@ -79,7 +79,7 @@ collate_revint(WT_COLLATOR *collator,
 	 * hence we unpack using "ii".
 	 */
 	if ((ret = wiredtiger_unpack_start(session, "ii",
-	    k1->data, k1->size, &s1)) != 0 || 
+	    k1->data, k1->size, &s1)) != 0 ||
 	    (ret = wiredtiger_unpack_start(session, "ii",
 	    k2->data, k2->size, &s2)) != 0)
 		collate_error(ret, "unpack start");
@@ -125,7 +125,7 @@ collate_revint(WT_COLLATOR *collator,
 			else
 				collate_error(ret, "unpack primary key 2");
 		}
-		
+
 		/* sorting is not reversed here */
 		if (p1 < p2)
 			*cmp = -1;
