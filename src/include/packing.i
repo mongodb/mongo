@@ -677,7 +677,7 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 
 	if (fmt[0] != '\0' && fmt[1] == '\0') {
 		pv.type = fmt[0];
-		if (p >= end)
+		if (p >= end && pv.type != 'u')
 			return (ENOMEM);
 		if ((ret = __unpack_read(session, &pv, &p, size)) == 0)
 			WT_UNPACK_PUT(session, pv, ap);
@@ -686,7 +686,7 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 
 	WT_RET(__pack_init(session, &pack, fmt));
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
-		if (p >= end)
+		if (p >= end && pv.type != 'u')
 			return (ENOMEM);
 		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));
 		WT_UNPACK_PUT(session, pv, ap);
