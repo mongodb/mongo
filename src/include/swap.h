@@ -7,7 +7,7 @@
  */
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1300)
-#include <cstdlib>
+#include <stdlib.h>
 #define	__wt_bswap16(v)	_byteswap_ushort(v)
 #define	__wt_bswap32(v)	_byteswap_ulong(v)
 #define	__wt_bswap64(v)	_byteswap_uint64(v)
