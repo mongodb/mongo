@@ -342,7 +342,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
     cmdBob.append("tailable", true);
     cmdBob.append("oplogReplay", true);
     cmdBob.append("awaitData", true);
-    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(fetcherMaxTimeMS));
+    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(Minutes(1)));  // 1 min initial find.
 
     BSONObjBuilder metadataBob;
     if (isV1ElectionProtocol) {
