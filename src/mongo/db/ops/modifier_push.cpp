@@ -31,6 +31,7 @@
 #include "mongo/db/ops/modifier_push.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include "mongo/base/error_codes.h"
@@ -305,7 +306,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
         if (!positionElem.isNumber()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The value for $position must "
-                                           "be a positive numeric value not a "
+                                           "be a non-negative numeric value not a "
                                         << typeName(positionElem.type()));
         }
 
@@ -314,9 +315,14 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
         // If the value of position is not fraction, even if it's a double, we allow it. The
         // reason here is that the shell will use doubles by default unless told otherwise.
         const double doubleVal = positionElem.numberDouble();
+        if (std::isnan(doubleVal)) {
+            return Status(ErrorCodes::BadValue,
+                          "The $position value in $push cannot be NaN.");
+        }
+
         if (doubleVal - static_cast<int64_t>(doubleVal) != 0) {
             return Status(ErrorCodes::BadValue,
-                          "The $position value in $push cannot be fractional");
+                          "The $position value in $push cannot be fractional.");
         }
 
         if (static_cast<double>(numeric_limits<int64_t>::max()) < doubleVal) {
@@ -331,7 +337,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
 
         const int64_t tempVal = positionElem.numberLong();
         if (tempVal < 0)
-            return Status(ErrorCodes::BadValue, "The $position value in $push must be positive.");
+            return Status(ErrorCodes::BadValue, "The $position value in $push must be non-negative.");
 
         _startPosition = size_t(tempVal);
     }
