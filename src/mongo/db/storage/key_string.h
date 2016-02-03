@@ -186,7 +186,7 @@ public:
          * size only includes data bytes, not the size byte itself.
          */
         uint8_t getSizeByte() const {
-            return _buf[0] & 0x3f;
+            return _buf[0] & 0x7f;
         }
         void setSizeByte(uint8_t size) {
             dassert(size < kMaxBytesNeeded);
