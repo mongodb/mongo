@@ -379,6 +379,7 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 
         if (verbosity >= ExplainCommon::EXEC_STATS) {
             bob->appendNumber("keysExamined", spec->keysExamined);
+            bob->appendNumber("seeks", spec->seeks);
             bob->appendNumber("dupsTested", spec->dupsTested);
             bob->appendNumber("dupsDropped", spec->dupsDropped);
             bob->appendNumber("seenInvalidated", spec->seenInvalidated);

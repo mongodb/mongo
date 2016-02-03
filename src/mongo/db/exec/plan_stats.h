@@ -370,7 +370,8 @@ struct IndexScanStats : public SpecificStats {
           dupsTested(0),
           dupsDropped(0),
           seenInvalidated(0),
-          keysExamined(0) {}
+          keysExamined(0),
+          seeks(0) {}
 
     SpecificStats* clone() const final {
         IndexScanStats* specific = new IndexScanStats(*this);
@@ -413,6 +414,9 @@ struct IndexScanStats : public SpecificStats {
 
     // Number of entries retrieved from the index during the scan.
     size_t keysExamined;
+
+    // Number of times the index cursor is re-positioned during the execution of the scan.
+    size_t seeks;
 };
 
 struct LimitStats : public SpecificStats {
