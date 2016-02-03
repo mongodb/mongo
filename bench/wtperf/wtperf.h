@@ -88,7 +88,7 @@ typedef struct {
 	int64_t insert;			/* Insert ratio */
 	int64_t read;			/* Read ratio */
 	int64_t update;			/* Update ratio */
-	uint64_t throttle;              /* Maximum operations/second */
+	uint64_t throttle;		/* Maximum operations/second */
 		/* Number of operations per transaction. Zero for autocommit */
 	int64_t ops_per_txn;
 	int64_t truncate;		/* Truncate ratio */
@@ -409,10 +409,11 @@ static inline char *
 dstrndup(const char *str, const size_t len)
 {
 	char *p;
+	p = dcalloc(len + 1, 1);
 
-	if ((p = strndup(str, len)) == NULL)
-		die(errno, "strndup");
+	strncpy(p, str, len);
+	if (p == NULL)
+		die(errno, "dstrndup");
 	return (p);
 }
-
 #endif
