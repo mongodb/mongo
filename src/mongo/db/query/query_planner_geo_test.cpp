@@ -766,118 +766,165 @@ TEST_F(QueryPlannerTest, Negation2DSphereGeoNearMultikey) {
 // 2dsphere V2 sparse indices, SERVER-9639
 //
 
+// A fixture to help run tests for multiple 2dsphere index versions.
+class QueryPlanner2dsphereVersionTest : public QueryPlannerTest {
+public:
+    // For each 2dsphere index version in 'versions', verifies the planner generates
+    // 'expectedSolutions' for 'predicate' given 'keyPatterns'.
+    void testMultiple2dsphereIndexVersions(std::vector<int> versions,
+                                           std::vector<BSONObj> keyPatterns,
+                                           BSONObj predicate,
+                                           std::vector<std::string> expectedSolutions) {
+        for (auto version : versions) {
+            params.indices.clear();
+            for (auto keyPattern : keyPatterns) {
+                addIndex(keyPattern, BSON("2dsphereIndexVersion" << version));
+            }
+
+            runQuery(predicate);
+
+            assertNumSolutions(expectedSolutions.size());
+            for (auto solution : expectedSolutions) {
+                assertSolutionExists(solution);
+            }
+        }
+    }
+
+    // For each 2dsphere index version in 'versions', verifies the planner generates
+    // 'numExpectedSolutions' for 'predicate' given 'keyPattern'.
+    void testMultiple2dsphereIndexVersions(std::vector<int> versions,
+                                           std::vector<BSONObj> keyPatterns,
+                                           BSONObj predicate,
+                                           size_t numExpectedSolutions) {
+        for (auto version : versions) {
+            params.indices.clear();
+            for (auto keyPattern : keyPatterns) {
+                addIndex(keyPattern, BSON("2dsphereIndexVersion" << version));
+            }
+
+            runQuery(predicate);
+
+            assertNumSolutions(numExpectedSolutions);
+        }
+    }
+};
+
 // Basic usage of a sparse 2dsphere index.  V1 ignores the sparse field.  We can use any prefix
 // of the index as every document is indexed.
-TEST_F(QueryPlannerTest, TwoDSphereSparseV1) {
-    // Create a V1 index.
-    addIndex(BSON("nonGeo" << 1 << "geo"
-                           << "2dsphere"),
-             BSON("2dsphereIndexVersion" << 1));
+TEST_F(QueryPlanner2dsphereVersionTest, TwoDSphereSparseV1) {
+    std::vector<int> versions{1};
+    std::vector<BSONObj> keyPatterns = {BSON("nonGeo" << 1 << "geo"
+                                                      << "2dsphere")};
+    BSONObj predicate = fromjson("{nonGeo: 7}");
+    std::vector<std::string> solutions = {
+        "{cscan: {dir: 1}}", "{fetch: {node: {ixscan: {pattern: {nonGeo: 1, geo: '2dsphere'}}}}}"};
 
-    // Can use the index for this.
-    runQuery(fromjson("{nonGeo: 7}"));
-    assertNumSolutions(2);
-    assertSolutionExists("{cscan: {dir: 1}}");
-    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {nonGeo: 1, geo: '2dsphere'}}}}}");
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
 }
 
-// V2 is "geo sparse" and removes the nonGeo assignment.
-TEST_F(QueryPlannerTest, TwoDSphereSparseV2CantUse) {
-    // Create a V2 index.
-    addIndex(BSON("nonGeo" << 1 << "geo"
-                           << "2dsphere"),
-             BSON("2dsphereIndexVersion" << 2));
+// V2 and V3 are "geo sparse" and remove the nonGeo assignment.  Can't use the index prefix here as
+// it's a V2 index and we have no geo pred.
+TEST_F(QueryPlanner2dsphereVersionTest, TwoDSphereSparseCantUse) {
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("nonGeo" << 1 << "geo"
+                                                      << "2dsphere")};
+    BSONObj predicate = fromjson("{nonGeo: 7}");
+    std::vector<std::string> solutions = {"{cscan: {dir: 1}}"};
 
-    // Can't use the index prefix here as it's a V2 index and we have no geo pred.
-    runQuery(fromjson("{nonGeo: 7}"));
-    assertNumSolutions(1);
-    assertSolutionExists("{cscan: {dir: 1}}");
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
 }
 
-TEST_F(QueryPlannerTest, TwoDSphereSparseOnePred) {
-    // Create a V2 index.
-    addIndex(BSON("geo"
-                  << "2dsphere"),
-             BSON("2dsphereIndexVersion" << 2));
+// We can use the index here as we have a geo pred.
+TEST_F(QueryPlanner2dsphereVersionTest, TwoDSphereSparseOnePred) {
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("geo"
+                                             << "2dsphere")};
+    BSONObj predicate =
+        fromjson("{geo : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}}");
 
-    // We can use the index here as we have a geo pred.
-    runQuery(fromjson("{geo : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}}"));
-    assertNumSolutions(2);
-    assertSolutionExists("{cscan: {dir: 1}}");
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, 2U);
 }
 
-// V2 is geo-sparse and the planner removes the nonGeo assignment when there's no geo pred
-TEST_F(QueryPlannerTest, TwoDSphereSparseV2TwoPreds) {
-    addIndex(BSON("nonGeo" << 1 << "geo"
-                           << "2dsphere"
-                           << "geo2"
-                           << "2dsphere"),
-             BSON("2dsphereIndexVersion" << 2));
+// V2 and V3 are geo-sparse and the planner removes the nonGeo assignment when there's no geo pred.
+TEST_F(QueryPlanner2dsphereVersionTest, TwoDSphereSparseTwoPreds) {
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("nonGeo" << 1 << "geo"
+                                                      << "2dsphere"
+                                                      << "geo2"
+                                                      << "2dsphere")};
 
     // Non-geo preds can only use a collscan.
-    runQuery(fromjson("{nonGeo: 7}"));
-    assertNumSolutions(1);
-    assertSolutionExists("{cscan: {dir: 1}}");
+    {
+        BSONObj predicate = fromjson("{nonGeo: 7}");
+        std::vector<std::string> solutions = {"{cscan: {dir: 1}}"};
+        testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
+    }
 
     // One geo pred so we can use the index.
-    runQuery(
-        fromjson("{nonGeo: 7, geo : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}}"));
-    ASSERT_EQUALS(getNumSolutions(), 2U);
+    {
+        BSONObj predicate =
+            fromjson("{nonGeo: 7, geo : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01] } }}}");
+        testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, 2U);
+    }
 
     // Two geo preds, so we can use the index still.
-    runQuery(fromjson(
-        "{nonGeo: 7, geo : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] }},"
-        " geo2 : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] }}}"));
-    ASSERT_EQUALS(getNumSolutions(), 2U);
+    {
+        BSONObj predicate = fromjson(
+            "{nonGeo: 7, geo : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] }},"
+            " geo2 : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] }}}");
+        testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, 2U);
+    }
 }
 
-TEST_F(QueryPlannerTest, TwoDNearCompound) {
-    addIndex(BSON("geo"
-                  << "2dsphere"
-                  << "nongeo" << 1),
-             BSON("2dsphereIndexVersion" << 2));
-    runQuery(fromjson("{geo: {$nearSphere: [-71.34895, 42.46037]}}"));
-    ASSERT_EQUALS(getNumSolutions(), 1U);
+TEST_F(QueryPlanner2dsphereVersionTest, TwoDNearCompound) {
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("geo"
+                                             << "2dsphere"
+                                             << "nongeo" << 1)};
+    BSONObj predicate = fromjson("{geo: {$nearSphere: [-71.34895, 42.46037]}}");
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, 1U);
 }
 
-TEST_F(QueryPlannerTest, TwoDSphereSparseV2BelowOr) {
+TEST_F(QueryPlanner2dsphereVersionTest, TwoDSphereSparseBelowOr) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
-    addIndex(BSON("geo1"
-                  << "2dsphere"
-                  << "a" << 1 << "b" << 1),
-             BSON("2dsphereIndexVersion" << 2));
-    addIndex(BSON("geo2"
-                  << "2dsphere"
-                  << "a" << 1 << "b" << 1),
-             BSON("2dsphereIndexVersion" << 2));
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("geo1"
+                                             << "2dsphere"
+                                             << "a" << 1 << "b" << 1),
+                                        BSON("geo2"
+                                             << "2dsphere"
+                                             << "a" << 1 << "b" << 1)};
 
-    runQuery(fromjson(
+    BSONObj predicate = fromjson(
         "{a: 4, b: 5, $or: ["
         "{geo1: {$geoWithin: {$centerSphere: [[10, 20], 0.01]}}},"
-        "{geo2: {$geoWithin: {$centerSphere: [[10, 20], 0.01]}}}]}"));
+        "{geo2: {$geoWithin: {$centerSphere: [[10, 20], 0.01]}}}]}");
 
-    assertNumSolutions(1U);
-    assertSolutionExists(
+    std::vector<std::string> solutions = {
         "{fetch: {filter: {a: 4, b: 5}, node: {or: {nodes: ["
         "{fetch: {node: {ixscan: {pattern: {geo1:'2dsphere',a:1,b:1}}}}},"
         "{fetch: {node: {ixscan: {pattern: {geo2:'2dsphere',a:1,b:1}}}}}"
-        "]}}}}");
+        "]}}}}"};
+
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
 }
 
-TEST_F(QueryPlannerTest, TwoDSphereSparseV2BelowElemMatch) {
+TEST_F(QueryPlanner2dsphereVersionTest, TwoDSphereSparseBelowElemMatch) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
-    addIndex(BSON("a.b"
-                  << "2dsphere"
-                  << "a.c" << 1),
-             BSON("2dsphereIndexVersion" << 2));
 
-    runQuery(fromjson(
+    std::vector<int> versions{2, 3};
+    std::vector<BSONObj> keyPatterns = {BSON("a.b"
+                                             << "2dsphere"
+                                             << "a.c" << 1)};
+
+    BSONObj predicate = fromjson(
         "{a: {$elemMatch: {b: {$geoWithin: {$centerSphere: [[10,20], 0.01]}},"
-        "c: {$gt: 3}}}}"));
+        "c: {$gt: 3}}}}");
+    std::vector<std::string> solutions = {
+        "{fetch: {node: {ixscan: {pattern: {'a.b': '2dsphere', 'a.c': 1}}}}}"};
 
-    assertNumSolutions(1U);
-    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b': '2dsphere', 'a.c': 1}}}}}");
+    testMultiple2dsphereIndexVersions(versions, keyPatterns, predicate, solutions);
 }
 
 }  // namespace
