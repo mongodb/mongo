@@ -78,6 +78,13 @@ TEST(AtomicMatchExpressionTest, Simple1) {
     ASSERT_FALSE(result.isOK());
 }
 
+TEST(MatchExpressionParserTest, MinDistanceWithoutNearFailsToParse) {
+    BSONObj query = fromjson("{loc: {$minDistance: 10}}");
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+    ASSERT_FALSE(result.isOK());
+}
+
 StatusWith<int> fib(int n) {
     if (n < 0)
         return StatusWith<int>(ErrorCodes::BadValue, "paramter to fib has to be >= 0");

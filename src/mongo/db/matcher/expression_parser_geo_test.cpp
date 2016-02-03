@@ -76,9 +76,8 @@ TEST(MatchExpressionParserGeoNear, ParseNearExtraField) {
         "{loc:{$near:{$maxDistance:100, "
         "$geometry:{type:\"Point\", coordinates:[0,0]}}, foo: 1}}");
 
-    StatusWithMatchExpression result =
-        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
-    ASSERT_FALSE(result.isOK());
+    ASSERT_THROWS(MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions()),
+                  UserException);
 }
 
 // For $near, $nearSphere, and $geoNear syntax of:
@@ -125,6 +124,35 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidNear) {
         ASSERT_THROWS(MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions()),
                       UserException);
     }
+    {
+        BSONObj query = fromjson("{loc: {$near: [0,0], $eq: 40}}");
+        ASSERT_THROWS(MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions()),
+                      UserException);
+    }
+    {
+        BSONObj query = fromjson("{loc: {$eq: 40, $near: [0,0]}}");
+        StatusWithMatchExpression result =
+            MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+        ASSERT_FALSE(result.isOK());
+    }
+    {
+        BSONObj query = fromjson(
+            "{loc: {$near: [0,0], $geoWithin: {$geometry: {type: \"Polygon\", coordinates: []}}}}");
+        ASSERT_THROWS(MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions()),
+                      UserException);
+    }
+    {
+        BSONObj query = fromjson("{loc: {$near: {$foo: 1}}}");
+        StatusWithMatchExpression result =
+            MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+        ASSERT_FALSE(result.isOK());
+    }
+    {
+        BSONObj query = fromjson("{loc: {$minDistance: 10}}");
+        StatusWithMatchExpression result =
+            MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+        ASSERT_FALSE(result.isOK());
+    }
 }
 
 TEST(MatchExpressionParserGeoNear, ParseValidGeoNear) {
@@ -154,6 +182,11 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidGeoNear) {
         StatusWithMatchExpression result =
             MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
         ASSERT_FALSE(result.isOK());
+    }
+    {
+        BSONObj query = fromjson("{loc: {$geoNear: [0,0], $eq: 1}}");
+        ASSERT_THROWS(MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions()),
+                      UserException);
     }
     {
         BSONObj query = fromjson("{loc: {$geoNear: [0,0], $maxDistance: {}}}");
@@ -202,6 +235,11 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidNearSphere) {
     }
     {
         BSONObj query = fromjson("{loc: {$nearSphere: [0,0], $minDistance: {}}}");
+        ASSERT_THROWS(MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions()),
+                      UserException);
+    }
+    {
+        BSONObj query = fromjson("{loc: {$nearSphere: [0,0], $eq: 1}}");
         ASSERT_THROWS(MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions()),
                       UserException);
     }
