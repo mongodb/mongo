@@ -66,7 +66,7 @@ function assertHasPrivilege(privilegeArray, privilege) {
      assert(roles[0].role == 'roleC' || roles[1].role == 'roleC' || roles[2].role == 'roleC');
      assert.eq(null, roles[0].inheritedPrivileges);
      var roles = db.getRoles({showPrivileges: true, showBuiltinRoles: true});
-     assert.eq(8, roles.length);
+     assert.eq(9, roles.length);
      assert.neq(null, roles[0].inheritedPrivileges);
 
 

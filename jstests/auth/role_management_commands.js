@@ -231,7 +231,7 @@ function runTest(conn) {
          assert.eq(4, res.roles.length);
 
          res = testUserAdmin.runCommand({rolesInfo: 1, showBuiltinRoles: 1});
-         assert.eq(9, res.roles.length);
+         assert.eq(10, res.roles.length);
      })();
 
     (function testDropRole() {
