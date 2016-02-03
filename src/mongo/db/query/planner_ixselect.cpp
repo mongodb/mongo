@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/geo/hash.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -734,8 +735,8 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsTo2dsphereIndices(
             continue;
         }
 
-        // They also have to be V2.  Both ignore the sparse flag but V1 is
-        // never-sparse, V2 geo-sparse.
+        // 2dsphere version 1 indices do not have the geo-sparseness property, so there's no need to
+        // strip assignments to such indices.
         BSONElement elt = index.infoObj["2dsphereIndexVersion"];
         if (elt.eoo()) {
             continue;
@@ -743,7 +744,7 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsTo2dsphereIndices(
         if (!elt.isNumber()) {
             continue;
         }
-        if (2 != elt.numberInt()) {
+        if (S2_INDEX_VERSION_1 == elt.numberInt()) {
             continue;
         }
 
