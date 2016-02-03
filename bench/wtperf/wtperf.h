@@ -403,7 +403,8 @@ dstrdup(const char *str)
 
 /*
  * dstrndup --
- *      Call strndup, dying on failure.
+ *      Call emulating strndup, dying on failure. Don't use actual strndup here
+ *	as it is not supported within MSVC.
  */
 static inline char *
 dstrndup(const char *str, const size_t len)
