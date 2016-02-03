@@ -178,8 +178,8 @@ std::string getMongoShellHelp(StringData name, const moe::OptionSection& options
     sb << "usage: " << name << " [options] [db address] [file names (ending in .js)]\n"
        << "db address can be:\n"
        << "  foo                   foo database on local machine\n"
-       << "  192.169.0.5/foo       foo database on 192.168.0.5 machine\n"
-       << "  192.169.0.5:9999/foo  foo database on 192.168.0.5 machine on port 9999\n"
+       << "  192.168.0.5/foo       foo database on 192.168.0.5 machine\n"
+       << "  192.168.0.5:9999/foo  foo database on 192.168.0.5 machine on port 9999\n"
        << options.helpString() << "\n"
        << "file names: a list of files to run. files have to end in .js and will exit after "
        << "unless --shell is specified";
