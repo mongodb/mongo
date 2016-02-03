@@ -61,6 +61,7 @@ const std::string BUILTIN_ROLE_HOST_MANAGEMENT = "hostManager";
 const std::string BUILTIN_ROLE_CLUSTER_MANAGEMENT = "clusterManager";
 const std::string BUILTIN_ROLE_BACKUP = "backup";
 const std::string BUILTIN_ROLE_RESTORE = "restore";
+const std::string BUILTIN_ROLE_ENABLE_SHARDING = "enableSharding";
 
 /// Actions that the "read" role may perform on a normal resources of a specific database, and
 /// that the "readAnyDatabase" role may perform on normal resources of any database.
@@ -259,6 +260,12 @@ void addDbOwnerPrivileges(PrivilegeVector* privileges, StringData dbName) {
     addUserAdminDbPrivileges(privileges, dbName);
 }
 
+void addEnableShardingPrivileges(PrivilegeVector* privileges) {
+    ActionSet enableShardingActions;
+    enableShardingActions.addAction(ActionType::enableSharding);
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges, Privilege(ResourcePattern::forAnyNormalResource(), enableShardingActions));
+}
 
 void addReadOnlyAnyDbPrivileges(PrivilegeVector* privileges) {
     Privilege::addPrivilegeToPrivilegeVector(
@@ -576,6 +583,8 @@ bool RoleGraph::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeV
         addDbAdminDbPrivileges(result, roleName.getDB());
     } else if (roleName.getRole() == BUILTIN_ROLE_DB_OWNER) {
         addDbOwnerPrivileges(result, roleName.getDB());
+    } else if (roleName.getRole() == BUILTIN_ROLE_ENABLE_SHARDING) {
+        addEnableShardingPrivileges(result);
     } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_ANY_DB) {
         addReadOnlyAnyDbPrivileges(result);
     } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_WRITE_ANY_DB) {
@@ -629,6 +638,8 @@ bool RoleGraph::isBuiltinRole(const RoleName& role) {
         return true;
     } else if (role.getRole() == BUILTIN_ROLE_DB_OWNER) {
         return true;
+    } else if (role.getRole() == BUILTIN_ROLE_ENABLE_SHARDING) {
+        return true;
     } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_READ_ANY_DB) {
         return true;
     } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_READ_WRITE_ANY_DB) {
@@ -663,6 +674,7 @@ void RoleGraph::_createBuiltinRolesForDBIfNeeded(const std::string& dbname) {
     _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_USER_ADMIN, dbname));
     _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_DB_ADMIN, dbname));
     _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_DB_OWNER, dbname));
+    _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_ENABLE_SHARDING, dbname));
 
     if (dbname == "admin") {
         _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_READ_ANY_DB, dbname));
