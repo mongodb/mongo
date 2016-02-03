@@ -42,8 +42,8 @@ class SeekableRecordCursor;
 /**
  * This stage turns a RecordId into a BSONObj.
  *
- * In WorkingSetMember terms, it transitions from LOC_AND_IDX to LOC_AND_OBJ by reading
- * the record at the provided loc.  Returns verbatim any data that already has an object.
+ * In WorkingSetMember terms, it transitions from RID_AND_IDX to RID_AND_OBJ by reading
+ * the record at the provided RecordId.  Returns verbatim any data that already has an object.
  *
  * Preconditions: Valid RecordId.
  */

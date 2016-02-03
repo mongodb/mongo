@@ -219,12 +219,12 @@ PlanStage::StageState AndHashStage::doWork(WorkingSetID* out) {
 
     // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
     // with this WSM.
-    if (!member->hasLoc()) {
+    if (!member->hasRecordId()) {
         _ws->flagForReview(*out);
         return PlanStage::NEED_TIME;
     }
 
-    DataMap::iterator it = _dataMap.find(member->loc);
+    DataMap::iterator it = _dataMap.find(member->recordId);
     if (_dataMap.end() == it) {
         // Child's output wasn't in every previous child.  Throw it out.
         _ws->free(*out);
@@ -264,13 +264,13 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
 
         // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
         // with this WSM.
-        if (!member->hasLoc()) {
+        if (!member->hasRecordId()) {
             _ws->flagForReview(id);
             return PlanStage::NEED_TIME;
         }
 
-        if (!_dataMap.insert(std::make_pair(member->loc, id)).second) {
-            // Didn't insert because we already had this loc inside the map. This should only
+        if (!_dataMap.insert(std::make_pair(member->recordId, id)).second) {
+            // Didn't insert because we already had this RecordId inside the map. This should only
             // happen if we're seeing a newer copy of the same doc in a more recent snapshot.
             // Throw out the newer copy of the doc.
             _ws->free(id);
@@ -329,18 +329,18 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
 
         // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
         // with this WSM.
-        if (!member->hasLoc()) {
+        if (!member->hasRecordId()) {
             _ws->flagForReview(id);
             return PlanStage::NEED_TIME;
         }
 
-        verify(member->hasLoc());
-        if (_dataMap.end() == _dataMap.find(member->loc)) {
+        verify(member->hasRecordId());
+        if (_dataMap.end() == _dataMap.find(member->recordId)) {
             // Ignore.  It's not in any previous child.
         } else {
             // We have a hit.  Copy data into the WSM we already have.
-            _seenMap.insert(member->loc);
-            WorkingSetID olderMemberID = _dataMap[member->loc];
+            _seenMap.insert(member->recordId);
+            WorkingSetID olderMemberID = _dataMap[member->recordId];
             WorkingSetMember* olderMember = _ws->get(olderMemberID);
             size_t memUsageBefore = olderMember->getMemUsage();
 
@@ -423,8 +423,8 @@ void AndHashStage::doInvalidate(OperationContext* txn, const RecordId& dl, Inval
     for (size_t i = 0; i < _lookAheadResults.size(); ++i) {
         if (WorkingSet::INVALID_ID != _lookAheadResults[i]) {
             WorkingSetMember* member = _ws->get(_lookAheadResults[i]);
-            if (member->hasLoc() && member->loc == dl) {
-                WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
+            if (member->hasRecordId() && member->recordId == dl) {
+                WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
                 _ws->flagForReview(_lookAheadResults[i]);
                 _lookAheadResults[i] = WorkingSet::INVALID_ID;
             }
@@ -441,7 +441,7 @@ void AndHashStage::doInvalidate(OperationContext* txn, const RecordId& dl, Inval
     if (_dataMap.end() != it) {
         WorkingSetID id = it->second;
         WorkingSetMember* member = _ws->get(id);
-        verify(member->loc == dl);
+        verify(member->recordId == dl);
 
         if (_hashingChildren) {
             ++_specificStats.flaggedInProgress;
@@ -452,8 +452,8 @@ void AndHashStage::doInvalidate(OperationContext* txn, const RecordId& dl, Inval
         // Update memory stats.
         _memUsage -= member->getMemUsage();
 
-        // The loc is about to be invalidated.  Fetch it and clear the loc.
-        WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
+        // The RecordId is about to be invalidated.  Fetch it and clear the RecordId.
+        WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
 
         // Add the WSID to the to-be-reviewed list in the WS.
         _ws->flagForReview(id);

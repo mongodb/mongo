@@ -406,13 +406,13 @@ namespace {
 
 void invalidateHelper(OperationContext* txn,
                       WorkingSet* ws,  // may flag for review
-                      const RecordId& dl,
+                      const RecordId& recordId,
                       list<WorkingSetID>* idsToInvalidate,
                       const Collection* collection) {
     for (auto it = idsToInvalidate->begin(); it != idsToInvalidate->end(); ++it) {
         WorkingSetMember* member = ws->get(*it);
-        if (member->hasLoc() && member->loc == dl) {
-            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, collection);
+        if (member->hasRecordId() && member->recordId == recordId) {
+            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, collection);
         }
     }
 }
@@ -420,7 +420,7 @@ void invalidateHelper(OperationContext* txn,
 }  // namespace
 
 void MultiPlanStage::doInvalidate(OperationContext* txn,
-                                  const RecordId& dl,
+                                  const RecordId& recordId,
                                   InvalidationType type) {
     if (_failure) {
         return;
@@ -428,14 +428,15 @@ void MultiPlanStage::doInvalidate(OperationContext* txn,
 
     if (bestPlanChosen()) {
         CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
-        invalidateHelper(txn, bestPlan.ws, dl, &bestPlan.results, _collection);
+        invalidateHelper(txn, bestPlan.ws, recordId, &bestPlan.results, _collection);
         if (hasBackupPlan()) {
             CandidatePlan& backupPlan = _candidates[_backupPlanIdx];
-            invalidateHelper(txn, backupPlan.ws, dl, &backupPlan.results, _collection);
+            invalidateHelper(txn, backupPlan.ws, recordId, &backupPlan.results, _collection);
         }
     } else {
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
-            invalidateHelper(txn, _candidates[ix].ws, dl, &_candidates[ix].results, _collection);
+            invalidateHelper(
+                txn, _candidates[ix].ws, recordId, &_candidates[ix].results, _collection);
         }
     }
 }

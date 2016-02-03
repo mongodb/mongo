@@ -112,9 +112,9 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             // Package up the result for the caller.
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
-            member->loc = kv->loc;
+            member->recordId = kv->loc;
             member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), kv->key, _iam));
-            _workingSet->transitionToLocAndIdx(id);
+            _workingSet->transitionToRecordIdAndIdx(id);
 
             *out = id;
             return PlanStage::ADVANCED;

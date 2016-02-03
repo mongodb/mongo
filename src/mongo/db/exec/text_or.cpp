@@ -328,10 +328,10 @@ private:
 
 PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out) {
     WorkingSetMember* wsm = _ws->get(wsid);
-    invariant(wsm->getState() == WorkingSetMember::LOC_AND_IDX);
+    invariant(wsm->getState() == WorkingSetMember::RID_AND_IDX);
     invariant(1 == wsm->keyData.size());
     const IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
-    TextRecordData* textRecordData = &_scores[wsm->loc];
+    TextRecordData* textRecordData = &_scores[wsm->recordId];
 
     if (textRecordData->score < 0) {
         // We have already rejected this document for not matching the filter.
@@ -375,7 +375,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
         }
 
         if (shouldKeep && !wsm->hasObj()) {
-            // Our parent expects LOC_AND_OBJ members, so we fetch the document here if we haven't
+            // Our parent expects RID_AND_OBJ members, so we fetch the document here if we haven't
             // already.
             try {
                 shouldKeep = WorkingSetCommon::fetch(getOpCtx(), _ws, wsid, _recordCursor);

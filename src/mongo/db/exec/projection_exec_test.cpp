@@ -146,7 +146,7 @@ void testTransform(const char* specStr,
 /**
  * Test function to verify the results of projecting the $meta sortKey while under a covered
  * projection. In particular, it tests that ProjectionExec can take a WorkingSetMember in
- * LOC_AND_IDX state and use the sortKey along with the index data to generate the final output
+ * RID_AND_IDX state and use the sortKey along with the index data to generate the final output
  * document. For SERVER-20117.
  *
  * sortKey - The sort key in BSONObj form.
@@ -163,7 +163,7 @@ BSONObj transformMetaSortKeyCovered(const BSONObj& sortKey,
     WorkingSetMember* wsm = ws.get(wsid);
     wsm->keyData.push_back(ikd);
     wsm->addComputed(new SortKeyComputedData(sortKey));
-    ws.transitionToLocAndIdx(wsid);
+    ws.transitionToRecordIdAndIdx(wsid);
 
     ProjectionExec projExec(fromjson(projSpec), nullptr, ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(projExec.transform(wsm));

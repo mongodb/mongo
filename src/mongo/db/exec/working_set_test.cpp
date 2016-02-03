@@ -71,12 +71,12 @@ TEST_F(WorkingSetFixture, noFieldToGet) {
     ASSERT_EQUALS(WorkingSetMember::INVALID, member->getState());
     ASSERT_FALSE(member->getFieldDotted("foo", &elt));
 
-    ws->transitionToLocAndIdx(id);
+    ws->transitionToRecordIdAndIdx(id);
     ASSERT_FALSE(member->getFieldDotted("foo", &elt));
 
     // Our state is that of a valid object.  The getFieldDotted shouldn't throw; there's
     // something to call getFieldDotted on, but there's no field there.
-    ws->transitionToLocAndObj(id);
+    ws->transitionToRecordIdAndObj(id);
     ASSERT_TRUE(member->getFieldDotted("foo", &elt));
 
     WorkingSetMember* member = ws->get(id);
@@ -91,8 +91,8 @@ TEST_F(WorkingSetFixture, getFieldUnowned) {
     string fieldName = "x";
 
     BSONObj obj = BSON(fieldName << 5);
-    // Not truthful since the loc is bogus, but the loc isn't accessed anyway...
-    ws->transitionToLocAndObj(id);
+    // Not truthful since the RecordId is bogus, but the RecordId isn't accessed anyway...
+    ws->transitionToRecordIdAndObj(id);
     member->obj = Snapshotted<BSONObj>(SnapshotId(), BSONObj(obj.objdata()));
     ASSERT_TRUE(obj.isOwned());
     ASSERT_FALSE(member->obj.value().isOwned());
@@ -123,8 +123,8 @@ TEST_F(WorkingSetFixture, getFieldFromIndex) {
     int secondValue = 10;
 
     member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), NULL));
-    // Also a minor lie as loc is bogus.
-    ws->transitionToLocAndIdx(id);
+    // Also a minor lie as RecordId is bogus.
+    ws->transitionToRecordIdAndIdx(id);
     BSONElement elt;
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
     ASSERT_EQUALS(elt.numberInt(), firstValue);
@@ -146,7 +146,7 @@ TEST_F(WorkingSetFixture, getDottedFieldFromIndex) {
     int firstValue = 5;
 
     member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), NULL));
-    ws->transitionToLocAndIdx(id);
+    ws->transitionToRecordIdAndIdx(id);
     BSONElement elt;
     ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
     ASSERT_EQUALS(elt.numberInt(), firstValue);

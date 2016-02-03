@@ -156,9 +156,9 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
-    member->loc = record->id;
+    member->recordId = record->id;
     member->obj = {getOpCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
-    _workingSet->transitionToLocAndObj(id);
+    _workingSet->transitionToRecordIdAndObj(id);
 
     return returnIfMatches(member, id, out);
 }

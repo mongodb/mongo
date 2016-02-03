@@ -65,7 +65,7 @@ bool SortStage::WorkingSetComparator::operator()(const SortableDataItem& lhs,
         return result < 0;
     }
     // Indices use RecordId as an additional sort key so we must as well.
-    return lhs.loc < rhs.loc;
+    return lhs.recordId < rhs.recordId;
 }
 
 SortStage::SortStage(OperationContext* opCtx,
@@ -131,8 +131,8 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
             verify(member->hasObj());
 
             // We might be sorting something that was invalidated at some point.
-            if (member->hasLoc()) {
-                _wsidByDiskLoc[member->loc] = id;
+            if (member->hasRecordId()) {
+                _wsidByRecordId[member->recordId] = id;
             }
 
             SortableDataItem item;
@@ -144,9 +144,9 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
                 static_cast<const SortKeyComputedData*>(member->getComputed(WSM_SORT_KEY));
             item.sortKey = sortKeyComputedData->getSortKey();
 
-            if (member->hasLoc()) {
+            if (member->hasRecordId()) {
                 // The RecordId breaks ties when sorting two WSMs with the same sort key.
-                item.loc = member->loc;
+                item.recordId = member->recordId;
             }
 
             addToBuffer(item);
@@ -187,8 +187,8 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
     // If we're returning something, take it out of our DL -> WSID map so that future
     // calls to invalidate don't cause us to take action for a DL we're done with.
     WorkingSetMember* member = _ws->get(*out);
-    if (member->hasLoc()) {
-        _wsidByDiskLoc.erase(member->loc);
+    if (member->hasRecordId()) {
+        _wsidByRecordId.erase(member->recordId);
     }
 
     return PlanStage::ADVANCED;
@@ -202,18 +202,18 @@ void SortStage::doInvalidate(OperationContext* txn, const RecordId& dl, Invalida
     // _data contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
     // the WorkingSet needs to change state as a result of a RecordId invalidation, it will still
     // be at the same spot in the WorkingSet.  As such, we don't need to modify _data.
-    DataMap::iterator it = _wsidByDiskLoc.find(dl);
+    DataMap::iterator it = _wsidByRecordId.find(dl);
 
     // If we're holding on to data that's got the RecordId we're invalidating...
-    if (_wsidByDiskLoc.end() != it) {
+    if (_wsidByRecordId.end() != it) {
         // Grab the WSM that we're nuking.
         WorkingSetMember* member = _ws->get(it->second);
-        verify(member->loc == dl);
+        verify(member->recordId == dl);
 
-        WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
+        WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
 
         // Remove the RecordId from our set of active DLs.
-        _wsidByDiskLoc.erase(it);
+        _wsidByRecordId.erase(it);
         ++_specificStats.forcedFetches;
     }
 }
@@ -317,8 +317,8 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
     // RecordId invalidation map and free from working set.
     if (wsidToFree != WorkingSet::INVALID_ID) {
         WorkingSetMember* member = _ws->get(wsidToFree);
-        if (member->hasLoc()) {
-            _wsidByDiskLoc.erase(member->loc);
+        if (member->hasRecordId()) {
+            _wsidByRecordId.erase(member->recordId);
         }
         _ws->free(wsidToFree);
     }

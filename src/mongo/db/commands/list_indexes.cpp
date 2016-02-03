@@ -173,7 +173,7 @@ public:
             WorkingSetID id = ws->allocate();
             WorkingSetMember* member = ws->get(id);
             member->keyData.clear();
-            member->loc = RecordId();
+            member->recordId = RecordId();
             member->obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec.getOwned());
             member->transitionToOwnedObj();
             root->pushBack(id);

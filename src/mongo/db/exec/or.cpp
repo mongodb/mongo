@@ -66,18 +66,18 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
         WorkingSetMember* member = _ws->get(id);
 
         // If we're deduping (and there's something to dedup by)
-        if (_dedup && member->hasLoc()) {
+        if (_dedup && member->hasRecordId()) {
             ++_specificStats.dupsTested;
 
             // ...and we've seen the RecordId before
-            if (_seen.end() != _seen.find(member->loc)) {
+            if (_seen.end() != _seen.find(member->recordId)) {
                 // ...drop it.
                 ++_specificStats.dupsDropped;
                 _ws->free(id);
                 return PlanStage::NEED_TIME;
             } else {
                 // Otherwise, note that we've seen it.
-                _seen.insert(member->loc);
+                _seen.insert(member->recordId);
             }
         }
 
@@ -131,7 +131,7 @@ void OrStage::doInvalidate(OperationContext* txn, const RecordId& dl, Invalidati
     if (_dedup && INVALIDATION_DELETION == type) {
         unordered_set<RecordId, RecordId::Hasher>::iterator it = _seen.find(dl);
         if (_seen.end() != it) {
-            ++_specificStats.locsForgotten;
+            ++_specificStats.recordIdsForgotten;
             _seen.erase(dl);
         }
     }

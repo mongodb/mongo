@@ -250,7 +250,7 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
 
         member->obj = Snapshotted<BSONObj>(SnapshotId(), builder.obj());
         member->keyData.clear();
-        member->loc = RecordId();
+        member->recordId = RecordId();
         member->transitionToOwnedObj();
         return Status::OK();
     }
@@ -347,14 +347,14 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
                 return sortKeyMetaStatus;
             }
         } else if (META_RECORDID == it->second) {
-            bob.append(it->first, static_cast<long long>(member->loc.repr()));
+            bob.append(it->first, static_cast<long long>(member->recordId.repr()));
         }
     }
 
     BSONObj newObj = bob.obj();
     member->obj = Snapshotted<BSONObj>(SnapshotId(), newObj);
     member->keyData.clear();
-    member->loc = RecordId();
+    member->recordId = RecordId();
     member->transitionToOwnedObj();
 
     return Status::OK();

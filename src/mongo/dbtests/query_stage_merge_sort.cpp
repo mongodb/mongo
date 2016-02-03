@@ -77,7 +77,7 @@ public:
         _client.remove(ns(), obj);
     }
 
-    void getLocs(set<RecordId>* out, Collection* coll) {
+    void getRecordIds(set<RecordId>* out, Collection* coll) {
         auto cursor = coll->getCursor(&_txn);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -562,12 +562,12 @@ public:
             ms->addChild(new IndexScan(&_txn, params, &ws, NULL));
         }
 
-        set<RecordId> locs;
-        getLocs(&locs, coll);
+        set<RecordId> recordIds;
+        getRecordIds(&recordIds, coll);
 
-        set<RecordId>::iterator it = locs.begin();
+        set<RecordId>::iterator it = recordIds.begin();
 
-        // Get 10 results.  Should be getting results in order of 'locs'.
+        // Get 10 results.  Should be getting results in order of 'recordIds'.
         int count = 0;
         while (!ms->isEOF() && count < 10) {
             WorkingSetID id = WorkingSet::INVALID_ID;
@@ -577,7 +577,7 @@ public:
             }
 
             WorkingSetMember* member = ws.get(id);
-            ASSERT_EQUALS(member->loc, *it);
+            ASSERT_EQUALS(member->recordId, *it);
             BSONElement elt;
             string index(1, 'a' + count);
             ASSERT(member->getFieldDotted(index, &elt));
@@ -588,12 +588,12 @@ public:
             ++it;
         }
 
-        // Invalidate locs[11].  Should force a fetch and return the deleted document.
+        // Invalidate recordIds[11].  Should force a fetch and return the deleted document.
         ms->saveState();
         ms->invalidate(&_txn, *it, INVALIDATION_DELETION);
         ms->restoreState();
 
-        // Make sure locs[11] was fetched for us.
+        // Make sure recordIds[11] was fetched for us.
         {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState status;
@@ -602,7 +602,7 @@ public:
             } while (PlanStage::ADVANCED != status);
 
             WorkingSetMember* member = ws.get(id);
-            ASSERT(!member->hasLoc());
+            ASSERT(!member->hasRecordId());
             ASSERT(member->hasObj());
             string index(1, 'a' + count);
             BSONElement elt;
@@ -624,7 +624,7 @@ public:
             }
 
             WorkingSetMember* member = ws.get(id);
-            ASSERT_EQUALS(member->loc, *it);
+            ASSERT_EQUALS(member->recordId, *it);
             BSONElement elt;
             string index(1, 'a' + count);
             ASSERT_TRUE(member->getFieldDotted(index, &elt));
@@ -659,7 +659,7 @@ public:
         addIndex(BSON("a" << 1));
 
         std::set<RecordId> rids;
-        getLocs(&rids, coll);
+        getRecordIds(&rids, coll);
         set<RecordId>::iterator it = rids.begin();
 
         WorkingSet ws;
@@ -698,8 +698,8 @@ public:
 
         // First doc should be {a: 4}.
         member = getNextResult(&ws, ms.get());
-        ASSERT_EQ(member->getState(), WorkingSetMember::LOC_AND_OBJ);
-        ASSERT_EQ(member->loc, *it);
+        ASSERT_EQ(member->getState(), WorkingSetMember::RID_AND_OBJ);
+        ASSERT_EQ(member->recordId, *it);
         ASSERT_EQ(member->obj.value(), BSON("_id" << 4 << "a" << 4));
         ++it;
 
@@ -714,8 +714,8 @@ public:
 
         // We correctly dedup the invalidated doc and return {a: 6} next.
         member = getNextResult(&ws, ms.get());
-        ASSERT_EQ(member->getState(), WorkingSetMember::LOC_AND_OBJ);
-        ASSERT_EQ(member->loc, *it);
+        ASSERT_EQ(member->getState(), WorkingSetMember::RID_AND_OBJ);
+        ASSERT_EQ(member->recordId, *it);
         ASSERT_EQ(member->obj.value(), BSON("_id" << 6 << "a" << 6));
     }
 

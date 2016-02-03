@@ -120,10 +120,10 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
     WorkingSetID id = WorkingSet::INVALID_ID;
     try {
         // Look up the key by going directly to the index.
-        RecordId loc = _accessMethod->findSingle(getOpCtx(), _key);
+        RecordId recordId = _accessMethod->findSingle(getOpCtx(), _key);
 
         // Key not found.
-        if (loc.isNull()) {
+        if (recordId.isNull()) {
             _done = true;
             return PlanStage::IS_EOF;
         }
@@ -134,14 +134,14 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
         // Create a new WSM for the result document.
         id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
-        member->loc = loc;
-        _workingSet->transitionToLocAndIdx(id);
+        member->recordId = recordId;
+        _workingSet->transitionToRecordIdAndIdx(id);
 
         if (!_recordCursor)
             _recordCursor = _collection->getCursor(getOpCtx());
 
         // We may need to request a yield while we fetch the document.
-        if (auto fetcher = _recordCursor->fetcherForId(loc)) {
+        if (auto fetcher = _recordCursor->fetcherForId(recordId)) {
             // There's something to fetch. Hand the fetcher off to the WSM, and pass up a
             // fetch request.
             _idBeingPagedIn = id;
@@ -215,13 +215,13 @@ void IDHackStage::doInvalidate(OperationContext* txn, const RecordId& dl, Invali
         return;
     }
 
-    // It's possible that the loc getting invalidated is the one we're about to
+    // It's possible that the RecordId getting invalidated is the one we're about to
     // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
     if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
         WorkingSetMember* member = _workingSet->get(_idBeingPagedIn);
-        if (member->hasLoc() && (member->loc == dl)) {
-            // Fetch it now and kill the diskloc.
-            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
+        if (member->hasRecordId() && (member->recordId == dl)) {
+            // Fetch it now and kill the RecordId.
+            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
         }
     }
 }

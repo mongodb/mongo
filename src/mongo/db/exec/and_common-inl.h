@@ -44,9 +44,9 @@ public:
         // Both 'src' and 'dest' must have a RecordId (and they must be the same RecordId), as
         // we should have just matched them according to this RecordId while doing an
         // intersection.
-        verify(dest->hasLoc());
-        verify(src.hasLoc());
-        verify(dest->loc == src.loc);
+        verify(dest->hasRecordId());
+        verify(src.hasRecordId());
+        verify(dest->recordId == src.recordId);
 
         // Merge computed data.
         typedef WorkingSetComputedDataType WSCD;
@@ -63,7 +63,7 @@ public:
         }
 
         if (src.hasObj()) {
-            invariant(src.getState() == WorkingSetMember::LOC_AND_OBJ);
+            invariant(src.getState() == WorkingSetMember::RID_AND_OBJ);
 
             // 'src' has the full document but 'dest' doesn't so we need to copy it over.
             dest->obj = src.obj;
@@ -72,7 +72,7 @@ public:
             // We have an object so we don't need key data.
             dest->keyData.clear();
 
-            workingSet->transitionToLocAndObj(destId);
+            workingSet->transitionToRecordIdAndObj(destId);
 
             // Now 'dest' has the full object. No more work to do.
             return;

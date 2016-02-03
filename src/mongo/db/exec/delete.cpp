@@ -144,12 +144,12 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // We want to free this member when we return, unless we need to retry it.
     ScopeGuard memberFreer = MakeGuard(&WorkingSet::free, _ws, id);
 
-    if (!member->hasLoc()) {
+    if (!member->hasRecordId()) {
         // We expect to be here because of an invalidation causing a force-fetch.
         ++_specificStats.nInvalidateSkips;
         return PlanStage::NEED_TIME;
     }
-    RecordId rloc = member->loc;
+    RecordId recordId = member->recordId;
     // Deletes can't have projections. This means that covering analysis will always add
     // a fetch. We should always get fetched data, and never just key data.
     invariant(member->hasObj());
@@ -177,7 +177,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         // is allowed to free the memory.
         if (_params.returnDeleted) {
             // Save a copy of the document that is about to get deleted, but keep it in the
-            // LOC_AND_OBJ state in case we need to retry deleting it.
+            // RID_AND_OBJ state in case we need to retry deleting it.
             BSONObj deletedDoc = member->obj.value();
             member->obj.setValue(deletedDoc.getOwned());
         }
@@ -199,7 +199,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         // Do the write, unless this is an explain.
         if (!_params.isExplain) {
             WriteUnitOfWork wunit(getOpCtx());
-            _collection->deleteDocument(getOpCtx(), rloc, _params.fromMigrate);
+            _collection->deleteDocument(getOpCtx(), recordId, _params.fromMigrate);
             wunit.commit();
         }
 
@@ -221,8 +221,8 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 
     if (_params.returnDeleted) {
         // After deleting the document, the RecordId associated with this member is invalid.
-        // Remove the 'loc' from the WorkingSetMember before returning it.
-        member->loc = RecordId();
+        // Remove the 'recordId' from the WorkingSetMember before returning it.
+        member->recordId = RecordId();
         member->transitionToOwnedObj();
     }
 

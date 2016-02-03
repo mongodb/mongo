@@ -71,7 +71,7 @@ BSONObj extractSortKeyCovered(const char* sortSpec, const IndexKeyDatum& ikd) {
     WorkingSetID wsid = ws.allocate();
     WorkingSetMember* wsm = ws.get(wsid);
     wsm->keyData.push_back(ikd);
-    ws.transitionToLocAndIdx(wsid);
+    ws.transitionToRecordIdAndIdx(wsid);
 
     BSONObj sortKey;
     auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(fromjson(sortSpec), BSONObj());

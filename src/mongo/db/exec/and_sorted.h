@@ -74,11 +74,11 @@ public:
 
 private:
     // Find a node to AND against.
-    PlanStage::StageState getTargetLoc(WorkingSetID* out);
+    PlanStage::StageState getTargetRecordId(WorkingSetID* out);
 
     // Move a child which hasn't advanced to the target node forward.
     // Returns the target node in 'out' if all children successfully advance to it.
-    PlanStage::StageState moveTowardTargetLoc(WorkingSetID* out);
+    PlanStage::StageState moveTowardTargetRecordId(WorkingSetID* out);
 
     // Not owned by us.
     const Collection* _collection;
@@ -88,11 +88,11 @@ private:
 
     // The current node we're AND-ing against.
     size_t _targetNode;
-    RecordId _targetLoc;
+    RecordId _targetRecordId;
     WorkingSetID _targetId;
 
     // Nodes we're moving forward until they hit the element we're AND-ing.
-    // Everything in here has not advanced to _targetLoc yet.
+    // Everything in here has not advanced to _targetRecordId yet.
     // These are indices into _children.
     std::queue<size_t> _workingTowardRep;
 

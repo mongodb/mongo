@@ -81,8 +81,8 @@ public:
         wunit.commit();
     }
 
-    void getLocs() {
-        _locs.clear();
+    void getRecordIds() {
+        _recordIds.clear();
         WorkingSet ws;
 
         CollectionScanParams params;
@@ -96,8 +96,8 @@ public:
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasLoc());
-                _locs.push_back(member->loc);
+                verify(member->hasRecordId());
+                _recordIds.push_back(member->recordId);
             }
         }
     }
@@ -108,19 +108,19 @@ public:
         wunit.commit();
     }
 
-    void remove(const RecordId& loc) {
+    void remove(const RecordId& recordId) {
         WriteUnitOfWork wunit(&_txn);
-        _coll->deleteDocument(&_txn, loc);
+        _coll->deleteDocument(&_txn, recordId);
         wunit.commit();
     }
 
-    void update(const RecordId& oldLoc, const BSONObj& newDoc) {
+    void update(const RecordId& oldrecordId, const BSONObj& newDoc) {
         WriteUnitOfWork wunit(&_txn);
-        BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_txn, oldLoc).releaseToBson();
+        BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_txn, oldrecordId).releaseToBson();
         OplogUpdateEntryArgs args;
         args.ns = _coll->ns().ns();
         _coll->updateDocument(&_txn,
-                              oldLoc,
+                              oldrecordId,
                               Snapshotted<BSONObj>(_txn.recoveryUnit()->getSnapshotId(), oldDoc),
                               newDoc,
                               false,
@@ -138,7 +138,7 @@ public:
     //  - asserts nSkipped is correct
     void testCount(const CountRequest& request, int expected_n = kDocuments, bool indexed = false) {
         setup();
-        getLocs();
+        getRecordIds();
 
         unique_ptr<WorkingSet> ws(new WorkingSet);
 
@@ -223,7 +223,7 @@ public:
     }
 
 protected:
-    vector<RecordId> _locs;
+    vector<RecordId> _recordIds;
     OperationContextImpl _txn;
     ScopedTransaction _scopedXact;
     Lock::DBLock _dbLock;
@@ -294,14 +294,14 @@ public:
     // At the point which this is called we are in between counting the first + second record
     void interject(CountStage& count_stage, int interjection) {
         if (interjection == 0) {
-            // At this point, our first interjection, we've counted _locs[0]
-            // and are about to count _locs[1]
+            // At this point, our first interjection, we've counted _recordIds[0]
+            // and are about to count _recordIds[1]
             WriteUnitOfWork wunit(&_txn);
-            count_stage.invalidate(&_txn, _locs[interjection], INVALIDATION_DELETION);
-            remove(_locs[interjection]);
+            count_stage.invalidate(&_txn, _recordIds[interjection], INVALIDATION_DELETION);
+            remove(_recordIds[interjection]);
 
-            count_stage.invalidate(&_txn, _locs[interjection + 1], INVALIDATION_DELETION);
-            remove(_locs[interjection + 1]);
+            count_stage.invalidate(&_txn, _recordIds[interjection + 1], INVALIDATION_DELETION);
+            remove(_recordIds[interjection + 1]);
             wunit.commit();
         }
     }
@@ -321,13 +321,13 @@ public:
     // At the point which this is called we are in between the first and second record
     void interject(CountStage& count_stage, int interjection) {
         if (interjection == 0) {
-            count_stage.invalidate(&_txn, _locs[0], INVALIDATION_MUTATION);
-            OID id1 = _coll->docFor(&_txn, _locs[0]).value().getField("_id").OID();
-            update(_locs[0], BSON("_id" << id1 << "x" << 100));
+            count_stage.invalidate(&_txn, _recordIds[0], INVALIDATION_MUTATION);
+            OID id1 = _coll->docFor(&_txn, _recordIds[0]).value().getField("_id").OID();
+            update(_recordIds[0], BSON("_id" << id1 << "x" << 100));
 
-            count_stage.invalidate(&_txn, _locs[1], INVALIDATION_MUTATION);
-            OID id2 = _coll->docFor(&_txn, _locs[1]).value().getField("_id").OID();
-            update(_locs[1], BSON("_id" << id2 << "x" << 100));
+            count_stage.invalidate(&_txn, _recordIds[1], INVALIDATION_MUTATION);
+            OID id2 = _coll->docFor(&_txn, _recordIds[1]).value().getField("_id").OID();
+            update(_recordIds[1], BSON("_id" << id2 << "x" << 100));
         }
     }
 };

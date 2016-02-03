@@ -45,25 +45,25 @@ public:
      * Requires either a valid BSONObj or valid RecordId.
      * Returns true if the fetch and invalidate succeeded, false otherwise.
      */
-    static bool fetchAndInvalidateLoc(OperationContext* txn,
-                                      WorkingSetMember* member,
-                                      const Collection* collection);
+    static bool fetchAndInvalidateRecordId(OperationContext* txn,
+                                           WorkingSetMember* member,
+                                           const Collection* collection);
 
     /**
      * This must be called as part of "saveState" operations after all nodes in the tree save their
      * state.
      *
      * Iterates over WorkingSetIDs in 'workingSet' which are "sensitive to yield". These are ids
-     * that have transitioned into the LOC_AND_IDX state since the previous yield.
+     * that have transitioned into the RID_AND_IDX state since the previous yield.
      *
-     * The LOC_AND_IDX members are tagged as suspicious so that they can be handled properly in case
+     * The RID_AND_IDX members are tagged as suspicious so that they can be handled properly in case
      * the document keyed by the index key is deleted or updated during the yield.
      */
     static void prepareForSnapshotChange(WorkingSet* workingSet);
 
     /**
-     * Transitions the WorkingSetMember with WorkingSetID 'id' from the LOC_AND_IDX state to the
-     * LOC_AND_OBJ state by fetching a document. Does the fetch using   'cursor'.
+     * Transitions the WorkingSetMember with WorkingSetID 'id' from the RID_AND_IDX state to the
+     * RID_AND_OBJ state by fetching a document. Does the fetch using 'cursor'.
      *
      * If false is returned, the document should not be considered for the result set. It is the
      * caller's responsibility to free 'id' in this case.

@@ -182,7 +182,7 @@ Status ProjectionStage::transform(WorkingSetMember* member) {
     }
 
     member->keyData.clear();
-    member->loc = RecordId();
+    member->recordId = RecordId();
     member->obj = Snapshotted<BSONObj>(SnapshotId(), bob.obj());
     member->transitionToOwnedObj();
     return Status::OK();

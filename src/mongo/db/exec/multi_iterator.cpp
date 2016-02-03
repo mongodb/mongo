@@ -90,9 +90,9 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
 
     *out = _ws->allocate();
     WorkingSetMember* member = _ws->get(*out);
-    member->loc = record->id;
+    member->recordId = record->id;
     member->obj = {getOpCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
-    _ws->transitionToLocAndObj(*out);
+    _ws->transitionToRecordIdAndObj(*out);
     return PlanStage::ADVANCED;
 }
 

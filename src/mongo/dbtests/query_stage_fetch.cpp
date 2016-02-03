@@ -61,7 +61,7 @@ public:
         _client.dropCollection(ns());
     }
 
-    void getLocs(set<RecordId>* out, Collection* coll) {
+    void getRecordIds(set<RecordId>* out, Collection* coll) {
         auto cursor = coll->getCursor(&_txn);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -105,9 +105,9 @@ public:
 
         // Add an object to the DB.
         insert(BSON("foo" << 5));
-        set<RecordId> locs;
-        getLocs(&locs, coll);
-        ASSERT_EQUALS(size_t(1), locs.size());
+        set<RecordId> recordIds;
+        getRecordIds(&recordIds, coll);
+        ASSERT_EQUALS(size_t(1), recordIds.size());
 
         // Create a mock stage that returns the WSM.
         auto mockStage = make_unique<QueuedDataStage>(&_txn, &ws);
@@ -116,16 +116,16 @@ public:
         {
             WorkingSetID id = ws.allocate();
             WorkingSetMember* mockMember = ws.get(id);
-            mockMember->loc = *locs.begin();
-            mockMember->obj = coll->docFor(&_txn, mockMember->loc);
-            ws.transitionToLocAndObj(id);
+            mockMember->recordId = *recordIds.begin();
+            mockMember->obj = coll->docFor(&_txn, mockMember->recordId);
+            ws.transitionToRecordIdAndObj(id);
             // Points into our DB.
             mockStage->pushBack(id);
         }
         {
             WorkingSetID id = ws.allocate();
             WorkingSetMember* mockMember = ws.get(id);
-            mockMember->loc = RecordId();
+            mockMember->recordId = RecordId();
             mockMember->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("foo" << 6));
             mockMember->transitionToOwnedObj();
             ASSERT_TRUE(mockMember->obj.value().isOwned());
@@ -171,9 +171,9 @@ public:
 
         // Add an object to the DB.
         insert(BSON("foo" << 5));
-        set<RecordId> locs;
-        getLocs(&locs, coll);
-        ASSERT_EQUALS(size_t(1), locs.size());
+        set<RecordId> recordIds;
+        getRecordIds(&recordIds, coll);
+        ASSERT_EQUALS(size_t(1), recordIds.size());
 
         // Create a mock stage that returns the WSM.
         auto mockStage = make_unique<QueuedDataStage>(&_txn, &ws);
@@ -182,10 +182,10 @@ public:
         {
             WorkingSetID id = ws.allocate();
             WorkingSetMember* mockMember = ws.get(id);
-            mockMember->loc = *locs.begin();
-            ws.transitionToLocAndIdx(id);
+            mockMember->recordId = *recordIds.begin();
+            ws.transitionToRecordIdAndIdx(id);
 
-            // State is loc and index, shouldn't be able to get the foo data inside.
+            // State is RecordId and index, shouldn't be able to get the foo data inside.
             BSONElement elt;
             ASSERT_FALSE(mockMember->getFieldDotted("foo", &elt));
             mockStage->pushBack(id);

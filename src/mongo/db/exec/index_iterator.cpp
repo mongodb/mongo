@@ -64,9 +64,9 @@ PlanStage::StageState IndexIteratorStage::doWork(WorkingSetID* out) {
 
         WorkingSetID id = _ws->allocate();
         WorkingSetMember* member = _ws->get(id);
-        member->loc = entry->loc;
+        member->recordId = entry->loc;
         member->keyData.push_back(IndexKeyDatum(_keyPattern, entry->key, _iam));
-        _ws->transitionToLocAndIdx(id);
+        _ws->transitionToRecordIdAndIdx(id);
 
         *out = id;
         return PlanStage::ADVANCED;

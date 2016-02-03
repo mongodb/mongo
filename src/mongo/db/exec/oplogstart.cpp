@@ -106,9 +106,9 @@ PlanStage::StageState OplogStart::workExtentHopping(WorkingSetID* out) {
                 _done = true;
                 WorkingSetID id = _workingSet->allocate();
                 WorkingSetMember* member = _workingSet->get(id);
-                member->loc = record->id;
+                member->recordId = record->id;
                 member->obj = {getOpCtx()->recoveryUnit()->getSnapshotId(), std::move(obj)};
-                _workingSet->transitionToLocAndObj(id);
+                _workingSet->transitionToRecordIdAndObj(id);
                 *out = id;
                 return PlanStage::ADVANCED;
             }
@@ -149,7 +149,7 @@ PlanStage::StageState OplogStart::workBackwardsScan(WorkingSetID* out) {
 
     WorkingSetMember* member = _workingSet->get(*out);
     verify(member->hasObj());
-    verify(member->hasLoc());
+    verify(member->hasRecordId());
 
     if (!_filter->matchesBSON(member->obj.value())) {
         _done = true;

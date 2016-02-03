@@ -40,23 +40,23 @@
 namespace mongo {
 
 // static
-bool WorkingSetCommon::fetchAndInvalidateLoc(OperationContext* txn,
-                                             WorkingSetMember* member,
-                                             const Collection* collection) {
+bool WorkingSetCommon::fetchAndInvalidateRecordId(OperationContext* txn,
+                                                  WorkingSetMember* member,
+                                                  const Collection* collection) {
     // Already in our desired state.
     if (member->getState() == WorkingSetMember::OWNED_OBJ) {
         return true;
     }
 
     // We can't do anything without a RecordId.
-    if (!member->hasLoc()) {
+    if (!member->hasRecordId()) {
         return false;
     }
 
     // Do the fetch, invalidate the DL.
-    member->obj = collection->docFor(txn, member->loc);
+    member->obj = collection->docFor(txn, member->recordId);
     member->obj.setValue(member->obj.value().getOwned());
-    member->loc = RecordId();
+    member->recordId = RecordId();
     member->transitionToOwnedObj();
 
     return true;
@@ -72,7 +72,7 @@ void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
 
         // We may see the same member twice, so anything we do here should be idempotent.
         WorkingSetMember* member = workingSet->get(id);
-        if (member->getState() == WorkingSetMember::LOC_AND_IDX) {
+        if (member->getState() == WorkingSetMember::RID_AND_IDX) {
             member->isSuspicious = true;
         }
     }
@@ -90,10 +90,10 @@ bool WorkingSetCommon::fetch(OperationContext* txn,
 
     // We should have a RecordId but need to retrieve the obj. Get the obj now and reset all WSM
     // state appropriately.
-    invariant(member->hasLoc());
+    invariant(member->hasRecordId());
 
     member->obj.reset();
-    auto record = cursor->seekExact(member->loc);
+    auto record = cursor->seekExact(member->recordId);
     if (!record) {
         return false;
     }
@@ -119,7 +119,7 @@ bool WorkingSetCommon::fetch(OperationContext* txn,
     }
 
     member->keyData.clear();
-    workingSet->transitionToLocAndObj(id);
+    workingSet->transitionToRecordIdAndObj(id);
     return true;
 }
 

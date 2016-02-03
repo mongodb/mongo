@@ -121,19 +121,19 @@ public:
     // WorkingSetMember state transitions
     //
 
-    void transitionToLocAndIdx(WorkingSetID id);
-    void transitionToLocAndObj(WorkingSetID id);
+    void transitionToRecordIdAndIdx(WorkingSetID id);
+    void transitionToRecordIdAndObj(WorkingSetID id);
     void transitionToOwnedObj(WorkingSetID id);
 
     /**
-     * Returns the list of working set ids that have transitioned into the LOC_AND_IDX or
-     * LOC_AND_OBJ state since the last yield. The members corresponding to these ids may have since
+     * Returns the list of working set ids that have transitioned into the RID_AND_IDX or
+     * RID_AND_OBJ state since the last yield. The members corresponding to these ids may have since
      * transitioned to a different state or been freed, so these cases must be handled by the
      * caller. The list may also contain duplicates.
      *
      * Execution stages are *not* responsible for managing this list, as working set ids are added
-     * to the set automatically by WorkingSet::transitionToLocAndIdx() and
-     * WorkingSet::transitionToLocAndObj().
+     * to the set automatically by WorkingSet::transitionToRecordIdAndIdx() and
+     * WorkingSet::transitionToRecordIdAndObj().
      *
      * As a side effect, calling this method clears the list of flagged ids kept by the working set.
      */
@@ -232,9 +232,9 @@ private:
 /**
  * The type of the data passed between query stages.  In particular:
  *
- * Index scan stages return a WorkingSetMember in the LOC_AND_IDX state.
+ * Index scan stages return a WorkingSetMember in the RID_AND_IDX state.
  *
- * Collection scan stages return a WorkingSetMember in the LOC_AND_OBJ state.
+ * Collection scan stages return a WorkingSetMember in the RID_AND_OBJ state.
  *
  * A WorkingSetMember may have any of the data above.
  */
@@ -255,11 +255,11 @@ public:
         INVALID,
 
         // Data is from 1 or more indices.
-        LOC_AND_IDX,
+        RID_AND_IDX,
 
         // Data is from a collection scan, or data is from an index scan and was fetched. The
         // BSONObj might be owned or unowned.
-        LOC_AND_OBJ,
+        RID_AND_OBJ,
 
         // RecordId has been invalidated, or the obj doesn't correspond to an on-disk document
         // anymore (e.g. is a computed expression).
@@ -278,20 +278,20 @@ public:
     // Core attributes
     //
 
-    RecordId loc;
+    RecordId recordId;
     Snapshotted<BSONObj> obj;
     std::vector<IndexKeyDatum> keyData;
 
-    // True if this WSM has survived a yield in LOC_AND_IDX state.
+    // True if this WSM has survived a yield in RID_AND_IDX state.
     // TODO consider replacing by tracking SnapshotIds for IndexKeyDatums.
     bool isSuspicious = false;
 
-    bool hasLoc() const;
+    bool hasRecordId() const;
     bool hasObj() const;
     bool hasOwnedObj() const;
 
     /**
-     * Ensures that 'obj' of a WSM in the LOC_AND_OBJ state is owned BSON. It is a no-op if the WSM
+     * Ensures that 'obj' of a WSM in the RID_AND_OBJ state is owned BSON. It is a no-op if the WSM
      * is in a different state or if 'obj' is already owned.
      *
      * It is also a no-op if the active storage engine doesn't support document-level concurrency.

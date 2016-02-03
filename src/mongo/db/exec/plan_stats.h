@@ -446,7 +446,7 @@ struct MultiPlanStats : public SpecificStats {
 };
 
 struct OrStats : public SpecificStats {
-    OrStats() : dupsTested(0), dupsDropped(0), locsForgotten(0) {}
+    OrStats() : dupsTested(0), dupsDropped(0), recordIdsForgotten(0) {}
 
     SpecificStats* clone() const final {
         OrStats* specific = new OrStats(*this);
@@ -457,7 +457,7 @@ struct OrStats : public SpecificStats {
     size_t dupsDropped;
 
     // How many calls to invalidate(...) actually removed a RecordId from our deduping map?
-    size_t locsForgotten;
+    size_t recordIdsForgotten;
 };
 
 struct ProjectionStats : public SpecificStats {

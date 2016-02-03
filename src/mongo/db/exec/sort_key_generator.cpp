@@ -150,7 +150,7 @@ Status SortKeyGenerator::getSortKey(const WorkingSetMember& member, BSONObj* obj
 }
 
 StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromIndexKey(const WorkingSetMember& member) const {
-    invariant(member.getState() == WorkingSetMember::LOC_AND_IDX);
+    invariant(member.getState() == WorkingSetMember::RID_AND_IDX);
     invariant(!_sortHasMeta);
 
     BSONObjBuilder sortKeyObj;

@@ -400,7 +400,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
             bool hasRequestedData = true;
 
             if (NULL != objOut) {
-                if (WorkingSetMember::LOC_AND_IDX == member->getState()) {
+                if (WorkingSetMember::RID_AND_IDX == member->getState()) {
                     if (1 != member->keyData.size()) {
                         _workingSet->free(id);
                         hasRequestedData = false;
@@ -418,8 +418,8 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
             }
 
             if (NULL != dlOut) {
-                if (member->hasLoc()) {
-                    *dlOut = member->loc;
+                if (member->hasRecordId()) {
+                    *dlOut = member->recordId;
                 } else {
                     _workingSet->free(id);
                     hasRequestedData = false;

@@ -97,15 +97,15 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
         if (member->hasObj()) {
             ++_specificStats.alreadyHasObj;
         } else {
-            // We need a valid loc to fetch from and this is the only state that has one.
-            verify(WorkingSetMember::LOC_AND_IDX == member->getState());
-            verify(member->hasLoc());
+            // We need a valid RecordId to fetch from and this is the only state that has one.
+            verify(WorkingSetMember::RID_AND_IDX == member->getState());
+            verify(member->hasRecordId());
 
             try {
                 if (!_cursor)
                     _cursor = _collection->getCursor(getOpCtx());
 
-                if (auto fetcher = _cursor->fetcherForId(member->loc)) {
+                if (auto fetcher = _cursor->fetcherForId(member->recordId)) {
                     // There's something to fetch. Hand the fetcher off to the WSM, and pass up
                     // a fetch request.
                     _idRetrying = id;
@@ -171,13 +171,13 @@ void FetchStage::doReattachToOperationContext() {
 }
 
 void FetchStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
-    // It's possible that the loc getting invalidated is the one we're about to
+    // It's possible that the recordId getting invalidated is the one we're about to
     // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
     if (WorkingSet::INVALID_ID != _idRetrying) {
         WorkingSetMember* member = _ws->get(_idRetrying);
-        if (member->hasLoc() && (member->loc == dl)) {
-            // Fetch it now and kill the diskloc.
-            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
+        if (member->hasRecordId() && (member->recordId == dl)) {
+            // Fetch it now and kill the recordId.
+            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
         }
     }
 }

@@ -147,11 +147,11 @@ public:
 
 private:
     /**
-     * Computes the result of applying mods to the document 'oldObj' at RecordId 'loc' in
+     * Computes the result of applying mods to the document 'oldObj' at RecordId 'recordId' in
      * memory, then commits these changes to the database. Returns a possibly unowned copy
      * of the newly-updated version of the document.
      */
-    BSONObj transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& loc);
+    BSONObj transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& recordId);
 
     /**
      * Computes the document to insert and inserts it into the collection. Used if the
@@ -205,8 +205,8 @@ private:
     // document and we wouldn't want to update that.
     //
     // So, no matter what, we keep track of where the doc wound up.
-    typedef unordered_set<RecordId, RecordId::Hasher> DiskLocSet;
-    const std::unique_ptr<DiskLocSet> _updatedLocs;
+    typedef unordered_set<RecordId, RecordId::Hasher> RecordIdSet;
+    const std::unique_ptr<RecordIdSet> _updatedRecordIds;
 
     // These get reused for each update.
     mutablebson::Document& _doc;

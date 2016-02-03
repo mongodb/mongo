@@ -121,7 +121,7 @@ private:
         // Since we must replicate the behavior of a covered sort as much as possible we use the
         // RecordId to break sortKey ties.
         // See sorta.js.
-        RecordId loc;
+        RecordId recordId;
     };
 
     // Comparison object for data buffers (vector and set).
@@ -170,7 +170,7 @@ private:
 
     // We buffer a lot of data and we want to look it up by RecordId quickly upon invalidation.
     typedef unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
-    DataMap _wsidByDiskLoc;
+    DataMap _wsidByRecordId;
 
     SortStats _specificStats;
 

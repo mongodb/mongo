@@ -86,21 +86,21 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
 
             // If we're deduping...
             if (_dedup) {
-                if (!member->hasLoc()) {
+                if (!member->hasRecordId()) {
                     // Can't dedup data unless there's a RecordId.  We go ahead and use its
                     // result.
                     _noResultToMerge.pop();
                 } else {
                     ++_specificStats.dupsTested;
-                    // ...and there's a diskloc and and we've seen the RecordId before
-                    if (_seen.end() != _seen.find(member->loc)) {
+                    // ...and there's a RecordId and and we've seen the RecordId before
+                    if (_seen.end() != _seen.find(member->recordId)) {
                         // ...drop it.
                         _ws->free(id);
                         ++_specificStats.dupsDropped;
                         return PlanStage::NEED_TIME;
                     } else {
                         // Otherwise, note that we've seen it.
-                        _seen.insert(member->loc);
+                        _seen.insert(member->recordId);
                         // We're going to use the result from the child, so we remove it from
                         // the queue of children without a result.
                         _noResultToMerge.pop();
@@ -175,14 +175,14 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
 void MergeSortStage::doInvalidate(OperationContext* txn,
                                   const RecordId& dl,
                                   InvalidationType type) {
-    // Go through our data and see if we're holding on to the invalidated loc.
+    // Go through our data and see if we're holding on to the invalidated RecordId.
     for (list<StageWithValue>::iterator valueIt = _mergingData.begin();
          valueIt != _mergingData.end();
          valueIt++) {
         WorkingSetMember* member = _ws->get(valueIt->id);
-        if (member->hasLoc() && (dl == member->loc)) {
+        if (member->hasRecordId() && (dl == member->recordId)) {
             // Fetch the about-to-be mutated result.
-            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
+            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
             ++_specificStats.forcedFetches;
         }
     }

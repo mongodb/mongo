@@ -209,9 +209,9 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     // We found something to return, so fill out the WSM.
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
-    member->loc = kv->loc;
+    member->recordId = kv->loc;
     member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, _iam));
-    _workingSet->transitionToLocAndIdx(id);
+    _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_params.addKeyMetadata) {
         BSONObjBuilder bob;

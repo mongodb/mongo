@@ -303,8 +303,8 @@ void CachedPlanStage::doInvalidate(OperationContext* txn,
                                    InvalidationType type) {
     for (auto it = _results.begin(); it != _results.end(); ++it) {
         WorkingSetMember* member = _ws->get(*it);
-        if (member->hasLoc() && member->loc == dl) {
-            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
+        if (member->hasRecordId() && member->recordId == dl) {
+            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
         }
     }
 }

@@ -80,9 +80,9 @@ public:
         _client.remove(nss.ns(), obj);
     }
 
-    void getLocs(Collection* collection,
-                 CollectionScanParams::Direction direction,
-                 vector<RecordId>* out) {
+    void getRecordIds(Collection* collection,
+                      CollectionScanParams::Direction direction,
+                      vector<RecordId>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
@@ -96,8 +96,8 @@ public:
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasLoc());
-                out->push_back(member->loc);
+                verify(member->hasRecordId());
+                out->push_back(member->recordId);
             }
         }
     }
@@ -133,8 +133,8 @@ public:
         Collection* coll = ctx.getCollection();
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> locs;
-        getLocs(coll, CollectionScanParams::FORWARD, &locs);
+        vector<RecordId> recordIds;
+        getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
         // Configure the scan.
         CollectionScanParams collScanParams;
@@ -163,14 +163,14 @@ public:
             ASSERT_EQUALS(PlanStage::NEED_TIME, state);
         }
 
-        // Remove locs[targetDocIndex];
+        // Remove recordIds[targetDocIndex];
         deleteStage.saveState();
         {
             WriteUnitOfWork wunit(&_txn);
-            deleteStage.invalidate(&_txn, locs[targetDocIndex], INVALIDATION_DELETION);
+            deleteStage.invalidate(&_txn, recordIds[targetDocIndex], INVALIDATION_DELETION);
             wunit.commit();
         }
-        BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]).value();
+        BSONObj targetDoc = coll->docFor(&_txn, recordIds[targetDocIndex]).value();
         ASSERT(!targetDoc.isEmpty());
         remove(targetDoc);
         deleteStage.restoreState();
@@ -202,18 +202,18 @@ public:
         const unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> locs;
-        getLocs(coll, CollectionScanParams::FORWARD, &locs);
+        vector<RecordId> recordIds;
+        getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
-        // LOC_AND_OBJ state.
+        // RID_AND_OBJ state.
         auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
-        member->loc = locs[targetDocIndex];
+        member->recordId = recordIds[targetDocIndex];
         const BSONObj oldDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex);
         member->obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
-        ws->transitionToLocAndObj(id);
+        ws->transitionToRecordIdAndObj(id);
         qds->pushBack(id);
 
         // Configure the delete.
@@ -238,7 +238,7 @@ public:
         WorkingSetMember* resultMember = ws->get(id);
         // With an owned copy of the object, with no RecordId.
         ASSERT_TRUE(resultMember->hasOwnedObj());
-        ASSERT_FALSE(resultMember->hasLoc());
+        ASSERT_FALSE(resultMember->hasRecordId());
         ASSERT_EQUALS(resultMember->getState(), WorkingSetMember::OWNED_OBJ);
         ASSERT_TRUE(resultMember->obj.value().isOwned());
 

@@ -391,7 +391,7 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainCommon::EXEC_STATS) {
             bob->appendNumber("dupsTested", spec->dupsTested);
             bob->appendNumber("dupsDropped", spec->dupsDropped);
-            bob->appendNumber("locsForgotten", spec->locsForgotten);
+            bob->appendNumber("recordIdsForgotten", spec->recordIdsForgotten);
         }
     } else if (STAGE_LIMIT == stats.stageType) {
         LimitStats* spec = static_cast<LimitStats*>(stats.specific.get());
