@@ -1928,6 +1928,12 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_cache_page_inmem_incr(session, right, right_incr);
 
 	/*
+	 * The act of splitting into the parent releases the pages for eviction;
+	 * ensure the page contents are correct.
+	 */
+	WT_WRITE_BARRIER();
+
+	/*
 	 * Split into the parent. On successful return, the original page is no
 	 * longer locked, so we cannot safely look at it.
 	 */
