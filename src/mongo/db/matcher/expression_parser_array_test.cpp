@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include <limits>
+
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/db/matcher/expression_parser.h"
@@ -54,30 +56,71 @@ TEST(MatchExpressionParserArrayTest, Size1) {
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
-TEST(MatchExpressionParserArrayTest, SizeAsString) {
-    BSONObj query = BSON("x" << BSON("$size"
-                                     << "a"));
+TEST(MatchExpressionParserArrayTest, SizeAsLong) {
+    BSONObj query = BSON("x" << BSON("$size" << 2LL));
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
     ASSERT_TRUE(result.isOK());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSONArray())));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+}
+
+TEST(MatchExpressionParserArrayTest, SizeAsNegativeLong) {
+    BSONObj query = BSON("x" << BSON("$size" << -2LL));
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserArrayTest, SizeTooLarge) {
+    BSONObj query = BSON("x" << BSON("$size" << std::numeric_limits<long long>::max()));
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserArrayTest, SizeAsString) {
+    BSONObj query = BSON("x" << BSON("$size"
+                                     << "a"));
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+    ASSERT_FALSE(result.isOK());
+}
+
+TEST(MatchExpressionParserArrayTest, SizeWithIntegralDouble) {
+    BSONObj query = BSON("x" << BSON("$size" << 2.0));
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+    ASSERT_TRUE(result.isOK());
+
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+}
+
+TEST(MatchExpressionParserArrayTest, SizeWithNegativeIntegralDouble) {
+    BSONObj query = BSON("x" << BSON("$size" << -2.0));
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+    ASSERT_FALSE(result.isOK());
 }
 
 TEST(MatchExpressionParserArrayTest, SizeWithDouble) {
     BSONObj query = BSON("x" << BSON("$size" << 2.5));
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
-    ASSERT_TRUE(result.isOK());
+    ASSERT_FALSE(result.isOK());
+}
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSONArray())));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+TEST(MatchExpressionParserArrayTest, SizeWithNegative) {
+    BSONObj query = BSON("x" << BSON("$size" << -2));
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+    ASSERT_FALSE(result.isOK());
 }
 
 TEST(MatchExpressionParserArrayTest, SizeBad) {
