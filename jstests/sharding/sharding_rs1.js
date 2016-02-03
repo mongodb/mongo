@@ -27,7 +27,7 @@ assert.writeOK(bulk.execute({w: 3}));
 assert.commandWorked(s.s.adminCommand({ shardcollection: "test.foo" , key: { _id: 1 } }));
 
 jsTest.log("Waiting for balance to complete");
-s.awaitBalance('foo', 'test', 2 * 60 * 1000);
+s.awaitBalance('foo', 'test', 3 * 60 * 1000);
 
 jsTest.log("Stopping balancer");
 s.stopBalancer();
