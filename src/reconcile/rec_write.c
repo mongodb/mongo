@@ -1889,7 +1889,15 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * we don't waste space when we write).
 	 */
 	a = maxpagesize;			/* Don't overflow. */
-	split_size = (uint32_t)((a * (u_int)btree->split_pct) / 100);
+	split_size = (uint32_t)WT_ALIGN_NEAREST(
+	    (a * (u_int)btree->split_pct) / 100, btree->allocsize);
+
+	/*
+	 * Respect the configured split percentage if the calculated split
+	 * size is either zero or a full page.
+	 */
+	if (split_size == 0 || split_size == maxpagesize)
+		split_size = (uint32_t)((a * (u_int)btree->split_pct) / 100);
 
 	return (split_size);
 }
