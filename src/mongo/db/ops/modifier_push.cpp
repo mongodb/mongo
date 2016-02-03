@@ -316,8 +316,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
         // reason here is that the shell will use doubles by default unless told otherwise.
         const double doubleVal = positionElem.numberDouble();
         if (std::isnan(doubleVal)) {
-            return Status(ErrorCodes::BadValue,
-                          "The $position value in $push cannot be NaN.");
+            return Status(ErrorCodes::BadValue, "The $position value in $push cannot be NaN.");
         }
 
         if (doubleVal - static_cast<int64_t>(doubleVal) != 0) {
@@ -337,7 +336,8 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
 
         const int64_t tempVal = positionElem.numberLong();
         if (tempVal < 0)
-            return Status(ErrorCodes::BadValue, "The $position value in $push must be non-negative.");
+            return Status(ErrorCodes::BadValue,
+                          "The $position value in $push must be non-negative.");
 
         _startPosition = size_t(tempVal);
     }
