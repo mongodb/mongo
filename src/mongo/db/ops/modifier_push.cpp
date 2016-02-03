@@ -104,9 +104,9 @@ Status parseEachMode(ModifierPush::ModifierPushMode pushMode,
     *eachElem = modExpr.embeddedObject()[kEach];
     if (eachElem->type() != Array) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "The argument to $each in $push must be"
-                                       " an array but it was of type "
-                                    << typeName(eachElem->type()));
+                      str::stream()
+                          << "The argument to $each in $push must be"
+                             " an array but it was of type: " << typeName(eachElem->type()));
     }
 
     // There must be only one $each clause.
@@ -264,7 +264,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
             if (_pushMode == PUSH_ALL) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "$pushAll requires an array of values "
-                                               "but was given an " << typeName(modExpr.type()));
+                                               "but was given type: " << typeName(modExpr.type()));
             }
 
             _val = modExpr;
@@ -280,7 +280,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
         if (!sliceElem.isNumber()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The value for $slice must "
-                                           "be a numeric value not a "
+                                           "be a numeric value but was given type: "
                                         << typeName(sliceElem.type()));
         }
 
@@ -306,7 +306,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
         if (!positionElem.isNumber()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The value for $position must "
-                                           "be a non-negative numeric value not a "
+                                           "be a non-negative numeric value, not of type: "
                                         << typeName(positionElem.type()));
         }
 
@@ -496,7 +496,7 @@ Status ModifierPush::apply() const {
     // 1. Create the doc array we'll push into, if it is not there
     // 2. Add the items in the $each array (or the simple $push) to the doc array
     // 3. Sort the resulting array according to $sort clause, if present
-    // 4. Trim the resulting array according the $slice clasue, if present
+    // 4. Trim the resulting array according the $slice clause, if present
     //
     // TODO There are _lots_ of optimization opportunities that we'll consider once the
     // test coverage is adequate.

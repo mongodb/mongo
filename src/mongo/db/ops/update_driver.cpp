@@ -109,7 +109,7 @@ Status UpdateDriver::parse(const BSONObj& updateExpr, const bool multi) {
         // Check whether there is indeed a list of mods under this modifier.
         if (outerModElem.type() != Object) {
             return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Modifiers operate on fields but we found a "
+                          str::stream() << "Modifiers operate on fields but we found type "
                                         << typeName(outerModElem.type())
                                         << " instead. For example: {$mod: {<field>: ...}}"
                                         << " not {" << outerModElem.toString() << "}");
