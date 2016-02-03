@@ -318,8 +318,8 @@ bool MigrationDestinationManager::startCommit(const MigrationSessionId& sessionI
     // serving as a recipient of chunks for another collection (note that it cannot be the same
     // collection, because the old donor still holds the collection lock).
     if (!_sessionId->matches(sessionId)) {
-        warning() << "startCommit received commit request from a stale session " << sessionId.toString()
-              << ". Current session is " << _sessionId->toString();
+        warning() << "startCommit received commit request from a stale session "
+                  << sessionId.toString() << ". Current session is " << _sessionId->toString();
         return false;
     }
 
