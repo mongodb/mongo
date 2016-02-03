@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/multi_iterator.h"
 #include "mongo/db/query/cursor_response.h"
@@ -150,6 +151,7 @@ public:
                                      exec.release(),
                                      ns.ns(),
                                      txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
+                cc->setLeftoverMaxTimeMicros(CurOp::get(txn)->getRemainingMaxTimeMicros());
 
                 BSONObjBuilder threadResult;
                 appendCursorResponseObject(cc->cursorid(), ns.ns(), BSONArray(), &threadResult);
