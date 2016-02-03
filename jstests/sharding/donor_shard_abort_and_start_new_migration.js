@@ -131,6 +131,9 @@ for (var op in inProgressOps) {
     }
 }
 unpauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
+assert.throws(function() {
+    joinFooMoveChunk();
+});
 
 /**
  * Start second moveChunk operation in the background: moving chunk [10, 20) in testDB.baz
@@ -170,9 +173,6 @@ assert.eq(4, bazColl.count(), "Failed to insert documents into baz collection!")
 
 jsTest.log('Finishing first migration, which should fail....');
 unpauseMigrateAtStep(fooRecipient, migrateStepNames.cloned);
-assert.throws(function() {
-    joinFooMoveChunk();
-});
 
 /**
  * Unpause bazRecipient (disable failpoint) and finish second migration, which should
