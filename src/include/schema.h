@@ -109,7 +109,7 @@ struct __wt_table {
 			__wt_spin_unlock(session, (lock));		\
 		}							\
 	} else								\
-		WT_WITH_LOCK_WAIT(session, lock, flag, op);			\
+		WT_WITH_LOCK_WAIT(session, lock, flag, op);		\
 } while (0)
 
 /*
