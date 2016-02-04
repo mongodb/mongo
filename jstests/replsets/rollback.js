@@ -97,7 +97,7 @@ load("jstests/replsets/rslib.js");
 
     conns[0].disconnect(conns[1]);
     conns[0].disconnect(conns[2]);
-    assert.soon(function () { try { return B.isMaster().ismaster; } catch(e) { return false; } });
+    replTest.waitForState(replTest.nodes[1], ReplSetTest.State.PRIMARY, 60 * 1000);
 
     // These 97 documents will be rolled back eventually.
     for (var i = 4; i <= 100; i++) {
