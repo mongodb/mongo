@@ -98,7 +98,7 @@ var failed_mongod = MongoRunner.runMongod({binVersion: "3.0", restart: mongod});
 assert.eq(failed_mongod, null);
 
 // upgrade, reindex, then downgrade to fix
-mongod = MongoRunner.runMongod({binVersion: "latest", restart: mongod})
+mongod = MongoRunner.runMongod({binVersion: "latest", restart: mongod});
 coll = getCollection(mongod);
 assert.eq(3, get2dsphereIndexVersion(coll));
 res = coll.dropIndex({geometry: "2dsphere"});

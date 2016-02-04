@@ -98,15 +98,15 @@ ShardingTest.prototype.restartMongoses = function() {
         var mongos = this._mongos[i];
         
         MongoRunner.stopMongos(mongos);
-        mongos = MongoRunner.runMongos({ restart : mongos })
+        mongos = MongoRunner.runMongos({ restart : mongos });
         
         this[ "s" + i ] = this._mongos[i] = mongos;
         if( i == 0 ) this.s = mongos;
     }
     
-    this.config = this.s.getDB( "config" )
-    this.admin = this.s.getDB( "admin" )
-}
+    this.config = this.s.getDB( "config" );
+    this.admin = this.s.getDB( "admin" );
+};
 
 ShardingTest.prototype.getMongosAtVersion = function(binVersion) {
     var mongoses = this._mongos;
@@ -122,4 +122,4 @@ ShardingTest.prototype.getMongosAtVersion = function(binVersion) {
             print(mongoses[i]);
         }
     }
-}
+};

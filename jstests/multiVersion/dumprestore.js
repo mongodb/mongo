@@ -1,6 +1,6 @@
 // dumprestore.js
 
-load( './jstests/multiVersion/libs/dumprestore_helpers.js' )
+load( './jstests/multiVersion/libs/dumprestore_helpers.js' );
 
 
 // The base name to use for various things in the test, including the dbpath and the database name

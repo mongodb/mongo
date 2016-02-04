@@ -3,9 +3,9 @@
  */
 
 Mongo.prototype.getBinVersion = function() {
-    var result = this.getDB( "admin" ).runCommand({ serverStatus : 1 })
-    return result.version
-}
+    var result = this.getDB( "admin" ).runCommand({ serverStatus : 1 });
+    return result.version;
+};
 
 // Checks that our mongodb process is of a certain version
 assert.binVersion = function(mongo, version) {
@@ -14,7 +14,7 @@ assert.binVersion = function(mongo, version) {
                                              MongoRunner.getBinVersionFor(version)),
            "version " + version + " (" + MongoRunner.getBinVersionFor(version) + ")" + 
            " is not the same as " + currVersion);
-}
+};
 
 
 // Compares an array of desired versions and an array of found versions,
@@ -36,4 +36,4 @@ assert.allBinVersions = function(versionsWanted, versionsFound) {
                       version + " (" + MongoRunner.getBinVersionFor(version) + ")" +
                       " in " + versionsFound);
     }
-}
+};

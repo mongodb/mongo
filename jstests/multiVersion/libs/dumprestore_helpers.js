@@ -1,6 +1,6 @@
 // dumprestore_helpers.js
 
-load( './jstests/multiVersion/libs/verify_collection_data.js' )
+load( './jstests/multiVersion/libs/verify_collection_data.js' );
 
 // Given a "test spec" object, runs the specified test.
 //
@@ -39,7 +39,7 @@ function multiVersionDumpRestoreTest(configObj) {
         'testDbpath',
         'dumpType',
         'restoreType'
-    ]
+    ];
 
     var i;
 
@@ -58,7 +58,7 @@ function multiVersionDumpRestoreTest(configObj) {
             shards : [{ binVersion : configObj.serverSourceVersion,
                         setParameter : "textSearchEnabled=true" }],
             config : [{ binVersion : configObj.serverSourceVersion }]
-        }
+        };
         var shardingTest = new ShardingTest(shardingTestConfig);
         var serverSource = shardingTest.s;
     }
@@ -118,7 +118,7 @@ function multiVersionDumpRestoreTest(configObj) {
             shards : [{ binVersion : configObj.serverDestVersion,
                         setParameter : "textSearchEnabled=true" }],
             config : [{ binVersion : configObj.serverDestVersion }]
-        }
+        };
         var shardingTest = new ShardingTest(shardingTestConfig);
         serverDest = shardingTest.s;
         MongoRunner.runMongoTool("mongorestore", { dir : configObj.dumpDir + "/" + testBaseName,
@@ -219,7 +219,7 @@ function getPermutationIterator(permsObj) {
         "hasNext" : function () {
             return currentPermutation < allPermutations.length;
         }
-    }
+    };
 }
 
 // Given a "test spec" object, runs all test combinations.

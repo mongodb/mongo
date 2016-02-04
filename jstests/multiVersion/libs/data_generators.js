@@ -27,14 +27,14 @@ function DataGenerator() {
     // Generator functions
     // BSON Type: -1
     function GenMinKey (seed) {
-        return MinKey()
+        return MinKey();
     }
     // BSON Type: 0 (EOO)
     // No Shell Equivalent
     // BSON Type: 1
     function GenNumberDouble (seed) {
         var seed = seed || 0;
-        return Number(seed)
+        return Number(seed);
     }
     // BSON Type: 2
     function GenString (seed) {
@@ -184,11 +184,11 @@ function DataGenerator() {
     function GenNumberLong (seed) {
         var seed = seed || 0;
 
-        return NumberLong(seed)
+        return NumberLong(seed);
     }
     // BSON Type: 127
     function GenMaxKey (seed) {
-        return MaxKey()
+        return MaxKey();
     }
     // The DBRef type is not a BSON type but is treated specially in the shell:
     function GenDBRef (seed) {
@@ -243,7 +243,7 @@ function DataGenerator() {
             "MaxKey" : GenMaxKey(seed),
             // The DBRef type is not a BSON type but is treated specially in the shell:
             "DBRef" : GenDBRef(seed),
-        }
+        };
     }
 
     function GenFlatObjectAllTypesHardCoded() {
@@ -298,7 +298,7 @@ function DataGenerator() {
             "MaxKey" : MaxKey(),
             // The DBRef type is not a BSON type but is treated specially in the shell:
             "DBRef" : DBRef("bar", 2)
-        }
+        };
     }
 
     // Data we are using as a source for our testing
@@ -312,7 +312,7 @@ function DataGenerator() {
         GenFlatObjectAllTypes(23),
         GenFlatObjectAllTypes(111),
         GenFlatObjectAllTypes(11111111),
-    ]
+    ];
 
     // Cursor interface
     var i = 0;
@@ -326,7 +326,7 @@ function DataGenerator() {
             }
             return testData[i++];
         }
-    }
+    };
 }
 
 //
@@ -408,7 +408,7 @@ function IndexDataGenerator(options) {
             // Loop again if we advanced the character past the end of keyChars and wrapped around,
             // so that we can advance the next character over too.  For example, this is the case
             // where "ab" follows "Za".
-        } while (keyCharsIndex + 1 >= keyChars.length)
+        } while (keyCharsIndex + 1 >= keyChars.length);
 
         return currentKey;
     }
@@ -536,7 +536,7 @@ function IndexDataGenerator(options) {
         // When using a text index, the following additional index properties are required when
         // downgrading from 2.6:
         // { "textIndexVersion" : 1 }
-        attributes["textIndexVersion"] = 1
+        attributes["textIndexVersion"] = 1;
         return attributes;
     }
 
@@ -545,7 +545,7 @@ function IndexDataGenerator(options) {
         // When using a 2dsphere index, the following additional index properties are required when
         // downgrading from 2.6:
         // { "2dsphereIndexVersion" : 1 }
-        attributes["2dsphereIndexVersion"] = 1
+        attributes["2dsphereIndexVersion"] = 1;
         return attributes;
     }
 
@@ -584,7 +584,7 @@ function IndexDataGenerator(options) {
 
         // Hashed Index
         { "spec" : GenHashedIndex(10), "options" : GenIndexOptions(14) },
-    ]
+    ];
 
     // Cursor interface
     var i = 0;
@@ -598,7 +598,7 @@ function IndexDataGenerator(options) {
             }
             return testIndexes[i++];
         }
-    }
+    };
 }
 
 //
@@ -646,7 +646,7 @@ function CollectionMetadataGenerator(options) {
         "max" : 2000,
         "usePowerOf2Sizes" : true,
         //"autoIndexId" : false // XXX: this doesn't exist in 2.4
-    }
+    };
     // We need to explicitly enable usePowerOf2Sizes, since it's the default in 2.6 but not in 2.4
     var normalCollectionMetadata = {
         "usePowerOf2Sizes" : true
@@ -656,7 +656,7 @@ function CollectionMetadataGenerator(options) {
         "get" : function () {
             return capped ? cappedCollectionMetadata : normalCollectionMetadata;
         }
-    }
+    };
 }
 
 //
@@ -667,5 +667,5 @@ function CollectionDataGenerator(options) {
         "data" : new DataGenerator(),
         "indexes" : new IndexDataGenerator(),
         "collectionMetadata" : new CollectionMetadataGenerator(options)
-    }
+    };
 }
