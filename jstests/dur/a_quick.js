@@ -5,15 +5,15 @@
 */
 
 testname = "a_quick";
-tst = {}
+tst = {};
 
 tst.log = function (optional_msg) {
     print("\n\nstep " + ++this._step + " " + (optional_msg || ""));
-}
+};
 
 tst.success = function () {
     print(testname + " SUCCESS");
-}
+};
 
 /* diff files a and b, returning the difference (empty str if no difference) */
 tst.diff = function(a, b) {
@@ -33,7 +33,7 @@ tst.diff = function(a, b) {
     b = reSlash(b);
     print("diff " + a + " " + b);
     return run("diff", a, b);
-}
+};
 print(testname + " BEGIN");
 tst._step = 0;
 

@@ -33,10 +33,10 @@ function f(variant, quickCommits, paranoid) {
 
     print("closeall.js run test");
 
-    print("wait for initial sync to finish") // SERVER-4852
+    print("wait for initial sync to finish"); // SERVER-4852
     assert.writeOK(db1.foo.insert({}, { writeConcern: { w: 2 }}));
     assert.writeOK(db1.foo.remove({}, { writeConcern: { w: 2 }}));
-    print("initial sync done")
+    print("initial sync done");
 
     var writeOps = startParallelShell('var coll = db.getSiblingDB("' + ourdb + '").foo; \
                                        for( var i = 0; i < ' + N + '; i++ ) { \

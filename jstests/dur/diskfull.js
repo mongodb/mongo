@@ -44,7 +44,7 @@ function checkNoJournalFiles(path, pass) {
 /** Clear dbpath without removing and recreating diskfulltest directory, as resetDbpath does */
 function clear() {
     files = listFiles( startPath );
-    files.forEach( function( x ) { removeFile( x.name ) } );
+    files.forEach( function( x ) { removeFile( x.name ); } );
 }
 
 function log(str) {
