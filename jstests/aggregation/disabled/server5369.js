@@ -6,7 +6,7 @@ db = db.getSiblingDB('aggdb');
 
 // empty and populate
 db.test.drop();
-db.test.save({a:1,b:2})
+db.test.save({a:1,b:2});
 
 // agg with exclusion than ensure fields are only the two we expect
 var f = db.test.aggregate({$project:{a:0}});

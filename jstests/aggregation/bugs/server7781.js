@@ -28,7 +28,7 @@ function checkOutput(cmdOut, aggOut, expectedNum) {
     var massaged; // massage geoNear command output to match output from agg pipeline
     for (var i=0; i < cmdOut.length; i++) {
         massaged = {};
-        Object.extend(massaged, cmdOut[i].obj, /*deep=*/true)
+        Object.extend(massaged, cmdOut[i].obj, /*deep=*/true);
         massaged.stats = {'dis': cmdOut[i].dis,
                           'loc': cmdOut[i].loc};
 

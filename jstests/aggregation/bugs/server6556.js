@@ -15,5 +15,5 @@ assert.eq(c.aggregate({$project: {_id: 0, matches: {$eq:["as", "$foo"]}}}).toArr
 assert.eq(c.aggregate({$project: {_id: 0, matches: {$eq:["as\0de", "$foo"]}}}).toArray(), [{matches:false}]);
 // should assert on fieldpaths with a null
 assert.throws( function() {
-    c.aggregate({$project: {_id: 0, matches: {$eq:["as\0df", "$f\0oo"]}}})
+    c.aggregate({$project: {_id: 0, matches: {$eq:["as\0df", "$f\0oo"]}}});
 });

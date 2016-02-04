@@ -3,8 +3,8 @@ load('jstests/aggregation/extras/utils.js');
 // Use this for aggregations that only have arrays or results of specified order.
 // It will check that cursors return the same results as non-cursors.
 function aggregateOrdered(coll, pipeline) {
-    var cursor = coll.aggregate(pipeline).toArray()
-    var noCursor = coll.runCommand('aggregate', {pipeline:pipeline}).result
+    var cursor = coll.aggregate(pipeline).toArray();
+    var noCursor = coll.runCommand('aggregate', {pipeline:pipeline}).result;
     assert.eq(cursor, noCursor);
     return cursor;
 }
@@ -156,7 +156,7 @@ var a4 = aggregateNoOrder(db.ts1, [
 assert.eq(a4.length, 6, tojson(a4));
 for(i = 0; i < 6; ++i) {
     c = a4[i].counter;
-    printjson({c:c})
+    printjson({c:c});
     assert((c == 55) || (c == 1111) || (c == 2222) ||
            (c == 33333) || (c == 99999) || (c == 55555),
            'agg sharded test simple match failed');
@@ -166,7 +166,7 @@ function testSkipLimit(ops, expectedCount) {
     jsTestLog('testSkipLimit(' + tojson(ops) + ', ' + expectedCount + ')');
     if (expectedCount > 10) {
         // make shard -> mongos intermediate results less than 16MB
-        ops.unshift({$project: {_id:1}})
+        ops.unshift({$project: {_id:1}});
     }
 
     ops.push({$group: {_id:1, count: {$sum: 1}}});
@@ -213,9 +213,9 @@ function testAvgStdDev() {
     var res = db.ts1.aggregate([{$group: {_id: null,
                                           avg: {$avg: '$counter'},
                                           stdDevPop: {$stdDevPop: '$counter'},
-                                         }}]).toArray()
+                                         }}]).toArray();
     // http://en.wikipedia.org/wiki/Arithmetic_progression#Sum
-    var avg = (1 + nItems) / 2
+    var avg = (1 + nItems) / 2;
     assert.close(res[0].avg, avg, '', 10 /*decimal places*/);
 
     // http://en.wikipedia.org/wiki/Arithmetic_progression#Standard_deviation

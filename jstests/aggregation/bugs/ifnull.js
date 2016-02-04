@@ -8,7 +8,7 @@ t.drop();
 t.save( {} );
 
 function assertError( expectedErrorCode, ifNullSpec ) {
-    assertErrorCode(t, {$project: {a: {$ifNull: ifNullSpec}}}, expectedErrorCode)
+    assertErrorCode(t, {$project: {a: {$ifNull: ifNullSpec}}}, expectedErrorCode);
 }
 
 function assertResult( expectedResult, arg0, arg1 ) {

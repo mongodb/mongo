@@ -68,7 +68,7 @@ function setupArray(){
         { _id : 16, a : function(){}, ty : "Code" },
         //Code with Scope not implemented in JS
         { _id : 17, a : MaxKey, ty : "MaxKey"}
-    ]
+    ];
 }
 
 //***
@@ -80,7 +80,7 @@ Random.setRandomSeed();
 runSort( { a : 1 }, false, "p1" );
  
 //problem 2, does aggregate $sort work with all types nested
-runSort( { "a" : 1 }, true, "p2a" )
+runSort( { "a" : 1 }, true, "p2a" );
 runSort( { "a.b" : 1 }, true, "p2b" );
  
 //problem 3, check reverse order sort

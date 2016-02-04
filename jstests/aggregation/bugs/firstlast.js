@@ -7,7 +7,7 @@ t.drop();
 /** Check expected $first and $last result values. */
 function assertFirstLast( expectedFirst, expectedLast, pipeline, expression ) {
     pipeline = pipeline || [];
-    expression = expression || '$b'
+    expression = expression || '$b';
     pipeline.push( { $group:{ _id:'$a',
                               first:{ $first:expression },
                               last:{ $last:expression } } } );

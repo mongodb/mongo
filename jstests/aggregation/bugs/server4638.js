@@ -1,7 +1,7 @@
 // SERVER-4638 - this tests explicit undefined values
 // This case is marked as a dup of SERVER-4674
 
-t = db.server4638
+t = db.server4638;
 t.drop();
 
 t.insert( { _id : 0 , x : 0 , undef: undefined } );
