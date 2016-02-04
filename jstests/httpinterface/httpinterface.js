@@ -11,9 +11,9 @@ tryHttp = function() {
     }
     // if we managed to start and connect a new mongo then the web interface is working
     return true;
-}
+};
 
-assert.throws(function() {assert.soon(tryHttp, "tryHttp failed, like we expected it to")});
+assert.throws(function() {assert.soon(tryHttp, "tryHttp failed, like we expected it to");});
 
 MongoRunner.stopMongod(conn);
 
