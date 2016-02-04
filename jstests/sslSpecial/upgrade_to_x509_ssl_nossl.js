@@ -17,9 +17,9 @@ function authAllNodes() {
         var status = rst.nodes[n].getDB("admin").auth("root", "pwd");
         assert.eq(status, 1);
     }
-};
+}
 
-opts = {sslMode:"disabled", clusterAuthMode:"keyFile", keyFile: KEYFILE}
+opts = {sslMode:"disabled", clusterAuthMode:"keyFile", keyFile: KEYFILE};
 var NUM_NODES = 3;
 var rst = new ReplSetTest({ name: 'sslSet', nodes: NUM_NODES, nodeOptions : opts });
 rst.startSet();
