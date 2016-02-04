@@ -23,7 +23,7 @@ var contains = function(logLines, func) {
         }
     }
     return false;
-}
+};
 
 var replTest = new ReplSetTest({name: 'cloner', nodes: 3, oplogSize: 150 /*~1.5x data size*/});
 replTest.startSet();
@@ -70,7 +70,7 @@ var insertAndRemove = function(host) {
     }
 
     jsTestLog("finished bg writes on " + host);
-}
+};
 var worker = new ScopedThread(insertAndRemove, primary.host);
 worker.start();
 
@@ -104,7 +104,7 @@ if (!droppedDups) {
     jsTestLog("Warning: Test did not trigger duplicate documents, this run will be a false negative");
 }
 
-jsTestLog("stopping writes and waiting for replica set to coalesce")
+jsTestLog("stopping writes and waiting for replica set to coalesce");
 primary.getDB('test').stop.insert({});
 worker.join();
 //make sure all secondaries are caught up, after init sync

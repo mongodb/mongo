@@ -5,7 +5,7 @@
     var commandsRan = [];
 
     // Create a new DB object backed by a mock connection.
-    function MockMongo() {};
+    function MockMongo() {}
     MockMongo.prototype = Mongo.prototype;
     MockMongo.prototype.runCommand = function(db, cmd, opts) {
         commandsRan.push({db: db, cmd: cmd, opts:opts});

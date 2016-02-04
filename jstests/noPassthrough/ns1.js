@@ -1,7 +1,7 @@
 
-load( "jstests/libs/slow_weekly_util.js" )
+load( "jstests/libs/slow_weekly_util.js" );
 
-testServer = new SlowWeeklyMongod( "ns1" )
+testServer = new SlowWeeklyMongod( "ns1" );
 mydb = testServer.getDB( "test_ns1" );
 
 check = function( n , isNew ){
@@ -13,7 +13,7 @@ check = function( n , isNew ){
     assert.eq( 1 , coll.count() , "pop b: " + n );
     assert.eq( n , coll.findOne()._id , "pop c: " + n );
     return coll;
-}
+};
 
 max = 0;
 
@@ -46,6 +46,6 @@ for ( i=0; i<its; i++ ){
         print( i + "/" + its );
     }
 }    
-print( "yay" )
+print( "yay" );
 
 mydb.dropDatabase();

@@ -2,7 +2,7 @@
 // this tests that members will stay in RECOVERING state on startup if they have not reached
 // their stored minvalid
 
-var name = "minvalid"
+var name = "minvalid";
 var replTest = new ReplSetTest({name: name, nodes: 1, oplogSize:1});
 var host = getHostName();
 

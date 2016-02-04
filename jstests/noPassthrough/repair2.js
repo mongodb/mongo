@@ -2,8 +2,8 @@
 
 baseName = "jstests_repair2";
 
-load( "jstests/libs/slow_weekly_util.js" )
-testServer = new SlowWeeklyMongod( baseName )
+load( "jstests/libs/slow_weekly_util.js" );
+testServer = new SlowWeeklyMongod( baseName );
 
 t = testServer.getDB( baseName )[ baseName ];
 t.drop();

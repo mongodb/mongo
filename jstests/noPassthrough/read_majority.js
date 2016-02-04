@@ -107,7 +107,7 @@ assert.eq(getReadMajorityAggCursor().itcount(), 10);
 getReadMajorityAggCursor().forEach(function(doc) {
     // Note: agg uses internal batching so can't reliably test flipping snapshot. However, it uses
     // the same mechanism as find, so if one works, both should.
-    assert.eq(doc.version, 3)
+    assert.eq(doc.version, 3);
 });
 
 assert.eq(getReadMajorityCursor().itcount(), 10);

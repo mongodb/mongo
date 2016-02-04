@@ -1,16 +1,16 @@
 if (0) { // Test disabled until SERVER-8579 is finished. Reminder ticket: SERVER-8342
 
-load( "jstests/libs/slow_weekly_util.js" )
-testServer = new SlowWeeklyMongod( "query_yield1" )
+load( "jstests/libs/slow_weekly_util.js" );
+testServer = new SlowWeeklyMongod( "query_yield1" );
 db = testServer.getDB( "test" );
 
 t = db.query_yield1;
-t.drop()
+t.drop();
 
 N = 20000;
 i = 0;
 
-q = function(){ var x=this.n; for ( var i=0; i<250; i++ ){ x = x * 2; } return false; }
+q = function(){ var x=this.n; for ( var i=0; i<250; i++ ){ x = x * 2; } return false; };
 
 while ( true ){
     function fill(){
@@ -45,7 +45,7 @@ while ( true ){
 
 assert.eq( 0, db.currentOp().inprog.length , "setup broken" );
 
-join = startParallelShell( "print( 0 == db.query_yield1.find( function(){ var x=this.n; for ( var i=0; i<500; i++ ){ x = x * 2; } return false; } ).itcount() ); " )
+join = startParallelShell( "print( 0 == db.query_yield1.find( function(){ var x=this.n; for ( var i=0; i<500; i++ ){ x = x * 2; } return false; } ).itcount() ); " );
 
 assert.soon( 
     function(){
@@ -61,7 +61,7 @@ start = new Date();
 biggestMe = 0;
 while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
     var me = Date.timeFunc( function(){ t.insert( { x : 1 } ); });
-    var x = db.currentOp()
+    var x = db.currentOp();
 
     if ( num++ == 0 ){
         assert.eq( 1 , x.inprog.length , "nothing in prog" );
@@ -81,7 +81,7 @@ while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
 
 join();
 
-var x = db.currentOp()
+var x = db.currentOp();
 assert.eq( 0 , x.inprog.length , "weird 2" );
 
 testServer.stop();

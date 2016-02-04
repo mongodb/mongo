@@ -20,7 +20,7 @@ t.drop();
 N = 200;
 i = 0;
 
-q = function() { var x=this.n; for ( var i=0; i<25000; i++ ) { x = x * 2; } return false; }
+q = function() { var x=this.n; for ( var i=0; i<25000; i++ ) { x = x * 2; } return false; };
 
 print( "Shell ==== Creating test.query_yield2 collection ..." );
 print( "Shell ==== Adding documents until a time-wasting query takes over 2 seconds to complete" );
@@ -68,7 +68,7 @@ if ( len ) {
 print( "Shell ==== The test is working so far: db.currentOp().inprog.length is " + len );
 
 print( "Shell ==== Starting parallel shell to test if slow query will yield to write" );
-join = startParallelShell( "print( 0 == db.query_yield2.find( function(){ var x=this.n; for ( var i=0; i<50000; i++ ){ x = x * 2; } return false; } ).itcount() ); " )
+join = startParallelShell( "print( 0 == db.query_yield2.find( function(){ var x=this.n; for ( var i=0; i<50000; i++ ){ x = x * 2; } return false; } ).itcount() ); " );
 
 print( "Shell ==== Waiting until db.currentOp().inprog becomes non-empty" );
 assert.soon( 

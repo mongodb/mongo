@@ -1,8 +1,8 @@
 // this tests all points using $near
 load("jstests/libs/geo_near_random.js");
-load( "jstests/libs/slow_weekly_util.js" )
+load( "jstests/libs/slow_weekly_util.js" );
 
-testServer = new SlowWeeklyMongod( "geo_near_random1" )
+testServer = new SlowWeeklyMongod( "geo_near_random1" );
 db = testServer.getDB( "test" );
 
 
