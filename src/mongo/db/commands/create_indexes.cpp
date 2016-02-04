@@ -174,8 +174,9 @@ public:
         }
 
         Collection* collection = db->getCollection(ns.ns());
-        result.appendBool("createdCollectionAutomatically", collection == NULL);
-        if (!collection) {
+        if (collection) {
+            result.appendBool("createdCollectionAutomatically", false);
+        } else {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wunit(txn);
                 collection = db->createCollection(txn, ns.ns(), CollectionOptions());
@@ -183,6 +184,7 @@ public:
                 wunit.commit();
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
+            result.appendBool("createdCollectionAutomatically", true);
         }
 
         const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(txn);
