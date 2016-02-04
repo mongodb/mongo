@@ -152,14 +152,6 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         # Opening a clone of the database home directory should run
         # recovery and see the committed results.
         self.backup(self.backup_dir)
-        backup_conn_params = 'read_only=true'
-        backup_conn = self.wiredtiger_open(self.backup_dir, backup_conn_params)
-        try:
-            self.check(backup_conn.open_session(), None, committed)
-        finally:
-            backup_conn.close()
-
-        # Now open the clone of the database home directory with
         backup_conn_params = 'log=(enabled,file_max=%s)' % self.logmax
         backup_conn = self.wiredtiger_open(self.backup_dir, backup_conn_params)
         try:
