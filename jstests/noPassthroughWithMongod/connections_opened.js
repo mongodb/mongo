@@ -32,7 +32,7 @@ function createTemporaryConnection() {
         "assert.soon(function() {" +
         "try { conn = new Mongo(\"" + db.getMongo().host + "\"); return conn" +
         "} catch (x) {return false;}}, " +
-        "\"Timed out waiting for temporary connection to connect\", 30000, 5000);"
+        "\"Timed out waiting for temporary connection to connect\", 30000, 5000);";
     // Poll the signal collection until it is told to terminate.
     pollString += "assert.soon(function() {"
         + "return conn.getDB('" + testDB + "').getCollection('" + signalCollection + "')"

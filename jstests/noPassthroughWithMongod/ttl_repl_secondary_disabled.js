@@ -29,7 +29,7 @@ assert.commandWorked(slave1col.runCommand("godinsert",
         {obj: {_id: new Date(), x: new Date( (new Date()).getTime() - 600000 ) } }));
 assert.eq(1, slave1col.count(), "missing inserted doc" );
 
-sleep(70*1000) //wait for 70seconds
+sleep(70*1000); //wait for 70seconds
 assert.eq(1, slave1col.count(), "ttl deleted my doc!" );
 
 // looking for these errors : "Assertion: 13312:replSet error : logOp() but not primary",
@@ -38,7 +38,7 @@ assert.eq(1, slave1col.count(), "ttl deleted my doc!" );
 var errorStrings = ["Assertion: 13312", "Assertion 17405"];
 var foundError = false;
 var foundLine = "";
-var globalLogLines = assert.commandWorked(slave1col.getDB().adminCommand({getLog:"global"})).log
+var globalLogLines = assert.commandWorked(slave1col.getDB().adminCommand({getLog:"global"})).log;
 for (i in globalLogLines) {
     var line = globalLogLines[i];
     errorStrings.forEach(function(errorString) {

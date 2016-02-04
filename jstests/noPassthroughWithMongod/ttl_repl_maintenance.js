@@ -51,7 +51,7 @@ var restartWithoutConfig = function() {
 print("Create a TTL collection and put doc in local.system.replset");
 primeSystemReplset();
 
-print("make sure TTL doesn't work when member is started with system.replset doc")
+print("make sure TTL doesn't work when member is started with system.replset doc");
 restartWithConfig();
 
 print("remove system.replset entry & restart");

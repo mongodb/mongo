@@ -5,15 +5,15 @@
     var count = 10;
 
     function testValidate(output) {
-        assert.eq(output.nrecords, count, "validate returned an invalid count")
-        assert.eq(output.nIndexes, 3, "validate returned an invalid number of indexes")
+        assert.eq(output.nrecords, count, "validate returned an invalid count");
+        assert.eq(output.nIndexes, 3, "validate returned an invalid number of indexes");
 
-        var indexNames = output.keysPerIndex
+        var indexNames = output.keysPerIndex;
 
         for (var i in indexNames) {
             if (!indexNames.hasOwnProperty(i))
                 continue;
-            assert.eq(indexNames[i], count, "validate returned an invalid number of indexes")
+            assert.eq(indexNames[i], count, "validate returned an invalid number of indexes");
         }
     }
 
@@ -27,15 +27,15 @@
         t.insert({x:i});
     }
 
-    t.ensureIndex({x:1}, {name: "forward"})
-    t.ensureIndex({x:-1}, {name: "reverse"})
+    t.ensureIndex({x:1}, {name: "forward"});
+    t.ensureIndex({x:-1}, {name: "reverse"});
 
 
     // TEST NORMAL VALIDATE
-    var output = t.validate()
+    var output = t.validate();
     testValidate(output);
 
     // TEST FULL
-    var output = t.validate({full:true})
+    var output = t.validate({full:true});
     testValidate(output);
 }());

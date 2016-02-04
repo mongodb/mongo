@@ -5,7 +5,7 @@
 var st = new ShardingTest({ shards : 2, mongos : 1,
                             other : { mongosOptions : { noAutoSplit : "" },
                                       shardOptions : { /* binVersion : "latest" */ } } });
-st.stopBalancer()
+st.stopBalancer();
 
 var mongos = st.s0;
 var coll = mongos.getCollection( "foo.bar" );
@@ -20,7 +20,7 @@ assert( admin.runCommand({ split : coll + "", middle : { _id : 0 } }).ok );
 
 jsTest.log( "Preparing large insert..." );
 
-var data1MB = "x"
+var data1MB = "x";
 while ( data1MB.length < 1024 * 1024 )
     data1MB += data1MB;
 

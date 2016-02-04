@@ -52,9 +52,9 @@ assert.eq( 6 , t.count() );
 var shard0 = s._connections[0].getDB( dbname );
 var shard1 = s._connections[1].getDB( dbname );
 
-print("Shard 0 coll stats:")
+print("Shard 0 coll stats:");
 printjson( shard0.getCollection( coll ).stats() );
-print("Shard 1 coll stats:")
+print("Shard 1 coll stats:");
 printjson( shard1.getCollection( coll ).stats() );
 
 

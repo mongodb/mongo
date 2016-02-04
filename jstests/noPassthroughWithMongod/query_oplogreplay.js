@@ -5,7 +5,7 @@ function test(t) {
     assert.commandWorked(t.getDB().createCollection(t.getName(), {capped: true, size: 16*1024}));
 
     function makeTS(i) {
-        return Timestamp(1000, i)
+        return Timestamp(1000, i);
     }
 
     for (var i = 0; i < 100; i++) {

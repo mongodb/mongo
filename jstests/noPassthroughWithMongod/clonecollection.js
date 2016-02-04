@@ -30,8 +30,8 @@ if ( t.a.getIndexes().length != 2 ) {
 }
 assert.eq( 2, t.a.getIndexes().length, "expected index missing" );
 // Verify index works
-x = t.a.find( { i: 50 } ).hint( { i: 1 } ).explain("executionStats")
-printjson( x )
+x = t.a.find( { i: 50 } ).hint( { i: 1 } ).explain("executionStats");
+printjson( x );
 assert.eq( 1, x.executionStats.nReturned , "verify 1" );
 assert.eq( 1, t.a.find( { i: 50 } ).hint( { i: 1 } ).toArray().length, "match length did not match expected" );
 

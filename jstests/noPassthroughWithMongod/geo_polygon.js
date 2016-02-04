@@ -13,7 +13,7 @@ assert.writeOK(bulk.execute());
 
 var numTests = 31;
 for( var n = 0; n < numTests; n++ ){
-    t.dropIndexes()
+    t.dropIndexes();
     t.ensureIndex( { loc : "2d" }, { bits : 2 + n } );
 
     assert.between( 9 - 2 , t.find( { loc: { "$within": { "$polygon" : [[0,0], [1,1], [0,2]] }}} ).count() , 9, "Triangle Test", true);

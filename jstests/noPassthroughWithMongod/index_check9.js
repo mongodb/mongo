@@ -21,7 +21,7 @@ n = Random.randInt( 5 ) + 1;
 var idx = sort();
 
 var chars = "abcdefghijklmnopqrstuvwxyz";
-var alphas = []
+var alphas = [];
 for( var i = 0; i < n; ++i ) {
     alphas.push( Random.rand() > 0.5 );
 }
@@ -79,7 +79,7 @@ function check() {
             break;
         }
         case 1 /* $in */ : {
-            var vals = []
+            var vals = [];
             var inLength = Random.randInt( 15 );
             for( var j = 0; j < inLength; ++j ) {
                 vals.push( r( alphas[ i ] ) );

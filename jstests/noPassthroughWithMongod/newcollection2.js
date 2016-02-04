@@ -14,4 +14,4 @@ assert( v.valid );
 
 db.runCommand({ applyOps: [ { op: 'u', ns: 'a\0b' } ] });
 var res = db["a\0a"].insert({});
-assert(res.hasWriteError(), "A write to collection a\0a succceeded")
+assert(res.hasWriteError(), "A write to collection a\0a succceeded");

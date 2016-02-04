@@ -3,10 +3,10 @@
 // This test requires persistence beacuase it assumes data will survive a restart.
 // @tags: [requires_persistence]
 
-testname = 'temp_namespace_sw'
+testname = 'temp_namespace_sw';
 
 var conn = MongoRunner.runMongod({smallfiles: "", noprealloc: "", nopreallocj: ""});
-d = conn.getDB('test')
+d = conn.getDB('test');
 d.runCommand({create: testname+'temp1', temp: true});
 d[testname+'temp1'].ensureIndex({x:1});
 d.runCommand({create: testname+'temp2', temp: 1});
@@ -21,8 +21,8 @@ function countCollectionNames( theDB, regex ) {
         return z.match( regex ); } ).length;
 }
 
-assert.eq(countCollectionNames( d, /temp\d$/) , 2)
-assert.eq(countCollectionNames( d, /keep\d$/) , 4)
+assert.eq(countCollectionNames( d, /temp\d$/) , 2);
+assert.eq(countCollectionNames( d, /keep\d$/) , 4);
 MongoRunner.stopMongod(conn);
 
 conn = MongoRunner.runMongod({restart:true,
@@ -31,7 +31,7 @@ conn = MongoRunner.runMongod({restart:true,
                               smallfiles: "",
                               noprealloc: "",
                               nopreallocj: ""});
-d = conn.getDB('test')
-assert.eq(countCollectionNames( d, /temp\d$/) , 0)
-assert.eq(countCollectionNames( d, /keep\d$/) , 4)
+d = conn.getDB('test');
+assert.eq(countCollectionNames( d, /temp\d$/) , 0);
+assert.eq(countCollectionNames( d, /keep\d$/) , 4);
 MongoRunner.stopMongod(conn);

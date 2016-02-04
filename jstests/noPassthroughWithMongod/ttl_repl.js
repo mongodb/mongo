@@ -39,7 +39,7 @@ rt.awaitReplication();
 assert.eq( 24 , mastercol.count() , "docs not inserted on primary" );
 assert.eq( 24 , slave1col.count() , "docs not inserted on secondary" );
 
-print("Initial Stats:")
+print("Initial Stats:");
 print("Master:");
 printjson( mastercol.stats() );
 print("Slave1:");
@@ -52,7 +52,7 @@ rt.awaitReplication();
 
 sleep(70*1000); // TTL monitor runs every 60 seconds, so wait 70
 
-print("Stats after waiting for TTL Monitor:")
+print("Stats after waiting for TTL Monitor:");
 print("Master:");
 printjson( mastercol.stats() );
 print("Slave1:");
