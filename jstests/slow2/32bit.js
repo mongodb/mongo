@@ -7,7 +7,7 @@ var forceSeedToBe = null;
 
 if (forceSeedToBe) {
     print("\n32bit.js WARNING FORCING A SPECIFIC SEED");
-    print("seed="+ forceSeedToBe)
+    print("seed="+ forceSeedToBe);
     Random.srand(forceSeedToBe);
 }
 else {
