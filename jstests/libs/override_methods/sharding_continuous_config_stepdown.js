@@ -93,7 +93,7 @@ ReplSetTest = function ReplSetTestWithContinuousPrimaryStepdown() {
         }
         options.verbose = 2;
         return _originalStartSetFn.call(this, options);
-    }
+    };
 
     /**
      * Overrides the stopSet call so it terminates the failover thread.
@@ -168,7 +168,7 @@ ShardingTest = function ShardingTestWithContinuousConfigPrimaryStepdown() {
      */
     this.printShardingStatus = function() {
 
-    }
+    };
 
     // Start the continuous config server stepdown thread
     this.configRS.startContinuousFailover();

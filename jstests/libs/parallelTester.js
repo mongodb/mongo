@@ -4,12 +4,12 @@
 if (typeof _threadInject != "undefined") {
     Thread = function(){
         this.init.apply( this, arguments );
-    }
+    };
     _threadInject( Thread.prototype );
 
     ScopedThread = function() {
         this.init.apply( this, arguments );
-    }
+    };
     ScopedThread.prototype = new Thread( function() {} );
     _scopedThreadInject( ScopedThread.prototype );
 
@@ -17,48 +17,48 @@ if (typeof _threadInject != "undefined") {
         var t = new Thread( function() {} );
         Thread.apply( t, arguments );
         return t;
-    }    
+    };    
 
     // Helper class to generate a list of events which may be executed by a ParallelTester
     EventGenerator = function( me, collectionName, mean, host ) {
         this.mean = mean;
         if (host == undefined) host = db.getMongo().host;
         this.events = new Array( me, collectionName, host );
-    }
+    };
 
     EventGenerator.prototype._add = function( action ) {
         this.events.push( [ Random.genExp( this.mean ), action ] );
-    }
+    };
     
     EventGenerator.prototype.addInsert = function( obj ) {
         this._add( "t.insert( " + tojson( obj ) + " )" );
-    }
+    };
 
     EventGenerator.prototype.addRemove = function( obj ) {
         this._add( "t.remove( " + tojson( obj ) + " )" );
-    }
+    };
 
     EventGenerator.prototype.addUpdate = function( objOld, objNew ) {
         this._add( "t.update( " + tojson( objOld ) + ", " + tojson( objNew ) + " )" );
-    }
+    };
     
     EventGenerator.prototype.addCheckCount = function( count, query, shouldPrint, checkQuery ) {
         query = query || {};
         shouldPrint = shouldPrint || false;
         checkQuery = checkQuery || false;
-        var action = "assert.eq( " + count + ", t.count( " + tojson( query ) + " ) );"
+        var action = "assert.eq( " + count + ", t.count( " + tojson( query ) + " ) );";
         if ( checkQuery ) {
-            action += " assert.eq( " + count + ", t.find( " + tojson( query ) + " ).toArray().length );"
+            action += " assert.eq( " + count + ", t.find( " + tojson( query ) + " ).toArray().length );";
         }
         if ( shouldPrint ) {
             action += " print( me + ' ' + " + count + " );";
         }
         this._add( action );
-    }
+    };
     
     EventGenerator.prototype.getEvents = function() {
         return this.events;
-    }
+    };
     
     EventGenerator.dispatch = function() {
         var args = argumentsToArray( arguments );
@@ -71,25 +71,25 @@ if (typeof _threadInject != "undefined") {
             sleep( args[ i ][ 0 ] );
             eval( args[ i ][ 1 ] );
         }
-    }
+    };
     
     // Helper class for running tests in parallel.  It assembles a set of tests
     // and then calls assert.parallelests to run them.
     ParallelTester = function() {
-        assert.neq(db.getMongo().writeMode(), "legacy", "wrong shell write mode")
+        assert.neq(db.getMongo().writeMode(), "legacy", "wrong shell write mode");
         this.params = new Array();
-    }
+    };
     
     ParallelTester.prototype.add = function( fun, args ) {
         args = args || [];
         args.unshift( fun );
         this.params.push( args );
-    }
+    };
     
     ParallelTester.prototype.run = function( msg, newScopes ) {
         newScopes = newScopes || false;
         assert.parallelTests( this.params, msg, newScopes );
-    }
+    };
     
     // creates lists of tests from jstests dir in a format suitable for use by
     // ParallelTester.fileTester.  The lists will be in random order.
@@ -106,7 +106,7 @@ if (typeof _threadInject != "undefined") {
                 ret[ a[ i ] ] = 1;
             }
             return ret;
-        }
+        };
         
         // some tests can't run in parallel with most others
         var skipTests = makeKeys([ "repair.js",
@@ -205,7 +205,7 @@ if (typeof _threadInject != "undefined") {
         }
 
         return params;
-    }
+    };
     
     // runs a set of test files
     // first argument is an identifier for this tester, remaining arguments are file names
@@ -219,7 +219,7 @@ if (typeof _threadInject != "undefined") {
                 print("         S" + suite + " Test : " + x + " " + time + "ms" );
             }
         );
-    }
+    };
 
     // params: array of arrays, each element of which consists of a function followed
     // by zero or more arguments to that function.  Each function and its arguments will
@@ -247,7 +247,7 @@ if (typeof _threadInject != "undefined") {
                          "}"
                          );
             return z;
-        }
+        };
         var runners = new Array();
         for( var i in params ) {
             var param = params[ i ];
@@ -266,7 +266,7 @@ if (typeof _threadInject != "undefined") {
         // (see SERVER-19615 for a similar issue).
         runners.forEach( function( x ) { if( !x.returnData() ) { ++nFailed; } } );        
         assert.eq( 0, nFailed, msg );
-    }
+    };
 }
 
 if ( typeof CountDownLatch !== 'undefined' ) {

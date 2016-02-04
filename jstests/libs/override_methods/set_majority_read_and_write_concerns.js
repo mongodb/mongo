@@ -13,13 +13,13 @@
 
         if (typeof(jsCode) === "function") {
             // Load the override file and immediately invoke the supplied function.
-            newCode = `load("${overridesFile}"); (${jsCode})();`
+            newCode = `load("${overridesFile}"); (${jsCode})();`;
         } else {
-            newCode = `load("${overridesFile}"); ${jsCode};`
+            newCode = `load("${overridesFile}"); ${jsCode};`;
         }
 
         return originalStartParallelShell(newCode, port, noConnect);
-    }
+    };
 
     DB.prototype._runCommandImpl = function(dbName, obj, options) {
         var cmdName = "";
