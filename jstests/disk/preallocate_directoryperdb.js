@@ -4,9 +4,9 @@
  */
 
 var baseDir = "jstests_disk_preallocate_directoryperdb";
-var baseName = "preallocate_directoryperdb"
-var baseName2 = "preallocate_directoryperdb2"
-var baseName3 = "preallocate_directoryperdb3"
+var baseName = "preallocate_directoryperdb";
+var baseName2 = "preallocate_directoryperdb2";
+var baseName3 = "preallocate_directoryperdb3";
 dbpath = MongoRunner.dataPath + baseDir + "/";
 
 function checkDb2DirAbsent() {

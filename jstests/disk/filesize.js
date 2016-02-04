@@ -21,7 +21,7 @@ if (db.serverBuildInfo().bits == 32) {
     });
 
     db = m.getDB( baseName );
-    var log = db.adminCommand( { getLog : "global" } ).log
+    var log = db.adminCommand( { getLog : "global" } ).log;
 
     // Find log message like:
     // "openExisting file size 16777216 but

@@ -4,7 +4,7 @@
     var baseName = "jstests_disk_repair5";
 
     var dbpath = MongoRunner.dataPath + baseName + "/";
-    var repairpath = dbpath + "repairDir/"
+    var repairpath = dbpath + "repairDir/";
 
     resetDbpath( dbpath );
     resetDbpath( repairpath );

@@ -1,8 +1,8 @@
 // test that disk space check happens on --repairpath partition
 
 var baseName = "jstests_disk_repair4";
-var smallbase = MongoRunner.dataDir + "/repairpartitiontest"
-var smallpath = smallbase + "/dir"
+var smallbase = MongoRunner.dataDir + "/repairpartitiontest";
+var smallpath = smallbase + "/dir";
 
 doIt = false;
 files = listFiles( MongoRunner.dataDir );
