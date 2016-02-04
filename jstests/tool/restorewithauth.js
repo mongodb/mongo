@@ -52,11 +52,11 @@ MongoRunner.stopMongod(conn);
 conn = MongoRunner.runMongod({auth: "", nojournal: "", bind_ip: "127.0.0.1"});
 
 // admin user
-var admin = conn.getDB( "admin" )
+var admin = conn.getDB( "admin" );
 admin.createUser({user:  "admin" , pwd: "admin", roles: jsTest.adminUserRoles});
 admin.auth( "admin" , "admin" );
 
-var foo = conn.getDB( "foo" )
+var foo = conn.getDB( "foo" );
 
 // make sure no collection with the same name exists
 collNames = foo.getCollectionNames();

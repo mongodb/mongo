@@ -5,12 +5,12 @@ t = new ToolTest("exportimport6");
 
 c = t.startDB("foo");
 assert.eq(0, c.count(), "setup1");
-c.save({a:1, b:1})
-c.save({a:1, b:2})
-c.save({a:2, b:3})
-c.save({a:2, b:3})
-c.save({a:3, b:4})
-c.save({a:3, b:5})
+c.save({a:1, b:1});
+c.save({a:1, b:2});
+c.save({a:2, b:3});
+c.save({a:2, b:3});
+c.save({a:3, b:4});
+c.save({a:3, b:5});
 
 assert.eq(6, c.count(), "setup2");
 

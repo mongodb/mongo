@@ -15,8 +15,8 @@ var doc = {_id: new ObjectId(), x:bigString};
 var docSize = Object.bsonsize(doc);
 var numDocs = Math.floor(20*1024*1024 / docSize);
 
-print('Size of one document: ' + docSize)
-print('Number of documents to exceed maximum BSON size: ' + numDocs)
+print('Size of one document: ' + docSize);
+print('Number of documents to exceed maximum BSON size: ' + numDocs);
 
 print('About to insert ' + numDocs + ' documents into ' +
       exportimport_db.getName() + '.' + src.getName());

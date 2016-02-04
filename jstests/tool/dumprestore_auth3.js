@@ -122,9 +122,9 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
                  "version doc was changed by restore");
 
     jsTestLog("Make modifications to user data that should be overridden by the restore");
-    db.dropUser('user')
+    db.dropUser('user');
     db.createUser({user: 'user2', pwd: 'password2', roles: jsTest.basicUserRoles});
-    db.dropRole('role')
+    db.dropRole('role');
     db.createRole({role: 'role2', roles: [], privileges:[]});
 
     jsTestLog("Restore foo database (and user data) with --drop so it overrides the changes made");
@@ -213,7 +213,7 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
                  "version doc was changed by restore");
 
     MongoRunner.stopMongod(mongod);
-}
+};
 
 // Tests that the default auth roles of backup and restore work properly.
 dumpRestoreAuth3("backup", "restore");

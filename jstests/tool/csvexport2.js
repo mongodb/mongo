@@ -1,6 +1,6 @@
 // csvexport2.js
 
-t = new ToolTest( "csvexport2" )
+t = new ToolTest( "csvexport2" );
 
 c = t.startDB( "foo" );
 
@@ -28,4 +28,4 @@ c = t.startDB( "foo" );
 //assert.eq( expected, actual );
 
 
-t.stop()
+t.stop();

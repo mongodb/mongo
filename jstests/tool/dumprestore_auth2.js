@@ -7,7 +7,7 @@ var dumpRestoreAuth2 = function(backup_role, restore_role) {
 	t = new ToolTest("dumprestore_auth2", {auth: ""});
 
 	coll = t.startDB("foo");
-	admindb = coll.getDB().getSiblingDB("admin")
+	admindb = coll.getDB().getSiblingDB("admin");
 
 	// Create the relevant users and roles.
 	admindb.createUser({user: "root", pwd: "pass", roles: ["root"]});
@@ -26,11 +26,11 @@ var dumpRestoreAuth2 = function(backup_role, restore_role) {
 	coll.insert({word: "tomato"});
 	assert.eq(1, coll.count());
 
-	assert.eq(4, admindb.system.users.count(), "setup users")
+	assert.eq(4, admindb.system.users.count(), "setup users");
 	assert.eq(2, admindb.system.users.getIndexes().length,
 	          "setup2: " + tojson( admindb.system.users.getIndexes() ) );
-	assert.eq(1, admindb.system.roles.count(), "setup3")
-	assert.eq(2, admindb.system.roles.getIndexes().length, "setup4")
+	assert.eq(1, admindb.system.roles.count(), "setup3");
+	assert.eq(2, admindb.system.roles.getIndexes().length, "setup4");
 	assert.eq(1, admindb.system.version.count());
 	var versionDoc = admindb.system.version.findOne();
 
@@ -109,7 +109,7 @@ var dumpRestoreAuth2 = function(backup_role, restore_role) {
 
 	t.stop();
 
-}
+};
 
 // Tests that the default auth roles of backup and restore work properly.
 dumpRestoreAuth2("backup", "restore");

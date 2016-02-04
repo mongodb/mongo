@@ -4,7 +4,7 @@ var nodes = replTest.startSet();
 replTest.initiate();
 
 var master = replTest.getPrimary();
-db = master.getDB("foo")
+db = master.getDB("foo");
 db.foo.save({a: 1000});
 replTest.awaitReplication();
 replTest.awaitSecondaryNodes();
@@ -21,18 +21,18 @@ if (jsTest.options().keyFile) {
     args = args.concat(authargs);
 }
 runMongoProgram.apply(null, args);
-db.foo.drop()
+db.foo.drop();
 
 assert.eq( 0 , db.foo.count() , "after drop" );
 args = ['mongorestore', '-h', master.host, MongoRunner.dataDir + '/jstests_tool_dumpsecondary_external/'];
 if (jsTest.options().keyFile) {
     args = args.concat(authargs);
 }
-runMongoProgram.apply(null, args)
+runMongoProgram.apply(null, args);
 assert.soon( "db.foo.findOne()" , "no data after sleep" );
 assert.eq( 1 , db.foo.count() , "after restore" );
 assert.eq( 1000 , db.foo.findOne().a , "after restore 2" );
 
-resetDbpath(MongoRunner.dataDir + '/jstests_tool_dumpsecondary_external')
+resetDbpath(MongoRunner.dataDir + '/jstests_tool_dumpsecondary_external');
 
-replTest.stopSet(15)
+replTest.stopSet(15);

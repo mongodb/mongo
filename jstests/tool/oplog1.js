@@ -7,7 +7,7 @@ t = new ToolTest( "oplog1" );
 
 db = t.startDB();
 
-output = db.output
+output = db.output;
 
 doc = { _id : 5 , x : 17 };
 
@@ -15,7 +15,7 @@ assert.commandWorked(db.createCollection(output.getName()));
 
 db.oplog.insert( { ts : new Timestamp() , "op" : "i" , "ns" : output.getFullName() , "o" : doc } );
 
-assert.eq( 0 , output.count() , "before" )
+assert.eq( 0 , output.count() , "before" );
 
 t.runTool( "oplog" , "--oplogns" , db.getName() + ".oplog" , "--from" , "127.0.0.1:" + t.port , "-vv" );
 
