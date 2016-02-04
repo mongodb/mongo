@@ -96,7 +96,7 @@ assert.eq(countIndexesFor(secondDB,/temp\d$/), 0); // indexes (2 _id + 2 x)
 assert.eq(countCollection(secondDB,/keep\d$/), 4); 
 
 // check that former primary dropped collections
-replTest.awaitReplication()
+replTest.awaitReplication();
 assert.eq(countCollection(masterDB,/temp\d$/), 0); // collections
 assert.eq(countIndexesFor(masterDB,/temp\d$/), 0); // indexes (2 _id + 2 x)
 assert.eq(countCollection(masterDB,/keep\d$/), 4); 

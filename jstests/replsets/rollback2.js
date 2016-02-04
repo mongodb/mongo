@@ -25,7 +25,7 @@ load("jstests/replsets/rslib.js");
         assert.eq(33, db.bar.findOne({q: 0})["y"]);
         assert.eq(1, db.kap.count());
         assert.eq(0, db.kap2.count());
-    }
+    };
 
     var name = "rollback2js";
     var replTest = new ReplSetTest({ name: name, nodes: 3, useBridge: true });

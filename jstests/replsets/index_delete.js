@@ -26,7 +26,7 @@ var checkOp = function(checkDB) {
         }
     }
     return false;
-}
+};
 // Set up replica set
 var replTest = new ReplSetTest({ name: 'fgIndex', nodes: 3 });
 var nodes = replTest.nodeList();
@@ -66,7 +66,7 @@ jsTest.log("Index created on secondary");
 masterDB.runCommand( {dropIndexes: "jstests_fgsec", index: "i_1"} );
 jsTest.log("Waiting on replication");
 replTest.awaitReplication();
-assert.soon( function() {return !checkOp(secondDB)}, "index not cancelled on secondary", 30000, 50);
+assert.soon( function() {return !checkOp(secondDB);}, "index not cancelled on secondary", 30000, 50);
 masterDB.jstests_fgsec.getIndexes().forEach(printjson);
 secondDB.jstests_fgsec.getIndexes().forEach(printjson);
 assert.soon( function() { 

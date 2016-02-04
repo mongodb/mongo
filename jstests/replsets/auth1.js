@@ -78,7 +78,7 @@ function doQueryOn(p) {
     }, [], "find did not throw, returned: " + tojson(r)).toString();
     printjson(error);
     assert.gt(error.indexOf("not authorized"), -1, "error was non-auth");
-};
+}
 
 doQueryOn(slave);
 master.adminCommand({logout:1});

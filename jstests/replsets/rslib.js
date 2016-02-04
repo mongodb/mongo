@@ -85,7 +85,7 @@ waitForAllMembers = function(master, timeout) {
     var failCount = 0;
 
     assert.soon( function() {
-        var state = null
+        var state = null;
         try {
             state = master.getSisterDB("admin").runCommand({replSetGetStatus:1});
             failCount = 0;

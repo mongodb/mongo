@@ -2,37 +2,37 @@
  * Test replication metrics
  */
 function testSecondaryMetrics(secondary, opCount, offset) {
-    var ss = secondary.getDB("test").serverStatus()
-    printjson(ss.metrics)
+    var ss = secondary.getDB("test").serverStatus();
+    printjson(ss.metrics);
 
-    assert(ss.metrics.repl.network.readersCreated > 0, "no (oplog) readers created")
-    assert(ss.metrics.repl.network.getmores.num > 0, "no getmores")
-    assert(ss.metrics.repl.network.getmores.totalMillis > 0, "no getmores time")
+    assert(ss.metrics.repl.network.readersCreated > 0, "no (oplog) readers created");
+    assert(ss.metrics.repl.network.getmores.num > 0, "no getmores");
+    assert(ss.metrics.repl.network.getmores.totalMillis > 0, "no getmores time");
     // The first oplog entry may or may not make it into network.ops now that we have two
     // n ops (initiate and new primary) before steady replication starts.
     // Sometimes, we disconnect from our sync source and since our find is a gte query, we may
     // double count an oplog entry, so we need some wiggle room for that.
-    assert.lte(ss.metrics.repl.network.ops, opCount + offset + 5, "wrong number of ops retrieved")
-    assert.gte(ss.metrics.repl.network.ops, opCount + offset, "wrong number of ops retrieved")
-    assert(ss.metrics.repl.network.bytes > 0, "zero or missing network bytes")
+    assert.lte(ss.metrics.repl.network.ops, opCount + offset + 5, "wrong number of ops retrieved");
+    assert.gte(ss.metrics.repl.network.ops, opCount + offset, "wrong number of ops retrieved");
+    assert(ss.metrics.repl.network.bytes > 0, "zero or missing network bytes");
 
-    assert(ss.metrics.repl.buffer.count >= 0, "buffer count missing")
-    assert(ss.metrics.repl.buffer.sizeBytes >= 0, "size (bytes)] missing")
-    assert(ss.metrics.repl.buffer.maxSizeBytes >= 0, "maxSize (bytes) missing")
+    assert(ss.metrics.repl.buffer.count >= 0, "buffer count missing");
+    assert(ss.metrics.repl.buffer.sizeBytes >= 0, "size (bytes)] missing");
+    assert(ss.metrics.repl.buffer.maxSizeBytes >= 0, "maxSize (bytes) missing");
 
-    assert(ss.metrics.repl.preload.docs.num >= 0, "preload.docs num  missing")
-    assert(ss.metrics.repl.preload.docs.totalMillis  >= 0, "preload.docs time missing")
-    assert(ss.metrics.repl.preload.docs.num >= 0, "preload.indexes num missing")
-    assert(ss.metrics.repl.preload.indexes.totalMillis >= 0, "preload.indexes time missing")
+    assert(ss.metrics.repl.preload.docs.num >= 0, "preload.docs num  missing");
+    assert(ss.metrics.repl.preload.docs.totalMillis  >= 0, "preload.docs time missing");
+    assert(ss.metrics.repl.preload.docs.num >= 0, "preload.indexes num missing");
+    assert(ss.metrics.repl.preload.indexes.totalMillis >= 0, "preload.indexes time missing");
 
-    assert(ss.metrics.repl.apply.batches.num > 0, "no batches")
-    assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing batch time")
-    assert.eq(ss.metrics.repl.apply.ops, opCount + offset, "wrong number of applied ops")
+    assert(ss.metrics.repl.apply.batches.num > 0, "no batches");
+    assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing batch time");
+    assert.eq(ss.metrics.repl.apply.ops, opCount + offset, "wrong number of applied ops");
 }
 
 var rt = new ReplSetTest( { name : "server_status_metrics" , nodes: 2, oplogSize: 100 } );
-rt.startSet()
-rt.initiate()
+rt.startSet();
+rt.initiate();
 
 rt.awaitSecondaryNodes();
 
@@ -61,8 +61,8 @@ assert.writeOK(testDB.a.update({}, { $set: { d: new Date() }}, options));
 testSecondaryMetrics(secondary, 2000, secondaryBaseOplogInserts );
 
 // Test getLastError.wtime and that it only records stats for w > 1, see SERVER-9005
-var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis
-var startNum = testDB.serverStatus().metrics.getLastError.wtime.num
+var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis;
+var startNum = testDB.serverStatus().metrics.getLastError.wtime.num;
 
 printjson(primary.getDB("test").serverStatus().metrics);
 

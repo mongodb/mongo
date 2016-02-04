@@ -107,5 +107,5 @@ function reconnect(a) {
         return false;
       }
     });
-};
+}
 

@@ -32,7 +32,7 @@
                          // it's killed
                          sleep(1000);
                      } });
-     }
+     };
      var evalRunner = startParallelShell(evalCmd, primary.port);
 
      jsTestLog("Confirming that eval() is running and has the global lock");

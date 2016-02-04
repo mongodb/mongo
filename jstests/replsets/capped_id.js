@@ -97,7 +97,7 @@ for( testnum=0; testnum < numtests; testnum++ ){
     }
     else if  ( testnum == 3 ){
         // explicitly set autoIndexId : false
-        masterdb.runCommand( {create : coll , capped : true , size : 1024 , autoIndexId : false } )
+        masterdb.runCommand( {create : coll , capped : true , size : 1024 , autoIndexId : false } );
         for(i=0; i < 500 ; i++){
             masterdb.getCollection( coll ).insert( {a: 1000} );
         }

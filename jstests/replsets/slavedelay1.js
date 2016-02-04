@@ -77,7 +77,7 @@ doTest = function( signal ) {
 
   assert.soon(function() {
           var z = conn.getDB(name).foo.findOne({_id:123});
-          return z != null && z.x == "foo"
+          return z != null && z.x == "foo";
       });
 
   /************* Part 3 ******************/
@@ -115,6 +115,6 @@ doTest = function( signal ) {
   }, 10*1000);
 
   replTest.stopSet();
-}
+};
 
 doTest(15);

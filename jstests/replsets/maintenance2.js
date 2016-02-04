@@ -20,7 +20,7 @@
     var master = replTest.getPrimary();
 
     // save some records
-    var len = 100
+    var len = 100;
     for (var i = 0; i < len; ++i) {
         master.getDB("foo").foo.save({a: i});
     }

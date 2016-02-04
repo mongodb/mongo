@@ -27,9 +27,9 @@ var verbosity = {
     "logComponentVerbosity" : {
         "replication" : { "verbosity" : 3 },
     }
-}
+};
 primary.adminCommand(verbosity);
-rst.getSecondaries().forEach(function (node) {node.adminCommand(verbosity)});
+rst.getSecondaries().forEach(function (node) {node.adminCommand(verbosity);});
 
 // Do a write, this will set up sync sources on secondaries.
 print("do a write");

@@ -33,7 +33,7 @@ var wait = function(f) {
         assert(n < 200, 'tried 200 times, giving up');
         sleep(1000);
     }
-}
+};
 
 var reconnect = function(a) {
   wait(function() {
@@ -48,7 +48,7 @@ var reconnect = function(a) {
 };
 
 
-var name = "toostale"
+var name = "toostale";
 var replTest = new ReplSetTest({ name: name, nodes: 3, oplogSize: 5 });
 var host = getHostName();
 
@@ -72,7 +72,7 @@ replTest.awaitReplication();
 print("3: stop s2");
 replTest.stop(2);
 print("waiting until the master knows the slave is blind");
-assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health == 0 });
+assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health == 0; });
 print("okay");
 
 print("4: overflow oplog");
@@ -97,7 +97,7 @@ while (count > prevCount) {
 print("5: restart s2");
 replTest.restart(2);
 print("waiting until the master knows the slave is not blind");
-assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health != 0 });
+assert.soon(function() { return master.getDB("admin").runCommand({replSetGetStatus:1}).members[2].health != 0; });
 print("okay");
 
 

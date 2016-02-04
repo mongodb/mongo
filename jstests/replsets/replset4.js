@@ -32,7 +32,7 @@ doTest = function (signal) {
 
     print("replset4.js worked, stopping");
     replTest.stopSet(signal);
-}
+};
 
 print("replset4.js");
 doTest( 15 );

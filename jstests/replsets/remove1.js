@@ -31,7 +31,7 @@ for (var i = 0; i < config.members.length; i++) {
         config.members.splice(i, 1);
         break;
     }
-};
+}
 config.version = 2;
 
 assert.eq(secondary.getDB("admin").runCommand({ping:1}).ok,

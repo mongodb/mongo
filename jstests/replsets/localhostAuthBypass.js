@@ -177,7 +177,7 @@ var runTest = function(useHostName) {
     });
 
     shutdown(rs);
-}
+};
 
 var runNonlocalTest = function(ipAddr) {
     print("==========================");

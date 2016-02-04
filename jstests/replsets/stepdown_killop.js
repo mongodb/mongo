@@ -44,7 +44,7 @@
          var res = db.getSiblingDB('admin').runCommand({replSetStepDown: 60,
                                                         secondaryCatchUpPeriodSecs: 60});
          assert.commandFailedWithCode(res, 11601 /*interrupted*/);
-     }
+     };
      var stepDowner = startParallelShell(stepDownCmd, primary.port);
      var stepDownOpID = -1;
 

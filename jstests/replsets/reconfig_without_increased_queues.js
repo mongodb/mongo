@@ -54,7 +54,7 @@
             }
             return true;
         }, "queues too high", 13 * 1000 /*13 secs*/); // what we are looking for has a 10s timeout.
-    }
+    };
 
     var reconfig = function(newConfig) {
         newConfig.version += 1;
@@ -66,7 +66,7 @@
                 throw e;
             }
         }
-    }
+    };
 
     replTest.awaitSecondaryNodes();
 

@@ -73,7 +73,7 @@ var checkMember = function (memberInfo) {
     assert(badFields.length === 0 && missingFields.length === 0 && badValues.length === 0,
            memberInfo.name + " had the following problems."
            + generateErrorString(badFields, missingFields, badValues, result));
-}
+};
 
 // start of test code
 var name = "ismaster";
@@ -114,7 +114,7 @@ var agreeOnPrimaryAndSetVersion = function( setVersion ) {
     }
     
     return true;
-}
+};
 
 var master = replTest.getPrimary();
 assert.soon( function() { return agreeOnPrimaryAndSetVersion( 1 ); },

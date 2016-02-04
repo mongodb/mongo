@@ -66,7 +66,7 @@ printjson(assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown
 
 print("\n do stepdown that should work");
 assert.throws(function() {
-    assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown:50, force:true}))
+    assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown:50, force:true}));
 });
 
 var r2 = assert.commandWorked(master.getDB("admin").runCommand({ismaster : 1}));
