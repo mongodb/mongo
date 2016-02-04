@@ -312,11 +312,7 @@ var ReplSetTest = function(opts) {
         return this.ports[n];
     };
 
-    this.getPath = function(n) {
-        if (n.host)
-            n = this.getNodeId(n);
-
-        var p = MongoRunner.dataPath + this.name + "-" + n;
+    this._addPath = function(p) {
         if (!_alldbpaths)
             _alldbpaths = [p];
         else
@@ -802,9 +798,6 @@ var ReplSetTest = function(opts) {
         if (tojson(options) != tojson({}))
             printjson(options);
 
-        // make sure to call getPath, otherwise folders wont be cleaned
-        this.getPath(n);
-
         print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
 
         if (_useBridge) {
@@ -824,6 +817,9 @@ var ReplSetTest = function(opts) {
         if (!conn) {
             throw new Error("Failed to start node " + n);
         }
+
+        // Make sure to call _addPath, otherwise folders won't be cleaned.
+        this._addPath(conn.dbpath);
 
         if (_useBridge) {
             this.nodes[n].connectToBridge();
