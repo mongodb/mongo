@@ -192,14 +192,10 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
             # Check the state after each commit/rollback.
             self.check_all(current, committed)
 
-        # Backup the target we modified.  We expect that running
-        # recovery now will generate an exception if we committed.
+        # Backup the target we modified and verify the data.
         # print 'Call hot_backup with ' + self.uri
         self.hot_backup(self.uri, committed)
-        if txn == 'commit':
-            self.assertEqual(True, self.exception == 'true')
-        else:
-            self.assertEqual(True, self.exception == 'false')
+        self.assertEqual(True, self.exception == 'false')
 
 if __name__ == '__main__':
     wttest.run()
