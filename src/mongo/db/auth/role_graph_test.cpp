@@ -658,6 +658,7 @@ TEST(RoleGraphTest, BuiltinRolesOnlyOnAppropriateDatabases) {
     ASSERT(graph.roleExists(RoleName("userAdmin", "test")));
     ASSERT(graph.roleExists(RoleName("dbAdmin", "test")));
     ASSERT(graph.roleExists(RoleName("dbOwner", "test")));
+    ASSERT(graph.roleExists(RoleName("enableSharding", "test")));
     ASSERT(!graph.roleExists(RoleName("readAnyDatabase", "test")));
     ASSERT(!graph.roleExists(RoleName("readWriteAnyDatabase", "test")));
     ASSERT(!graph.roleExists(RoleName("userAdminAnyDatabase", "test")));
@@ -672,6 +673,7 @@ TEST(RoleGraphTest, BuiltinRolesOnlyOnAppropriateDatabases) {
     ASSERT(graph.roleExists(RoleName("userAdmin", "admin")));
     ASSERT(graph.roleExists(RoleName("dbAdmin", "admin")));
     ASSERT(graph.roleExists(RoleName("dbOwner", "admin")));
+    ASSERT(graph.roleExists(RoleName("enableSharding", "admin")));
     ASSERT(graph.roleExists(RoleName("readAnyDatabase", "admin")));
     ASSERT(graph.roleExists(RoleName("readWriteAnyDatabase", "admin")));
     ASSERT(graph.roleExists(RoleName("userAdminAnyDatabase", "admin")));
@@ -693,6 +695,7 @@ TEST(RoleGraphTest, getRolesForDatabase) {
     RoleNameIterator it = graph.getRolesForDatabase("fakedb");
     ASSERT_EQUALS(RoleName("dbAdmin", "fakedb"), it.next());
     ASSERT_EQUALS(RoleName("dbOwner", "fakedb"), it.next());
+    ASSERT_EQUALS(RoleName("enableSharding", "fakedb"), it.next());
     ASSERT_EQUALS(RoleName("read", "fakedb"), it.next());
     ASSERT_EQUALS(RoleName("readWrite", "fakedb"), it.next());
     ASSERT_EQUALS(RoleName("userAdmin", "fakedb"), it.next());
@@ -702,6 +705,7 @@ TEST(RoleGraphTest, getRolesForDatabase) {
     it = graph.getRolesForDatabase("test");
     ASSERT_EQUALS(RoleName("dbAdmin", "test"), it.next());
     ASSERT_EQUALS(RoleName("dbOwner", "test"), it.next());
+    ASSERT_EQUALS(RoleName("enableSharding", "test"), it.next());
     ASSERT_EQUALS(RoleName("myRole", "test"), it.next());
     ASSERT_EQUALS(RoleName("read", "test"), it.next());
     ASSERT_EQUALS(RoleName("readWrite", "test"), it.next());
@@ -718,6 +722,7 @@ TEST(RoleGraphTest, getRolesForDatabase) {
     ASSERT_EQUALS(RoleName("dbAdmin", "admin"), it.next());
     ASSERT_EQUALS(RoleName("dbAdminAnyDatabase", "admin"), it.next());
     ASSERT_EQUALS(RoleName("dbOwner", "admin"), it.next());
+    ASSERT_EQUALS(RoleName("enableSharding", "admin"), it.next());
     ASSERT_EQUALS(RoleName("hostManager", "admin"), it.next());
     ASSERT_EQUALS(RoleName("myAdminRole", "admin"), it.next());
     ASSERT_EQUALS(RoleName("read", "admin"), it.next());
