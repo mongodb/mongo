@@ -2,9 +2,9 @@
 // test mongodump with authentication
 
 var m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
-var dbName = "admin"
-var colName = "testcol"
-var profileName = "system.profile"
+var dbName = "admin";
+var colName = "testcol";
+var profileName = "system.profile";
 var dumpDir = MongoRunner.dataPath + "jstests_tool_dumprestore_dump_system_profile/";
 db = m.getDB(dbName);
 

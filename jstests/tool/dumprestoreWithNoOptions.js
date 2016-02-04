@@ -23,7 +23,7 @@ dbname2 = "NOT_"+dbname;
 
 db.dropDatabase();
 
-var defaultFlags = {}
+var defaultFlags = {};
 
 var options = { capped: true, size: 4096, autoIndexId: true };
 db.createCollection('capped', options);
@@ -58,7 +58,7 @@ db.createCollection('capped', options);
 assert.eq( 1, db.capped.getIndexes().length, "auto index not created" );
 var cappedOptions = db.capped.exists().options;
 for ( var opt in options ) {
-  assert.eq(options[opt], cappedOptions[opt], 'invalid option')
+  assert.eq(options[opt], cappedOptions[opt], 'invalid option');
 }
 assert.writeOK(db.capped.insert({ x: 1 }));
 
@@ -87,7 +87,7 @@ db.createCollection('capped', options);
 assert.eq( 1, db.capped.getIndexes().length, "auto index not created" );
 var cappedOptions = db.capped.exists().options;
 for ( var opt in options ) {
-  assert.eq(options[opt], cappedOptions[opt], 'invalid option')
+  assert.eq(options[opt], cappedOptions[opt], 'invalid option');
 }
 
 assert.writeOK(db.capped.insert({ x: 1 }));

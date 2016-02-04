@@ -45,7 +45,7 @@
     print("restore the db");
     runMongoProgram("mongorestore", "--host", replSetConnString, "--dir", data);
 
-    print("db successfully restored, checking count")
+    print("db successfully restored, checking count");
     var x = master.getDB("foo").getCollection("bar").count();
     assert.eq(x, 100, "mongorestore should have successfully restored the collection");
 
@@ -68,7 +68,7 @@
     var x = master.getDB("foo").getCollection("bar").count();
     assert.eq(x, 100, "mongoimport should have successfully imported the collection");
     var doc = {_id: 5, x: 17};
-    var oplogEntry = {ts: new Timestamp(), "op": "i", "ns": "foo.bar", "o": doc, "v": NumberInt(2)}
+    var oplogEntry = {ts: new Timestamp(), "op": "i", "ns": "foo.bar", "o": doc, "v": NumberInt(2)};
     assert.writeOK(master.getDB("local").oplog.rs.insert(oplogEntry));
 
     assert.eq(100, master.getDB("foo").getCollection("bar").count(), "count before running " +
@@ -77,14 +77,14 @@
     runMongoProgram("mongooplog" , "--from", "127.0.0.1:" + replTest.ports[0],
                                    "--host", replSetConnString);
 
-    print("finished running mongooplog to replay the oplog")
+    print("finished running mongooplog to replay the oplog");
 
     assert.eq(101, master.getDB("foo").getCollection("bar").count(), "count after running " +
-              "mongooplog was not 101 as expected")
+              "mongooplog was not 101 as expected");
 
-    print("all tests successful, stopping replica set")
+    print("all tests successful, stopping replica set");
 
     replTest.stopSet();
 
-    print("replica set stopped, test complete")
+    print("replica set stopped, test complete");
 }());
