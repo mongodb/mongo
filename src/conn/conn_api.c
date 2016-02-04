@@ -402,7 +402,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_ENCRYPTOR *encryptor;
+	WT_ENCRYPTOR *custom, *encryptor;
 	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
 	uint64_t bucket, hash;
@@ -440,12 +440,13 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_ERR(__wt_strndup(session, keyid->str, keyid->len, &kenc->keyid));
 	encryptor = nenc->encryptor;
 	if (encryptor->customize != NULL) {
+		custom = NULL;
 		WT_ERR(encryptor->customize(encryptor, &session->iface,
-		    cfg_arg, &encryptor));
-		if (encryptor == NULL)
-			encryptor = nenc->encryptor;
-		else
+		    cfg_arg, &custom));
+		if (custom != NULL) {
 			kenc->owned = 1;
+			encryptor = custom;
+		}
 	}
 	WT_ERR(encryptor->sizing(encryptor, &session->iface,
 	    &kenc->size_const));
