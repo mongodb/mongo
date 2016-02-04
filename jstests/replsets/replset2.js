@@ -32,7 +32,7 @@ doTest = function (signal) {
     slaves.forEach(function (slave) { slave.setSlaveOk(); });
 
     // Test write concern with multiple inserts.
-    print("\n\nreplset2.js **** Try inserting a multiple records -- first insert ****")
+    print("\n\nreplset2.js **** Try inserting a multiple records -- first insert ****");
 
     printjson(master.getDB("admin").runCommand("replSetGetStatus"));
 
@@ -41,19 +41,19 @@ doTest = function (signal) {
     bulk.insert({ n: 2 });
     bulk.insert({ n: 3 });
 
-    print("\nreplset2.js **** TEMP 1 ****")
+    print("\nreplset2.js **** TEMP 1 ****");
 
     printjson(master.getDB("admin").runCommand("replSetGetStatus"));
 
     assert.writeOK(bulk.execute({ w: 3, wtimeout: 25000 }));
 
-    print("replset2.js **** TEMP 1a ****")
+    print("replset2.js **** TEMP 1a ****");
 
     m1 = master.getDB(testDB).foo.findOne({ n: 1 });
     printjson(m1);
     assert(m1['n'] == 1, "replset2.js Failed to save to master on multiple inserts");
 
-    print("replset2.js **** TEMP 1b ****")
+    print("replset2.js **** TEMP 1b ****");
 
     var s0 = slaves[0].getDB(testDB).foo.findOne({ n: 1 });
     assert(s0['n'] == 1, "replset2.js Failed to replicate to slave 0 on multiple inserts");
@@ -62,7 +62,7 @@ doTest = function (signal) {
     assert(s1['n'] == 1, "replset2.js Failed to replicate to slave 1 on multiple inserts");
 
     // Test write concern with a simple insert
-    print("replset2.js **** Try inserting a single record ****")
+    print("replset2.js **** Try inserting a single record ****");
     master.getDB(testDB).dropDatabase();
     var options = { writeConcern: { w: 3, wtimeout: 10000 }};
     assert.writeOK(master.getDB(testDB).foo.insert({ n: 1 }, options));
@@ -77,7 +77,7 @@ doTest = function (signal) {
     s1 = slaves[1].getDB(testDB).foo.findOne({ n: 1 });
     assert(s1['n'] == 1, "replset2.js Failed to replicate to slave 1");
 
-    print("replset2.js **** Try inserting many records ****")
+    print("replset2.js **** Try inserting many records ****");
     try {
       var bigData = new Array(2000).toString();
       bulk = master.getDB(testDB).baz.initializeUnorderedBulkOp();
@@ -86,7 +86,7 @@ doTest = function (signal) {
       }
       assert.writeOK(bulk.execute({ w: 3, wtimeout: 60000 }));
 
-      print("replset2.js **** V1 ")
+      print("replset2.js **** V1 ");
 
       var verifyReplication = function (nodeName, collection) {
           data = collection.findOne({ n: 1 });
@@ -116,7 +116,7 @@ doTest = function (signal) {
     }
 
     replTest.stopSet(signal);
-}
+};
 
 doTest( 15 );
 

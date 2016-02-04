@@ -5,7 +5,7 @@
  * We cannot test each phase of the initial sync directly but by providing constant writes we can 
  * assume that each individual phase will have data to work with, and therefore tested.
  */
-var testName = "resync_with_write_load"
+var testName = "resync_with_write_load";
 var replTest = new ReplSetTest({name: testName, nodes: 3, oplogSize: 100});
 var nodes = replTest.nodeList();
 
@@ -46,7 +46,7 @@ var work = function() {
                 while (true) {
                     for (x=0; x < 100; x++) { 
                         db["a" + x].insert({a:x});
-                    };
+                    }
                     
                     var runTime = (new Date().getTime() - start);
                     if (runTime > 30000) 
@@ -56,7 +56,7 @@ var work = function() {
                     else
                         sleep(1);
 
-                }; 
+                } 
                 print("finshing loadgen");
             };
 //insert enough that resync node has to go through oplog replay in each step

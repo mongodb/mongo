@@ -19,7 +19,7 @@
         assert.commandFailedWithCode(db.runCommand({collStats: 'bar'}), authzErrorCode);
         assert.commandWorked(db.runCommand({collStats: 'baz'}));
         assert.commandWorked(db.runCommand({collStats: 'foobar'}));
-    }
+    };
 
     var authzErrorCode = 13;
 

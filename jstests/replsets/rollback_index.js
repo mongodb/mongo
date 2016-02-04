@@ -18,7 +18,7 @@ doesEntryMatch = function(array, regex) {
         }
     }
     return found;
-}
+};
 
 // set up a set and grab things for later
 var name = "rollback_index";

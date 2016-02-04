@@ -55,7 +55,7 @@
 
     jsTestLog("do a write and wait for it to be waiting for a lock");
     var updateCmd = function() {
-        jsTestLog('Updating document on the primary. Blocks until the primary has stepped down.')
+        jsTestLog('Updating document on the primary. Blocks until the primary has stepped down.');
         try {
             var res = db.getSiblingDB("stepDownWithLongWait").foo.update({}, {$inc: {x: 1}});
             jsTestLog('Unexpected successful update operation on the primary during step down: ' +

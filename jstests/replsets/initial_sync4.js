@@ -55,7 +55,7 @@ for( i = N-1; i >= N-10000; --i ) {
 }
 
 for ( i = N; i < N*2; i++ ) {
-    mc.insert( { _id : i, x : i } )
+    mc.insert( { _id : i, x : i } );
 }
 
 assert.eq( N*2, mc.count() );
@@ -68,7 +68,7 @@ wait(function() {
      (status.members[1].state == 2);
      });
 
-print("8. Wait for new node to have all the data")
+print("8. Wait for new node to have all the data");
 wait(function() {
     return sc.count() == mc.count();
 } );

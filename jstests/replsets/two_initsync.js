@@ -87,7 +87,7 @@ doTest = function (signal) {
     print("two_initsync.js SUCCESS");
 
     replTest.stopSet(signal);
-}
+};
 
 
 print("two_initsync.js");

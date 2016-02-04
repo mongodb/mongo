@@ -4,7 +4,7 @@
 var mongod = MongoRunner.runMongod({});
 
 // get db and collection, then perform a trivial insert
-db = mongod.getDB("test")
+db = mongod.getDB("test");
 col = db.getCollection("single_server_majority");
 col.drop();
 

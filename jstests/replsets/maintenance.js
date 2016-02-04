@@ -79,7 +79,7 @@ var ex = assert.throws(
 		}
 	},
 	[] /*no params*/,
-	"getmore didn't fail")
+	"getmore didn't fail");
 
 assert(ex.message.match("13436"), "wrong error code -- " + ex );
 

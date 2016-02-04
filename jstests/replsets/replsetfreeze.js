@@ -24,7 +24,7 @@ var wait = function(f) {
         assert(n < 200, 'tried 200 times, giving up');
         sleep(1000);
     }
-}
+};
 
 var reconnect = function(a) {
   wait(function() { 

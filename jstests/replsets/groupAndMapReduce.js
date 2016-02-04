@@ -23,7 +23,7 @@ doTest = function( signal ) {
     var master = replTest.getPrimary();
 
     // save some records
-    var len = 100
+    var len = 100;
     for (var i = 0; i < len; ++i) {
         master.getDB("foo").foo.save({a: i});
     }
@@ -100,7 +100,7 @@ doTest = function( signal ) {
 
     // Shut down the set and finish the test.
     replTest.stopSet( signal );
-}
+};
 
 doTest( 15 );
 print("SUCCESS");

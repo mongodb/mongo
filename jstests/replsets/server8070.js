@@ -13,7 +13,7 @@ var waitForSameOplogPosition = function(db1, db2, errmsg) {
                 .next();
             jsTest.log("primary: " + tojson(last1) + " secondary: " + tojson(last2));
 
-            return ((last1.ts.t === last2.ts.t) && (last1.ts.i === last2.ts.i))
+            return ((last1.ts.t === last2.ts.t) && (last1.ts.i === last2.ts.i));
         },
         errmsg
     );
@@ -130,7 +130,7 @@ assert.soon(
         jsTest.log("member 3 collection size: " + member3.getSisterDB("foo").bar.find().itcount());
         jsTest.log("curop: ");
         printjson(member3.getSisterDB("foo").currentOp(true));
-        return ((last.ts.t === last3.ts.t) && (last.ts.i === last3.ts.i))
+        return ((last.ts.t === last3.ts.t) && (last.ts.i === last3.ts.i));
     },
     "Replication member 3 did not apply ops 25-75"
 );

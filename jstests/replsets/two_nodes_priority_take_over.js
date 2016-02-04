@@ -27,8 +27,8 @@ var verbosity = {
       "verbosity": 4,
       "storage" : { "verbosity" : 1 }
     }
-}
-rst.nodes.forEach(function (node) {node.adminCommand(verbosity)});
+};
+rst.nodes.forEach(function (node) {node.adminCommand(verbosity);});
 
 // The first node will be the primary at the beginning.
 rst.waitForState(rst.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);

@@ -30,7 +30,7 @@ load("jstests/replsets/rslib.js");
         assert.eq(6, db.bar.count({q: {$gt: -1}}));
         assert.eq(0, db.getSiblingDB("abc").foo.count());
         assert.eq(0, db.getSiblingDB("abc").bar.count());
-    }
+    };
 
     var name = "rollback2js";
     var replTest = new ReplSetTest({ name: name, nodes: 3, useBridge: true });

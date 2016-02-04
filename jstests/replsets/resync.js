@@ -32,14 +32,14 @@
 
     // create an oplog entry with an insert
     assert.writeOK( A.foo.insert({ x: 1 }, { writeConcern: { w: 2, wtimeout: 60000 }}));
-    assert.eq(B.foo.findOne().x, 1)
+    assert.eq(B.foo.findOne().x, 1);
     
     // run resync and wait for it to happen
     assert.commandWorked(b_conn.getDB("admin").runCommand({resync:1}));
     replTest.awaitReplication();
     replTest.awaitSecondaryNodes();
     
-    assert.eq(B.foo.findOne().x, 1)
+    assert.eq(B.foo.findOne().x, 1);
     replTest.stop(BID);
 
     function hasCycled() {
@@ -94,7 +94,7 @@
     assert.commandWorked(b_conn.getDB("admin").runCommand({resync:1}));
     replTest.awaitReplication();
     replTest.awaitSecondaryNodes();
-    assert.eq(B.foo.findOne().x, 1)
+    assert.eq(B.foo.findOne().x, 1);
 
     replTest.stopSet(15);
     jsTest.log("success");

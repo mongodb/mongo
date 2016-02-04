@@ -67,7 +67,7 @@ assert(slaves[0].getDB("admin").fsyncUnlock().ok);
 
 // The secondary should have equal or more documents than what it had before.
 assert.soon(function() {
-        return slaves[0].getDB("foo").bar.count() > 100
+        return slaves[0].getDB("foo").bar.count() > 100;
     }, "count of documents stored on the secondary did not increase");
 replTest.stopSet();
 }());

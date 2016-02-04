@@ -10,7 +10,7 @@ replTest.initiate(c);
 
 var master = replTest.getPrimary();
 var testDB = master.getDB('test');
-var firstPrimary = testDB.isMaster().primary
+var firstPrimary = testDB.isMaster().primary;
 
 // do a write to allow stepping down of the primary;
 // otherwise, the primary will refuse to step down
@@ -19,7 +19,7 @@ replTest.awaitReplication();
 
 // stepdown should fail since there is no-one to elect within 10 secs
 testDB.adminCommand({replSetStepDown:5});
-assert(master.getDB("a").isMaster().ismaster, "not master")
+assert(master.getDB("a").isMaster().ismaster, "not master");
 
 // step down the primary asyncronously so it doesn't kill this test
 var wait = startParallelShell("db.adminCommand({replSetStepDown:1000, force:true})", master.port);
@@ -35,7 +35,7 @@ assert.soon( function() {
     } catch (e) {
         return false;
     }
-  }, "they shouldn't be master, but are")
+  }, "they shouldn't be master, but are");
 
 // stop
 replTest.stopSet();
