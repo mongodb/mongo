@@ -3,7 +3,7 @@ f.drop();
 
 getLastError = function() {
     return db.runCommand( { getlasterror : 1 } );
-}
+};
 
 f.remove( {} );
 assert.eq( 0, getLastError().n );

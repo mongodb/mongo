@@ -4,7 +4,7 @@
 // Remember the global 'db' var
 var lastDB = db;
 var mongo = new Mongo(db.getMongo().host);
-mongo.writeMode = function() { return "legacy"; }
+mongo.writeMode = function() { return "legacy"; };
 db = mongo.getDB(db.toString());
 
 var t = db.opcounters;
@@ -35,27 +35,27 @@ assert.eq(opCounters.insert + 1, db.serverStatus().opcounters.insert);
 
 // Bulk insert, no error.
 opCounters = db.serverStatus().opcounters;
-t.insert([{_id:1},{_id:2}])
+t.insert([{_id:1},{_id:2}]);
 assert(!db.getLastError());
 assert.eq(opCounters.insert + 2, db.serverStatus().opcounters.insert);
 
 // Single insert, with error.
 opCounters = db.serverStatus().opcounters;
-t.insert({_id:0})
-print( db.getLastError() )
+t.insert({_id:0});
+print( db.getLastError() );
 assert(db.getLastError());
 assert.eq(opCounters.insert + (isMongos ? 1 : 0), db.serverStatus().opcounters.insert);
 
 // Bulk insert, with error, continueOnError=false.
 opCounters = db.serverStatus().opcounters;
-t.insert([{_id:3},{_id:3},{_id:4}])
+t.insert([{_id:3},{_id:3},{_id:4}]);
 assert(db.getLastError());
 assert.eq(opCounters.insert + (isMongos ? 2 : 1), db.serverStatus().opcounters.insert);
 
 // Bulk insert, with error, continueOnError=true.
 var continueOnErrorFlag = 1;
 opCounters = db.serverStatus().opcounters;
-t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag)
+t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag);
 assert(db.getLastError());
 assert.eq(opCounters.insert + 2, db.serverStatus().opcounters.insert);
 
@@ -118,7 +118,7 @@ assert.eq(opCounters.query + 1, db.serverStatus().opcounters.query);
 
 // Query, with error.
 opCounters = db.serverStatus().opcounters;
-assert.throws(function() { t.findOne({_id:{$invalidOp:1}}) });
+assert.throws(function() { t.findOne({_id:{$invalidOp:1}}); });
 assert.eq(opCounters.query + (isMongos ? 0 : 1), db.serverStatus().opcounters.query);
 
 //
@@ -147,28 +147,28 @@ assert.eq(opCounters.getmore + 1, db.serverStatus().opcounters.getmore);
 //
 
 t.drop();
-t.insert({_id:0})
+t.insert({_id:0});
 
 // Command, recognized, no error.
 serverStatus = db.runCommand({serverStatus:1});
-opCounters = serverStatus.opcounters
-metricsObj = serverStatus.metrics.commands
+opCounters = serverStatus.opcounters;
+metricsObj = serverStatus.metrics.commands;
 assert.eq(opCounters.command + 1, db.serverStatus().opcounters.command); // "serverStatus" counted
 // Count this and the last run of "serverStatus"
 assert.eq( metricsObj.serverStatus.total + 2,   
     db.serverStatus().metrics.commands.serverStatus.total,
-    "total ServerStatus command counter did not increment" )
+    "total ServerStatus command counter did not increment" );
 assert.eq( metricsObj.serverStatus.failed,
     db.serverStatus().metrics.commands.serverStatus.failed,
-    "failed ServerStatus command counter incremented!" )
+    "failed ServerStatus command counter incremented!" );
 
 // Command, recognized, with error.
 serverStatus = db.runCommand({serverStatus:1});
-opCounters = serverStatus.opcounters
-metricsObj = serverStatus.metrics.commands
+opCounters = serverStatus.opcounters;
+metricsObj = serverStatus.metrics.commands;
 var countVal = { "total" : 0, "failed" : 0 };
 if (metricsObj.count != null){
-    countVal = metricsObj.count
+    countVal = metricsObj.count;
 }
 res = t.runCommand("count", {query:{$invalidOp:1}});
 assert.eq(0, res.ok);
@@ -177,15 +177,15 @@ assert.eq(opCounters.command + 2,
 
 assert.eq( countVal.total +1,
     db.serverStatus().metrics.commands.count.total,
-    "total count command counter did not incremented" )
+    "total count command counter did not incremented" );
 assert.eq( countVal.failed + 1,
     db.serverStatus().metrics.commands.count.failed,
-    "failed count command counter did not increment" )
+    "failed count command counter did not increment" );
 
 // Command, unrecognized.
 serverStatus = db.runCommand({serverStatus:1});
-opCounters = serverStatus.opcounters
-metricsObj = serverStatus.metrics.commands
+opCounters = serverStatus.opcounters;
+metricsObj = serverStatus.metrics.commands;
 res = t.runCommand("invalid");
 assert.eq(0, res.ok);
 assert.eq(opCounters.command + 1, db.serverStatus().opcounters.command); // "serverStatus" counted

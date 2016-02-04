@@ -155,7 +155,7 @@ var query = {
       $maxDistance : 1000,
     }
   }
-}
+};
 printjson(coll.remove(query));
 printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
 assert(gle.ok);

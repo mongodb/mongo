@@ -11,12 +11,12 @@ if (test.conn.writeMode() == 'commands') {
 }
 else {
 
-    db = test.conn.getDB( "test" )
-    t = db.sync1
-    t.save( { x : 1 } )
+    db = test.conn.getDB( "test" );
+    t = db.sync1;
+    t.save( { x : 1 } );
     assert.eq( 1 , t.find().itcount() , "A1" );
     assert.eq( 1 , t.find().count() , "A2" );
-    t.save( { x : 2 } )
+    t.save( { x : 2 } );
     assert.eq( 2 , t.find().itcount() , "A3" );
     assert.eq( 2 , t.find().count() , "A4" );
 
@@ -45,15 +45,15 @@ else {
     assert.eq( 2 , t.find().itcount() , "C1" );
     assert.soon( function(){
         try  {
-            t.remove( { x : 1 } )
+            t.remove( { x : 1 } );
             return true;
         }
         catch ( e ){
             print( e );
         }
         return false;
-    } )
-    t.find().forEach( printjson )
+    } );
+    t.find().forEach( printjson );
     assert.eq( 1 , t.find().itcount() , "C2" );
 
     test.stop();
