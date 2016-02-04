@@ -550,8 +550,9 @@ __create_index(WT_SESSION_IMPL *session,
 	/* Make sure that the configuration is valid. */
 	WT_ERR(__wt_schema_open_index(
 	    session, table, idxname, strlen(idxname), &idx));
-	if (!exists)
-		WT_ERR(__fill_index(session, table, idx));
+
+	/* If there is data in the table, fill the index. */
+	WT_ERR(__fill_index(session, table, idx));
 
 err:	__wt_free(session, idxconf);
 	__wt_free(session, origconf);
