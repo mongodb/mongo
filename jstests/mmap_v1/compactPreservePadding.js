@@ -11,7 +11,7 @@ for (i = 0; i < 10000; i++) {
 }
 
 // remove half the entries
-t.remove({useLargerKeyName:{$mod:[2,0]}})
+t.remove({useLargerKeyName:{$mod:[2,0]}});
 printjson(t.stats());
 originalSize = t.stats().size;
 originalStorage = t.stats().storageSize;
