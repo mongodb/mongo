@@ -65,13 +65,13 @@ if (/V8/.test(interpreterVersion()) &&
             lastCompletion = Math.max(lastCompletion, threadTimes[i].threadEnd);
         }
         return lastCompletion;
-    }
+    };
 
     // Functions we are performance testing
 
     db.v8_parallel_mr_src.drop();
 
-    for (j=0; j<100; j++) for (i=0; i<512; i++){ db.v8_parallel_mr_src.save({j:j, i:i})}
+    for (j=0; j<100; j++) for (i=0; i<512; i++){ db.v8_parallel_mr_src.save({j:j, i:i});}
 
     db.getLastError();
 
@@ -96,7 +96,7 @@ if (/V8/.test(interpreterVersion()) &&
 
         function reduce(key, values) {
             values_halved = values.map(function (value) {
-                return value / 2
+                return value / 2;
             });
             values_halved_sum = Array.sum(values_halved);
             return values_halved_sum;
