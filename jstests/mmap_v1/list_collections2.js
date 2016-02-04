@@ -21,7 +21,7 @@ assert.eq( foo.name, mydb.foo.getName() );
 
 assert( mydb.bar.temp, tojson( bar ) );
 
-getCollectionName = function(infoObj) { return infoObj.name; }
+getCollectionName = function(infoObj) { return infoObj.name; };
 
 assert.eq( mydb._getCollectionInfosSystemNamespaces().map(getCollectionName),
            mydb._getCollectionInfosCommand().map(getCollectionName) );

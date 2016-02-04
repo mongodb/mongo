@@ -1,6 +1,6 @@
 
 t = db.datasize3;
-t.drop()
+t.drop();
 
 function run( options ){
     var c = { dataSize : "test.datasize3" };
@@ -9,21 +9,21 @@ function run( options ){
     return db.runCommand( c );
 }
 
-t.insert( { x : 1 } )
+t.insert( { x : 1 } );
 
-a = run()
-b = run( { estimate : true } )
+a = run();
+b = run( { estimate : true } );
 printjson( t.stats() );
 assert.eq( a.size , b.size );
 
 
-t.ensureIndex( { x : 1 } )
+t.ensureIndex( { x : 1 } );
 
 for ( i=2; i<100; i++ )
-    t.insert( { x : i } )
+    t.insert( { x : i } );
 
-a = run( { min : { x : 20 } , max : { x : 50 } } ).size
-b = run( { min : { x : 20 } , max : { x : 50 } , estimate : true } ).size
+a = run( { min : { x : 20 } , max : { x : 50 } } ).size;
+b = run( { min : { x : 20 } , max : { x : 50 } , estimate : true } ).size;
 
 ratio = Math.min( a , b ) / Math.max( a , b );
 

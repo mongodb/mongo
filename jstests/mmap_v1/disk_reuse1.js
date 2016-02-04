@@ -14,7 +14,7 @@ s = "";
 while ( s.length < 1024 )
     s += "abc";
 
-state = {}
+state = {};
 
 var bulk = t.initializeUnorderedBulkOp();
 for (var i = 0; i < N; i++) {
@@ -32,7 +32,7 @@ for (i = 0; i < N; i++) {
 }
 assert.writeOK(bulk.execute());
 
-assert.eq( orig.storageSize , t.stats().storageSize , "A" )
+assert.eq( orig.storageSize , t.stats().storageSize , "A" );
 
 for (j = 0; j < 100; j++){
     for (i = 0; i < N; i++){
@@ -45,7 +45,7 @@ for (j = 0; j < 100; j++){
     }
 
     assert.writeOK(bulk.execute());
-    assert.eq( orig.storageSize , t.stats().storageSize , "B" + j  )
+    assert.eq( orig.storageSize , t.stats().storageSize , "B" + j  );
 }
 
 test.stop();

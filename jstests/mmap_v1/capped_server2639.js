@@ -1,5 +1,5 @@
 
-name = "server2639"
+name = "server2639";
 
 t = db.getCollection( name );
 t.drop();

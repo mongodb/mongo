@@ -7,7 +7,7 @@ for(var i=0; i<10; i++) {
     txt = txt + txt;
 }
 
-var iterations = _isWindows() ? 2500 : 5000
+var iterations = _isWindows() ? 2500 : 5000;
 
 // fill db
 for(var i=1; i<=iterations; i++) {

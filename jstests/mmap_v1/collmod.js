@@ -31,7 +31,7 @@ debug( res );
 assert.eq( res.ok , 0 , "collMod shouldn't return ok with unrecognized value" );
 
 // add a TTL index
-t.ensureIndex( {a : 1}, { "expireAfterSeconds": 50 } )
+t.ensureIndex( {a : 1}, { "expireAfterSeconds": 50 } );
 assert.eq( 1, db.system.indexes.count( { key : {a:1}, expireAfterSeconds : 50 } ),
            "TTL index not added" );
 
@@ -62,7 +62,7 @@ assert.eq( 1, db.system.indexes.count( { key : {a:1}, expireAfterSeconds : 100 }
 
 // try to modify a faulty TTL index with a non-numeric expireAfterSeconds field
 t.dropIndex( {a : 1 } );
-t.ensureIndex( {a : 1} , { "expireAfterSeconds": "50" } )
+t.ensureIndex( {a : 1} , { "expireAfterSeconds": "50" } );
 var res = db.runCommand( { "collMod" : coll,
                            "index" : { "keyPattern" : {a : 1} , "expireAfterSeconds" : 100 } } );
 debug( res );
@@ -70,7 +70,7 @@ assert.eq( 0, res.ok, "shouldn't be able to modify faulty index spec" );
 
 // try with new index, this time set both expireAfterSeconds and the usePowerOf2Sizes flag
 t.dropIndex( {a : 1 } );
-t.ensureIndex( {a : 1} , { "expireAfterSeconds": 50 } )
+t.ensureIndex( {a : 1} , { "expireAfterSeconds": 50 } );
 var res = db.runCommand( { "collMod" : coll ,
                            "usePowerOf2Sizes" : true,
                            "index" : { "keyPattern" : {a : 1} , "expireAfterSeconds" : 100 } } );

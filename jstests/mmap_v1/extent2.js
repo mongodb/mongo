@@ -6,9 +6,9 @@ mydb.dropDatabase();
 t = mydb.foo;
 
 function insert(){
-    t.insert( { _id : 1 , x : 1 } )
-    t.insert( { _id : 2 , x : 1 } )
-    t.insert( { _id : 3 , x : 1 } )
+    t.insert( { _id : 1 , x : 1 } );
+    t.insert( { _id : 2 , x : 1 } );
+    t.insert( { _id : 3 , x : 1 } );
     t.ensureIndex( { x : 1 } );
 }
 
@@ -25,7 +25,7 @@ for ( i=0; i<100; i++ ) {
 end = mydb.stats();
 
 printjson( start );
-printjson( end )
+printjson( end );
 assert.eq( start.extentFreeList.num, end.extentFreeList.num );
 
 // 3: 1 data, 1 _id idx, 1 x idx
