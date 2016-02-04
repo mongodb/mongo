@@ -14,7 +14,7 @@ var testDB = conn.getDB('test');
 var adminDB = conn.getDB('admin');
 adminDB.createUser({user:'admin', pwd:'admin', roles:['userAdminAnyDatabase']});
 adminDB.auth('admin','admin');
-testDB.createUser({user:'rwuser', pwd:'rwuser', roles:['readWrite']})
+testDB.createUser({user:'rwuser', pwd:'rwuser', roles:['readWrite']});
 adminDB.logout();
 testDB.auth('rwuser', 'rwuser');
 
@@ -24,7 +24,7 @@ assert.eq(1, testDB.foo.find({a:1}).count(), "failed to read");
 
 // assert that the user cannot read unauthenticated
 testDB.logout();
-assert.throws(function(){ testDB.foo.findOne() },
+assert.throws(function(){ testDB.foo.findOne(); },
               [],
               "user should not be able to read after logging out");
 
@@ -41,7 +41,7 @@ try{
 catch(err){}
 
 // assert that credentials were not autosubmitted on reconnect
-assert.throws(function(){ testDB.foo.findOne() },
+assert.throws(function(){ testDB.foo.findOne(); },
               [],
               "user should not be able to read after logging out");
 

@@ -179,11 +179,11 @@ function createUsers(conn) {
 var opts = {
     auth:"",
     enableExperimentalStorageDetailsCmd: ""
-}
+};
 var impls = {
     createUsers: createUsers,
     runOneTest: runOneTest
-}
+};
 
 // run all tests standalone
 var conn = MongoRunner.runMongod(opts);

@@ -8,7 +8,7 @@ var testUserSpecialCharacters = function(){
                         roles: jsTest.adminUserRoles});
     assert(adminDB.auth({user: '~`!@#$%^&*()-_+={}[]||;:",.//><',
                          pwd: 'pass'}));
-}
+};
 
 testUserSpecialCharacters();
 MongoRunner.stopMongod(conn);

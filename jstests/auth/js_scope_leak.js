@@ -23,7 +23,7 @@ function missingOrEquals(string) {
             // + 'print(global.hasOwnProperty("someGlobal") ? someGlobal : "MISSING" );'
             + 'return !global.hasOwnProperty("someGlobal")'
             + '    || someGlobal == unescape("' + escape(string) + '");'
-            +'}()'
+            +'}()';
 }
 
 function testDbEval() {
@@ -71,15 +71,15 @@ testWhere();
 testWhere();
 
 function testMapReduce() {
-    var mapSet = function(string) { return Function('someGlobal = "' + string + '"'); }
-    var mapGet = function(string) { return Function('assert(' + missingOrEquals(string) +')'); }
-    var reduce = function(k, v) { }
+    var mapSet = function(string) { return Function('someGlobal = "' + string + '"'); };
+    var mapGet = function(string) { return Function('assert(' + missingOrEquals(string) +')'); };
+    var reduce = function(k, v) { };
     var setGlobalInMap = function(string) {
         test.foo.mapReduce(mapSet(string), reduce, {out:{inline:1}});
-    }
+    };
     var getGlobalFromMap = function(string) {
         test.foo.mapReduce(mapGet(string), reduce, {out:{inline:1}});
-    }
+    };
 
     // set the global variable 'someGlobal' before authenticating
     setGlobalInMap('noUsers');
@@ -107,13 +107,13 @@ function testGroup() {
                              reduce: Function('doc1', 'agg',
                                               'someGlobal = "' + string + '"'),
                              initial:{}});
-    }
+    };
     var getGlobalFromGroup = function(string) {
         return test.foo.group({key: 'a',
                              reduce: Function('doc1', 'agg',
                                               'assert(' + missingOrEquals(string) +')'),
                              initial:{}});
-    }
+    };
 
     // set the global variable 'someGlobal' before authenticating
     setGlobalInGroup('noUsers');

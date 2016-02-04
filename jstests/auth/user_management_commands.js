@@ -55,14 +55,14 @@ function runTest(conn) {
          assert(db.auth('spencer', 'pwd'));
          assert.writeOK(db.foo.insert({ a: 1 }));
          assert.eq(1, db.foo.findOne().a);
-         assert.doesNotThrow(function() {db.getRole('testRole')});
+         assert.doesNotThrow(function() {db.getRole('testRole');});
          assert.commandWorked(db.adminCommand('connPoolSync'));
 
          db.logout();
          assert(db.auth('andy', 'pwd'));
          hasAuthzError(db.foo.insert({ a: 1 }));
          assert.throws(function() { db.foo.findOne();});
-         assert.throws(function() {db.getRole('testRole')});
+         assert.throws(function() {db.getRole('testRole');});
      })();
 
     (function testUpdateUser() {
@@ -81,7 +81,7 @@ function runTest(conn) {
          hasAuthzError(db.foo.insert({ a: 1 }));
          assert.eq(1, db.foo.findOne().a);
          assert.eq(1, db.foo.count());
-         assert.doesNotThrow(function() {db.getRole('testRole')});
+         assert.doesNotThrow(function() {db.getRole('testRole');});
          assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
 
          testUserAdmin.updateUser('spencer', {roles: ["readWrite",
@@ -89,7 +89,7 @@ function runTest(conn) {
          assert.writeOK(db.foo.update({}, { $inc: { a: 1 }}));
          assert.eq(2, db.foo.findOne().a);
          assert.eq(1, db.foo.count());
-         assert.throws(function() {db.getRole('testRole')});
+         assert.throws(function() {db.getRole('testRole');});
          assert.commandWorked(db.adminCommand('connPoolSync'));
      })();
 
@@ -110,7 +110,7 @@ function runTest(conn) {
          assert.writeOK(db.foo.update({}, { $inc: { a: 1 }}));
          assert.eq(3, db.foo.findOne().a);
          assert.eq(1, db.foo.count());
-         assert.doesNotThrow(function() {db.getRole('testRole')});
+         assert.doesNotThrow(function() {db.getRole('testRole');});
          assert.commandWorked(db.adminCommand('connPoolSync'));
      })();
 
@@ -125,7 +125,7 @@ function runTest(conn) {
          assert.commandWorked(db.runCommand({collMod: 'foo', usePowerOf2Sizes: true}));
          hasAuthzError(db.foo.update({}, { $inc: { a: 1 }}));
          assert.throws(function() { db.foo.findOne();});
-         assert.throws(function() {db.getRole('testRole')});
+         assert.throws(function() {db.getRole('testRole');});
          assert.commandWorked(db.adminCommand('connPoolSync'));
 
 
@@ -133,7 +133,7 @@ function runTest(conn) {
 
          hasAuthzError(db.foo.update({}, { $inc: { a: 1 }}));
          assert.throws(function() { db.foo.findOne();});
-         assert.throws(function() {db.getRole('testRole')});
+         assert.throws(function() {db.getRole('testRole');});
          assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);
 
      })();

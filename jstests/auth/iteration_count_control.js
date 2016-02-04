@@ -29,7 +29,7 @@ var testIterationCountControl = function(){
                                              scramIterationCount: 4999}));
     assert.commandFailed(adminDB.runCommand({setParameter: 1,
                                              scramIterationCount: -5000}));
-}
+};
 
 testIterationCountControl();
 MongoRunner.stopMongod(conn);

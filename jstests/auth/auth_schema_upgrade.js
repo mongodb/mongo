@@ -5,7 +5,7 @@ var setupCRUsers = function(conn){
     jsTest.log("setting up legacy users");
     var adminDB = conn.getDB('admin');
 
-    adminDB.system.version.update({_id:"authSchema"},{"currentVersion":3},{upsert:true})
+    adminDB.system.version.update({_id:"authSchema"},{"currentVersion":3},{upsert:true});
 
     adminDB.createUser({user: 'user1', pwd: 'pass',
                         roles: jsTest.adminUserRoles});
@@ -34,7 +34,7 @@ var setupCRUsers = function(conn){
     verifyAuth(adminDB, 'user1', 'newpass', true, true);
 
     verifyUserDoc(adminDB, 'user1', true, false);
-}
+};
 
 var verifySchemaUpgrade = function(adminDB) {
     // All users should only have SCRAM credentials.
@@ -45,7 +45,7 @@ var verifySchemaUpgrade = function(adminDB) {
     // After authSchemaUpgrade MONGODB-CR no longer works.
     verifyAuth(adminDB, 'user1', 'newpass', false, true);
     verifyAuth(adminDB, 'user2', 'pass', false, true);
-}
+};
 
 var runAndVerifySchemaUpgrade = function(conn){
     jsTest.log("run authSchemaUpgrade");
@@ -53,12 +53,12 @@ var runAndVerifySchemaUpgrade = function(conn){
 
     assert.commandWorked(adminDB.runCommand('authSchemaUpgrade'));
     verifySchemaUpgrade(adminDB);
-}
+};
 
 var testAuthSchemaUpgrade = function(conn) {
     setupCRUsers(conn);
     runAndVerifySchemaUpgrade(conn);
-}
+};
 
 // Test authSchemaUpgrade and upgrade shards
 var testUpgradeShards = function(mongos, shard) {
@@ -66,7 +66,7 @@ var testUpgradeShards = function(mongos, shard) {
 
     assert.commandWorked(mongos.adminCommand({"authSchemaUpgrade":1,"upgradeShards":1}));
     verifySchemaUpgrade(shard.getDB('admin'));
-}
+};
 
 jsTest.log('Test authSchemUpgrade standalone');
 var conn = MongoRunner.runMongod();
@@ -74,7 +74,7 @@ testAuthSchemaUpgrade(conn);
 MongoRunner.stopMongod(conn);
 
 jsTest.log('Test authSchemUpgrade sharded');
-var dopts = { smallfiles: "", nopreallocj: ""}
+var dopts = { smallfiles: "", nopreallocj: ""};
 var st = new ShardingTest(
     { shards: 1,
       mongos: 1,

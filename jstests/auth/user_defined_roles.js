@@ -42,13 +42,13 @@ function runTest(conn) {
 
     // test CRUD
     hasAuthzError(testDB.foo.insert({ a: 1 }));
-    assert.throws(function() { testDB.foo.findOne()});
+    assert.throws(function() { testDB.foo.findOne();});
 
     testUserAdmin.grantPrivilegesToRole('testRole1', [{resource: {db: 'test', collection: ''},
                                                        actions:['find']}]);
 
     hasAuthzError(testDB.foo.insert({ a: 1 }));
-    assert.doesNotThrow(function() { testDB.foo.findOne()});
+    assert.doesNotThrow(function() { testDB.foo.findOne();});
     assert.eq(0, testDB.foo.count());
     assert.eq(0, testDB.foo.find().itcount());
 
@@ -56,11 +56,11 @@ function runTest(conn) {
                                                        actions:['insert']}]);
 
     assert.writeOK(testDB.foo.insert({ a: 1 }));
-    assert.eq(1, testDB.foo.findOne().a)
+    assert.eq(1, testDB.foo.findOne().a);
     assert.eq(1, testDB.foo.count());
     assert.eq(1, testDB.foo.find().itcount());
     hasAuthzError(testDB.foo.update({ a: 1 }, { $inc: { a: 1 }}));
-    assert.eq(1, testDB.foo.findOne().a)
+    assert.eq(1, testDB.foo.findOne().a);
 
     hasAuthzError(testDB.bar.insert({ a: 1 }));
     assert.eq(0, testDB.bar.count());
@@ -68,7 +68,7 @@ function runTest(conn) {
     adminUserAdmin.grantPrivilegesToRole('adminRole', [{resource: {db: '', collection: 'foo'},
                                                         actions:['update']}]);
     assert.writeOK(testDB.foo.update({ a: 1 }, { $inc: { a: 1 }}));
-    assert.eq(2, testDB.foo.findOne().a)
+    assert.eq(2, testDB.foo.findOne().a);
     assert.writeOK(testDB.foo.update({ b: 1 }, { $inc: { b: 1 }}, true)); // upsert
     assert.eq(2, testDB.foo.count());
     assert.eq(2, testDB.foo.findOne({b: {$exists: true}}).b);
@@ -94,7 +94,7 @@ function runTest(conn) {
 
     // Test changeOwnPassword/changeOwnCustomData
     assert.throws(function() { testDB.changeUserPassword('testUser', 'password'); });
-    assert.throws(function() { testDB.updateUser('testUser', {customData: {zipCode: 10036}})});
+    assert.throws(function() { testDB.updateUser('testUser', {customData: {zipCode: 10036}});});
     assert.eq(null, testDB.getUser('testUser').customData);
     testUserAdmin.grantPrivilegesToRole('testRole1', [{resource: {db: 'test', collection: ''},
                                                        actions:['changeOwnPassword',
@@ -107,8 +107,8 @@ function runTest(conn) {
 
     testUserAdmin.revokeRolesFromRole('testRole2', ['testRole1']);
     assert.throws(function() { testDB.changeUserPassword('testUser', 'pwd'); });
-    assert.throws(function() { testDB.foo.findOne()});
-    assert.throws(function() { testDB.updateUser('testUser', {customData: {zipCode: 10028}})});
+    assert.throws(function() { testDB.foo.findOne();});
+    assert.throws(function() { testDB.updateUser('testUser', {customData: {zipCode: 10028}});});
     assert.eq(10036, testDB.getUser('testUser').customData.zipCode);
 
     // Test changeAnyPassword/changeAnyCustomData

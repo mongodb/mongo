@@ -67,7 +67,7 @@
     // Validate that you cannot even log in as __system@local with the supplied password; you _must_
     // use the password from the keyfile.
     //
-    assert(!local.auth('__system', 'a'))
+    assert(!local.auth('__system', 'a'));
     assertCountUnauthorized(conn, "admin", "foo");
     assertCountUnauthorized(conn, "local", "foo");
     assertCountUnauthorized(conn, "test", "foo");

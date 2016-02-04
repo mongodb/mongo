@@ -210,26 +210,26 @@ function run_tests(granter, verifier) {
       ],
       {
           "a.a" : function(testdb, testcol) { should_insert(testdb, testcol);
-                                              should_find(testdb, testcol) },
+                                              should_find(testdb, testcol); },
           "a.b" : function(testdb, testcol) { should_insert(testdb, testcol);
-                                              should_fail_find(testdb, testcol) },
+                                              should_fail_find(testdb, testcol); },
           "b.a" : function(testdb, testcol) { should_insert(testdb, testcol);
-                                              should_fail_find(testdb, testcol) },
+                                              should_fail_find(testdb, testcol); },
           "b.b" : function(testdb, testcol) { should_insert(testdb, testcol);
-                                              should_fail_find(testdb, testcol) },
+                                              should_fail_find(testdb, testcol); },
       }
     );
 }
 
-var keyfile = "jstests/libs/key1"
+var keyfile = "jstests/libs/key1";
 
-print('--- standalone node test ---')
+print('--- standalone node test ---');
 var conn = MongoRunner.runMongod({auth: null, keyFile: keyfile});
 run_tests(conn.getDB('test'), conn.getDB('test'));
 MongoRunner.stopMongod(conn);
-print('--- done standalone node test ---')
+print('--- done standalone node test ---');
 
-print('--- replica set test ---')
+print('--- replica set test ---');
 var rst = new ReplSetTest({
   name: 'testset',
   nodes: 2,
@@ -245,7 +245,7 @@ run_tests(primary, secondary);
 rst.stopSet();
 print('--- done with the rs tests ---');
 
-print('--- sharding test ---')
+print('--- sharding test ---');
 var st = new ShardingTest({
   mongos: 2,
   shard: 1,
@@ -255,7 +255,7 @@ var st = new ShardingTest({
     configOptions: { 'auth': null, 'httpinterface': null },
     shardOptions: { 'auth': null, 'httpinterface': null }
   }
-})
+});
 run_tests(st.s0.getDB('admin'), st.s1.getDB('admin'));
 st.stop();
 print('--- sharding test done ---');

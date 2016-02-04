@@ -18,7 +18,7 @@ function testUserAdminAnyDatabaseSystemCollIndexing(adminDB) {
     assert.commandWorked(adminDB.system.users.dropIndex({ db: 1 }));
     assert.commandWorked(adminDB.system.roles.dropIndex({ db: 1 }));
     adminDB.logout();
-};
+}
 
 
 // SERVER-14701: the backup role should be able to run the

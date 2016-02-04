@@ -237,7 +237,7 @@ function runTest(conn) {
     (function testDropRole() {
          jsTestLog("Testing dropRole");
 
-         testUserAdmin.grantRolesToUser('testUser', ['testRole4'])
+         testUserAdmin.grantRolesToUser('testUser', ['testRole4']);
 
          assert.doesNotThrow(function() {db.foo.findOne();});
          assert.writeOK(db.foo.insert({ a: 1 }));

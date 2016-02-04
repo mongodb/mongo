@@ -125,7 +125,7 @@ var AuthReplTest = function(spec) {
         secondaryConn = secondary;
         secondaryConn.setSlaveOk(true);
         adminSec = secondaryConn.getDB("admin");
-    }
+    };
 
     /**
      * Create user and roles in preparation
@@ -177,7 +177,7 @@ var AuthReplTest = function(spec) {
     };
 
     return that;
-}
+};
 
 jsTest.log("1 test replica sets");
 var rs = new ReplSetTest({name: rsName, nodes: 2});

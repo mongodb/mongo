@@ -10,7 +10,7 @@ var mechanisms, hasCR, hasCramMd5;
 var admin = conn.getDB('admin');
 // In order to test MONGODB-CR we need to "reset" the authSchemaVersion to
 // 26Final "3" or else the user won't get MONGODB-CR credentials.
-admin.system.version.save({ "_id" : "authSchema", "currentVersion" : 3 })
+admin.system.version.save({ "_id" : "authSchema", "currentVersion" : 3 });
 admin.createUser({user:'andy', pwd: 'a', roles: jsTest.adminUserRoles});
 admin.auth({user: 'andy', pwd: 'a'});
 
