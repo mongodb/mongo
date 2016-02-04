@@ -97,11 +97,11 @@ assert.eq(22, c.findOne().a,
           "did not find correct value in document after mongoimport");
 
 // Test that mongofiles supports ssl
-var mongofiles_ssl_dbname = "mongofiles_ssl"
+var mongofiles_ssl_dbname = "mongofiles_ssl";
 mongofiles_db = md.getDB(mongofiles_ssl_dbname);
 
-source_filename = 'jstests/ssl/ssl_cert_password.js'
-filename = 'ssl_cert_password.js'
+source_filename = 'jstests/ssl/ssl_cert_password.js';
+filename = 'ssl_cert_password.js';
 
 exit_code = runMongoProgram("mongofiles", "-d", mongofiles_ssl_dbname, "put", source_filename,
                             "--port", md.port,
@@ -113,7 +113,7 @@ assert.eq(exit_code, 0, "Failed to start mongofiles with ssl");
 
 md5 = md5sumFile(source_filename);
 
-file_obj = mongofiles_db.fs.files.findOne()
+file_obj = mongofiles_db.fs.files.findOne();
 assert(file_obj, "failed to find file object in mongofiles_ssl db using gridfs");
 md5_stored = file_obj.md5;
 md5_computed = mongofiles_db.runCommand({filemd5: file_obj._id}).md5;

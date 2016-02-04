@@ -15,7 +15,7 @@ function authAllNodes() {
         var status = rst.nodes[n].getDB("admin").auth("root", "pwd");
         assert.eq(status, 1);
     }
-};
+}
 
 load("jstests/ssl/libs/ssl_helpers.js");
 

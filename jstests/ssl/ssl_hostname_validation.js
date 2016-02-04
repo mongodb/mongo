@@ -1,10 +1,10 @@
 // Test SSL server certificate hostname validation
 // for client-server and server-server connections 
-var CA_CERT = "jstests/libs/ca.pem" 
+var CA_CERT = "jstests/libs/ca.pem"; 
 var SERVER_CERT = "jstests/libs/server.pem";
 var CN_CERT = "jstests/libs/localhostnameCN.pem"; 
 var SAN_CERT = "jstests/libs/localhostnameSAN.pem"; 
-var CLIENT_CERT = "jstests/libs/client.pem"
+var CLIENT_CERT = "jstests/libs/client.pem";
 var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
@@ -74,7 +74,7 @@ ssl_options = {sslMode : "requireSSL",
 
 replTest = new ReplSetTest({nodes : {node0 : ssl_options, node1 : ssl_options}});
 replTest.startSet();
-assert.throws( function() { replTest.initiate() } );
+assert.throws( function() { replTest.initiate(); } );
 replTest.stopSet();
 
 // 3. Initiate ReplSetTest with invalid certs but set allowInvalidHostnames
