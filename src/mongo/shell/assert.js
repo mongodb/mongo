@@ -16,7 +16,7 @@ doassert = function(msg, obj) {
     }
     print(ex.stack);
     throw ex;
-}
+};
 
 assert = function(b, msg){
     if (arguments.length > 2) {
@@ -29,11 +29,11 @@ assert = function(b, msg){
     if (b)
         return;
     doassert(msg == undefined ? "assert failed" : "assert failed : " + msg);
-}
+};
 
 assert.automsg = function(b) {
     assert(eval(b), b);
-}
+};
 
 assert._debug = false;
 
@@ -47,7 +47,7 @@ assert.eq = function(a, b, msg){
         return;
 
     doassert("[" + tojson(a) + "] != [" + tojson(b) + "] are not equal : " + msg);
-}
+};
 
 // Sort doc/obj fields and return new sorted obj
 sortDoc = function(doc) {
@@ -62,7 +62,7 @@ sortDoc = function(doc) {
 
         }
         return newArr;
-    }
+    };
 
     // not a container we can sort
     if (!(doc instanceof Object))
@@ -96,7 +96,7 @@ sortDoc = function(doc) {
     }
 
     return newDoc;
-}
+};
 
 assert.docEq = function(a, b, msg) {
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -111,11 +111,11 @@ assert.docEq = function(a, b, msg) {
         return;
 
     doassert("[" + tojson(aSorted) + "] != [" + tojson(bSorted) + "] are not equal : " + msg);
-}
+};
 
 assert.eq.automsg = function(a, b) {
     assert.eq(eval(a), eval(b), "[" + a + "] != [" + b + "]");
-}
+};
 
 assert.neq = function(a, b, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -123,27 +123,27 @@ assert.neq = function(a, b, msg){
         return;
 
     doassert("[" + a + "] != [" + b + "] are equal : " + msg);
-}
+};
 
 assert.contains = function(o, arr, msg){
-    var wasIn = false
+    var wasIn = false;
 
     if(! arr.length){
         for(var i in arr){
-            wasIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o))
+            wasIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o));
                 return;
-            if(wasIn) break
+            if(wasIn) break;
         }
     }
     else {
         for(var i = 0; i < arr.length; i++){
-            wasIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o))
-            if(wasIn) break
+            wasIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o));
+            if(wasIn) break;
         }
     }
 
-    if(! wasIn) doassert(tojson(o) + " was not in " + tojson(arr) + " : " + msg)
-}
+    if(! wasIn) doassert(tojson(o) + " was not in " + tojson(arr) + " : " + msg);
+};
 
 assert.soon = function(f, msg, timeout /*ms*/, interval) {
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -177,7 +177,7 @@ assert.soon = function(f, msg, timeout /*ms*/, interval) {
         }
         sleep(interval);
     }
-}
+};
 
 assert.time = function(f, msg, timeout /*ms*/) {
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -195,7 +195,7 @@ assert.time = function(f, msg, timeout /*ms*/) {
         if (diff > timeout)
             doassert("assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg:" + msg);
         return res;
-}
+};
 
 assert.throws = function(func, params, msg) {
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -240,7 +240,7 @@ assert.commandWorked = function(res, msg){
     if (res.ok == 1)
         return res;
     doassert("command failed: " + tojson(res) + " : " + msg, res);
-}
+};
 
 assert.commandFailed = function(res, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -248,7 +248,7 @@ assert.commandFailed = function(res, msg){
     if (res.ok == 0)
         return res;
     doassert("command worked when it should have failed: " + tojson(res) + " : " + msg);
-}
+};
 
 assert.commandFailedWithCode = function(res, code, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -258,7 +258,7 @@ assert.commandFailedWithCode = function(res, code, msg){
     assert.eq(res.code, code, "Expected failure code did not match actual in command result: " +
               tojson(res) + " : " + msg);
     return res;
-}
+};
 
 assert.isnull = function(what, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -266,7 +266,7 @@ assert.isnull = function(what, msg){
     if (what == null)
         return;
     doassert("supposed to be null (" + (msg || "") + ") was: " + tojson(what));
-}
+};
 
 assert.lt = function(a, b, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -274,7 +274,7 @@ assert.lt = function(a, b, msg){
     if (a < b)
         return;
     doassert(a + " is not less than " + b + " : " + msg);
-}
+};
 
 assert.gt = function(a, b, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -282,7 +282,7 @@ assert.gt = function(a, b, msg){
     if (a > b)
         return;
     doassert(a + " is not greater than " + b + " : " + msg);
-}
+};
 
 assert.lte = function(a, b, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -290,7 +290,7 @@ assert.lte = function(a, b, msg){
     if (a <= b)
         return;
     doassert(a + " is not less than or eq " + b + " : " + msg);
-}
+};
 
 assert.gte = function(a, b, msg){
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -298,7 +298,7 @@ assert.gte = function(a, b, msg){
     if (a >= b)
         return;
     doassert(a + " is not greater than or eq " + b + " : " + msg);
-}
+};
 
 assert.between = function(a, b, c, msg, inclusive){
     if (assert._debug && msg) print("in assert for: " + msg);
@@ -307,10 +307,10 @@ assert.between = function(a, b, c, msg, inclusive){
         a <= b && b <= c) return;
     else if(a < b && b < c) return;
     doassert(b + " is not between " + a + " and " + c + " : " + msg);
-}
+};
 
-assert.betweenIn = function(a, b, c, msg){ assert.between(a, b, c, msg, true) }
-assert.betweenEx = function(a, b, c, msg){ assert.between(a, b, c, msg, false) }
+assert.betweenIn = function(a, b, c, msg){ assert.between(a, b, c, msg, true); };
+assert.betweenEx = function(a, b, c, msg){ assert.between(a, b, c, msg, false); };
 
 assert.close = function(a, b, msg, places){
     if (places === undefined) {
@@ -391,7 +391,7 @@ assert.writeOK = function(res, msg) {
     }
     
     return res;
-}
+};
 
 assert.writeError = function(res, msg) {
     
@@ -426,14 +426,14 @@ assert.writeError = function(res, msg) {
     }
     
     return res;
-}
+};
 
 assert.gleOK = function(res, msg) {
     
     var errMsg = null;
 
     if (!res) {
-        errMsg = "missing first argument, no response to check"
+        errMsg = "missing first argument, no response to check";
     }
     else if (!res.ok) {
         errMsg = "getLastError failed: " + tojson(res);
@@ -450,7 +450,7 @@ assert.gleOK = function(res, msg) {
     }
     
     return res;
-}
+};
 
 assert.gleSuccess = function(dbOrGLEDoc, msg) {
     var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
@@ -460,7 +460,7 @@ assert.gleSuccess = function(dbOrGLEDoc, msg) {
         doassert("getLastError not null:" + tojson(gle) + " :" + msg, gle);
     }
     return gle;
-}
+};
 
 assert.gleError = function(dbOrGLEDoc, msg) {
     var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
@@ -469,7 +469,7 @@ assert.gleError = function(dbOrGLEDoc, msg) {
             msg = msg(gle);
         doassert("getLastError is null: " + tojson(gle) + " :" + msg);
     }
-}
+};
 
 assert.gleErrorCode = function(dbOrGLEDoc, code, msg) {
     var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
@@ -479,7 +479,7 @@ assert.gleErrorCode = function(dbOrGLEDoc, code, msg) {
         doassert("getLastError is null or has code other than \"" + code + "\": "
                  + tojson(gle) + " :" + msg);
     }
-}
+};
 
 assert.gleErrorRegex = function(dbOrGLEDoc, regex, msg) {
     var gle = dbOrGLEDoc instanceof DB ? dbOrGLEDoc.getLastErrorObj() : dbOrGLEDoc;
@@ -489,4 +489,4 @@ assert.gleErrorRegex = function(dbOrGLEDoc, regex, msg) {
         doassert("getLastError is null or doesn't match regex (" + regex + "): " 
                  + tojson(gle) + " :" + msg);
     }
-}
+};

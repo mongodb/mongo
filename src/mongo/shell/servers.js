@@ -11,7 +11,7 @@ _parsePath = function() {
         throw Error("No dbpath specified");
 
     return dbpath;
-}
+};
 
 _parsePort = function() {
     var port = "";
@@ -22,7 +22,7 @@ _parsePort = function() {
     if ( port == "" )
         throw Error("No port specified");
     return port;
-}
+};
 
 connectionURLTheSame = function( a , b ){
     
@@ -32,37 +32,37 @@ connectionURLTheSame = function( a , b ){
     if ( ! a || ! b )
         return false;
     
-    if( a.host ) return connectionURLTheSame( a.host, b )
-    if( b.host ) return connectionURLTheSame( a, b.host )
+    if( a.host ) return connectionURLTheSame( a.host, b );
+    if( b.host ) return connectionURLTheSame( a, b.host );
     
-    if( a.name ) return connectionURLTheSame( a.name, b )
-    if( b.name ) return connectionURLTheSame( a, b.name )
+    if( a.name ) return connectionURLTheSame( a.name, b );
+    if( b.name ) return connectionURLTheSame( a, b.name );
     
     if( a.indexOf( "/" ) < 0 && b.indexOf( "/" ) < 0 ){
-        a = a.split( ":" )
-        b = b.split( ":" )
+        a = a.split( ":" );
+        b = b.split( ":" );
         
-        if( a.length != b.length ) return false
+        if( a.length != b.length ) return false;
         
-        if( a.length == 2 && a[1] != b[1] ) return false
+        if( a.length == 2 && a[1] != b[1] ) return false;
                 
-        if( a[0] == "localhost" || a[0] == "127.0.0.1" ) a[0] = getHostName()
-        if( b[0] == "localhost" || b[0] == "127.0.0.1" ) b[0] = getHostName()
+        if( a[0] == "localhost" || a[0] == "127.0.0.1" ) a[0] = getHostName();
+        if( b[0] == "localhost" || b[0] == "127.0.0.1" ) b[0] = getHostName();
         
-        return a[0] == b[0]
+        return a[0] == b[0];
     }
     else {
-        var a0 = a.split( "/" )[0]
-        var b0 = b.split( "/" )[0]
-        return a0 == b0
+        var a0 = a.split( "/" )[0];
+        var b0 = b.split( "/" )[0];
+        return a0 == b0;
     }
-}
+};
 
-assert( connectionURLTheSame( "foo" , "foo" ) )
-assert( ! connectionURLTheSame( "foo" , "bar" ) )
+assert( connectionURLTheSame( "foo" , "foo" ) );
+assert( ! connectionURLTheSame( "foo" , "bar" ) );
 
-assert( connectionURLTheSame( "foo/a,b" , "foo/b,a" ) )
-assert( ! connectionURLTheSame( "foo/a,b" , "bar/a,b" ) )
+assert( connectionURLTheSame( "foo/a,b" , "foo/b,a" ) );
+assert( ! connectionURLTheSame( "foo/a,b" , "bar/a,b" ) );
 
 createMongoArgs = function( binaryName , args ){
     var fullArgs = [ binaryName ];
@@ -90,22 +90,22 @@ createMongoArgs = function( binaryName , args ){
     }
     else {
         for ( var i=0; i<args.length; i++ )
-            fullArgs.push( args[i] )
+            fullArgs.push( args[i] );
     }
 
     return fullArgs;
-}
+};
 
 
-MongoRunner = function(){}
+MongoRunner = function(){};
     
-MongoRunner.dataDir = "/data/db"
-MongoRunner.dataPath = "/data/db/"
+MongoRunner.dataDir = "/data/db";
+MongoRunner.dataPath = "/data/db/";
 
 MongoRunner.VersionSub = function(regex, version) {
     this.regex = regex;
     this.version = version;
-}
+};
 
 // These patterns allow substituting the binary versions used for each version string to support the
 // dev/stable MongoDB release cycle.
@@ -153,7 +153,7 @@ MongoRunner.areBinVersionsTheSame = function(versionA, versionB) {
 
     return versionA.startsWith(versionB) ||
            versionB.startsWith(versionA);
-}
+};
 
 MongoRunner.logicalOptions = { runId : true,
                                pathOpts : true, 
@@ -176,16 +176,16 @@ MongoRunner.logicalOptions = { runId : true,
                                noJournal : true,
                                binVersion : true,
                                waitForConnect : true,
-                               bridgeOptions : true }
+                               bridgeOptions : true };
 
 MongoRunner.toRealPath = function( path, pathOpts ){
     
     // Replace all $pathOptions with actual values
-    pathOpts = pathOpts || {}
-    path = path.replace( /\$dataPath/g, MongoRunner.dataPath )
-    path = path.replace( /\$dataDir/g, MongoRunner.dataDir )
+    pathOpts = pathOpts || {};
+    path = path.replace( /\$dataPath/g, MongoRunner.dataPath );
+    path = path.replace( /\$dataDir/g, MongoRunner.dataDir );
     for( var key in pathOpts ){
-        path = path.replace( RegExp( "\\$" + RegExp.escape(key), "g" ), pathOpts[ key ] )
+        path = path.replace( RegExp( "\\$" + RegExp.escape(key), "g" ), pathOpts[ key ] );
     }
     
     // Relative path
@@ -195,26 +195,26 @@ MongoRunner.toRealPath = function( path, pathOpts ){
 
     if( ! path.match( /^(\/|\\|[A-Za-z]:)/ ) ){
         if( path != "" && ! path.endsWith( "/" ) )
-            path += "/"
+            path += "/";
                 
-        path = MongoRunner.dataPath + path
+        path = MongoRunner.dataPath + path;
     }
     
-    return path
+    return path;
     
-}
+};
 
 MongoRunner.toRealDir = function( path, pathOpts ){
     
-    path = MongoRunner.toRealPath( path, pathOpts )
+    path = MongoRunner.toRealPath( path, pathOpts );
     
     if( path.endsWith( "/" ) )
-        path = path.substring( 0, path.length - 1 )
+        path = path.substring( 0, path.length - 1 );
         
-    return path
-}
+    return path;
+};
 
-MongoRunner.toRealFile = MongoRunner.toRealDir
+MongoRunner.toRealFile = MongoRunner.toRealDir;
 
 /**
  * Returns an iterator object which yields successive versions on toString(), starting from a
@@ -228,8 +228,8 @@ MongoRunner.toRealFile = MongoRunner.toRealDir
 MongoRunner.versionIterator = function( arr, isRandom ){
     
     // If this isn't an array of versions, or is already an iterator, just use it
-    if( typeof arr == "string" ) return arr
-    if( arr.isVersionIterator ) return arr
+    if( typeof arr == "string" ) return arr;
+    if( arr.isVersionIterator ) return arr;
     
     if (isRandom == undefined) isRandom = false;
     
@@ -237,20 +237,20 @@ MongoRunner.versionIterator = function( arr, isRandom ){
     var i = isRandom ? parseInt( Random.rand() * arr.length ) : 0;
     
     return new MongoRunner.versionIterator.iterator(i, arr); 
-}
+};
 
 MongoRunner.versionIterator.iterator = function(i, arr) {
 
     this.toString = function() {
-        i = ( i + 1 ) % arr.length
+        i = ( i + 1 ) % arr.length;
         print( "Returning next version : " + i +
                " (" + arr[i] + ") from " + tojson( arr ) + "..." );
-        return arr[ i ]
-    }
+        return arr[ i ];
+    };
 
     this.isVersionIterator = true;
 
-}
+};
 
 /**
  * Converts the args object by pairing all keys with their value and appending
@@ -265,13 +265,13 @@ MongoRunner.versionIterator.iterator = function(i, arr) {
  */
 MongoRunner.arrOptions = function( binaryName , args ){
 
-    var fullArgs = [ "" ]
+    var fullArgs = [ "" ];
 
     // isObject returns true even if "args" is an array, so the else branch of this statement is
     // dead code.  See SERVER-14220.
     if ( isObject( args ) || ( args.length == 1 && isObject( args[0] ) ) ){
 
-        var o = isObject( args ) ? args : args[0]
+        var o = isObject( args ) ? args : args[0];
                 
         // If we've specified a particular binary version, use that
         if (o.binVersion && o.binVersion != "") {
@@ -281,75 +281,75 @@ MongoRunner.arrOptions = function( binaryName , args ){
         // Manage legacy options
         var isValidOptionForBinary = function( option, value ){
             
-            if( ! o.binVersion ) return true
+            if( ! o.binVersion ) return true;
             
             // Version 1.x options
             if( o.binVersion.startsWith( "1." ) ){
                 
-                return [ "nopreallocj" ].indexOf( option ) < 0
+                return [ "nopreallocj" ].indexOf( option ) < 0;
             }
             
-            return true
-        }
+            return true;
+        };
         
         for ( var k in o ){
             
             // Make sure our logical option should be added to the array of options
             if( ! o.hasOwnProperty( k ) ||
                   k in MongoRunner.logicalOptions || 
-                ! isValidOptionForBinary( k, o[k] ) ) continue
+                ! isValidOptionForBinary( k, o[k] ) ) continue;
             
             if ( ( k == "v" || k == "verbose" ) && isNumber( o[k] ) ){
-                var n = o[k]
+                var n = o[k];
                 if ( n > 0 ){
-                    if ( n > 10 ) n = 10
-                    var temp = "-"
-                    while ( n-- > 0 ) temp += "v"
-                    fullArgs.push( temp )
+                    if ( n > 10 ) n = 10;
+                    var temp = "-";
+                    while ( n-- > 0 ) temp += "v";
+                    fullArgs.push( temp );
                 }
             }
             else {
-                if( o[k] == undefined || o[k] == null ) continue
-                fullArgs.push( "--" + k )
+                if( o[k] == undefined || o[k] == null ) continue;
+                fullArgs.push( "--" + k );
                 if ( o[k] != "" )
-                    fullArgs.push( "" + o[k] ) 
+                    fullArgs.push( "" + o[k] ); 
             }
         } 
     }
     else {
         for ( var i=0; i<args.length; i++ )
-            fullArgs.push( args[i] )
+            fullArgs.push( args[i] );
     }
 
-    fullArgs[ 0 ] = binaryName    
-    return fullArgs
-}
+    fullArgs[ 0 ] = binaryName;    
+    return fullArgs;
+};
 
 MongoRunner.arrToOpts = function( arr ){
         
-    var opts = {}
+    var opts = {};
     for( var i = 1; i < arr.length; i++ ){
         if( arr[i].startsWith( "-" ) ){
-            var opt = arr[i].replace( /^-/, "" ).replace( /^-/, "" )
+            var opt = arr[i].replace( /^-/, "" ).replace( /^-/, "" );
             
             if( arr.length > i + 1 && ! arr[ i + 1 ].startsWith( "-" ) ){
-                opts[ opt ] = arr[ i + 1 ]
-                i++
+                opts[ opt ] = arr[ i + 1 ];
+                i++;
             }
             else{
-                opts[ opt ] = ""
+                opts[ opt ] = "";
             }
             
             if( opt.replace( /v/g, "" ) == "" ){
-                opts[ "verbose" ] = opt.length
+                opts[ "verbose" ] = opt.length;
             }
         }
     }
     
-    return opts
-}
+    return opts;
+};
 
-MongoRunner.savedOptions = {}
+MongoRunner.savedOptions = {};
 
 MongoRunner.mongoOptions = function(opts) {
     // Don't remember waitForConnect
@@ -358,44 +358,44 @@ MongoRunner.mongoOptions = function(opts) {
     
     // If we're a mongo object
     if( opts.getDB ){
-        opts = { restart : opts.runId }
+        opts = { restart : opts.runId };
     }
     
     // Initialize and create a copy of the opts
-    opts = Object.merge( opts || {}, {} )
+    opts = Object.merge( opts || {}, {} );
 
-    if( ! opts.restart ) opts.restart = false
+    if( ! opts.restart ) opts.restart = false;
     
     // RunId can come from a number of places
     // If restart is passed as an old connection
     if( opts.restart && opts.restart.getDB ){
-        opts.runId = opts.restart.runId
-        opts.restart = true
+        opts.runId = opts.restart.runId;
+        opts.restart = true;
     }
     // If it's the runId itself
     else if( isObject( opts.restart ) ){
-        opts.runId = opts.restart
-        opts.restart = true
+        opts.runId = opts.restart;
+        opts.restart = true;
     }
     
     if( isObject( opts.remember ) ){
-        opts.runId = opts.remember
-        opts.remember = true
+        opts.runId = opts.remember;
+        opts.remember = true;
     }
     else if( opts.remember == undefined ){
         // Remember by default if we're restarting
-        opts.remember = opts.restart
+        opts.remember = opts.restart;
     }
     
     // If we passed in restart : <conn> or runId : <conn>
-    if( isObject( opts.runId ) && opts.runId.runId ) opts.runId = opts.runId.runId
+    if( isObject( opts.runId ) && opts.runId.runId ) opts.runId = opts.runId.runId;
     
     if (opts.restart && opts.remember) {
         opts = Object.merge(MongoRunner.savedOptions[ opts.runId ], opts);
     }
 
     // Create a new runId
-    opts.runId = opts.runId || ObjectId()
+    opts.runId = opts.runId || ObjectId();
 
     if (opts.forgetPort) {
         delete opts.port;
@@ -421,8 +421,8 @@ MongoRunner.mongoOptions = function(opts) {
         MongoRunner.savedOptions[opts.runId] = Object.merge(opts, {});
     }
 
-    return opts
-}
+    return opts;
+};
 
 /**
  * @option {object} opts
@@ -441,18 +441,18 @@ MongoRunner.mongoOptions = function(opts) {
  */
 MongoRunner.mongodOptions = function( opts ){
     
-    opts = MongoRunner.mongoOptions( opts )
+    opts = MongoRunner.mongoOptions( opts );
     
     opts.dbpath = MongoRunner.toRealDir( opts.dbpath || "$dataDir/mongod-$port",
-                                         opts.pathOpts )
+                                         opts.pathOpts );
                                          
-    opts.pathOpts = Object.merge( opts.pathOpts, { dbpath : opts.dbpath } )
+    opts.pathOpts = Object.merge( opts.pathOpts, { dbpath : opts.dbpath } );
     
     if( ! opts.logFile && opts.useLogFiles ){
-        opts.logFile = opts.dbpath + "/mongod.log"
+        opts.logFile = opts.dbpath + "/mongod.log";
     }
     else if( opts.logFile ){
-        opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts )
+        opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts );
     }
 
     if ( opts.logFile !== undefined ) {
@@ -460,16 +460,16 @@ MongoRunner.mongodOptions = function( opts ){
     }
     
     if( jsTestOptions().noJournalPrealloc || opts.noJournalPrealloc )
-        opts.nopreallocj = ""
+        opts.nopreallocj = "";
 
     if((jsTestOptions().noJournal || opts.noJournal) &&
             !('journal' in opts) &&
             !('configsvr' in opts)) {
-        opts.nojournal = ""
+        opts.nojournal = "";
     }
 
     if( jsTestOptions().keyFile && !opts.keyFile) {
-        opts.keyFile = jsTestOptions().keyFile
+        opts.keyFile = jsTestOptions().keyFile;
     }
 
     if (opts.hasOwnProperty("enableEncryption")) {
@@ -524,29 +524,29 @@ MongoRunner.mongodOptions = function( opts ){
         opts.enableMajorityReadConcern = "";
     }
 
-    if( opts.noReplSet ) opts.replSet = null
-    if( opts.arbiter ) opts.oplogSize = 1
+    if( opts.noReplSet ) opts.replSet = null;
+    if( opts.arbiter ) opts.oplogSize = 1;
             
-    return opts
-}
+    return opts;
+};
 
 MongoRunner.mongosOptions = function( opts ) {
     opts = MongoRunner.mongoOptions(opts);
     
     // Normalize configdb option to be host string if currently a host
     if( opts.configdb && opts.configdb.getDB ){
-        opts.configdb = opts.configdb.host
+        opts.configdb = opts.configdb.host;
     }
     
     opts.pathOpts = Object.merge( opts.pathOpts, 
-                                { configdb : opts.configdb.replace( /:|\/|,/g, "-" ) } )
+                                { configdb : opts.configdb.replace( /:|\/|,/g, "-" ) } );
     
     if( ! opts.logFile && opts.useLogFiles ){
         opts.logFile = MongoRunner.toRealFile( "$dataDir/mongos-$configdb-$port.log",
-                                               opts.pathOpts )
+                                               opts.pathOpts );
     }
     else if( opts.logFile ){
-        opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts )
+        opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts );
     }
 
     if ( opts.logFile !== undefined ){
@@ -574,8 +574,8 @@ MongoRunner.mongosOptions = function( opts ) {
         opts.binVersion = MongoRunner.getBinVersionFor(testOptions.mongosBinVersion);
     }
 
-    return opts
-}
+    return opts;
+};
 
 /**
  * Starts a mongod instance.
@@ -600,7 +600,7 @@ MongoRunner.mongosOptions = function( opts ) {
  */
 MongoRunner.runMongod = function( opts ){
     
-    opts = opts || {}
+    opts = opts || {};
     var useHostName = true;
     var runId = null;
     var waitForConnect = true;
@@ -623,33 +623,33 @@ MongoRunner.runMongod = function( opts ){
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
         
-        if( opts.forceLock ) removeFile( opts.dbpath + "/mongod.lock" )
+        if( opts.forceLock ) removeFile( opts.dbpath + "/mongod.lock" );
         if( ( opts.cleanData || opts.startClean ) || ( ! opts.restart && ! opts.noCleanData ) ){
-            print( "Resetting db path '" + opts.dbpath + "'" )
-            resetDbpath( opts.dbpath )
+            print( "Resetting db path '" + opts.dbpath + "'" );
+            resetDbpath( opts.dbpath );
         }
         
-        opts = MongoRunner.arrOptions( "mongod", opts )
+        opts = MongoRunner.arrOptions( "mongod", opts );
     }
 
     var mongod = MongoRunner.startWithArgs(opts, waitForConnect);
     if (!waitForConnect) mongod = {};
     if (!mongod) return null;
     
-    mongod.commandLine = MongoRunner.arrToOpts( opts )
-    mongod.name = (useHostName ? getHostName() : "localhost") + ":" + mongod.commandLine.port
-    mongod.host = mongod.name
-    mongod.port = parseInt( mongod.commandLine.port )
-    mongod.runId = runId || ObjectId()
+    mongod.commandLine = MongoRunner.arrToOpts( opts );
+    mongod.name = (useHostName ? getHostName() : "localhost") + ":" + mongod.commandLine.port;
+    mongod.host = mongod.name;
+    mongod.port = parseInt( mongod.commandLine.port );
+    mongod.runId = runId || ObjectId();
     mongod.dbpath = fullOptions.dbpath;
     mongod.savedOptions = MongoRunner.savedOptions[ mongod.runId ];
     mongod.fullOptions = fullOptions;
     
-    return mongod
-}
+    return mongod;
+};
 
 MongoRunner.runMongos = function(opts) {
-    opts = opts || {}
+    opts = opts || {};
 
     var useHostName = false;
     var runId = null;
@@ -671,21 +671,21 @@ MongoRunner.runMongos = function(opts) {
     if (!waitForConnect) mongos = {};
     if (!mongos) return null;
     
-    mongos.commandLine = MongoRunner.arrToOpts( opts )
-    mongos.name = (useHostName ? getHostName() : "localhost") + ":" + mongos.commandLine.port
-    mongos.host = mongos.name
-    mongos.port = parseInt( mongos.commandLine.port ) 
-    mongos.runId = runId || ObjectId()
-    mongos.savedOptions = MongoRunner.savedOptions[ mongos.runId ]
+    mongos.commandLine = MongoRunner.arrToOpts( opts );
+    mongos.name = (useHostName ? getHostName() : "localhost") + ":" + mongos.commandLine.port;
+    mongos.host = mongos.name;
+    mongos.port = parseInt( mongos.commandLine.port ); 
+    mongos.runId = runId || ObjectId();
+    mongos.savedOptions = MongoRunner.savedOptions[ mongos.runId ];
     mongos.fullOptions = fullOptions;
 
-    return mongos
-}
+    return mongos;
+};
 
 
 MongoRunner.StopError = function(message, returnCode) {
     this.name = "StopError";
-    this.returnCode = returnCode || "non-zero"
+    this.returnCode = returnCode || "non-zero";
     this.message = message || "MongoDB process stopped with exit code: " + this.returnCode;
     this.stack = this.toString() + "\n" + (new Error()).stack;
 };
@@ -732,8 +732,8 @@ MongoRunner.EXIT_TEST = 101;
 MongoRunner.stopMongod = function( port, signal, opts ){
     
     if( ! port ) {
-        print( "Cannot stop mongo process " + port )
-        return
+        print( "Cannot stop mongo process " + port );
+        return;
     }
 
     signal = parseInt(signal) || 15;
@@ -757,11 +757,11 @@ MongoRunner.stopMongod = function( port, signal, opts ){
     }
 
     if( port.port )
-        port = parseInt( port.port )
+        port = parseInt( port.port );
     
     if( port instanceof ObjectId ){
-        var opts = MongoRunner.savedOptions( port )
-        if( opts ) port = parseInt( opts.port )
+        var opts = MongoRunner.savedOptions( port );
+        if( opts ) port = parseInt( opts.port );
     }
 
     var returnCode = _stopMongoProgram(parseInt(port), signal, opts);
@@ -774,7 +774,7 @@ MongoRunner.stopMongod = function( port, signal, opts ){
     }
 
     return returnCode;
-}
+};
 
 MongoRunner.stopMongos = MongoRunner.stopMongod;
 
@@ -791,15 +791,15 @@ MongoRunner.stopMongos = MongoRunner.stopMongod;
  */
 MongoRunner.runMongoTool = function( binaryName, opts ){
 
-    var opts = opts || {}
+    var opts = opts || {};
     // Normalize and get the binary version to use
     opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
 
-    var argsArray = MongoRunner.arrOptions(binaryName, opts)
+    var argsArray = MongoRunner.arrOptions(binaryName, opts);
 
     return runMongoProgram.apply(null, argsArray);
 
-}
+};
 
 // Given a test name figures out a directory for that test to use for dump files and makes sure
 // that directory exists and is empty.
@@ -807,7 +807,7 @@ MongoRunner.getAndPrepareDumpDirectory = function(testName) {
     var dir = MongoRunner.dataPath + testName + "_external/";
     resetDbpath(dir);
     return dir;
-}
+};
 
 // Start a mongod instance and return a 'Mongo' object connected to it.
 // This function's arguments are passed as command line arguments to mongod.
@@ -820,17 +820,17 @@ _startMongodEmpty = function () {
     resetDbpath(dbpath);
 
     return startMongoProgram.apply(null, args);
-}
+};
 
 _startMongod = function () {
     print("startMongod WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING ONLY");
     return _startMongodEmpty.apply(null, arguments);
-}
+};
 
 _startMongodNoReset = function(){
     var args = createMongoArgs( "mongod" , arguments );
     return startMongoProgram.apply( null, args );
-}
+};
 
 /**
  * Returns a new argArray with any test-specific arguments added.
@@ -868,7 +868,7 @@ function appendSetParameterArgs(argArray) {
                 var params = jsTest.options().setParametersMongos.split(",");
                 if (params && params.length > 0) {
                     params.forEach(function(p) {
-                        if (p) argArray.push.apply(argArray, ['--setParameter', p])
+                        if (p) argArray.push.apply(argArray, ['--setParameter', p]);
                     });
                 }
             }
@@ -895,14 +895,14 @@ function appendSetParameterArgs(argArray) {
                 var params = jsTest.options().setParameters.split(",");
                 if (params && params.length > 0) {
                     params.forEach(function(p) {
-                        if (p) argArray.push.apply(argArray, ['--setParameter', p])
+                        if (p) argArray.push.apply(argArray, ['--setParameter', p]);
                     });
                 }
             }
         }
     }
     return argArray;
-};
+}
 
 /**
  * Start a mongo process with a particular argument array.  If we aren't waiting for connect, 
@@ -924,7 +924,7 @@ MongoRunner.startWithArgs = function(argArray, waitForConnect) {
             } catch( e ) {
                 if (!checkProgram(pid)) {
                     
-                    print("Could not start mongo program at " + port + ", process ended")
+                    print("Could not start mongo program at " + port + ", process ended");
                     
                     // Break out
                     return true;
@@ -935,7 +935,7 @@ MongoRunner.startWithArgs = function(argArray, waitForConnect) {
     }
 
     return conn;   
-}
+};
 
 /** 
  * DEPRECATED
@@ -964,7 +964,7 @@ startMongoProgram = function(){
         } catch( e ) {
             if (!checkProgram(pid)) {
                 
-                print("Could not start mongo program at " + port + ", process ended")
+                print("Could not start mongo program at " + port + ", process ended");
                 
                 // Break out
                 m = null;
@@ -975,7 +975,7 @@ startMongoProgram = function(){
     }, "unable to connect to mongo program on port " + port, 600 * 1000 );
 
     return m;
-}
+};
 
 runMongoProgram = function() {
     var args = argumentsToArray( arguments );
@@ -998,7 +998,7 @@ runMongoProgram = function() {
     }
 
     return _runMongoProgram.apply( null, args );
-}
+};
 
 // Start a mongo program instance.  This function's first argument is the
 // program name, and subsequent arguments to this function are passed as
@@ -1022,7 +1022,7 @@ startMongoProgramNoConnect = function() {
     }
 
     return _startMongoProgram.apply( null, args );
-}
+};
 
 myPort = function() {
     var m = db.getMongo();
@@ -1030,6 +1030,6 @@ myPort = function() {
         return m.host.match( /:(.*)/ )[ 1 ];
     else
         return 27017;
-}
+};
 
 }());

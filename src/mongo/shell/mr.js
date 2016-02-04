@@ -10,12 +10,12 @@ MR.init = function(){
     $numReduces = 0;
     $numReducesToDB = 0;
     gc(); // this is just so that keep memory size sane
-}
+};
 
 MR.cleanup = function(){
     MR.init();
     gc();
-}
+};
 
 MR.emit = function(k,v){
     $numEmits++;
@@ -27,7 +27,7 @@ MR.emit = function(k,v){
     }
     data.values[data.count++] = v;
     $max = Math.max( $max , data.count );
-}
+};
 
 MR.doReduce = function( useDB ){
     $numReduces++;
@@ -67,7 +67,7 @@ MR.doReduce = function( useDB ){
             }
         }
     }
-}
+};
 
 MR.check = function(){                        
     if ( $max < 2000 && $arr.length < 1000 ){ 
@@ -83,7 +83,7 @@ MR.check = function(){
     reset_num();
     gc();
     return 2;
-}
+};
 
 MR.finalize = function(){
     tempcoll.find().forEach( 
@@ -92,4 +92,4 @@ MR.finalize = function(){
             tempcoll.save( z );
         }
     );
-}
+};

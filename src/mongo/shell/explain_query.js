@@ -49,7 +49,7 @@ var DBExplainQuery = (function() {
         return function() {
             dbQuery[name].apply(dbQuery, arguments);
             return explainQuery;
-        }
+        };
     }
 
     /**
@@ -178,21 +178,21 @@ var DBExplainQuery = (function() {
             else {
                 return explainWithLegacyQueryOption(this);
             }
-        }
+        };
 
         this.next = function() {
             return this.finish();
-        }
+        };
 
         this.hasNext = function() {
             return !this._finished;
-        }
+        };
 
         this.forEach = function(func) {
             while (this.hasNext()) {
                 func(this.next());
             }
-        }
+        };
 
         /**
          * Returns the explain resulting from running this query as a count operation.
@@ -206,7 +206,7 @@ var DBExplainQuery = (function() {
                 this._applySkipLimit = true;
             }
             return this.finish();
-        }
+        };
 
         /**
          * This gets called automatically by the shell in interactive mode. It should
@@ -215,7 +215,7 @@ var DBExplainQuery = (function() {
         this.shellPrint = function() {
             var result = this.finish();
             return tojson(result);
-        }
+        };
 
         /**
          * Display help text.
@@ -242,7 +242,7 @@ var DBExplainQuery = (function() {
             print("\t.snapshot()");
             print("\t.sort(sortSpec)");
             return __magicNoPrint;
-        }
+        };
 
     }
 

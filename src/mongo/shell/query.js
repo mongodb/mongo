@@ -19,47 +19,47 @@ if ( typeof DBQuery == "undefined" ){
         this._numReturned = 0;
         this._special = false;
         this._prettyShell = false;
-    }
+    };
     print( "DBQuery probably won't have array access " );
 }
 
 DBQuery.prototype.help = function () {
-    print("find(<predicate>, <projection>) modifiers")
-    print("\t.sort({...})")
-    print("\t.limit(<n>)")
-    print("\t.skip(<n>)")
-    print("\t.batchSize(<n>) - sets the number of docs to return per getMore")
-    print("\t.hint({...})")
-    print("\t.readConcern(<level>)")
-    print("\t.readPref(<mode>, <tagset>)")
-    print("\t.count(<applySkipLimit>) - total # of objects matching query. by default ignores skip,limit")
-    print("\t.size() - total # of objects cursor would return, honors skip,limit")
-    print("\t.explain(<verbosity>) - accepted verbosities are {'queryPlanner', 'executionStats', 'allPlansExecution'}")
-    print("\t.min({...})")
-    print("\t.max({...})")
-    print("\t.maxScan(<n>)")
-    print("\t.maxTimeMS(<n>)")
-    print("\t.comment(<comment>)")
-    print("\t.snapshot()")
-    print("\t.tailable(<isAwaitData>)")
-    print("\t.noCursorTimeout()")
-    print("\t.allowPartialResults()")
-    print("\t.returnKey()")
-    print("\t.showRecordId() - adds a $recordId field to each returned object")
+    print("find(<predicate>, <projection>) modifiers");
+    print("\t.sort({...})");
+    print("\t.limit(<n>)");
+    print("\t.skip(<n>)");
+    print("\t.batchSize(<n>) - sets the number of docs to return per getMore");
+    print("\t.hint({...})");
+    print("\t.readConcern(<level>)");
+    print("\t.readPref(<mode>, <tagset>)");
+    print("\t.count(<applySkipLimit>) - total # of objects matching query. by default ignores skip,limit");
+    print("\t.size() - total # of objects cursor would return, honors skip,limit");
+    print("\t.explain(<verbosity>) - accepted verbosities are {'queryPlanner', 'executionStats', 'allPlansExecution'}");
+    print("\t.min({...})");
+    print("\t.max({...})");
+    print("\t.maxScan(<n>)");
+    print("\t.maxTimeMS(<n>)");
+    print("\t.comment(<comment>)");
+    print("\t.snapshot()");
+    print("\t.tailable(<isAwaitData>)");
+    print("\t.noCursorTimeout()");
+    print("\t.allowPartialResults()");
+    print("\t.returnKey()");
+    print("\t.showRecordId() - adds a $recordId field to each returned object");
 
     print("\nCursor methods");
-    print("\t.toArray() - iterates through docs and returns an array of the results")
-    print("\t.forEach(<func>)")
-    print("\t.map(<func>)")
-    print("\t.hasNext()")
-    print("\t.next()")
-    print("\t.close()")
-    print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
-    print("\t.itcount() - iterates through documents and counts them")
+    print("\t.toArray() - iterates through docs and returns an array of the results");
+    print("\t.forEach(<func>)");
+    print("\t.map(<func>)");
+    print("\t.hasNext()");
+    print("\t.next()");
+    print("\t.close()");
+    print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)");
+    print("\t.itcount() - iterates through documents and counts them");
     print("\t.getQueryPlan() - get query plans associated with shape. To get more info on query plans, " +
           "call getQueryPlan().help().");
-    print("\t.pretty() - pretty print each document, possibly over multiple lines")
-}
+    print("\t.pretty() - pretty print each document, possibly over multiple lines");
+};
 
 DBQuery.prototype.clone = function(){
     var q =  new DBQuery( this._mongo , this._db , this._collection , this._ns ,
@@ -67,7 +67,7 @@ DBQuery.prototype.clone = function(){
         this._limit , this._skip , this._batchSize , this._options );
     q._special = this._special;
     return q;
-}
+};
 
 DBQuery.prototype._ensureSpecial = function(){
     if ( this._special )
@@ -76,12 +76,12 @@ DBQuery.prototype._ensureSpecial = function(){
     var n = { query : this._query };
     this._query = n;
     this._special = true;
-}
+};
 
 DBQuery.prototype._checkModify = function(){
     if ( this._cursor )
         throw Error("query already executed");
-}
+};
 
 DBQuery.prototype._canUseFindCommand = function() {
     // Since runCommand() is implemented by running a findOne() against the $cmd collection, we have
@@ -91,7 +91,7 @@ DBQuery.prototype._canUseFindCommand = function() {
     // find command does not support exhaust.
     return (this._collection.getName().indexOf("$cmd") !== 0)
         && (this._options & DBQuery.Option.exhaust) === 0;
-}
+};
 
 DBQuery.prototype._exec = function(){
     if ( ! this._cursor ){
@@ -119,7 +119,7 @@ DBQuery.prototype._exec = function(){
         }
     }
     return this._cursor;
-}
+};
 
 /**
  * Internal helper used to convert this cursor into the format required by the find command.
@@ -142,7 +142,7 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
     }
 
     if (this._skip) {
-        cmd["skip"] = this._skip
+        cmd["skip"] = this._skip;
     }
 
     if (this._batchSize) {
@@ -242,31 +242,31 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
     }
 
     return cmd;
-}
+};
 
 DBQuery.prototype.limit = function( limit ){
     this._checkModify();
     this._limit = limit;
     return this;
-}
+};
 
 DBQuery.prototype.batchSize = function( batchSize ){
     this._checkModify();
     this._batchSize = batchSize;
     return this;
-}
+};
 
 
 DBQuery.prototype.addOption = function( option ){
     this._options |= option;
     return this;
-}
+};
 
 DBQuery.prototype.skip = function( skip ){
     this._checkModify();
     this._skip = skip;
     return this;
-}
+};
 
 DBQuery.prototype.hasNext = function(){
     this._exec();
@@ -277,7 +277,7 @@ DBQuery.prototype.hasNext = function(){
     }
     var o = this._cursor.hasNext();
     return o;
-}
+};
 
 DBQuery.prototype.next = function(){
     this._exec();
@@ -295,7 +295,7 @@ DBQuery.prototype.next = function(){
 
     this._numReturned++;
     return ret;
-}
+};
 
 DBQuery.prototype.objsLeftInBatch = function(){
     this._exec();
@@ -305,13 +305,13 @@ DBQuery.prototype.objsLeftInBatch = function(){
         throw _getErrorWithCode(ret,  "error: " + tojson( ret ));
 
     return ret;
-}
+};
 
 DBQuery.prototype.readOnly = function(){
     this._exec();
     this._cursor.readOnly();
     return this;
-}
+};
 
 DBQuery.prototype.toArray = function(){
     if ( this._arr )
@@ -322,7 +322,7 @@ DBQuery.prototype.toArray = function(){
         a.push( this.next() );
     this._arr = a;
     return a;
-}
+};
 
 DBQuery.prototype._convertToCountCmd = function( applySkipLimit ) {
     var cmd = { count: this._collection.getName() };
@@ -354,7 +354,7 @@ DBQuery.prototype._convertToCountCmd = function( applySkipLimit ) {
     }
 
     return cmd;
-}
+};
 
 DBQuery.prototype.count = function( applySkipLimit ) {
     var cmd = this._convertToCountCmd( applySkipLimit );
@@ -362,11 +362,11 @@ DBQuery.prototype.count = function( applySkipLimit ) {
     var res = this._db.runReadCommand( cmd );
     if( res && res.n != null ) return res.n;
     throw _getErrorWithCode(res, "count failed: " + tojson( res ));
-}
+};
 
 DBQuery.prototype.size = function(){
     return this.count( true );
-}
+};
 
 DBQuery.prototype.countReturn = function(){
     var c = this.count();
@@ -378,7 +378,7 @@ DBQuery.prototype.countReturn = function(){
         return this._limit;
 
     return c;
-}
+};
 
 /**
 * iterative count - only for testing
@@ -405,48 +405,48 @@ DBQuery.prototype.itcount = function(){
         }
     }
     return num;
-}
+};
 
 DBQuery.prototype.length = function(){
     return this.toArray().length;
-}
+};
 
 DBQuery.prototype._addSpecial = function( name , value ){
     this._ensureSpecial();
     this._query[name] = value;
     return this;
-}
+};
 
 DBQuery.prototype.sort = function( sortBy ){
     return this._addSpecial( "orderby" , sortBy );
-}
+};
 
 DBQuery.prototype.hint = function( hint ){
     return this._addSpecial( "$hint" , hint );
-}
+};
 
 DBQuery.prototype.min = function( min ) {
     return this._addSpecial( "$min" , min );
-}
+};
 
 DBQuery.prototype.max = function( max ) {
     return this._addSpecial( "$max" , max );
-}
+};
 
 /**
  * Deprecated. Use showRecordId().
  */
 DBQuery.prototype.showDiskLoc = function() {
     return this.showRecordId();
-}
+};
 
 DBQuery.prototype.showRecordId = function() {
     return this._addSpecial("$showDiskLoc", true);
-}
+};
 
 DBQuery.prototype.maxTimeMS = function( maxTimeMS ) {
     return this._addSpecial( "$maxTimeMS" , maxTimeMS );
-}
+};
 
 DBQuery.prototype.readConcern = function( level ) {
     var readConcernObj = {
@@ -454,7 +454,7 @@ DBQuery.prototype.readConcern = function( level ) {
     };
 
     return this._addSpecial( "readConcern", readConcernObj );
-}
+};
 
 /**
  * Sets the read preference for this cursor.
@@ -480,44 +480,44 @@ DBQuery.prototype.readPref = function( mode, tagSet ) {
 DBQuery.prototype.forEach = function( func ){
     while ( this.hasNext() )
         func( this.next() );
-}
+};
 
 DBQuery.prototype.map = function( func ){
     var a = [];
     while ( this.hasNext() )
         a.push( func( this.next() ) );
     return a;
-}
+};
 
 DBQuery.prototype.arrayAccess = function( idx ){
     return this.toArray()[idx];
-}
+};
 
 DBQuery.prototype.comment = function (comment) {
     return this._addSpecial( "$comment" , comment );
-}
+};
 
 DBQuery.prototype.explain = function (verbose) {
     var explainQuery = new DBExplainQuery(this, verbose);
     return explainQuery.finish();
-}
+};
 
 DBQuery.prototype.snapshot = function(){
     return this._addSpecial( "$snapshot" , true );
-}
+};
 
 DBQuery.prototype.returnKey = function(){
     return this._addSpecial( "$returnKey" , true );
-}
+};
 
 DBQuery.prototype.maxScan = function(n){
     return this._addSpecial( "$maxScan" , n );
-}
+};
 
 DBQuery.prototype.pretty = function(){
     this._prettyShell = true;
     return this;
-}
+};
 
 DBQuery.prototype.shellPrint = function(){
     try {
@@ -544,18 +544,18 @@ DBQuery.prototype.shellPrint = function(){
         print( e );
     }
 
-}
+};
 
 /**
  * Returns a QueryPlan for the query.
  */
 DBQuery.prototype.getQueryPlan = function() {
     return new QueryPlan( this );
-}
+};
 
 DBQuery.prototype.toString = function(){
     return "DBQuery: " + this._ns + " -> " + tojson( this._query );
-}
+};
 
 //
 // CRUD specification find cursor extension
@@ -572,7 +572,7 @@ DBQuery.prototype.allowPartialResults = function() {
     this._checkModify();
     this.addOption(DBQuery.Option.partial);
     return this;
-}
+};
 
 /**
 * The server normally times out idle cursors after an inactivity period (10 minutes)
@@ -586,7 +586,7 @@ DBQuery.prototype.noCursorTimeout = function() {
     this._checkModify();
     this.addOption(DBQuery.Option.noTimeout);
     return this;
-}
+};
 
 /**
 * Internal replication use only - driver should not set
@@ -599,7 +599,7 @@ DBQuery.prototype.oplogReplay = function() {
     this._checkModify();
     this.addOption(DBQuery.Option.oplogReplay);
     return this;
-}
+};
 
 /**
 * Limits the fields to return for all matching documents.
@@ -613,7 +613,7 @@ DBQuery.prototype.projection = function(document) {
     this._checkModify();
     this._fields = document;
     return this;
-}
+};
 
 /**
 * Specify cursor as a tailable cursor, allowing to specify if it will use awaitData
@@ -633,7 +633,7 @@ DBQuery.prototype.tailable = function(awaitData) {
     }
 
     return this;
-}
+};
 
 /**
 * Specify a document containing modifiers for the query.
@@ -657,11 +657,11 @@ DBQuery.prototype.modifiers = function(document) {
     }
 
     return this;
-}
+};
 
 DBQuery.prototype.close = function() {
-    this._cursor.close()
-}
+    this._cursor.close();
+};
 
 DBQuery.shellBatchSize = 20;
 
@@ -723,7 +723,7 @@ DBCommandCursor.prototype.close = function() {
         this._cursorHandle.zeroCursorId();
         this._cursorid = NumberLong(0);
     }
-}
+};
 
 /**
  * Fills out this._batch by running a getMore command. If the cursor is exhausted, also resets
@@ -764,7 +764,7 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
 
     // Successfully retrieved the next batch.
     this._batch = cmdRes.cursor.nextBatch.reverse();
-}
+};
 
 DBCommandCursor.prototype._hasNextUsingCommands = function() {
     assert(this._useReadCommands);
@@ -778,7 +778,7 @@ DBCommandCursor.prototype._hasNextUsingCommands = function() {
     }
 
     return this._batch.length > 0;
-}
+};
 
 DBCommandCursor.prototype.hasNext = function() {
     if (this._useReadCommands) {
@@ -786,7 +786,7 @@ DBCommandCursor.prototype.hasNext = function() {
     }
 
     return this._batch.length || this._cursor.hasNext();
-}
+};
 
 DBCommandCursor.prototype.next = function() {
     if (this._batch.length) {
@@ -807,7 +807,7 @@ DBCommandCursor.prototype.next = function() {
             throw _getErrorWithCode(ret, "error: " + tojson(ret));
         return ret;
     }
-}
+};
 DBCommandCursor.prototype.objsLeftInBatch = function() {
     if (this._useReadCommands) {
         return this._batch.length;
@@ -818,29 +818,29 @@ DBCommandCursor.prototype.objsLeftInBatch = function() {
     else {
         return this._cursor.objsLeftInBatch();
     }
-}
+};
 
 DBCommandCursor.prototype.help = function () {
     // This is the same as the "Cursor Methods" section of DBQuery.help().
     print("\nCursor methods");
-    print("\t.toArray() - iterates through docs and returns an array of the results")
-    print("\t.forEach( func )")
-    print("\t.map( func )")
-    print("\t.hasNext()")
-    print("\t.next()")
-    print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
-    print("\t.itcount() - iterates through documents and counts them")
-    print("\t.pretty() - pretty print each document, possibly over multiple lines")
-    print("\t.close()")
-}
+    print("\t.toArray() - iterates through docs and returns an array of the results");
+    print("\t.forEach( func )");
+    print("\t.map( func )");
+    print("\t.hasNext()");
+    print("\t.next()");
+    print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)");
+    print("\t.itcount() - iterates through documents and counts them");
+    print("\t.pretty() - pretty print each document, possibly over multiple lines");
+    print("\t.close()");
+};
 
 // Copy these methods from DBQuery
-DBCommandCursor.prototype.toArray = DBQuery.prototype.toArray
-DBCommandCursor.prototype.forEach = DBQuery.prototype.forEach
-DBCommandCursor.prototype.map = DBQuery.prototype.map
-DBCommandCursor.prototype.itcount = DBQuery.prototype.itcount
-DBCommandCursor.prototype.shellPrint = DBQuery.prototype.shellPrint
-DBCommandCursor.prototype.pretty = DBQuery.prototype.pretty
+DBCommandCursor.prototype.toArray = DBQuery.prototype.toArray;
+DBCommandCursor.prototype.forEach = DBQuery.prototype.forEach;
+DBCommandCursor.prototype.map = DBQuery.prototype.map;
+DBCommandCursor.prototype.itcount = DBQuery.prototype.itcount;
+DBCommandCursor.prototype.shellPrint = DBQuery.prototype.shellPrint;
+DBCommandCursor.prototype.pretty = DBQuery.prototype.pretty;
 
 /**
  * QueryCache
@@ -850,7 +850,7 @@ DBCommandCursor.prototype.pretty = DBQuery.prototype.pretty
 if ( ( typeof  QueryPlan ) == "undefined" ){
     QueryPlan = function( cursor ){
         this._cursor = cursor;
-    }
+    };
 }
 
 /**
@@ -859,7 +859,7 @@ if ( ( typeof  QueryPlan ) == "undefined" ){
  */
 QueryPlan.prototype.getName = function() {
     return this._cursor._collection.getName();
-}
+};
 
 /**
  * tojson prints the name of the collection
@@ -867,7 +867,7 @@ QueryPlan.prototype.getName = function() {
 
 QueryPlan.prototype.tojson = function(indent, nolint) {
     return tojson(this.getPlans());
-}
+};
 
 /**
  * Displays help for a PlanCache object.
@@ -879,14 +879,14 @@ QueryPlan.prototype.help = function () {
     print("\t.clearPlans() - drops query shape from plan cache");
     print("\t.getPlans() - displays the cached plans for a query shape");
     return __magicNoPrint;
-}
+};
 
 /**
  * List plans for a query shape.
  */
 QueryPlan.prototype.getPlans = function() {
     return this._cursor._collection.getPlanCache().getPlansByQuery(this._cursor);
-}
+};
 
 /**
  * Drop query shape from the plan cache.
@@ -894,4 +894,4 @@ QueryPlan.prototype.getPlans = function() {
 QueryPlan.prototype.clearPlans = function() {
     this._cursor._collection.getPlanCache().clearPlansByQuery(this._cursor);
     return;
-}
+};

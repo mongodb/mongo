@@ -4,7 +4,7 @@
 if ( typeof Mongo == "undefined" ){
     Mongo = function( host ){
         this.init( host );
-    }
+    };
 }
 
 if ( ! Mongo.prototype ){
@@ -12,13 +12,13 @@ if ( ! Mongo.prototype ){
 }
 
 if ( ! Mongo.prototype.find )
-    Mongo.prototype.find = function( ns , query , fields , limit , skip , batchSize , options ){ throw Error("find not implemented"); }
+    Mongo.prototype.find = function( ns , query , fields , limit , skip , batchSize , options ){ throw Error("find not implemented"); };
 if ( ! Mongo.prototype.insert )
-    Mongo.prototype.insert = function( ns , obj ){ throw Error("insert not implemented"); }
+    Mongo.prototype.insert = function( ns , obj ){ throw Error("insert not implemented"); };
 if ( ! Mongo.prototype.remove )
-    Mongo.prototype.remove = function( ns , pattern ){ throw Error("remove not implemented"); }
+    Mongo.prototype.remove = function( ns , pattern ){ throw Error("remove not implemented"); };
 if ( ! Mongo.prototype.update )
-    Mongo.prototype.update = function( ns , query , obj , upsert ){ throw Error("update not implemented"); }
+    Mongo.prototype.update = function( ns , query , obj , upsert ){ throw Error("update not implemented"); };
 
 if ( typeof mongoInject == "function" ){
     mongoInject( Mongo.prototype );
@@ -27,16 +27,16 @@ if ( typeof mongoInject == "function" ){
 Mongo.prototype.setSlaveOk = function( value ) {
     if( value == undefined ) value = true;
     this.slaveOk = value;
-}
+};
 
 Mongo.prototype.getSlaveOk = function() {
     return this.slaveOk || false;
-}
+};
 
 Mongo.prototype.getDB = function( name ){
     if ((jsTest.options().keyFile) &&
          ((typeof this.authenticated == 'undefined') || !this.authenticated)) {
-        jsTest.authenticate(this)
+        jsTest.authenticate(this);
     }
     // There is a weird issue where typeof(db._name) !== "string" when the db name
     // is created from objects returned from native C++ methods.
@@ -45,18 +45,18 @@ Mongo.prototype.getDB = function( name ){
         name = name.toString();
     }
     return new DB( this , name );
-}
+};
 
 Mongo.prototype.getDBs = function(){
     var res = this.getDB( "admin" ).runCommand( { "listDatabases" : 1 } );
     if ( ! res.ok )
         throw _getErrorWithCode(res, "listDatabases failed:" + tojson(res));
     return res;
-}
+};
 
 Mongo.prototype.adminCommand = function( cmd ){
     return this.getDB( "admin" ).runCommand( cmd );
-}
+};
 
 /**
  * Returns all log components and current verbosity values
@@ -66,7 +66,7 @@ Mongo.prototype.getLogComponents = function() {
     if (!res.ok)
         throw _getErrorWithCode(res, "getLogComponents failed:" + tojson(res));
     return res.logComponentVerbosity;
-}
+};
 
 /**
  * Accepts optional second argument "component",
@@ -93,7 +93,7 @@ Mongo.prototype.setLogLevel = function(logLevel, component) {
     if (!res.ok)
         throw _getErrorWithCode(res, "setLogLevel failed:" + tojson(res));
     return res;
-}
+};
 
 Mongo.prototype.getDBNames = function(){
     return this.getDBs().databases.map( 
@@ -101,7 +101,7 @@ Mongo.prototype.getDBNames = function(){
             return z.name;
         }
     );
-}
+};
 
 Mongo.prototype.getCollection = function(ns){
     var idx = ns.indexOf( "." );
@@ -110,11 +110,11 @@ Mongo.prototype.getCollection = function(ns){
     var db = ns.substring( 0 , idx );
     var c = ns.substring( idx + 1 );
     return this.getDB( db ).getCollection( c );
-}
+};
 
 Mongo.prototype.toString = function(){
     return "connection to " + this.host;
-}
+};
 Mongo.prototype.tojson = Mongo.prototype.toString;
 
 /**
@@ -212,7 +212,7 @@ connect = function(url, user, pass) {
         }
     }
 
-    chatty("connecting to: " + url)
+    chatty("connecting to: " + url);
     var db;
     if (url.startsWith("mongodb://")) {
         db = new Mongo(url);
@@ -231,30 +231,30 @@ connect = function(url, user, pass) {
         }
     }
     return db;
-}
+};
 
 /** deprecated, use writeMode below
  * 
  */
 Mongo.prototype.useWriteCommands = function() {
-	return (this.writeMode() != "legacy");
-}
+     return (this.writeMode() != "legacy");
+};
 
 Mongo.prototype.forceWriteMode = function( mode ) {
     this._writeMode = mode;
-}
+};
 
 Mongo.prototype.hasWriteCommands = function() {
     var hasWriteCommands = (this.getMinWireVersion() <= 2 &&
                             2 <= this.getMaxWireVersion());
     return hasWriteCommands;
-}
+};
 
 Mongo.prototype.hasExplainCommand = function() {
     var hasExplain = (this.getMinWireVersion() <= 3 &&
                       3 <= this.getMaxWireVersion());
     return hasExplain;
-}
+};
 
 /**
  * {String} Returns the current mode set. Will be commands/legacy/compatibility
@@ -292,7 +292,7 @@ Mongo.prototype.writeMode = function() {
  */
 Mongo.prototype.useReadCommands = function() {
     return (this.readMode() === "commands");
-}
+};
 
 /**
  * For testing, forces the shell to use the readMode specified in 'mode'. Must be either "commands"

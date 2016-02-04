@@ -1,12 +1,12 @@
 __quiet = false;
-__magicNoPrint = { __magicNoPrint : 1111 }
+__magicNoPrint = { __magicNoPrint : 1111 };
 __callLastError = false; 
 _verboseShell = false;
 
 chatty = function(s){
     if ( ! __quiet )
         print( s );
-}
+};
 
 function reconnect(db) {
     assert.soon(function() {
@@ -17,7 +17,7 @@ function reconnect(db) {
                         return false;
                     }
                 });
-};
+}
 
 function _getErrorWithCode(codeOrObj, message) {
     var e = new Error(message);
@@ -49,7 +49,7 @@ friendlyEqual = function( a , b ){
     var clean = function( s ){
         s = s.replace( /NumberInt\((\-?\d+)\)/g , "$1" );
         return s;
-    }
+    };
     
     a = clean(a);
     b = clean(b);
@@ -58,7 +58,7 @@ friendlyEqual = function( a , b ){
         return true;
     
     return false;
-}
+};
 
 printStackTrace = function(){
     try{
@@ -66,7 +66,7 @@ printStackTrace = function(){
     } catch (e) {
         print(e.stack);
     }
-}
+};
 
 /**
  * <p> Set the shell verbosity. If verbose the shell will display more information about command results. </>
@@ -76,14 +76,14 @@ printStackTrace = function(){
 setVerboseShell = function( value ) { 
     if( value == undefined ) value = true; 
     _verboseShell = value; 
-}
+};
 
 argumentsToArray = function( a ){
     var arr = [];
     for ( var i=0; i<a.length; i++ )
         arr[i] = a[i];
     return arr;
-}
+};
 
 // Formats a simple stacked horizontal histogram bar in the shell.
 // @param data array of the form [[ratio, symbol], ...] where ratio is between 0 and 1 and
@@ -106,16 +106,16 @@ _barFormat = function(data, width) {
     }
     res += "]";
     return res;
-}
+};
 
 
 //these two are helpers for Array.sort(func)
-compare = function(l, r){ return (l == r ? 0 : (l < r ? -1 : 1)); }
+compare = function(l, r){ return (l == r ? 0 : (l < r ? -1 : 1)); };
 
 // arr.sort(compareOn('name'))
 compareOn = function(field){
-    return function(l, r) { return compare(l[field], r[field]); }
-}
+    return function(l, r) { return compare(l[field], r[field]); };
+};
 
 
 shellPrint = function( x ){
@@ -133,7 +133,7 @@ shellPrint = function( x ){
         }
         db.resetError();
     }
-}
+};
 
 print.captureAllOutput = function (fn, args) {
     var res = {};
@@ -153,13 +153,13 @@ print.captureAllOutput = function (fn, args) {
 };
 
 if ( typeof TestData == "undefined" ){
-    TestData = undefined
+    TestData = undefined;
 }
 
 jsTestName = function(){
-    if( TestData ) return TestData.testName
-    return "__unknown_name__"
-}
+    if( TestData ) return TestData.testName;
+    return "__unknown_name__";
+};
 
 var _jsTestOptions = { enableTestCommands : true }; // Test commands should be enabled by default
 
@@ -196,25 +196,25 @@ jsTestOptions = function(){
                         );
     }
     return _jsTestOptions;
-}
+};
 
 setJsTestOption = function(name, value) {
     _jsTestOptions[name] = value;
-}
+};
 
 jsTestLog = function(msg){
-    print( "\n\n----\n" + msg + "\n----\n\n" )
-}
+    print( "\n\n----\n" + msg + "\n----\n\n" );
+};
 
-jsTest = {}
+jsTest = {};
 
-jsTest.name = jsTestName
-jsTest.options = jsTestOptions
-jsTest.setOption = setJsTestOption
-jsTest.log = jsTestLog
-jsTest.readOnlyUserRoles = ["read"]
-jsTest.basicUserRoles = ["dbOwner"]
-jsTest.adminUserRoles = ["root"]
+jsTest.name = jsTestName;
+jsTest.options = jsTestOptions;
+jsTest.setOption = setJsTestOption;
+jsTest.log = jsTestLog;
+jsTest.readOnlyUserRoles = ["read"];
+jsTest.basicUserRoles = ["dbOwner"];
+jsTest.adminUserRoles = ["root"];
 
 jsTest.authenticate = function(conn) {
     if (!jsTest.options().auth && !jsTest.options().keyFile) {
@@ -241,7 +241,7 @@ jsTest.authenticate = function(conn) {
         conn.authenticated = false;
     }
     return conn.authenticated;
-}
+};
 
 jsTest.authenticateNodes = function(nodes) {
     assert.soon(function() {
@@ -257,11 +257,11 @@ jsTest.authenticateNodes = function(nodes) {
         }
         return true;
     }, "Authenticate to nodes: " + nodes, 30000);
-}
+};
 
 jsTest.isMongos = function(conn) {
     return conn.getDB('admin').isMaster().msg=='isdbgrid';
-}
+};
 
 defaultPrompt = function() {
     var status = db.getMongo().authStatus;
@@ -272,7 +272,7 @@ defaultPrompt = function() {
         var buildInfo = db.runCommand({buildInfo: 1});
         try {
             if (buildInfo.modules.indexOf("enterprise") > -1) {
-                prefix = "MongoDB Enterprise "
+                prefix = "MongoDB Enterprise ";
             }
         } catch (e) {
             // Don't do anything here. Just throw the error away.
@@ -332,7 +332,7 @@ defaultPrompt = function() {
 
     db.getMongo().authStatus = status;
     return prefix + "> ";
-}
+};
 
 replSetMemberStatePrompt = function() {
     var state = '';
@@ -358,7 +358,7 @@ replSetMemberStatePrompt = function() {
          }
     }
     return state + '> ';
-}
+};
 
 isMasterStatePrompt = function() {
     var state = '';
@@ -378,7 +378,7 @@ isMasterStatePrompt = function() {
             else if (isMaster.arbiterOnly)
                 role = "ARBITER";
             else {
-                role = "OTHER"
+                role = "OTHER";
             }
             state = isMaster.setName + ':';
         }
@@ -387,22 +387,22 @@ isMasterStatePrompt = function() {
         throw _getErrorWithCode(isMaster, "Failed: " + tojson(isMaster));
     }
     return state + '> ';
-}
+};
 
 if (typeof(_useWriteCommandsDefault) == 'undefined') {
     // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
     _useWriteCommandsDefault = function() { return false; };
-};
+}
 
 if (typeof(_writeMode) == 'undefined') {
     // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
     _writeMode = function() { return "commands"; };
-};
+}
 
 if (typeof(_readMode) == 'undefined') {
     // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
     _readMode = function() { return "legacy"; };
-};
+}
 
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {
@@ -445,7 +445,7 @@ shellPrintHelper = function (x) {
         print(x.tojson());
     else
         print(tojson(x));
-}
+};
 
 shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on init. Actual function at end
 
@@ -479,7 +479,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
         if ( name[0] == '_' ) return true;
         if ( name[name.length - 1] == '_' ) return true; // some native functions have an extra name_ method
         return false;
-    }
+    };
 
     var customComplete = function( obj ) {
         try {
@@ -497,7 +497,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
             // print( e ); // uncomment if debugging custom completers
             return [];
         }
-    }
+    };
 
     var worker = function( prefix ) {
         var global = ( function() { return this; } ).call(); // trick to get global object
@@ -511,7 +511,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
         }
 
         var lastPrefix = parts[parts.length - 1] || '';
-        var lastPrefixLowercase = lastPrefix.toLowerCase()
+        var lastPrefixLowercase = lastPrefix.toLowerCase();
         var beginning = parts.slice( 0, parts.length - 1 ).join( '.' );
         if ( beginning.length )
             beginning += '.';
@@ -547,7 +547,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
             ret.push( i );
 
         return ret;
-    }
+    };
 
     // this is the actual function that gets assigned to shellAutocomplete
     return function( prefix ) {
@@ -557,7 +557,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
             print( "exception during autocomplete: " + tojson( e.message ) );
             __autocomplete__ = [];
         }
-    }
+    };
 } ();
 
 shellAutocomplete.showPrivate = false; // toggle to show (useful when working on internals)
@@ -574,7 +574,7 @@ shellHelper = function( command , rest , shouldPrint ){
         shellPrintHelper( res );
     }
     return res;
-}
+};
 
 shellHelper.use = function (dbname) {
     var s = "" + dbname;
@@ -584,7 +584,7 @@ shellHelper.use = function (dbname) {
     }
     db = db.getMongo().getDB(dbname);
     print("switched to db " + db.getName());
-}
+};
 
 shellHelper.set = function (str) {
     if (str == "") {
@@ -604,7 +604,7 @@ shellHelper.set = function (str) {
         _verboseShell = value;
     }
     print("set " + param + " to " + value);
-}
+};
 
 shellHelper.it = function(){
     if ( typeof( ___it___ ) == "undefined" || ___it___ == null ){
@@ -612,14 +612,14 @@ shellHelper.it = function(){
         return;
     }
     shellPrintHelper( ___it___ );
-}
+};
 
 shellHelper.show = function (what) {
     assert(typeof what == "string");
 
     var args = what.split( /\s+/ );
-    what = args[0]
-    args = args.splice(1)
+    what = args[0];
+    args = args.splice(1);
 
     if (what == "profile") {
         if (db.system.profile.count() == 0) {
@@ -654,7 +654,7 @@ shellHelper.show = function (what) {
                     print( l );
                     print("\n"); 
                 }
-            )
+            );
         }
         return "";
     }
@@ -670,7 +670,7 @@ shellHelper.show = function (what) {
     }
 
     if (what == "collections" || what == "tables") {
-        db.getCollectionNames().forEach(function (x) { print(x) });
+        db.getCollectionNames().forEach(function (x) { print(x); });
         return "";
     }
 
@@ -697,7 +697,7 @@ shellHelper.show = function (what) {
             });
         });
 
-        dbinfo.sort(compareOn('name'))
+        dbinfo.sort(compareOn('name'));
         dbinfo.forEach(function (db) {
             var namePadding = maxNameLength - db.name_size;
             var sizePadding = maxGbDigits   - db.gb_digits;
@@ -715,7 +715,7 @@ shellHelper.show = function (what) {
     if (what == "log" ) {
         var n = "global";
         if ( args.length > 0 )
-            n = args[0]
+            n = args[0];
         
         var res = db.adminCommand( { getLog : n } );
         if ( ! res.ok ) {
@@ -723,21 +723,21 @@ shellHelper.show = function (what) {
             return "";
         }
         for ( var i=0; i<res.log.length; i++){
-            print( res.log[i] )
+            print( res.log[i] );
         }
-        return ""
+        return "";
     }
 
     if (what == "logs" ) {
-        var res = db.adminCommand( { getLog : "*" } )
+        var res = db.adminCommand( { getLog : "*" } );
         if ( ! res.ok ) {
             print("Error while trying to show logs: " + res.errmsg);
             return "";
         }
         for ( var i=0; i<res.names.length; i++){
-            print( res.names[i] )
+            print( res.names[i] );
         }
-        return ""
+        return "";
     }
 
     if (what == "startupWarnings" ) {
@@ -757,7 +757,7 @@ shellHelper.show = function (what) {
                 }
                 print( "Server has startup warnings: " );
                 for ( var i=0; i<res.log.length; i++){
-                    print( res.log[i] )
+                    print( res.log[i] );
                 }
                 return "";
             } else if (res.errmsg == "no such cmd: getLog" ) {
@@ -780,7 +780,7 @@ shellHelper.show = function (what) {
 
     throw Error( "don't know how to show [" + what + "]" );
 
-}
+};
 
 Math.sigFig = function( x , N ){
     if ( ! N ){
@@ -788,7 +788,7 @@ Math.sigFig = function( x , N ){
     }
     var p = Math.pow( 10, N - Math.ceil( Math.log( Math.abs(x) ) / Math.log( 10 )) );
     return Math.round(x*p)/p;
-}
+};
 
 var Random = (function() {
     var initialized = false;
@@ -893,7 +893,7 @@ Geo.distance = function( a , b ){
 
     return Math.sqrt( Math.pow( by - ay , 2 ) + 
                       Math.pow( bx - ax , 2 ) );
-}
+};
 
 Geo.sphereDistance = function( a , b ){
     var ax = null;
@@ -933,9 +933,9 @@ Geo.sphereDistance = function( a , b ){
     }
 
     return Math.acos(cross_prod);
-}
+};
 
-rs = function () { return "try rs.help()"; }
+rs = function () { return "try rs.help()"; };
 
 /**
  * This method is intended to aid in the writing of tests. It takes a host's address, desired state,
@@ -951,7 +951,7 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
         desiredState = {ok: true};
     }
 
-    print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " + " rs " + rsName)
+    print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " + " rs " + rsName);
 
     var tests = 0;
     assert.soon(function() {
@@ -961,7 +961,7 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
         }
 
         for (var i=0; i<stats.length; i++) {
-            var node = stats[i]
+            var node = stats[i];
             printjson(node);
             if (node["addr"] !== hostAddr)
                 continue;
@@ -989,7 +989,7 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
     }, "timed out waiting for replica set member: " + hostAddr + " to reach state: " +
             tojson(desiredState),
     timeout);
-}
+};
 
 rs.help = function () {
     print("\trs.status()                                { replSetGetStatus : 1 } checks repl set status");
@@ -1012,13 +1012,13 @@ rs.help = function () {
     print();
     print("\treconfiguration helpers disconnect from the database so the shell will display");
     print("\tan error, even if the command succeeds.");
-}
-rs.slaveOk = function (value) { return db.getMongo().setSlaveOk(value); }
-rs.status = function () { return db._adminCommand("replSetGetStatus"); }
-rs.isMaster = function () { return db.isMaster(); }
-rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
-rs.printSlaveReplicationInfo = function () { return db.printSlaveReplicationInfo() };
-rs.printReplicationInfo = function () { return db.printReplicationInfo() };
+};
+rs.slaveOk = function (value) { return db.getMongo().setSlaveOk(value); };
+rs.status = function () { return db._adminCommand("replSetGetStatus"); };
+rs.isMaster = function () { return db.isMaster(); };
+rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); };
+rs.printSlaveReplicationInfo = function () { return db.printSlaveReplicationInfo(); };
+rs.printReplicationInfo = function () { return db.printReplicationInfo(); };
 rs._runCmd = function (c) {
     // after the command, catch the disconnect and reconnect if necessary
     var res = null;
@@ -1044,7 +1044,7 @@ rs._runCmd = function (c) {
         return "";
     }
     return res;
-}
+};
 rs.reconfig = function (cfg, options) {
     cfg.version = rs.conf().version + 1;
     cmd = { replSetReconfig: cfg };
@@ -1052,7 +1052,7 @@ rs.reconfig = function (cfg, options) {
         cmd[i] = options[i];
     }
     return this._runCmd(cmd);
-}
+};
 rs.add = function (hostport, arb) {
     var cfg = hostport;
 
@@ -1081,7 +1081,7 @@ rs.add = function (hostport, arb) {
     }
     c.members.push(cfg);
     return this._runCmd({ replSetReconfig: c });
-}
+};
 rs.syncFrom = function (host) { return db._adminCommand({replSetSyncFrom : host}); };
 rs.stepDown = function (stepdownSecs, catchUpSecs) {
     var cmdObj = {replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs};
@@ -1090,8 +1090,8 @@ rs.stepDown = function (stepdownSecs, catchUpSecs) {
     }
     return db._adminCommand(cmdObj);
 };
-rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); }
-rs.addArb = function (hn) { return this.add(hn, true); }
+rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); };
+rs.addArb = function (hn) { return this.add(hn, true); };
 
 rs.conf = function () { 
     var resp = db._adminCommand({replSetGetConfig:1});
@@ -1100,7 +1100,7 @@ rs.conf = function () {
     else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
         return db.getSisterDB("local").system.replset.findOne(); 
     throw new Error("Could not retrieve replica set config: " + tojson(resp));
-}
+};
 rs.config = rs.conf;
 
 rs.remove = function (hn) {
@@ -1265,4 +1265,4 @@ help = shellHelper.help = function (x) {
     }
     else
         print("unknown help option");
-}
+};
