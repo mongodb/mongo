@@ -10,15 +10,15 @@ var baseName = "jstests_repl_master1test";
 
 oplog = function() {
     return m.getDB( "local" ).oplog.$main;
-}
+};
 
 lastop = function() {
     return oplog().find().sort( {$natural:-1} ).next();
-}
+};
 
 am = function() {
     return m.getDB( baseName ).a;
-}
+};
 
 rt = new ReplTest( baseName );
 
@@ -29,7 +29,7 @@ assert.eq( "i", lastop().op );
 
 op = lastop();
 printjson( op );
-op.ts.t = op.ts.t + 600000 // 10 minutes
+op.ts.t = op.ts.t + 600000; // 10 minutes
 assert.commandWorked(m.getDB( "local" ).runCommand( {godinsert:"oplog.$main", obj:op} ));
 
 rt.stop( true );

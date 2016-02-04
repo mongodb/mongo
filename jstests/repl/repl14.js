@@ -24,7 +24,7 @@ function testWithCollectionIndexIds( capped, sparse, useIds ) {
     else { // Otherwise avoid the auto generated _id.
         mc._mongo.insert( mc._fullName, toInsert, 0 );
     }
-    assert.eq(mc.count(), 1)
+    assert.eq(mc.count(), 1);
     
     s = rt.start( false ); // slave
     sc = s.getDB( 'd' )[ 'c' ]; // slave collection

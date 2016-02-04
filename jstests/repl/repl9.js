@@ -9,12 +9,12 @@ s = rt.start( false );
 
 admin = m.getDB( "admin" );
 
-debug = function( foo ) {} // print( foo ); }
+debug = function( foo ) {}; // print( foo ); }
 
 // rename within db
 
 m.getDB( baseName ).one.save( { a: 1 } );
-assert.soon( function() { v = s.getDB( baseName ).one.findOne(); return v && 1 == v.a } );
+assert.soon( function() { v = s.getDB( baseName ).one.findOne(); return v && 1 == v.a; } );
 
 assert.commandWorked( admin.runCommand( {renameCollection:"jstests_repl_repl9.one", to:"jstests_repl_repl9.two"} ) );
 assert.soon( function() {

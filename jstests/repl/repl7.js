@@ -7,7 +7,7 @@ var getDBNamesNoThrow = function(conn) {
         printjson(e);
         return [""];
     }
-}
+};
 
 doTest = function(signal, extraOpts) {
 
@@ -48,7 +48,7 @@ doTest = function(signal, extraOpts) {
     sleep( 300 );
     
     rt.stop();
-}
+};
 
 doTest( 15 ); // SIGTERM
 doTest(9, { journal: null });  // SIGKILL

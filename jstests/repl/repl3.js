@@ -8,18 +8,18 @@ soonCount = function( count ) {
 //                print( "count: " + s.getDB( baseName ).z.find().count() + ", expected: " + count );
                 return s.getDB( baseName ).a.find().itcount() == count;
                 } );
-}
+};
 
 doTest = function (signal) {
 
-    print("repl3.js doTest(" + signal + ")")
+    print("repl3.js doTest(" + signal + ")");
 
     rt = new ReplTest("repl3tests");
 
     m = rt.start(true);
     s = rt.start(false);
 
-    am = m.getDB(baseName).a
+    am = m.getDB(baseName).a;
 
     am.save({ _id: new ObjectId() });
     soonCount(1);
@@ -36,16 +36,16 @@ doTest = function (signal) {
 
     // Need the 2 additional seconds timeout, since commands don't work on an 'allDead' node.
     soonCount(1001);
-    as = s.getDB(baseName).a
+    as = s.getDB(baseName).a;
     assert.eq(1, as.find({ i: 0 }).count());
     assert.eq(1, as.find({ i: 999 }).count());
 
     assert.commandFailed(s.getDB("admin").runCommand({ "resync": 1 }));
 
     rt.stop();
-}
+};
 
 doTest( 15 ); // SIGTERM
 doTest( 9 );  // SIGKILL
 
-print("repl3.js OK")
+print("repl3.js OK");

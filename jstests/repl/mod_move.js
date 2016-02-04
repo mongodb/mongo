@@ -38,10 +38,10 @@ for (i = 0; i < BIG; i++) {
     bulk.find({ _id: i }).remove();
 }
 assert.writeOK(bulk.execute());
-assert.eq( BIG , am.a.count() )
+assert.eq( BIG , am.a.count() );
 
 if ( am.serverStatus().storageEngine.name == "mmapv1" ) {
-    assert.eq( 1 , am.a.stats().paddingFactor , "A2"  )
+    assert.eq( 1 , am.a.stats().paddingFactor , "A2"  );
 }
 
 // start slave
@@ -53,6 +53,6 @@ for (i = N - 1; i >= BIG; i--) {
 }
 assert.writeOK(bulk.execute());
 
-check( "B" )
+check( "B" );
 
 rt.stop();
