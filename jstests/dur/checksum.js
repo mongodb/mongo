@@ -11,10 +11,10 @@ if (0) {
 
     // each insert is in it's own commit.
     db.foo.insert({a: 1});
-    db.runCommand({getlasterror:1, j:1})
+    db.runCommand({getlasterror:1, j:1});
 
     db.foo.insert({a: 2});
-    db.runCommand({getlasterror:1, j:1})
+    db.runCommand({getlasterror:1, j:1});
 
     MongoRunner.stopMongod(conn.port, /*signal*/9);
 
