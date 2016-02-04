@@ -80,4 +80,4 @@ x509_options2 = Object.merge(common_options,
                              clusterAuthMode: "x509"});
 var replTest = new ReplSetTest({nodes : {node0 : x509_options1, node1 : x509_options2}});
 var conns = replTest.startSet();
-assert.throws( function() { replTest.initiate() } );
+assert.throws( function() { replTest.initiate(); } );

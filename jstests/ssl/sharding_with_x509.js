@@ -24,14 +24,14 @@ var st = new ShardingTest({ name : "sharding_with_x509" ,
 
 st.s.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
 st.s.getDB('admin').auth('admin', 'pwd');
-var coll = st.s.getCollection( "test.foo" )
+var coll = st.s.getCollection( "test.foo" );
 
-st.shardColl( coll, { _id : 1 }, false )
+st.shardColl( coll, { _id : 1 }, false );
 
 // Create an index so we can find by num later
-coll.ensureIndex({ insert : 1 })
+coll.ensureIndex({ insert : 1 });
 
-print( "starting insertion phase" )
+print( "starting insertion phase" );
 
 // Insert a bunch of data
 var toInsert = 2000;
@@ -41,7 +41,7 @@ for( var i = 0; i < toInsert; i++ ){
 }
 assert.writeOK(bulk.execute());
 
-print( "starting updating phase" )
+print( "starting updating phase" );
 
 // Update a bunch of data
 var toUpdate = toInsert;
@@ -52,7 +52,7 @@ for( var i = 0; i < toUpdate; i++ ){
 }
 assert.writeOK(bulk.execute());
 
-print( "starting deletion" )
+print( "starting deletion" );
 
 // Remove a bunch of data
 var toDelete = toInsert / 2;
@@ -63,7 +63,7 @@ for( var i = 0; i < toDelete; i++ ){
 assert.writeOK(bulk.execute());
 
 // Make sure the right amount of data is there
-assert.eq( coll.find().count(), toInsert / 2 )
+assert.eq( coll.find().count(), toInsert / 2 );
 
 // Finish
-st.stop()
+st.stop();

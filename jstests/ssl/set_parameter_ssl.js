@@ -1,7 +1,7 @@
 // Test changing the --sslMode and --clusterAuthMode parameters using setParameter
 
-var SERVER_CERT = "jstests/libs/server.pem"
-var CA_CERT = "jstests/libs/ca.pem" 
+var SERVER_CERT = "jstests/libs/server.pem";
+var CA_CERT = "jstests/libs/ca.pem"; 
 
 function testSSLTransition(oldMode, newMode, shouldSucceed) {
     var conn = MongoRunner.runMongod({
