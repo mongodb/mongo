@@ -77,6 +77,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	int depth;
 
 	btree = S2BT(session);
+	current = NULL;
 
 	__cursor_pos_clear(cbt);
 
@@ -116,7 +117,14 @@ __wt_col_search(WT_SESSION_IMPL *session,
 		goto leaf_only;
 	}
 
-restart:
+	if (0) {
+restart:	/*
+		 * Discard the currently held page and retart the search from
+		 * the root.
+		 */
+		WT_RET(__wt_page_release(session, current, 0));
+	}
+
 	/* Search the internal pages of the tree. */
 	current = &btree->root;
 	for (depth = 2, pindex = NULL;; ++depth) {
@@ -139,10 +147,9 @@ restart:
 			 */
 			if (parent_pindex != NULL &&
 			    __wt_split_intl_race(
-			    session, current->home, parent_pindex)) {
-				WT_RET(__wt_page_release(session, current, 0));
+			    session, current->home, parent_pindex))
 				goto restart;
-			}
+
 			goto descend;
 		}
 
