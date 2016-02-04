@@ -260,6 +260,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 }
 
 void DeleteStage::doRestoreState() {
+    invariant(_collection);
     const NamespaceString& ns(_collection->ns());
     massert(28537,
             str::stream() << "Demoted from primary while removing from " << ns.ns(),
