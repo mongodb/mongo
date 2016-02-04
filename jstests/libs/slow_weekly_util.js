@@ -9,7 +9,7 @@ SlowWeeklyMongod = function( name ) {
 
 SlowWeeklyMongod.prototype.getDB = function( name ) {
     return this.conn.getDB( name );
-}
+};
 
 SlowWeeklyMongod.prototype.stop = function(){
     MongoRunner.stopMongod( this.conn );

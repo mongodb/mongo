@@ -8,7 +8,7 @@ GeoNearRandomTest = function(name) {
     Random.srand(1234);
 
     print("starting test: " + name);
-}
+};
 
 
 GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds){
@@ -23,7 +23,7 @@ GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds){
         return [( Random.rand() * (range - eps) + eps) + indexBounds.min, ( Random.rand() * (range - eps) + eps ) + indexBounds.min];
     }
     
-}
+};
 
 GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale) {
     assert.eq(this.nPts, 0, "insertPoints already called");
@@ -38,23 +38,23 @@ GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale) {
     if(!indexBounds)
         this.t.ensureIndex({loc: '2d'});
     else
-        this.t.ensureIndex({loc: '2d'}, indexBounds)
-}
+        this.t.ensureIndex({loc: '2d'}, indexBounds);
+};
 
 GeoNearRandomTest.prototype.assertIsPrefix = function(short, long) {
     for (var i=0; i < short.length; i++){
         
-        var xS = short[i].obj ? short[i].obj.loc[0] : short[i].loc[0]
-        var yS = short[i].obj ? short[i].obj.loc[1] : short[i].loc[1]
-        var dS = short[i].obj ? short[i].dis : 1
+        var xS = short[i].obj ? short[i].obj.loc[0] : short[i].loc[0];
+        var yS = short[i].obj ? short[i].obj.loc[1] : short[i].loc[1];
+        var dS = short[i].obj ? short[i].dis : 1;
         
-        var xL = long[i].obj ? long[i].obj.loc[0] : long[i].loc[0]
-        var yL = long[i].obj ? long[i].obj.loc[1] : long[i].loc[1]
-        var dL = long[i].obj ? long[i].dis : 1
+        var xL = long[i].obj ? long[i].obj.loc[0] : long[i].loc[0];
+        var yL = long[i].obj ? long[i].obj.loc[1] : long[i].loc[1];
+        var dL = long[i].obj ? long[i].dis : 1;
         
         assert.eq([xS, yS, dS], [xL, yL, dL]);
     }
-} 
+}; 
 
 GeoNearRandomTest.prototype.testPt = function(pt, opts) {
     assert.neq(this.nPts, 0, "insertPoints not yet called");
@@ -71,7 +71,7 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
     var last = db.runCommand(cmd).results;
     for (var i=2; i <= opts.nToTest; i++){
         //print(i); // uncomment to watch status
-        cmd.num = i
+        cmd.num = i;
         var ret = db.runCommand(cmd).results;
 
         try {
@@ -90,7 +90,7 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
 
     
     if (!opts.sharded){
-        last = last.map(function(x){return x.obj});
+        last = last.map(function(x){return x.obj;});
 
         var query = {loc:{}};
         query.loc[ opts.sphere ? '$nearSphere' : '$near' ] = pt;
@@ -99,6 +99,6 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
         this.assertIsPrefix(last, near);
         assert.eq(last, near);
     }
-}
+};
 
 

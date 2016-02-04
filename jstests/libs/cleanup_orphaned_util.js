@@ -25,7 +25,7 @@ function cleanupOrphaned(shardConnection, ns, expectedIterations) {
 
     assert.eq(iterations, expectedIterations, 'Expected to run ' +
         'cleanupOrphaned' + expectedIterations + ' times, but it only ran ' +
-        iterations + ' times before stoppedAtKey was null.')
+        iterations + ' times before stoppedAtKey was null.');
 }
 
 // Shards data from key range, then inserts orphan documents, runs cleanupOrphans
