@@ -1,7 +1,7 @@
 // test basic operations in parallel, with replication
-load('jstests/libs/parallelTester.js')
+load('jstests/libs/parallelTester.js');
 
-baseName = "parallel_repl"
+baseName = "parallel_repl";
 
 rt = new ReplTest( baseName );
 

@@ -1,5 +1,5 @@
 // test all operations in parallel
-load('jstests/libs/parallelTester.js')
+load('jstests/libs/parallelTester.js');
 
 f = db.jstests_parallel_allops;
 f.drop();

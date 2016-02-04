@@ -1,5 +1,5 @@
 // perform inserts in parallel from a large number of clients
-load('jstests/libs/parallelTester.js')
+load('jstests/libs/parallelTester.js');
 
 f = db.jstests_parallel_manyclients;
 f.drop();
@@ -11,7 +11,7 @@ t = new ParallelTester();
 
 // Reducing the number of threads to 100 because of WT-1989
 numThreads = 100;
-buildInfo = db.adminCommand( "buildInfo" )
+buildInfo = db.adminCommand( "buildInfo" );
 
 if ( buildInfo.bits < 64 ||
      buildInfo.buildEnvironment.target_os != "linux" ||
