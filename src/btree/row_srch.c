@@ -276,12 +276,12 @@ __wt_row_search(WT_SESSION_IMPL *session,
 		goto leaf_only;
 	}
 
+restart:
 	/* Search the internal pages of the tree. */
-restart_root:
 	current = &btree->root;
 	for (depth = 2, pindex = NULL;; ++depth) {
 		parent_pindex = pindex;
-restart_page:	page = current->page;
+		page = current->page;
 		if (page->type != WT_PAGE_ROW_INT)
 			break;
 
@@ -426,14 +426,20 @@ append:			if (parent_pindex != NULL &&
 					return (ret);
 
 				skiplow = skiphigh = 0;
-				goto restart_root;
+				goto restart;
 			}
 		}
 
 descend:	/*
 		 * Swap the current page for the child page. If the page splits
-		 * while we're retrieving it, restart the search in the current
-		 * page; otherwise return on error, the swap call ensures we're
+		 * while we're retrieving it, restart the search at the root.
+		 * We cannot restart in the "current" page; for example, if a
+		 * thread is appending to the tree, the page it's waiting for
+		 * did an insert-split into the parent, then the parent split
+		 * into its parent, the name space we are searching for may have
+		 * moved above the current page in the tree.
+		 *
+		 * On other error, simply return, the swap call ensures we're
 		 * holding nothing on failure.
 		 */
 		if ((ret = __wt_page_swap(
@@ -443,7 +449,7 @@ descend:	/*
 		}
 		if (ret == WT_RESTART) {
 			skiphigh = skiplow = 0;
-			goto restart_page;
+			goto restart;
 		}
 		return (ret);
 	}
