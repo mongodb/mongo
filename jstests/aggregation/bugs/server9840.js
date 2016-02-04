@@ -59,7 +59,7 @@ test({$let: {vars: {x: 6, y: 10},
 
 
 // unicode is allowed
-test({$let: {vars: {'日本語': 10}, in: '$$日本語'}}, 10) // Japanese for "Japanese language"
+test({$let: {vars: {'日本語': 10}, in: '$$日本語'}}, 10); // Japanese for "Japanese language"
 
 // Can use ROOT and CURRENT directly with no subfield (SERVER-5916)
 t.drop();

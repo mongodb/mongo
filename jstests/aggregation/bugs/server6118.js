@@ -36,6 +36,6 @@ for(var i = 0; i < N; ++i) {
     assert.eq(i, result[i]._id);
 }
 
-s.stop()
+s.stop();
 
 })();

@@ -5,12 +5,12 @@ c.drop();
 
 NUM_OBJS = 100;
 
-var randoms = {}
+var randoms = {};
 function generateRandom() {
     // we want unique randoms since $sort isn't guaranteed stable
     var random;
     do {
-        random = Math.round(Math.random() * 1000 * NUM_OBJS)
+        random = Math.round(Math.random() * 1000 * NUM_OBJS);
     } while (randoms[random]);
     randoms[random] = true;
     return random;

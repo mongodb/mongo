@@ -12,9 +12,9 @@ identityProjection = { _id:'$_id', a:'$a' };
 function assertError( expectedCode, matchSpec ) {
     matchStage = { $match:matchSpec };
     // Check where matching is folded in to DocumentSourceCursor.
-    assertErrorCode(t, [matchStage], expectedCode)
+    assertErrorCode(t, [matchStage], expectedCode);
     // Check where matching is not folded in to DocumentSourceCursor.
-    assertErrorCode(t, [{$project: identityProjection}, matchStage], expectedCode)
+    assertErrorCode(t, [{$project: identityProjection}, matchStage], expectedCode);
 }
 
 /** Assert that the contents of two arrays are equal, ignoring element ordering. */

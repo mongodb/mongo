@@ -4,10 +4,10 @@
   One way to do this is to dump and restore it using mongodump and mongorestore
   */
 
-db = db.getSiblingDB( "mongousage" )
+db = db.getSiblingDB( "mongousage" );
 
 function rollupMap() {
-    emit( this._id.t , { total : this.value , unique : 1 } )
+    emit( this._id.t , { total : this.value , unique : 1 } );
 }
 
 function rollupReduce(key, values) {
@@ -22,22 +22,22 @@ function rollupReduce(key, values) {
 function mrrollups() {
 
     res = db.gen.monthly.ip.mapReduce( rollupMap , rollupReduce ,
-				       { out : "gen.monthly" } )
-    res.find().sort( { _id : -1 } ).forEach( printjsononeline )
+				       { out : "gen.monthly" } );
+    res.find().sort( { _id : -1 } ).forEach( printjsononeline );
 
     res = db.gen.weekly.ip.mapReduce( rollupMap , rollupReduce ,
-				      { out : "gen.weekly" } )
-    res.find().sort( { _id : -1 } ).forEach( printjsononeline )
+				      { out : "gen.weekly" } );
+    res.find().sort( { _id : -1 } ).forEach( printjsononeline );
 }
 
 function rollupMonthlyMR() {
     resMonthlyMR = db.gen.monthly.ip.mapReduce( rollupMap , rollupReduce ,
-						{ out: { inline : 1 }} )
+						{ out: { inline : 1 }} );
 }
 
 function rollupWeeklyMR() {
     resWeeklyMR = db.gen.weekly.ip.mapReduce( rollupMap , rollupReduce ,
-					      { out : {inline : 1 }} )
+					      { out : {inline : 1 }} );
 }
 
 function rollupMonthlyA() {

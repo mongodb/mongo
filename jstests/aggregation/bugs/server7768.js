@@ -9,4 +9,4 @@ res = db.runCommand({ 'aggregate': collection
                     });
 
 assert.commandWorked(res);
-assert.eq(res.result, [{foo:1}])
+assert.eq(res.result, [{foo:1}]);

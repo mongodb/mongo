@@ -17,7 +17,7 @@ assert.eq(res.toArray()[0], {a:2});
 assertErrorCode(c, {$project: {'nested._id':0}}, 16406);
 
 // nested _id is not automatically included
-res = c.aggregate({$project: {_id:0, 'nested.other':1}})
+res = c.aggregate({$project: {_id:0, 'nested.other':1}});
 assert.eq(res.toArray()[0], {nested: {other:2}});
 
 // not including anything is an error

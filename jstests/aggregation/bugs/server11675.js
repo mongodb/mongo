@@ -44,7 +44,7 @@ var server11675 = function() {
         var findRes = cursor.toArray();
         var aggRes = t.aggregate(pipeline).toArray();
         assert.docEq(aggRes, findRes);
-    }
+    };
 
     assertSameAsFind({query: {}}); // sanity check
     assertSameAsFind({query: {$text:{$search:"apple"}}});
@@ -158,5 +158,5 @@ var server11675 = function() {
     // wrong $stage, but correct position
     assertErrorCode(t, [{$project: {searchValue: {$text: {$search: 'apple banana'}}}}], 15999);
     assertErrorCode(t, [{$sort: {$text: {$search: 'apple banana'}}}], 17312);
-}
+};
 server11675();

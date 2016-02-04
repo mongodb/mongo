@@ -1,6 +1,6 @@
 // ensure $concat asserts on string
 
-load('jstests/aggregation/extras/utils.js')
+load('jstests/aggregation/extras/utils.js');
 
 c = db.s6570;
 c.drop();
