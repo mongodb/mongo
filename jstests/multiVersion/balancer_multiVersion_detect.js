@@ -11,7 +11,7 @@ var options = {
     shardOptions : { binVersion : [ "latest", "last-stable" ] },
     sync : false,
     enableBalancer : true
-}
+};
 
 var st = new ShardingTest({ shards : 3, mongos : 1, other : options });
 
