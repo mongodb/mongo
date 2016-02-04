@@ -10,7 +10,7 @@ if ( ( typeof  DBCollection ) == "undefined" ){
         this._fullName = fullName;
 
         this.verify();
-    }
+    };
 }
 
 DBCollection.prototype.verify = function(){
@@ -22,11 +22,11 @@ DBCollection.prototype.verify = function(){
 
     assert( this._mongo , "no mongo in DBCollection" );
     assert( this.getMongo() , "no mongo from getMongo()" );
-}
+};
 
 DBCollection.prototype.getName = function(){
     return this._shortName;
-}
+};
 
 DBCollection.prototype.help = function () {
     var shortName = this.getName();
@@ -82,7 +82,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".update( query, object[, upsert_bool, multi_bool] ) - instead of two flags, you can pass an object with fields: upsert, multi");
     print("\tdb." + shortName + ".updateOne( filter, update, <optional params> ) - update the first matching document, optional parameters are: upsert, w, wtimeout, j");
     print("\tdb." + shortName + ".updateMany( filter, update, <optional params> ) - update all matching documents, optional parameters are: upsert, w, wtimeout, j");
-    print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
+    print("\tdb." + shortName + ".validate( <full> ) - SLOW");
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
     print("\tdb." + shortName + ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
@@ -92,17 +92,17 @@ DBCollection.prototype.help = function () {
     // print("\tdb." + shortName + ".getDiskStorageStats({...}) - prints a summary of disk usage statistics");
     // print("\tdb." + shortName + ".getPagesInRAM({...}) - prints a summary of storage pages currently in physical memory");
     return __magicNoPrint;
-}
+};
 
 DBCollection.prototype.getFullName = function(){
     return this._fullName;
-}
+};
 DBCollection.prototype.getMongo = function(){
     return this._db.getMongo();
-}
+};
 DBCollection.prototype.getDB = function(){
     return this._db;
-}
+};
 
 DBCollection.prototype._makeCommand = function (cmd, params) {
     var c = {};
@@ -110,14 +110,14 @@ DBCollection.prototype._makeCommand = function (cmd, params) {
     if ( params )
         Object.extend(c, params);
     return c;
-}
+};
 
 DBCollection.prototype._dbCommand = function( cmd , params ){
     if (typeof( cmd ) === "object")
         return this._db._dbCommand(cmd, {}, this.getQueryOptions());
 
     return this._db._dbCommand(this._makeCommand(cmd, params), {}, this.getQueryOptions());
-}
+};
 
 // Like _dbCommand, but applies $readPreference
 DBCollection.prototype._dbReadCommand = function( cmd , params ){
@@ -125,7 +125,7 @@ DBCollection.prototype._dbReadCommand = function( cmd , params ){
         return this._db._dbReadCommand( cmd , {}, this.getQueryOptions());
 
     return this._db._dbReadCommand(this._makeCommand(cmd, params), {}, this.getQueryOptions());
-}
+};
 
 DBCollection.prototype.runCommand = DBCollection.prototype._dbCommand;
 
@@ -155,7 +155,7 @@ DBCollection.prototype._massageObject = function( q ){
 
     throw Error( "don't know how to massage : " + type );
 
-}
+};
 
 
 DBCollection.prototype._validateObject = function( o ){
@@ -167,7 +167,7 @@ DBCollection.prototype._validateObject = function( o ){
 
     if ( o._ensureSpecial && o._checkModify )
         throw Error( "can't save a DBQuery object" );
-}
+};
 
 DBCollection._allowedFields = { $id : 1 , $ref : 1 , $db : 1 };
 
@@ -202,7 +202,7 @@ DBCollection.prototype.find = function( query , fields , limit , skip, batchSize
     }
 
     return cursor;
-}
+};
 
 DBCollection.prototype.findOne = function( query , fields, options, readConcern ){
     var cursor = this.find(query, fields, -1 /* limit */, 0 /* skip*/,
@@ -219,7 +219,7 @@ DBCollection.prototype.findOne = function( query , fields, options, readConcern 
     if ( ret.$err )
         throw _getErrorWithCode(ret, "error " + tojson(ret));
     return ret;
-}
+};
 
 DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     if ( ! obj )
@@ -350,7 +350,7 @@ DBCollection.prototype._parseRemove = function( t , justOne ) {
     }
 
     return {"query": query, "justOne": justOne, "wc": wc};
-}
+};
 
 DBCollection.prototype.remove = function( t , justOne ){
     var parsed = this._parseRemove(t, justOne);
@@ -399,7 +399,7 @@ DBCollection.prototype.remove = function( t , justOne ){
 
     this._printExtraInfo("Removed", startTime);
     return result;
-}
+};
 
 DBCollection.prototype._validateUpdateDoc = function(doc) {
     // Hidden property for testing purposes.
@@ -454,7 +454,7 @@ DBCollection.prototype._parseUpdate = function( query , obj , upsert , multi ){
             "upsert": upsert,
             "multi": multi,
             "wc": wc};
-}
+};
 
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
     var parsed = this._parseUpdate(query, obj, upsert, multi);
@@ -523,7 +523,7 @@ DBCollection.prototype.save = function( obj , opts ){
     else {
         return this.update( { _id : obj._id } , obj , Object.merge({ upsert:true }, opts));
     }
-}
+};
 
 DBCollection.prototype._genIndexName = function( keys ){
     var name = "";
@@ -539,7 +539,7 @@ DBCollection.prototype._genIndexName = function( keys ){
         name += v;
     }
     return name;
-}
+};
 
 DBCollection.prototype._indexSpec = function( keys, options ) {
     var ret = { ns : this._fullName , key : keys , name : this._genIndexName( keys ) };
@@ -580,11 +580,11 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
     }
 
     return ret;
-}
+};
 
 DBCollection.prototype.createIndex = function(keys , options) {
     return this.createIndexes([keys], options);
-}
+};
 
 DBCollection.prototype.createIndexes = function(keys, options) {
     var indexSpecs = Array(keys.length);
@@ -616,7 +616,7 @@ DBCollection.prototype.createIndexes = function(keys, options) {
     else {
         this._db.getCollection("system.indexes").insert(indexSpecs, 0, true);
     }
-}
+};
 
 DBCollection.prototype.ensureIndex = function( keys , options ){
     var result = this.createIndex(keys, options);
@@ -630,11 +630,11 @@ DBCollection.prototype.ensureIndex = function( keys , options ){
         return err;
     }
     // nothing returned on success
-}
+};
 
 DBCollection.prototype.reIndex = function() {
     return this._db.runCommand({ reIndex: this.getName() });
-}
+};
 
 DBCollection.prototype.dropIndexes = function(){
     if ( arguments.length )
@@ -649,7 +649,7 @@ DBCollection.prototype.dropIndexes = function(){
         return res;
 
     throw _getErrorWithCode(res, "error dropping indexes : " + tojson(res));
-}
+};
 
 
 DBCollection.prototype.drop = function(){
@@ -662,7 +662,7 @@ DBCollection.prototype.drop = function(){
         throw _getErrorWithCode(ret, "drop failed: " + tojson(ret));
     }
     return true;
-}
+};
 
 DBCollection.prototype.findAndModify = function(args){
     var cmd = { findandmodify: this.getName() };
@@ -678,13 +678,13 @@ DBCollection.prototype.findAndModify = function(args){
         throw _getErrorWithCode(ret, "findAndModifyFailed failed: " + tojson(ret));
     }
     return ret.value;
-}
+};
 
 DBCollection.prototype.renameCollection = function( newName , dropTarget ){
     return this._db._adminCommand( { renameCollection : this._fullName ,
                                      to : this._db._name + "." + newName ,
-                                     dropTarget : dropTarget } )
-}
+                                     dropTarget : dropTarget } );
+};
 
 // Display verbose information about the operation
 DBCollection.prototype._printExtraInfo = function(action, startTime) {
@@ -706,13 +706,13 @@ DBCollection.prototype._printExtraInfo = function(action, startTime) {
         // hack for inserted because res.n is 0
         info += action != "Inserted" ? res.n : 1;
         if (res.n > 0 && res.updatedExisting != undefined)
-            info += " " + (res.updatedExisting ? "existing" : "new")
+            info += " " + (res.updatedExisting ? "existing" : "new");
         info += " record(s)";
         var time = new Date().getTime() - startTime;
         info += " in " + time + "ms";
         print(info);
     }
-}
+};
 
 DBCollection.prototype.validate = function(full) {
     var cmd = { validate: this.getName() };
@@ -744,7 +744,7 @@ DBCollection.prototype.validate = function(full) {
     }
 
     return res;
-}
+};
 
 /**
  * Invokes the storageDetails command to provide aggregate and (if requested) detailed information
@@ -760,7 +760,7 @@ DBCollection.prototype.diskStorageStats = function(opt) {
         print("this command requires starting mongod with --enableExperimentalStorageDetailsCmd");
     }
     return res;
-}
+};
 
 // Refer to diskStorageStats
 DBCollection.prototype.getDiskStorageStats = function(params) {
@@ -820,7 +820,7 @@ DBCollection.prototype.getDiskStorageStats = function(params) {
         printExtent(stats, "range " + stats.range);
     }
 
-}
+};
 
 /**
  * Invokes the storageDetails command to report the percentage of virtual memory pages of the
@@ -836,7 +836,7 @@ DBCollection.prototype.pagesInRAM = function(opt) {
         print("this command requires starting mongod with --enableExperimentalStorageDetailsCmd");
     }
     return res;
-}
+};
 
 // Refer to pagesInRAM
 DBCollection.prototype.getPagesInRAM = function(params) {
@@ -851,7 +851,7 @@ DBCollection.prototype.getPagesInRAM = function(params) {
         return "size".pad(8) + " " +
                _barFormat([ [data.inMem, '='] ], BAR_WIDTH) + "  " +
                data.inMem.toPercentStr().pad(7);
-    }
+    };
 
     var printExtent = function(ex, rng) {
         print("--- extent " + rng + " ---");
@@ -879,7 +879,7 @@ DBCollection.prototype.getPagesInRAM = function(params) {
             print(line + "]");
             print();
         }
-    }
+    };
 
     if (stats.extents) {
         print("--- extent overview ---\n");
@@ -900,19 +900,19 @@ DBCollection.prototype.getPagesInRAM = function(params) {
     } else {
         printExtent(stats, "range " + stats.range);
     }
-}
+};
 
 DBCollection.prototype.getShardVersion = function(){
     return this._db._adminCommand( { getShardVersion : this._fullName } );
-}
+};
 
 DBCollection.prototype._getIndexesSystemIndexes = function(filter){
     var si = this.getDB().getCollection( "system.indexes" );
     var query = { ns : this.getFullName() };
     if (filter)
-        query = Object.extend(query, filter)
+        query = Object.extend(query, filter);
     return si.find( query ).toArray();
-}
+};
 
 DBCollection.prototype._getIndexesCommand = function(filter){
     var res = this.runCommand( "listIndexes", filter );
@@ -937,7 +937,7 @@ DBCollection.prototype._getIndexesCommand = function(filter){
     }
 
     return new DBCommandCursor(this._mongo, res).toArray();
-}
+};
 
 DBCollection.prototype.getIndexes = function(filter){
     var res = this._getIndexesCommand(filter);
@@ -945,7 +945,7 @@ DBCollection.prototype.getIndexes = function(filter){
         return res;
     }
     return this._getIndexesSystemIndexes(filter);
-}
+};
 
 DBCollection.prototype.getIndices = DBCollection.prototype.getIndexes;
 DBCollection.prototype.getIndexSpecs = DBCollection.prototype.getIndexes;
@@ -956,7 +956,7 @@ DBCollection.prototype.getIndexKeys = function(){
             return i.key;
         }
     );
-}
+};
 
 
 DBCollection.prototype.hashAllDocs = function() {
@@ -967,7 +967,7 @@ DBCollection.prototype.hashAllDocs = function() {
     assert( hash );
     assert( typeof(hash) == "string" );
     return hash;
-}
+};
 
 /**
  * <p>Drop a specified index.</p>
@@ -987,7 +987,7 @@ DBCollection.prototype.dropIndex =  function(index) {
     assert(index, "need to specify index to dropIndex" );
     var res = this._dbCommand( "deleteIndexes", { index: index } );
     return res;
-}
+};
 
 DBCollection.prototype.copyTo = function( newName ){
     return this.getDB().eval(
@@ -1007,11 +1007,11 @@ DBCollection.prototype.copyTo = function( newName ){
             return count;
         } , this.getName() , newName
     );
-}
+};
 
 DBCollection.prototype.getCollection = function( subName ){
     return this._db.getCollection( this._shortName + "." + subName );
-}
+};
 
 /**
   * scale: The scale at which to deliver results. Unless specified, this command returns all data
@@ -1075,15 +1075,15 @@ DBCollection.prototype.stats = function(args) {
     }
 
     return res;
-}
+};
 
 DBCollection.prototype.dataSize = function(){
     return this.stats().size;
-}
+};
 
 DBCollection.prototype.storageSize = function(){
     return this.stats().storageSize;
-}
+};
 
 DBCollection.prototype.totalIndexSize = function( verbose ){
     var stats = this.stats();
@@ -1093,7 +1093,7 @@ DBCollection.prototype.totalIndexSize = function( verbose ){
         }
     }
     return stats.totalIndexSize;
-}
+};
 
 
 DBCollection.prototype.totalSize = function(){
@@ -1103,14 +1103,14 @@ DBCollection.prototype.totalSize = function(){
         total += totalIndexSize;
     }
     return total;
-}
+};
 
 
 DBCollection.prototype.convertToCapped = function( bytes ){
     if ( ! bytes )
         throw Error("have to specify # of bytes");
-    return this._dbCommand( { convertToCapped : this._shortName , size : bytes } )
-}
+    return this._dbCommand( { convertToCapped : this._shortName , size : bytes } );
+};
 
 DBCollection.prototype.exists = function(){
     var res = this._db.runCommand( "listCollections",
@@ -1127,12 +1127,12 @@ DBCollection.prototype.exists = function(){
     }
 
     throw _getErrorWithCode(res, "listCollections failed: " + tojson(res));
-}
+};
 
 DBCollection.prototype.isCapped = function(){
     var e = this.exists();
     return ( e && e.options && e.options.capped ) ? true : false;
-}
+};
 
 //
 // CRUD specification aggregation cursor extension
@@ -1140,8 +1140,8 @@ DBCollection.prototype.isCapped = function(){
 DBCollection.prototype.aggregate = function(pipeline, aggregateOptions) {
     if (!(pipeline instanceof Array)) {
         // support legacy varargs form. (Also handles db.foo.aggregate())
-        pipeline = argumentsToArray(arguments)
-        aggregateOptions = {}
+        pipeline = argumentsToArray(arguments);
+        aggregateOptions = {};
     } else if (aggregateOptions === undefined) {
         aggregateOptions = {};
     }
@@ -1219,17 +1219,17 @@ DBCollection.prototype.aggregate = function(pipeline, aggregateOptions) {
     }
 
     return res;
-}
+};
 
 DBCollection.prototype.group = function( params ){
     params.ns = this._shortName;
     return this._db.group( params );
-}
+};
 
 DBCollection.prototype.groupcmd = function( params ){
     params.ns = this._shortName;
     return this._db.groupcmd( params );
-}
+};
 
 MapReduceResult = function( db , o ){
     Object.extend( this , o );
@@ -1239,23 +1239,23 @@ MapReduceResult = function( db , o ){
     if ( this.result != null ) {
         this._coll = this._db.getCollection( this.result );
     }
-}
+};
 
 MapReduceResult.prototype._simpleKeys = function(){
     return this._o;
-}
+};
 
 MapReduceResult.prototype.find = function(){
     if ( this.results )
         return this.results;
     return DBCollection.prototype.find.apply( this._coll , arguments );
-}
+};
 
 MapReduceResult.prototype.drop = function(){
     if ( this._coll ) {
         return this._coll.drop();
     }
-}
+};
 
 /**
 * just for debugging really
@@ -1265,20 +1265,20 @@ MapReduceResult.prototype.convertToSingleObject = function(){
     var it = this.results != null ? this.results : this._coll.find();
     it.forEach( function(a){ z[a._id] = a.value; } );
     return z;
-}
+};
 
 DBCollection.prototype.convertToSingleObject = function(valueField){
     var z = {};
     this.find().forEach( function(a){ z[a._id] = a[valueField]; } );
     return z;
-}
+};
 
 /**
 * @param optional object of optional fields;
 */
 DBCollection.prototype.mapReduce = function( map , reduce , optionsOrOutString ){
     var c = { mapreduce : this._shortName , map : map , reduce : reduce };
-    assert( optionsOrOutString , "need to supply an optionsOrOutString" )
+    assert( optionsOrOutString , "need to supply an optionsOrOutString" );
 
     if ( typeof( optionsOrOutString ) == "string" )
         c["out"] = optionsOrOutString;
@@ -1301,15 +1301,15 @@ DBCollection.prototype.mapReduce = function( map , reduce , optionsOrOutString )
     }
     return new MapReduceResult( this._db , raw );
 
-}
+};
 
 DBCollection.prototype.toString = function(){
     return this.getFullName();
-}
+};
 
 DBCollection.prototype.toString = function(){
     return this.getFullName();
-}
+};
 
 
 DBCollection.prototype.tojson = DBCollection.prototype.toString;
@@ -1327,7 +1327,7 @@ DBCollection.autocomplete = function(obj){
         ret.push(c.slice(obj.getName().length+1));
     }
     return ret;
-}
+};
 
 
 // Sharding additions
@@ -1357,185 +1357,185 @@ true
 
 DBCollection.prototype.getShardDistribution = function(){
 
-   var stats = this.stats()
+   var stats = this.stats();
 
    if( ! stats.sharded ){
-       print( "Collection " + this + " is not sharded." )
-       return
+       print( "Collection " + this + " is not sharded." );
+       return;
    }
 
-   var config = this.getMongo().getDB("config")
+   var config = this.getMongo().getDB("config");
 
-   var numChunks = 0
+   var numChunks = 0;
 
    for( var shard in stats.shards ){
 
-       var shardDoc = config.shards.findOne({ _id : shard })
+       var shardDoc = config.shards.findOne({ _id : shard });
 
-       print( "\nShard " + shard + " at " + shardDoc.host )
+       print( "\nShard " + shard + " at " + shardDoc.host );
 
-       var shardStats = stats.shards[ shard ]
+       var shardStats = stats.shards[ shard ];
 
-       var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray()
+       var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray();
 
-       numChunks += chunks.length
+       numChunks += chunks.length;
 
-       var estChunkData = shardStats.size / chunks.length
-       var estChunkCount = Math.floor( shardStats.count / chunks.length )
+       var estChunkData = shardStats.size / chunks.length;
+       var estChunkCount = Math.floor( shardStats.count / chunks.length );
 
        print( " data : " + sh._dataFormat( shardStats.size ) +
               " docs : " + shardStats.count +
-              " chunks : " +  chunks.length )
-       print( " estimated data per chunk : " + sh._dataFormat( estChunkData ) )
-       print( " estimated docs per chunk : " + estChunkCount )
+              " chunks : " +  chunks.length );
+       print( " estimated data per chunk : " + sh._dataFormat( estChunkData ) );
+       print( " estimated docs per chunk : " + estChunkCount );
 
    }
 
-   print( "\nTotals" )
+   print( "\nTotals" );
    print( " data : " + sh._dataFormat( stats.size ) +
           " docs : " + stats.count +
-          " chunks : " +  numChunks )
+          " chunks : " +  numChunks );
    for( var shard in stats.shards ){
 
-       var shardStats = stats.shards[ shard ]
+       var shardStats = stats.shards[ shard ];
 
-       var estDataPercent = Math.floor( shardStats.size / stats.size * 10000 ) / 100
-       var estDocPercent = Math.floor( shardStats.count / stats.count * 10000 ) / 100
+       var estDataPercent = Math.floor( shardStats.size / stats.size * 10000 ) / 100;
+       var estDocPercent = Math.floor( shardStats.count / stats.count * 10000 ) / 100;
 
        print( " Shard " + shard + " contains " + estDataPercent + "% data, " + estDocPercent + "% docs in cluster, " +
-              "avg obj size on shard : " + sh._dataFormat( stats.shards[ shard ].avgObjSize ) )
+              "avg obj size on shard : " + sh._dataFormat( stats.shards[ shard ].avgObjSize ) );
    }
 
-   print( "\n" )
+   print( "\n" );
 
-}
+};
 
 
 DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
 
-   var stats = this.stats()
+   var stats = this.stats();
 
    if( ! stats.sharded ){
-       print( "Collection " + this + " is not sharded." )
-       return
+       print( "Collection " + this + " is not sharded." );
+       return;
    }
 
-   var config = this.getMongo().getDB("config")
+   var config = this.getMongo().getDB("config");
 
    if( ! chunkSize ){
-       chunkSize = config.settings.findOne({ _id : "chunksize" }).value
-       print( "Chunk size not set, using default of " + chunkSize + "MB" )
+       chunkSize = config.settings.findOne({ _id : "chunksize" }).value;
+       print( "Chunk size not set, using default of " + chunkSize + "MB" );
    }
    else{
-       print( "Using chunk size of " + chunkSize + "MB" )
+       print( "Using chunk size of " + chunkSize + "MB" );
    }
 
-   var shardDocs = config.shards.find().toArray()
+   var shardDocs = config.shards.find().toArray();
 
-   var allSplitPoints = {}
-   var numSplits = 0
+   var allSplitPoints = {};
+   var numSplits = 0;
 
    for( var i = 0; i < shardDocs.length; i++ ){
 
-       var shardDoc = shardDocs[i]
-       var shard = shardDoc._id
-       var host = shardDoc.host
-       var sconn = new Mongo( host )
+       var shardDoc = shardDocs[i];
+       var shard = shardDoc._id;
+       var host = shardDoc.host;
+       var sconn = new Mongo( host );
 
-       var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray()
+       var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray();
 
-       print( "\nGetting split points for chunks on shard " + shard + " at " + host )
+       print( "\nGetting split points for chunks on shard " + shard + " at " + host );
 
-       var splitPoints = []
+       var splitPoints = [];
 
        for( var j = 0; j < chunks.length; j++ ){
-           var chunk = chunks[j]
-           var result = sconn.getDB("admin").runCommand({ splitVector : this + "", min : chunk.min, max : chunk.max, maxChunkSize : chunkSize })
+           var chunk = chunks[j];
+           var result = sconn.getDB("admin").runCommand({ splitVector : this + "", min : chunk.min, max : chunk.max, maxChunkSize : chunkSize });
            if( ! result.ok ){
-               print( " Had trouble getting split keys for chunk " + sh._pchunk( chunk ) + " :\n" )
-               printjson( result )
+               print( " Had trouble getting split keys for chunk " + sh._pchunk( chunk ) + " :\n" );
+               printjson( result );
            }
            else{
-               splitPoints = splitPoints.concat( result.splitKeys )
+               splitPoints = splitPoints.concat( result.splitKeys );
 
                if( result.splitKeys.length > 0 )
-                   print( " Added " + result.splitKeys.length + " split points for chunk " + sh._pchunk( chunk ) )
+                   print( " Added " + result.splitKeys.length + " split points for chunk " + sh._pchunk( chunk ) );
            }
        }
 
-       print( "Total splits for shard " + shard + " : " + splitPoints.length )
+       print( "Total splits for shard " + shard + " : " + splitPoints.length );
 
-       numSplits += splitPoints.length
-       allSplitPoints[ shard ] = splitPoints
+       numSplits += splitPoints.length;
+       allSplitPoints[ shard ] = splitPoints;
 
    }
 
    // Get most recent migration
-   var migration = config.changelog.find({ what : /^move.*/ }).sort({ time : -1 }).limit( 1 ).toArray()
+   var migration = config.changelog.find({ what : /^move.*/ }).sort({ time : -1 }).limit( 1 ).toArray();
    if( migration.length == 0 )
-       print( "\nNo migrations found in changelog." )
+       print( "\nNo migrations found in changelog." );
    else {
-       migration = migration[0]
-       print( "\nMost recent migration activity was on " + migration.ns + " at " + migration.time )
+       migration = migration[0];
+       print( "\nMost recent migration activity was on " + migration.ns + " at " + migration.time );
    }
 
-   var admin = this.getMongo().getDB("admin")
-   var coll = this
+   var admin = this.getMongo().getDB("admin");
+   var coll = this;
    var splitFunction = function(){
 
        // Turn off the balancer, just to be safe
-       print( "Turning off balancer..." )
-       config.settings.update({ _id : "balancer" }, { $set : { stopped : true } }, true )
+       print( "Turning off balancer..." );
+       config.settings.update({ _id : "balancer" }, { $set : { stopped : true } }, true );
        print( "Sleeping for 30s to allow balancers to detect change.  To be extra safe, check config.changelog" +
-              " for recent migrations." )
-       sleep( 30000 )
+              " for recent migrations." );
+       sleep( 30000 );
 
        for( var shard in allSplitPoints ){
            for( var i = 0; i < allSplitPoints[ shard ].length; i++ ){
-               var splitKey = allSplitPoints[ shard ][i]
-               print( "Splitting at " + tojson( splitKey ) )
-               printjson( admin.runCommand({ split : coll + "", middle : splitKey }) )
+               var splitKey = allSplitPoints[ shard ][i];
+               print( "Splitting at " + tojson( splitKey ) );
+               printjson( admin.runCommand({ split : coll + "", middle : splitKey }) );
            }
        }
 
-       print( "Turning the balancer back on." )
-       config.settings.update({ _id : "balancer" }, { $set : { stopped : false } } )
-       sleep( 1 )
-   }
+       print( "Turning the balancer back on." );
+       config.settings.update({ _id : "balancer" }, { $set : { stopped : false } } );
+       sleep( 1 );
+   };
 
-   splitFunction.getSplitPoints = function(){ return allSplitPoints; }
+   splitFunction.getSplitPoints = function(){ return allSplitPoints; };
 
    print( "\nGenerated " + numSplits + " split keys, run output function to perform splits.\n" +
           " ex : \n" +
           "  > var splitter = <collection>.getSplitKeysForChunks()\n" +
-          "  > splitter() // Execute splits on cluster !\n" )
+          "  > splitter() // Execute splits on cluster !\n" );
 
-   return splitFunction
+   return splitFunction;
 
-}
+};
 
 DBCollection.prototype.setSlaveOk = function( value ) {
     if( value == undefined ) value = true;
     this._slaveOk = value;
-}
+};
 
 DBCollection.prototype.getSlaveOk = function() {
     if (this._slaveOk != undefined) return this._slaveOk;
     return this._db.getSlaveOk();
-}
+};
 
 DBCollection.prototype.getQueryOptions = function() {
     // inherit this method from DB but use apply so
     // that slaveOk will be set if is overridden on this DBCollection
     return this._db.getQueryOptions.apply(this, arguments);
-}
+};
 
 /**
  * Returns a PlanCache for the collection.
  */
 DBCollection.prototype.getPlanCache = function() {
     return new PlanCache( this );
-}
+};
 
 // Overrides connection-level settings.
 //
@@ -1607,7 +1607,7 @@ DBCollection.prototype.count = function(query, options) {
 
     // Return the result of the find
     return query.count(true);
-}
+};
 
 /**
 * The distinct command returns returns a list of distinct values for the given key across a collection.
@@ -1651,11 +1651,11 @@ DBCollection.prototype.distinct = function(keyString, query, options){
     }
 
     return res.values;
-}
+};
 
 DBCollection.prototype._distinct = function( keyString , query ){
     return this._dbReadCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
-}
+};
 
 /**
  * PlanCache
@@ -1665,7 +1665,7 @@ DBCollection.prototype._distinct = function( keyString , query ){
 if ( ( typeof  PlanCache ) == "undefined" ){
     PlanCache = function( collection ){
         this._collection = collection;
-    }
+    };
 }
 
 /**
@@ -1674,7 +1674,7 @@ if ( ( typeof  PlanCache ) == "undefined" ){
  */
 PlanCache.prototype.getName = function(){
     return this._collection.getName();
-}
+};
 
 
 /**
@@ -1682,7 +1682,7 @@ PlanCache.prototype.getName = function(){
  */
 PlanCache.prototype.toString = function(){
     return "PlanCache for collection " + this.getName() + '. Type help() for more info.';
-}
+};
 
 PlanCache.prototype.shellPrint = PlanCache.prototype.toString;
 
@@ -1702,7 +1702,7 @@ PlanCache.prototype.help = function () {
     print("\tdb." + shortName + ".getPlanCache().getPlansByQuery(query[, projection, sort]) - " +
           "displays the cached plans for a query shape");
     return __magicNoPrint;
-}
+};
 
 /**
  * Internal function to parse query shape.
@@ -1734,7 +1734,7 @@ PlanCache.prototype._parseQueryShape = function(query, projection, sort) {
             throw new Error("cannot pass DBQuery with sort");
         }
 
-        var queryObj = query._query["query"] || {}
+        var queryObj = query._query["query"] || {};
         projection = query._fields || {};
         sort = query._query["orderby"] || {};
         // Overwrite DBQuery with the BSON query.
@@ -1747,7 +1747,7 @@ PlanCache.prototype._parseQueryShape = function(query, projection, sort) {
         sort: sort == undefined ? {} : sort,
     };
     return shape;
-}
+};
 
 /**
  * Internal function to run command.
@@ -1758,14 +1758,14 @@ PlanCache.prototype._runCommandThrowOnError = function(cmd, params) {
         throw new Error(res.errmsg);
     }
     return res;
-}
+};
 
 /**
  * Lists query shapes in a collection.
  */
 PlanCache.prototype.listQueryShapes = function() {
     return this._runCommandThrowOnError("planCacheListQueryShapes", {}).shapes;
-}
+};
 
 /**
  * Clears plan cache in a collection.
@@ -1773,7 +1773,7 @@ PlanCache.prototype.listQueryShapes = function() {
 PlanCache.prototype.clear = function() {
     this._runCommandThrowOnError("planCacheClear", {});
     return;
-}
+};
 
 /**
  * List plans for a query shape.
@@ -1781,7 +1781,7 @@ PlanCache.prototype.clear = function() {
 PlanCache.prototype.getPlansByQuery = function(query, projection, sort) {
     return this._runCommandThrowOnError("planCacheListPlans",
                                         this._parseQueryShape(query, projection, sort)).plans;
-}
+};
 
 /**
  * Drop query shape from the plan cache.
@@ -1789,4 +1789,4 @@ PlanCache.prototype.getPlansByQuery = function(query, projection, sort) {
 PlanCache.prototype.clearPlansByQuery = function(query, projection, sort) {
     this._runCommandThrowOnError("planCacheClear", this._parseQueryShape(query, projection, sort));
     return;
-}
+};

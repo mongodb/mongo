@@ -93,7 +93,7 @@ exportToMongoHelpers = {
             return 'function() { ' + fnSrc + ' }';
         }
     }
-}
+};
 
 // WARNING: Anything outside the exportToMongoHelpers dictionary will be available in the
 // global scope and visible to users!

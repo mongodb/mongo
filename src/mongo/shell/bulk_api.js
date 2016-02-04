@@ -7,7 +7,7 @@ var _bulk_api_module = (function() {
   var NONE = 0;
   var INSERT = 1;
   var UPDATE = 2;
-  var REMOVE = 3
+  var REMOVE = 3;
 
   // Error codes
   var UNKNOWN_ERROR = 8;
@@ -28,7 +28,7 @@ var _bulk_api_module = (function() {
         return value;
       }
     });
-  }
+  };
 
   /**
    * Shell representation of WriteConcern, possibly includes:
@@ -49,7 +49,7 @@ var _bulk_api_module = (function() {
       if (arguments.length == 1)
         opts = Object.merge(wValue);
       else
-        throw Error("If the first arg is an Object then no additional args are allowed!")
+        throw Error("If the first arg is an Object then no additional args are allowed!");
     } else {
       if (typeof wValue != 'undefined')
         opts.w = wValue;
@@ -61,7 +61,7 @@ var _bulk_api_module = (function() {
 
     // Do basic validation.
     if (typeof opts.w != 'undefined' && typeof opts.w != 'number' && typeof opts.w != 'string')
-      throw Error("w value must be a number or string but was found to be a " + typeof opts.w)
+      throw Error("w value must be a number or string but was found to be a " + typeof opts.w);
     if (typeof opts.w == 'number' && NumberInt( opts.w ).toNumber() < 0)
       throw Error("Numeric w value must be equal to or larger than 0, not " + opts.w);
 
@@ -159,7 +159,7 @@ var _bulk_api_module = (function() {
      * @return {string}
      */
     this.tojson = function(indent, nolint) {
-      var result = {}
+      var result = {};
 
       if(singleBatchType == INSERT) {
         result.nInserted = this.nInserted;
@@ -198,7 +198,7 @@ var _bulk_api_module = (function() {
     this.toString = function() {
       // Suppress all output for the write concern w:0, since the client doesn't care.
       if(writeConcern && writeConcern.w == 0) {
-        return "WriteResult(" + tojson({}) + ")";;
+        return "WriteResult(" + tojson({}) + ")";
       }
       return "WriteResult(" + this.tojson() + ")";
     };
@@ -228,40 +228,40 @@ var _bulk_api_module = (function() {
     // Define access methods
     this.getUpsertedIds = function() {
       return bulkResult.upserted;
-    }
+    };
 
     this.getUpsertedIdAt = function(index) {
       return bulkResult.upserted[index];
-    }
+    };
 
     this.getRawResponse = function() {
       return bulkResult;
-    }
+    };
 
     this.hasWriteErrors = function() {
       return bulkResult.writeErrors.length > 0;
-    }
+    };
 
     this.getWriteErrorCount = function() {
       return bulkResult.writeErrors.length;
-    }
+    };
 
     this.getWriteErrorAt = function(index) {
       if(index < bulkResult.writeErrors.length) {
         return bulkResult.writeErrors[index];
       }
       return null;
-    }
+    };
 
     //
     // Get all errors
     this.getWriteErrors = function() {
       return bulkResult.writeErrors;
-    }
+    };
 
     this.hasWriteConcernError = function() {
       return bulkResult.writeConcernErrors.length > 0;
-    }
+    };
 
     this.getWriteConcernError = function() {
       if(bulkResult.writeConcernErrors.length == 0) {
@@ -284,30 +284,30 @@ var _bulk_api_module = (function() {
 
         return new WriteConcernError({ errmsg : errmsg, code : WRITE_CONCERN_FAILED });
       }
-    }
+    };
 
     /**
      * @return {string}
      */
     this.tojson = function(indent, nolint) {
       return tojson(bulkResult, indent, nolint);
-    }
+    };
 
     this.toString = function() {
       // Suppress all output for the write concern w:0, since the client doesn't care.
       if(writeConcern && writeConcern.w == 0) {
-        return "BulkWriteResult(" + tojson({}) + ")";;
+        return "BulkWriteResult(" + tojson({}) + ")";
       }
       return "BulkWriteResult(" + this.tojson() + ")";
-    }
+    };
 
     this.shellPrint = function() {
       return this.toString();
-    }
+    };
 
     this.hasErrors = function() {
       return this.hasWriteErrors() || this.hasWriteConcernError();
-    }
+    };
 
     this.toError = function() {
       if (this.hasErrors()) {
@@ -337,7 +337,7 @@ var _bulk_api_module = (function() {
       else {
         throw Error("batch was successful, cannot create BulkWriteError");
       }
-    }
+    };
 
     /**
      * @return {WriteResult} the simplified results condensed into one.
@@ -346,7 +346,7 @@ var _bulk_api_module = (function() {
       if(singleBatchType == null) throw Error(
           "Cannot output single WriteResult from multiple batch result");
       return new WriteResult(bulkResult, singleBatchType, writeConcern);
-    }
+    };
   };
 
   /**
@@ -368,13 +368,13 @@ var _bulk_api_module = (function() {
       
     this.toString = function() {
       return "BulkWriteError(" + this.tojson() + ")";
-    }
+    };
     this.stack = this.toString() + "\n" + (new Error().stack);
 
     this.toResult = function() {
       return new BulkWriteResult(bulkResult, singleBatchType, writeConcern);
-    }
-  }
+    };
+  };
 
   BulkWriteError.prototype = new Error();
   BulkWriteError.prototype.constructor = BulkWriteError;
@@ -390,7 +390,7 @@ var _bulk_api_module = (function() {
       , nRemoved: 0
       , upserted: []
     };
-  }
+  };
 
   /**
    * Wraps a command error
@@ -411,16 +411,16 @@ var _bulk_api_module = (function() {
      */
     this.tojson = function(indent, nolint) {
       return tojson(commandError, indent, nolint);
-    }
+    };
 
     this.toString = function() {
       return "WriteCommandError(" + this.tojson() + ")";
-    }
+    };
     this.stack = this.toString() + "\n" + (new Error().stack);
 
     this.shellPrint = function() {
       return this.toString();
-    }
+    };
 
     this.toSingleResult = function() {
       // This is *only* safe to do with a WriteCommandError from the bulk api when the bulk is
@@ -428,8 +428,8 @@ var _bulk_api_module = (function() {
       var bulkResult = getEmptyBulkResult();
       bulkResult.writeErrors.push({ code : this.code, index : 0, errmsg : this.errmsg });
       return new BulkWriteResult(bulkResult, NONE).toSingleResult();
-    }
-  }
+    };
+  };
 
   WriteCommandError.prototype = new Error();
   WriteCommandError.prototype.constructor = WriteCommandError;
@@ -449,23 +449,23 @@ var _bulk_api_module = (function() {
     // Define access methods
     this.getOperation = function() {
       return err.op;
-    }
+    };
 
     /**
      * @return {string}
      */
     this.tojson = function(indent, nolint) {
       return tojson(err, indent, nolint);
-    }
+    };
 
     this.toString = function() {
       return "WriteError(" + tojson(err) + ")";
-    }
+    };
 
     this.shellPrint = function() {
       return this.toString();
-    }
-  }
+    };
+  };
 
   /**
    * Wraps a write concern error
@@ -483,16 +483,16 @@ var _bulk_api_module = (function() {
      */
     this.tojson = function(indent, nolint) {
       return tojson(err, indent, nolint);
-    }
+    };
 
     this.toString = function() {
       return "WriteConcernError(" + tojson(err) + ")";
-    }
+    };
 
     this.shellPrint = function() {
       return this.toString();
-    }
-  }
+    };
+  };
 
   /**
    * Keeps the state of an unordered batch so we can rewrite the results
@@ -502,7 +502,7 @@ var _bulk_api_module = (function() {
     this.originalZeroIndex = originalZeroIndex;
     this.batchType = batchType;
     this.operations = [];
-  }
+  };
 
   /**
    * Wraps a legacy operation so we can correctly rewrite its error
@@ -511,7 +511,7 @@ var _bulk_api_module = (function() {
     this.batchType = batchType;
     this.index = index;
     this.operation = operation;
-  }
+  };
   
   /***********************************************************
    * Wraps the operations done for the batch
@@ -556,7 +556,7 @@ var _bulk_api_module = (function() {
           return counter;
         }
       });
-    }
+    };
 
     defineBatchTypeCounter(this, "nInsertOps", INSERT);
     defineBatchTypeCounter(this, "nUpdateOps", UPDATE);
@@ -565,7 +565,7 @@ var _bulk_api_module = (function() {
     // Convert bulk into string
     this.toString = function() {
       return this.tojson();
-    }
+    };
 
     this.tojson = function() {
       return tojson({
@@ -573,12 +573,12 @@ var _bulk_api_module = (function() {
         , nUpdateOps: this.nUpdateOps
         , nRemoveOps: this.nRemoveOps
         , nBatches: batches.length + (currentBatch == null ? 0 : 1)
-      })
-    }
+      });
+    };
 
     this.getOperations = function() {
       return batches;
-    }
+    };
 
     var finalizeBatch = function(newDocType) {
         // Save the batch to the execution stack
@@ -663,7 +663,7 @@ var _bulk_api_module = (function() {
           , u: updateDocument
           , multi: true
           , upsert: upsert
-        }
+        };
 
         // Clear out current Op
         currentOp = null;
@@ -682,7 +682,7 @@ var _bulk_api_module = (function() {
           , u: updateDocument
           , multi: false
           , upsert: upsert
-        }
+        };
 
         // Clear out current Op
         currentOp = null;
@@ -707,7 +707,7 @@ var _bulk_api_module = (function() {
         var document = {
             q: currentOp.selector
           , limit: 1
-        }
+        };
 
         // Clear out current Op
         currentOp = null;
@@ -722,14 +722,14 @@ var _bulk_api_module = (function() {
         var document = {
             q: currentOp.selector
           , limit: 0
-        }
+        };
 
         // Clear out current Op
         currentOp = null;
         // Add the remove document to the list
         return addToOperationsList(REMOVE, document);
       }
-    }
+    };
 
     //
     // Start of update and remove operations
@@ -738,11 +738,11 @@ var _bulk_api_module = (function() {
       // Save a current selector
       currentOp = {
         selector: selector
-      }
+      };
 
       // Return the find Operations
       return findOperations;
-    }
+    };
 
     //
     // Merge write command result into aggregated results object
@@ -809,7 +809,7 @@ var _bulk_api_module = (function() {
       if(result.writeConcernError) {
         bulkResult.writeConcernErrors.push(new WriteConcernError(result.writeConcernError));
       }
-    }
+    };
 
     //
     // Constructs the write batch command.
@@ -818,7 +818,7 @@ var _bulk_api_module = (function() {
 
       // Generate the right update
       if(batch.batchType == UPDATE) {
-        cmd = { update: coll.getName(), updates: batch.operations, ordered: ordered }
+        cmd = { update: coll.getName(), updates: batch.operations, ordered: ordered };
       } else if(batch.batchType == INSERT) {
         var transformedInserts = [];
         batch.operations.forEach(function(insertDoc) {
@@ -826,9 +826,9 @@ var _bulk_api_module = (function() {
         });
         batch.operations = transformedInserts;
 
-        cmd = { insert: coll.getName(), documents: batch.operations, ordered: ordered }
+        cmd = { insert: coll.getName(), documents: batch.operations, ordered: ordered };
       } else if(batch.batchType == REMOVE) {
-        cmd = { delete: coll.getName(), deletes: batch.operations, ordered: ordered }
+        cmd = { delete: coll.getName(), deletes: batch.operations, ordered: ordered };
       }
 
       // If we have a write concern
@@ -837,7 +837,7 @@ var _bulk_api_module = (function() {
       }
 
       return cmd;
-    }
+    };
 
     //
     // Execute the batch
@@ -861,7 +861,7 @@ var _bulk_api_module = (function() {
 
       // Merge the results
       mergeBatchResults(batch, bulkResult, result);
-    }
+    };
     
     // Execute a single legacy op
     var executeLegacyOp = function(_legacyOp) {
@@ -894,7 +894,7 @@ var _bulk_api_module = (function() {
                                      _legacyOp.operation.q,
                                      single);
       }
-    }
+    };
 
     /**
      * Parses the getLastError response and properly sets the write errors and
@@ -965,7 +965,7 @@ var _bulk_api_module = (function() {
         extractedErr.unknownError = {
             code: code
           , errmsg: errMsg
-        }
+        };
       }
       else if (err != '') {
         extractedErr.writeError = {
@@ -1110,7 +1110,7 @@ var _bulk_api_module = (function() {
 
       // Merge the results
       mergeBatchResults(batch, bulkResult, batchResult);
-    }
+    };
 
     //
     // Execute the batch
@@ -1163,7 +1163,7 @@ var _bulk_api_module = (function() {
       }
 
       return typedResult;
-    }
+    };
 
     // Generate an explain command for the bulk operation. Currently we only support single batches
     // of size 1, which must be either delete or update.
@@ -1181,8 +1181,8 @@ var _bulk_api_module = (function() {
       var explainBatch = batches[0];
       var writeCmd = buildBatchCmd(explainBatch);
       return {"explain": writeCmd, "verbosity": verbosity};
-    }
-  }
+    };
+  };
 
   //
   // Exports

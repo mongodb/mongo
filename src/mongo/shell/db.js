@@ -8,31 +8,31 @@ if (DB === undefined) {
     DB = function( mongo , name ){
         this._mongo = mongo;
         this._name = name;
-    }
+    };
 }
 
 DB.prototype.getMongo = function(){
     assert( this._mongo , "why no mongo!" );
     return this._mongo;
-}
+};
 
 DB.prototype.getSiblingDB = function( name ){
     return this.getMongo().getDB( name );
-}
+};
 
 DB.prototype.getSisterDB = DB.prototype.getSiblingDB;
 
 DB.prototype.getName = function(){
     return this._name;
-}
+};
 
 DB.prototype.stats = function(scale){
     return this.runCommand( { dbstats : 1 , scale : scale } );
-}
+};
 
 DB.prototype.getCollection = function( name ){
     return new DBCollection( this._mongo , this , name , this._name + "." + name );
-}
+};
 
 DB.prototype.commandHelp = function( name ){
     var c = {};
@@ -42,7 +42,7 @@ DB.prototype.commandHelp = function( name ){
     if ( ! res.ok )
         throw _getErrorWithCode(res, res.errmsg);
     return res.help;
-}
+};
 
  // utility to attach readPreference if needed.
  DB.prototype._attachReadPreferenceToCommand = function (cmdObj, readPref) {
@@ -112,7 +112,7 @@ DB.prototype.commandHelp = function( name ){
  // runCommand uses this impl to actually execute the command
  DB.prototype._runCommandImpl = function(name, obj, options){
      return this.getMongo().runCommand(name, obj, options);
- }
+ };
 
  DB.prototype.runCommand = function( obj, extra, queryOptions ){
      var mergedObj = (typeof(obj) === "string") ? this._mergeCommandOptions(obj, extra) : obj;
@@ -147,7 +147,7 @@ DB.prototype.adminCommand = function( obj, extra ){
     if ( this._name == "admin" )
         return this.runCommand( obj, extra );
     return this.getSiblingDB( "admin" ).runCommand( obj, extra );
-}
+};
 
 DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
 
@@ -229,7 +229,7 @@ DB.prototype.createCollection = function(name, opt) {
     Object.extend(cmd, options);
 
     return this._dbCommand(cmd);
-}
+};
 
 /**
  * @deprecated use getProfilingStatus
@@ -239,7 +239,7 @@ DB.prototype.createCollection = function(name, opt) {
 DB.prototype.getProfilingLevel  = function() {
     var res = assert.commandWorked(this._dbCommand( { profile: -1 } ));
     return res ? res.was : null;
-}
+};
 
 /**
  *  @return the current profiling status
@@ -250,9 +250,9 @@ DB.prototype.getProfilingStatus  = function() {
     var res = this._dbCommand( { profile: -1 } );
     if ( ! res.ok )
         throw _getErrorWithCode(res, "profile command failed: " + tojson(res));
-    delete res.ok
+    delete res.ok;
     return res;
-}
+};
 
 
 /**
@@ -264,7 +264,7 @@ DB.prototype.dropDatabase = function() {
     if ( arguments.length )
         throw Error("dropDatabase doesn't take arguments");
     return this._dbCommand( { dropDatabase: 1 } );
-}
+};
 
 /**
  * Shuts down the database.  Must be run while using the admin database.
@@ -300,7 +300,7 @@ DB.prototype.shutdownServer = function(opts) {
         }
         throw e;
     }
-}
+};
 
 /**
   Clone database on another server to here.
@@ -320,7 +320,7 @@ DB.prototype.shutdownServer = function(opts) {
 DB.prototype.cloneDatabase = function(from) { 
     assert( isString(from) && from.length );
     return this._dbCommand( { clone: from } );
-}
+};
 
 
 /**
@@ -346,7 +346,7 @@ DB.prototype.cloneCollection = function(from, collection, query) {
     collection = this._name + "." + collection;
     query = query || {};
     return this._dbCommand( { cloneCollection:collection, from:from, query:query } );
-}
+};
 
 
 /**
@@ -394,7 +394,7 @@ DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password,
     return this._adminCommand({ copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb,
                                 username:username, nonce:n.nonce,
                                 key:this.__pwHash(n.nonce, username, password) });
-}
+};
 
 /**
   Repair database.
@@ -403,7 +403,7 @@ DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password,
 */
 DB.prototype.repairDatabase = function() {
     return this._dbCommand( { repairDatabase: 1 } );
-}
+};
 
 
 DB.prototype.help = function() {
@@ -461,7 +461,7 @@ DB.prototype.help = function() {
     print("\tdb.version() current version of the server");
 
     return __magicNoPrint;
-}
+};
 
 DB.prototype.printCollectionStats = function(scale) { 
     if (arguments.length > 1) { 
@@ -486,7 +486,7 @@ DB.prototype.printCollectionStats = function(scale) {
             print( "---" );
         }
     );
-}
+};
 
 /**
  * <p> Set profiling level for your db.  Profiling gathers stats on query performance. </p>
@@ -516,7 +516,7 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
     if ( isNumber( slowms ) )
         cmd["slowms"] = slowms;
     return assert.commandWorked(this._dbCommand( cmd ));
-}
+};
 
 /**
  * @deprecated
@@ -553,7 +553,7 @@ DB.prototype.eval = function(jsfunction) {
         throw _getErrorWithCode(res, tojson(res));
     
     return res.retval;
-}
+};
 
 DB.prototype.dbEval = DB.prototype.eval;
 
@@ -626,10 +626,10 @@ DB.prototype.groupeval = function(parmsObj) {
         }
 
         return map.values();
-    }
+    };
 
     return this.eval(groupFunction, this._groupFixParms( parmsObj ));
-}
+};
 
 DB.prototype.groupcmd = function( parmsObj ){
     var ret = this.runCommand( { "group" : this._groupFixParms( parmsObj ) } );
@@ -637,7 +637,7 @@ DB.prototype.groupcmd = function( parmsObj ){
         throw _getErrorWithCode(ret, "group command failed: " + tojson(ret));
     }
     return ret.retval;
-}
+};
 
 DB.prototype.group = DB.prototype.groupcmd;
 
@@ -655,22 +655,22 @@ DB.prototype._groupFixParms = function( parmsObj ){
     }
 
     return parms;
-}
+};
 
 DB.prototype.resetError = function(){
     return this.runCommand( { reseterror : 1 } );
-}
+};
 
 DB.prototype.forceError = function(){
     return this.runCommand( { forceerror : 1 } );
-}
+};
 
 DB.prototype.getLastError = function( w , wtimeout ){
     var res = this.getLastErrorObj( w , wtimeout );
     if ( ! res.ok )
         throw _getErrorWithCode(ret, "getlasterror failed: " + tojson(res));
     return res.err;
-}
+};
 DB.prototype.getLastErrorObj = function( w , wtimeout ){
     var cmd = { getlasterror : 1 };
     if ( w ){
@@ -683,7 +683,7 @@ DB.prototype.getLastErrorObj = function( w , wtimeout ){
     if ( ! res.ok )
         throw _getErrorWithCode(res, "getlasterror failed: " + tojson(res));
     return res;
-}
+};
 DB.prototype.getLastErrorCmd = DB.prototype.getLastErrorObj;
 
 
@@ -696,7 +696,7 @@ DB.prototype.getLastErrorCmd = DB.prototype.getLastErrorObj;
  */
 DB.prototype.getPrevError = function(){
     return this.runCommand( { getpreverror : 1 } );
-}
+};
 
 DB.prototype._getCollectionInfosSystemNamespaces = function(filter) {
     var all = [];
@@ -727,7 +727,7 @@ DB.prototype._getCollectionInfosSystemNamespaces = function(filter) {
     
     // Return list of objects sorted by collection name.
     return all.sort(function(coll1, coll2) { return coll1.name.localeCompare(coll2.name); });
-}
+};
 
 
 DB.prototype._getCollectionInfosCommand = function(filter) {
@@ -747,7 +747,7 @@ DB.prototype._getCollectionInfosCommand = function(filter) {
     }
 
     return new DBCommandCursor(this._mongo, res).toArray().sort(compareOn("name"));
-}
+};
 
 /**
  * Returns a list that contains the names and options of this database's collections, sorted by
@@ -760,34 +760,34 @@ DB.prototype.getCollectionInfos = function(filter) {
         return res;
     }
     return this._getCollectionInfosSystemNamespaces(filter);
-}
+};
 
 /**
  * Returns this database's list of collection names in sorted order.
  */
 DB.prototype.getCollectionNames = function() {
     return this.getCollectionInfos().map(function(infoObj) { return infoObj.name; });
-}
+};
 
 DB.prototype.tojson = function(){
     return this._name;
-}
+};
 
 DB.prototype.toString = function(){
     return this._name;
-}
+};
 
-DB.prototype.isMaster = function () { return this.runCommand("isMaster"); }
+DB.prototype.isMaster = function () { return this.runCommand("isMaster"); };
 
 var commandUnsupported = function(res) {
     return (!res.ok &&
             (res.errmsg.startsWith("no such cmd") ||
              res.errmsg.startsWith("no such command") ||
-             res.code === 59 /* CommandNotFound */))
+             res.code === 59 /* CommandNotFound */));
 };
 
 DB.prototype.currentOp = function(arg) {
-    var q = {}
+    var q = {};
     if ( arg ) {
         if ( typeof( arg ) == "object" )
             Object.extend( q , arg );
@@ -809,7 +809,7 @@ DB.prototype.currentOp = function(arg) {
         }
     }
     return res;
-}
+};
 DB.prototype.currentOP = DB.prototype.currentOp;
 
 DB.prototype.killOp = function(op) {
@@ -827,14 +827,14 @@ DB.prototype.killOp = function(op) {
         }
     }
     return res;
-}
+};
 DB.prototype.killOP = DB.prototype.killOp;
 
 DB.tsToSeconds = function(x){
     if ( x.t && x.i )
         return x.t;
     return x / 4294967296; // low 32 bits are ordinal #s within a second
-}
+};
 
 /** 
   Get a replication log information summary.
@@ -933,7 +933,7 @@ DB.prototype.printReplicationInfo = function() {
     print("oplog first event time:  " + result.tFirst);
     print("oplog last event time:   " + result.tLast);
     print("now:                     " + result.now);
-}
+};
 
 DB.prototype.printSlaveReplicationInfo = function() {
     var startOptimeDate = null;
@@ -952,7 +952,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
             suffix = "freshest member (no primary available at the moment)";
         }
         print("\t" + Math.round(ago) + " secs (" + hrs + " hrs) behind the " + suffix);
-    };
+    }
 
     function getMaster(members) {
         for (i in members) {
@@ -963,10 +963,10 @@ DB.prototype.printSlaveReplicationInfo = function() {
         }
 
         return null;
-    };
+    }
 
     function g(x) {
-        assert( x , "how could this be null (printSlaveReplicationInfo gx)" )
+        assert( x , "how could this be null (printSlaveReplicationInfo gx)" );
         print("source: " + x.host);
         if ( x.syncedTo ){
             var st = new Date( DB.tsToSeconds( x.syncedTo ) * 1000 );
@@ -975,7 +975,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
         else {
             print( "\tdoing initial sync" );
         }
-    };
+    }
 
     function r(x) {
         assert( x , "how could this be null (printSlaveReplicationInfo rx)" );
@@ -990,7 +990,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
         else {
             print( "\tno replication info, yet.  State: " + x.stateStr );
         }
-    };
+    }
     
     var L = this.getSiblingDB("local");
 
@@ -1022,11 +1022,11 @@ DB.prototype.printSlaveReplicationInfo = function() {
         print("local.sources is empty; is this db a --slave?");
         return;
     }
-}
+};
 
 DB.prototype.serverBuildInfo = function(){
     return this._adminCommand( "buildinfo" );
-}
+};
 
 // Used to trim entries from the metrics.commands that have never been executed
 getActiveCommands = function(tree) {
@@ -1053,7 +1053,7 @@ getActiveCommands = function(tree) {
         }
     }
     return result;
-}
+};
 
 DB.prototype.serverStatus = function( options ){
     var cmd = { serverStatus : 1 };
@@ -1066,23 +1066,23 @@ DB.prototype.serverStatus = function( options ){
             res.metrics.commands = getActiveCommands(res.metrics.commands);
     }
     return res;
-}
+};
 
 DB.prototype.hostInfo = function(){
     return this._adminCommand( "hostInfo" );
-}
+};
 
 DB.prototype.serverCmdLineOpts = function(){
     return this._adminCommand( "getCmdLineOpts" );
-}
+};
 
 DB.prototype.version = function(){
     return this.serverBuildInfo().version;
-}
+};
 
 DB.prototype.serverBits = function(){
     return this.serverBuildInfo().bits;
-}
+};
 
 DB.prototype.listCommands = function(){
     var x = this.runCommand( "listCommands" );
@@ -1100,15 +1100,15 @@ DB.prototype.listCommands = function(){
         
         print( s );
     }
-}
+};
 
 DB.prototype.printShardingStatus = function( verbose ){
     printShardingStatus( this.getSiblingDB( "config" ) , verbose );
-}
+};
 
 DB.prototype.fsyncLock = function() {
     return this.adminCommand({fsync:1, lock:true});
-}
+};
 
 DB.prototype.fsyncUnlock = function() {
     var res = this.adminCommand({fsyncUnlock: 1});
@@ -1122,7 +1122,7 @@ DB.prototype.fsyncUnlock = function() {
         }
     }
     return res;
-}
+};
 
 DB.autocomplete = function(obj){
     var colls = obj.getCollectionNames();
@@ -1132,23 +1132,23 @@ DB.autocomplete = function(obj){
             ret.push(colls[i]);
     }
     return ret;
-}
+};
 
 DB.prototype.setSlaveOk = function( value ) {
     if( value == undefined ) value = true;
     this._slaveOk = value;
-}
+};
 
 DB.prototype.getSlaveOk = function() {
     if (this._slaveOk != undefined) return this._slaveOk;
     return this._mongo.getSlaveOk();
-}
+};
 
 DB.prototype.getQueryOptions = function() {
    var options = 0;
    if (this.getSlaveOk()) options |= 4;
    return options;
-}
+};
 
 /* Loads any scripts contained in system.js into the client shell.
 */
@@ -1157,14 +1157,14 @@ DB.prototype.loadServerScripts = function(){
     this.system.js.find().forEach(function(u) {
         global[u._id] = u.value;
     });
-}
+};
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////// Security shell helpers below //////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var _defaultWriteConcern = { w: 'majority', wtimeout: 30 * 1000 }
+var _defaultWriteConcern = { w: 'majority', wtimeout: 30 * 1000 };
 
 function getUserObjString(userObj) {
     var pwd = userObj.pwd;
@@ -1193,7 +1193,7 @@ DB.prototype._modifyCommandToDigestPasswordIfNecessary = function(cmdObj, userna
                     passwordDigestor + "'");
     }
     delete cmdObj["passwordDigestor"];
-}
+};
 
 DB.prototype.createUser = function(userObj, writeConcern) {
     var name = userObj["user"];
@@ -1223,7 +1223,7 @@ DB.prototype.createUser = function(userObj, writeConcern) {
     }
 
     throw _getErrorWithCode(res, "couldn't add user: " + res.errmsg);
-}
+};
 
 function _hashPassword(username, password) {
     if (typeof password != 'string') {
@@ -1288,7 +1288,7 @@ DB.prototype.logout = function(){
 DB.prototype.removeUser = function( username, writeConcern ) {
     print("WARNING: db.removeUser has been deprecated, please use db.dropUser instead");
     return this.dropUser(username, writeConcern);
-}
+};
 
 DB.prototype.dropUser = function( username, writeConcern ){
     var cmdObj = {dropUser: username,
@@ -1308,7 +1308,7 @@ DB.prototype.dropUser = function( username, writeConcern ){
     }
 
     throw _getErrorWithCode(res, res.errmsg);
-}
+};
 
 /**
  * Used for removing users in systems with V1 style user information
@@ -1328,7 +1328,7 @@ DB.prototype._removeUserV1 = function(username, writeConcern) {
     } else {
         return false;
     }
-}
+};
 
 DB.prototype.dropAllUsers = function(writeConcern) {
     var res = this.runCommand({dropAllUsersFromDatabase:1,
@@ -1339,11 +1339,11 @@ DB.prototype.dropAllUsers = function(writeConcern) {
     }
 
     return res.n;
-}
+};
 
 DB.prototype.__pwHash = function( nonce, username, pass ) {
     return hex_md5(nonce + username + _hashPassword(username, pass));
-}
+};
 
 DB.prototype._defaultAuthenticationMechanism = null;
 
@@ -1358,7 +1358,7 @@ DB.prototype._getDefaultAuthenticationMechanism = function() {
         return "MONGODB-CR";
     }
     return "SCRAM-SHA-1";
-}
+};
 
 DB.prototype._defaultGssapiServiceName = null;
 
@@ -1399,7 +1399,7 @@ DB.prototype._authOrThrow = function () {
     }
 
     return good;
-}
+};
 
 
 DB.prototype.auth = function() {
@@ -1411,7 +1411,7 @@ DB.prototype.auth = function() {
         return 0;
     }
     return 1;
-}
+};
 
 DB.prototype.grantRolesToUser = function(username, roles, writeConcern) {
     var cmdObj = {grantRolesToUser: username,
@@ -1421,7 +1421,7 @@ DB.prototype.grantRolesToUser = function(username, roles, writeConcern) {
     if (!res.ok) {
         throw _getErrorWithCode(res, res.errmsg);
     }
-}
+};
 
 DB.prototype.revokeRolesFromUser = function(username, roles, writeConcern) {
     var cmdObj = {revokeRolesFromUser: username,
@@ -1431,7 +1431,7 @@ DB.prototype.revokeRolesFromUser = function(username, roles, writeConcern) {
     if (!res.ok) {
         throw _getErrorWithCode(res, res.errmsg);
     }
-}
+};
 
 DB.prototype.getUser = function(username, args) {
     if (typeof username != "string") {
@@ -1449,7 +1449,7 @@ DB.prototype.getUser = function(username, args) {
         return null;
     }
     return res.users[0];
-}
+};
 
 DB.prototype.getUsers = function(args) {
     var cmdObj = {usersInfo: 1};
@@ -1467,7 +1467,7 @@ DB.prototype.getUsers = function(args) {
     }
 
     return res.users;
-}
+};
 
 DB.prototype.createRole = function(roleObj, writeConcern) {
     var name = roleObj["role"];
@@ -1482,7 +1482,7 @@ DB.prototype.createRole = function(roleObj, writeConcern) {
         throw _getErrorWithCode(res, res.errmsg);
     }
     printjson(roleObj);
-}
+};
 
 DB.prototype.updateRole = function(name, updateObject, writeConcern) {
     var cmdObj = {updateRole:name};
@@ -1519,7 +1519,7 @@ DB.prototype.dropAllRoles = function(writeConcern) {
     }
 
     return res.n;
-}
+};
 
 DB.prototype.grantRolesToRole = function(rolename, roles, writeConcern) {
     var cmdObj = {grantRolesToRole: rolename,
@@ -1529,7 +1529,7 @@ DB.prototype.grantRolesToRole = function(rolename, roles, writeConcern) {
     if (!res.ok) {
         throw _getErrorWithCode(res, res.errmsg);
     }
-}
+};
 
 DB.prototype.revokeRolesFromRole = function(rolename, roles, writeConcern) {
     var cmdObj = {revokeRolesFromRole: rolename,
@@ -1539,7 +1539,7 @@ DB.prototype.revokeRolesFromRole = function(rolename, roles, writeConcern) {
     if (!res.ok) {
         throw _getErrorWithCode(res, res.errmsg);
     }
-}
+};
 
 DB.prototype.grantPrivilegesToRole = function(rolename, privileges, writeConcern) {
     var cmdObj = {grantPrivilegesToRole: rolename,
@@ -1549,7 +1549,7 @@ DB.prototype.grantPrivilegesToRole = function(rolename, privileges, writeConcern
     if (!res.ok) {
         throw _getErrorWithCode(res, res.errmsg);
     }
-}
+};
 
 DB.prototype.revokePrivilegesFromRole = function(rolename, privileges, writeConcern) {
     var cmdObj = {revokePrivilegesFromRole: rolename,
@@ -1559,7 +1559,7 @@ DB.prototype.revokePrivilegesFromRole = function(rolename, privileges, writeConc
     if (!res.ok) {
         throw _getErrorWithCode(res, res.errmsg);
     }
-}
+};
 
 DB.prototype.getRole = function(rolename, args) {
     if (typeof rolename != "string") {
@@ -1576,7 +1576,7 @@ DB.prototype.getRole = function(rolename, args) {
         return null;
     }
     return res.roles[0];
-}
+};
 
 DB.prototype.getRoles = function(args) {
     var cmdObj = {rolesInfo:1};
@@ -1587,7 +1587,7 @@ DB.prototype.getRoles = function(args) {
     }
 
     return res.roles;
-}
+};
 
 DB.prototype.setWriteConcern = function( wc ) {
     if ( wc instanceof WriteConcern ) {
@@ -1614,10 +1614,10 @@ DB.prototype.unsetWriteConcern = function() {
 
 DB.prototype.getLogComponents = function() {
     return this.getMongo().getLogComponents();
-}
+};
 
 DB.prototype.setLogLevel = function(logLevel, component) {
     return this.getMongo().setLogLevel(logLevel, component);
-}
+};
 
 }());

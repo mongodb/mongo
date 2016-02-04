@@ -22,7 +22,7 @@ DBCollection.prototype._createWriteConcern = function(options) {
     }
 
     return writeConcern;
-}
+};
 
 /**
  * @return {Object} a new document with an _id: ObjectId if _id is not present.
@@ -39,7 +39,7 @@ DBCollection.prototype.addIdIfNeeded = function(obj) {
     }
 
     return obj;
-}
+};
 
 /**
 * Perform a bulkWrite operation without a fluent API
@@ -112,7 +112,7 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
                 operation = operation.upsert();
             }
 
-            operation.updateOne(op.updateOne.update)
+            operation.updateOne(op.updateOne.update);
         } else if(op.updateMany) {
             if(!op.updateMany.filter) {
                 throw new Error('updateMany bulkWrite operation expects the filter field');
@@ -128,7 +128,7 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
                 operation = operation.upsert();
             }
 
-            operation.update(op.updateMany.update)
+            operation.update(op.updateMany.update);
         } else if(op.replaceOne) {
             if(!op.replaceOne.filter) {
                 throw new Error('replaceOne bulkWrite operation expects the filter field');
@@ -144,7 +144,7 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
                 operation = operation.upsert();
             }
 
-            operation.replaceOne(op.replaceOne.replacement)
+            operation.replaceOne(op.replaceOne.replacement);
         } else if(op.deleteOne) {
             if(!op.deleteOne.filter) {
                 throw new Error('deleteOne bulkWrite operation expects the filter field');
@@ -183,7 +183,7 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
 
     // Return the result
     return result;
-}
+};
 
 /**
 * Inserts a single document into MongoDB.
@@ -236,7 +236,7 @@ DBCollection.prototype.insertOne = function(document, options) {
 
     // Return the result
     return result;
-}
+};
 
 /**
 * Inserts an array of documents into MongoDB.
@@ -289,7 +289,7 @@ DBCollection.prototype.insertMany = function(documents, options) {
 
     // Return the result
     return result;
-}
+};
 
 /**
 * Delete a document on MongoDB
@@ -338,7 +338,7 @@ DBCollection.prototype.deleteOne = function(filter, options) {
 
     result.deletedCount = r.nRemoved;
     return result;
-}
+};
 
 /**
 * Delete multiple documents on MongoDB
@@ -387,7 +387,7 @@ DBCollection.prototype.deleteMany = function(filter, options) {
 
     result.deletedCount = r.nRemoved;
     return result;
-}
+};
 
 /**
 * Replace a document on MongoDB
@@ -456,7 +456,7 @@ DBCollection.prototype.replaceOne = function(filter, replacement, options) {
     }
 
     return result;
-}
+};
 
 /**
 * Update a single document on MongoDB
@@ -525,11 +525,11 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
     result.modifiedCount = (r.nModified != null) ? r.nModified : r.n;
 
     if (r.getUpsertedIds().length > 0) {
-        result.upsertedId = r.getUpsertedIdAt(0)._id
+        result.upsertedId = r.getUpsertedIdAt(0)._id;
     }
 
     return result;
-}
+};
 
 /**
 * Update multiple documents on MongoDB
@@ -598,11 +598,11 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
     result.modifiedCount = (r.nModified != null) ? r.nModified : r.n;
 
     if (r.getUpsertedIds().length > 0) {
-        result.upsertedId = r.getUpsertedIdAt(0)._id
+        result.upsertedId = r.getUpsertedIdAt(0)._id;
     }
 
     return result;
-}
+};
 
 /**
 * Find a document and delete it in one atomic operation,
@@ -643,7 +643,7 @@ DBCollection.prototype.findOneAndDelete = function(filter, options) {
 
     // Execute findAndModify
     return this.findAndModify(cmd);
-}
+};
 
 /**
 * Find a document and replace it in one atomic operation, requires a write lock for the duration of the operation.
@@ -697,7 +697,7 @@ DBCollection.prototype.findOneAndReplace = function(filter, replacement, options
 
     // Execute findAndModify
     return this.findAndModify(cmd);
-}
+};
 
 /**
 * Find a document and update it in one atomic operation, requires a write lock for the duration of the operation.
@@ -755,4 +755,4 @@ DBCollection.prototype.findOneAndUpdate = function(filter, update, options) {
 
     // Execute findAndModify
     return this.findAndModify(cmd);
-}
+};

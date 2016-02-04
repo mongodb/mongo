@@ -27,7 +27,7 @@ var Explainable = (function() {
         }
 
         return verbosity;
-    }
+    };
 
     var throwOrReturn = function(explainResult) {
         if (("ok" in explainResult && !explainResult.ok) || explainResult.$err) {
@@ -35,7 +35,7 @@ var Explainable = (function() {
         }
 
         return explainResult;
-    }
+    };
 
     function constructor(collection, verbosity) {
 
@@ -52,16 +52,16 @@ var Explainable = (function() {
 
         this.getCollection = function() {
             return this._collection;
-        }
+        };
 
         this.getVerbosity = function() {
             return this._verbosity;
-        }
+        };
 
         this.setVerbosity = function(verbosity) {
             this._verbosity = parseVerbosity(verbosity);
             return this;
-        }
+        };
 
         this.help = function() {
             print("Explainable operations");
@@ -78,7 +78,7 @@ var Explainable = (function() {
             print("\t.getVerbosity()");
             print("\t.setVerbosity(verbosity)");
             return __magicNoPrint;
-        }
+        };
 
         //
         // Pretty representations.
@@ -103,8 +103,8 @@ var Explainable = (function() {
         this.aggregate = function(pipeline, extraOpts) {
             if (!(pipeline instanceof Array)) {
                 // support legacy varargs form. (Also handles db.foo.aggregate())
-                pipeline = argumentsToArray(arguments)
-                extraOpts = {}
+                pipeline = argumentsToArray(arguments);
+                extraOpts = {};
             }
 
             // Add the explain option.
@@ -112,11 +112,11 @@ var Explainable = (function() {
             extraOpts.explain = true;
 
             return this._collection.aggregate(pipeline, extraOpts);
-        }
+        };
 
         this.count = function(query) {
             return this.find(query).count();
-        }
+        };
 
         /**
          * .explain().find() and .find().explain() mean the same thing. In both cases, we use
@@ -126,7 +126,7 @@ var Explainable = (function() {
         this.find = function() {
             var cursor = this._collection.find.apply(this._collection, arguments);
             return new DBExplainQuery(cursor, this._verbosity);
-        }
+        };
 
         this.findAndModify = function(params) {
             var famCmd = Object.extend({"findAndModify": this._collection.getName()}, params);
@@ -141,7 +141,7 @@ var Explainable = (function() {
             var explainCmd = {"explain": grpCmd, "verbosity": this._verbosity};
             var explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
-        }
+        };
 
         this.distinct = function(keyString, query) {
             var distinctCmd = {distinct: this._collection.getName(),
@@ -150,7 +150,7 @@ var Explainable = (function() {
             var explainCmd = {explain: distinctCmd, verbosity: this._verbosity};
             var explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
-        }
+        };
 
         this.remove = function() {
             var parsed = this._collection._parseRemove.apply(this._collection, arguments);
@@ -169,7 +169,7 @@ var Explainable = (function() {
             var explainCmd = bulk.convertToExplainCmd(this._verbosity);
             var explainResult = this._collection.runCommand(explainCmd);
             return throwOrReturn(explainResult);
-        }
+        };
 
         this.update = function() {
             var parsed = this._collection._parseUpdate.apply(this._collection, arguments);
@@ -195,7 +195,7 @@ var Explainable = (function() {
             var explainCmd = bulk.convertToExplainCmd(this._verbosity);
             var explainResult = this._collection.runCommand(explainCmd);
             return throwOrReturn(explainResult);
-        }
+        };
 
     }
 

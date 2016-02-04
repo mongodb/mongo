@@ -2,19 +2,19 @@
 if (typeof(Timestamp) != "undefined"){
     Timestamp.prototype.tojson = function() {
         return this.toString();
-    }
+    };
 
     Timestamp.prototype.getTime = function() {
         return this.t;
-    }
+    };
 
     Timestamp.prototype.getInc = function() {
         return this.i;
-    }
+    };
 
     Timestamp.prototype.toString = function() {
         return "Timestamp(" + this.t + ", " + this.i + ")";
-    }
+    };
 }
 else {
     print("warning: no Timestamp class");
@@ -28,7 +28,7 @@ Date.timeFunc = function(theFunc, numTimes){
     }
 
     return (new Date()).getTime() - start.getTime();
-}
+};
 
 Date.prototype.tojson = function(){
     var UTC = 'UTC';
@@ -37,10 +37,10 @@ Date.prototype.tojson = function(){
     var date = this['get'+UTC+'Date']().zeroPad(2);
     var hour = this['get'+UTC+'Hours']().zeroPad(2);
     var minute = this['get'+UTC+'Minutes']().zeroPad(2);
-    var sec = this['get'+UTC+'Seconds']().zeroPad(2)
+    var sec = this['get'+UTC+'Seconds']().zeroPad(2);
 
     if (this['get'+UTC+'Milliseconds']())
-        sec += '.' + this['get'+UTC+'Milliseconds']().zeroPad(3)
+        sec += '.' + this['get'+UTC+'Milliseconds']().zeroPad(3);
 
     var ofs = 'Z';
     // // print a non-UTC time
@@ -51,7 +51,7 @@ Date.prototype.tojson = function(){
     //     ofs += (ofsmin%60).zeroPad(2)
     // }
     return 'ISODate("'+year+'-'+month+'-'+date+'T'+hour+':'+minute+':'+sec+ofs+'")';
-}
+};
 
 ISODate = function(isoDateStr){
     if (!isoDateStr)
@@ -101,16 +101,16 @@ ISODate = function(isoDateStr){
         if (res[12] == '+') // if ahead subtract
             ofs *= -1;
 
-        time += ofs
+        time += ofs;
     }
 
     return new Date(time);
-}
+};
 
 // Regular Expression
 RegExp.escape = function(text){
     return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
-}
+};
 
 RegExp.prototype.tojson = RegExp.prototype.toString;
 
@@ -125,7 +125,7 @@ Array.contains = function(a, x){
             return true;
     }
     return false;
-}
+};
 
 Array.unique = function(a){
     if (!Array.isArray(a)) {
@@ -140,7 +140,7 @@ Array.unique = function(a){
         }
     }
     return u;
-}
+};
 
 Array.shuffle = function(arr){
     if (!Array.isArray(arr)) {
@@ -154,7 +154,7 @@ Array.shuffle = function(arr){
         arr[pos] = save;
     }
     return arr;
-}
+};
 
 Array.tojson = function(a, indent, nolint){
     if (!Array.isArray(a)) {
@@ -191,7 +191,7 @@ Array.tojson = function(a, indent, nolint){
 
     s += elementSeparator + indent + "]";
     return s;
-}
+};
 
 Array.fetchRefs = function(arr, coll){
     if (!Array.isArray(arr)) {
@@ -206,7 +206,7 @@ Array.fetchRefs = function(arr, coll){
         n.push(z.fetch());
     }
     return n;
-}
+};
 
 Array.sum = function(arr){
     if (!Array.isArray(arr)) {
@@ -219,7 +219,7 @@ Array.sum = function(arr){
     for (var i=1; i<arr.length; i++)
         s += arr[i];
     return s;
-}
+};
 
 Array.avg = function(arr){
     if (!Array.isArray(arr)) {
@@ -229,7 +229,7 @@ Array.avg = function(arr){
     if (arr.length == 0)
         return null;
     return Array.sum(arr) / arr.length;
-}
+};
 
 Array.stdDev = function(arr){
     if (!Array.isArray(arr)) {
@@ -244,7 +244,7 @@ Array.stdDev = function(arr){
     }
 
     return Math.sqrt(sum / arr.length);
-}
+};
 
 // Object
 Object.extend = function(dst, src, deep){
@@ -262,12 +262,12 @@ Object.extend = function(dst, src, deep){
         dst[k] = v;
     }
     return dst;
-}
+};
 
 Object.merge = function(dst, src, deep){
-    var clone = Object.extend({}, dst, deep)
-    return Object.extend(clone, src, deep)
-}
+    var clone = Object.extend({}, dst, deep);
+    return Object.extend(clone, src, deep);
+};
 
 Object.keySet = function(o) {
     var ret = new Array();
@@ -277,23 +277,23 @@ Object.keySet = function(o) {
         }
     }
     return ret;
-}
+};
 
 // String
 if (String.prototype.trim === undefined) {
     String.prototype.trim = function() {
         return this.replace(/^\s+|\s+$/g,"");
-    }
+    };
 }
 if (String.prototype.trimLeft === undefined) {
     String.prototype.trimLeft = function() {
         return this.replace(/^\s+/,"");
-    }
+    };
 }
 if (String.prototype.trimRight === undefined) {
     String.prototype.trimRight = function() {
         return this.replace(/\s+$/,"");
-    }
+    };
 }
 
 // always provide ltrim and rtrim for backwards compatibility
@@ -301,12 +301,12 @@ String.prototype.ltrim = String.prototype.trimLeft;
 String.prototype.rtrim = String.prototype.trimRight;
 
 String.prototype.startsWith = function(str){
-    return this.indexOf(str) == 0
-}
+    return this.indexOf(str) == 0;
+};
 
 String.prototype.endsWith = function(str){
-    return this.indexOf(str, this.length - str.length) !== -1
-}
+    return this.indexOf(str, this.length - str.length) !== -1;
+};
 
 // Polyfill taken from
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/includes
@@ -334,71 +334,71 @@ String.prototype.pad = function(length, right, chr) {
         }
     }
     return str;
-}
+};
 
 // Number
 Number.prototype.toPercentStr = function() {
     return (this * 100).toFixed(2) + "%";
-}
+};
 
 Number.prototype.zeroPad = function(width) {
     return ('' + this).pad(width, false, '0');
-}
+};
 
 // NumberLong
 if (! NumberLong.prototype) {
-    NumberLong.prototype = {}
+    NumberLong.prototype = {};
 }
 
 NumberLong.prototype.tojson = function() {
     return this.toString();
-}
+};
 
 // NumberInt
 if (! NumberInt.prototype) {
-    NumberInt.prototype = {}
+    NumberInt.prototype = {};
 }
 
 NumberInt.prototype.tojson = function() {
     return this.toString();
-}
+};
 
 // NumberDecimal
 if (typeof NumberDecimal !== 'undefined') {
     if (! NumberDecimal.prototype) {
-        NumberDecimal.prototype = {}
+        NumberDecimal.prototype = {};
     }
 
     NumberDecimal.prototype.tojson = function() {
         return this.toString();
-    }
+    };
 }
 
 // ObjectId
 if (! ObjectId.prototype)
-    ObjectId.prototype = {}
+    ObjectId.prototype = {};
 
 ObjectId.prototype.toString = function(){
     return "ObjectId(" + tojson(this.str) + ")";
-}
+};
 
 ObjectId.prototype.tojson = function(){
     return this.toString();
-}
+};
 
 ObjectId.prototype.valueOf = function(){
     return this.str;
-}
+};
 
 ObjectId.prototype.isObjectId = true;
 
 ObjectId.prototype.getTimestamp = function(){
     return new Date(parseInt(this.valueOf().slice(0,8), 16)*1000);
-}
+};
 
 ObjectId.prototype.equals = function(other){
     return this.str == other.str;
-}
+};
 
 // Creates an ObjectId from a Date.
 // Based on solution discussed here:
@@ -429,7 +429,7 @@ ObjectId.fromDate = function(source) {
     var objectId = ObjectId(hexTimestamp);
 
     return objectId;
-}
+};
 
 // DBPointer
 if (typeof(DBPointer) != "undefined"){
@@ -437,23 +437,23 @@ if (typeof(DBPointer) != "undefined"){
         assert(this.ns, "need a ns");
         assert(this.id, "need an id");
         return db[ this.ns ].findOne({ _id : this.id });
-    }
+    };
 
     DBPointer.prototype.tojson = function(indent){
         return this.toString();
-    }
+    };
 
     DBPointer.prototype.getCollection = function(){
         return this.ns;
-    }
+    };
 
     DBPointer.prototype.getId = function(){
         return this.id;
-    }
+    };
 
     DBPointer.prototype.toString = function(){
         return "DBPointer(" + tojson(this.ns) + ", " + tojson(this.id) + ")";
-    }
+    };
 }
 else {
     print("warning: no DBPointer");
@@ -466,31 +466,31 @@ if (typeof(DBRef) != "undefined"){
         assert(this.$id, "need an id");
         var coll = this.$db ? db.getSiblingDB(this.$db).getCollection(this.$ref) : db[this.$ref];
         return coll.findOne({ _id : this.$id });
-    }
+    };
 
     DBRef.prototype.tojson = function(indent){
         return this.toString();
-    }
+    };
 
     DBRef.prototype.getDb = function(){
         return this.$db || undefined;
-    }
+    };
 
     DBRef.prototype.getCollection = function(){
         return this.$ref;
-    }
+    };
 
     DBRef.prototype.getRef = function(){
         return this.$ref;
-    }
+    };
 
     DBRef.prototype.getId = function(){
         return this.$id;
-    }
+    };
 
     DBRef.prototype.toString = function(){
         return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) + (this.$db ? ", " + tojson(this.$db) : "") + ")";
-    }
+    };
 }
 else {
     print("warning: no DBRef");
@@ -500,14 +500,14 @@ else {
 if (typeof(BinData) != "undefined"){
     BinData.prototype.tojson = function() {
         return this.toString();
-    }
+    };
 
     BinData.prototype.subtype = function() {
         return this.type;
-    }
+    };
     BinData.prototype.length = function() {
         return this.len;
-    }
+    };
 }
 else {
     print("warning: no BinData class");
@@ -517,7 +517,7 @@ else {
 if (typeof(Map) == "undefined"){
     Map = function(){
         this._data = {};
-    }
+    };
 }
 
 Map.hash = function(val){
@@ -539,18 +539,18 @@ Map.hash = function(val){
     }
 
     throw Error( "can't hash : " + typeof(val) );
-}
+};
 
 Map.prototype.put = function(key, value){
     var o = this._get(key);
     var old = o.value;
     o.value = value;
     return old;
-}
+};
 
 Map.prototype.get = function(key){
     return this._get(key).value;
-}
+};
 
 Map.prototype._get = function(key){
     var h = Map.hash(key);
@@ -567,7 +567,7 @@ Map.prototype._get = function(key){
     var o = { key : key, value : null };
     a.push(o);
     return o;
-}
+};
 
 Map.prototype.values = function(){
     var all = [];
@@ -575,18 +575,18 @@ Map.prototype.values = function(){
         this._data[k].forEach(function(z){ all.push(z.value); });
     }
     return all;
-}
+};
 
 if (typeof(gc) == "undefined"){
     gc = function(){
         print("warning: using noop gc()");
-    }
+    };
 }
 
 // Free Functions
 tojsononeline = function(x){
     return tojson(x, " ", true);
-}
+};
 
 tojson = function(x, indent, nolint){
     if (x === null)
@@ -658,7 +658,7 @@ tojson = function(x, indent, nolint){
         throw Error( "tojson can't handle type " + (typeof x) );
     }
 
-}
+};
 
 tojsonObject = function(x, indent, nolint){
     var lineEnding = nolint ? " " : "\n";
@@ -720,25 +720,25 @@ tojsonObject = function(x, indent, nolint){
     // pop one level of indent
     indent = indent.substring(1);
     return s + indent + "}";
-}
+};
 
 printjson = function(x){
     print( tojson( x ) );
-}
+};
 
 printjsononeline = function(x){
     print( tojsononeline( x ) );
-}
+};
 
 isString = function(x){
     return typeof(x) == "string";
-}
+};
 
 isNumber = function(x){
     return typeof(x) == "number";
-}
+};
 
 // This function returns true even if the argument is an array.  See SERVER-14220.
 isObject = function(x){
     return typeof(x) == "object";
-}
+};
