@@ -5,7 +5,7 @@ getLastError = function() {
     ret = db.runCommand( { getlasterror : 1 } );
 //    printjson( ret );
     return ret;
-}
+};
 
 f.save( {a:1} );
 f.update( {a:1}, {a:2} );
