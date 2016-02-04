@@ -57,7 +57,6 @@
  * compromising on hash quality.
  */
 
-#include <string.h>
 #include "wt_internal.h"
 
 /*
@@ -86,33 +85,60 @@ static uint32_t UNALIGNED_LOAD32(const char *p) {
 	return (result);
 }
 
-#if !defined(WORDS_BIGENDIAN)
+#ifdef _MSC_VER
 
-#define	uint32_in_expected_order(x) (x)
-#define	uint64_in_expected_order(x) (x)
+#include <stdlib.h>
+#define	bswap_32(x) _byteswap_ulong(x)
+#define	bswap_64(x) _byteswap_uint64(x)
 
-#else
+#elif defined(__APPLE__)
 
-#ifdef __APPLE__
-/* Mac OS X / Darwin features */
+// Mac OS X / Darwin features
 #include <libkern/OSByteOrder.h>
 #define	bswap_32(x) OSSwapInt32(x)
 #define	bswap_64(x) OSSwapInt64(x)
 
-#elif defined(__sun)
+#elif defined(__sun) || defined(sun)
 
 #include <sys/byteorder.h>
-#define	bswap_32 BSWAP_32
-#define	bswap_64 BSWAP_64
+#define	bswap_32(x) BSWAP_32(x)
+#define	bswap_64(x) BSWAP_64(x)
 
-#else
-#include <byteswap.h>
+#elif defined(__FreeBSD__)
+
+#include <sys/endian.h>
+#define	bswap_32(x) bswap32(x)
+#define	bswap_64(x) bswap64(x)
+
+#elif defined(__OpenBSD__)
+
+#include <sys/types.h>
+#define	bswap_32(x) swap32(x)
+#define	bswap_64(x) swap64(x)
+
+#elif defined(__NetBSD__)
+
+#include <sys/types.h>
+#include <machine/bswap.h>
+#if defined(__BSWAP_RENAME) && !defined(__bswap_32)
+#define	bswap_32(x) bswap32(x)
+#define	bswap_64(x) bswap64(x)
 #endif
 
+#else
+
+#define	bswap_32(x) __wt_bswap32(x)
+#define	bswap_64(x) __wt_bswap64(x)
+
+#endif
+
+#ifdef WORDS_BIGENDIAN
 #define	uint32_in_expected_order(x) (bswap_32(x))
 #define	uint64_in_expected_order(x) (bswap_64(x))
-
-#endif  /* WORDS_BIGENDIAN */
+#else
+#define	uint32_in_expected_order(x) (x)
+#define	uint64_in_expected_order(x) (x)
+#endif
 
 static uint64_t Fetch64(const char *p) {
 	return uint64_in_expected_order(UNALIGNED_LOAD64(p));

@@ -455,6 +455,7 @@ extern int __wt_ext_metadata_search(WT_EXTENSION_API *wt_api, WT_SESSION *wt_ses
 extern int __wt_ext_metadata_update(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *key, const char *value);
 extern int __wt_metadata_get_ckptlist( WT_SESSION *session, const char *name, WT_CKPT **ckptbasep);
 extern void __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase);
+extern void __wt_metadata_init(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor_open( WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp);
 extern int __wt_metadata_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
 extern int __wt_metadata_cursor_release(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);

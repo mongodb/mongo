@@ -287,9 +287,26 @@ restart_page:	page = current->page;
 
 		WT_INTL_INDEX_GET(session, page, pindex);
 
-		/* Fast-path appends. */
+		/*
+		 * Fast-path appends.
+		 *
+		 * The 0th key on an internal page is a problem for a couple of
+		 * reasons.  First, we have to force the 0th key to sort less
+		 * than any application key, so internal pages don't have to be
+		 * updated if the application stores a new, "smallest" key in
+		 * the tree.  Second, reconciliation is aware of this and will
+		 * store a byte of garbage in the 0th key, so the comparison of
+		 * an application key and a 0th key is meaningless (but doing
+		 * the comparison could still incorrectly modify our tracking
+		 * of the leading bytes in each key that we can skip during the
+		 * comparison). For these reasons, special-case the 0th key, and
+		 * never pass it to a collator.
+		 */
 		if (append_check) {
 			descent = pindex->index[pindex->entries - 1];
+
+			if (pindex->entries == 1)
+				goto append;
 			__wt_ref_key(page, descent, &item->data, &item->size);
 			WT_ERR(__wt_compare(
 			    session, collator, srch_key, item, &cmp));
@@ -307,16 +324,8 @@ restart_page:	page = current->page;
 		 * collation order), because doing the tests and error handling
 		 * inside the loop costs about 5%.
 		 *
-		 * The 0th key on an internal page is a problem for a couple of
-		 * reasons.  First, we have to force the 0th key to sort less
-		 * than any application key, so internal pages don't have to be
-		 * updated if the application stores a new, "smallest" key in
-		 * the tree.  Second, reconciliation is aware of this and will
-		 * store a byte of garbage in the 0th key, so the comparison of
-		 * an application key and a 0th key is meaningless (but doing
-		 * the comparison could still incorrectly modify our tracking
-		 * of the leading bytes in each key that we can skip during the
-		 * comparison).  For these reasons, skip the 0th key.
+		 * Reference the comment above about the 0th key: we continue to
+		 * special-case it.
 		 */
 		base = 1;
 		limit = pindex->entries - 1;

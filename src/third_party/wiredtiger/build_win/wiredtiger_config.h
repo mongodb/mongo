@@ -52,9 +52,6 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
-/* Define to 1 if you have the `bz2' library (-lbz2). */
-/* #undef HAVE_LIBBZ2 */
-
 /* Define to 1 if you have the `dl' library (-ldl). */
 /* #undef HAVE_LIBDL */
 
