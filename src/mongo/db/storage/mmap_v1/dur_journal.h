@@ -75,7 +75,7 @@ unsigned long long journalReadLSN();
 
 /** never throws.
     @param anyFiles by default we only look at j._* files. If anyFiles is true, return true
-           if there are any files in the journal directory. acquirePathLock() uses this to
+           if there are any files in the journal directory. checkForUncleanShutdown() uses this to
            make sure that the journal directory is mounted.
     @return true if there are any journal files in the journal dir.
 */

@@ -65,9 +65,9 @@ namespace {
 
 #if !defined(__sun)
 // if doingRepair is true don't consider unclean shutdown an error
-void acquirePathLock(MMAPV1Engine* storageEngine,
-                     bool doingRepair,
-                     const StorageEngineLockFile& lockFile) {
+void checkForUncleanShutdown(MMAPV1Engine* storageEngine,
+                             bool doingRepair,
+                             const StorageEngineLockFile& lockFile) {
     string name = lockFile.getFilespec();
     bool oldFile = lockFile.createdByUncleanShutdown();
 
@@ -139,9 +139,9 @@ void acquirePathLock(MMAPV1Engine* storageEngine,
     }
 }
 #else
-void acquirePathLock(MMAPV1Engine* storageEngine,
-                     bool doingRepair,
-                     const StorageEngineLockFile& lockFile) {
+void checkForUncleanShutDown(MMAPV1Engine* storageEngine,
+                             bool doingRepair,
+                             const StorageEngineLockFile& lockFile) {
     // TODO - this is very bad that the code above not running here.
 
     // Not related to lock file, but this is where we handle unclean shutdown
@@ -220,15 +220,18 @@ void clearTmpFiles() {
 }
 }  // namespace
 
-MMAPV1Engine::MMAPV1Engine(const StorageEngineLockFile& lockFile) {
+MMAPV1Engine::MMAPV1Engine(const StorageEngineLockFile* lockFile) {
     // TODO check non-journal subdirs if using directory-per-db
     checkReadAhead(storageGlobalParams.dbpath);
 
-    acquirePathLock(this, storageGlobalParams.repair, lockFile);
+    if (!storageGlobalParams.readOnly) {
+        invariant(lockFile);
+        checkForUncleanShutdown(this, storageGlobalParams.repair, *lockFile);
 
-    FileAllocator::get()->start();
+        FileAllocator::get()->start();
 
-    MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(clearTmpFiles(), "clear tmp files");
+        MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(clearTmpFiles(), "clear tmp files");
+    }
 }
 
 void MMAPV1Engine::finishInit() {

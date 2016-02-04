@@ -56,8 +56,8 @@ class WiredTigerFactory : public StorageEngine::Factory {
 public:
     virtual ~WiredTigerFactory() {}
     virtual StorageEngine* create(const StorageGlobalParams& params,
-                                  const StorageEngineLockFile& lockFile) const {
-        if (lockFile.createdByUncleanShutdown()) {
+                                  const StorageEngineLockFile* lockFile) const {
+        if (lockFile && lockFile->createdByUncleanShutdown()) {
             warning() << "Recovering data from the last clean checkpoint.";
         }
 

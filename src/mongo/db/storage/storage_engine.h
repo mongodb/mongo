@@ -67,10 +67,11 @@ public:
         virtual ~Factory() {}
 
         /**
-         * Return a new instance of the StorageEngine.  Caller owns the returned pointer.
+         * Return a new instance of the StorageEngine. The lockFile parameter may be null if
+         * params.readOnly is set. Caller owns the returned pointer.
          */
         virtual StorageEngine* create(const StorageGlobalParams& params,
-                                      const StorageEngineLockFile& lockFile) const = 0;
+                                      const StorageEngineLockFile* lockFile) const = 0;
 
         /**
          * Returns the name of the storage engine.

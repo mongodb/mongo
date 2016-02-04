@@ -85,8 +85,19 @@ void ServiceContextMongoD::createLockFile() {
                 false);
     }
     bool wasUnclean = _lockFile->createdByUncleanShutdown();
-    uassertStatusOK(_lockFile->open());
+    auto openStatus = _lockFile->open();
+    if (storageGlobalParams.readOnly && openStatus == ErrorCodes::IllegalOperation) {
+        _lockFile.reset();
+    } else {
+        uassertStatusOK(openStatus);
+    }
+
     if (wasUnclean) {
+        if (storageGlobalParams.readOnly) {
+            severe() << "Attempted to open dbpath in readOnly mode, but the server was "
+                        "previously not shut down cleanly.";
+            fassertFailedNoTrace(34414);
+        }
         warning() << "Detected unclean shutdown - " << _lockFile->getFilespec() << " is not empty.";
     }
 }
@@ -94,6 +105,11 @@ void ServiceContextMongoD::createLockFile() {
 void ServiceContextMongoD::initializeGlobalStorageEngine() {
     // This should be set once.
     invariant(!_storageEngine);
+
+    // We should have a _lockFile or be in read-only mode. Confusingly, we can still have a lockFile
+    // if we are in read-only mode. This can happen if the server is started in read-only mode on a
+    // writable dbpath.
+    invariant(_lockFile || storageGlobalParams.readOnly);
 
     const std::string dbpath = storageGlobalParams.dbpath;
     if (auto existingStorageEngine = StorageEngineMetadata::getStorageEngineForPath(dbpath)) {
@@ -150,19 +166,34 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
 
     std::unique_ptr<StorageEngineMetadata> metadata = StorageEngineMetadata::forPath(dbpath);
 
+    if (storageGlobalParams.readOnly) {
+        uassert(34415,
+                "Server was started in read-only mode, but the storage metadata file was not"
+                " found.",
+                metadata.get());
+    }
+
     // Validate options in metadata against current startup options.
     if (metadata.get()) {
         uassertStatusOK(factory->validateMetadata(*metadata, storageGlobalParams));
     }
 
-    invariant(_lockFile);
-    ScopeGuard guard = MakeGuard(&StorageEngineLockFile::close, _lockFile.get());
-    _storageEngine = factory->create(storageGlobalParams, *_lockFile);
+    ScopeGuard guard = MakeGuard([&] {
+        if (_lockFile) {
+            _lockFile->close();
+        }
+    });
+
+    _storageEngine = factory->create(storageGlobalParams, _lockFile.get());
     _storageEngine->finishInit();
-    uassertStatusOK(_lockFile->writePid());
+
+    if (_lockFile) {
+        uassertStatusOK(_lockFile->writePid());
+    }
 
     // Write a new metadata file if it is not present.
     if (!metadata.get()) {
+        invariant(!storageGlobalParams.readOnly);
         metadata.reset(new StorageEngineMetadata(storageGlobalParams.dbpath));
         metadata->setStorageEngine(factory->getCanonicalName().toString());
         metadata->setStorageEngineOptions(factory->createMetadataOptions(storageGlobalParams));
@@ -176,9 +207,10 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
 
 void ServiceContextMongoD::shutdownGlobalStorageEngineCleanly() {
     invariant(_storageEngine);
-    invariant(_lockFile.get());
     _storageEngine->cleanShutdown();
-    _lockFile->clearPidAndUnlock();
+    if (_lockFile) {
+        _lockFile->clearPidAndUnlock();
+    }
 }
 
 void ServiceContextMongoD::registerStorageEngine(const std::string& name,
