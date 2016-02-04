@@ -1,5 +1,5 @@
 
-t = db.remove7
+t = db.remove7;
 t.drop();
 
 

@@ -1,10 +1,10 @@
 
-t = db.mr_comments
-t.drop()
+t = db.mr_comments;
+t.drop();
 
-t.insert( { foo : 1 } )
-t.insert( { foo : 1 } )
-t.insert( { foo : 2 } )
+t.insert( { foo : 1 } );
+t.insert( { foo : 1 } );
+t.insert( { foo : 2 } );
 
 res = db.runCommand(
     { mapreduce : "mr_comments",
@@ -14,7 +14,7 @@ res = db.runCommand(
       },
       out: "mr_comments_out"
     });
-assert.eq( 3 , res.counts.emit )
+assert.eq( 3 , res.counts.emit );
 
 res = db.runCommand(
     { mapreduce : "mr_comments",
@@ -25,4 +25,4 @@ res = db.runCommand(
       out: "mr_comments_out"
     });
 
-assert.eq( 3 , res.counts.emit )
+assert.eq( 3 , res.counts.emit );

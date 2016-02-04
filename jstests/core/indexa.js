@@ -15,7 +15,7 @@ assert.eq( 2 , t.count() , "indexa 1" );
 t.update( {x:'B'}, { x:'A' } );
 
 a = t.find().toArray();
-u = Array.unique( a.map( function(z){ return z.x } ) );
+u = Array.unique( a.map( function(z){ return z.x; } ) );
 assert.eq( 2 , t.count() , "indexa 2" );
 
 assert( a.length == u.length , "unique index update is broken" );

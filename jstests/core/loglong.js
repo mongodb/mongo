@@ -7,21 +7,21 @@ t.drop();
 t.insert( { x : 1 } );
 
 n = 0;
-query = { x : [] }
+query = { x : [] };
 while ( Object.bsonsize( query ) < 30000 ) {
     query.x.push( n++ );
 }
 
-before = db.adminCommand( { setParameter : 1 , logLevel : 1 } )
+before = db.adminCommand( { setParameter : 1 , logLevel : 1 } );
 
-t.findOne( query )
+t.findOne( query );
 
-x = db.adminCommand( { setParameter : 1 , logLevel : before.was } )
-assert.eq( 1 , x.was , tojson( x ) )
+x = db.adminCommand( { setParameter : 1 , logLevel : before.was } );
+assert.eq( 1 , x.was , tojson( x ) );
 
-log = db.adminCommand( { getLog : "global" } ).log
+log = db.adminCommand( { getLog : "global" } ).log;
 
-found = false
+found = false;
 for ( i=log.length - 1; i>= 0; i-- ) {
     if ( log[i].indexOf( "warning: log line attempted (16kB)" ) >= 0 ) {
         found = true;

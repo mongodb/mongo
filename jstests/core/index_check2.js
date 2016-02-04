@@ -15,7 +15,7 @@ for ( var i=0; i<1000; i++ ){
 
 q1 = { tags : "tag6" };
 q2 = { tags : "tag12" };
-q3 = { tags : { $all : [ "tag6" , "tag12" ] } }
+q3 = { tags : { $all : [ "tag6" , "tag12" ] } };
 
 assert.eq( 120 , t.find( q1 ).itcount() , "q1 a");
 assert.eq( 120 , t.find( q2 ).itcount() , "q2 a" );

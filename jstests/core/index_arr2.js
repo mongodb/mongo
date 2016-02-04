@@ -12,7 +12,7 @@ function test( withIndex ){
         a : [
             { b : { c : 1 }  }
         ]
-    }
+    };
     
     now = (new Date()).getTime() / 1000;
     for (created = now - NUM; created <= now; created++ ) {
@@ -24,14 +24,14 @@ function test( withIndex ){
     // change the last M items.
     query = {
         'created' : { '$gte' : now - M }
-    }
+    };
     
     Z = t.find( query ).count();
     
     if ( withIndex ){
         //t.ensureIndex( { 'a.b.c' : 1, 'created' : -1 } )
         //t.ensureIndex( { created : -1 } )
-        t.ensureIndex( { 'a.b.c' : 1 } , { name : "x" } )
+        t.ensureIndex( { 'a.b.c' : 1 } , { name : "x" } );
     }
     
     var res = t.update(query, { '$set' : { "a.0.b.c" : 0 } } , false , true );
@@ -45,7 +45,7 @@ function test( withIndex ){
     assert.eq( Z , count , "count after withIndex:" + withIndex );
 }
 
-test( false )
+test( false );
 test( true );
 
 

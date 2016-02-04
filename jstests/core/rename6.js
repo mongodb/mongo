@@ -3,10 +3,10 @@
 // that is greater than 120 chars. To do this we create a long index name and try
 // and rename the collection to one with a much longer name. We use the test database
 // by default and we add this here to ensure we are using it
-testDB = db.getSiblingDB("test")
+testDB = db.getSiblingDB("test");
 c = "rename2c";
 dbc = testDB.getCollection(c);
-d = "dest4567890123456789012345678901234567890123456789012345678901234567890"
+d = "dest4567890123456789012345678901234567890123456789012345678901234567890";
 dbd = testDB.getCollection(d);
 dbc.ensureIndex({ "name" : 1,
                   "date" : 1,

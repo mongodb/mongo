@@ -12,7 +12,7 @@
  * counted collection must not be empty; hence an initial write to the collection is required.
  */
 
-t = db.jstests_killop
+t = db.jstests_killop;
 t.drop();
 
 t.save( {x:1} );

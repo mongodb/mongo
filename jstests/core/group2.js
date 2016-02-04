@@ -27,14 +27,14 @@ var keyFn = function(x) {
     return { a: 'a' in x ? x.a : null };
 };
 
-delete cmd.key
+delete cmd.key;
 cmd["$keyf"] = keyFn;
 result2 = t.group( cmd );
 
 assert.eq( result , result2, "check result2" );
 
 
-delete cmd.$keyf
+delete cmd.$keyf;
 cmd["keyf"] = keyFn;
 result3 = t.group( cmd );
 

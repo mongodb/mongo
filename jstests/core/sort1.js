@@ -1,6 +1,6 @@
 debug = function( s ){
     //print( s );
-}
+};
 
 t = db.sort1;
 t.drop();
@@ -11,7 +11,7 @@ t.save({x:2,z:33});
 t.save({x:3,z:33});
 t.save({x:1,z:33});
 
-debug( "a" )
+debug( "a" );
 for( var pass = 0; pass < 2; pass++ ) {
     assert( t.find().sort({x:1})[0].x == 1 );
     assert( t.find().sort({x:1}).skip(1)[0].x == 2 );
@@ -23,7 +23,7 @@ for( var pass = 0; pass < 2; pass++ ) {
 
 }
 
-debug( "b" )
+debug( "b" );
 assert(t.validate().valid);
 
 t.drop();
@@ -32,7 +32,7 @@ t.save({x:'aba'});
 t.save({x:'zed'});
 t.save({x:'foo'});
 
-debug( "c" )
+debug( "c" );
 
 for( var pass = 0; pass < 2; pass++ ) { 
     debug( tojson( t.find().sort( { "x" : 1 } ).limit(1).next() ) );
@@ -43,6 +43,6 @@ for( var pass = 0; pass < 2; pass++ ) {
     t.ensureIndex({x:1});
 }
 
-debug( "d" )
+debug( "d" );
 
 assert(t.validate().valid);

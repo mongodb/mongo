@@ -27,29 +27,29 @@ t.update( { _id : 2 } , { $pop : { a : -1 } } );
 assert.eq( "4,5" , t.findOne().a.toString() , "E3" );
 
 res = t.update( { _id : 2 } , { $pop : { a : -1 } } );
-assert.writeOK( res )
+assert.writeOK( res );
 assert.eq( "5" , t.findOne().a.toString() , "E4" );
 
 
 res = t.update( { _id : 2 } , { $pop : { a : -1 } } );
-assert.writeOK( res )
+assert.writeOK( res );
 assert.eq( "" , t.findOne().a.toString() , "E5" );
 
 res = t.update( { _id : 2 } , { $pop : { a : -1 } } );
-assert.writeOK( res )
+assert.writeOK( res );
 assert.eq( "" , t.findOne().a.toString() , "E6" );
 
 res = t.update( { _id : 2 } , { $pop : { a : -1 } } );
-assert.writeOK( res )
+assert.writeOK( res );
 assert.eq( "" , t.findOne().a.toString() , "E7" );
 
 res = t.update( { _id : 2 } , { $pop : { a : 1 } } );
-assert.writeOK( res )
+assert.writeOK( res );
 assert.eq( "" , t.findOne().a.toString() , "E8" );
 
 res = t.update( { _id : 2 } , { $pop : { b : -1 } } );
-assert.writeOK( res )
+assert.writeOK( res );
 
 res = t.update( { _id : 2 } , { $pop : { b : 1 } } );
-assert.writeOK( res )
+assert.writeOK( res );
 

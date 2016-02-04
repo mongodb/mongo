@@ -1,8 +1,8 @@
 
-t = db.push2
-t.drop()
+t = db.push2;
+t.drop();
 
-t.save( { _id : 1 , a : [] } )
+t.save( { _id : 1 , a : [] } );
 
 s = new Array(700000).toString();
 

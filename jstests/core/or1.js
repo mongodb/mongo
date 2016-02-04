@@ -10,7 +10,7 @@ checkArrs = function( a, b ) {
     for ( i = 0; i < aStr.length; ++i ) {
         assert.neq( -1, bStr.indexOf( aStr[ i ] ) );
     }
-}
+};
 
 doTest = function() {
 
@@ -39,7 +39,7 @@ assert.eq( 1, t.find( { $or: [ { a: {$in:[0,1]}}  ] } ).toArray().length );
 assert.eq( 1, t.find( { $or: [ { b: {$in:[0,1]}}  ] } ).toArray().length );
 assert.eq( 1, t.find( { $or: [ { a: {$in:[0,1]}}, { b: {$in:[0,1]}}  ] } ).toArray().length );
 
-}
+};
 
 doTest();
 

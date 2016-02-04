@@ -3,7 +3,7 @@
 // MongoDB test script for mapreduce with geo query
 
 // setup test collection
-db.apples.drop()
+db.apples.drop();
 db.apples.insert( { "geo" : { "lat" : 32.68331909, "long" : 69.41610718 }, "apples" : 5 } );
 db.apples.insert( { "geo" : { "lat" : 35.01860809, "long" : 70.92027283 }, "apples" : 2 } );
 db.apples.insert( { "geo" : { "lat" : 31.11639023, "long" : 64.19970703 }, "apples" : 11 } );
@@ -36,7 +36,7 @@ r = function(key, values) {
 // mapreduce without geo query works fine
 res = db.apples.mapReduce( m, r, { out : { inline : 1 } } );
 
-printjson( res )
+printjson( res );
 total = res.results[0];
 assert.eq( 31, total.value.apples );
 

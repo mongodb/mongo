@@ -8,11 +8,11 @@ t.save( {a:'foo'} );
 
 function check() {
     // $and must be an array
-    assert.throws( function() { t.find( {$and:4} ).toArray() } );
+    assert.throws( function() { t.find( {$and:4} ).toArray(); } );
     // $and array must not be empty
-    assert.throws( function() { t.find( {$and:[]} ).toArray() } );
+    assert.throws( function() { t.find( {$and:[]} ).toArray(); } );
     // $and elements must be objects
-    assert.throws( function() { t.find( {$and:[4]} ).toArray() } );
+    assert.throws( function() { t.find( {$and:[4]} ).toArray(); } );
 
     // Check equality matching
     assert.eq( 1, t.count( {$and:[{a:1}]} ) );

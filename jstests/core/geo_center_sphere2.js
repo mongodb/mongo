@@ -48,7 +48,7 @@ for ( var test = 0; test < numTests; test++ ) {
         t.drop();
         startPoint = randomPoint();
         t.ensureIndex( { loc : "2d" }, { bits : bits } );
-    } while (!pointIsOK(startPoint, radius))
+    } while (!pointIsOK(startPoint, radius));
 
     var pointsIn = 0;
     var pointsOut = 0;
@@ -139,7 +139,7 @@ for ( var test = 0; test < numTests; test++ ) {
 
     var distance = 0;
     for ( var i = 0; i < results.length; i++ ) {
-        var retDistance = results[i].dis
+        var retDistance = results[i].dis;
 
         // print( "Dist from : " + results[i].loc + " to " + startPoint + " is "
         // + retDistance + " vs " + radius )

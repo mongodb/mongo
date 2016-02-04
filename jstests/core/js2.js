@@ -18,6 +18,6 @@ assert.throws( function(){
             } ).forEach( printjson );
 } , null , "can't save from $where" );
 
-assert.eq( 0 , t2.find().length() , "B" )
+assert.eq( 0 , t2.find().length() , "B" );
 
 assert(t.validate().valid , "E");

@@ -2,7 +2,7 @@
 t = db.capped_empty;
 t.drop();
 
-db.createCollection( t.getName() , { capped : true , size : 100 } )
+db.createCollection( t.getName() , { capped : true , size : 100 } );
 
 t.insert( { x : 1 } );
 t.insert( { x : 2 } );

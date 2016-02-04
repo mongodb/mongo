@@ -8,7 +8,7 @@ for (var i = 0; i < N; ++i) {
     t.insert({foo: i, bar: N - i, baz: i});
 }
 
-t.ensureIndex({foo: 1})
+t.ensureIndex({foo: 1});
 t.ensureIndex({foo: 1, baz: 1});
 
 // foo <= 20

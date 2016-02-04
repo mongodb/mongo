@@ -1,8 +1,8 @@
 t = db.distinct_index2;
 t.drop();
 
-t.ensureIndex( { a : 1 , b : 1 } )
-t.ensureIndex( { c : 1 } )
+t.ensureIndex( { a : 1 , b : 1 } );
+t.ensureIndex( { c : 1 } );
 
 // Uniformly distributed dataset.
 // If we use a randomly generated dataset, we might not
@@ -15,25 +15,25 @@ for ( var a=0; a<10; a++ ) {
     }
 }
 
-correct = []
+correct = [];
 for ( i=0; i<10; i++ )
-    correct.push( i )
+    correct.push( i );
 
 function check( field ){
-    res = t.distinct( field )
-    res = res.sort()
+    res = t.distinct( field );
+    res = res.sort();
     assert.eq( correct , res , "check: " + field );
 
     if ( field != "a" ){
-        res = t.distinct( field , { a : 1 } )
-        res = res.sort()
+        res = t.distinct( field , { a : 1 } );
+        res = res.sort();
         assert.eq( correct , res , "check 2: " + field );
     }
 }
 
-check( "a" )
-check( "b" )
-check( "c" )
+check( "a" );
+check( "b" );
+check( "c" );
 
 // hashed index should produce same results.
 t.dropIndexes();

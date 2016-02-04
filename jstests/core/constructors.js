@@ -26,7 +26,7 @@ function clientEvalConstructorTest (constructorList) {
         }
     });
     constructorList.invalid.forEach(function (constructor) {
-        assert.throws(function () { eval(constructor) },
+        assert.throws(function () { eval(constructor); },
                       [], "invalid constructor did not throw error in eval context: " + constructor);
     });
 }
@@ -42,7 +42,7 @@ function dbEvalConstructorTest (constructorList) {
         }
     });
     constructorList.invalid.forEach(function (constructor) {
-        assert.throws(function () { db.eval(constructor) },
+        assert.throws(function () { db.eval(constructor); },
                       [], "invalid constructor did not throw error in db.eval context: " + constructor);
     });
 }
@@ -52,12 +52,12 @@ function mapReduceConstructorTest (constructorList) {
     t = db.mr_constructors;
     t.drop();
 
-    t.save( { "partner" : 1, "visits" : 9 } )
-    t.save( { "partner" : 2, "visits" : 9 } )
-    t.save( { "partner" : 1, "visits" : 11 } )
-    t.save( { "partner" : 1, "visits" : 30 } )
-    t.save( { "partner" : 2, "visits" : 41 } )
-    t.save( { "partner" : 2, "visits" : 41 } )
+    t.save( { "partner" : 1, "visits" : 9 } );
+    t.save( { "partner" : 2, "visits" : 9 } );
+    t.save( { "partner" : 1, "visits" : 11 } );
+    t.save( { "partner" : 1, "visits" : 30 } );
+    t.save( { "partner" : 2, "visits" : 41 } );
+    t.save( { "partner" : 2, "visits" : 41 } );
 
     constructorList.valid.forEach(function (constructor) {
         try {
@@ -77,7 +77,7 @@ function mapReduceConstructorTest (constructorList) {
         r = eval("dummy = function( k , v ){ return { test : " + constructor + " } }");
 
         assert.throws(function () { res = t.mapReduce( m , r ,
-                                    { out : "mr_constructors_out" , scope : { xx : 1 } } ) },
+                                    { out : "mr_constructors_out" , scope : { xx : 1 } } ); },
                       [], "invalid constructor did not throw error in mapReduce context: " + constructor);
     });
 
@@ -100,7 +100,7 @@ function whereConstructorTest (constructorList) {
         }
     });
     constructorList.invalid.forEach(function (constructor) {
-        assert.throws(function () { t.findOne({ $where : constructor }) },
+        assert.throws(function () { t.findOne({ $where : constructor }); },
                       [], "invalid constructor did not throw error in $where query: " + constructor);
     });
 }
@@ -122,7 +122,7 @@ var dbrefConstructors = {
             "DBRef(\"namespace\", ObjectId(), true)",
             "DBRef(\"namespace\", ObjectId(), 123)",
         ]
-}
+};
 
 var dbpointerConstructors = {
     "valid" : [
@@ -137,7 +137,7 @@ var dbpointerConstructors = {
             "DBPointer(\"namespace\")",
             "DBPointer(\"namespace\", ObjectId(), true)",
         ]
-}
+};
 
 
 var objectidConstructors = {
@@ -149,7 +149,7 @@ var objectidConstructors = {
         'ObjectId(5)',
         'ObjectId("FFFFFFFFFFFFFFFFFFFFFFFQ")',
         ]
-}
+};
 
 var timestampConstructors = {
     "valid" : [
@@ -167,7 +167,7 @@ var timestampConstructors = {
         'Timestamp(true,0)',
         'Timestamp(0,true)',
         ]
-}
+};
 
 var bindataConstructors = {
     "valid" : [
@@ -186,7 +186,7 @@ var bindataConstructors = {
         'BinData(0, [])',
         'BinData(0, function () {})',
         ]
-}
+};
 
 var uuidConstructors = {
     "valid" : [
@@ -205,7 +205,7 @@ var uuidConstructors = {
         'UUID([])',
         'UUID(function () {})',
         ]
-}
+};
 
 var md5Constructors = {
     "valid" : [
@@ -224,7 +224,7 @@ var md5Constructors = {
         'MD5([])',
         'MD5(function () {})',
         ]
-}
+};
 
 var hexdataConstructors = {
     "valid" : [
@@ -250,7 +250,7 @@ var hexdataConstructors = {
         'HexData(0, function () {})',
         'HexData(0, "invalidhex")',
         ]
-}
+};
 
 var dateConstructors = {
     "valid" : [
@@ -262,7 +262,7 @@ var dateConstructors = {
         ],
     "invalid" : [
         ]
-}
+};
 
 clientEvalConstructorTest(dbrefConstructors);
 clientEvalConstructorTest(dbpointerConstructors);

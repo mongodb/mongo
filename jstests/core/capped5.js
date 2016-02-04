@@ -1,17 +1,17 @@
 
-tn = "capped5"
+tn = "capped5";
 
-t = db[tn]
+t = db[tn];
 t.drop();
 
 
 db.createCollection( tn , {capped: true, size: 1024 * 1024 * 1 } );
 t.insert( { _id : 5 , x : 11 , z : 52 } );
-assert.eq( 1 , t.getIndexKeys().length , "A0" )  //now we assume _id index even on capped coll
+assert.eq( 1 , t.getIndexKeys().length , "A0" );  //now we assume _id index even on capped coll
 assert.eq( 52 , t.findOne( { x : 11 } ).z , "A1" );
 
-t.ensureIndex( { _id : 1 } )
-t.ensureIndex( { x : 1 } )
+t.ensureIndex( { _id : 1 } );
+t.ensureIndex( { x : 1 } );
 
 assert.eq( 52 , t.findOne( { x : 11 } ).z , "B1" );
 assert.eq( 52 , t.findOne( { _id : 5 } ).z , "B2" );

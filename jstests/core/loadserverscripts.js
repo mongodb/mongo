@@ -27,7 +27,7 @@ x = testdb.system.js.count();
 assert.eq( x, 3, "Should now be one function in the system.js collection");
 
 // Set a global variable that will be over-written
-var changeme = true
+var changeme = true;
 
 // Load that function
 testdb.loadServerScripts();

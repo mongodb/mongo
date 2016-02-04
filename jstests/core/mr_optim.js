@@ -31,7 +31,7 @@ function reformat( r ){
 }
 
 res = t.mapReduce( m , r , { out : "mr_optim_out" } );
-printjson( res )
+printjson( res );
 x = reformat( res );
 for (var key in x) {
     assert.eq(x[key], 13, "value is not equal to original, maybe reduce has run");
@@ -43,6 +43,6 @@ res = t.mapReduce( m , r , { out : { inline : 1 } } );
 x2 = reformat( res );
 res.drop();
 
-assert.eq(x, x2, "object from inline and collection are not equal")
+assert.eq(x, x2, "object from inline and collection are not equal");
 
 t.drop();

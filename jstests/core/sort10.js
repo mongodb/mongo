@@ -13,8 +13,8 @@ function checkSorting1(opts) {
     }
 }
 
-checkSorting1({})
-checkSorting1({"background":true})
+checkSorting1({});
+checkSorting1({"background":true});
 
 
 
@@ -34,15 +34,15 @@ dates = [new Date(-5000000000000), new Date(5000000000000), new Date(0), new Dat
 for (var i = 0; i < dates.length; i++) {
     t.insert({x:dates[i]});
 }
-dates.sort(function(a,b){return a - b});
-reverseDates = dates.slice(0).reverse()
+dates.sort(function(a,b){return a - b;});
+reverseDates = dates.slice(0).reverse();
 
-checkSorting2(dates, 1)
-checkSorting2(reverseDates, -1)
-t.ensureIndex({x:1})
-checkSorting2(dates, 1)
-checkSorting2(reverseDates, -1)
-t.dropIndexes()
-t.ensureIndex({x:-1})
-checkSorting2(dates, 1)
-checkSorting2(reverseDates, -1)
+checkSorting2(dates, 1);
+checkSorting2(reverseDates, -1);
+t.ensureIndex({x:1});
+checkSorting2(dates, 1);
+checkSorting2(reverseDates, -1);
+t.dropIndexes();
+t.ensureIndex({x:-1});
+checkSorting2(dates, 1);
+checkSorting2(reverseDates, -1);

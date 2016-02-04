@@ -1,14 +1,14 @@
 
 t = db.geoc;
-t.drop() 
+t.drop(); 
 
 N = 1000;
 
-for (var i=0; i<N; i++) t.insert({loc:[100+Math.random(), 100+Math.random()], z:0}) 
-for (var i=0; i<N; i++) t.insert({loc:[0+Math.random(), 0+Math.random()], z:1}) 
-for (var i=0; i<N; i++) t.insert({loc:[-100+Math.random(), -100+Math.random()], z:2}) 
+for (var i=0; i<N; i++) t.insert({loc:[100+Math.random(), 100+Math.random()], z:0}); 
+for (var i=0; i<N; i++) t.insert({loc:[0+Math.random(), 0+Math.random()], z:1}); 
+for (var i=0; i<N; i++) t.insert({loc:[-100+Math.random(), -100+Math.random()], z:2}); 
 
-t.ensureIndex({loc:'2d'}) 
+t.ensureIndex({loc:'2d'}); 
 
 function test( z , l ){
     assert.lt( 0 , t.find({loc:{$near:[100,100]}, z:z}).limit(l).itcount() , "z: " + z + " l: " + l );

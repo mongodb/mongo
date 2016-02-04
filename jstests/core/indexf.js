@@ -1,5 +1,5 @@
 
-t = db.indexf
+t = db.indexf;
 t.drop();
 
 t.ensureIndex( { x : 1 } );

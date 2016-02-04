@@ -135,11 +135,11 @@ for ( var test = 0; test < numTests; test++ ) {
 
         var nextSeg = function(currTurtle, prevTurtle) {
 
-            var pathX = currTurtle[0]
+            var pathX = currTurtle[0];
 
             if ( currTurtle[1] < prevTurtle[1] ) {
                 pathX = currTurtle[0] + 1;
-                pathY = prevTurtle[1]
+                pathY = prevTurtle[1];
             } else if ( currTurtle[1] > prevTurtle[1] ) {
                 pathX = currTurtle[0];
                 pathY = currTurtle[1];
@@ -155,7 +155,7 @@ for ( var test = 0; test < numTests; test++ ) {
             // : "
             // + [pathX, pathY]);
 
-            return [ pathX, pathY ]
+            return [ pathX, pathY ];
         };
 
         for ( var s = 1; s < turtles[t].length; s++ ) {

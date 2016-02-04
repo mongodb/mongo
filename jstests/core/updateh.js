@@ -1,30 +1,30 @@
 // Disallow $ in field names
 var res;
 
-t = db.jstest_updateh
-t.drop()
+t = db.jstest_updateh;
+t.drop();
 
-t.insert( {x:1} )
+t.insert( {x:1} );
 
-res = t.update( {x:1}, {$set: {y:1}} ) // ok
-assert.writeOK( res )
+res = t.update( {x:1}, {$set: {y:1}} ); // ok
+assert.writeOK( res );
 
-res = t.update( {x:1}, {$set: {$z:1}} ) // not ok
-assert.writeError( res )
+res = t.update( {x:1}, {$set: {$z:1}} ); // not ok
+assert.writeError( res );
 
-res = t.update( {x:1}, {$set: {'a.$b':1}} ) // not ok
-assert.writeError( res )
+res = t.update( {x:1}, {$set: {'a.$b':1}} ); // not ok
+assert.writeError( res );
 
-res = t.update( {x:1}, {$inc: {$z:1}} ) // not ok
-assert.writeError( res )
+res = t.update( {x:1}, {$inc: {$z:1}} ); // not ok
+assert.writeError( res );
 
-res = t.update( {x:1}, {$pushAll: {$z:[1,2,3]}} ) // not ok
-assert.writeError( res )
+res = t.update( {x:1}, {$pushAll: {$z:[1,2,3]}} ); // not ok
+assert.writeError( res );
 
 //Second section
-t.drop()
+t.drop();
 
-t.save( {_id:0, n: 0} )
+t.save( {_id:0, n: 0} );
 
 // Test that '$' cannot be the first character in a field.
 // SERVER-7150
@@ -45,7 +45,7 @@ assert.writeError(res);
 
 res = t.update({ n: 0 }, { $set: { "secret.agent$": 1 }});
 assert.writeOK(res);
-t.save( {_id:0, n: 0} )
+t.save( {_id:0, n: 0} );
 
 // Test that you cannot update database references into top level fields
 // Enable after SERVER-14252 fixed: currently validation does not catch DBRef
@@ -72,14 +72,14 @@ assert.writeError(res);
 // SERVER-3231
 res = t.update({ n: 0 }, { $set: { 'x.$ref': '1', 'x.$id': 1, 'x.$db': '1' }});
 assert.writeOK(res);
-t.save( {_id:0, n: 0} )
+t.save( {_id:0, n: 0} );
 
 // Test that '$' can occur elsewhere in a field name.
 // SERVER-7557
 res = t.update({n: 0 }, { $set: { ke$sha: 1 }});
 assert.writeOK(res);
-t.save( {_id:0, n: 0} )
+t.save( {_id:0, n: 0} );
 
 res = t.update({n: 0 }, { $set: { more$$moreproblem$: 1 }});
 assert.writeOK(res);
-t.save( {_id:0, n: 0} )
+t.save( {_id:0, n: 0} );

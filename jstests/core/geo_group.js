@@ -20,7 +20,7 @@ assert.eq(t.find( { loc : { $near : [56, 8, 10] } } ).count(), 81);
 // Test basic group that effectively does a count
 assert.eq(
   t.group( { 
-    reduce : function (obj, prev) { prev.sums = { count : prev.sums.count + 1} }, 
+    reduce : function (obj, prev) { prev.sums = { count : prev.sums.count + 1}; }, 
     initial : { sums:{count:0} } } 
   ),
   [ { "sums" : { "count" : 10000 } } ]
@@ -29,7 +29,7 @@ assert.eq(
 // Test basic group + $near that does a count
 assert.eq(
   t.group( { 
-    reduce : function (obj, prev) { prev.sums = { count : prev.sums.count + 1} }, 
+    reduce : function (obj, prev) { prev.sums = { count : prev.sums.count + 1}; }, 
     initial : { sums:{count:0} },
     cond : { loc : { $near : [56, 8, 10] } } }
   ),

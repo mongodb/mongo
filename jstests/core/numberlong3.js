@@ -12,7 +12,7 @@ for( i = 10; i >= 0; --i ) {
     }
 }
 
-ret = t.find().sort({x:1}).toArray().filter( function( x ) { return typeof( x.x.floatApprox ) != 'undefined' } );
+ret = t.find().sort({x:1}).toArray().filter( function( x ) { return typeof( x.x.floatApprox ) != 'undefined'; } );
 
 //printjson( ret );
 

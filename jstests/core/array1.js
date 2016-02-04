@@ -1,5 +1,5 @@
-t = db.array1
-t.drop()
+t = db.array1;
+t.drop();
 
 x = { a : [ 1 , 2 ] };
 

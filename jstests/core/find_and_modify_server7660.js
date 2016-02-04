@@ -13,6 +13,6 @@ a = t.findAndModify({
 b = t.findOne();
 assert.eq( a, b );
 assert.eq( "bar", a.foo );
-assert.eq( "john", a.bob )
+assert.eq( "john", a.bob );
 
 

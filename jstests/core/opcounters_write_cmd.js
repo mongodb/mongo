@@ -33,7 +33,7 @@ assert.eq(opCounters.insert + 1, newdb.serverStatus().opcounters.insert);
 
 // Bulk insert, no error.
 opCounters = newdb.serverStatus().opcounters;
-res = t.insert([{_id:1},{_id:2}])
+res = t.insert([{_id:1},{_id:2}]);
 assert.writeOK(res);
 assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
@@ -42,20 +42,20 @@ assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 if (t.getMongo().writeMode() != "compatibility"){
     // Single insert, with error.
     opCounters = newdb.serverStatus().opcounters;
-    res = t.insert({_id:0})
+    res = t.insert({_id:0});
     assert.writeError(res);
     assert.eq(opCounters.insert + 1, newdb.serverStatus().opcounters.insert);
 
     // Bulk insert, with error, ordered.
     opCounters = newdb.serverStatus().opcounters;
-    res = t.insert([{_id:3},{_id:3},{_id:4}])
+    res = t.insert([{_id:3},{_id:3},{_id:4}]);
     assert.writeError(res);
     assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
     // Bulk insert, with error, unordered.
     var continueOnErrorFlag = 1;
     opCounters = newdb.serverStatus().opcounters;
-    res = t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag)
+    res = t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag);
     assert.writeError(res);
     assert.eq(opCounters.insert + 3, newdb.serverStatus().opcounters.insert);
 }
@@ -113,7 +113,7 @@ assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 
 // Query, with error.
 opCounters = newdb.serverStatus().opcounters;
-assert.throws(function() { t.findOne({_id:{$invalidOp:1}}) });
+assert.throws(function() { t.findOne({_id:{$invalidOp:1}}); });
 assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 
 //
@@ -142,12 +142,12 @@ assert.eq(opCounters.getmore + 1, newdb.serverStatus().opcounters.getmore);
 //
 
 t.drop();
-t.insert({_id:0})
+t.insert({_id:0});
 
 // Command, recognized, no error.
 serverStatus = newdb.runCommand({serverStatus: 1});
-opCounters = serverStatus.opcounters
-metricsObj = serverStatus.metrics.commands
+opCounters = serverStatus.opcounters;
+metricsObj = serverStatus.metrics.commands;
 assert.eq(opCounters.command + 1, newdb.serverStatus().opcounters.command); // "serverStatus" counted
 // Count this and the last run of "serverStatus"
 assert.eq(metricsObj.serverStatus.total + 2,
@@ -160,7 +160,7 @@ assert.eq(metricsObj.serverStatus.failed,
 // Command, recognized, with error.
 countVal = { "total" : 0, "failed" : 0 };
 if (metricsObj.count != null) {
-    countVal = metricsObj.count
+    countVal = metricsObj.count;
 }
 res = t.runCommand("count", {query:{$invalidOp:1}}); // "count command" counted
 assert.eq(0, res.ok);

@@ -21,7 +21,7 @@ boxBounds = [ [0,0], [0,10], [10,10], [10,0] ];
 assert.eq( num , t.find( { loc : { "$within" : { "$polygon" : boxBounds } } } ).count() , "Bounding Box Test" );
 
 //Make sure we can add object-based polygons
-assert.eq( num, t.find( { loc : { $within : { $polygon : { a : [-10, -10], b : [-10, 10], c : [10, 10], d : [10, -10] } } } } ).count() )
+assert.eq( num, t.find( { loc : { $within : { $polygon : { a : [-10, -10], b : [-10, 10], c : [10, 10], d : [10, -10] } } } } ).count() );
 
 // Look in a box much bigger than the one we have data in
 boxBounds = [[-100,-100], [-100, 100], [100,100], [100,-100]];
@@ -39,8 +39,8 @@ assert.writeOK(t.save({loc: [1,3] })); // Add a point that's in
 
 assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).count() , "Pacman single point" );
 
-t.save({ loc : [5, 3] })  // Add a point that's out right in the mouth opening
-t.save({ loc : [3, 7] })  // Add a point above the center of the head
-t.save({ loc : [3,-1] })  // Add a point below the center of the bottom
+t.save({ loc : [5, 3] });  // Add a point that's out right in the mouth opening
+t.save({ loc : [3, 7] });  // Add a point above the center of the head
+t.save({ loc : [3,-1] });  // Add a point below the center of the bottom
 
 assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).count() , "Pacman double point" );

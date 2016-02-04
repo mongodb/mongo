@@ -14,7 +14,7 @@ doesLogMatchRegex = function(logArray, regex) {
         }
     }
     return false;
-}
+};
 
 doTest = function() {
     var log = db.adminCommand({ getLog: 'global'});
@@ -34,6 +34,6 @@ doTest = function() {
 
     var informationIsLogged = doesLogMatchRegex(log2.log, re);
     assert.eq(informationIsLogged, true, "Process details not present in RAM log");
-}
+};
 
 doTest();

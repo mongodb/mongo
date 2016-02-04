@@ -23,4 +23,4 @@ for ( i=0; i<3; i++ ){
 
 
 t.ensureIndex( { x : 1 } );
-t.distinct( "x" , { x : 5 } )
+t.distinct( "x" , { x : 5 } );

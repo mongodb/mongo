@@ -1,7 +1,7 @@
 // If our $within is enormous, create a coarse covering for the search so it
 // doesn't take forever.
-t = db.geo_s2largewithin
-t.drop()
+t = db.geo_s2largewithin;
+t.drop();
 t.ensureIndex( { geo : "2dsphere" } );
 
 testPoint = {
@@ -42,4 +42,4 @@ longPoly = {type: "Polygon",
 result = t.find({geo: {$geoWithin: {$geometry: longPoly}}});
 assert.eq(result.itcount(), 1);
 result = t.find({geo: {$geoWithin: {$geometry: longPoly}}});
-assert.eq("origin", result[0].name)
+assert.eq("origin", result[0].name);

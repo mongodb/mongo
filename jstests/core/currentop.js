@@ -1,7 +1,7 @@
 print("BEGIN currentop.js");
 
 // test basic currentop functionality + querying of nested documents
-t = db.jstests_currentop
+t = db.jstests_currentop;
 t.drop();
 
 for(i=0;i<100;i++) {
@@ -24,12 +24,12 @@ print("sleep");
 sleep(1000);
 
 print("inprog:");
-printjson(db.currentOp().inprog)
-print()
+printjson(db.currentOp().inprog);
+print();
 sleep(1);
 print("inprog:");
-printjson(db.currentOp().inprog)
-print()
+printjson(db.currentOp().inprog);
+print();
 
 // need to wait for read to start
 print("wait have some ops");

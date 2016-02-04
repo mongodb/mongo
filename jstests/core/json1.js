@@ -21,8 +21,8 @@ assert.eq(tojson(x,"",false), '{\n\t"x" : ObjectId("4ad35a73d2e34eb4fc43579a"),\
 
 // Timestamp type
 x = {"x" : Timestamp()};
-assert.eq(tojson(x,"",false), '{\n\t"x" : Timestamp(0, 0)\n}' , "G")
+assert.eq(tojson(x,"",false), '{\n\t"x" : Timestamp(0, 0)\n}' , "G");
 
 // Timestamp type, second
 x = {"x" : Timestamp(10,2)};
-assert.eq(tojson(x,"",false), '{\n\t"x" : Timestamp(10, 2)\n}' , "H")
+assert.eq(tojson(x,"",false), '{\n\t"x" : Timestamp(10, 2)\n}' , "H");

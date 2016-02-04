@@ -46,9 +46,9 @@ for( var n = 0; n < numTests; n++ ){
 	
 	assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).itcount() , "Pacman single point" );
 	
-	t.save({ loc : [5, 3] })  // Add a point that's out right in the mouth opening
-	t.save({ loc : [3, 7] })  // Add a point above the center of the head
-	t.save({ loc : [3,-1] })  // Add a point below the center of the bottom
+	t.save({ loc : [5, 3] });  // Add a point that's out right in the mouth opening
+	t.save({ loc : [3, 7] });  // Add a point above the center of the head
+	t.save({ loc : [3,-1] });  // Add a point below the center of the bottom
 	
 	assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).itcount() , "Pacman double point" );
 }

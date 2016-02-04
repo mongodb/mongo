@@ -22,10 +22,10 @@ function test(index) {
     // FIXME: surely code like this belongs in utils.js.
     a=r.toArray();
     x=[];
-    for (k in a) { x.push(a[k]["_id"]) }
-    x.sort()
+    for (k in a) { x.push(a[k]["_id"]); }
+    x.sort();
         assert.eq([1,2,3,4,5], x, "B1");
 }
 
-test(false)
-test(true)
+test(false);
+test(true);

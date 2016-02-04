@@ -155,7 +155,7 @@ var executeTests = function() {
     coll.dropIndexes();
     coll.remove({});
     coll.ensureIndex({a : 1}, {unique : true});
-}
+};
 
 var buildVersion = parseInt(db.runCommand({buildInfo:1}).versionArray.slice(0, 3).join(""), 10);
 // Save the existing useWriteCommands function
@@ -168,7 +168,7 @@ if(buildVersion >= 255) {
     // Force the use of useWriteCommands
     coll._mongo.useWriteCommands = function() {
         return true;
-    }
+    };
 
     // Execute tests using legacy operations
     executeTests();
@@ -177,7 +177,7 @@ if(buildVersion >= 255) {
 // Force the use of legacy commands
 coll._mongo.useWriteCommands = function() {
     return false;
-}
+};
 
 // Execute tests using legacy operations
 executeTests();

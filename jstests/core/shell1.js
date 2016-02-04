@@ -1,8 +1,8 @@
 x = 1;
 
-shellHelper( "show", "tables;" )
-shellHelper( "show", "tables" )
-shellHelper( "show", "tables ;" )
+shellHelper( "show", "tables;" );
+shellHelper( "show", "tables" );
+shellHelper( "show", "tables ;" );
 
 // test slaveOk levels
 assert(!db.getSlaveOk() && !db.test.getSlaveOk() && !db.getMongo().getSlaveOk(), "slaveOk 1");

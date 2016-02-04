@@ -12,7 +12,7 @@ for (var i = 0; i < N; ++i) {
     // This is the only thing that should be outputted in the and.
     t.insert({foo: 1, bar:1, baz: 12});
     t.insert({bar: 1});
-    t.insert({bar:1, baz: 12})
+    t.insert({bar:1, baz: 12});
     t.insert({baz: 12});
     t.insert({foo: 1, baz: 12});
     t.insert({baz: 12});

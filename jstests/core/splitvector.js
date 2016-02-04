@@ -30,7 +30,7 @@ assertChunkSizes = function ( splitVec , numDocs , maxChunkSize , msg ){
             assert.gt( maxChunkSize , size , "A"+i , msg + "b" );
         }
     }
-}
+};
 
 // Takes two documents and asserts that both contain exactly the same set of field names.
 // This is useful for checking that splitPoints have the same format as the original key pattern,
@@ -47,11 +47,11 @@ var assertFieldNamesMatch = function( splitPoint , keyPattern ){
             assert( splitPoint.hasOwnProperty( p ) , "property " + p + " not in splitPoint" );
         }
     }
-}
+};
 
 var resetCollection = function() {
     f.drop();
-}
+};
 
 // -------------------------
 //  TESTS START HERE
@@ -109,7 +109,7 @@ var case4 = function() {
     for( i=0; i < res.splitKeys.length; i++ ){
         assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
     }
-}
+};
 case4();
 
 // -------------------------
@@ -131,7 +131,7 @@ var case5 = function() {
     for( i=0; i < res.splitKeys.length; i++ ){
         assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
     }
-}
+};
 case5();
 
 // -------------------------
@@ -153,7 +153,7 @@ var case6 = function() {
     for( i=0; i < res.splitKeys.length; i++ ){
         assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
     }
-}
+};
 case6();
 
 // -------------------------
@@ -180,7 +180,7 @@ var case7 = function() {
     for( i=0; i < res.splitKeys.length; i++ ){
         assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
     }
-}
+};
 case7();
 
 // -------------------------
@@ -213,7 +213,7 @@ var case8 = function() {
     for( i=0; i < res.splitKeys.length; i++ ){
         assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
     }
-}
+};
 case8();
 
 // -------------------------
@@ -229,7 +229,7 @@ var case9 = function() {
     f.save( { x: 3 } );
 
     assert.eq( 3 , f.count() );
-    print( f.getFullName() )
+    print( f.getFullName() );
 
     res = db.runCommand( { splitVector: f.getFullName() , keyPattern: {x:1} , force : true } );
 
@@ -247,7 +247,7 @@ var case9 = function() {
             assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
         }
     }
-}
+};
 case9();
 
 // -------------------------

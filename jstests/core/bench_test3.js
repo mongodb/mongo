@@ -1,4 +1,4 @@
-t = db.bench_test3
+t = db.bench_test3;
 t.drop();
 
 
@@ -9,7 +9,7 @@ benchArgs = { ops : [ { ns : t.getFullName() ,
                         update : { $inc : { x : 1 } } } ] ,
               parallel : 2 ,
               seconds : 5 ,
-              host : db.getMongo().host }
+              host : db.getMongo().host };
 
 if (jsTest.options().auth) {
     benchArgs['db'] = 'admin';
@@ -17,11 +17,11 @@ if (jsTest.options().auth) {
     benchArgs['password'] = jsTest.options().adminPassword;
 }
 
-res = benchRun( benchArgs )
+res = benchRun( benchArgs );
 printjson( res );
 
-var keys = []
-var totals = {}
-db.bench_test3.find().sort( { _id : 1 } ).forEach( function(z){ keys.push( z._id ); totals[z._id] = z.x } );
+var keys = [];
+var totals = {};
+db.bench_test3.find().sort( { _id : 1 } ).forEach( function(z){ keys.push( z._id ); totals[z._id] = z.x; } );
 printjson(totals);
-assert.eq( [ 0 , 4 , 8 , 12 , 16 ] , keys )
+assert.eq( [ 0 , 4 , 8 , 12 , 16 ] , keys );

@@ -1,5 +1,5 @@
-var t = db.geo_s2intersectinglines
-t.drop()
+var t = db.geo_s2intersectinglines;
+t.drop();
 t.ensureIndex( { geo : "2dsphere" } );
 
 /* All the tests in this file are generally confirming intersections based upon
@@ -50,7 +50,7 @@ assert.eq(result[0]['name'], 'canonLine');
 var testPoly = {type: "Polygon",
     coordinates: [
         [[0.4, -0.1],[0.4, 0.1], [0.6, 0.1], [0.6, -0.1], [0.4, -0.1]]
-    ]}
+    ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: testPoly}}});
 assert.eq(result.count(), 1);
@@ -117,7 +117,7 @@ assert.eq(result[0]['name'], 'canonPoint');
 // as above but with an identical point to the canonPoint.  We expect an
 // intersection here.
 testPoint = {type: "Point",
-    coordinates: [10.0, 10.0]}
+    coordinates: [10.0, 10.0]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: testPoint}}});
 assert.eq(result.count(), 1);
@@ -126,7 +126,7 @@ assert.eq(result[0]['name'], 'canonPoint');
 
 //Case 10: Sanity point non-intersection.
 var testPoint = {type: "Point",
-    coordinates: [12.0, 12.0]}
+    coordinates: [12.0, 12.0]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: testPoint}}});
 assert.eq(result.count(), 0);
@@ -134,7 +134,7 @@ assert.eq(result.count(), 0);
 // Case 11: Point polygon intersection
 // verify that a point inside a polygon $geoIntersects.
 testPoint = {type: "Point",
-    coordinates: [50.5, 50.5]}
+    coordinates: [50.5, 50.5]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: testPoint}}});
 assert.eq(result.count(), 1);

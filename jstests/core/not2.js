@@ -9,7 +9,7 @@ check = function( query, expected, size ) {
     if ( size > 0 ) {
         assert.eq( expected, t.findOne( query ).i, tojson( query ) );
     }
-}
+};
 
 fail = function( query ) {
     try {
@@ -18,7 +18,7 @@ fail = function( query ) {
     } catch ( e ) {
         // expected
     }
-}
+};
 
 doTest = function() {
 
@@ -77,7 +77,7 @@ t.save( {i:[{j:"b"}]} );
 check( {i:{$not:{$elemMatch:{j:"a"}}}}, [{j:"b"}] );
 check( {i:{$not:{$elemMatch:{j:"f"}}}}, [{j:"a"}], 2 );
 
-}
+};
 
 doTest();
 t.ensureIndex( {i:1} );

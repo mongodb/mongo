@@ -2,7 +2,7 @@ t = db.geo_center_sphere1;
 
 function test(index) {
     t.drop();
-    skip = 8 // lower for more rigor, higher for more speed (tested with .5, .678, 1, 2, 3, and 4)
+    skip = 8; // lower for more rigor, higher for more speed (tested with .5, .678, 1, 2, 3, and 4)
 
     searches = [ 
         //  x , y    rad
@@ -25,7 +25,7 @@ function test(index) {
     var bulk = t.initializeUnorderedBulkOp();
     for ( x=-179; x<=179; x += skip ){
         for ( y=-89; y<=89; y += skip ){
-            o = { _id : num++ , loc : [ x , y ] } 
+            o = { _id : num++ , loc : [ x , y ] }; 
             bulk.insert( o );
             for ( i=0; i<searches.length; i++ ){
                 if ( Geo.sphereDistance( [ x , y ] , searches[i][0] ) <= searches[i][1])
@@ -42,8 +42,8 @@ function test(index) {
 
     for ( i=0; i<searches.length; i++ ){
         print('------------');
-        print( tojson( searches[i] ) + "\t" + correct[i].length )
-        q = { loc : { $within : { $centerSphere : searches[i] } } }
+        print( tojson( searches[i] ) + "\t" + correct[i].length );
+        q = { loc : { $within : { $centerSphere : searches[i] } } };
 
         //correct[i].forEach( printjson )
         //printjson( q );
@@ -54,9 +54,9 @@ function test(index) {
         //printjson( Array.sort( correct[i].map( function(z){ return z._id; } ) ) )
         //printjson( Array.sort( t.find(q).map( function(z){ return z._id; } ) ) )
         
-        var numExpected = correct[i].length
-        var x = correct[i].map( function(z){ return z._id; } )
-        var y = t.find(q).map( function(z){ return z._id; } )
+        var numExpected = correct[i].length;
+        var x = correct[i].map( function(z){ return z._id; } );
+        var y = t.find(q).map( function(z){ return z._id; } );
 
         missing = [];
         epsilon = 0.001; // allow tenth of a percent error due to conversions
@@ -65,7 +65,7 @@ function test(index) {
                 missing.push(x[j]);
                 var obj = t.findOne({_id: x[j]});
                 var dist = Geo.sphereDistance(searches[i][0], obj.loc);
-                print("missing: " + tojson(obj) + " " + dist)
+                print("missing: " + tojson(obj) + " " + dist);
                 if ((Math.abs(dist - searches[i][1]) / dist) < epsilon)
                     numExpected -= 1;
             }
@@ -75,7 +75,7 @@ function test(index) {
                 missing.push(y[j]);
                 var obj = t.findOne({_id: y[j]});
                 var dist = Geo.sphereDistance(searches[i][0], obj.loc);
-                print("extra: " + tojson(obj) + " " + dist)
+                print("extra: " + tojson(obj) + " " + dist);
                 if ((Math.abs(dist - searches[i][1]) / dist) < epsilon)
                     numExpected += 1;
             }
@@ -90,11 +90,11 @@ function test(index) {
             // The index should be at least minimally effective in preventing the full collection
             // scan.
             assert.gt( t.find().count(), explain.executionStats.totalKeysExamined ,
-                       "nscanned : " + tojson( searches[i] ) )
+                       "nscanned : " + tojson( searches[i] ) );
         }
     }
 }
 
-test("2d")
-test("2dsphere")
-test(false)
+test("2d");
+test("2dsphere");
+test(false);

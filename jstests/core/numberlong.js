@@ -6,7 +6,7 @@ assert.eq.automsg( "4", "n.toNumber()" );
 assert.eq.automsg( "8", "n + 4" );
 assert.eq.automsg( "'NumberLong(4)'", "n.toString()" );
 assert.eq.automsg( "'NumberLong(4)'", "tojson( n )" );
-a = {}
+a = {};
 a.a = n;
 p = tojson( a );
 assert.eq.automsg( "'{ \"a\" : NumberLong(4) }'", "p" );
@@ -20,7 +20,7 @@ assert.eq.automsg( "-4", "n.toNumber()" );
 assert.eq.automsg( "0", "n + 4" );
 assert.eq.automsg( "'NumberLong(-4)'", "n.toString()" );
 assert.eq.automsg( "'NumberLong(-4)'", "tojson( n )" );
-a = {}
+a = {};
 a.a = n;
 p = tojson( a );
 assert.eq.automsg( "'{ \"a\" : NumberLong(-4) }'", "p" );
@@ -31,7 +31,7 @@ assert.eq.automsg( "11111111111111112", "n.toNumber()" );
 assert.eq.automsg( "11111111111111116", "n + 4" );
 assert.eq.automsg( "'NumberLong(\"11111111111111111\")'", "n.toString()" );
 assert.eq.automsg( "'NumberLong(\"11111111111111111\")'", "tojson( n )" );
-a = {}
+a = {};
 a.a = n;
 p = tojson( a );
 assert.eq.automsg( "'{ \"a\" : NumberLong(\"11111111111111111\") }'", "p" );
@@ -44,7 +44,7 @@ assert.eq.automsg( "-11111111111111112", "n.toNumber()" );
 assert.eq.automsg( "-11111111111111108", "n + 4" );
 assert.eq.automsg( "'NumberLong(\"-11111111111111111\")'", "n.toString()" );
 assert.eq.automsg( "'NumberLong(\"-11111111111111111\")'", "tojson( n )" );
-a = {}
+a = {};
 a.a = n;
 p = tojson( a );
 assert.eq.automsg( "'{ \"a\" : NumberLong(\"-11111111111111111\") }'", "p" );

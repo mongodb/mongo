@@ -1,6 +1,6 @@
 
-t = db.geo_haystack2
-t.drop()
+t = db.geo_haystack2;
+t.drop();
 
 function distance( a , b ){
     var x = a[0] - b[0];
@@ -18,9 +18,9 @@ function distanceTotal( a , arr , f ){
 
 queries = [
     { near : [ 7 , 8 ]  , maxDistance : 3 , search : { z : 3 } } ,
-]
+];
 
-answers = queries.map( function(){ return { totalDistance : 0 , results : [] }; } )
+answers = queries.map( function(){ return { totalDistance : 0 , results : [] }; } );
 
 
 n = 0;
@@ -29,13 +29,13 @@ for ( x=0; x<20; x++ ){
         t.insert( { _id : n , loc : [ x , y ] , z : [ n % 10 , ( n + 5 ) % 10 ] } );
         
         for ( i=0; i<queries.length; i++ ){
-            var d = distance( queries[i].near , [ x , y ] )
+            var d = distance( queries[i].near , [ x , y ] );
             if ( d > queries[i].maxDistance )
                 continue;
             if ( queries[i].search.z != n % 10 &&
                  queries[i].search.z != ( n + 5 ) % 10 )
                 continue;
-            answers[i].results.push( { _id : n , loc : [ x , y ] } )
+            answers[i].results.push( { _id : n , loc : [ x , y ] } );
             answers[i].totalDistance += d;
         }
 
@@ -48,11 +48,11 @@ t.ensureIndex( { loc : "geoHaystack" , z : 1 } , { bucketSize : .7 } );
 for ( i=0; i<queries.length; i++ ){
     print( "---------" );
     printjson( queries[i] );
-    res = t.runCommand( "geoSearch" , queries[i] )
+    res = t.runCommand( "geoSearch" , queries[i] );
     print( "\t" + tojson( res.stats ) );
     print( "\tshould have: " + answers[i].results.length + "\t actually got: " + res.stats.n );
-    assert.eq( answers[i].results.length , res.stats.n, "num:"+ i + " number matches" )
-    assert.eq( answers[i].totalDistance , distanceTotal( queries[i].near , res.results , "loc" ), "num:"+ i + " totalDistance" )
+    assert.eq( answers[i].results.length , res.stats.n, "num:"+ i + " number matches" );
+    assert.eq( answers[i].totalDistance , distanceTotal( queries[i].near , res.results , "loc" ), "num:"+ i + " totalDistance" );
     //printjson( res );    
     //printjson( answers[i].length );
 }

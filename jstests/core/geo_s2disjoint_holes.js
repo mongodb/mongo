@@ -78,4 +78,4 @@ assert.writeOK(t.insert({p: multiPoly}));
 
 t.drop();
 
-jsTest.log("Success.")
+jsTest.log("Success.");

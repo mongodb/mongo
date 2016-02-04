@@ -2,7 +2,7 @@
 // the same document multiple times only apply
 // the update once
 
-var t = db.jstests_geo_update_dedup;;
+var t = db.jstests_geo_update_dedup;
 
 // 2d index with $near
 t.drop();
@@ -36,8 +36,8 @@ assert.eq(1, t.findOne().touchCount);
 t.drop();
 t.ensureIndex({geo: "2dsphere"});
 var x = { "type" : "Polygon",
-          "coordinates" : [[[49.999,49.999], [50.0,50.0], [50.001,50.001], [49.999,49.999]]]}
-t.save({geo: x})
+          "coordinates" : [[[49.999,49.999], [50.0,50.0], [50.001,50.001], [49.999,49.999]]]};
+t.save({geo: x});
 
 res = t.update({geo: {$geoNear: {"type" : "Point", "coordinates" : [50.0, 50.0]}}},
                {$inc: {touchCount: 1}}, false, true);
@@ -50,7 +50,7 @@ var locdata = [
     {geo: {type: "Point", coordinates: [50.000,50.000]}},
     {geo: {type: "Point", coordinates: [50.001,50.001]}}
 ];
-t.save({locdata: locdata, count: 0})
+t.save({locdata: locdata, count: 0});
 t.ensureIndex({"locdata.geo": "2dsphere"});
 
 res = t.update({"locdata.geo": {$geoNear: {"type" : "Point", "coordinates" : [50.0, 50.0]}}},

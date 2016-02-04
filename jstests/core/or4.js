@@ -13,7 +13,7 @@ checkArrs = function( a, b ) {
     for ( i = 0; i < aStr.length; ++i ) {
         assert( -1 != bStr.indexOf( aStr[ i ] ), m );
     }
-}
+};
 
 t.ensureIndex( {a:1} );
 t.ensureIndex( {b:1} );

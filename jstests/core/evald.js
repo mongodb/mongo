@@ -37,7 +37,7 @@ function doIt( ev, wait, where ) {
     }
 
     o = null;
-    assert.soon( function() { o = op( ev, where ); return o != -1 } );
+    assert.soon( function() { o = op( ev, where ); return o != -1; } );
 
     if ( wait ) {
         sleep( 2000 );

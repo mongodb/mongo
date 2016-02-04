@@ -4,9 +4,9 @@ t = db.stages_text;
 t.drop();
 var collname = "stages_text";
 
-t.save({x: "az b x"})
+t.save({x: "az b x"});
 
-t.ensureIndex({x: "text"})
+t.ensureIndex({x: "text"});
 
 // We expect to retrieve 'b'
 res = db.runCommand({stageDebug: {collection: collname,

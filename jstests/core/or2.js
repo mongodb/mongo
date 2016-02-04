@@ -13,7 +13,7 @@ checkArrs = function( a, b ) {
     for ( i = 0; i < aStr.length; ++i ) {
         assert.neq( -1, bStr.indexOf( aStr[ i ] ) );
     }
-}
+};
 
 doTest = function( index ) {
     if ( index == null ) {
@@ -54,7 +54,7 @@ doTest = function( index ) {
     t.update( {x:10,$or:[ {a:2} ]}, {$set:{'a.$':100}} );
     assert.eq( obj, t.findOne() ); // no change
     */
-}
+};
 
 doTest( false );
 

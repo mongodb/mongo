@@ -1,7 +1,7 @@
 // Verify that we can index multiple geo fields with 2dsphere, and that
 // performance is what we expect it to be with indexing both fields.
-var t = db.geo_s2twofields
-t.drop()
+var t = db.geo_s2twofields;
+t.drop();
 
 Random.setRandomSeed();
 var random = Random.rand;

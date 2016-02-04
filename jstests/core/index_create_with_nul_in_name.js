@@ -11,4 +11,4 @@
     var res = coll.runCommand('createIndexes', {indexes: [idx]});
     assert.commandFailed(res, tojson(res));
     assert.eq(res.code, 67); // CannotCreateIndex
-}())
+}());

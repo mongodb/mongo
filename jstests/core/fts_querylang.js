@@ -52,7 +52,7 @@ assert.eq(results[0]._id, 1);
 // Test $and of basic text query with indexed expression, and bad language
 assert.throws(function() {
     t.find({$text: {$search: "content -irrelevant", $language: "spanglish"}, _id: 1})
-    .itcount()});
+    .itcount();});
 
 // Test $and of basic text query with unindexed expression.
 results = t.find({$text: {$search: "content -irrelevant"},
@@ -70,7 +70,7 @@ cursor = t.find({$text: {$search: "contents", $language: "EN"}});
 assert.eq(true, cursor.hasNext());
 
 cursor = t.find({$text: {$search: "contents", $language: "spanglish"}});
-assert.throws(function() { cursor.next() });
+assert.throws(function() { cursor.next(); });
 
 // TODO Test $and of basic text query with geo expression.
 

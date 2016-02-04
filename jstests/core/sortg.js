@@ -3,7 +3,7 @@
 t = db.jstests_sortg;
 t.drop();
 
-big = new Array( 1000000 ).toString()
+big = new Array( 1000000 ).toString();
 
 for( i = 0; i < 100; ++i ) {
     t.save( {b:0} );
@@ -16,7 +16,7 @@ for( i = 0; i < 40; ++i ) {
 function memoryException( sortSpec, querySpec ) {
     querySpec = querySpec || {};
     var ex = assert.throws( function() {
-        t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount()
+        t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount();
     } );
     assert( ex.toString().match( /Sort/ ) );
 }

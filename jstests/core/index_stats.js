@@ -18,7 +18,7 @@
         }
 
         return undefined;
-    }
+    };
 
     var getIndexKey = function(indexName) {
         var cursor = col.aggregate([{$indexStats: {}}]);
@@ -31,7 +31,7 @@
         }
 
         return undefined;
-    }
+    };
 
     var getIndexNamesForWinningPlan = function(explain) {
         var indexNameList = [];
@@ -41,7 +41,7 @@
         }
 
         return indexNameList;
-    }
+    };
 
     assert.writeOK(col.insert({a: 1, b: 1, c: 1}));
     assert.writeOK(col.insert({a: 2, b: 2, c: 2}));
@@ -206,5 +206,5 @@
     //
     // Confirm that retrieval fails if $indexStats is not in the first pipeline position.
     //
-    assert.throws(function() { col.aggregate([{$match: {}}, {$indexStats: {}}]) });
+    assert.throws(function() { col.aggregate([{$match: {}}, {$indexStats: {}}]); });
 })();

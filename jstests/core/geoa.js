@@ -1,10 +1,10 @@
 
-t = db.geoa
+t = db.geoa;
 t.drop();
 
-t.save( { _id : 1 , a : { loc : [ 5 , 5 ] } } )
-t.save( { _id : 2 , a : { loc : [ 6 , 6 ] } } )
-t.save( { _id : 3 , a : { loc : [ 7 , 7 ] } } )
+t.save( { _id : 1 , a : { loc : [ 5 , 5 ] } } );
+t.save( { _id : 2 , a : { loc : [ 6 , 6 ] } } );
+t.save( { _id : 3 , a : { loc : [ 7 , 7 ] } } );
 
 t.ensureIndex( { "a.loc" : "2d" } );
 

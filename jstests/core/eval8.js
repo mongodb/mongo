@@ -9,7 +9,7 @@ x = t.findOne();
 assert( x.a && x.b , "A" );
 delete x.b;
 
-assert( x.a && ! x.b , "B" )
+assert( x.a && ! x.b , "B" );
 x.b = 3;
 assert( x.a && x.b , "C" );
 assert.eq( 3 , x.b , "D" );

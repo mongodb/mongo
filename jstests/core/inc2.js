@@ -1,5 +1,5 @@
 
-t = db.inc2
+t = db.inc2;
 t.drop();
 
 t.save( { _id : 1 , x : 1 } );

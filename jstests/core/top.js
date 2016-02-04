@@ -24,7 +24,7 @@ var lastTop = getTop();
 function diffTop(key) {
     var thisTop = getTop();
     difference = { time  : thisTop[key].time - lastTop[key].time,
-                   count : thisTop[key].count - lastTop[key].count }
+                   count : thisTop[key].count - lastTop[key].count };
     lastTop[key] = thisTop[key];
 
     assert.gte(difference.count, 0, "non-decreasing count");
@@ -38,9 +38,9 @@ function diffTop(key) {
 var numRecords = 100;
 
 // check stats for specified key are as expected
-var checked = { }
+var checked = { };
 function checkStats(key, expected) {
-    checked[key]++
+    checked[key]++;
     var actual = diffTop(key).count;
     assert.eq(actual, expected, "top reports wrong count for " + key);
 }
@@ -59,7 +59,7 @@ for(i = 0; i < numRecords; i++) {
 checkStats("update", numRecords);
 
 // Queries
-var query = { }
+var query = { };
 for(i = 0; i < numRecords; i++) {
     query[i] = testColl.find({x : {$gte:i}}).batchSize(2);
     assert.eq(query[i].next()._id, i);

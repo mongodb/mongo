@@ -1,6 +1,6 @@
 
-t = db.regex5
-t.drop()
+t = db.regex5;
+t.drop();
 
 // Add filler data to make sure that indexed solutions are
 // chosen over collection scans.
@@ -8,11 +8,11 @@ for (var i = 0; i < 10; i++) {
     t.save({filler: "filler"});
 }
 
-t.save( { x : [ "abc" , "xyz1" ] } )
-t.save( { x : [ "ac" , "xyz2" ] } )
+t.save( { x : [ "abc" , "xyz1" ] } );
+t.save( { x : [ "ac" , "xyz2" ] } );
 
-a = /.*b.*c/
-x = /.*y.*/
+a = /.*b.*c/;
+x = /.*y.*/;
 
 doit = function() {
     
@@ -28,8 +28,8 @@ doit = function() {
     assert.eq( 11 , t.find( { x : { $nin: [ a, "xyz1" ] } } ).count() , "J" ); // SERVER-322
     assert.eq( 10 , t.find( { x : { $nin: [ a, "xyz2" ] } } ).count() , "K" ); // SERVER-322
     assert.eq( 2 , t.find( { x : { $not: { $nin: [ x ] } } } ).count() , "L" ); // SERVER-322
-    assert.eq( 11 , t.find( { x : { $nin: [ /^a.c/ ] } } ).count() , "M" ) // SERVER-322
-}
+    assert.eq( 11 , t.find( { x : { $nin: [ /^a.c/ ] } } ).count() , "M" ); // SERVER-322
+};
 
 doit();
 t.ensureIndex( {x:1} );

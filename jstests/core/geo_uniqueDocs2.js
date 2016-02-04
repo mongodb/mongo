@@ -64,7 +64,7 @@ arrLocs = [[20,30],[40,50]];
 t.save( {loc:arrLocs} );
 results = db.runCommand( { geoNear : collName , near : [50,50], num : 10, uniqueDocs : false, includeLocs : true } ).results;
 // The original loc arrays are returned as objects.
-expectedLocs = arrLocs
+expectedLocs = arrLocs;
 
 assert.contains( results[0].loc, expectedLocs );
 

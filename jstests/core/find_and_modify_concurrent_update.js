@@ -1,7 +1,7 @@
 // Ensures that find and modify will not apply an update to a document which, due to a concurrent
 // modification, no longer matches the query predicate.
 (function() {
-    "use strict"
+    "use strict";
 
     // Repeat the test a few times, as the timing of the yield means it won't fail consistently.
     for (var i = 0; i < 3; i++) {

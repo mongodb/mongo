@@ -133,6 +133,6 @@ t.save( { x : 3 } );
 
 t.ensureIndex( { x : 1 } );
 
-assert.eq( "1,2,3" , s() , "F1" )
+assert.eq( "1,2,3" , s() , "F1" );
 t.update( { x : { $gt : 0 } } , { $inc : { x : 5 } } , false , true );
-assert.eq( "6,7,8" , s() , "F1" )
+assert.eq( "6,7,8" , s() , "F1" );

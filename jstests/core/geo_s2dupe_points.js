@@ -2,9 +2,9 @@
 // s2 rejects shapes with duplicate adjacent points as invalid, but they are
 // valid in GeoJSON.  We store the duplicates, but internally remove them
 // before indexing or querying.
-t = db.geo_s2dupe_points
-t.drop()
-t.ensureIndex({geo: "2dsphere"})
+t = db.geo_s2dupe_points;
+t.drop();
+t.ensureIndex({geo: "2dsphere"});
 
 function testDuplicates(shapeName, shapeWithDupes, shapeWithoutDupes) {
     // insert a doc with dupes

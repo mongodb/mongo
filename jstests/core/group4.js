@@ -1,5 +1,5 @@
 
-t = db.group4
+t = db.group4;
 t.drop();
 
 function test( c , n ){
@@ -11,20 +11,20 @@ function test( c , n ){
     );
 }
 
-t.insert({name:'bob',foo:1})
-t.insert({name:'bob',foo:2})
-t.insert({name:'alice',foo:1})
-t.insert({name:'alice',foo:3})
-t.insert({name:'fred',foo:3})
-t.insert({name:'fred',foo:4})
+t.insert({name:'bob',foo:1});
+t.insert({name:'bob',foo:2});
+t.insert({name:'alice',foo:1});
+t.insert({name:'alice',foo:3});
+t.insert({name:'fred',foo:3});
+t.insert({name:'fred',foo:4});
 
 x = t.group( 
     {
         key: {foo:1},
         initial: {count:0,values:[]},
         reduce: function (obj, prev){
-            prev.count++
-            prev.values.push(obj.name)
+            prev.count++;
+            prev.values.push(obj.name);
         }
     } 
 );

@@ -14,7 +14,7 @@ print( "lookAtDocumentMetrics: " + lookAtDocumentMetrics );
 
 if ( lookAtDocumentMetrics ) {
     // ignore mongos
-    nscannedStart = db.serverStatus().metrics.queryExecutor.scanned
+    nscannedStart = db.serverStatus().metrics.queryExecutor.scanned;
 }
 
 
@@ -48,6 +48,6 @@ assert(t.validate().valid,"not valid");
 
 if ( lookAtDocumentMetrics ) {
     // ignore mongos
-    nscannedEnd = db.serverStatus().metrics.queryExecutor.scanned
+    nscannedEnd = db.serverStatus().metrics.queryExecutor.scanned;
     assert.lte( nscannedStart + 16, nscannedEnd );
 }

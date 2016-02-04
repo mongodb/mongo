@@ -9,9 +9,9 @@ function check( want , err ){
 }
 
 t.update( { a : 5 } , { $set : { a : 6 , b : null } } , true );
-check( { a : 6 , b : null } , "A" )
+check( { a : 6 , b : null } , "A" );
 
 t.drop();
 
 t.update( { z : 5 } , { $set : { z : 6 , b : null } } , true );
-check( { b : null , z : 6 } , "B" )
+check( { b : null , z : 6 } , "B" );

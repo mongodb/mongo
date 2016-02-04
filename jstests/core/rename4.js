@@ -8,9 +8,9 @@ function bad( f ) {
     //Ensure error
     if (!res.hasWriteError()) {
         print("Error:" + res.toString());
-        print("Existing docs (before)")
+        print("Existing docs (before)");
         printjson(docsBeforeUpdate);
-        print("Existing docs (after)")
+        print("Existing docs (after)");
         printjson(t.find().toArray());
         assert( false, "Expected error but didn't get one for: " + f );
     }

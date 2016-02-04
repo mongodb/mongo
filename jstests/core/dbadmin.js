@@ -12,22 +12,22 @@ assert( res.databases && res.databases.length > 0 , "listDatabases 1 " + tojson(
 
 var now = new Date();
 var x = db._adminCommand( "ismaster" );
-assert( x.ismaster , "ismaster failed: " + tojson( x ) )
-assert( x.localTime, "ismaster didn't include time: " + tojson(x))
+assert( x.ismaster , "ismaster failed: " + tojson( x ) );
+assert( x.localTime, "ismaster didn't include time: " + tojson(x));
 
-var localTimeSkew = x.localTime - now
+var localTimeSkew = x.localTime - now;
 if ( localTimeSkew >= 50 ) {
-    print( "Warning: localTimeSkew " + localTimeSkew + " > 50ms." )
+    print( "Warning: localTimeSkew " + localTimeSkew + " > 50ms." );
 }
-assert.lt( localTimeSkew, 500, "isMaster.localTime" )
+assert.lt( localTimeSkew, 500, "isMaster.localTime" );
 
-var before = db.runCommand( "serverStatus" )
+var before = db.runCommand( "serverStatus" );
 print(before.uptimeEstimate);
-sleep( 5000 )
+sleep( 5000 );
 
-var after = db.runCommand( "serverStatus" )
+var after = db.runCommand( "serverStatus" );
 print(after.uptimeEstimate);
-assert.lt( 2 , after.uptimeEstimate , "up1" )
+assert.lt( 2 , after.uptimeEstimate , "up1" );
 assert.gt( after.uptimeEstimate , before.uptimeEstimate , "up2" );
 
 })();

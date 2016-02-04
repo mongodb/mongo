@@ -7,7 +7,7 @@ t.save( { _id : 2 , name : "sara" } );
 
 f = function(id){ 
     return db["eval1"].findOne( { _id : id } ).name;
-}
+};
 
 
 assert.eq( "eliot" , f( 1 ) , "A" );

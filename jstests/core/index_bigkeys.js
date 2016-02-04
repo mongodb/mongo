@@ -1,7 +1,7 @@
 
 t = db.bigkeysidxtest;
 
-var keys = []
+var keys = [];
 
 var str = "aaaabbbbccccddddeeeeffffgggghhhh";
 

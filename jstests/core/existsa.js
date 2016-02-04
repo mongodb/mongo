@@ -37,7 +37,7 @@ function assertExists( query, expectedExists ) {
     assert.eq( expectedExists, t.count( query ) );
     // An $exists:true predicate generates no index filters.  Add another predicate on the index key
     // to trigger use of the index.
-    andClause = {}
+    andClause = {};
     andClause[ indexKeyField ] = { $ne:null };
     Object.extend( query, { $and:[ andClause ] } );
     assert.eq( expectedExists, t.count( query ) );
@@ -49,7 +49,7 @@ function assertExistsUnindexed( query, expectedExists ) {
     expectedExists = expectedExists || 2;
     assert.eq( expectedExists, t.count( query ) );
     // Even with another predicate on the index key, the sparse index is disallowed.
-    andClause = {}
+    andClause = {};
     andClause[ indexKeyField ] = { $ne:null };
     Object.extend( query, { $and:[ andClause ] } );
     assert.eq( expectedExists, t.count( query ) );

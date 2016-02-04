@@ -1,5 +1,5 @@
 
-t = db.big_object1
+t = db.big_object1;
 t.drop();
 
 if ( db.adminCommand( "buildinfo" ).bits == 64 ){
@@ -12,12 +12,12 @@ if ( db.adminCommand( "buildinfo" ).bits == 64 ){
     x = 0;
     while ( true ){
         var result;
-        n = { _id : x , a : [] }
+        n = { _id : x , a : [] };
         for ( i=0; i<14+x; i++ )
-            n.a.push( s )
+            n.a.push( s );
         try {
-            result = t.insert( n )
-            o = n
+            result = t.insert( n );
+            o = n;
         }
         catch ( e ){
             break;
@@ -28,15 +28,15 @@ if ( db.adminCommand( "buildinfo" ).bits == 64 ){
         x++;
     }
     
-    printjson( t.stats(1024*1024) )
+    printjson( t.stats(1024*1024) );
 
-    assert.lt( 15 * 1024 * 1024 , Object.bsonsize( o ) , "A1" )
-    assert.gt( 17 * 1024 * 1024 , Object.bsonsize( o ) , "A2" )
+    assert.lt( 15 * 1024 * 1024 , Object.bsonsize( o ) , "A1" );
+    assert.gt( 17 * 1024 * 1024 , Object.bsonsize( o ) , "A2" );
     
-    assert.eq( x , t.count() , "A3" )
+    assert.eq( x , t.count() , "A3" );
     
     for ( i=0; i<x; i++ ){
-        o = t.findOne( { _id : i } )
+        o = t.findOne( { _id : i } );
         try {
             // test large mongo -> js conversion
             var a = o.a;
@@ -46,10 +46,10 @@ if ( db.adminCommand( "buildinfo" ).bits == 64 ){
         assert( o , "B" + i );
     }
     
-    t.drop()
+    t.drop();
 }
 else {
-    print( "skipping big_object1 b/c not 64-bit" )
+    print( "skipping big_object1 b/c not 64-bit" );
 }
 
 print("SUCCESS");

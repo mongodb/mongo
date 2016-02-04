@@ -1,4 +1,4 @@
-load( "jstests/libs/fts.js" )
+load( "jstests/libs/fts.js" );
 
 t = db.text_parition1;
 t.drop();

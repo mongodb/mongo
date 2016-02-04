@@ -12,7 +12,7 @@ profileCursor = function( query ) {
     query = query || {};
     Object.extend( query, { user: username + "@" + db.getName() } );
      return db.system.profile.find( query );
-}
+};
 
 try {
     username = "jstests_profile3_user";
@@ -22,7 +22,7 @@ try {
     db.setProfilingLevel(0);
 
     db.system.profile.drop();
-    assert.eq( 0 , profileCursor().count() )
+    assert.eq( 0 , profileCursor().count() );
     
     db.setProfilingLevel(2);
     
@@ -34,14 +34,14 @@ try {
     t.update( { x : 1 }, {$inc:{a:1}} );
     t.update( { x : 0 }, {$inc:{a:1}} );
     
-    profileCursor().forEach( printjson )
+    profileCursor().forEach( printjson );
 
     db.setProfilingLevel(0);
 
 
-    assert.eq(profileCursor({nMatched: {$exists:1}}).count(), 3)
-    assert.eq(profileCursor({nMatched: 1}).count(), 2)
-    assert.eq(profileCursor({nMatched: 0}).count(), 1)
+    assert.eq(profileCursor({nMatched: {$exists:1}}).count(), 3);
+    assert.eq(profileCursor({nMatched: 1}).count(), 2);
+    assert.eq(profileCursor({nMatched: 0}).count(), 1);
     if ( db.serverStatus().storageEngine.name == "mmapv1" ) {
         assert.eq(profileCursor({nmoved: 1}).count(), 1 );
     }
