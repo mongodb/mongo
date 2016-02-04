@@ -1894,7 +1894,11 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 
 	/*
 	 * Respect the configured split percentage if the calculated split
-	 * size is either zero or a full page.
+	 * size is either zero or a full page. The user has either configured
+	 * an allocation size that matches the page size, or a split
+	 * percentage that is close to zero or one hundred. Rounding is going
+	 * to provide a worse outcome than having a split point that doesn't
+	 * fall on an allocation size boundary in those cases.
 	 */
 	if (split_size == 0 || split_size == maxpagesize)
 		split_size = (uint32_t)((a * (u_int)btree->split_pct) / 100);
