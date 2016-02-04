@@ -3,7 +3,7 @@
  * mixed modes can still function
  */
 
-load("jstests/ssl/libs/ssl_helpers.js")
+load("jstests/ssl/libs/ssl_helpers.js");
 
 // Verify that disabled allows non-ssl connections
 print("=== Testing disabled cluster ===");
