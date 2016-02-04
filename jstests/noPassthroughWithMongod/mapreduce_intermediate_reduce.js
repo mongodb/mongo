@@ -24,8 +24,8 @@ for (var i = 0; i < 10; i++) {
 }
 assert.writeOK(bulk.execute());
 
-function mapFn() { emit(this.idx, 1); };
-function reduceFn(key, values) { return Array.sum(values); };
+function mapFn() { emit(this.idx, 1); }
+function reduceFn(key, values) { return Array.sum(values); }
 
 var out = coll.mapReduce(mapFn, reduceFn, { out: { replace: "mrOutput" } });
 

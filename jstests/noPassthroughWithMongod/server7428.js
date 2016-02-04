@@ -17,6 +17,6 @@ var admin = toDb.getDB("admin");
 admin.createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
 admin.auth("foo","bar");
 
-admin.copyDatabase('test', 'test', fromDb.host)
+admin.copyDatabase('test', 'test', fromDb.host);
 
 })();

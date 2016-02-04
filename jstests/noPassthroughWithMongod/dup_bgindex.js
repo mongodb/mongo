@@ -5,7 +5,7 @@ t.drop();
 for (var i=0; i<10000; i++) {
   t.insert( { name : "foo" , z : { a : 17 , b : 4}, i: i } );
 }
-var cmd = "db.duplIndexTest.ensureIndex( { i : 1 }, {background:true} );"
+var cmd = "db.duplIndexTest.ensureIndex( { i : 1 }, {background:true} );";
 var join1 = startParallelShell(cmd);
 var join2 = startParallelShell(cmd);
 t.ensureIndex( { i : 1 }, {background:true} );

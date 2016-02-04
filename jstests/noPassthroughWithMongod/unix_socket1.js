@@ -10,16 +10,16 @@ doesLogMatchRegex = function(logArray, regex) {
 
 
 if ( ! _isWindows() ) {
-    hoststring = db.getMongo().host
-    index = hoststring.lastIndexOf(':')
+    hoststring = db.getMongo().host;
+    index = hoststring.lastIndexOf(':');
     if (index == -1){
-        port = '27017'
+        port = '27017';
     } else {
-        port = hoststring.substr(index + 1)
+        port = hoststring.substr(index + 1);
     }
 
-    sock = new Mongo('/tmp/mongodb-' + port + '.sock')
-    sockdb = sock.getDB(db.getName())
+    sock = new Mongo('/tmp/mongodb-' + port + '.sock');
+    sockdb = sock.getDB(db.getName());
     assert( sockdb.runCommand('ping').ok );
 
     // Test unix socket path
@@ -30,7 +30,7 @@ if ( ! _isWindows() ) {
     var conn = MongoRunner.runMongod({dbpath: dataPath, unixSocketPrefix: path});
     
     var sock2 = new Mongo(path + "/mongodb-" + conn.port + ".sock");
-    sockdb2 = sock2.getDB(db.getName())
+    sockdb2 = sock2.getDB(db.getName());
     assert( sockdb2.runCommand('ping').ok );
 
     // Test the naming of the unix socket

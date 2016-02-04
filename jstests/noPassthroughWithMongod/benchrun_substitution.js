@@ -61,7 +61,7 @@ function benchrun_sub_remove(use_write_command) {
     ops = [{op: "remove", ns: "test.benchrun_sub",
             query: {x: {"#RAND_INT": [0, 100]}},
             writeCmd: use_write_command,
-            }]
+            }];
 
     for (var i = 0; i < 100; ++i) {
         t.insert({x: i});

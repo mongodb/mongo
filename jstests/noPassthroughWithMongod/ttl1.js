@@ -18,7 +18,7 @@ assertEntryMatches = function(array, regex) {
     }
     assert(found,
            "The regex: " + regex + " did not match any entries in the array: " + array.join('\n'));
-}
+};
 // Part 1
 var t = db.ttl1;
 t.drop();
@@ -29,12 +29,12 @@ for (i=0; i<24; i++) {
     var past = new Date(now - (3600 * 1000 * i));
     t.insert({x: past, y: past, z: past});
 }
-t.insert( { a : 1 } )     //no x value
-t.insert( { x: null } )   //non-date value
-t.insert( { x : true } )  //non-date value
-t.insert( { x : "yo" } )  //non-date value
-t.insert( { x : 3 } )     //non-date value
-t.insert( { x : /foo/ } ) //non-date value
+t.insert( { a : 1 } );     //no x value
+t.insert( { x: null } );   //non-date value
+t.insert( { x : true } );  //non-date value
+t.insert( { x : "yo" } );  //non-date value
+t.insert( { x : 3 } );     //non-date value
+t.insert( { x : /foo/ } ); //non-date value
 
 assert.eq( 30 , t.count() );
 

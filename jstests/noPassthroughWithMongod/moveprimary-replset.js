@@ -18,7 +18,7 @@ var shardingTestConfig = {
     config : 3,
     rs : { nodes : 3 },
     other : { manualAddShard : true }
-}
+};
 var shardingTest = new ShardingTest(shardingTestConfig);
 
 jsTest.log("Geting connections to the individual shards");

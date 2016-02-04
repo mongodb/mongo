@@ -16,7 +16,7 @@ var assertCmdNotFound = function(db, cmdName) {
     var res = db.runCommand(cmdName);
     assert.eq(0, res.ok);
     assert.eq(59, res.code, 'expected CommandNotFound(59) error code for test command ' + cmdName);
-}
+};
 
 var assertCmdFound = function(db, cmdName) {
     var res = db.runCommand(cmdName);
@@ -25,7 +25,7 @@ var assertCmdFound = function(db, cmdName) {
                    'test command ' + cmdName + ' should either have succeeded or ' +
                    'failed with an error code other than CommandNotFound(59)');
     }
-}
+};
 
 jsTest.setOption('enableTestCommands', false);
 

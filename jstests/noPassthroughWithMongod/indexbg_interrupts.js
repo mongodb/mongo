@@ -26,7 +26,7 @@ var checkOp = function(checkDB) {
         }
     }
     return false;
-}
+};
 
 var dbname = 'bgIndexSec';
 var collection = 'jstests_feh';

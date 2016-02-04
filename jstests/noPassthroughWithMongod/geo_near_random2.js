@@ -12,7 +12,7 @@ test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);
 
-opts.sphere = 1
+opts.sphere = 1;
 test.testPt([0,0], opts);
 test.testPt(test.mkPt(0.8), opts);
 test.testPt(test.mkPt(0.8), opts);

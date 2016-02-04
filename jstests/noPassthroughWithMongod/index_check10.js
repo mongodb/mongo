@@ -66,7 +66,7 @@ function doIt() {
                 }
                 spec[ fields[ i ] ] = s;
             } else {
-                var vals = []
+                var vals = [];
                 for( var j = 0; j < Random.randInt( 15 ); ++j ) {
                     vals.push( r() );
                 }
