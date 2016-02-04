@@ -49,7 +49,7 @@
 	((((uintmax_t)(n)) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1))
 
 #define	WT_ALIGN_NEAREST(n, v)						\
-	((((uintmax_t)(n)) + ((v) / 2 + 1)) & ~(((uintmax_t)(v)) - 1))
+	((((uintmax_t)(n)) + ((v) / 2)) & ~(((uintmax_t)(v)) - 1))
 
 /* Min, max. */
 #define	WT_MIN(a, b)	((a) < (b) ? (a) : (b))
