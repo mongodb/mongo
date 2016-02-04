@@ -5,7 +5,7 @@ soonCountAtLeast = function( db, coll, count ) {
 //                print( "count: " + s.getDB( db )[ coll ].find().count() );
                 return s.getDB( db )[ coll ].find().itcount() >= count;
                 } );    
-}
+};
 
 doTest = function(signal, extraOpts) {
 
@@ -28,7 +28,7 @@ doTest = function(signal, extraOpts) {
     soonCountAtLeast( "a", "a", 10000 );
 
     rt.stop();
-}
+};
 
 doTest( 15 ); // SIGTERM
 doTest(9, { journal: null });  // SIGKILL

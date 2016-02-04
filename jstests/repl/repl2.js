@@ -19,7 +19,7 @@ soonCount = function( count ) {
 //                print( "count: " + s.getDB( baseName ).z.find().count() );
                 return s.getDB("foo").a.find().count() == count;
                 } );
-}
+};
 
 doTest = function(signal, extraOpts) {
     print("signal: "+signal);
@@ -30,7 +30,7 @@ doTest = function(signal, extraOpts) {
     m = rt.start( true, { oplogSize : "1" } );
     s = rt.start(false, extraOpts);
 
-    am = m.getDB("foo").a
+    am = m.getDB("foo").a;
 
     am.save( { _id: new ObjectId() } );
     soonCount( 1 );
@@ -55,7 +55,7 @@ doTest = function(signal, extraOpts) {
     soonCount( 1001 );
     assert.automsg( "m.getDB( 'local' ).getCollection( 'oplog.$main' ).stats().size > 0" );
 
-    as = s.getDB("foo").a
+    as = s.getDB("foo").a;
     assert.eq( 1, as.find( { i: 0 } ).count() );
     assert.eq( 1, as.find( { i: 999 } ).count() );
 
@@ -63,7 +63,7 @@ doTest = function(signal, extraOpts) {
 
     rt.stop();
 
-}
+};
 
 doTest(15, {"vv": null}); // SIGTERM
 doTest(9,  {"vv": null, journal: null });  // SIGKILL

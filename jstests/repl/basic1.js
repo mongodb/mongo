@@ -8,7 +8,7 @@ m = rt.start( true );
 s = rt.start( false );
 
 function block(){
-    am.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 3000 } )
+    am.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 3000 } );
 }
 
 am = m.getDB( "foo" );
@@ -53,16 +53,16 @@ m = function(){
         print( "\t " + i );
         emit( this.tags[i] , 1 );
     }
-}
+};
 
 r = function( key , v ){
     return Array.sum( v );
-}
+};
 
 correct = { a : 2 , b : 1 };
 
 function checkMR( t ){
-    var res = t.mapReduce( m , r , { out : { inline : 1 } } )
+    var res = t.mapReduce( m , r , { out : { inline : 1 } } );
     assert.eq( correct , res.convertToSingleObject() , "checkMR: " + tojson( t ) );
 }
 
@@ -102,8 +102,8 @@ t.update({ b: 3 }, { $set: { "b.$": 17 }}, writeOption);
 check( "after pos 4 " );
 
 
-printjson( am.rpos.findOne() )
-printjson( as.rpos.findOne() )
+printjson( am.rpos.findOne() );
+printjson( as.rpos.findOne() );
 
 //am.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().limit(10).sort( { $natural : -1 } ).forEach( printjson )
 
@@ -121,40 +121,40 @@ check( "b 4" );
 
 // lots of indexes
 
-am.lotOfIndexes.insert( { x : 1 } )
+am.lotOfIndexes.insert( { x : 1 } );
 for ( i=0; i<200; i++ ){
-    var idx = {}
+    var idx = {};
     idx["x"+i] = 1;
     am.lotOfIndexes.ensureIndex( idx );
 }
 
-assert.soon( function(){ return am.lotOfIndexes.getIndexes().length == as.lotOfIndexes.getIndexes().length; } , "lots of indexes a" )
+assert.soon( function(){ return am.lotOfIndexes.getIndexes().length == as.lotOfIndexes.getIndexes().length; } , "lots of indexes a" );
 
-assert.eq( am.lotOfIndexes.getIndexes().length , as.lotOfIndexes.getIndexes().length , "lots of indexes b" )
+assert.eq( am.lotOfIndexes.getIndexes().length , as.lotOfIndexes.getIndexes().length , "lots of indexes b" );
 
 // multi-update with $inc
 
-am.mu1.update( { _id : 1 , $atomic : 1 } , { $inc : { x : 1 } } , true , true )
-x = { _id : 1 , x : 1 }
+am.mu1.update( { _id : 1 , $atomic : 1 } , { $inc : { x : 1 } } , true , true );
+x = { _id : 1 , x : 1 };
 assert.eq( x , am.mu1.findOne() , "mu1" );
-assert.soon( function(){ z = as.mu1.findOne(); printjson( z ); return friendlyEqual( x , z ); } , "mu2" )
+assert.soon( function(){ z = as.mu1.findOne(); printjson( z ); return friendlyEqual( x , z ); } , "mu2" );
 
 // profiling - this should be last
 
-am.setProfilingLevel( 2 )
+am.setProfilingLevel( 2 );
 am.foo.insert({ x: 1 }, writeOption);
-am.foo.findOne()
-assert.eq( 2 , am.system.profile.count() , "P1" )
-assert.eq( 0 , as.system.profile.count() , "P2" )
+am.foo.findOne();
+assert.eq( 2 , am.system.profile.count() , "P1" );
+assert.eq( 0 , as.system.profile.count() , "P2" );
 
 assert.eq( 1 , as.foo.findOne().x , "P3" );
-assert.eq( 0 , as.system.profile.count() , "P4" )
+assert.eq( 0 , as.system.profile.count() , "P4" );
 
-assert( as.getCollectionNames().indexOf( "system.profile" ) < 0 , "P4.5" )
+assert( as.getCollectionNames().indexOf( "system.profile" ) < 0 , "P4.5" );
 
-as.setProfilingLevel(2)
+as.setProfilingLevel(2);
 as.foo.findOne();
-assert.eq( 1 , as.system.profile.count() , "P5" )
+assert.eq( 1 , as.system.profile.count() , "P5" );
 
 
 rt.stop();

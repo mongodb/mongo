@@ -9,11 +9,11 @@ rt = new ReplTest( "repl12tests" );
 
 m = rt.start( true );
 
-usedDBs = []
+usedDBs = [];
 
-a = "a"
+a = "a";
 for( i = 0; i < 3; ++i ) {
-    usedDBs.push( a )
+    usedDBs.push( a );
     m.getDB( a ).c.save( {} );
     a += "a";
 }

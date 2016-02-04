@@ -17,9 +17,9 @@ assert.soon( function() {
   return normalDocs == 0 && specialDocs == 1;
 }, "Failed to only sync to " + specialDB );
 
-}
+};
 
 // Disabled because of SERVER-10344
 if (false) {
-    doTest()
+    doTest();
 }

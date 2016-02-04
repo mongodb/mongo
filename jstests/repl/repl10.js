@@ -8,7 +8,7 @@ soonCount = function( count ) {
                 //                print( "count: " + s.getDB( baseName ).z.find().count() );
                 return s.getDB( baseName ).a.find().count() == count; 
                 } );    
-}
+};
 
 doTest = function( signal ) {
     
@@ -17,7 +17,7 @@ doTest = function( signal ) {
     m = rt.start( true );
     s = rt.start( false, { "slavedelay": "10" } );
     
-    am = m.getDB( baseName ).a
+    am = m.getDB( baseName ).a;
     
     am.save( {i:1} );
     
@@ -31,7 +31,7 @@ doTest = function( signal ) {
     soonCount( 2 );
 
     rt.stop();
-}
+};
 
 print("repl10.js dotest(15)");
 doTest(15); // SIGTERM

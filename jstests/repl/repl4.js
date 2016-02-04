@@ -4,7 +4,7 @@ soonCount = function( db, coll, count ) {
     assert.soon( function() { 
                 return s.getDB( db )[ coll ].find().count() == count; 
                 } );    
-}
+};
 
 doTest = function() {
 
@@ -13,8 +13,8 @@ doTest = function() {
     m = rt.start( true );
     s = rt.start( false, { only: "c" } );
     
-    cm = m.getDB( "c" ).c
-    bm = m.getDB( "b" ).b
+    cm = m.getDB( "c" ).c;
+    bm = m.getDB( "b" ).b;
     
     cm.save( { x:1 } );
     bm.save( { x:2 } );
@@ -33,7 +33,7 @@ doTest = function() {
     
     s = rt.start( false, { only: "c" }, true );
     soonCount( "c", "c", 2 );
-}
+};
 
 // Disabled because of SERVER-10344
 if (false) {
