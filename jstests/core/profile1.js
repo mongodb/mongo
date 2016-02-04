@@ -4,7 +4,7 @@
         query = query || {};
         Object.extend(query, {user:username + "@" + db.getName()});
         return db.system.profile.find(query);
-    };
+    }
 
     function getProfileAString() {
         var s = "\n";
@@ -12,20 +12,20 @@
             s += tojson(z) + " ,\n";
         });
         return s;
-    };
+    }
 
     function resetProfile(level, slowms) {
         db.setProfilingLevel(0);
         db.system.profile.drop();
         db.setProfilingLevel(level,slowms);
-    };
+    }
 
     // special db so that it can be run in parallel tests
     var stddb = db;
     db = db.getSisterDB("profile1");
     var username = "jstests_profile1_user";
 
-    db.dropUser(username)
+    db.dropUser(username);
     db.dropDatabase();
 
     try {
@@ -46,7 +46,7 @@
         assert.eq(2, db.runCommand({profile: -1}).was, "B");
         assert.eq(1, db.system.profile.stats().capped, "C");
 
-        db.foo.findOne()
+        db.foo.findOne();
 
         var profileItems = profileCursor().toArray();
 

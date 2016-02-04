@@ -1,17 +1,17 @@
 // Test geoNear + $within.
-t = db.geo_s2nearwithin
+t = db.geo_s2nearwithin;
 t.drop();
 
-points = 10
+points = 10;
 for (var x = -points; x < points; x += 1) {
     for (var y = -points; y < points; y += 1) {
-        t.insert({geo: [x, y]})
+        t.insert({geo: [x, y]});
     }
 }
 
-origin = { "type" : "Point", "coordinates": [ 0, 0] }
+origin = { "type" : "Point", "coordinates": [ 0, 0] };
 
-t.ensureIndex({ geo : "2dsphere" })
+t.ensureIndex({ geo : "2dsphere" });
 // Near requires an index, and 2dsphere is an index.  Spherical isn't
 // specified so this doesn't work.
 assert.commandFailed( db.runCommand({ geoNear: t.getName(), near: [0, 0],
@@ -21,21 +21,21 @@ assert.commandFailed( db.runCommand({ geoNear: t.getName(), near: [0, 0],
 // because you can use them with both $center and $centerSphere.  Points are
 // the only things we will do this conversion for.
 resNear = db.runCommand({geoNear : t.getName(), near: [0, 0], spherical: true,
-                         query: {geo: {$within: {$center: [[0, 0], 1]}}}})
-assert.eq(resNear.results.length, 5)
+                         query: {geo: {$within: {$center: [[0, 0], 1]}}}});
+assert.eq(resNear.results.length, 5);
 
 resNear = db.runCommand({geoNear : t.getName(), near: [0, 0], spherical: true,
-                         query: {geo: {$within: {$centerSphere: [[0, 0], Math.PI/180.0]}}}})
-assert.eq(resNear.results.length, 5)
+                         query: {geo: {$within: {$centerSphere: [[0, 0], Math.PI/180.0]}}}});
+assert.eq(resNear.results.length, 5);
 
 resNear = db.runCommand({geoNear : t.getName(), near: [0, 0], spherical: true,
-                         query: {geo: {$within: {$centerSphere: [[0, 0], 0]}}}})
-assert.eq(resNear.results.length, 1)
+                         query: {geo: {$within: {$centerSphere: [[0, 0], 0]}}}});
+assert.eq(resNear.results.length, 1);
 
 resNear = db.runCommand({geoNear : t.getName(), near: [0, 0], spherical: true,
-                         query: {geo: {$within: {$centerSphere: [[1, 0], 0.5 * Math.PI/180.0]}}}})
-assert.eq(resNear.results.length, 1)
+                         query: {geo: {$within: {$centerSphere: [[1, 0], 0.5 * Math.PI/180.0]}}}});
+assert.eq(resNear.results.length, 1);
 
 resNear = db.runCommand({geoNear : t.getName(), near: [0, 0], spherical: true,
-                         query: {geo: {$within: {$center: [[1, 0], 1.5]}}}})
-assert.eq(resNear.results.length, 9)
+                         query: {geo: {$within: {$center: [[1, 0], 1.5]}}}});
+assert.eq(resNear.results.length, 9);

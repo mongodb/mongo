@@ -50,7 +50,7 @@ doTest = function( n ) {
     t.save( { a: { b: [ 20, 30 ] } } );
     assert.eq( 1, t.find( { 'a.b': { $all: [ 20 ] } } ).count() , n + " O" );
     assert.eq( 1, t.find( { 'a.b': { $all: [ 20, 30 ] } } ).count() , n + " P" );
-}
+};
 
 doTest( "no index" );
 t.drop();

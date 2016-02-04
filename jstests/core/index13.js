@@ -74,7 +74,7 @@ assertResults( { 'a.b': 1, 'a.c' : 1, 'd': { $elemMatch:{ e:1, f:1 } } } );
 
 
 // Cases with nested $elemMatch.
-t.remove({})
+t.remove({});
 index = { 'a.b.c':1, 'a.b.d' :1 };
 t.ensureIndex( index );
 t.insert( { a:[ { b: [ { c : 1, d : 1 } ] } ] } ) ;
@@ -115,7 +115,7 @@ assertResults( { 'a.b':{ $elemMatch:{ x:1, y:1 } } } );
 
 // Cases with double dotted index field names branching to different fields at each dot.
 t.drop();
-index = { 'a.b.c':1, 'a.e.f':1, 'a.b.d':1, 'a.e.g':1 }
+index = { 'a.b.c':1, 'a.e.f':1, 'a.b.d':1, 'a.e.g':1 };
 t.ensureIndex( index );
 t.save( { a:{ b:{ c:1, d:1 }, e:{ f:1, g:1 } } } );
 t.save( { a:[ { b:{ c:1 }, e:{ f:1 } }, { b:{ d:1 }, e:{ g:1 } } ] } );
@@ -138,7 +138,7 @@ assertResults( { 'a.b':{ $elemMatch:{ d:1 } },
 // Cases with double dotted index field names branching to different fields at each dot, and the
 // same field name strings after the second dot.
 t.drop();
-index = { 'a.b.c':1, 'a.e.c':1, 'a.b.d':1, 'a.e.d':1 }
+index = { 'a.b.c':1, 'a.e.c':1, 'a.b.d':1, 'a.e.d':1 };
 t.ensureIndex( index );
 t.save( { a:[ { b:[ { c:1, d:1 } ] }, { e:[ { c:1, d:1 } ] } ] } );
 assert.eq( 1, t.count() );

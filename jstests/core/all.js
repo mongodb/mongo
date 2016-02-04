@@ -39,7 +39,7 @@ doTest = function() {
     assert.eq( 0 , t.find( { a : { $all : [] } } ).count() , "E3" );
 
 
-}
+};
 
 doTest();
 t.drop();

@@ -68,7 +68,7 @@ function runTest(db) {
      assert.eq(null, db.getUser('andy'));
 
      // Test dropAllUsers
-     db.dropAllUsers()
+     db.dropAllUsers();
      assert.eq(0, db.getUsers().length);
 
      // Test password digestion
@@ -91,7 +91,7 @@ function runTest(db) {
      assert(db.auth('user1', 'y'));
      assert(db.auth('user2', 'y'));
 
-};
+}
 
 try {
     runTest(db);

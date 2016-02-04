@@ -1,6 +1,6 @@
 
 t = db.where3;
-t.drop()
+t.drop();
 
 t.save( { returned_date : 5 } );
 t.save( { returned_date : 6 } );

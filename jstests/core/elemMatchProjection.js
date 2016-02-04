@@ -81,10 +81,10 @@ assert.throws( function() {
                }, [], "throw on invalid projection (field mismatch)" );
 
 assert.throws( function() {
-                   t.find( { group:3, 'x.a':2 }, { 'y.$':1 } ).sort( { x:1 } ).toArray()
+                   t.find( { group:3, 'x.a':2 }, { 'y.$':1 } ).sort( { x:1 } ).toArray();
                }, [], "throw on invalid sorted projection (field mismatch)" );
 
-assert.throws( function() {x
+assert.throws( function() {x;
                    t.find( { group:3, 'x.a':2 }, { 'x.$':1, group:0 } ).sort( { x:1 } ).toArray();
                }, [], "throw on invalid projection combination (include and exclude)" );
 
@@ -93,7 +93,7 @@ assert.throws( function() {
                }, [], "throw on multiple projections" );
 
 assert.throws( function() {
-                   t.find( { group:3}, { 'g.$':1 } ).toArray()
+                   t.find( { group:3}, { 'g.$':1 } ).toArray();
                }, [], "throw on invalid projection (non-array field)" );
 
 assert.eq( { aa:1, dd:5 },
@@ -226,13 +226,13 @@ if (false) {
 // Batch/getMore tests
 //
 // test positional operator across multiple batches
-a = t.find( { group:3, 'x.b':2 }, { 'x.$':1 } ).batchSize(1)
+a = t.find( { group:3, 'x.b':2 }, { 'x.$':1 } ).batchSize(1);
 while ( a.hasNext() ) {
     assert.eq( 2, a.next().x[0].b, "positional getMore test");
 }
 
 // test $elemMatch operator across multiple batches
-a = t.find( { group:3 }, { x:{$elemMatch:{a:1}} } ).batchSize(1)
+a = t.find( { group:3 }, { x:{$elemMatch:{a:1}} } ).batchSize(1);
 while ( a.hasNext() ) {
     assert.eq( 1, a.next().x[0].a, "positional getMore test");
 }

@@ -3,7 +3,7 @@
     "use strict";
 
     // Setup the capped collection.
-    var collname = "jstests_tailable_skip_limit"
+    var collname = "jstests_tailable_skip_limit";
     var t = db[collname];
     t.drop();
     db.createCollection(collname, {capped: true, size: 1024});

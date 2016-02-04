@@ -1,5 +1,5 @@
 
-t = db.index_check5
+t = db.index_check5;
 t.drop();
 
 t.save( { "name" : "Player1" , 

@@ -23,4 +23,4 @@ assert.eq( 10 , t.find({ "loc" : { "$within" : { "$center" : [ { "x" : 0 ,"y" : 
 assert.eq( 6 , t.find({ "loc" : { "$within" : { "$center" : [ { "x" : 0 ,"y" : 0} , 50]}}, "categories" : "sports" } ).itcount() , "B" );
 
 // When not a $near or $within query, geo index should not be used.  Fails if geo index is used.
-assert.eq( 1 , t.find({ "loc" : { "x" : -36, "y" : -8}, "categories" : "sports" }).itcount(), "C" )
+assert.eq( 1 , t.find({ "loc" : { "x" : -36, "y" : -8}, "categories" : "sports" }).itcount(), "C" );

@@ -1,13 +1,13 @@
 // Added to make sure that S2 indexing's string AND non-string keys work.
-t = db.geo_s2nonstring
-t.drop()
+t = db.geo_s2nonstring;
+t.drop();
 
 t.ensureIndex( { geo:'2dsphere', x:1 } );
 
 t.save( { geo:{ type:'Point', coordinates:[ 0, 0 ] }, x:'a' } );
 t.save( { geo:{ type:'Point', coordinates:[ 0, 0 ] }, x:5 } );
 
-t.drop()
+t.drop();
 t.ensureIndex( { geo:'2dsphere', x:1 } );
 
 t.save( { geo:{ type:'Point', coordinates:[ 0, 0 ] }, x:'a' } );

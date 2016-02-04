@@ -1,8 +1,8 @@
 if ( ! _isWindows() ) {
     
     // note that normal program exit returns 0
-    assert.eq (0, runProgram('true'))
-    assert.neq(0, runProgram('false'))
+    assert.eq (0, runProgram('true'));
+    assert.neq(0, runProgram('false'));
     assert.neq(0, runProgram('this_program_doesnt_exit'));
 
     //verify output visually

@@ -1,5 +1,5 @@
 // Test various cursor behaviors
-var t = db.geo_s2getmmm
+var t = db.geo_s2getmmm;
 t.drop();
 t.ensureIndex({geo: "2dsphere"});
 
@@ -47,14 +47,14 @@ for (var j = 0; j < initialAdvance; j++) {
     cursor.next();
 }
 // We looked at (totalPointCount - initialAdvance) points, there should still be more.
-assert(cursor.hasNext())
+assert(cursor.hasNext());
 
 // Cursor was advanced 10 times, batchSize=4 => 1 query + 2 getmore.
 assert.eq(1, db.system.profile.count({op: "query", ns: t.getFullName()}));
 assert.eq(2, db.system.profile.count({op: "getmore", ns: t.getFullName()}));
 
 for (var k = initialAdvance; k < totalPointCount; k++) {
-    assert(cursor.hasNext())
+    assert(cursor.hasNext());
     var tmpPoint = cursor.next();
 }
 
@@ -67,18 +67,18 @@ db.setProfilingLevel(0);
 db.system.profile.drop();
 
 // Shouldn't be any more points to look at now.
-assert(!cursor.hasNext())
+assert(!cursor.hasNext());
 
 var someLimit = 23;
 // Make sure limit does something.
-cursor = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).limit(someLimit)
+cursor = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).limit(someLimit);
 // Count doesn't work here -- ignores limit/skip, so we use itcount.
-assert.eq(cursor.itcount(), someLimit)
+assert.eq(cursor.itcount(), someLimit);
 // Make sure skip works by skipping some stuff ourselves.
 var someSkip = 3;
-cursor = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).limit(someLimit + someSkip)
+cursor = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).limit(someLimit + someSkip);
 for (var i = 0; i < someSkip; ++i) { cursor.next(); }
-var cursor2 = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).skip(someSkip).limit(someLimit)
+var cursor2 = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).skip(someSkip).limit(someLimit);
 while (cursor.hasNext()) {
     assert(cursor2.hasNext());
     assert.eq(cursor.next(), cursor2.next());

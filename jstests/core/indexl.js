@@ -9,9 +9,9 @@ function test(t) {
     assert.eq( 1, t.count( {a:{$in:[2],$all:[1]}} ) );
     assert.eq( 1, t.count( {a:{$in:[1],$all:[2]}} ) );
     assert.eq( 1, t.count( {a:{$all:[1],$in:[2]}} ) );
-    t.save({a:[3,4]})
-    t.save({a:[2,3]})
-    t.save({a:[1,2,3,4]})
+    t.save({a:[3,4]});
+    t.save({a:[2,3]});
+    t.save({a:[1,2,3,4]});
     assert.eq( 2, t.count( {a:{$in:[2],$all:[1]}} ) );
     assert.eq( 1, t.count( {a:{$in:[3],$all:[1,2]}} ) );
     assert.eq( 1, t.count( {a:{$in:[1],$all:[3]}} ) );

@@ -25,7 +25,7 @@ lineAlongMeridian = {
             [180.0, 11.0],
             [180.0, 9.0]
         ]
-}
+};
 
 result = t.find({geo: {$geoIntersects: {$geometry: lineAlongMeridian}}});
 assert.eq(result.itcount(), 1);

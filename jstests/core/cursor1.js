@@ -1,5 +1,5 @@
 
-t = db.cursor1
+t = db.cursor1;
 t.drop();
 
 big = "";

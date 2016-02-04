@@ -84,7 +84,7 @@ function testOne( map, reduce, finalize, scope, childLoop, wait ) {
     }
     
     o = null;
-    assert.soon( function() { o = op( childLoop ); return o != -1 } );
+    assert.soon( function() { o = op( childLoop ); return o != -1; } );
 
     res = db.killOp( o );
     debug( "did kill : " + tojson( res ) );
@@ -125,7 +125,7 @@ function runMRTests( loop, childLoop ) {
 
     debug( " Running finalization test - loop map function. with scope " );
     test( function() { loop(); }, // map
-          function( k, v ) { return v[ 0 ] }, // reduce
+          function( k, v ) { return v[ 0 ]; }, // reduce
           null, // finalize
           { loop: loop }, // scope
           childLoop );
@@ -135,15 +135,15 @@ function runMRTests( loop, childLoop ) {
 function runFinalizeTests( loop, childLoop ) {
     debug( " Running finalization test - no scope " );
     test( function() { emit( this.a, 1 ); }, // map
-          function( k, v ) { return v[ 0 ] }, // reduce
+          function( k, v ) { return v[ 0 ]; }, // reduce
           loop, // finalize
           null, // scope
           childLoop );
 
     debug( " Running finalization test - with scope " );
     test( function() { emit( this.a, 1 ); }, // map
-          function( k, v ) { return v[ 0 ] }, // reduce
-          function( a, b ) { loop() }, // finalize
+          function( k, v ) { return v[ 0 ]; }, // reduce
+          function( a, b ) { loop(); }, // finalize
           { loop: loop }, // scope
           childLoop );
 }
@@ -153,6 +153,6 @@ var loop = function() {
     while( 1 ) {
         sleep( 1000 );
     }
-}
+};
 runMRTests( loop, false );
 runFinalizeTests( loop, false );

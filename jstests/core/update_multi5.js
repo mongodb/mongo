@@ -1,7 +1,7 @@
 
 t = db.update_multi5;
 
-t.drop()
+t.drop();
 
 t.insert({path: 'r1', subscribers: [1,2]});
 t.insert({path: 'r2', subscribers: [3,4]});

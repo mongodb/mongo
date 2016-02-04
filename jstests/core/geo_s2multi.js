@@ -1,21 +1,21 @@
-t = db.geo_s2multi
-t.drop()
+t = db.geo_s2multi;
+t.drop();
 
-t.ensureIndex({geo: "2dsphere"})
+t.ensureIndex({geo: "2dsphere"});
 
 // Let's try the examples in the GeoJSON spec.
-multiPointA = { "type": "MultiPoint", "coordinates": [ [100.0, 0.0], [101.0, 1.0] ] }
+multiPointA = { "type": "MultiPoint", "coordinates": [ [100.0, 0.0], [101.0, 1.0] ] };
 assert.writeOK(t.insert({geo: multiPointA}));
 
 multiLineStringA = { "type": "MultiLineString", "coordinates": [ [ [100.0, 0.0], [101.0, 1.0] ],
-    [ [102.0, 2.0], [103.0, 3.0] ]]}
+    [ [102.0, 2.0], [103.0, 3.0] ]]};
 assert.writeOK(t.insert({geo: multiLineStringA}));
 
 multiPolygonA = { "type": "MultiPolygon", "coordinates": [
     [[[102.0, 2.0], [103.0, 2.0], [103.0, 3.0], [102.0, 3.0], [102.0, 2.0]]],
     [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]],
-     [[100.2, 0.2], [100.8, 0.2], [100.8, 0.8], [100.2, 0.8], [100.2, 0.2]]]]}
-assert.writeOK(t.insert({geo: multiPolygonA}))
+     [[100.2, 0.2], [100.8, 0.2], [100.8, 0.8], [100.2, 0.8], [100.2, 0.2]]]]};
+assert.writeOK(t.insert({geo: multiPolygonA}));
 
 assert.eq(3, t.find({geo: {$geoIntersects: {$geometry:
                           {"type": "Point", "coordinates": [100,0]}}}}).itcount());

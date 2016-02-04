@@ -31,8 +31,8 @@ assert.writeError(t.insert({geo: polygonWithProtrudingHole}));
 
 // Can't search with bogus poly.
 assert.throws(function() {
-    return t.find({geo: {$within: {$geometry: polygonWithProtrudingHole}}}).itcount()
-})
+    return t.find({geo: {$within: {$geometry: polygonWithProtrudingHole}}}).itcount();
+});
 
 // Test 3: This test will confirm that a polygon with overlapping holes throws
 // an error.

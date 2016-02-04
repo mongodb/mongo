@@ -3,9 +3,9 @@ t = db.not1;
 t.drop();
 
 
-t.insert({a:1})
-t.insert({a:2})
-t.insert({})
+t.insert({a:1});
+t.insert({a:2});
+t.insert({});
 
 function test( name ){
     assert.eq( 3 , t.find().count() , name + "A" );

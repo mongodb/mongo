@@ -3,7 +3,7 @@
 t = db.jstests_indexm;
 t.drop();
 
-t.save( { a : [ { x : 1 } , { x : 2 } , { x : 3 } , { x : 4 } ] } ) 
+t.save( { a : [ { x : 1 } , { x : 2 } , { x : 3 } , { x : 4 } ] } ); 
 
 function test(){ 
     assert.eq( 1, t.count( 

@@ -3,7 +3,7 @@
 
 var coll = db.geo_s2sparse;
 
-var point = { type: "Point", coordinates: [5, 5] }
+var point = { type: "Point", coordinates: [5, 5] };
 
 var indexSpec = { geo: "2dsphere", nonGeo: 1 };
 

@@ -8,7 +8,7 @@ f.save( {a:1} );
 
 assert.throws( 
     function(){
-        c = f.find({$where : function(){ return a() }});
+        c = f.find({$where : function(){ return a(); }});
         c.next();
     }
 );

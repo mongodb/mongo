@@ -1,5 +1,5 @@
 var t = db.hashindex1;
-t.drop()
+t.drop();
 
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");

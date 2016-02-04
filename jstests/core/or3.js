@@ -13,7 +13,7 @@ checkArrs = function( a, b ) {
     for ( i = 0; i < aStr.length; ++i ) {
         assert.neq( -1, bStr.indexOf( aStr[ i ] ) );
     }
-}
+};
 
 doTest = function( index ) {
     if ( index == null ) {
@@ -46,7 +46,7 @@ doTest = function( index ) {
     
     an1b2 = t.find( { $nor: [ { a : 1 } ], $or: [ { b : 2 } ] } ).toArray();
     checkArrs( t.find( {a:{$ne:1},b:2} ).toArray(), an1b2 );    
-}
+};
 
 doTest( false );
 

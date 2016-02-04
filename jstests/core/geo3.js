@@ -1,5 +1,5 @@
 
-t = db.geo3
+t = db.geo3;
 t.drop();
 
 n = 1;
@@ -14,7 +14,7 @@ assert.eq( t.count(), 100 * 100 );
 assert.eq( t.count(), n - 1 );
 
 
-t.ensureIndex( { loc : "2d" } )
+t.ensureIndex( { loc : "2d" } );
 
 fast = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 } );
 
@@ -22,7 +22,7 @@ fast = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 } 
 
 filtered1 = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 , query : { a : 2 } } );
 assert.eq( 10 , filtered1.results.length , "B1" );
-filtered1.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B2: " + tojson( z ) ); } )
+filtered1.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B2: " + tojson( z ) ); } );
 //printjson( filtered1.stats );
 
 function avgA( q , len ){
@@ -49,35 +49,35 @@ function testFiltering( msg ){
 
 testFiltering( "just loc" );
 
-t.dropIndex( { loc : "2d" } )
-assert.eq( 1 , t.getIndexKeys().length , "setup 3a" )
-t.ensureIndex( { loc : "2d" , a : 1 } )
-assert.eq( 2 , t.getIndexKeys().length , "setup 3b" )
+t.dropIndex( { loc : "2d" } );
+assert.eq( 1 , t.getIndexKeys().length , "setup 3a" );
+t.ensureIndex( { loc : "2d" , a : 1 } );
+assert.eq( 2 , t.getIndexKeys().length , "setup 3b" );
 
 filtered2 = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 , query : { a : 2 } } );
 assert.eq( 10 , filtered2.results.length , "B3" );
-filtered2.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B4: " + tojson( z ) ); } )
+filtered2.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B4: " + tojson( z ) ); } );
 
-assert.eq( filtered1.stats.avgDistance , filtered2.stats.avgDistance , "C1" )
-assert.gt( filtered1.stats.objectsLoaded , filtered2.stats.objectsLoaded , "C3" )
+assert.eq( filtered1.stats.avgDistance , filtered2.stats.avgDistance , "C1" );
+assert.gt( filtered1.stats.objectsLoaded , filtered2.stats.objectsLoaded , "C3" );
 
 testFiltering( "loc and a" );
 
-t.dropIndex( { loc : "2d" , a : 1 } )
-assert.eq( 1 , t.getIndexKeys().length , "setup 4a" )
-t.ensureIndex( { loc : "2d" , b : 1 } )
-assert.eq( 2 , t.getIndexKeys().length , "setup 4b" )
+t.dropIndex( { loc : "2d" , a : 1 } );
+assert.eq( 1 , t.getIndexKeys().length , "setup 4a" );
+t.ensureIndex( { loc : "2d" , b : 1 } );
+assert.eq( 2 , t.getIndexKeys().length , "setup 4b" );
 
 testFiltering( "loc and b" );
 
 
-q = { loc : { $near : [ 50 , 50 ] } }
-assert.eq( 100 , t.find( q ).limit(100).itcount() , "D1" )
-assert.eq( 100 , t.find( q ).limit(100).size() , "D2" )
+q = { loc : { $near : [ 50 , 50 ] } };
+assert.eq( 100 , t.find( q ).limit(100).itcount() , "D1" );
+assert.eq( 100 , t.find( q ).limit(100).size() , "D2" );
 
-assert.eq( 20 , t.find( q ).limit(20).itcount() , "D3" )
-assert.eq( 20 , t.find( q ).limit(20).size() , "D4" )
+assert.eq( 20 , t.find( q ).limit(20).itcount() , "D3" );
+assert.eq( 20 , t.find( q ).limit(20).size() , "D4" );
 
 // SERVER-14039 Wrong limit after skip with $nearSphere, 2d index
-assert.eq( 10 , t.find( q ).skip(10).limit(10).itcount() , "D5" )
-assert.eq( 10 , t.find( q ).skip(10).limit(10).size() , "D6" )
+assert.eq( 10 , t.find( q ).skip(10).limit(10).itcount() , "D5" );
+assert.eq( 10 , t.find( q ).skip(10).limit(10).size() , "D6" );

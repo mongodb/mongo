@@ -108,7 +108,7 @@ res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , out : "mr1_out
 d( res );
 assert.eq( 999 , res.counts.input , "Z1" );
 x = db[res.result];
-x.find().forEach( d )
+x.find().forEach( d );
 assert.eq( 4 , x.find().count() , "Z2" );
 assert.eq( "a,b,c,d" , x.distinct( ks ) , "Z3" );
 

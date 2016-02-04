@@ -48,7 +48,7 @@ function f( who , res ){
 }
 
 res = t.mapReduce( m , r , { finalize : f , out : "mr2_out" } );
-printjson( res )
+printjson( res );
 x = reformat( res );
 assert.eq( 9 , x.a.avg , "A1" );
 assert.eq( 16 , x.b.avg , "A2" );
@@ -58,16 +58,16 @@ res.drop();
 // inline does needs to exist - so set it to false to make sure the code is just checking for
 // existence
 res = t.mapReduce( m , r , { finalize : f , out : { inline : 0 } } );
-printjson( res )
+printjson( res );
 x = reformat( res );
 assert.eq( 9 , x.a.avg , "B1" );
 assert.eq( 16 , x.b.avg , "B2" );
 assert.eq( 18 , x.c.avg , "B3" );
 res.drop();
-assert( ! ( "result" in res ) , "B4" )
+assert( ! ( "result" in res ) , "B4" );
 
 res = t.mapReduce( m , r , { finalize : f , out : "mr2_out", jsMode: true } );
-printjson( res )
+printjson( res );
 x = reformat( res );
 assert.eq( 9 , x.a.avg , "A1" );
 assert.eq( 16 , x.b.avg , "A2" );
@@ -75,11 +75,11 @@ assert.eq( 18 , x.c.avg , "A3" );
 res.drop();
 
 res = t.mapReduce( m , r , { finalize : f , out : { inline : 5 }, jsMode: true } );
-printjson( res )
+printjson( res );
 x = reformat( res );
 assert.eq( 9 , x.a.avg , "B1" );
 assert.eq( 16 , x.b.avg , "B2" );
 assert.eq( 18 , x.c.avg , "B3" );
 res.drop();
-assert( ! ( "result" in res ) , "B4" )
+assert( ! ( "result" in res ) , "B4" );
 

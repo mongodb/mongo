@@ -43,7 +43,7 @@ var testNaNComparisons = function() {
     cursor = t.find({a: {$gte: NaN}});
     assert.eq(5, cursor.next()["_id"]);
     assert(!cursor.hasNext());
-}
+};
 
 // Unindexed
 testNaNComparisons();

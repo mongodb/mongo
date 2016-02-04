@@ -12,6 +12,6 @@ t.find().itcount();
 
 // Check that the 'cursor not found in map -1' message is not printed.  This message indicates an
 // attempt to look up a cursor with an invalid id and should never appear in the log.
-log = db.adminCommand( { getLog:'global' } ).log
+log = db.adminCommand( { getLog:'global' } ).log;
 log.forEach( function( line ) { assert( !line.match( /cursor not found in map -1 / ),
                                         'Cursor map lookup with id -1.' ); } );

@@ -54,7 +54,7 @@ a.save( {a: 1} );
 a.save( {a: 2} );
 a.save( {a: 3} );
 
-previousMaxSize = a.stats().maxSize
+previousMaxSize = a.stats().maxSize;
 
 assert.commandWorked( admin.runCommand( {renameCollection: "db_a.rename7_capped",
                                          to: "db_b.rename7_capped"} ) );

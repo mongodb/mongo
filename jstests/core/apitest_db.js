@@ -6,7 +6,7 @@ assert( "test" == db, "wrong database currently not test" );
 
 dd = function( x ){
     //print( x );
-}
+};
 
 dd( "a" );
 
@@ -48,13 +48,13 @@ var storageEngineName = db.serverStatus().storageEngine.name;
 assert.commandFailed(db.createCollection('test', {storageEngine: 'not a document'}));
 assert.commandWorked(db.createCollection('test', {storageEngine: {}}));
 assert.commandFailed(db.createCollection('test', {storageEngine: {unknownStorageEngine: {}}}));
-var invalidStorageEngineOptions = {}
+var invalidStorageEngineOptions = {};
 invalidStorageEngineOptions[storageEngineName] = 12345;
 assert.commandFailed(db.createCollection('test', {storageEngine: invalidStorageEngineOptions}));
 
 // Test round trip of storageEngine in collection options.
 // Assume that empty document for storageEngine-specific options is acceptable.
-var validStorageEngineOptions = {}
+var validStorageEngineOptions = {};
 validStorageEngineOptions[storageEngineName] = {};
 db.getCollection('test').drop();
 assert.commandWorked(db.createCollection('test', {storageEngine: validStorageEngineOptions}));
@@ -148,6 +148,6 @@ dd( "g" );
 
 
 
-assert.eq( "foo" , db.getSisterDB( "foo" ).getName() )
-assert.eq( "foo" , db.getSiblingDB( "foo" ).getName() )
+assert.eq( "foo" , db.getSisterDB( "foo" ).getName() );
+assert.eq( "foo" , db.getSiblingDB( "foo" ).getName() );
 

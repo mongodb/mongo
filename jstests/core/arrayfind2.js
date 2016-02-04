@@ -9,14 +9,14 @@ function go( prefix ){
     assert.eq( 1 , t.find( { a : { $all : [ { $elemMatch : { x : { $lt : 4 } } } ,
                                             { $elemMatch : { x : { $gt : 5 } } } ] } } ).count() , prefix + " A4" );
 
-    assert.throws( function() { return t.findOne( { a : { $all : [ 1, { $elemMatch : { x : 3 } } ] } } ) } );
-    assert.throws( function() { return t.findOne( { a : { $all : [ /a/, { $elemMatch : { x : 3 } } ] } } ) } );
+    assert.throws( function() { return t.findOne( { a : { $all : [ 1, { $elemMatch : { x : 3 } } ] } } ); } );
+    assert.throws( function() { return t.findOne( { a : { $all : [ /a/, { $elemMatch : { x : 3 } } ] } } ); } );
 
 }
 
-t.save( { a : [ { x : 1 } , { x : 5 } ] } )
-t.save( { a : [ { x : 3 } , { x : 5 } ] } )
-t.save( { a : [ { x : 3 } , { x : 6 } ] } )
+t.save( { a : [ { x : 1 } , { x : 5 } ] } );
+t.save( { a : [ { x : 3 } , { x : 5 } ] } );
+t.save( { a : [ { x : 3 } , { x : 6 } ] } );
 
 go( "no index" );
 t.ensureIndex( { a : 1 } );

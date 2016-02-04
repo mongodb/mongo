@@ -8,9 +8,9 @@ for (var i = 0; i < N; ++i) {
     t.insert({foo: i, bar: N - i, baz: i});
 }
 
-t.ensureIndex({foo: 1})
-t.ensureIndex({bar: 1})
-t.ensureIndex({baz: 1})
+t.ensureIndex({foo: 1});
+t.ensureIndex({bar: 1});
+t.ensureIndex({baz: 1});
 
 // baz >= 40
 ixscan1 = {ixscan: {args:{keyPattern:{baz: 1},

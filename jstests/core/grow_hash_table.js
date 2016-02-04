@@ -37,6 +37,6 @@ var doTest = function(count) {
     }
     testDB.dropDatabase();
     jsTest.log('Test PASSED');
-}
+};
 
 doTest(10000);

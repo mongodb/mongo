@@ -5,7 +5,7 @@ addData = function() {
     t.save( { a: 1, b: 2 } );
     t.save( { a: 2, b: 1 } );
     t.save( { a: 2, b: 2 } );    
-}
+};
 
 t = db.jstests_minmax;
 t.drop();
@@ -36,11 +36,11 @@ assert.eq( 1, t.find().min( { a: 2, b: 1 } ).hint( { a: 1, b: -1 } ).toArray().l
 assert.eq( 1, t.find().max( { a: 1, b: 1.5 } ).hint( { a: 1, b: -1 } ).toArray().length );
 
 // hint doesn't match
-assert.throws( function() { t.find().min( { a: 1 } ).hint( { a: 1, b: -1 } ).toArray() } );
-assert.throws( function() { t.find().min( { a: 1, b: 1 } ).max( { a: 1 } ).hint( { a: 1, b: -1 } ).toArray() } );
-assert.throws( function() { t.find().min( { b: 1 } ).max( { a: 1, b: 2 } ).hint( { a: 1, b: -1 } ).toArray() } );
-assert.throws( function() { t.find().min( { a: 1 } ).hint( { $natural: 1 } ).toArray() } );
-assert.throws( function() { t.find().max( { a: 1 } ).hint( { $natural: 1 } ).toArray() } );
+assert.throws( function() { t.find().min( { a: 1 } ).hint( { a: 1, b: -1 } ).toArray(); } );
+assert.throws( function() { t.find().min( { a: 1, b: 1 } ).max( { a: 1 } ).hint( { a: 1, b: -1 } ).toArray(); } );
+assert.throws( function() { t.find().min( { b: 1 } ).max( { a: 1, b: 2 } ).hint( { a: 1, b: -1 } ).toArray(); } );
+assert.throws( function() { t.find().min( { a: 1 } ).hint( { $natural: 1 } ).toArray(); } );
+assert.throws( function() { t.find().max( { a: 1 } ).hint( { $natural: 1 } ).toArray(); } );
 
 // Reverse direction scan of the a:1 index between a:6 (inclusive) and a:3 (exclusive).
 t.drop();

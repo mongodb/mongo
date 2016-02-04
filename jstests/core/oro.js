@@ -5,7 +5,7 @@ t.drop();
 
 orClauses = [];
 for( idxKey = 'a'; idxKey <= 'aaaaaaaaaa'; idxKey += 'a' ) {
-    idx = {}
+    idx = {};
     idx[ idxKey ] = 1;
     t.ensureIndex( idx );
     for( i = 0; i < 200; ++i ) {

@@ -11,7 +11,7 @@ assert.eq( 1, t.find({c: {$exists: false}}).itcount() );
 assert.eq( 1, t.find({c: {$exists: false}}).sort({c: -1}).itcount() );
 
 // now we have an index on the sort key 
-t.ensureIndex({c: -1})
+t.ensureIndex({c: -1});
 
 assert.eq( 1, t.find({c: {$exists: false}}).sort({c: -1}).itcount() );
 assert.eq( 1, t.find({c: {$exists: false}}).itcount() );

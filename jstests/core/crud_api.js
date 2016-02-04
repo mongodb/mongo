@@ -24,7 +24,7 @@
                 var results = coll.find({}).sort({_id: 1}).toArray();
 
                 assert.docEq(args.expected, results);
-            }
+            };
         }
 
         function checkResultObject(first, second) {
@@ -732,16 +732,16 @@
 
         // Drop collection
         coll.drop();
-        coll.ensureIndex({a:1}, {unique:true})
+        coll.ensureIndex({a:1}, {unique:true});
 
         // Should throw duplicate key error
         assert.throws(function() {
-          coll.insertMany([{a:0, b:0}, {a:0, b:1}])
+          coll.insertMany([{a:0, b:0}, {a:0, b:1}]);
         });
 
         assert(coll.findOne({a:0, b:0}) != null);
         assert.throws(function() {
-          coll.insertOne({a:0, b:0})
+          coll.insertOne({a:0, b:0});
         });
 
         assert.throws(function() {
@@ -765,7 +765,7 @@
             { insertOne: { document: { _id: 4, a: 0 } } }
           ]);
         });
-    }
+    };
 
     crudAPISpecTests();
 })();

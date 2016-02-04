@@ -3,7 +3,7 @@ t = db.jstests_js3;
 
 debug = function( s ){
     //printjson( s );
-}
+};
 
 for( z = 0; z < 2; z++ ) {
     debug(z);
@@ -20,7 +20,7 @@ for( z = 0; z < 2; z++ ) {
     
     assert( 33 == db.dbEval(function() { return 33; } ) );
     
-    db.dbEval( function() { db.jstests_js3.save({i:-1, z:"server side"}) } );
+    db.dbEval( function() { db.jstests_js3.save({i:-1, z:"server side"}); } );
     
     assert( t.findOne({i:-1}) );
     

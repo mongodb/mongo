@@ -21,7 +21,7 @@ assert( db.things.findOne().o.fetch().n == 2, "dbrefs broken" );
 db.getSiblingDB("otherdb").dropDatabase();
 var objid = new ObjectId();
 db.getSiblingDB("otherdb").getCollection("othercoll").insert({_id:objid, field:"value"});
-var subdoc = db.getSiblingDB("otherdb").getCollection("othercoll").findOne({_id:objid})
+var subdoc = db.getSiblingDB("otherdb").getCollection("othercoll").findOne({_id:objid});
 
 db.mycoll.drop();
 db.mycoll.insert({_id:"asdf", asdf:new DBRef("othercoll", objid, "otherdb")});

@@ -39,7 +39,7 @@ assert( s.getIndexKeys().length > 0 , "no indexes" );
 assert( s.getIndexKeys()[0]._id , "no _id index" );
 
 assert.eq( "undefined" , testdb.eval( function(){ return typeof(zzz); } ) , "C1" );
-s.save( { _id : "zzz" , value : 5 } )
+s.save( { _id : "zzz" , value : 5 } );
 assert.eq( "number" , testdb.eval( function(){ return typeof(zzz); } ) , "C2" );
 s.remove( { _id : "zzz" } );
 assert.eq( "undefined" , testdb.eval( function(){ return typeof(zzz); } ) , "C3" );

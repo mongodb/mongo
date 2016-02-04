@@ -2,9 +2,9 @@
 t = db.arrayfind1;
 t.drop();
 
-t.save( { a : [ { x : 1 } ] } )
-t.save( { a : [ { x : 1 , y : 2 , z : 1 } ] } )
-t.save( { a : [ { x : 1 , y : 1 , z : 3 } ] } )
+t.save( { a : [ { x : 1 } ] } );
+t.save( { a : [ { x : 1 , y : 2 , z : 1 } ] } );
+t.save( { a : [ { x : 1 , y : 1 , z : 3 } ] } );
 
 function test( exptected , q , name ){
     assert.eq( exptected , t.find( q ).itcount() , name + " " + tojson( q ) + " itcount" );
@@ -17,9 +17,9 @@ test( 1 , { "a" : { x : 1 } } , "A3" );
 test( 3 , { "a" : { $elemMatch : { x : 1 } } } , "A4" ); // SERVER-377
 
 
-t.save( { a : [ { x : 2 } ] } )
-t.save( { a : [ { x : 3 } ] } )
-t.save( { a : [ { x : 4 } ] } )
+t.save( { a : [ { x : 2 } ] } );
+t.save( { a : [ { x : 3 } ] } );
+t.save( { a : [ { x : 4 } ] } );
 
 assert.eq( 1 , t.find( { a : { $elemMatch : { x : 2 } } } ).count() , "B1" );
 assert.eq( 2 , t.find( { a : { $elemMatch : { x : { $gt : 2 } } } } ).count() , "B2" );

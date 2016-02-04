@@ -20,19 +20,19 @@ function nice( sort , correct , extra ){
     return s;
 }
 
-t.save({name: 'A', prename: 'B'})
-t.save({name: 'A', prename: 'C'})
-t.save({name: 'B', prename: 'B'})
-t.save({name: 'B', prename: 'D'})
+t.save({name: 'A', prename: 'B'});
+t.save({name: 'A', prename: 'C'});
+t.save({name: 'B', prename: 'B'});
+t.save({name: 'B', prename: 'D'});
 
 nice( { name:1 } , "AB,AC,BB,BD" , "s1" );
 nice( { prename : 1 } , "AB,BB,AC,BD" , "s2" );
 nice( {name:1, prename:1} , "AB,AC,BB,BD" , "s3" );
 
-t.save({name: 'A'})     
+t.save({name: 'A'});     
 nice( {name:1, prename:1} , "A,AB,AC,BB,BD" , "e1" );          
 
-t.save({name: 'C'})               
+t.save({name: 'C'});               
 nice( {name:1, prename:1} , "A,AB,AC,BB,BD,C" , "e2" ); // SERVER-282
 
 t.ensureIndex( { name : 1 , prename : 1 } );

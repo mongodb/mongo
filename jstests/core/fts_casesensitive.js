@@ -1,6 +1,6 @@
 // Integration tests for {$caseSensitive: true} option to $text query operator.
 
-load('jstests/libs/fts.js')
+load('jstests/libs/fts.js');
 var coll = db.fts_casesensitive;
 
 coll.drop();

@@ -1,10 +1,10 @@
 t = db.distinct_array1;
 t.drop();
 
-t.save( { a : [1,2,3] } )
-t.save( { a : [2,3,4] } )
-t.save( { a : [3,4,5] } )
-t.save( { a : 9 } )
+t.save( { a : [1,2,3] } );
+t.save( { a : [2,3,4] } );
+t.save( { a : [3,4,5] } );
+t.save( { a : 9 } );
 
 
 // Without index.
@@ -56,14 +56,14 @@ assert.eq( "d,e,f" , res.toString() , "B3" );
 // With index.
 t.ensureIndex( { "a.b" : 1 } );
 res = t.distinct( "a.b" );
-res.sort()
+res.sort();
 assert.eq( "a,b,c,d,e,f,z" , res.toString() , "B4" );
 
 // _id as an document containing an array
-t.save( { _id : { a : [1,2,3] } } )
-t.save( { _id : { a : [2,3,4] } } )
-t.save( { _id : { a : [3,4,5] } } )
-t.save( { _id : { a : 9 } } )
+t.save( { _id : { a : [1,2,3] } } );
+t.save( { _id : { a : [2,3,4] } } );
+t.save( { _id : { a : [3,4,5] } } );
+t.save( { _id : { a : 9 } } );
 
 // Without index.
 res = t.distinct( "_id.a" ).sort();

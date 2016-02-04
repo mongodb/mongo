@@ -61,7 +61,7 @@ try {
     coll.save({});
     coll.find().skip(1).limit(4).itcount();
     lastOp = getLastOp();
-    assert.eq(lastOp.query.skip, 1)
+    assert.eq(lastOp.query.skip, 1);
     assert.eq(lastOp.docsExamined, 3);
     assert.eq(lastOp.nreturned, 2);
     // Find command will use "limit", OP_QUERY will use ntoreturn.
@@ -166,8 +166,8 @@ try {
     assert("getMore" in lastOp.query);
     assert.eq(lastOp.query.getMore, lastOp.cursorid);
     assert.eq(lastOp.query.collection, coll.getName());
-    assert.eq(lastOp.query.batchSize, 3)
-    assert.eq(lastOp.cursorExhausted, true)
+    assert.eq(lastOp.query.batchSize, 3);
+    assert.eq(lastOp.cursorExhausted, true);
     assert.eq(lastOp.nreturned, 2);
     assert("responseLength" in lastOp);
 

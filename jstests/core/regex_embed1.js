@@ -1,11 +1,11 @@
 
-t = db.regex_embed1
+t = db.regex_embed1;
 
-t.drop()
+t.drop();
 
-t.insert( { _id : 1 , a : [ { x : "abc" } , { x : "def" } ] } )
-t.insert( { _id : 2 , a : [ { x : "ab" } , { x : "de" }  ] } )
-t.insert( { _id : 3 , a : [ { x : "ab" } , { x : "de" } , { x : "abc" } ] } )
+t.insert( { _id : 1 , a : [ { x : "abc" } , { x : "def" } ] } );
+t.insert( { _id : 2 , a : [ { x : "ab" } , { x : "de" }  ] } );
+t.insert( { _id : 3 , a : [ { x : "ab" } , { x : "de" } , { x : "abc" } ] } );
 
 function test( m ){
     assert.eq( 3 , t.find().itcount() , m + "1" );
@@ -18,7 +18,7 @@ function test( m ){
 
 test( "A" );
 
-t.ensureIndex( { "a.x" : 1 } )
+t.ensureIndex( { "a.x" : 1 } );
 test( "B" );
 
 

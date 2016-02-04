@@ -2,7 +2,7 @@
 // constraint is printed at appropriate times.  SERVER-5353
 
 function numWarnings() {
-    logs = db.adminCommand( { getLog:"global" } ).log
+    logs = db.adminCommand( { getLog:"global" } ).log;
     ret = 0;
     logs.forEach( function( x ) {
                  if ( x.match( warningMatchRegexp ) ) {

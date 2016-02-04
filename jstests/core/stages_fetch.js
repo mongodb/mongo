@@ -24,8 +24,8 @@ assert.eq(res.ok, 0);
 ixscan2 = {ixscan: {args:{keyPattern:{foo:1},
                           startKey: {"": 20},
                           endKey: {"" : 30}, endKeyInclusive: true,
-                          direction: 1}}}
-fetch = {fetch: {args: {node: ixscan2}, filter: {bar: 25}}}
+                          direction: 1}}};
+fetch = {fetch: {args: {node: ixscan2}, filter: {bar: 25}}};
 res = db.runCommand({stageDebug: {collection: collname, plan: fetch}});
 printjson(res);
 assert.eq(res.ok, 1);

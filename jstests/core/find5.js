@@ -46,6 +46,6 @@ assert( !o.b.e , "E 3" );
 assert( ! t.find( {} , { "b.c" : 1 } ).toArray()[0].b.d , "F" );
 
 t.drop();
-t.save( { a : { b : { c : 1 } } } )
+t.save( { a : { b : { c : 1 } } } );
 assert.eq( 1 , t.find( {} , { "a.b.c" : 1 } )[0].a.b.c , "G" );
 

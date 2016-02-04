@@ -3,11 +3,11 @@
 function test() {
     function assertTooBig(obj) {
         // This used to crash rather than throwing an exception.
-        assert.throws(function(){Object.bsonsize(obj)});
+        assert.throws(function(){Object.bsonsize(obj);});
     }
 
     function assertNotTooBig(obj) {
-        assert.doesNotThrow(function(){Object.bsonsize(obj)});
+        assert.doesNotThrow(function(){Object.bsonsize(obj);});
     }
 
     function objWithDepth(depth) {

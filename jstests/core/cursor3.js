@@ -11,7 +11,7 @@ function checkResults( expected, cursor , testNum ) {
 }
 
 t = db.cursor3;
-t.drop()
+t.drop();
 
 t.save( { a: 0 } );
 t.save( { a: 1 } );
@@ -21,15 +21,15 @@ t.ensureIndex( { a: 1 } );
 
 
 
-checkResults( [ 1 ], t.find( { a: 1 } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ )
-checkResults( [ 1 ], t.find( { a: 1 } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ )
+checkResults( [ 1 ], t.find( { a: 1 } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ );
+checkResults( [ 1 ], t.find( { a: 1 } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ );
 
-checkResults( [ 1, 2 ], t.find( { a: { $gt: 0 } } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ )
-checkResults( [ 2, 1 ], t.find( { a: { $gt: 0 } } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ )
-checkResults( [ 1, 2 ], t.find( { a: { $gte: 1 } } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ )
-checkResults( [ 2, 1 ], t.find( { a: { $gte: 1 } } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ )
+checkResults( [ 1, 2 ], t.find( { a: { $gt: 0 } } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ );
+checkResults( [ 2, 1 ], t.find( { a: { $gt: 0 } } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ );
+checkResults( [ 1, 2 ], t.find( { a: { $gte: 1 } } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ );
+checkResults( [ 2, 1 ], t.find( { a: { $gte: 1 } } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ );
 
-checkResults( [ 0, 1 ], t.find( { a: { $lt: 2 } } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ )
-checkResults( [ 1, 0 ], t.find( { a: { $lt: 2 } } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ )
-checkResults( [ 0, 1 ], t.find( { a: { $lte: 1 } } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ )
-checkResults( [ 1, 0 ], t.find( { a: { $lte: 1 } } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ )
+checkResults( [ 0, 1 ], t.find( { a: { $lt: 2 } } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ );
+checkResults( [ 1, 0 ], t.find( { a: { $lt: 2 } } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ );
+checkResults( [ 0, 1 ], t.find( { a: { $lte: 1 } } ).sort( { a: 1 } ).hint( { a: 1 } ) , testNum++ );
+checkResults( [ 1, 0 ], t.find( { a: { $lte: 1 } } ).sort( { a: -1 } ).hint( { a: 1 } ) , testNum++ );

@@ -111,7 +111,7 @@
 
         // Pin the cursor during a getMore.
         var code = 'db.runCommand({getMore: ' + cursorId.toString() +
-                   ', collection: "' + coll.getName() + '"});'
+                   ', collection: "' + coll.getName() + '"});';
         cleanup = startParallelShell(code);
 
         // Sleep to make it more likely that the cursor will be pinned.

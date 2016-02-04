@@ -5,7 +5,7 @@ t.drop();
 // each group has groupnum+1 5 users
 for ( var group=0; group<10; group++ ){
     for ( var i=0; i<5+group; i++ ){
-        t.save( { group : "group" + group , user : i } )
+        t.save( { group : "group" + group , user : i } );
     }
 }
 

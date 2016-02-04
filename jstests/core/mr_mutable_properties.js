@@ -14,7 +14,7 @@ var map = function() {
     this.a = {cake:1};
     emit(this._id, this.feed);
     emit(this._id, this.a);
-}
+};
 
 var reduce = function(key, values) {
     // set property on receiver
@@ -30,7 +30,7 @@ var reduce = function(key, values) {
     // modify each value in the (modified) array arg
     values.forEach(function(val) { val.mod = 1; });
     return {food:values};
-}
+};
 
 var finalize = function(key, values) {
     // set property on receiver
@@ -47,7 +47,7 @@ var finalize = function(key, values) {
     // modify each value in the (modified) array arg
     values.food.forEach(function(val) { val.mod = 1; });
     return values;
-}
+};
 
 var mr = collection.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}});
 printjson(mr);

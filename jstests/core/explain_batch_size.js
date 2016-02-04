@@ -7,7 +7,7 @@
 t = db.explain_batch_size;
 t.drop();
 
-var n = 3
+var n = 3;
 for (i=0; i<n; i++) {
     t.save( { x : i } );
 }

@@ -45,7 +45,7 @@ assert.eq( false , res.ok , "2b " + tojson(res) );
 // Check _id index
 res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {_id:1} });
 assert.eq( true , res.ok , "2c " + tojson(res) );
-assert( res.idskip , "2d " + tojson(res) )
+assert( res.idskip , "2d " + tojson(res) );
 
 // -------------------------
 // Case 3: entry with array values would make an index unsuitable
@@ -69,7 +69,7 @@ assert.eq( 1 , f.count() , "3. count after removing array value should be 1" );
 res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {x:1, y:1} });
 assert.eq( true , res.ok , "3b " + tojson(res) );
 
-f.save( { x : 2, y : [1, 2] } )
+f.save( { x : 2, y : [1, 2] } );
 
 assert.eq( 2 , f.count() , "3. count after adding array value should be 2" );
 res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {x:1, y:1} });
@@ -110,7 +110,7 @@ assert.eq( 1 , f.count() , "4. count after removing array value should be 1" );
 res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {x:1, y:1, z:1} });
 assert.eq( true , res.ok , "4f " + tojson(res) );
 
-f.save( { x : 3, y : [1, 2], z : 3 } )
+f.save( { x : 3, y : [1, 2], z : 3 } );
 
 assert.eq( 2 , f.count() , "4. count after adding array value on second key should be 2" );
 res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {x:1} });
@@ -127,7 +127,7 @@ assert.eq( 1 , f.count() , "4. count after removing array value should be 1 agai
 res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {x:1, y:1, z:1} });
 assert.eq( true , res.ok , "4e " + tojson(res) );
 
-f.save( { x : 4, y : 4, z : [1, 2] } )
+f.save( { x : 4, y : 4, z : [1, 2] } );
 
 assert.eq( 2 , f.count() , "4. count after adding array value on third key should be 2" );
 res = db.runCommand( { checkShardingIndex: "test.jstests_shardingindex" , keyPattern: {x:1} });

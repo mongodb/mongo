@@ -32,7 +32,7 @@ function findCollectionInfo() {
 assert.commandFailed(t.runCommand('collmod', {NotARealOption:1}));
 
 // add a TTL index
-t.ensureIndex( {a : 1}, { "expireAfterSeconds": 50 } )
+t.ensureIndex( {a : 1}, { "expireAfterSeconds": 50 } );
 assert( findTTL( { a : 1 }, 50 ), "TTL index not added" );
 
 // try to modify it with a bad key pattern
@@ -61,7 +61,7 @@ assert( findTTL( {a:1}, 100  ), "TTL index not modified" );
 
 // try to modify a faulty TTL index with a non-numeric expireAfterSeconds field
 t.dropIndex( {a : 1 } );
-t.ensureIndex( {a : 1} , { "expireAfterSeconds": "50" } )
+t.ensureIndex( {a : 1} , { "expireAfterSeconds": "50" } );
 var res = db.runCommand( { "collMod" : coll,
                            "index" : { "keyPattern" : {a : 1} , "expireAfterSeconds" : 100 } } );
 debug( res );
@@ -69,7 +69,7 @@ assert.eq( 0, res.ok, "shouldn't be able to modify faulty index spec" );
 
 // try with new index, this time set both expireAfterSeconds and the usePowerOf2Sizes flag
 t.dropIndex( {a : 1 } );
-t.ensureIndex( {a : 1} , { "expireAfterSeconds": 50 } )
+t.ensureIndex( {a : 1} , { "expireAfterSeconds": 50 } );
 var res = db.runCommand( { "collMod" : coll ,
                            "usePowerOf2Sizes" : true,
                            "index" : { "keyPattern" : {a : 1} , "expireAfterSeconds" : 100 } } );
@@ -79,7 +79,7 @@ assert( findTTL( {a:1}, 100), "TTL index should be 100 now" );
 // Clear usePowerOf2Sizes and enable noPadding. Make sure collection options.flags is updated.
 var res = db.runCommand( { "collMod" : coll ,
                            "usePowerOf2Sizes" : false,
-                           "noPadding" : true} )
+                           "noPadding" : true} );
 debug( res );
 assert.commandWorked(res);
 var info = findCollectionInfo();
@@ -87,7 +87,7 @@ assert.eq(info.options.flags, 2, tojson(info)); // 2 is CollectionOptions::Flag_
 
 // Clear noPadding and check results object and options.flags.
 var res = db.runCommand( { "collMod" : coll ,
-                           "noPadding" : false} )
+                           "noPadding" : false} );
 debug( res );
 assert.commandWorked(res);
 if (!isMongos) {

@@ -3,7 +3,7 @@
 t = db.sub1;
 t.drop();
 
-x = { a : 1 , b : { c : { d : 2 } } }
+x = { a : 1 , b : { c : { d : 2 } } };
 
 t.save( x );
 

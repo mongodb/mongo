@@ -20,6 +20,6 @@ assert.eq( subcursor.objsLeftInBatch(), 1 );
 
 t.drop(); // should invalidate cursor, but not subcursor
 
-assert.throws( function(){ cursor.itcount() } );  // throws "cursor doesn't exist on server" error on getMore
+assert.throws( function(){ cursor.itcount(); } );  // throws "cursor doesn't exist on server" error on getMore
 assert.eq( subcursor.itcount(), 9 ); //one already seen
 

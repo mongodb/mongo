@@ -5,7 +5,7 @@
 var coll = db.getCollection( "batch_write_update" );
 coll.drop();
 
-assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands")
+assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands");
 
 var request;
 var result;
@@ -19,13 +19,13 @@ function resultOK( result ) {
            !( 'errmsg' in result ) &&
            !( 'errInfo' in result ) &&
            !( 'writeErrors' in result );
-};
+}
 
 function resultNOK( result ) {
     return !result.ok &&
            typeof( result.code ) == 'number' &&
            typeof( result.errmsg ) == 'string';
-};
+}
 
 // EACH TEST BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
 
@@ -51,7 +51,7 @@ assert.eq(0, result.upserted[0].index);
 // Count the upserted doc
 var upsertedId = result.upserted[0]._id;
 assert.eq(1, coll.count({_id: upsertedId}));
-assert.eq(0, result.nModified, "missing/wrong nModified")
+assert.eq(0, result.nModified, "missing/wrong nModified");
 
 //
 // Single document upsert, write concern specified, no ordered specified
@@ -69,7 +69,7 @@ assert.eq(0, result.upserted[0].index);
 // Count the upserted doc
 upsertedId = result.upserted[0]._id;
 assert.eq(1, coll.count({_id: upsertedId}));
-assert.eq(0, result.nModified, "missing/wrong nModified")
+assert.eq(0, result.nModified, "missing/wrong nModified");
 
 //
 // Single document upsert, write concern specified, ordered = true
@@ -88,7 +88,7 @@ assert.eq(0, result.upserted[0].index);
 // Count the upserted doc
 upsertedId = result.upserted[0]._id;
 assert.eq(1, coll.count({_id: upsertedId}));
-assert.eq(0, result.nModified, "missing/wrong nModified")
+assert.eq(0, result.nModified, "missing/wrong nModified");
 
 //
 // Single document upsert, write concern 0 specified, ordered = true

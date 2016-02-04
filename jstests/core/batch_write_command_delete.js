@@ -19,13 +19,13 @@ function resultOK( result ) {
            !( 'errmsg' in result ) &&
            !( 'errInfo' in result ) &&
            !( 'writeErrors' in result );
-};
+}
 
 function resultNOK( result ) {
     return !result.ok &&
            typeof( result.code ) == 'number' &&
            typeof( result.errmsg ) == 'string';
-};
+}
 
 // EACH TEST BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
 

@@ -1,4 +1,4 @@
-t = db.fm3
+t = db.fm3;
 t.drop();
 
 t.insert( {a:[{c:{e:1, f:1}}, {d:2}, 'z'], b:1} );

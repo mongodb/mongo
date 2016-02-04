@@ -6,7 +6,7 @@ load("jstests/libs/analyze_plan.js");
 var otherDB = db.getSiblingDB("indexOtherNS");
 otherDB.dropDatabase();
 
-otherDB.foo.insert({a:1})
+otherDB.foo.insert({a:1});
 assert.eq(1, otherDB.foo.getIndexes().length);
 assert(isCollscan(otherDB.foo.find({a:1}).explain().queryPlanner.winningPlan));
 

@@ -32,7 +32,7 @@ test( "a" );
 test( "b" , { x : 1 } );
 test( "c" , { tags : 1 } );
 
-N = 5000
+N = 5000;
 
 test( "a2" );
 test( "b2" , { x : 1 } );

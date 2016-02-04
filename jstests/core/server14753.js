@@ -4,7 +4,7 @@
 (function() {
 
     "use strict";
-    var t = db.jstests_server14753
+    var t = db.jstests_server14753;
 
     t.drop();
     t.ensureIndex({a: 1});

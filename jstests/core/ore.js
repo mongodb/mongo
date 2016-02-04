@@ -4,7 +4,7 @@
 t = db.jstests_ore;
 t.drop();
 
-t.ensureIndex( {a:-1} )
+t.ensureIndex( {a:-1} );
 t.ensureIndex( {b:1} );
 
 t.save( {a:1,b:1} );

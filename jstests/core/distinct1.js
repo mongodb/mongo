@@ -4,11 +4,11 @@ t.drop();
 
 assert.eq( 0 , t.distinct( "a" ).length , "test empty" );
 
-t.save( { a : 1 } )
-t.save( { a : 2 } )
-t.save( { a : 2 } )
-t.save( { a : 2 } )
-t.save( { a : 3 } )
+t.save( { a : 1 } );
+t.save( { a : 2 } );
+t.save( { a : 2 } );
+t.save( { a : 2 } );
+t.save( { a : 3 } );
 
 
 res = t.distinct( "a" );
@@ -26,7 +26,7 @@ t.save( { a : { b : "c" } , c : 12 } );
 res = t.distinct( "a.b" );
 assert.eq( "a,b,c" , res.toString() , "B1" );
 printjson(t._distinct( "a.b" ).stats);
-assert.eq( "COLLSCAN" , t._distinct( "a.b" ).stats.planSummary , "B2" )
+assert.eq( "COLLSCAN" , t._distinct( "a.b" ).stats.planSummary , "B2" );
 
 t.drop();
 

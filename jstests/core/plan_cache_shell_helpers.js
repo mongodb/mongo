@@ -83,7 +83,7 @@ assert.eq(0, planCache.getPlansByQuery({unknownfield: 1}).length,
           'collection.getPlanCache().getPlansByQuery() should return empty results ' +
           'on non-existent collection');
 // should error on missing required field query.
-assert.throws(function() { planCache.getPlansByQuery() });
+assert.throws(function() { planCache.getPlansByQuery(); });
 
 // Invoke with various permutations of required (query) and optional (projection, sort) arguments.
 assert.eq(getPlans(queryB, sortC, projectionB), planCache.getPlansByQuery(queryB, projectionB,
@@ -131,7 +131,7 @@ assert.eq(0, planCache.getPlansByQuery({query: queryB, sort: sortC,
 // should not error on non-existent query shape.
 planCache.clearPlansByQuery({unknownfield: 1});
 // should error on missing required field query.
-assert.throws(function() { planCache.clearPlansByQuery() });
+assert.throws(function() { planCache.clearPlansByQuery(); });
 
 // Invoke with various permutations of required (query) and optional (projection, sort) arguments.
 planCache.clearPlansByQuery(queryB, projectionB);

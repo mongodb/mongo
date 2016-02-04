@@ -19,7 +19,7 @@ function doQuery( query ) {
 }
 
 function getIds( query ) {
-    var ids = []
+    var ids = [];
     t.find( query ).forEach(
         function(z) {
             ids.push( z._id );
@@ -35,7 +35,7 @@ for ( var i=0; i < theQueries.length; i++ ) {
     assert.eq( [2,4], getIds( theQueries[i] ) );
 }
 
-t.ensureIndex( { "a.b" : 1 } )
+t.ensureIndex( { "a.b" : 1 } );
 
 for ( var i=0; i < theQueries.length; i++ ) {
     assert.eq( 2, doQuery( theQueries[i] ) );

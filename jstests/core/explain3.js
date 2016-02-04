@@ -11,7 +11,7 @@ for( var i = 0; i < 10000; ++i ) {
 s = startParallelShell( "sleep( 20 ); db.jstests_explain3.dropIndex( {i:1} );" );
 
 try {
-    t.find( {i:{$gt:-1},j:1} ).hint( {i:1} ).explain()
+    t.find( {i:{$gt:-1},j:1} ).hint( {i:1} ).explain();
 } catch (e) {
     print( "got exception" );
     printjson( e );

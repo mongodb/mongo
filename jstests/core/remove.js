@@ -24,4 +24,4 @@ f(500, -1);
 assert(t.validate().valid , "C" );
 
 // no query for remove() throws starting in 2.6
-assert.throws(function() { db.t.remove() });
+assert.throws(function() { db.t.remove(); });

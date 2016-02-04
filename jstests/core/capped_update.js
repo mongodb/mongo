@@ -24,7 +24,7 @@
     assert.commandWorked(t.getDB().runCommand({godinsert:t.getName(), obj:{a:2}}));
     var doc = t.findOne({a:2});
     assert.eq(undefined, doc["_id"], "now has _id after godinsert");
-    assert.writeOK(t.update({a:2}, {$inc:{a:1}}))
+    assert.writeOK(t.update({a:2}, {$inc:{a:1}}));
     doc = t.findOne({a:3});
     assert.eq(undefined, doc["_id"], "now has _id after update");
 })();

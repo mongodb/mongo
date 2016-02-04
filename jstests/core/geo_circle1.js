@@ -14,8 +14,8 @@ num = 0;
 
 for ( x=0; x<=20; x++ ){
     for ( y=0; y<=20; y++ ){
-        o = { _id : num++ , loc : [ x , y ] } 
-        t.save( o )
+        o = { _id : num++ , loc : [ x , y ] }; 
+        t.save( o );
         for ( i=0; i<searches.length; i++ )
             if ( Geo.distance( [ x , y ] , searches[i][0] ) <= searches[i][1] )
                 correct[i].push( o );
@@ -26,7 +26,7 @@ t.ensureIndex( { loc : "2d" } );
 
 for ( i=0; i<searches.length; i++ ){
     //print( tojson( searches[i] ) + "\t" + correct[i].length )
-    q = { loc : { $within : { $center : searches[i] } } }
+    q = { loc : { $within : { $center : searches[i] } } };
 
     //correct[i].forEach( printjson )
     //printjson( q );

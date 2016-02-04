@@ -46,7 +46,7 @@ test = function() {
     
     ok( {$nor:[{$and:[{$nor:[{a:1}]}]}]} );
     
-}
+};
 
 test();
 t.ensureIndex( {a:1} );
@@ -90,7 +90,7 @@ test = function() {
     
     ok( {$nor:[{$and:[{$nor:[{a:{$ne:2}}]}]}]} );
     
-}
+};
 
 t.drop();
 t.save( {a:1} );

@@ -18,7 +18,7 @@ assert.eq( [], t.findOne().a );
 
 // SERVER-6047: $pullAll creates empty nested docs for dotted fields
 // that don't exist.
-t.drop()
+t.drop();
 t.save({ m : 1 } );
 t.update( { m : 1 }, { $pullAll : { 'a.b' : [ 1 ] } } );
 assert( ('a' in t.findOne()) == false );

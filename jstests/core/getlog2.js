@@ -1,7 +1,7 @@
 // tests getlog as well as slow querying logging
 
 glcol = db.getLogTest2;
-glcol.drop()
+glcol.drop();
 
 contains = function(arr, func) {
     var i = arr.length;
@@ -11,7 +11,7 @@ contains = function(arr, func) {
         }
     }
     return false;
-}
+};
 
 // test doesn't work when talking to mongos
 if(db.isMaster().msg != "isdbgrid") {

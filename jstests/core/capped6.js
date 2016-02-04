@@ -77,7 +77,7 @@
             count -= (n + inc);
             valueArrayCurIndex -= (n + inc);
             checkOrder(valueArrayCurIndex, valueArray);
-        };
+        }
         // We return the index of the next document that should be inserted into the capped
         // collection, which would be the document after valueArrayCurIndex.
         return valueArrayCurIndex + 1;
@@ -100,5 +100,5 @@
 
     // Same test as above, but now the newer documents take less space than the
     // older documents instead of more.
-    doTest(true)
+    doTest(true);
 })();

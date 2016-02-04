@@ -12,10 +12,10 @@ function fill(){
 
 fill();
 assert.eq( N , t.count() , "A" );
-t.remove( {} )
+t.remove( {} );
 assert.eq( 0 , t.count() , "B" );
 
 fill();
 assert.eq( N , t.count() , "C" );
-db.eval( function(){ db.remove8.remove( {} ); } )
+db.eval( function(){ db.remove8.remove( {} ); } );
 assert.eq( 0 , t.count() , "D" );

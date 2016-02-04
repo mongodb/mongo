@@ -32,12 +32,12 @@ function dotest( n ){
     assert.eq( 4, t.count( {'a.b.c.d': {$exists:false}} ) , n );
 }
 
-dotest( "before index" )
-t.ensureIndex( { "a" : 1 } )
-t.ensureIndex( { "a.b" : 1 } )
-t.ensureIndex( { "a.b.c" : 1 } )
-t.ensureIndex( { "a.b.c.d" : 1 } )
-dotest( "after index" )
+dotest( "before index" );
+t.ensureIndex( { "a" : 1 } );
+t.ensureIndex( { "a.b" : 1 } );
+t.ensureIndex( { "a.b.c" : 1 } );
+t.ensureIndex( { "a.b.c.d" : 1 } );
+dotest( "after index" );
 assert.eq( 1, t.find( {a: {$exists:false}} ).hint( {a:1} ).itcount() );
     
 t.drop();

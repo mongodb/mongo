@@ -26,7 +26,7 @@ ret = t.groupcmd( { key : {} , reduce : p.reduce , initial : p.initial } );
 assert.eq( 1 , ret.length , "ZZ 2" );
 assert.eq( 5 , ret[0].count , "ZZ 3" );
 
-ret = t.groupcmd( { key : {} , reduce : function(obj,prev){ prev.sum += obj.n } , initial : { sum : 0 } } );
+ret = t.groupcmd( { key : {} , reduce : function(obj,prev){ prev.sum += obj.n; } , initial : { sum : 0 } } );
 assert.eq( 1 , ret.length , "ZZ 4" );
 assert.eq( 15 , ret[0].sum , "ZZ 5" );
 
@@ -56,10 +56,10 @@ p = { key : { 'name.first' : true } ,
 
 res = t.group( p );
 assert.eq( 2 , res.length , "Z1" );
-assert.eq( "a" , res[0]['name.first'] , "Z2" )
-assert.eq( "b" , res[1]['name.first'] , "Z3" )
-assert.eq( 2 , res[0].count , "Z4" )
-assert.eq( 1 , res[1].count , "Z5" )
+assert.eq( "a" , res[0]['name.first'] , "Z2" );
+assert.eq( "b" , res[1]['name.first'] , "Z3" );
+assert.eq( 2 , res[0].count , "Z4" );
+assert.eq( 1 , res[1].count , "Z5" );
 
 // SERVER-15851 Test invalid user input.
 p = {
@@ -78,7 +78,7 @@ p = {
         key: {"name.first": true},
         $reduce: function(obj, prev){prev.count++;},
         initial: {count: 0},
-        finalize: function(obj){ob}
+        finalize: function(obj){ob;}
     };
 assert.commandFailedWithCode(db.runCommand({group: p}),
                              ErrorCodes.JSInterpreterFailure,
@@ -89,7 +89,7 @@ p = {
         $keyf: "a" ,
         $reduce: function(obj, prev){prev.count++;},
         initial: {count: 0},
-        finalize: function(obj){ob}
+        finalize: function(obj){ob;}
     };
 assert.commandFailedWithCode(db.runCommand({group: p}),
                              ErrorCodes.JSInterpreterFailure,

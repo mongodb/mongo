@@ -1,5 +1,5 @@
-var t = db.geo_s2overlappingpolys
-t.drop()
+var t = db.geo_s2overlappingpolys;
+t.drop();
 
 t.ensureIndex( { geo : "2dsphere" } );
 
@@ -107,7 +107,7 @@ assert.eq(result.itcount(), 1);
 // as though it's intersecting.
 // NOTE: I think this error bound seems odd. Going to 0.000152297 will break this test.
 // I've confirmed there is an error bound, but it's a lot larger than we experienced above.
-var errorBound = 0.000152298
+var errorBound = 0.000152298;
 var notCloseEnoughSharedPointPoly = {type: "Polygon",
     coordinates: [
         [[0.0, -2.0], [0.0, -1.0 - errorBound], [1.0, -2.0], [0.0, -2.0]]

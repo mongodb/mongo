@@ -1,6 +1,6 @@
 
 t = db.updated;
-t.drop()
+t.drop();
 
 o = { _id : Math.random() , 
       items:[null,null,null,null]

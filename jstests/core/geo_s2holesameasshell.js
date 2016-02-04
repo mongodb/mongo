@@ -1,5 +1,5 @@
 // If polygons have holes, the holes cannot be equal to the entire geometry.
-var t = db.geo_s2holessameasshell
+var t = db.geo_s2holessameasshell;
 t.drop();
 t.ensureIndex({geo: "2dsphere"});
 
@@ -25,7 +25,7 @@ assert.writeError(t.insert({geo: polygonWithFullHole}));
 
 // No covering to search over should give an empty result set.
 assert.throws(function() {
-    return t.find({geo: {$geoWithin: {$geometry: polygonWithFullHole}}}).count()})
+    return t.find({geo: {$geoWithin: {$geometry: polygonWithFullHole}}}).count();});
 
 // Similar polygon to the one above, but is covered by two holes instead of
 // one.
@@ -41,4 +41,4 @@ assert.writeError(t.insert({geo: polygonWithTwoHolesCoveringWholeArea}));
 
 // No covering to search over should give an empty result set.
 assert.throws(function() {
-    return t.find({geo: {$geoWithin: {$geometry: polygonWithTwoHolesCoveringWholeArea}}}).count()})
+    return t.find({geo: {$geoWithin: {$geometry: polygonWithTwoHolesCoveringWholeArea}}}).count();});

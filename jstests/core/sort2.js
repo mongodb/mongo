@@ -17,8 +17,8 @@ for( var pass = 0; pass < 2; pass++ ) {
 assert(t.validate().valid);
 
 t.drop();
-t.insert({ x: 1 })
-t.insert({ x: 5000000000 })
+t.insert({ x: 1 });
+t.insert({ x: 5000000000 });
 t.insert({ x: NaN });
 t.insert({ x: Infinity });
 t.insert({ x: -Infinity });

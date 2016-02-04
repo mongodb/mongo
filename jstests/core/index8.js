@@ -18,7 +18,7 @@ checkIndexes = function( num ) {
     assert( indexes[ start + 1 ].unique , "B" + num + " " + tojson( indexes[start+1] ) );
     assert( !indexes[ start + 2 ].unique , "C" + num );
     assert.eq( "cIndex", indexes[ start + 2 ].name , "D" + num );
-}
+};
 
 checkIndexes( 1 );
 t.reIndex();

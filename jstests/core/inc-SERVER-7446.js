@@ -1,4 +1,4 @@
-var c = db.incSERVER7446
+var c = db.incSERVER7446;
 
 // A 32 bit overflow spills to 64 bits
 c.drop();
@@ -36,4 +36,4 @@ updateResult = c.update( {}, { $inc:{ a:NumberInt( -1 ) } } );
 assert.eq(0, updateResult.nMatched,
        "Did not fail to decrement a NumberLong past std::numeric_limits<int64_t>::min()");
 
-c.drop()
+c.drop();

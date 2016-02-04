@@ -1,23 +1,23 @@
-t = db.borders
-t.drop()
+t = db.borders;
+t.drop();
 
 epsilon = 0.0001;
 
 // For these tests, *required* that step ends exactly on max
-min = -1
-max = 1
-step = 1
+min = -1;
+max = 1;
+step = 1;
 numItems = 0;
 
 for ( var x = min; x <= max; x += step ) {
     for ( var y = min; y <= max; y += step ) {
-        t.insert( { loc : { x : x, y : y } } )
+        t.insert( { loc : { x : x, y : y } } );
         numItems++;
     }
 }
 
-overallMin = -1
-overallMax = 1
+overallMin = -1;
+overallMax = 1;
 
 // Create a point index slightly smaller than the points we have
 var res = t.ensureIndex({ loc: "2d" },
@@ -72,14 +72,14 @@ assert.eq( numItems, t.find(
 // Circle tests
 // **************
 
-center = ( overallMax + overallMin ) / 2
-center = [ center, center ]
-radius = overallMax
+center = ( overallMax + overallMin ) / 2;
+center = [ center, center ];
+radius = overallMax;
 
-offCenter = [ center[0] + radius, center[1] + radius ]
-onBounds = [ offCenter[0] + epsilon, offCenter[1] + epsilon ]
-offBounds = [ onBounds[0] + epsilon, onBounds[1] + epsilon ]
-onBoundsNeg = [ -onBounds[0], -onBounds[1] ]
+offCenter = [ center[0] + radius, center[1] + radius ];
+onBounds = [ offCenter[0] + epsilon, offCenter[1] + epsilon ];
+offBounds = [ onBounds[0] + epsilon, onBounds[1] + epsilon ];
+onBoundsNeg = [ -onBounds[0], -onBounds[1] ];
 
 // Make sure we can get all points when radius is exactly at full bounds
 assert.lt( 0, t.find( { loc : { $within : { $center : [ center, radius + epsilon ] } } } ).count() );
@@ -93,13 +93,13 @@ assert.lt( 0, t.find( { loc : { $within : { $center : [ offCenter, radius + 2 * 
 // Make sure we get correct corner point when center is in bounds
 // (x bounds wrap, so could get other corner)
 cornerPt = t.findOne( { loc : { $within : { $center : [ offCenter, step / 2 ] } } } );
-assert.eq( cornerPt.loc.y, overallMax )
+assert.eq( cornerPt.loc.y, overallMax );
 
 // Make sure we get correct corner point when center is on bounds
 // NOTE: Only valid points on MIN bounds
 cornerPt = t
         .findOne( { loc : { $within : { $center : [ onBoundsNeg, Math.sqrt( 2 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
-assert.eq( cornerPt.loc.y, overallMin )
+assert.eq( cornerPt.loc.y, overallMin );
 
 // Make sure we can't get corner point when center is over bounds
 // TODO: SERVER-5800 clean up wrapping rules for different CRS queries - not sure this is an error

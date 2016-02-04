@@ -1,8 +1,8 @@
 // Verify that odd polygons (huge or "narrow") behave as we expect.
 // Note that since 2dsphere is spherical, polygons that seem narrow are actually
 // rather wide if their latitude (or longitude) range is large.
-var t = db.geo_s2oddshapes
-t.drop()
+var t = db.geo_s2oddshapes;
+t.drop();
 t.ensureIndex( { geo : "2dsphere" } );
 
 var testPoint = {
@@ -66,7 +66,7 @@ assert.eq(result.itcount(), 3);
 
 //Test a poly that is the size of half the earth.
 
-t.drop()
+t.drop();
 t.ensureIndex( { geo : "2dsphere" } );
 
 var insidePoint = {
@@ -98,12 +98,12 @@ var largePoly = {type: "Polygon",
 result = t.find({geo: {$within: {$geometry: largePoly}}});
 assert.eq(result.itcount(), 1);
 result = t.find({geo: {$within: {$geometry: largePoly}}});
-var point = result[0]
+var point = result[0];
 assert.eq(point.name, 'inside');
 
 //Test a poly that is very small.  A couple meters around.
 
-t.drop()
+t.drop();
 t.ensureIndex( { geo : "2dsphere" } );
 
 insidePoint = {
@@ -133,6 +133,6 @@ smallPoly = {type: "Polygon",
 result = t.find({geo: {$within: {$geometry: smallPoly}}});
 assert.eq(result.itcount(), 1);
 result = t.find({geo: {$within: {$geometry: smallPoly}}});
-point = result[0]
+point = result[0];
 assert.eq(point.name, 'inside');
 

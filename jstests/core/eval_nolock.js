@@ -1,5 +1,5 @@
 
-t = db.eval_nolock
+t = db.eval_nolock;
 t.drop();
 
 for ( i=0; i<10; i++ )
@@ -12,5 +12,5 @@ res = db.runCommand( { eval :
               }
               , nolock : true } );
     
-assert.eq( 11 , res.retval , "A" )
+assert.eq( 11 , res.retval , "A" );
 

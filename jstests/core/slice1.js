@@ -41,8 +41,8 @@ assert.eq(out.a , [0,1,2]);
 assert.eq(out.b , undefined);
 assert.eq(out.c , 1);
 
-t.drop()
-t.insert({comments: [{id:0, text:'a'},{id:1, text:'b'},{id:2, text:'c'},{id:3, text:'d'}], title:'foo'})
+t.drop();
+t.insert({comments: [{id:0, text:'a'},{id:1, text:'b'},{id:2, text:'c'},{id:3, text:'d'}], title:'foo'});
 
 
 out = t.findOne({}, {comments:{$slice:2}, 'comments.id':true});

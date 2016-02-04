@@ -7,7 +7,7 @@ t.drop();
 
 var s = "";
 
-t.ensureIndex( { a : 1 , x : 1 } )
+t.ensureIndex( { a : 1 , x : 1 } );
 
 var bulk = t.initializeUnorderedBulkOp();
 for ( i=0; i<N; i++ ) {
