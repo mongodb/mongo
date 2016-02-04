@@ -2844,8 +2844,8 @@ var authCommandsLib = {
             failures = failures.concat(res);
         }
 
-        failures.forEach(function(i) { jsTest.log(i) });
+        failures.forEach(function(i) { jsTest.log(i); });
         assert.eq(0, failures.length);
     }
 
-}
+};

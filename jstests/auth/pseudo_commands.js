@@ -47,7 +47,7 @@ function runTest(conn) {
     function isMongos(db) {
         var res = db.adminCommand({isdbgrid: 1});
         return (res.ok == 1 && res.isdbgrid == 1);
-    };
+    }
 
 
     (function testInprog() {
@@ -83,7 +83,7 @@ function runTest(conn) {
              if (shouldPass) {
                  assert.gte(res.inprog.length, 0);
              }
-         }
+         };
 
          testProperAuthorization(testFunc, roles, privilege);
      })();
@@ -124,7 +124,7 @@ function runTest(conn) {
                  passed = false;
              }
              assert.eq(shouldPass, passed);
-         }
+         };
 
          testProperAuthorization(testFunc, roles, privilege);
     })();
@@ -175,7 +175,7 @@ function runTest(conn) {
              }
 
              assert.eq(shouldPass, passed);
-         }
+         };
 
          testProperAuthorization(testFunc, roles, privilege);
      })();

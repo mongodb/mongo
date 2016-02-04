@@ -3,7 +3,7 @@
 // are user documents stored in the configuration information, it must assume that
 // there are.
 
-var dopts = { smallfiles: "", nopreallocj: ""}
+var dopts = { smallfiles: "", nopreallocj: ""};
 var st = new ShardingTest(
     { shards: 1,
       mongos: 1,
@@ -32,7 +32,7 @@ assert.commandFailedWithCode(db.adminCommand('serverStatus'), authzErrorCode);
 db.auth('user', 'pwd');
 assert.commandWorked(db.adminCommand('serverStatus'));
 
-jsTest.log('repeat without config server')
+jsTest.log('repeat without config server');
 
 // shut down only config server
 MongoRunner.stopMongod(config.port, /*signal*/15);

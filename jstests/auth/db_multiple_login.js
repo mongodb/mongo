@@ -15,7 +15,7 @@ admin.logout();
 
 // Nothing logged in, can neither read nor write.
 assert.writeError(test.docs.insert({ value: 0 }));
-assert.throws(function() { test.foo.findOne() });
+assert.throws(function() { test.foo.findOne(); });
 
 // Writer logged in, can read and write.
 test.auth('writer', 'a');

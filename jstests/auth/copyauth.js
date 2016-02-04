@@ -34,7 +34,7 @@ function ClusterSpawnHelper(clusterType, startWithAuth) {
             mongos : 1,
             shards : 1,
             config : 1
-        }
+        };
         if (startWithAuth) {
             shardingTestConfig.auth = "";
             shardingTestConfig.keyFile = "jstests/libs/key1";
@@ -82,7 +82,7 @@ function ClusterSpawnHelper(clusterType, startWithAuth) {
         else {
             MongoRunner.stopMongod(this.conn.port);
         }
-    }
+    };
 }
 
 /*
@@ -110,7 +110,7 @@ function copydbBetweenClustersTest(configObj) {
         'isSourceUsingAuth',
         'targetClusterType',
         'isTargetUsingAuth'
-    ]
+    ];
 
     var i;
     for (i = 0; i < requiredKeys.length; i++) {
@@ -186,12 +186,12 @@ function copydbBetweenClustersTest(configObj) {
 }
 
 (function() {
-"use strict"
+"use strict";
 
-var sourceClusterTypeValues = [ "single", "repl", "sharded" ]
-var isSourceUsingAuthValues = [ true, false ]
-var targetClusterTypeValues = [ "single", "repl", "sharded" ]
-var isTargetUsingAuthValues = [ true, false ]
+var sourceClusterTypeValues = [ "single", "repl", "sharded" ];
+var isSourceUsingAuthValues = [ true, false ];
+var targetClusterTypeValues = [ "single", "repl", "sharded" ];
+var isTargetUsingAuthValues = [ true, false ];
 for (var i = 0; i < sourceClusterTypeValues.length; i++) {
     for (var j = 0; j < isSourceUsingAuthValues.length; j++) {
         for (var k = 0; k < targetClusterTypeValues.length; k++) {
@@ -223,7 +223,7 @@ for (var i = 0; i < sourceClusterTypeValues.length; i++) {
                     'isSourceUsingAuth' : isSourceUsingAuthValues[j],
                     'targetClusterType' : targetClusterTypeValues[k],
                     'isTargetUsingAuth' : isTargetUsingAuthValues[l]
-                }
+                };
                 print("Running copydb with auth test:");
                 printjson(testCase);
                 copydbBetweenClustersTest(testCase);

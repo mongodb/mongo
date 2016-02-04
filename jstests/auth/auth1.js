@@ -34,7 +34,7 @@ function runTest(m) {
     db.createUser({user: "guest" , pwd: "guest", roles: jsTest.readOnlyUserRoles});
     db.getSisterDB("admin").logout();
 
-    assert.throws( function() { t.findOne() }, [], "read without login" );
+    assert.throws( function() { t.findOne(); }, [], "read without login" );
 
     print("make sure we can't run certain commands w/out auth");
     var codeUnauthorized = 13;
@@ -59,7 +59,7 @@ function runTest(m) {
     db.setProfilingLevel( 2 );
     t.count();
     db.setProfilingLevel( 0 );
-    assert.lt( 0 , db.system.profile.find( { user : "eliot@test" } ).count() , "AP1" )
+    assert.lt( 0 , db.system.profile.find( { user : "eliot@test" } ).count() , "AP1" );
 
     var p = { key : { i : true } ,
         reduce : function(obj,prev) { prev.count++; },
@@ -86,14 +86,14 @@ function runTest(m) {
             };
 
 
-    assert.throws( function() { return t.group( p ) }, null , "write reduce didn't fail" );
+    assert.throws( function() { return t.group( p ); }, null , "write reduce didn't fail" );
     assert.eq( 1000, dbRO.jstests_auth_auth1.count() , "C3" );
 
 
     db.getSiblingDB('admin').auth('super', 'super');
 
     assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "D1" );
-    db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:1000} ) } );
+    db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:1000} ); } );
     assert.eq( 1001, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "D2" );
 
     print("SUCCESS auth1.js");

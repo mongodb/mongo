@@ -1,6 +1,6 @@
 (function() {
 
-'use strict'
+'use strict';
 
 var conn = MongoRunner.runMongod({ auth: "" });
 
