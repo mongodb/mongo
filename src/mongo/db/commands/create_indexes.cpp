@@ -137,12 +137,21 @@ public:
             }
 
             if (spec["ns"].type() != String) {
-                errmsg = "spec has no ns";
+                errmsg = "ns field must be a string";
                 result.append("spec", spec);
                 return false;
             }
-            if (ns != spec["ns"].String()) {
-                errmsg = "namespace mismatch";
+
+            std::string nsFromUser = spec["ns"].String();
+            if (nsFromUser.empty()) {
+                errmsg = "ns field cannot be an empty string";
+                result.append("spec", spec);
+                return false;
+            }
+
+            if (ns != nsFromUser) {
+                errmsg = str::stream() << "value of ns field '" << nsFromUser
+                                       << "' doesn't match namespace " << ns.ns();
                 result.append("spec", spec);
                 return false;
             }
