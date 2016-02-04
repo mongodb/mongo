@@ -108,10 +108,12 @@
         var coll = testDB.ttl;
         var testName = this.name;
 
-        // Wait until TTL monitor runs at least once
+        // Wait until TTL monitor runs at least once. The "passes" counter is incremented at the
+        // start of the TTL pass so to ensure that a pass has completed, it must increase by at
+        // least 2.
         var ttlPass = coll.getDB().serverStatus().metrics.ttl.passes;
         assert.soon(function() {
-                        return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 1;
+                        return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
                     },
                     testName + " TTL monitor didn't run before timing out.");
         // All docs should be expired, except 1
@@ -153,10 +155,12 @@
         var coll = testDB.ttl;
         var testName = this.name;
 
-        // Wait until TTL monitor runs at least once
+        // Wait until TTL monitor runs at least once. The "passes" counter is incremented at the
+        // start of the TTL pass so to ensure that a pass has completed, it must increase by at
+        // least 2.
         var ttlPass = coll.getDB().serverStatus().metrics.ttl.passes;
         assert.soon(function() {
-                        return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 1;
+                        return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
                     },
                     testName + " TTL monitor didn't run before timing out.");
 
