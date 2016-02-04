@@ -1,5 +1,5 @@
 var t = db.bench.geo_near1;
-t.drop()
+t.drop();
 
 var numPts = 1000*1000;
 

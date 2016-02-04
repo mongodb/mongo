@@ -9,7 +9,7 @@ function getRandomStr(L){
         if(n<10) return n; //1-10
         if(n<36) return String.fromCharCode(n+55); //A-Z
         return String.fromCharCode(n+61); //a-z
-    }
+    };
     while(s.length< L) s+= randomchar();
     return s;
 }
@@ -52,7 +52,7 @@ r = function(k,vals) {
      });
 
      return tmp;
-}
+};
 
 // following time limits are passing fine on a laptop with a debug build
 // so should always pass in theory unless something is wrong: GC, too much reducing, etc
