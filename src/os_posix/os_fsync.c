@@ -149,10 +149,10 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 int
 __wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh)
 {
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 #ifdef	HAVE_SYNC_FILE_RANGE
 	WT_DECL_RET;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_FILEOPS, "%s: sync_file_range", fh->name));
 
