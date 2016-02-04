@@ -278,7 +278,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 
 	if (0) {
 restart:	/*
-		 * Discard the currently held page and retart the search from
+		 * Discard the currently held page and restart the search from
 		 * the root.
 		 */
 		WT_RET(__wt_page_release(session, current, 0));
@@ -799,7 +799,7 @@ __wt_row_random_descent(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	if (0) {
 restart:	/*
-		 * Discard the currently held page and retart the search from
+		 * Discard the currently held page and restart the search from
 		 * the root.
 		 */
 		WT_RET(__wt_page_release(session, current, 0));
