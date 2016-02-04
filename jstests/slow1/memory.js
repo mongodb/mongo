@@ -17,7 +17,7 @@ db.system.js.save( { "_id" : "f1", "value" : function(n) {
         b.push(Math.random());
         c.push(Math.random());
     }
-} })
+} });
 
 // do mix of calls to make sure OOM is handled with no permanent damage
 db.eval("f1(10)");

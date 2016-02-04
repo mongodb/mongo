@@ -7,12 +7,12 @@ var s = new ShardingTest({ name: "multcollections",
                            other: { chunkSize: 1, enableBalancer : true } });
 
 s.adminCommand( { enablesharding : "test" } );
-db = s.getDB( "test" )
+db = s.getDB( "test" );
 s.ensurePrimaryShard('test', 'shard0001');
 
-N = 100000
+N = 100000;
 
-S = ""
+S = "";
 while ( S.length < 500 )
     S += "123123312312";
 
@@ -25,7 +25,7 @@ for ( i=0; i<N; i++ ){
 assert.writeOK(bulk.execute());
 assert.writeOK(bulk2.execute());
 
-db.printShardingStatus()
+db.printShardingStatus();
 
 function mytest( coll , i , loopNumber ){
     x = coll.find( { _id : i } ).explain();
@@ -34,15 +34,15 @@ function mytest( coll , i , loopNumber ){
     throw Error( "can't find " + i + " in " + coll.getName() + " on loopNumber: " + loopNumber +  " explain: " + tojson( x ) );
 }
 
-loopNumber = 0
+loopNumber = 0;
 while ( 1 ){
     for ( i=0; i<N; i++ ){
         mytest( db.foo , i , loopNumber );
         mytest( db.bar , i , loopNumber );
         if ( i % 1000 == 0 )
-            print( i )
+            print( i );
     }
-    db.printShardingStatus()
+    db.printShardingStatus();
     loopNumber++;
 
     if ( loopNumber == 1 ){
@@ -53,7 +53,7 @@ while ( 1 ){
     assert( loopNumber < 1000 , "taking too long" );
 
     if ( s.chunkDiff( "foo" ) < 12 && s.chunkDiff( "bar" ) < 12 )
-        break
+        break;
 }
 
 s.stop();
