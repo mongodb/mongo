@@ -72,9 +72,12 @@ StatusWith<std::unique_ptr<FTDCFileManager>> FTDCFileManager::create(
 
     if (!boost::filesystem::exists(dir)) {
         // Create the directory
-        if (!boost::filesystem::create_directories(dir)) {
+        boost::system::error_code ec;
+        boost::filesystem::create_directories(dir, ec);
+        if (ec) {
             return {ErrorCodes::NonExistentPath,
-                    str::stream() << "\'" << dir.generic_string() << "\' could not be created."};
+                    str::stream() << "\'" << dir.generic_string()
+                                  << "\' could not be created: " << ec.message()};
         }
     }
 
