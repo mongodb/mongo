@@ -23,7 +23,7 @@ var contains = function(logLines, func) {
         }
     }
     return false;
-}
+};
 
 // This test can only be run if the storageEngine is wiredTiger
 if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
@@ -50,7 +50,7 @@ else {
     replTest.awaitReplication();
     assert.eq(secondary1.getDB("test").foo.count(), 100);
 
-    jsTestLog("run fsync on the secondary to ensure it remains after restart")
+    jsTestLog("run fsync on the secondary to ensure it remains after restart");
     assert.commandWorked(secondary1.getDB("admin").runCommand({fsync : 1}));
 
     jsTestLog("kill -9 secondary 1");

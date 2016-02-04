@@ -17,8 +17,8 @@
 // test fails, and hard-wiring that as the test number.
 //
 
-load( "jstests/libs/slow_weekly_util.js" )
-testServer = new SlowWeeklyMongod( "geo_full" )
+load( "jstests/libs/slow_weekly_util.js" );
+testServer = new SlowWeeklyMongod( "geo_full" );
 db = testServer.getDB( "test" );
 
 var randEnvironment = function(){
@@ -32,78 +32,78 @@ var randEnvironment = function(){
                  bucketSize : 360 / ( 4 * 1024 * 1024 * 1024 ) };
     }
 
-    var scales = [ 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000 ]
-    var scale = scales[ Math.floor( Random.rand() * scales.length ) ]
-    var offset = Random.rand() * scale
+    var scales = [ 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000 ];
+    var scale = scales[ Math.floor( Random.rand() * scales.length ) ];
+    var offset = Random.rand() * scale;
 
-    var max = Random.rand() * scale + offset
-    var min = - Random.rand() * scale + offset
-    var bits = Math.floor( Random.rand() * 32 ) + 1
-    var bits = Math.floor( Random.rand() * 32 ) + 1
-    var range = max - min
-    var bucketSize = range / ( 4 * 1024 * 1024 * 1024 )
+    var max = Random.rand() * scale + offset;
+    var min = - Random.rand() * scale + offset;
+    var bits = Math.floor( Random.rand() * 32 ) + 1;
+    var bits = Math.floor( Random.rand() * 32 ) + 1;
+    var range = max - min;
+    var bucketSize = range / ( 4 * 1024 * 1024 * 1024 );
 
     return { max : max,
              min : min,
              bits : bits,
              earth : false,
-             bucketSize : bucketSize }
+             bucketSize : bucketSize };
 };
 
 var randPoint = function( env, query ) {
 
     if( query && Random.rand() > 0.5 )
-        return query.exact
+        return query.exact;
 
     if( env.earth )
-        return [ Random.rand() * 360 - 180, Random.rand() * 180 - 90 ]
+        return [ Random.rand() * 360 - 180, Random.rand() * 180 - 90 ];
 
-    var range = env.max - env.min
+    var range = env.max - env.min;
     return [ Random.rand() * range + env.min, Random.rand() * range + env.min ];
-}
+};
 
 var randLocType = function( loc, wrapIn ){
-    return randLocTypes( [ loc ], wrapIn )[0]
-}
+    return randLocTypes( [ loc ], wrapIn )[0];
+};
 
 var randLocTypes = function( locs, wrapIn ) {
 
-    var rLocs = []
+    var rLocs = [];
 
     for( var i = 0; i < locs.length; i++ ){
-        rLocs.push( locs[i] )
+        rLocs.push( locs[i] );
     }
 
     if( wrapIn ){
-        var wrappedLocs = []
+        var wrappedLocs = [];
         for( var i = 0; i < rLocs.length; i++ ){
-            var wrapper = {}
-            wrapper[wrapIn] = rLocs[i]
-            wrappedLocs.push( wrapper )
+            var wrapper = {};
+            wrapper[wrapIn] = rLocs[i];
+            wrappedLocs.push( wrapper );
         }
 
-        return wrappedLocs
+        return wrappedLocs;
     }
 
-    return rLocs
+    return rLocs;
 };
 
 var randDataType = function() {
 
-    var scales = [ 1, 10, 100, 1000, 10000 ]
-    var docScale = scales[ Math.floor( Random.rand() * scales.length ) ]
-    var locScale = scales[ Math.floor( Random.rand() * scales.length ) ]
+    var scales = [ 1, 10, 100, 1000, 10000 ];
+    var docScale = scales[ Math.floor( Random.rand() * scales.length ) ];
+    var locScale = scales[ Math.floor( Random.rand() * scales.length ) ];
 
-    var numDocs = 40000
-    var maxLocs = 40000
+    var numDocs = 40000;
+    var maxLocs = 40000;
     // Make sure we don't blow past our test resources
     while( numDocs * maxLocs > 40000 ){
-        numDocs = Math.floor( Random.rand() * docScale ) + 1
-        maxLocs = Math.floor( Random.rand() * locScale ) + 1
+        numDocs = Math.floor( Random.rand() * docScale ) + 1;
+        maxLocs = Math.floor( Random.rand() * locScale ) + 1;
     }
 
     return { numDocs : numDocs,
-             maxLocs : maxLocs }
+             maxLocs : maxLocs };
 };
 
 function deg2rad(arg) { return arg * Math.PI / 180.0; }
@@ -152,40 +152,40 @@ function pointIsOK(startPoint, radius, env) {
 }
 
 var randQuery = function( env ) {
-    var center = randPoint( env )
+    var center = randPoint( env );
 
-    var sphereRadius = -1
-    var sphereCenter = null
+    var sphereRadius = -1;
+    var sphereCenter = null;
     if( env.earth ){
         // Get a start point that doesn't require wrapping
         // TODO: Are we a bit too aggressive with wrapping issues?
-        var i
+        var i;
         for( i = 0; i < 5; i++ ){
-            sphereRadius = Random.rand() * 45 * Math.PI / 180
-            sphereCenter = randPoint( env )
+            sphereRadius = Random.rand() * 45 * Math.PI / 180;
+            sphereCenter = randPoint( env );
             if (pointIsOK(sphereCenter, sphereRadius, env)) { break; }
         }
         if( i == 5 ) sphereRadius = -1;
 
     }
 
-    var box = [ randPoint( env ), randPoint( env ) ]
+    var box = [ randPoint( env ), randPoint( env ) ];
 
     var boxPoly = [[ box[0][0], box[0][1] ],
                    [ box[0][0], box[1][1] ],
                    [ box[1][0], box[1][1] ],
-                   [ box[1][0], box[0][1] ] ]
+                   [ box[1][0], box[0][1] ] ];
 
     if( box[0][0] > box[1][0] ){
-        var swap = box[0][0]
-        box[0][0] = box[1][0]
-        box[1][0] = swap
+        var swap = box[0][0];
+        box[0][0] = box[1][0];
+        box[1][0] = swap;
     }
 
     if( box[0][1] > box[1][1] ){
-        var swap = box[0][1]
-        box[0][1] = box[1][1]
-        box[1][1] = swap
+        var swap = box[0][1];
+        box[0][1] = box[1][1];
+        box[1][1] = swap;
     }
 
     return { center : center,
@@ -194,19 +194,19 @@ var randQuery = function( env ) {
              sphereCenter : sphereCenter,
              sphereRadius : sphereRadius,
              box : box,
-             boxPoly : boxPoly }
+             boxPoly : boxPoly };
 };
 
 var resultTypes = {
 "exact" : function( loc ){
-    return query.exact[0] == loc[0] && query.exact[1] == loc[1]
+    return query.exact[0] == loc[0] && query.exact[1] == loc[1];
 },
 "center" : function( loc ){
-    return Geo.distance( query.center, loc ) <= query.radius
+    return Geo.distance( query.center, loc ) <= query.radius;
 },
 "box" : function( loc ){
     return loc[0] >= query.box[0][0] && loc[0] <= query.box[1][0] &&
-           loc[1] >= query.box[0][1] && loc[1] <= query.box[1][1]
+           loc[1] >= query.box[0][1] && loc[1] <= query.box[1][1];
 
 },
 "sphere" : function( loc ){
@@ -216,7 +216,7 @@ var resultTypes = {
 "poly" : function( loc ){
     return loc[0] >= query.box[0][0] && loc[0] <= query.box[1][0] &&
            loc[1] >= query.box[0][1] && loc[1] <= query.box[1][1];
-}}
+}};
 
 var queryResults = function( locs, query, results ){
 
@@ -227,55 +227,55 @@ var queryResults = function( locs, query, results ){
                 docsOut : 0,
                 locsIn : 0,
                 locsOut : 0
-            }
+            };
         }
     }
 
-    var indResults = {}
+    var indResults = {};
     for( var type in resultTypes ){
         indResults[type] = {
             docIn : false,
             locsIn : 0,
             locsOut : 0
-        }
+        };
     }
 
     for( var type in resultTypes ){
 
-        var docIn = false
+        var docIn = false;
         for( var i = 0; i < locs.length; i++ ){
             if( resultTypes[type]( locs[i] ) ){
-                results[type].locsIn++
-                indResults[type].locsIn++
-                indResults[type].docIn = true
+                results[type].locsIn++;
+                indResults[type].locsIn++;
+                indResults[type].docIn = true;
             }
             else{
-                results[type].locsOut++
-                indResults[type].locsOut++
+                results[type].locsOut++;
+                indResults[type].locsOut++;
             }
         }
-        if( indResults[type].docIn ) results[type].docsIn++
-        else results[type].docsOut++
+        if( indResults[type].docIn ) results[type].docsIn++;
+        else results[type].docsOut++;
 
     }
 
-    return indResults
-}
+    return indResults;
+};
 
 var randQueryAdditions = function( doc, indResults ){
 
     for( var type in resultTypes ){
-        var choice = Random.rand()
+        var choice = Random.rand();
         if( Random.rand() < 0.25 )
-            doc[type] = ( indResults[type].docIn ? { docIn : "yes" } : { docIn : "no" } )
+            doc[type] = ( indResults[type].docIn ? { docIn : "yes" } : { docIn : "no" } );
         else if( Random.rand() < 0.5 )
-            doc[type] = ( indResults[type].docIn ? { docIn : [ "yes" ] } : { docIn : [ "no" ] } )
+            doc[type] = ( indResults[type].docIn ? { docIn : [ "yes" ] } : { docIn : [ "no" ] } );
         else if( Random.rand() < 0.75 )
-            doc[type] = ( indResults[type].docIn ? [ { docIn : "yes" } ] : [ { docIn : "no" } ] )
+            doc[type] = ( indResults[type].docIn ? [ { docIn : "yes" } ] : [ { docIn : "no" } ] );
         else
             doc[type] = ( indResults[type].docIn ? [{ docIn: [ "yes" ] }] : [{ docIn: [ "no" ] }]);
     }
-}
+};
 
 var randIndexAdditions = function( indexDoc ){
 
@@ -283,9 +283,9 @@ var randIndexAdditions = function( indexDoc ){
 
         if( Random.rand() < 0.5 ) continue;
 
-        var choice = Random.rand()
+        var choice = Random.rand();
         if( Random.rand() < 0.5 )
-            indexDoc[type] = 1
+            indexDoc[type] = 1;
         else
             indexDoc[type + ".docIn"] = 1;
     }
@@ -293,68 +293,68 @@ var randIndexAdditions = function( indexDoc ){
 
 var randYesQuery = function(){
 
-    var choice = Math.floor( Random.rand() * 7 )
+    var choice = Math.floor( Random.rand() * 7 );
     if( choice == 0 )
-        return  { $ne : "no" }
+        return  { $ne : "no" };
     else if( choice == 1 )
-        return "yes"
+        return "yes";
     else if( choice == 2 )
-        return /^yes/
+        return /^yes/;
     else if( choice == 3 )
-        return { $in : [ "good", "yes", "ok" ] }
+        return { $in : [ "good", "yes", "ok" ] };
     else if( choice == 4 )
-        return { $exists : true }
+        return { $exists : true };
     else if( choice == 5 )
-        return { $nin : [ "bad", "no", "not ok" ] }
+        return { $nin : [ "bad", "no", "not ok" ] };
     else if( choice == 6 )
-        return { $not : /^no/ }
-}
+        return { $not : /^no/ };
+};
 
 var locArray = function( loc ){
-    if( loc.x ) return [ loc.x, loc.y ]
-    if( ! loc.length ) return [ loc[0], loc[1] ]
-    return loc
-}
+    if( loc.x ) return [ loc.x, loc.y ];
+    if( ! loc.length ) return [ loc[0], loc[1] ];
+    return loc;
+};
 
 var locsArray = function( locs ){
     if( locs.loc ){
-        arr = []
-        for( var i = 0; i < locs.loc.length; i++ ) arr.push( locArray( locs.loc[i] ) )
-        return arr
+        arr = [];
+        for( var i = 0; i < locs.loc.length; i++ ) arr.push( locArray( locs.loc[i] ) );
+        return arr;
     }
     else{
-        arr = []
-        for( var i = 0; i < locs.length; i++ ) arr.push( locArray( locs[i].loc ) )
-        return arr
+        arr = [];
+        for( var i = 0; i < locs.length; i++ ) arr.push( locArray( locs[i].loc ) );
+        return arr;
     }
-}
+};
 
 var minBoxSize = function( env, box ){
-    return env.bucketSize * Math.pow( 2, minBucketScale( env, box ) )
-}
+    return env.bucketSize * Math.pow( 2, minBucketScale( env, box ) );
+};
 
 var minBucketScale = function( env, box ){
 
     if( box.length && box[0].length )
-        box = [ box[0][0] - box[1][0], box[0][1] - box[1][1] ]
+        box = [ box[0][0] - box[1][0], box[0][1] - box[1][1] ];
 
     if( box.length )
-        box = Math.max( box[0], box[1] )
+        box = Math.max( box[0], box[1] );
 
-    print( box )
-    print( env.bucketSize )
+    print( box );
+    print( env.bucketSize );
 
-    return Math.ceil( Math.log( box / env.bucketSize ) / Math.log( 2 ) )
+    return Math.ceil( Math.log( box / env.bucketSize ) / Math.log( 2 ) );
 
-}
+};
 
 // TODO:  Add spherical $uniqueDocs tests
-var numTests = 100
+var numTests = 100;
 
 // Our seed will change every time this is run, but
 // each individual test will be reproducible given
 // that seed and test number
-var seed = new Date().getTime()
+var seed = new Date().getTime();
 //seed = 175 + 288 + 12
 
 for ( var test = 0; test < numTests; test++ ) {
@@ -362,43 +362,43 @@ for ( var test = 0; test < numTests; test++ ) {
     Random.srand( seed + test );
     //Random.srand( 42240 )
     //Random.srand( 7344 )
-    var t = db.testAllGeo
-    t.drop()
+    var t = db.testAllGeo;
+    t.drop();
 
-    print( "Generating test environment #" + test )
-    var env = randEnvironment()
+    print( "Generating test environment #" + test );
+    var env = randEnvironment();
     //env.bits = 11
-    var query = randQuery( env )
-    var data = randDataType()
+    var query = randQuery( env );
+    var data = randDataType();
     //data.numDocs = 5; data.maxLocs = 1;
-    var paddingSize = Math.floor( Random.rand() * 10 + 1 )
-    var results = {}
-    var totalPoints = 0
-    print( "Calculating target results for " + data.numDocs + " docs with max " + data.maxLocs + " locs " )
+    var paddingSize = Math.floor( Random.rand() * 10 + 1 );
+    var results = {};
+    var totalPoints = 0;
+    print( "Calculating target results for " + data.numDocs + " docs with max " + data.maxLocs + " locs " );
 
     var bulk = t.initializeUnorderedBulkOp();
     for ( var i = 0; i < data.numDocs; i++ ) {
-        var numLocs = Math.floor( Random.rand() * data.maxLocs + 1 )
-        totalPoints += numLocs
+        var numLocs = Math.floor( Random.rand() * data.maxLocs + 1 );
+        totalPoints += numLocs;
 
-        var multiPoint = []
+        var multiPoint = [];
         for ( var p = 0; p < numLocs; p++ ) {
-            var point = randPoint( env, query )
-            multiPoint.push( point )
+            var point = randPoint( env, query );
+            multiPoint.push( point );
         }
 
-        var indResults = queryResults( multiPoint, query, results )
+        var indResults = queryResults( multiPoint, query, results );
 
-        var doc
+        var doc;
         // Nest the keys differently
         if( Random.rand() < 0.5 )
-            doc = { locs : { loc : randLocTypes( multiPoint ) } }
+            doc = { locs : { loc : randLocTypes( multiPoint ) } };
         else
-            doc = { locs : randLocTypes( multiPoint, "loc" ) }
+            doc = { locs : randLocTypes( multiPoint, "loc" ) };
 
-        randQueryAdditions( doc, indResults )
+        randQueryAdditions( doc, indResults );
 
-        doc._id = i
+        doc._id = i;
         bulk.insert( doc );
     }
     assert.writeOK(bulk.execute());
@@ -408,10 +408,10 @@ for ( var test = 0; test < numTests; test++ ) {
     t.ensureIndex( indexDoc, env );
     assert.isnull( db.getLastError() );
 
-    var padding = "x"
-    for( var i = 0; i < paddingSize; i++ ) padding = padding + padding
+    var padding = "x";
+    for( var i = 0; i < paddingSize; i++ ) padding = padding + padding;
 
-    print( padding )
+    print( padding );
 
     printjson( { seed : seed,
                  test: test,
@@ -419,18 +419,18 @@ for ( var test = 0; test < numTests; test++ ) {
                  query : query,
                  data : data,
                  results : results,
-                 paddingSize : paddingSize } )
+                 paddingSize : paddingSize } );
 
     // exact
-    print( "Exact query..." )
-    assert.eq( results.exact.docsIn, t.find( { "locs.loc" : randLocType( query.exact ), "exact.docIn" : randYesQuery() } ).count() )
+    print( "Exact query..." );
+    assert.eq( results.exact.docsIn, t.find( { "locs.loc" : randLocType( query.exact ), "exact.docIn" : randYesQuery() } ).count() );
 
     // $center
-    print( "Center query..." )
-    print( "Min box : " + minBoxSize( env, query.radius ) )
-    assert.eq( results.center.docsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).count() )
+    print( "Center query..." );
+    print( "Min box : " + minBoxSize( env, query.radius ) );
+    assert.eq( results.center.docsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).count() );
 
-    print( "Center query update..." )
+    print( "Center query update..." );
     var res = t.update({ "locs.loc": { $within: { $center: [ query.center, query.radius ],
                                                   $uniqueDocs: true }},
                          "center.docIn": randYesQuery() },
@@ -439,11 +439,11 @@ for ( var test = 0; test < numTests; test++ ) {
 
     if( query.sphereRadius >= 0 ){
 
-        print( "Center sphere query...")
+        print( "Center sphere query...");
         // $centerSphere
-        assert.eq( results.sphere.docsIn, t.find( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ] } }, "sphere.docIn" : randYesQuery() } ).count() )
+        assert.eq( results.sphere.docsIn, t.find( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ] } }, "sphere.docIn" : randYesQuery() } ).count() );
 
-        print( "Center sphere query update..." )
+        print( "Center sphere query update..." );
         res = t.update({ "locs.loc": { $within: {
                                        $centerSphere: [ query.sphereCenter, query.sphereRadius ],
                                        $uniqueDocs: true } },
@@ -453,34 +453,34 @@ for ( var test = 0; test < numTests; test++ ) {
     }
 
     // $box
-    print( "Box query..." )
-    assert.eq( results.box.docsIn, t.find( { "locs.loc" : { $within : { $box : query.box, $uniqueDocs : true } }, "box.docIn" : randYesQuery() } ).count() )
+    print( "Box query..." );
+    assert.eq( results.box.docsIn, t.find( { "locs.loc" : { $within : { $box : query.box, $uniqueDocs : true } }, "box.docIn" : randYesQuery() } ).count() );
 
     // $polygon
-    print( "Polygon query..." )
-    assert.eq( results.poly.docsIn, t.find( { "locs.loc" : { $within : { $polygon : query.boxPoly } }, "poly.docIn" : randYesQuery() } ).count() )
+    print( "Polygon query..." );
+    assert.eq( results.poly.docsIn, t.find( { "locs.loc" : { $within : { $polygon : query.boxPoly } }, "poly.docIn" : randYesQuery() } ).count() );
 
     var defaultDocLimit = 100;
 
     // $near
-    print( "Near query..." )
+    print( "Near query..." );
     assert.eq( results.center.docsIn,
                t.find( { "locs.loc" : { $near : query.center,
                                         $maxDistance : query.radius } } ).count( true ),
                "Near query: center: " + query.center +
                "; radius: " + query.radius +
                "; docs: " + results.center.docsIn +
-               "; locs: " + results.center.locsIn )
+               "; locs: " + results.center.locsIn );
 
     if( query.sphereRadius >= 0 ){
-        print( "Near sphere query...")
+        print( "Near sphere query...");
         // $centerSphere
         assert.eq( results.sphere.docsIn,
                    t.find( { "locs.loc" : { $nearSphere : query.sphereCenter,
                                             $maxDistance : query.sphereRadius } } ).count( true ),
                    "Near sphere query: sphere center: " + query.sphereCenter +
                    "; radius: " + query.sphereRadius +
-                   "; docs: " + results.sphere.docsIn + "; locs: " + results.sphere.locsIn )
+                   "; docs: " + results.sphere.docsIn + "; locs: " + results.sphere.locsIn );
     }
 
     // geoNear
@@ -488,14 +488,14 @@ for ( var test = 0; test < numTests; test++ ) {
     if( data.maxLocs < defaultDocLimit ){
 
         // GeoNear query
-        print( "GeoNear query..." )
+        print( "GeoNear query..." );
         // GeoNear command has a default doc limit 100.
         assert.eq( Math.min( defaultDocLimit, results.center.docsIn ),
                    t.getDB().runCommand( { geoNear : "testAllGeo", near : query.center,
                                            maxDistance : query.radius } ).results.length,
                    "GeoNear query: center: " + query.center +
                    "; radius: " + query.radius +
-                   "; docs: " + results.center.docsIn + "; locs: " + results.center.locsIn )
+                   "; docs: " + results.center.docsIn + "; locs: " + results.center.locsIn );
 
 
         var num = Math.min( 2* defaultDocLimit, 2 * results.center.docsIn);
@@ -505,41 +505,41 @@ for ( var test = 0; test < numTests; test++ ) {
             near : query.center,
             maxDistance : query.radius ,
             includeLocs : true,
-            num : num } ).results
+            num : num } ).results;
 
         assert.eq( Math.min( num, results.center.docsIn ),
                    output.length,
                    "GeoNear query with limit of " + num +
                    ": center: " + query.center +
                    "; radius: " + query.radius +
-                   "; docs: " + results.center.docsIn + "; locs: " + results.center.locsIn )
+                   "; docs: " + results.center.docsIn + "; locs: " + results.center.locsIn );
 
         var distance = 0;
         for ( var i = 0; i < output.length; i++ ) {
-            var retDistance = output[i].dis
-            var retLoc = locArray( output[i].loc )
+            var retDistance = output[i].dis;
+            var retLoc = locArray( output[i].loc );
 
-            var arrLocs = locsArray( output[i].obj.locs )
+            var arrLocs = locsArray( output[i].obj.locs );
 
-            assert.contains( retLoc, arrLocs )
+            assert.contains( retLoc, arrLocs );
 
-            var distInObj = false
+            var distInObj = false;
             for ( var j = 0; j < arrLocs.length && distInObj == false; j++ ) {
-                var newDistance = Geo.distance( locArray( query.center ) , arrLocs[j] )
-                distInObj = ( newDistance >= retDistance - 0.0001 && newDistance <= retDistance + 0.0001 )
+                var newDistance = Geo.distance( locArray( query.center ) , arrLocs[j] );
+                distInObj = ( newDistance >= retDistance - 0.0001 && newDistance <= retDistance + 0.0001 );
             }
 
-            assert( distInObj )
-            assert.between( retDistance - 0.0001 , Geo.distance( locArray( query.center ), retLoc ), retDistance + 0.0001 )
-            assert.lte( retDistance, query.radius )
-            assert.gte( retDistance, distance )
-            distance = retDistance
+            assert( distInObj );
+            assert.between( retDistance - 0.0001 , Geo.distance( locArray( query.center ), retLoc ), retDistance + 0.0001 );
+            assert.lte( retDistance, query.radius );
+            assert.gte( retDistance, distance );
+            distance = retDistance;
         }
 
     }
 
     // $polygon
-    print( "Polygon remove..." )
+    print( "Polygon remove..." );
     res = t.remove({ "locs.loc": { $within: { $polygon: query.boxPoly }},
                      "poly.docIn": randYesQuery() });
     assert.eq( results.poly.docsIn, res.nRemoved );

@@ -14,7 +14,7 @@ function writeDataAndRestart(doFsync) {
     }
 
     if (doFsync) {
-        jsTestLog("run fsync on the node")
+        jsTestLog("run fsync on the node");
         assert.commandWorked(conn.getDB("admin").runCommand({fsync : 1}));
     }
 

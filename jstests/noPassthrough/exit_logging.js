@@ -13,7 +13,7 @@
                 data: { how: crashHow }
             }));
             admin.shutdownServer();
-        }
+        };
     }
 
     function makeRegExMatchFn(pattern) {
@@ -24,7 +24,7 @@
                 print("--- END LOG CONTENTS ---");
                 doassert("Log contents did not match " + pattern);
             }
-        }
+        };
     }
 
     function testShutdownLogging(launcher, crashFn, matchFn) {
@@ -44,7 +44,7 @@
     function runAllTests(launcher) {
         testShutdownLogging(
             launcher,
-            function (conn) { conn.getDB('admin').shutdownServer() },
+            function (conn) { conn.getDB('admin').shutdownServer(); },
             makeRegExMatchFn(/shutdown command received[\s\S]*dbexit:/));
 
         testShutdownLogging(
@@ -90,7 +90,7 @@
         });
         var mongosLauncher = {
             start: function (opts) {
-                var actualOpts = { configdb: st._configDB }
+                var actualOpts = { configdb: st._configDB };
                 Object.extend(actualOpts, opts);
                 return MongoRunner.runMongos(actualOpts);
             },

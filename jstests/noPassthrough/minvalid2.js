@@ -19,7 +19,7 @@
  */
 
 print("1. make 3-member set w/arb (2)");
-var name = "minvalid"
+var name = "minvalid";
 var replTest = new ReplSetTest({name: name, nodes: 3, oplogSize:1});
 var host = getHostName();
 
@@ -61,7 +61,7 @@ replTest.stop(masterId);
 print("6: start up slave");
 replTest.restart(slaveId);
 
-print("7: writes on former slave")
+print("7: writes on former slave");
 master = replTest.getPrimary();
 mdb1 = master.getDB("foo");
 mdb1.foo.save({a:1002});

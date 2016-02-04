@@ -5,7 +5,7 @@ var baseName = "jstests_slowNightly_command_line_parsing";
 // test notablescan
 var m = MongoRunner.runMongod({notablescan: ""});
 m.getDB( baseName ).getCollection( baseName ).save( {a:1} );
-assert.throws( function() { m.getDB( baseName ).getCollection( baseName ).find( {a:1} ).toArray() } );
+assert.throws( function() { m.getDB( baseName ).getCollection( baseName ).find( {a:1} ).toArray(); } );
 
 // test config file 
 var m2 = MongoRunner.runMongod({config: "jstests/libs/testconfig"});
