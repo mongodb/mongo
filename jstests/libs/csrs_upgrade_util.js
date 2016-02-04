@@ -11,7 +11,8 @@ var CSRSUpgradeCoordinator = function() {
 "use strict";
 
 var testDBName = jsTestName();
-var dataCollectionName = testDBName + ".data";
+var shardedCollectionName = testDBName + ".sharded";
+var unshardedCollectionName = testDBName + ".unsharded";
 var csrsName = jsTestName() + "-csrs";
 var numCsrsMembers;
 var st;
@@ -24,8 +25,20 @@ this.getTestDBName = function() {
     return testDBName;
 };
 
-this.getDataCollectionName = function() {
-    return dataCollectionName;
+this.getShardedCollectionName = function() {
+    return shardedCollectionName;
+};
+
+this.getShardedCollection = function() {
+    return st.s.getCollection(shardedCollectionName);
+};
+
+this.getUnhardedCollectionName = function() {
+    return unshardedCollectionName;
+};
+
+this.getUnshardedCollection = function() {
+    return st.s.getCollection(unshardedCollectionName);
 };
 
 /**
@@ -114,8 +127,8 @@ this.setupSCCCCluster = function() {
     assert.commandWorked(st.s0.adminCommand({enablesharding: testDBName}));
     st.ensurePrimaryShard(testDBName, this.getShardName(0));
 
-    jsTest.log("Creating a sharded collection " + dataCollectionName);
-    assert.commandWorked(st.s0.adminCommand({shardcollection: dataCollectionName,
+    jsTest.log("Creating a sharded collection " + shardedCollectionName);
+    assert.commandWorked(st.s0.adminCommand({shardcollection: shardedCollectionName,
                                              key: { _id: 1 }
                                             }));
 };

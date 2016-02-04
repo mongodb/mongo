@@ -34,7 +34,7 @@ var st;
     var runNextSplit = function (snode) {
         var splitPoint = nextSplit;
         nextSplit += 10;
-        return snode.adminCommand({split: coordinator.getDataCollectionName(),
+        return snode.adminCommand({split: coordinator.getShardedCollectionName(),
                                    middle: { _id: splitPoint }});
     };
 
@@ -51,7 +51,7 @@ var st;
         assert.commandWorked(runNextSplit(snode));
 
         // Check that basic crud ops work.
-        var dataColl = snode.getCollection(coordinator.getDataCollectionName());
+        var dataColl = snode.getCollection(coordinator.getShardedCollectionName());
         assert.eq(40, dataColl.find().itcount());
         assert.writeOK(dataColl.insert({_id: 100, x: 1}));
         assert.writeOK(dataColl.update({_id: 100}, {$inc: {x: 1}}));
@@ -72,13 +72,13 @@ var st;
 
     assert.commandWorked(runNextSplit(coordinator.getMongos(0)));
     assert.commandWorked(coordinator.getMongos(0).adminCommand({
-        moveChunk: coordinator.getDataCollectionName(),
+        moveChunk: coordinator.getShardedCollectionName(),
         find: { _id: 0 },
         to: coordinator.getShardName(1)
     }));
 
-    jsTest.log("Inserting data into " + coordinator.getDataCollectionName());
-    coordinator.getMongos(1).getCollection(coordinator.getDataCollectionName()).insert(
+    jsTest.log("Inserting data into " + coordinator.getShardedCollectionName());
+    coordinator.getMongos(1).getCollection(coordinator.getShardedCollectionName()).insert(
         (function () {
             var result = [];
             var i;

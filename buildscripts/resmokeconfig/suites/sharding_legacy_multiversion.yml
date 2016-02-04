@@ -6,8 +6,7 @@ selector:
     exclude_files:
     # The following tests fails because a certain command or functionality is not supported in v3.0
     # version of mongos:
-    - jstests/sharding/csrs_upgrade.js
-    - jstests/sharding/csrs_upgrade_during_migrate.js
+    - jstests/sharding/csrs_upgrade*.js
     - jstests/sharding/find_getmore_cmd.js
 
     # The following tests fail because explain format changed. In v3.0, read pref is inside

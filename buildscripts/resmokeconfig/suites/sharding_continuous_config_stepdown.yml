@@ -80,6 +80,8 @@ selector:
     - jstests/sharding/zbigMapReduce.js
     # Unknown balancer errors - need to be investigated
     - jstests/sharding/in_memory_sort_limit.js
+    # Continuous config server step down only available with CSRS
+    - jstests/sharding/csrs_upgrade*.js
 executor:
   js_test:
     config:

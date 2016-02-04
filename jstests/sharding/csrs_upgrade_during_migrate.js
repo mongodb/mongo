@@ -35,8 +35,8 @@ var st;
     var coordinator = new CSRSUpgradeCoordinator();
     coordinator.setupSCCCCluster();
 
-    jsTest.log("Inserting data into " + coordinator.getDataCollectionName());
-    coordinator.getMongos(1).getCollection(coordinator.getDataCollectionName()).insert(
+    jsTest.log("Inserting data into " + coordinator.getShardedCollectionName());
+    coordinator.getMongos(1).getCollection(coordinator.getShardedCollectionName()).insert(
         (function () {
             var result = [];
             var i;
@@ -59,7 +59,7 @@ var st;
     jsTest.log("Starting long-running chunk migration");
     var joinParallelShell = startParallelShell(
         function() {
-            var res = db.adminCommand({moveChunk: "csrs_upgrade_during_migrate.data",
+            var res = db.adminCommand({moveChunk: "csrs_upgrade_during_migrate.sharded",
                                        find: { _id: 0 },
                                        to: 'csrsUpgrade-rs1'
                                       });
@@ -101,7 +101,7 @@ var st;
 
     jsTest.log("Starting new migration after upgrade, which should succeed");
     assert.commandWorked(coordinator.getMongos(0).adminCommand(
-            {moveChunk: coordinator.getDataCollectionName(),
+            {moveChunk: coordinator.getShardedCollectionName(),
              find: { _id: 0 },
              to: coordinator.getShardName(1)
             }));
