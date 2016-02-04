@@ -1108,7 +1108,6 @@ __conn_config_append(const char *cfg[], const char *config)
 	*cfg = config;
 }
 
-
 /*
  * __conn_config_readonly --
  *	Append an entry to a config stack that overrides some settings
