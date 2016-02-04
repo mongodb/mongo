@@ -11,10 +11,10 @@ t = new ParallelTester();
 
 // Reducing the number of threads to 100 because of WT-1989
 numThreads = 100;
-buildInfo = db.adminCommand( "buildInfo" ).buildEnvironment
+buildInfo = db.adminCommand( "buildInfo" )
 
 if ( buildInfo.bits < 64 ||
-     buildInfo.target_os != "linux" ||
+     buildInfo.buildEnvironment.target_os != "linux" ||
      buildInfo.debug ) {
     numThreads = 50;
 }
