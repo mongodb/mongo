@@ -45,11 +45,11 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.data.getIndexSpec = function getIndexSpec() {
         return { geo: '2d' };
-    }
+    };
 
     $config.data.getReplaceSpec = function getReplaceSpec(i, coords) {
         return { _id: i, geo: coords };
-    }
+    };
 
     /*
      * Insert some docs in geo form and make a 2d index.

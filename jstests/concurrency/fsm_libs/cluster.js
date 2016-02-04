@@ -150,7 +150,7 @@ var Cluster = function(options) {
                     // Specify a longer timeout for replSetInitiate, to ensure that
                     // slow hardware has sufficient time for file pre-allocation.
                     initiateTimeout: REPL_SET_INITIATE_TIMEOUT_MS,
-                }
+                };
             }
 
             st = new ShardingTest(shardConfig);
@@ -399,7 +399,7 @@ var Cluster = function(options) {
             shard = st['shard' + i];
         }
         return cluster;
-    }
+    };
 
     this.startBalancer = function startBalancer() {
         assert(initialized, 'cluster must be initialized first');
