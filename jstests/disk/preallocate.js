@@ -16,7 +16,7 @@ var getTotalNonLocalSize = function() {
         totalNonLocalDBSize += dbStats.sizeOnDisk;
     });
     return totalNonLocalDBSize;
-}
+};
 
 assert.eq( 0, getTotalNonLocalSize() );
 

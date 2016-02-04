@@ -1,5 +1,5 @@
 var baseDir = "jstests_disk_directoryper";
-var baseName = "directoryperdb"
+var baseName = "directoryperdb";
 var dbpath = MongoRunner.dataPath + baseDir + "/";
 var storageEngine = db.serverStatus().storageEngine.name;
 
@@ -20,7 +20,7 @@ assertDocumentCount = function(db, count) {
     assert.eq( count, db[ baseName ].count() ,
                "Expected " + count + " documents in " + db._name + "." + baseName + ". " +
                "Found: " + tojson( db[ baseName ].find().toArray() ) );
-}
+};
 
 
 checkDBFilesInDBDirectory = function( db ) {
@@ -37,7 +37,7 @@ checkDBFilesInDBDirectory = function( db ) {
                 "In directory:" + dir + " found unexpected file: " + files[ f ].name );
     }
     assert( fileCount > 0, "Expected more than zero nondirectory files in database directory" );
-}
+};
 
 checkDBDirectoryNonexistent = function( db ) {
     db.adminCommand( { fsync : 1 } );
@@ -62,11 +62,11 @@ checkDBDirectoryNonexistent = function( db ) {
                     "Directory " + db._name + " still exists" );
         }
     } else if ( storageEngine == "wiredTiger" ) {
-        var files = listFiles( dbpath + db._name )
+        var files = listFiles( dbpath + db._name );
         assert.eq( files.length, 0,
                    "Files left behind in database directory" );
     }
-}
+};
 
 // Start the directoryperdb instance of mongod.
 var m = MongoRunner.runMongod( { storageEngine : storageEngine, dbpath : dbpath,

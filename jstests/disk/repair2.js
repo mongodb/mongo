@@ -73,7 +73,7 @@ assert.commandWorked( db.runCommand( {repairDatabase:1} ) );
 MongoRunner.stopMongod( m.port );
 
 //Test long repairPath
-resetDbpath( longRepairPath )
+resetDbpath( longRepairPath );
 m = MongoRunner.runMongod({
     port: m.port,
     directoryperdb: "",
@@ -87,7 +87,7 @@ check();
 MongoRunner.stopMongod( m.port );
 
 //Test database name and repairPath with --repair
-resetDbpath( longRepairPath )
+resetDbpath( longRepairPath );
 var returnCode = runMongoProgram("mongod",
                                  "--port", m.port,
                                  "--repair",

@@ -1,8 +1,8 @@
 // test --repairpath on another partition
 
 var baseName = "jstests_disk_repair3";
-var repairbase = MongoRunner.dataDir + "/repairpartitiontest"
-var repairpath = repairbase + "/dir"
+var repairbase = MongoRunner.dataDir + "/repairpartitiontest";
+var repairpath = repairbase + "/dir";
 
 doIt = false;
 files = listFiles( MongoRunner.dataDir );
