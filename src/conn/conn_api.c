@@ -1107,6 +1107,29 @@ __conn_config_append(const char *cfg[], const char *config)
 	*cfg = config;
 }
 
+
+/*
+ * __conn_config_readonly --
+ *	Append an entry to a config stack that overrides some settings
+ *	when read-only is configured.
+ */
+static void
+__conn_config_readonly(const char *cfg[])
+{
+	const char *readonly;
+
+	/*
+	 * Override certain settings.  Other settings at odds will return
+	 * an error and will be checked when those settings are processed.
+	 */
+	readonly="checkpoint=(wait=0),"
+	    "config_base=false,"
+	    "create=false,"
+	    "log=(archive=false,prealloc=false),"
+	    "lsm_manager=(merge=false),";
+	__conn_config_append(cfg, readonly);
+}
+
 /*
  * __conn_config_check_version --
  *	Check if a configuration version isn't compatible.
@@ -1390,6 +1413,9 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
 	is_create = cval.val != 0;
 
+	if (F_ISSET(conn, WT_CONN_READONLY))
+		is_create = false;
+
 	__wt_spin_lock(session, &__wt_process.spinlock);
 
 	/*
@@ -1447,8 +1473,21 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	exist = false;
 	if (!is_create)
 		WT_ERR(__wt_exist(session, WT_WIREDTIGER, &exist));
-	WT_ERR(__wt_open(session,
-	    WT_SINGLETHREAD, is_create || exist, false, 0, &conn->lock_fh));
+	ret = __wt_open(session,
+	    WT_SINGLETHREAD, is_create || exist, false, 0, &conn->lock_fh);
+
+	/*
+	 * If this is a read-only connection and we cannot grab the lock
+	 * file, check if it is because there is not write permission.
+	 * If the failure is due to permission then ignore the error.
+	 * XXX Ignoring a permission error does allow multiple read-only
+	 * connections to exist at the same time on a read-only directory.
+	 */
+	if (F_ISSET(conn, WT_CONN_READONLY) && ret == EPERM) {
+		ret = 0;
+		goto open_wt;
+	}
+	WT_ERR(ret);
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
@@ -1475,6 +1514,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_write(session, conn->lock_fh, (wt_off_t)0,
 		    strlen(WT_SINGLETHREAD_STRING), WT_SINGLETHREAD_STRING));
 
+open_wt:
 	/* We own the lock file, optionally create the WiredTiger file. */
 	WT_ERR(__wt_open(session, WT_WIREDTIGER, is_create, false, 0, &fh));
 
@@ -1506,6 +1546,13 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
 		WT_ERR(__wt_fsync(session, fh));
 	} else {
+		/*
+		 * Although exclusive and the read-only configuration settings
+		 * are at odds, we do not have to check against read-only here
+		 * because it falls out from earlier code in this function
+		 * preventing creation and confirming the database
+		 * already exists.
+		 */
 		WT_ERR(__wt_config_gets(session, cfg, "exclusive", &cval));
 		if (cval.val != 0)
 			WT_ERR_MSG(session, EEXIST,
@@ -1735,6 +1782,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    "exclusive=,"
 	    "in_memory=,"
 	    "log=(recover=),"
+	    "readonly=,"
 	    "use_environment_priv=,"
 	    "verbose=,", &base_config));
 	WT_ERR(__wt_config_init(session, &parser, base_config));
@@ -1807,7 +1855,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
 	bool config_base_set;
-	const char *enc_cfg[] = { NULL, NULL };
+	const char *enc_cfg[] = { NULL, NULL }, *merge_cfg;
 	char version[64];
 
 	/* Leave lots of space for optional additional configuration. */
@@ -1859,6 +1907,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		    session, cval.str, cval.len, &conn->error_prefix));
 
 	/*
+	 * We need to look for read-only early so that we can use it
+	 * in __conn_single and whether to use the base config file.
+	 * XXX that means we can only make the choice in __conn_single if the
+	 * user passes it in via the config string to wiredtiger_open.
+	 */
+	WT_ERR(__wt_config_gets(session, cfg, "readonly", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_READONLY);
+
+	/*
 	 * XXX ideally, we would check "in_memory" here, so we could completely
 	 * avoid having a database directory.  However, it can be convenient to
 	 * pass "in_memory" via the WIREDTIGER_CONFIG environment variable, and
@@ -1882,6 +1940,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * 4. the config passed in by the application
 	 * 5. user configuration file (optional)
 	 * 6. environment variable settings (optional)
+	 * 7. overrides for a read-only connection
 	 *
 	 * Clear the entries we added to the stack, we're going to build it in
 	 * order.
@@ -1897,8 +1956,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    (int)sizeof(version), ENOMEM);
 	__conn_config_append(cfg, version);
 
-	/* Ignore the base_config file if we config_base set to false. */
-	if (config_base_set)
+	/* Ignore the base_config file if config_base_set is false. */
+	if (config_base_set || F_ISSET(conn, WT_CONN_READONLY))
 		WT_ERR(
 		    __conn_config_file(session, WT_BASECONFIG, false, cfg, i1));
 	__conn_config_append(cfg, config);
@@ -1908,7 +1967,33 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/*
 	 * Merge the full configuration stack and save it for reconfiguration.
 	 */
-	WT_ERR(__wt_config_merge(session, cfg, NULL, &conn->cfg));
+	WT_ERR(__wt_config_merge(session, cfg, NULL, &merge_cfg));
+	/*
+	 * The read-only setting may have been set in a configuration file.
+	 * Get it again so that we can override other configuration settings
+	 * before they are processed by the subsystems.
+	 */
+	WT_ERR(__wt_config_gets(session, cfg, "readonly", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_READONLY);
+	if (F_ISSET(conn, WT_CONN_READONLY)) {
+		/*
+		 * Create a new stack with the merged configuration as the
+		 * base.  The read-only string will use entry 1 and then
+		 * we'll merge it again.
+		 */
+		cfg[0] = merge_cfg;
+		cfg[1] = NULL;
+		cfg[2] = NULL;
+		/*
+		 * We override some configuration settings for read-only.
+		 * Other settings that conflict with and are an error with
+		 * read-only are tested in their individual locations later.
+		 */
+		__conn_config_readonly(cfg);
+		WT_ERR(__wt_config_merge(session, cfg, NULL, &conn->cfg));
+	} else
+		conn->cfg = merge_cfg;
 
 	/*
 	 * Configuration ...

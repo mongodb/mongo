@@ -492,8 +492,14 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * return an error if the user does not want automatic
 	 * recovery.
 	 */
-	if (needs_rec && FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR))
+	if (needs_rec &&
+	    (FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR) ||
+	     F_ISSET(conn, WT_CONN_READONLY))) {
+		if (F_ISSET(conn, WT_CONN_READONLY))
+			WT_ERR_MSG(session, WT_RUN_RECOVERY,
+			    "Read-only database needs recovery");
 		WT_ERR(WT_RUN_RECOVERY);
+	}
 
 	/*
 	 * Recovery can touch more data than fits in cache, so it relies on

@@ -13,6 +13,36 @@ static int __session_snapshot(WT_SESSION *, const char *);
 static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*
+ * __wt_session_notsup_cfg --
+ *	Unsupported session actions that have a signature of a config string.
+ */
+int
+__wt_session_notsup_cfg(
+    WT_SESSION *wt_session, const char *config)
+{
+	WT_UNUSED(wt_session);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
+}
+
+/*
+ * __wt_session_notsup_uri --
+ *	Unsupported session actions that have a signature of a URI and
+ *	a config string.
+ */
+int
+__wt_session_notsup_uri(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_UNUSED(wt_session);
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	return (ENOTSUP);
+}
+
+/*
  * __wt_session_reset_cursors --
  *	Reset all open cursors.
  */
@@ -546,6 +576,9 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL_NOCONF(session, log_printf);
 
+	if (F_ISSET(S2C(session), WT_CONN_READONLY))
+		WT_ERR(ENOTSUP);
+
 	va_start(ap, fmt);
 	ret = __wt_log_vprintf(session, fmt, ap);
 	va_end(ap);
@@ -567,7 +600,7 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, rebalance, config, cfg);
 
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY | WT_CONN_READONLY))
 		WT_ERR(ENOTSUP);
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
@@ -592,6 +625,9 @@ __session_rename(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, rename, config, cfg);
+
+	if (F_ISSET(S2C(session), WT_CONN_READONLY))
+		WT_ERR(ENOTSUP);
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_str_name_check(session, uri));
@@ -952,6 +988,9 @@ __session_truncate(WT_SESSION *wt_session,
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_TXN_API_CALL(session, truncate, config, cfg);
 	WT_STAT_FAST_CONN_INCR(session, cursor_truncate);
+
+	if (F_ISSET(S2C(session), WT_CONN_READONLY))
+		WT_ERR(ENOTSUP);
 
 	/*
 	 * If the URI is specified, we don't need a start/stop, if start/stop
@@ -1382,6 +1421,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_transaction_sync
 	};
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t i;
 
@@ -1421,6 +1461,28 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	session_ret->id = i;
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
+	/*
+	 * Disable some methods if this is a read-only connection.  Group
+	 * them by call signature.
+	 */
+	if (F_ISSET(conn, WT_CONN_READONLY)) {
+		wt_session = &session_ret->iface;
+		wt_session->checkpoint = __wt_session_notsup_cfg;
+		wt_session->log_flush = __wt_session_notsup_cfg;
+		wt_session->transaction_sync = __wt_session_notsup_cfg;
+
+		wt_session->compact = __wt_session_notsup_uri;
+		wt_session->create = __wt_session_notsup_uri;
+		wt_session->drop = __wt_session_notsup_uri;
+		wt_session->salvage = __wt_session_notsup_uri;
+		wt_session->upgrade = __wt_session_notsup_uri;
+
+		/*
+		 * The other methods that are not supported but are
+		 * checked individually in the function are:
+		 *	log_printf, rebalance, rename, truncate
+		 */
+	}
 
 	WT_ERR(__wt_cond_alloc(session, "session", false, &session_ret->cond));
 

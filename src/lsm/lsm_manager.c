@@ -212,6 +212,8 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
 
+	if (F_ISSET(conn, WT_CONN_READONLY))
+		return (0);
 	/*
 	 * We need at least a manager, a switch thread and a generic
 	 * worker.

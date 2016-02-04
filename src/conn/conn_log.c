@@ -133,8 +133,13 @@ __logmgr_config(
 		FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.zero_fill", &cval));
-	if (cval.val != 0)
+	if (cval.val != 0) {
+		if (F_ISSET(conn, WT_CONN_READONLY))
+			WT_RET_MSG(session, EINVAL,
+			    "Read-only configuration incompatible with "
+			    "zero-filling log files");
 		FLD_SET(conn->log_flags, WT_CONN_LOG_ZERO_FILL);
+	}
 
 	WT_RET(__logmgr_sync_cfg(session, cfg));
 	return (0);

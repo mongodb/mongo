@@ -94,6 +94,9 @@ __wt_open(WT_SESSION_IMPL *session,
 #endif
 
 	if (ok_create) {
+		WT_ASSERT(session, !F_ISSET(conn, WT_CONN_READONLY) ||
+		    WT_STRING_MATCH(name, WT_SINGLETHREAD,
+		    strlen(WT_SINGLETHREAD)));
 		f |= O_CREAT;
 		if (exclusive)
 			f |= O_EXCL;
