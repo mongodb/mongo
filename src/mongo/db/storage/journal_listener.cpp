@@ -32,4 +32,4 @@
 
 namespace mongo {
 NoOpJournalListener NoOpJournalListener::instance;
-} // namespace mongo
+}  // namespace mongo
