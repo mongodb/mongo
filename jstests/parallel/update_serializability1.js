@@ -4,7 +4,7 @@ t.drop();
 
 N = 100000;
 
-bulk = t.initializeUnorderedBulkOp()
+bulk = t.initializeUnorderedBulkOp();
 for ( var i = 0; i < N; i++ ) {
     bulk.insert( { _id : i, a : i, b: N-i, x : 1, y : 1 } );
 }

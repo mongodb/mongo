@@ -5,7 +5,7 @@ function test() {
 
     var N = 100000;
 
-    var bulk = t.initializeUnorderedBulkOp()
+    var bulk = t.initializeUnorderedBulkOp();
     for ( var i = 0; i < N; i++ ) {
         bulk.insert( { _id : i, a : i, b: N-i, x : 1, y : 1 } );
     }

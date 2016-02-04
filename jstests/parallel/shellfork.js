@@ -1,11 +1,11 @@
-load('jstests/libs/parallelTester.js')
+load('jstests/libs/parallelTester.js');
 
 a = fork( function( a, b ) { return a / b; }, 10, 2 );
 a.start();
 b = fork( function( a, b, c ) { return a + b + c; }, 18, " is a ", "multiple of 3" );
 makeFunny = function( text ) {
     return text + " ha ha!";
-}
+};
 c = fork( makeFunny, "paisley" );
 c.start();
 b.start();
