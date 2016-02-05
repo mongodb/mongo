@@ -121,17 +121,14 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
 
         cmd += self.backup_dir
         self.runWt(cmd.split())
-        self.exception='false'
         backup_conn_params = 'log=(enabled,file_max=%s)' % self.logmax
         backup_conn = self.wiredtiger_open(self.backup_dir, backup_conn_params)
         try:
             self.check(backup_conn.open_session(), None, committed)
-        except:
-            self.exception='true'
         finally:
             backup_conn.close()
 
-    def test_ops(self):
+    def ops(self):
         self.session.create(self.uri, self.create_params)
         c = self.session.open_cursor(self.uri, None, 'overwrite')
         # Set up the table with entries for 1-5.
@@ -149,7 +146,6 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
             # The runWt command closes our connection and sessions so
             # we need to reopen them here.
             self.hot_backup(None, committed)
-            self.assertEqual(True, self.exception == 'false')
             c = self.session.open_cursor(self.uri, None, 'overwrite')
             c.set_value(1)
             # Then do the given modification.
@@ -195,7 +191,10 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         # Backup the target we modified and verify the data.
         # print 'Call hot_backup with ' + self.uri
         self.hot_backup(self.uri, committed)
-        self.assertEqual(True, self.exception == 'false')
+
+    def test_ops(self):
+        with self.expectedStdoutPattern('Recreating metadata'):
+            self.ops()
 
 if __name__ == '__main__':
     wttest.run()
