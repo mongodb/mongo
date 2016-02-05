@@ -2404,6 +2404,9 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
     }
 
     if (replEnabled) {
+        // Since the JournalListener has not yet been set up, we must manually set our
+        // durableOpTime.
+        setMyLastDurableOpTime(getMyLastAppliedOpTime());
         CBHStatus cbh = _replExecutor.scheduleWork(
             stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetInitiate,
                        this,
