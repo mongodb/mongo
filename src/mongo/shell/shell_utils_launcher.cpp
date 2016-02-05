@@ -392,24 +392,9 @@ boost::filesystem::path ProgramRunner::findProgram(const string& prog) {
     }
 #endif
 
-    if (boost::filesystem::exists(p)) {
-#ifndef _WIN32
-        p = boost::filesystem::initial_path() / p;
-#endif
-        return p;
-    }
-
-    {
-        boost::filesystem::path t = boost::filesystem::current_path() / p;
-        if (boost::filesystem::exists(t))
-            return t;
-    }
-
-    {
-        boost::filesystem::path t = boost::filesystem::initial_path() / p;
-        if (boost::filesystem::exists(t))
-            return t;
-    }
+    boost::filesystem::path t = boost::filesystem::current_path() / p;
+    if (boost::filesystem::exists(t))
+        return t;
 
     return p;  // not found; might find via system path
 }
