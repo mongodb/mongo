@@ -11,9 +11,9 @@ s.adminCommand( { shardcollection : "test.foo" , key : { x : 1 } } );
 
 db = s.getDB( "test" );
 
-big = ""
+big = "";
 while ( big.length < 10000 )
-    big += "."
+    big += ".";
 
 x = 0;
 var bulk = db.foo.initializeUnorderedBulkOp();
@@ -28,26 +28,26 @@ for ( ; x < 2000; x++ )
 
 assert.writeOK( bulk.execute() );
 
-sh.status(true)
+sh.status(true);
 
-res = sh.moveChunk( "test.foo" , { x : 0 } , "shard0001" )
+res = sh.moveChunk( "test.foo" , { x : 0 } , "shard0001" );
 if ( ! res.ok )
-    res = sh.moveChunk( "test.foo" , { x : 0 } , "shard0000" )
+    res = sh.moveChunk( "test.foo" , { x : 0 } , "shard0000" );
 
-sh.status(true)
+sh.status(true);
 
-sh.setBalancerState( true )
+sh.setBalancerState( true );
 
 function diff1(){
     var x = s.chunkCounts( "foo" );
-    printjson( x )
+    printjson( x );
     return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
 assert.soon( function(){
     var d = diff1();
     print( "diff: " + d );
-    sh.status(true)
+    sh.status(true);
     return d < 5;
 } , "balance didn't happen" , 1000 * 60 * 5 , 5000 );
 

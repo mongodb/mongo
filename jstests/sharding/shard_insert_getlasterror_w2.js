@@ -49,7 +49,7 @@
     testDB[testCollName].ensureIndex({ x : 1 });
     assert.commandWorked(mongosConn.getDB('admin').
                          runCommand({ shardcollection : testDBName + '.' + testCollName,
-                                      key : { x : 1 }}))
+                                      key : { x : 1 }}));
 
     // Test case where GLE should return an error
     testDB.foo.insert({_id:'a', x:1});

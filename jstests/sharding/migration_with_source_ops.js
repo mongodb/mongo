@@ -149,4 +149,4 @@ assert.eq(1, recipientCollUpdatedNum, "Update failed on recipient shard during m
 jsTest.log('DONE!');
 st.stop();
 
-})()
+})();

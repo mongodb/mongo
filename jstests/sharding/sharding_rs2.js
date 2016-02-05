@@ -24,14 +24,14 @@ s.ensurePrimaryShard('test', 'test-rs0');
 db.foo.save({ _id: 5,x: 17 });
 assert.eq(1, db.foo.count());
 
-s.config.databases.find().forEach(printjson)
-s.config.shards.find().forEach(printjson)
+s.config.databases.find().forEach(printjson);
+s.config.shards.find().forEach(printjson);
 
 var serverName = s.getServerName("test");
 
 function countNodes(){
     var x = s.config.shards.findOne({ _id: serverName });
-    return x.host.split(",").length
+    return x.host.split(",").length;
 }
 
 assert.eq(2, countNodes(), "A1");
@@ -68,12 +68,12 @@ for (var i = 0; i < 5; i++) {
     }
 }
 
-jsTest.log("Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts...")
-rs.test.awaitReplication()
+jsTest.log("Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts...");
+rs.test.awaitReplication();
 // Make sure we wait for secondaries here - otherwise a secondary could come online later and be used for the
 // count command before being fully replicated
-jsTest.log("Awaiting secondary status of all nodes")
-rs.test.waitForState(rs.test.getSecondaries(), ReplSetTest.State.SECONDARY, 180 * 1000)
+jsTest.log("Awaiting secondary status of all nodes");
+rs.test.waitForState(rs.test.getSecondaries(), ReplSetTest.State.SECONDARY, 180 * 1000);
 
 // -------------------------------------------------------------------------------------------
 // ---------- test routing to slaves ----------------
@@ -82,7 +82,7 @@ rs.test.waitForState(rs.test.getSecondaries(), ReplSetTest.State.SECONDARY, 180 
 // --- not sharded ----
 
 var m = new Mongo(s.s.name);
-var ts = m.getDB("test").foo
+var ts = m.getDB("test").foo;
 
 var before = rs.test.getPrimary().adminCommand("serverStatus").opcounters;
 
@@ -105,7 +105,7 @@ assert.lte(before.query + 10, after.query, "B3");
 
 // --- add more data ----
 
-db.foo.ensureIndex({ x: 1 })
+db.foo.ensureIndex({ x: 1 });
 
 var bulk = db.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
@@ -153,55 +153,55 @@ assert.eq(50, rs.test.getPrimary().getDB("test").foo.count(), "C4");
 // by non-shard key
 
 m = new Mongo(s.s.name);
-ts = m.getDB("test").foo
+ts = m.getDB("test").foo;
 
-before = rs.test.getPrimary().adminCommand("serverStatus").opcounters
+before = rs.test.getPrimary().adminCommand("serverStatus").opcounters;
 
 for (var i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne({ _id: 5 }).x, "D1");
 }
 
-m.setSlaveOk()
+m.setSlaveOk();
 for (var i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne({ _id: 5 }).x, "D2");
 }
 
-after = rs.test.getPrimary().adminCommand("serverStatus").opcounters
+after = rs.test.getPrimary().adminCommand("serverStatus").opcounters;
 
-assert.lte(before.query + 10, after.query, "D3")
+assert.lte(before.query + 10, after.query, "D3");
 
 // by shard key
 
 m = new Mongo(s.s.name);
 m.forceWriteMode("commands");
 
-db.printShardingStatus()
+db.printShardingStatus();
 
-ts = m.getDB("test").foo
+ts = m.getDB("test").foo;
 
-before = rs.test.getPrimary().adminCommand("serverStatus").opcounters
+before = rs.test.getPrimary().adminCommand("serverStatus").opcounters;
 
 for (var i = 0; i < 10; i++) {
     assert.eq(57, ts.findOne({ x: 57 }).x, "E1");
 }
 
-m.setSlaveOk()
+m.setSlaveOk();
 for (var i = 0; i < 10; i++) {
     assert.eq(57, ts.findOne({ x: 57 }).x, "E2");
 }
 
-after = rs.test.getPrimary().adminCommand("serverStatus").opcounters
+after = rs.test.getPrimary().adminCommand("serverStatus").opcounters;
 
-assert.lte(before.query + 10, after.query, "E3")
+assert.lte(before.query + 10, after.query, "E3");
 
-assert.eq(100, ts.count(), "E4")
-assert.eq(100, ts.find().itcount(), "E5")
-printjson(ts.find().batchSize(5).explain())
+assert.eq(100, ts.count(), "E4");
+assert.eq(100, ts.find().itcount(), "E5");
+printjson(ts.find().batchSize(5).explain());
 
 // fsyncLock the secondaries
 rs.test.getSecondaries().forEach(function(secondary) {
     assert.commandWorked(secondary.getDB("test").fsyncLock());
-})
+});
 // Modify data only on the primary replica of the primary shard.
 // { x: 60 } goes to the shard of "rs", which is the primary shard.
 assert.writeOK(ts.insert({ primaryOnly: true, x: 60 }));
@@ -211,7 +211,7 @@ assert.eq(0, ts.find({ primaryOnly: true, x: 60 }).itcount());
 // Unlock the secondaries
 rs.test.getSecondaries().forEach(function(secondary) {
     secondary.getDB("test").fsyncUnlock();
-})
+});
 // Clean up the data
 assert.writeOK(ts.remove({ primaryOnly: true, x: 60 }, { writeConcern: { w: 3 }}));
 

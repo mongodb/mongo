@@ -21,7 +21,7 @@ for ( var i = 0; i < shards.length; i++) {
 var collOneShard = mongos.getCollection("foo.collOneShard");
 var collAllShards = mongos.getCollection("foo.collAllShards");
 
-printjson(admin.runCommand({enableSharding : collOneShard.getDB() + ""}))
+printjson(admin.runCommand({enableSharding : collOneShard.getDB() + ""}));
 printjson(admin.runCommand({movePrimary : collOneShard.getDB() + "",
                             to : shards[0]._id}));
 
@@ -64,29 +64,29 @@ assert.eq(3, collAllShards.find().itcount());
 assert.eq(3, collOneShard.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 assert.eq(3, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 
-jsTest.log("One shard down!")
+jsTest.log("One shard down!");
 
-MongoRunner.stopMongod(st.shard2)
+MongoRunner.stopMongod(st.shard2);
 
-jsTest.log("done.")
+jsTest.log("done.");
 
 assert.eq(3, collOneShard.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 assert.eq(2, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 
-jsTest.log("Two shards down!")
+jsTest.log("Two shards down!");
 
-MongoRunner.stopMongod(st.shard1)
+MongoRunner.stopMongod(st.shard1);
 
-jsTest.log("done.")
+jsTest.log("done.");
 
 assert.eq(3, collOneShard.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 assert.eq(1, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 
-jsTest.log("All shards down!")
+jsTest.log("All shards down!");
 
-MongoRunner.stopMongod(st.shard0)
+MongoRunner.stopMongod(st.shard0);
 
-jsTest.log("done.")
+jsTest.log("done.");
 
 assert.eq(0, collOneShard.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 assert.eq(0, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());

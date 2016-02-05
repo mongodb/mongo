@@ -31,7 +31,7 @@ for (var i = (test.nPts/10); i < test.nPts; i+= (test.nPts/10)){
 //Turn balancer back on, for actual tests
 // s.startBalancer(); // SERVER-13365
 
-printShardingSizes()
+printShardingSizes();
 
 opts = {sphere:0, nToTest:test.nPts*0.01, sharded:true}; 
 test.testPt([0,0], opts);
@@ -40,7 +40,7 @@ test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);
 
-opts.sphere = 1
+opts.sphere = 1;
 test.testPt([0,0], opts);
 test.testPt(test.mkPt(0.8), opts);
 test.testPt(test.mkPt(0.8), opts);

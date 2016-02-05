@@ -63,9 +63,9 @@ assert.eq( 1 , s.onNumShards( "foo2" ) , "F1" );
 printjson( db.foo2.getIndexes() );
 s.adminCommand( { shardcollection : "test.foo2" , key : { _id : 1 } } );
 
-assert.eq( 3 , db.foo2.count() , "F2" )
+assert.eq( 3 , db.foo2.count() , "F2" );
 db.foo2.insert( {} );
-assert.eq( 4 , db.foo2.count() , "F3" )
+assert.eq( 4 , db.foo2.count() , "F3" );
 
 // --- map/reduce
 
@@ -126,7 +126,7 @@ doMR = function( n ){
     assert.eq( 3 , z.b , "MR T9 " + n );
     assert.eq( 3 , z.c , "MR TA " + n );
 
-}
+};
 
 doMR( "before" );
 
@@ -147,20 +147,20 @@ cmd = { mapreduce : "mr" , map : "emit( " , reduce : "fooz + " , out : "broken1"
 x = db.runCommand( cmd );
 y = s._connections[0].getDB( "test" ).runCommand( cmd );
 
-printjson( x )
-printjson( y )
+printjson( x );
+printjson( y );
 
 // count
 
-db.countaa.save({"regex" : /foo/i})
-db.countaa.save({"regex" : /foo/i})
-db.countaa.save({"regex" : /foo/i})
+db.countaa.save({"regex" : /foo/i});
+db.countaa.save({"regex" : /foo/i});
+db.countaa.save({"regex" : /foo/i});
 assert.eq( 3 , db.countaa.count() , "counta1" );
 assert.eq( 3 , db.countaa.find().itcount() , "counta1" );
 
 x = null; y = null;
 try {
-    x = db.runCommand( "forceerror" )
+    x = db.runCommand( "forceerror" );
 }
 catch ( e ){
     x = e;
@@ -180,8 +180,8 @@ catch ( e ){
 // as then MongoS should set code 121 as well.
 //
 // assert.eq( x.code , y.code , "assert format" )
-assert.eq( x.errmsg , y.errmsg , "assert format" )
-assert.eq( x.ok , y.ok , "assert format" )
+assert.eq( x.errmsg , y.errmsg , "assert format" );
+assert.eq( x.ok , y.ok , "assert format" );
 
 // isMaster and query-wrapped-command
 isMaster = db.runCommand({isMaster:1});

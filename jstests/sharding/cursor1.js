@@ -3,12 +3,12 @@
 (function() {
 
 var s = new ShardingTest({ name: "sharding_cursor1", shards: 2 });
-s.config.settings.find().forEach( printjson )
+s.config.settings.find().forEach( printjson );
 
 // create a sharded 'test.foo', for the moment with just one chunk
 s.adminCommand( { enablesharding: "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
-s.adminCommand( { shardcollection: "test.foo", key: { _id: 1 } } )
+s.adminCommand( { shardcollection: "test.foo", key: { _id: 1 } } );
 
 db = s.getDB( "test" );
 primary = s.getServer( "test" ).getDB( "test" );
@@ -44,22 +44,22 @@ assert.eq( numObjs , cursor3.itcount() , "c3" );
 
 // test timeout
 gc(); gc();
-cur = db.foo.find().batchSize( 2 )
-assert( cur.next() , "T1" )
+cur = db.foo.find().batchSize( 2 );
+assert( cur.next() , "T1" );
 assert( cur.next() , "T2" );
 assert.commandWorked(s.admin.runCommand({
     setParameter: 1,
     cursorTimeoutMillis: 10000 // 10 seconds.
 }));
 before = db.serverStatus().metrics.cursor;
-printjson( before )
-sleep( 6000 )
-assert( cur.next() , "T3" )
+printjson( before );
+sleep( 6000 );
+assert( cur.next() , "T3" );
 assert( cur.next() , "T4" );
-sleep( 24000 )
-assert.throws( function(){ cur.next(); } , null , "T5" )
+sleep( 24000 );
+assert.throws( function(){ cur.next(); } , null , "T5" );
 after = db.serverStatus().metrics.cursor;
-gc(); gc()
+gc(); gc();
 
 s.stop();
 

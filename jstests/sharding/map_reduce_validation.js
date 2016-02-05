@@ -13,17 +13,17 @@ assert.commandFailed(testDB.runCommand({ mapReduce: 'user',
 testDB.bar.insert({i: 1});
 assert.commandFailed(testDB.runCommand({ mapReduce: 'bar',
                                          map: function() {emit(this.i, this.i*3);},
-                                         reduce:  function(key, values) {return Array.sum(values)},
+                                         reduce:  function(key, values) {return Array.sum(values);},
                                          out: { replace: "foo", db: "admin" }}));
 
 assert.commandFailed(testDB.runCommand({ mapReduce: 'bar',
                                          map: function() {emit(this.i, this.i*3);},
-                                         reduce:  function(key, values) {return Array.sum(values)},
+                                         reduce:  function(key, values) {return Array.sum(values);},
                                          out: { replace: "foo", db: "config" }}));
 
 assert.commandWorked(testDB.runCommand({ mapReduce: 'bar',
                                          map: function() {emit(this.i, this.i*3);},
-                                         reduce:  function(key, values) {return Array.sum(values)},
+                                         reduce:  function(key, values) {return Array.sum(values);},
                                          out: { replace: "foo", db: "test" }}));
 
 st.stop();

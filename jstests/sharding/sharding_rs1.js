@@ -46,14 +46,14 @@ s._rs.forEach(function(rsNode) {
     }
 });
 
-assert.eq( num , db.foo.find().count() , "C1" )
-assert.eq( num , db.foo.find().itcount() , "C2" )
-assert.eq( num , db.foo.find().sort( { _id : 1 } ).itcount() , "C3" )
-assert.eq( num , db.foo.find().sort( { _id : -1 } ).itcount() , "C4" )
+assert.eq( num , db.foo.find().count() , "C1" );
+assert.eq( num , db.foo.find().itcount() , "C2" );
+assert.eq( num , db.foo.find().sort( { _id : 1 } ).itcount() , "C3" );
+assert.eq( num , db.foo.find().sort( { _id : -1 } ).itcount() , "C4" );
 
 db.foo.ensureIndex( { x : 1 } );
-assert.eq( num , db.foo.find().sort( { x : 1 } ).itcount() , "C5" )
-assert.eq( num , db.foo.find().sort( { x : -1 } ).itcount() , "C6" )
+assert.eq( num , db.foo.find().sort( { x : 1 } ).itcount() , "C5" );
+assert.eq( num , db.foo.find().sort( { x : -1 } ).itcount() , "C6" );
 
 s.stop();
 

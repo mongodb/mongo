@@ -159,4 +159,4 @@ assert.eq(31, coll.count());
 
 st.stop();
 
-})()
+})();

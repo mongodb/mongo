@@ -40,6 +40,6 @@ assert.eq(1, destTestDB.foo.findOne().a);
 
 st.stop();
 
-}
+};
 
 runTest();

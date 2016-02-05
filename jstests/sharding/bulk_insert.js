@@ -5,10 +5,10 @@
 var st = new ShardingTest({ shards : 2, mongos : 2 });
 
 var mongos = st.s;
-var staleMongos = st.s1
+var staleMongos = st.s1;
 var config = mongos.getDB("config");
 var admin = mongos.getDB("admin");
-var shards = config.shards.find().toArray()
+var shards = config.shards.find().toArray();
 
 for (var i = 0; i < shards.length; i++) {
     shards[i].conn = new Mongo(shards[i].host);
@@ -24,7 +24,7 @@ assert.writeError(admin.TestColl.insert([ { Doc1: 1 }, { Doc2: 1 } ]));
 
 jsTest.log("Setting up collections...");
 
-assert.commandWorked(admin.runCommand({ enableSharding : collSh.getDB() + "" }))
+assert.commandWorked(admin.runCommand({ enableSharding : collSh.getDB() + "" }));
 st.ensurePrimaryShard(collSh.getDB() + "", shards[0]._id);
 
 assert.commandWorked(admin.runCommand({ movePrimary : collUn.getDB() + "",
@@ -60,11 +60,11 @@ st.printShardingStatus();
 // BREAK-ON-ERROR
 //
 
-jsTest.log("Bulk insert (no ContinueOnError) to single shard...")
+jsTest.log("Bulk insert (no ContinueOnError) to single shard...");
 
 resetColls();
 var inserts = [{ukey : 0},
-               {ukey : 1}]
+               {ukey : 1}];
 
 assert.writeOK(collSh.insert(inserts));
 assert.eq(2, collSh.find().itcount());
@@ -75,22 +75,22 @@ assert.eq(2, collUn.find().itcount());
 assert.writeOK(collDi.insert(inserts));
 assert.eq(2, collDi.find().itcount());
 
-jsTest.log("Bulk insert (no COE) with mongos error...")
+jsTest.log("Bulk insert (no COE) with mongos error...");
 
 resetColls();
 var inserts = [{ukey : 0},
                {hello : "world"},
-               {ukey : 1}]
+               {ukey : 1}];
 
 assert.writeError(collSh.insert(inserts));
 assert.eq(1, collSh.find().itcount());
 
-jsTest.log("Bulk insert (no COE) with mongod error...")
+jsTest.log("Bulk insert (no COE) with mongod error...");
 
 resetColls();
 var inserts = [{ukey : 0},
                {ukey : 0},
-               {ukey : 1}]
+               {ukey : 1}];
 
 assert.writeError(collSh.insert(inserts));
 assert.eq(1, collSh.find().itcount());
@@ -101,13 +101,13 @@ assert.eq(1, collUn.find().itcount());
 assert.writeError(collDi.insert(inserts));
 assert.eq(1, collDi.find().itcount());
 
-jsTest.log("Bulk insert (no COE) with mongod and mongos error...")
+jsTest.log("Bulk insert (no COE) with mongod and mongos error...");
 
 resetColls();
 var inserts = [{ukey : 0},
                {ukey : 0},
                {ukey : 1},
-               {hello : "world"}]
+               {hello : "world"}];
 
 var res = assert.writeError(collSh.insert(inserts));
 assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
@@ -121,11 +121,11 @@ res = assert.writeError(collDi.insert(inserts));
 assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
 assert.eq(1, collDi.find().itcount());
 
-jsTest.log("Bulk insert (no COE) on second shard...")
+jsTest.log("Bulk insert (no COE) on second shard...");
 
 resetColls();
 var inserts = [{ukey : 0},
-               {ukey : -1}]
+               {ukey : -1}];
 
 assert.writeOK(collSh.insert(inserts));
 assert.eq(2, collSh.find().itcount());
@@ -136,25 +136,25 @@ assert.eq(2, collUn.find().itcount());
 assert.writeOK(collDi.insert(inserts));
 assert.eq(2, collDi.find().itcount());
 
-jsTest.log("Bulk insert to second shard (no COE) with mongos error...")
+jsTest.log("Bulk insert to second shard (no COE) with mongos error...");
 
 resetColls();
 var inserts = [{ukey : 0},
                {ukey : 1}, // switches shards
                {ukey : -1},
-               {hello : "world"}]
+               {hello : "world"}];
 
 assert.writeError(collSh.insert(inserts));
 assert.eq(3, collSh.find().itcount());
 
-jsTest.log("Bulk insert to second shard (no COE) with mongod error...")
+jsTest.log("Bulk insert to second shard (no COE) with mongod error...");
 
 resetColls();
 var inserts = [{ukey : 0},
                {ukey : 1},
                {ukey : -1},
                {ukey : -2},
-               {ukey : -2}]
+               {ukey : -2}];
 
 assert.writeError(collSh.insert(inserts));
 assert.eq(4, collSh.find().itcount());
@@ -165,7 +165,7 @@ assert.eq(4, collUn.find().itcount());
 assert.writeError(collDi.insert(inserts));
 assert.eq(4, collDi.find().itcount());
 
-jsTest.log("Bulk insert to third shard (no COE) with mongod and mongos error...")
+jsTest.log("Bulk insert to third shard (no COE) with mongod and mongos error...");
 
 resetColls();
 var inserts = [{ukey : 0},
@@ -174,7 +174,7 @@ var inserts = [{ukey : 0},
                {ukey : -3},
                {ukey : 4},
                {ukey : 4},
-               {hello : "world"}]
+               {hello : "world"}];
 
 res = assert.writeError(collSh.insert(inserts));
 assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
@@ -192,22 +192,22 @@ assert.eq(5, collDi.find().itcount());
 // CONTINUE-ON-ERROR
 //
 
-jsTest.log("Bulk insert (yes COE) with mongos error...")
+jsTest.log("Bulk insert (yes COE) with mongos error...");
 
 resetColls();
 var inserts = [{ukey : 0},
                {hello : "world"},
-               {ukey : 1}]
+               {ukey : 1}];
 
 assert.writeError(collSh.insert(inserts, 1)); // COE
 assert.eq(2, collSh.find().itcount());
 
-jsTest.log("Bulk insert (yes COE) with mongod error...")
+jsTest.log("Bulk insert (yes COE) with mongod error...");
 
 resetColls();
 var inserts = [{ukey : 0},
                {ukey : 0},
-               {ukey : 1}]
+               {ukey : 1}];
 
 assert.writeError(collSh.insert(inserts, 1));
 assert.eq(2, collSh.find().itcount());
@@ -219,7 +219,7 @@ assert.writeError(collDi.insert(inserts, 1));
 assert.eq(2, collDi.find().itcount());
 
 jsTest
-        .log("Bulk insert to third shard (yes COE) with mongod and mongos error...")
+        .log("Bulk insert to third shard (yes COE) with mongod and mongos error...");
 
 resetColls();
 var inserts = [{ukey : 0},
@@ -228,7 +228,7 @@ var inserts = [{ukey : 0},
                {ukey : -3},
                {ukey : 4},
                {ukey : 4},
-               {hello : "world"}]
+               {hello : "world"}];
 
 // Last error here is mongos error
 res = assert.writeError(collSh.insert(inserts, 1));
@@ -245,7 +245,7 @@ assert.eq(6, res.nInserted, res.toString());
 assert.eq(6, collDi.find().itcount());
 
 jsTest.log("Bulk insert to third shard (yes COE) with mongod and mongos error "
-           + "(mongos error first)...")
+           + "(mongos error first)...");
 
 resetColls();
 var inserts = [{ukey : 0},
@@ -299,7 +299,7 @@ assert.writeOK(staleCollSh.insert(inserts));
 // together with WBL.
 //
 
-jsTest.log("Testing bulk insert (no COE) with WBL and large objects...")
+jsTest.log("Testing bulk insert (no COE) with WBL and large objects...");
 resetColls();
 
 var data10MB = 'x'.repeat(10 * 1024 * 1024);

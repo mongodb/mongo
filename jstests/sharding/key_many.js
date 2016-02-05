@@ -123,7 +123,7 @@ for (var i = 0; i < types.length; i++) {
     assert.eq(4, c.find({$nor:[makeObjectDotted(curT.values[2]), makeObjectDotted(curT.values[4])]}).itcount(), curT.name + " $nor itcount()");
 
     var stats = c.stats();
-    printjson(stats)
+    printjson(stats);
     assert.eq(6, stats.count, curT.name + " total count with stats()");
 
     var count = 0;

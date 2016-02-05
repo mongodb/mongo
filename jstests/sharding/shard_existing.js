@@ -5,7 +5,7 @@ var s = new ShardingTest({ name: "shard_existing",
                            mongos: 1,
                            other: { chunkSize: 1 } });
 
-db = s.getDB( "test" )
+db = s.getDB( "test" );
 
 var stringSize = 10000;
 var numDocs = 2000;

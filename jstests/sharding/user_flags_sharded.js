@@ -17,7 +17,7 @@ if (jsTest.options().storageEngine === "mmapv1") {
     db1.createCollection( coll );
 
     // Then verify the new collection has userFlags set to 0
-    var collstats = db1.getCollection( coll ).stats()
+    var collstats = db1.getCollection( coll ).stats();
     print( "*************** Fresh Collection Stats ************" );
     printjson( collstats );
     assert.eq( collstats.userFlags , 1 , "fresh collection doesn't have userFlags = 1 ");
@@ -33,7 +33,7 @@ if (jsTest.options().storageEngine === "mmapv1") {
     }
 
     // Next verify that userFlags has changed to 0
-    collstats = db1.getCollection( coll ).stats()
+    collstats = db1.getCollection( coll ).stats();
     print( "*************** Collection Stats After CollMod ************" );
     printjson( collstats );
     assert.eq( collstats.userFlags , 0 , "modified collection should have userFlags = 0 ");
@@ -52,7 +52,7 @@ if (jsTest.options().storageEngine === "mmapv1") {
 
     print( "*************** Collection Stats On Other Shard ************" );
     var shard2 = s._connections[0].getDB( dbname );
-    shard2stats = shard2.getCollection( coll ).stats()
+    shard2stats = shard2.getCollection( coll ).stats();
     printjson( shard2stats );
 
     assert.eq( shard2stats.count , numdocs , "moveChunk didn't succeed" );

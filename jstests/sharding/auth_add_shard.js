@@ -88,7 +88,7 @@ assert.soon(function() {
     printjson(result);
 
     return result.ok && result.state == "completed";
-}, "failed to drain shard completely", 5 * 60 * 1000)
+}, "failed to drain shard completely", 5 * 60 * 1000);
 
 assert.eq(1, st.config.shards.count() , "removed server still appears in count");
 

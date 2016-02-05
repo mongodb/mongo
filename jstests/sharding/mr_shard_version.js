@@ -4,13 +4,13 @@
 var st = new ShardingTest({ shards : 2, mongos : 1 });
 
 //Stop balancer, since it'll just get in the way of these
-st.stopBalancer()
+st.stopBalancer();
 
-var coll = st.s.getCollection( jsTest.name() + ".coll" )
+var coll = st.s.getCollection( jsTest.name() + ".coll" );
 
-var numDocs = 50000
-var numKeys = 1000
-var numTests = 3
+var numDocs = 50000;
+var numKeys = 1000;
+var numTests = 3;
 
 var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < numDocs; i++ ){
@@ -18,24 +18,24 @@ for( var i = 0; i < numDocs; i++ ){
 }
 assert.writeOK(bulk.execute());
 
-assert.eq( numDocs, coll.find().itcount() )
+assert.eq( numDocs, coll.find().itcount() );
 
-var halfId = coll.find().itcount() / 2
+var halfId = coll.find().itcount() / 2;
 
 // Shard collection in half
-st.shardColl( coll, { _id : 1 }, { _id : halfId } )
+st.shardColl( coll, { _id : 1 }, { _id : halfId } );
 
-st.printShardingStatus()
+st.printShardingStatus();
 
-jsTest.log( "Collection now initialized with keys and values..." )
+jsTest.log( "Collection now initialized with keys and values..." );
 
-jsTest.log( "Starting migrations..." )
+jsTest.log( "Starting migrations..." );
 
-var migrateOp = { op : "command", ns : "admin", command : { moveChunk : "" + coll } }
+var migrateOp = { op : "command", ns : "admin", command : { moveChunk : "" + coll } };
 
-var checkMigrate = function(){ print( "Result of migrate : " ); printjson( this ) }
+var checkMigrate = function(){ print( "Result of migrate : " ); printjson( this ); };
 
-var ops = {}
+var ops = {};
 for( var i = 0; i < st._connections.length; i++ ){
     for( var j = 0; j < 2; j++ ){
         ops[ "" + (i * 2 + j) ] = { op : "command", ns : "admin", 
@@ -49,40 +49,40 @@ for( var i = 0; i < st._connections.length; i++ ){
 var bid = benchStart({ ops : ops,
                        host : st.s.host,
                        parallel : 1,
-                       handleErrors : false })
+                       handleErrors : false });
 
-jsTest.log( "Starting m/r..." )
+jsTest.log( "Starting m/r..." );
                        
-var map = function(){ emit( this.key, this.value ) }
+var map = function(){ emit( this.key, this.value ); };
 var reduce = function(k, values){ 
-    var total = 0
-    for( var i = 0; i < values.length; i++ ) total += values[i]
-    return total
-}
+    var total = 0;
+    for( var i = 0; i < values.length; i++ ) total += values[i];
+    return total;
+};
 
-var outputColl = st.s.getCollection( jsTest.name() + ".mrOutput" )
+var outputColl = st.s.getCollection( jsTest.name() + ".mrOutput" );
 
-jsTest.log( "Output coll : " + outputColl )
+jsTest.log( "Output coll : " + outputColl );
 
 for( var t = 0; t < numTests; t++ ){
 
-    var results = coll.mapReduce( map, reduce, { out : { replace : outputColl.getName() } })
+    var results = coll.mapReduce( map, reduce, { out : { replace : outputColl.getName() } });
     
     // Assert that the results are actually correct, all keys have values of (numDocs / numKeys) x key
-    var output = outputColl.find().sort({ _id : 1 }).toArray()
+    var output = outputColl.find().sort({ _id : 1 }).toArray();
     
     // printjson( output )
     
-    assert.eq( output.length, numKeys )
-    printjson( output )
+    assert.eq( output.length, numKeys );
+    printjson( output );
     for( var i = 0; i < output.length; i++ )
-        assert.eq( parseInt( output[i]._id ) * ( numDocs / numKeys ), output[i].value )
+        assert.eq( parseInt( output[i]._id ) * ( numDocs / numKeys ), output[i].value );
     
 }
 
-jsTest.log( "Finishing parallel migrations..." )
+jsTest.log( "Finishing parallel migrations..." );
 
-printjson( benchFinish( bid ) )
+printjson( benchFinish( bid ) );
 
 st.stop();
 

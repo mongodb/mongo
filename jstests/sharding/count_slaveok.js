@@ -24,49 +24,49 @@ for( var i = 0; i < 300; i++ ){
 }
 assert.writeOK(bulk.execute());
 
-var connA = conn
-var connB = new Mongo( st.s.host )
-var connC = new Mongo( st.s.host )
+var connA = conn;
+var connB = new Mongo( st.s.host );
+var connC = new Mongo( st.s.host );
 
-st.printShardingStatus()
+st.printShardingStatus();
 
 // Wait for client to update itself and replication to finish
-rst.awaitReplication()
+rst.awaitReplication();
 
-var primary = rst.getPrimary()
-var sec = rst.getSecondary()
+var primary = rst.getPrimary();
+var sec = rst.getSecondary();
 
 // Data now inserted... stop the master, since only two in set, other will still be secondary
 rst.stop(rst.getPrimary());
-printjson( rst.status() )
+printjson( rst.status() );
 
 // Wait for the mongos to recognize the slave
-ReplSetTest.awaitRSClientHosts( conn, sec, { ok : true, secondary : true } )
+ReplSetTest.awaitRSClientHosts( conn, sec, { ok : true, secondary : true } );
 
 // Make sure that mongos realizes that primary is already down
 ReplSetTest.awaitRSClientHosts( conn, primary, { ok : false });
 
 // Need to check slaveOk=true first, since slaveOk=false will destroy conn in pool when
 // master is down
-conn.setSlaveOk()
+conn.setSlaveOk();
 
 // count using the command path
-assert.eq( 30, coll.find({ i : 0 }).count() )
+assert.eq( 30, coll.find({ i : 0 }).count() );
 // count using the query path
 assert.eq( 30, coll.find({ i : 0 }).itcount() );
-assert.eq( 10, coll.distinct("i").length )
+assert.eq( 10, coll.distinct("i").length );
 
 try {
-    conn.setSlaveOk( false )
+    conn.setSlaveOk( false );
     // Should throw exception, since not slaveOk'd
-    coll.find({ i : 0 }).count()
+    coll.find({ i : 0 }).count();
     
-    print( "Should not reach here!" )
-    assert( false )
+    print( "Should not reach here!" );
+    assert( false );
     
 }
 catch( e ){
-    print( "Non-slaveOk'd connection failed." )
+    print( "Non-slaveOk'd connection failed." );
 }
 
 st.stop();

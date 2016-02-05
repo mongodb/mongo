@@ -52,7 +52,7 @@ jsTest.log("End the cursors.");
 shardedCursor.itcount();
 unshardedCursor.itcount();
 
-var cursorInfo = admin.serverStatus().metrics.cursor;;
+var cursorInfo = admin.serverStatus().metrics.cursor;
 printjson(cursorInfo);
 
 assert.eq(cursorInfo.open.multiTarget, 0);

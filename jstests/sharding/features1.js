@@ -82,10 +82,10 @@ assert.eq( 1 , db.foo3.count() , "eval pre1" );
 assert.eq( 1 , db.foo2.count() , "eval pre2" );
 
 assert.eq( 8 , db.eval( function(){ return db.foo3.findOne().a; } ), "eval 1 " );
-assert.throws( function(){ db.eval( function(){ return db.foo2.findOne().a; } ) } , null , "eval 2" )
+assert.throws( function(){ db.eval( function(){ return db.foo2.findOne().a; } ); } , null , "eval 2" );
 
 assert.eq( 1 , db.eval( function(){ return db.foo3.count(); } ), "eval 3 " );
-assert.throws( function(){ db.eval( function(){ return db.foo2.count(); } ) } , null , "eval 4" )
+assert.throws( function(){ db.eval( function(){ return db.foo2.count(); } ); } , null , "eval 4" );
 
 // ----- "eval" new command name SERVER-5588 -----
 var result;
@@ -116,11 +116,11 @@ assert.eq( 2 , b.foo4.getIndexes().length , "ub2" );
 assert( a.foo4.getIndexes()[1].unique , "ua3" );
 assert( b.foo4.getIndexes()[1].unique , "ub3" );
 
-assert.eq( 2 , db.foo4.count() , "uc1" )
-db.foo4.save( { num : 7 } )
-assert.eq( 3 , db.foo4.count() , "uc2" )
+assert.eq( 2 , db.foo4.count() , "uc1" );
+db.foo4.save( { num : 7 } );
+assert.eq( 3 , db.foo4.count() , "uc2" );
 assert.writeError(db.foo4.save( { num : 7 } ));
-assert.eq( 3 , db.foo4.count() , "uc4" )
+assert.eq( 3 , db.foo4.count() , "uc4" );
 
 // --- don't let you convertToCapped ----
 assert( ! db.foo4.isCapped() , "ca1" );
@@ -173,7 +173,7 @@ assert.soon( function() {
     return cmdRes.ok;
 }, 'move chunk test.foo6', 60000, 1000 );
 
-assert.throws( function(){ db.foo6.group( { key : { a : 1 } , initial : { count : 0 } , reduce : function(z,prev){ prev.count++; } } ); } );;
+assert.throws( function(){ db.foo6.group( { key : { a : 1 } , initial : { count : 0 } , reduce : function(z,prev){ prev.count++; } } ); } );
 
 
 // ---- can't shard non-empty collection without index -----
@@ -191,7 +191,7 @@ assert( ! s.admin.runCommand( { shardcollection : "test.foo9" , key : { a : 1 } 
 
 // --- listDatabases ---
 
-r = db.getMongo().getDBs()
+r = db.getMongo().getDBs();
 assert.eq(2, r.databases.length, tojson(r));
 assert.eq( "number", typeof(r.totalSize) , "listDatabases 2 : " + tojson( r ) );
 

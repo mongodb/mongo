@@ -14,7 +14,7 @@ s.config.settings.find().forEach( printjson );
 
 db = s.getDB( "test" );
 
-bigString = ""
+bigString = "";
 while ( bigString.length < 10000 )
     bigString += "asdasdasdasdadasdasdasdasdasdasdasdasda";
 
@@ -32,7 +32,7 @@ assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 
 function diff1(){
     var x = s.chunkCounts( "foo" );
-    printjson( x )
+    printjson( x );
     return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
@@ -51,7 +51,7 @@ s.config.settings.find().forEach( printjson );
 print("* B");
 
 
-print( diff1() )
+print( diff1() );
 
 var currDiff = diff1();
 var waitTime = 0;

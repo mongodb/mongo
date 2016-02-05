@@ -6,23 +6,23 @@
 
 placeCheck = function( num ){
     print("shard2 step: " + num );
-}
+};
 
 printAll = function(){
     print( "****************" );
-    db.foo.find().forEach( printjsononeline )
+    db.foo.find().forEach( printjsononeline );
     print( "++++++++++++++++++" );
-    primary.foo.find().forEach( printjsononeline )
+    primary.foo.find().forEach( printjsononeline );
     print( "++++++++++++++++++" );
-    secondary.foo.find().forEach( printjsononeline )
+    secondary.foo.find().forEach( printjsononeline );
     print( "---------------------" );
-}
+};
 
 s = new ShardingTest({name: "shard2", shards: 2});
 
 // We're doing a lot of checks here that can get screwed up by the balancer, now that
 // it moves small #s of chunks too
-s.stopBalancer()
+s.stopBalancer();
 
 db = s.getDB( "test" );
 
@@ -57,7 +57,7 @@ placeCheck( 2 );
 
 // test move shard
 assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : primary.getMongo().name, _waitForDelete : true } ); } );
-assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : "adasd", _waitForDelete : true } ) } );
+assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : "adasd", _waitForDelete : true } ); } );
 
 s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : secondary.getMongo().name, _waitForDelete : true } );
 assert.eq( 2 , secondary.foo.find().length() , "secondary should have 2 after move shard" );
@@ -139,18 +139,18 @@ assert.eq( "funny man" , db.foo.find( { num : { $lt : 100 } } ).sort( { num : 1 
 
 placeCheck( 7 );
 
-db.foo.find().sort( { _id : 1 } ).forEach( function(z){ print( z._id ); } )
+db.foo.find().sort( { _id : 1 } ).forEach( function(z){ print( z._id ); } );
 
 zzz = db.foo.find().explain("executionStats").executionStats;
-assert.eq( 0 , zzz.totalKeysExamined , "EX1a" )
-assert.eq( 6 , zzz.nReturned , "EX1b" )
-assert.eq( 6 , zzz.totalDocsExamined , "EX1c" )
+assert.eq( 0 , zzz.totalKeysExamined , "EX1a" );
+assert.eq( 6 , zzz.nReturned , "EX1b" );
+assert.eq( 6 , zzz.totalDocsExamined , "EX1c" );
 
 zzz = db.foo.find().hint( { _id : 1 } ).sort( { _id : 1 } )
                                        .explain("executionStats").executionStats;
-assert.eq( 6 , zzz.totalKeysExamined , "EX2a" )
-assert.eq( 6 , zzz.nReturned , "EX2b" )
-assert.eq( 6 , zzz.totalDocsExamined , "EX2c" )
+assert.eq( 6 , zzz.totalKeysExamined , "EX2a" );
+assert.eq( 6 , zzz.nReturned , "EX2b" );
+assert.eq( 6 , zzz.totalDocsExamined , "EX2c" );
 
 // getMore
 assert.eq( 4 , db.foo.find().limit(-4).toArray().length , "getMore 1" );

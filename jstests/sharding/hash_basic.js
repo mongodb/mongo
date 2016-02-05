@@ -2,7 +2,7 @@ var st = new ShardingTest({ shards: 2, chunkSize: 1 });
 
 var testDB = st.s.getDB('test');
 testDB.adminCommand({ enableSharding: 'test' });
-st.ensurePrimaryShard('test', 'shard0001');;
+st.ensurePrimaryShard('test', 'shard0001');
 testDB.adminCommand({ shardCollection: 'test.user', key: { x: 'hashed' }});
 
 var configDB = st.s.getDB('config');

@@ -22,7 +22,7 @@ var timeBadInsert = function() {
     var end = new Date().getTime();
 
     return end - start;
-}
+};
 
 // We need to work at least twice in order to check resetting the counter
 var successNeeded = 2;

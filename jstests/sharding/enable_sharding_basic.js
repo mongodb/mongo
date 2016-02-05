@@ -50,6 +50,6 @@ assert.eq(mongos.getDB('config').databases.findOne({_id: 'unsharded'}).partition
 
 st.stop();
 
-})()
+})();
 
 

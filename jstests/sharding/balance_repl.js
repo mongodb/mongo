@@ -11,7 +11,7 @@ for (var i = 0; i < 2100; i++) {
 }
 assert.writeOK(bulk.execute());
 
-s.adminCommand( { enablesharding : "test" } )
+s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'test-rs0');
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 

@@ -80,17 +80,17 @@ function runTest(s) {
     s.printChangeLog();
 
     function map() { emit('count', 1); }
-    function reduce(key, values) { return Array.sum(values) }
+    function reduce(key, values) { return Array.sum(values); }
 
     jsTest.log("Test basic mapreduce...");
 
     // Test basic mapReduce
     for (var iter = 0; iter < 5; iter++) {
         print("Test #" + iter);
-        out = db.foo.mapReduce(map, reduce,"big_out")
+        out = db.foo.mapReduce(map, reduce,"big_out");
     }
 
-    print("Testing output to different db...")
+    print("Testing output to different db...");
 
     // test output to a different DB
     // do it multiple times so that primary shard changes
@@ -102,9 +102,9 @@ function runTest(s) {
         outCollStr = "mr_replace_col_" + iter;
         outDbStr = "mr_db_" + iter;
 
-        print("Testing mr replace into DB " + iter)
+        print("Testing mr replace into DB " + iter);
 
-        res = db.foo.mapReduce(map , reduce , { out: { replace: outCollStr, db: outDbStr } })
+        res = db.foo.mapReduce(map , reduce , { out: { replace: outCollStr, db: outDbStr } });
         printjson(res);
 
         outDb = s.getDB(outDbStr);
@@ -119,7 +119,7 @@ function runTest(s) {
         assert.eq(res.result.db, outDbStr, "Wrong db " + res.result.db);
     }
 
-    jsTest.log("Verifying nonatomic M/R throws...")
+    jsTest.log("Verifying nonatomic M/R throws...");
 
     // check nonAtomic output
     assert.throws(function() {
@@ -142,8 +142,8 @@ function runTest(s) {
 
     jsTest.log("No errors...");
 
-    map2 = function() { emit(this.val, 1); }
-    reduce2 = function(key, values) { return Array.sum(values); }
+    map2 = function() { emit(this.val, 1); };
+    reduce2 = function(key, values) { return Array.sum(values); };
 
     // Test merge
     outcol = "big_out_merge";

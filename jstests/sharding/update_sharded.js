@@ -11,7 +11,7 @@ s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.update0" , key : { key : 1 } } );
 s.adminCommand( { shardcollection : "test.update1" , key : { key : "hashed" } } );
 
-db = s.getDB( "test" )
+db = s.getDB( "test" );
 
 for(i=0; i < 2; i++){
     coll = db.getCollection("update" + i);
@@ -22,9 +22,9 @@ for(i=0; i < 2; i++){
     coll.save({_id:2, key:2});
     coll.update({_id:3, key:3}, {$set: {foo: 'bar'}}, {upsert: true});
 
-    assert.eq(coll.count(), 3, "count A")
-    assert.eq(coll.findOne({_id:3}).key, 3 , "findOne 3 key A")
-    assert.eq(coll.findOne({_id:3}).foo, 'bar' , "findOne 3 foo A")
+    assert.eq(coll.count(), 3, "count A");
+    assert.eq(coll.findOne({_id:3}).key, 3 , "findOne 3 key A");
+    assert.eq(coll.findOne({_id:3}).foo, 'bar' , "findOne 3 foo A");
 
     // update existing using save()
     coll.save({_id:1, key:1, other:1});
@@ -37,9 +37,9 @@ for(i=0; i < 2; i++){
     coll.save( {_id:4, key:4} );
     coll.update({key:4}, {key:4, other:4});
     assert.eq( coll.find({key:4, other:4}).count() , 1 , 'replacement update error');
-    coll.remove( {_id:4} )
+    coll.remove( {_id:4} );
 
-    assert.eq(coll.count(), 3, "count B")
+    assert.eq(coll.count(), 3, "count B");
     coll.find().forEach(function(x){
         assert.eq(x._id, x.key, "_id == key");
         assert.eq(x._id, x.other, "_id == other");
@@ -51,10 +51,10 @@ for(i=0; i < 2; i++){
     assert.writeOK(coll.update({ _id: 1, key: 1 }, { $set: { foo: 2 }}));
 
     coll.update( { key : 17 } , { $inc : { x : 5 } } , true  );
-    assert.eq( 5 , coll.findOne( { key : 17 } ).x , "up1" )
+    assert.eq( 5 , coll.findOne( { key : 17 } ).x , "up1" );
 
     coll.update( { key : 18 } , { $inc : { x : 5 } } , true , true );
-    assert.eq( 5 , coll.findOne( { key : 18 } ).x , "up2" )
+    assert.eq( 5 , coll.findOne( { key : 18 } ).x , "up2" );
 
     // Make sure we can extract exact _id from certain queries
     assert.writeOK(coll.update({_id : ObjectId()}, {$set : {x : 1}}, {multi : false}));

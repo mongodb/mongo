@@ -2,7 +2,7 @@
 (function() {
 "use strict";
 
-var numShards = 3
+var numShards = 3;
 var s = new ShardingTest({name: "parallel", shards: numShards, mongos: 2});
 
 s.adminCommand( { enablesharding : "test" } );
@@ -29,19 +29,19 @@ assert.writeOK(bulk.execute());
 
 var doCommand = function( dbname , cmd ) {
     x = benchRun( { ops : [ { op : "findOne" , ns : dbname + ".$cmd" , query : cmd } ] ,
-                    host : db.getMongo().host , parallel : 2 , seconds : 2 } )
-    printjson(x)
+                    host : db.getMongo().host , parallel : 2 , seconds : 2 } );
+    printjson(x);
     x = benchRun( { ops : [ { op : "findOne" , ns : dbname + ".$cmd" , query : cmd } ] ,
-                    host : s._mongos[1].host , parallel : 2 , seconds : 2 } )
-    printjson(x)
-}
+                    host : s._mongos[1].host , parallel : 2 , seconds : 2 } );
+    printjson(x);
+};
 
-doCommand( "test" , { dbstats : 1 } )
-doCommand( "config" , { dbstats : 1 } )
+doCommand( "test" , { dbstats : 1 } );
+doCommand( "config" , { dbstats : 1 } );
 
-var x = s.getDB( "config" ).stats()
-assert( x.ok , tojson(x) )
-printjson(x)
+var x = s.getDB( "config" ).stats();
+assert( x.ok , tojson(x) );
+printjson(x);
 
-s.stop()
+s.stop();
 }());

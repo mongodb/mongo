@@ -10,9 +10,9 @@ s1.adminCommand( { enablesharding : "test" } );
 s1.ensurePrimaryShard('test', 'shard0001');
 s1.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 
-s1.config.databases.find().forEach( printjson )
+s1.config.databases.find().forEach( printjson );
 
-s1.getDB('test').existing.insert({_id:1})
+s1.getDB('test').existing.insert({_id:1});
 assert.eq(1, s1.getDB('test').existing.count({_id:1}));
 assert.eq(1, s2.getDB('test').existing.count({_id:1}));
 
@@ -24,7 +24,7 @@ res = s2.getDB( "admin" ).runCommand( { moveChunk: "test.existing" , find : { _i
 
 assert.eq(1 , res.ok, tojson(res));
 
-s1.adminCommand( { flushRouterConfig : 1 } )
+s1.adminCommand( { flushRouterConfig : 1 } );
 
 assert.eq(1, s1.getDB('test').existing.count({_id:1})); // SERVER-2828
 assert.eq(1, s2.getDB('test').existing.count({_id:1}));

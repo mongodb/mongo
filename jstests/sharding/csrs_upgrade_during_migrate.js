@@ -30,7 +30,7 @@ var st;
             conf.members[i].slaveDelay = delayed ? 30 : 0;
         }
         reconfig(rst, conf);
-    }
+    };
 
     var coordinator = new CSRSUpgradeCoordinator();
     coordinator.setupSCCCCluster();

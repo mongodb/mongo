@@ -57,4 +57,4 @@ assert.eq(shard1, mongos.getDB('config').databases.findOne({_id: kDbName}).prima
 
 st.stop();
 
-})()
+})();

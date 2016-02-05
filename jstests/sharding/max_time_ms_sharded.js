@@ -25,7 +25,7 @@ var configureMaxTimeAlwaysTimeOut = function(mode) {
         {configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
     assert.commandWorked(shards[1].getDB("admin").runCommand(
         {configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
-}
+};
 
 // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which prohibits mongod
 // from enforcing time limits.  See fail point declaration for complete description.
@@ -34,7 +34,7 @@ var configureMaxTimeNeverTimeOut = function(mode) {
         {configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
     assert.commandWorked(shards[1].getDB("admin").runCommand(
         {configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
-}
+};
 
 //
 // Pre-split collection: shard 0 takes {_id: {$lt: 0}}, shard 1 takes {_id: {$gte: 0}}.
@@ -70,7 +70,7 @@ assert.eq(50, shards[1].getCollection(coll.getFullName()).count());
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 cursor = coll.find();
 cursor.maxTimeMS(60*1000);
-assert.throws(function() { cursor.next() },
+assert.throws(function() { cursor.next(); },
               [],
               "expected query to fail in mongod due to maxTimeAlwaysTimeOut fail point");
 
@@ -78,7 +78,7 @@ assert.throws(function() { cursor.next() },
 configureMaxTimeAlwaysTimeOut("off");
 cursor = coll.find();
 cursor.maxTimeMS(60*1000);
-assert.doesNotThrow(function() { cursor.next() },
+assert.doesNotThrow(function() { cursor.next(); },
                     [],
                     "expected query to not hit time limit in mongod");
 

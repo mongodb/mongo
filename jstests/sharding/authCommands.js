@@ -69,10 +69,10 @@ assert.writeOK(bulk.execute({ w: "majority"}));
 assert.eq(expectedDocs, testDB.foo.count());
 
 // Wait for the balancer to start back up
-st.startBalancer()
+st.startBalancer();
 
 // Make sure we've done at least some splitting, so the balancer will work
-assert.gt( configDB.chunks.find({ ns : 'test.foo' }).count(), 2 )
+assert.gt( configDB.chunks.find({ ns : 'test.foo' }).count(), 2 );
 
 // Make sure we eventually balance all the chunks we've created
 assert.soon( function() {
@@ -82,11 +82,11 @@ assert.soon( function() {
 }, "no balance happened", 5 * 60 * 1000 );
 
 assert.soon( function(){
-    print( "Waiting for migration cleanup to occur..." )
+    print( "Waiting for migration cleanup to occur..." );
     return testDB.foo.find().itcount() == testDB.foo.count();
-})
+});
 
-var map = function() { emit (this.i, this.j) };
+var map = function() { emit (this.i, this.j); };
 var reduce = function( key, values ) {
     var jCount = 0;
     values.forEach( function(j) { jCount += j; } );
@@ -97,19 +97,19 @@ var checkCommandSucceeded = function( db, cmdObj ) {
     print( "Running command that should succeed: " );
     printjson( cmdObj );
     resultObj = db.runCommand( cmdObj );
-    printjson( resultObj )
+    printjson( resultObj );
     assert ( resultObj.ok );
     return resultObj;
-}
+};
 
 var checkCommandFailed = function( db, cmdObj ) {
     print( "Running command that should fail: " );
     printjson( cmdObj );
     resultObj = db.runCommand( cmdObj );
-    printjson( resultObj )
+    printjson( resultObj );
     assert ( !resultObj.ok );
     return resultObj;
-}
+};
 
 var checkReadOps = function( hasReadAuth ) {
     if ( hasReadAuth ) {
@@ -144,7 +144,7 @@ var checkReadOps = function( hasReadAuth ) {
                                      pipeline: [ {$project : {j : 1}},
                                                  {$group : {_id : 'j', sum : {$sum : '$j'}}}]} );
     }
-}
+};
 
 var checkWriteOps = function( hasWriteAuth ) {
     if ( hasWriteAuth ) {
@@ -197,7 +197,7 @@ var checkWriteOps = function( hasWriteAuth ) {
         }
         assert( !passed );
     }
-}
+};
 
 var checkAdminOps = function( hasAuth ) {
     if ( hasAuth ) {
@@ -225,7 +225,7 @@ var checkAdminOps = function( hasAuth ) {
                                       to : st.rs1.name, _waitForDelete : true} );
 
     }
-}
+};
 
 var checkRemoveShard = function( hasWriteAuth ) {
     if ( hasWriteAuth ) {
@@ -235,12 +235,12 @@ var checkRemoveShard = function( hasWriteAuth ) {
         checkRemoveShard = function() {
             res = checkCommandSucceeded( adminDB, { removeshard : st.rs1.name } );
             return res.msg == 'removeshard completed successfully';
-        }
+        };
         assert.soon( checkRemoveShard , "failed to remove shard" );
     } else {
         checkCommandFailed( adminDB, { removeshard : st.rs1.name } );
     }
-}
+};
 
 var checkAddShard = function( hasWriteAuth ) {
     if ( hasWriteAuth ) {
@@ -248,7 +248,7 @@ var checkAddShard = function( hasWriteAuth ) {
     } else {
         checkCommandFailed( adminDB, { addshard : st.rs1.getURL() } );
     }
-}
+};
 
 
 st.stopBalancer();
@@ -285,7 +285,7 @@ assert( testDB.dropDatabase().ok );
 checkRemoveShard( true );
 adminDB.printShardingStatus();
 
-jsTestLog("Check adding a shard")
+jsTestLog("Check adding a shard");
 assert( adminDB.logout().ok );
 checkAddShard( false );
 assert( adminDB.auth( rwUser, password ) );
@@ -294,6 +294,6 @@ adminDB.printShardingStatus();
 
 
 st.stop();
-}
+};
 
 doTest();

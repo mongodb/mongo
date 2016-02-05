@@ -11,35 +11,35 @@ var collB = mB.getCollection('multidrop.coll');
 
 jsTestLog( "Shard and split collection..." );
 
-var admin = mA.getDB( "admin" )
-admin.runCommand({ enableSharding : coll.getDB() + "" })
-admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } })
+var admin = mA.getDB( "admin" );
+admin.runCommand({ enableSharding : coll.getDB() + "" });
+admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } });
 
 for( var i = -100; i < 100; i++ ){
-    admin.runCommand({ split : coll + "", middle : { _id : i } })
+    admin.runCommand({ split : coll + "", middle : { _id : i } });
 }
 
-jsTestLog( "Create versioned connection for each mongos..." )
+jsTestLog( "Create versioned connection for each mongos..." );
 
-coll.find().itcount()
-collB.find().itcount()
+coll.find().itcount();
+collB.find().itcount();
 
-jsTestLog( "Dropping sharded collection..." )
-coll.drop()
+jsTestLog( "Dropping sharded collection..." );
+coll.drop();
 
-jsTestLog( "Recreating collection..." )
+jsTestLog( "Recreating collection..." );
 
-admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } })
+admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } });
 for( var i = -10; i < 10; i++ ){
-    admin.runCommand({ split : coll + "", middle : { _id : i } })
+    admin.runCommand({ split : coll + "", middle : { _id : i } });
 }
 
-jsTestLog( "Retrying connections..." )
+jsTestLog( "Retrying connections..." );
 
-coll.find().itcount()
-collB.find().itcount() 
+coll.find().itcount();
+collB.find().itcount(); 
 
-jsTestLog( "Done." )
+jsTestLog( "Done." );
 
 st.stop();
 

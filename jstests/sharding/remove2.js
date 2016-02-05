@@ -7,7 +7,7 @@ seedString = function(replTest) {
 
 removeShard = function(st, replTest) {
     print( "Removing shard with name: " + replTest.name );
-    res = st.admin.runCommand( { removeshard: replTest.name } )
+    res = st.admin.runCommand( { removeshard: replTest.name } );
     printjson(res);
     assert( res.ok , "failed to start draining shard" );
 
@@ -15,15 +15,15 @@ removeShard = function(st, replTest) {
         res = st.admin.runCommand( { removeshard: replTest.name } );
         printjson(res);
         return res.ok && res.msg == 'removeshard completed successfully';
-    }
+    };
     assert.soon( checkRemoveShard, "failed to remove shard", 5 * 60000 );
 
     // Need to wait for migration to be over... only works for inline deletes
     checkNSLock = function() {
-        printjson( st.s.getDB( "config" ).locks.find().toArray() )
+        printjson( st.s.getDB( "config" ).locks.find().toArray() );
         return !st.isAnyBalanceInFlight();
-    }
-    assert.soon( checkNSLock, "migrations did not end?" )
+    };
+    assert.soon( checkNSLock, "migrations did not end?" );
 
     sleep( 2000 );
 
@@ -44,7 +44,7 @@ addShard = function(st, replTest) {
     try {
         assert.eq(true, st.adminCommand({ addshard : seed }));
     } catch (e) {
-        print("First attempt to addShard failed, trying again")
+        print("First attempt to addShard failed, trying again");
         // transport error on first attempt is expected.  Make sure second attempt goes through
         assert.eq(true, st.adminCommand({ addshard : seed }));
     }
@@ -125,13 +125,13 @@ assert.eq( 300, coll.find().itcount() );
 st.admin.printShardingStatus();
 
 // Remove shard and add it back in, without shutting it down.
-jsTestLog( "Attempting to remove shard and add it back in" )
+jsTestLog( "Attempting to remove shard and add it back in" );
 removeShard( st, rst1 );
 addShard(st, rst1 );
 
 
 // Remove shard, restart set, then add it back in.
-jsTestLog( "Attempting to remove shard, restart the set, and then add it back in" )
+jsTestLog( "Attempting to remove shard, restart the set, and then add it back in" );
 originalSeed = seedString(rst1);
 
 removeShard( st, rst1 );
@@ -214,6 +214,6 @@ rst1.awaitReplication();
 assert.eq( originalSeed, seedString(rst1), "Set didn't come back up with the same hosts as before" );
 addShard( st, rst1 );
 
-jsTestLog( "finishing!" )
+jsTestLog( "finishing!" );
 // this should be fixed by SERVER-22176
-st.stop({ allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] })
+st.stop({ allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] });

@@ -56,4 +56,4 @@ assertUnauthorized(shardAdmin.runCommand({cleanupOrphaned: 'foo.bar'}));
 
 st.stop();
 
-})()
+})();

@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-var st = new ShardingTest({shards: 2})
+var st = new ShardingTest({shards: 2});
 
 jsTestLog("Setting up initial data");
 

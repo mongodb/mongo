@@ -14,7 +14,7 @@ var adminUser = {
              "dbAdminAnyDatabase",
              "userAdminAnyDatabase",
              "clusterAdmin" ]
-}
+};
 
 var test1User = {
     user: "test",
@@ -45,7 +45,7 @@ var cluster = new ShardingTest({ name: "authmr",
     var test2DB = adminDB.getSiblingDB('test2');
     var ex;
     try {
-        adminDB.createUser(adminUser)
+        adminDB.createUser(adminUser);
         assert(adminDB.auth(adminUser.user, adminUser.pwd));
 
         adminDB.dropUser(test1User.user);

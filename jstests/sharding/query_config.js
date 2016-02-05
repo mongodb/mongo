@@ -15,7 +15,7 @@
     };
 
     var arrayGetNames = function(array) {
-        return array.map(function(spec) { return spec.name });
+        return array.map(function(spec) { return spec.name; });
     };
 
     var cursorGetCollectionNames = function(cursor) {
@@ -40,7 +40,7 @@
         } catch(err) {
             assert.eq(err.code, ErrorCodes.NamespaceNotFound);
         }
-    }
+    };
 
     /**
      * Sets up the test database with with several sharded collections.
@@ -56,14 +56,14 @@
         var testDB = st.s.getDB("test");
 
         assert.commandWorked(st.s.adminCommand({enablesharding: testDB.getName()}));
-        var testNamespaces = testCollNames.map(function(e) { return testDB.getName() + "." + e });
+        var testNamespaces = testCollNames.map(function(e) { return testDB.getName() + "." + e; });
         for (var i = 0; i < testKeys.length; i++) {
             assert.commandWorked(st.s.adminCommand({shardcollection: testNamespaces[i],
                                                     key: testKeys[i]}));
         }
 
         return testNamespaces;
-    }
+    };
 
     /**
      * Test that a list collections query works on the config database. This test cannot detect
@@ -123,7 +123,7 @@
         cursorArray.push(cursor.next());
         assert(!cursor.hasNext());
         assert.eq(arrayGetNames(sortArrayByName(cursorArray)), configChunksIndexes);
-    }
+    };
 
     /**
      * Test queries over the collections collection of the config database.
@@ -232,15 +232,15 @@
             if (this.ns == "test2.testColl") {
                 emit(this.shard, 1);
             }
-        }
+        };
         var reduceFunction = function(key, values) {
             return {chunks: values.length};
-        }
+        };
         result = configDB.chunks.mapReduce(mapFunction, reduceFunction, {out: {inline: 1}});
         assert.eq(result.ok, 1);
         assert.eq(sortArrayById(result.results), [{_id: shard1, value: {chunks: 2}},
                                                   {_id: shard2, value: {chunks: 3}}]);
-    }
+    };
 
     /**
      * Test queries over a user created collection of an arbitrary database on the config servers.
@@ -253,7 +253,7 @@
                             {_id: 4, g: 2, c: 1, s: "a", u: [2, 4]},
                             {_id: 5, g: 2, c: 18, s: "d", u: [3]},
                             {_id: 6, g: 3, c: 11, s: "e", u: [2, 3]},
-                            {_id: 7, g: 3, c: 2, s: "f", u: [1]}]
+                            {_id: 7, g: 3, c: 2, s: "f", u: [1]}];
         var userCollIndexes = ["_id_", "s_1"];
         var cursor;
         var cursorArray;
@@ -328,10 +328,10 @@
         // Map reduce query.
         var mapFunction = function() {
             emit(this.g, 1);
-        }
+        };
         var reduceFunction = function(key, values) {
             return {count: values.length};
-        }
+        };
         result = userColl.mapReduce(mapFunction, reduceFunction, {out: {inline: 1}});
         assert.eq(result.ok, 1);
         assert.eq(sortArrayById(result.results), [{_id: 1, value: {count: 2}},
@@ -339,7 +339,7 @@
                                                   {_id: 3, value: {count: 2}}]);
 
         assert(userColl.drop());
-    }
+    };
 
     var st = new ShardingTest({shards: 2, mongos: 1});
     var testNamespaces = setupTestCollections(st);

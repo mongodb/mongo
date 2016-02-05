@@ -24,11 +24,11 @@ db.printShardingStatus();
 // Create unique index
 assert.commandWorked(coll.ensureIndex({ a: 1, b: 1 }, { unique: true }));
 
-jsTest.log("------ indexes -------")
+jsTest.log("------ indexes -------");
 jsTest.log(tojson(coll.getIndexes()));
 
 // Second Part
-jsTest.log("------ dropping sharded collection to start part 2 -------")
+jsTest.log("------ dropping sharded collection to start part 2 -------");
 coll.drop();
 
 //Create unique index
@@ -42,4 +42,4 @@ db.printShardingStatus();
 jsTest.log("------ indexes 2-------");
 jsTest.log(tojson(coll.getIndexes()));
 
-s.stop()
+s.stop();

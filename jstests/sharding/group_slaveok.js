@@ -42,13 +42,13 @@ conn.setSlaveOk();
 
 // Should not throw exception, since slaveOk'd
 assert.eq(10, coll.group({ key: { i: true } , 
-                           reduce: function(obj, ctx) { ctx.count += 1 },
-                           initial: { count: 0 } }).length)
+                           reduce: function(obj, ctx) { ctx.count += 1; },
+                           initial: { count: 0 } }).length);
 
 try {   
     conn.setSlaveOk(false);
     var res = coll.group({ key: { i: true },
-                           reduce: function(obj, ctx) { ctx.count += 1 },
+                           reduce: function(obj, ctx) { ctx.count += 1; },
                            initial: { count: 0 } });
 
     print("Should not reach here! Group result: " + tojson(res));
