@@ -226,14 +226,9 @@ void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
         uassert(10209, str::stream() << "name has to be a string: " << n, n.type() == String);
         uassert(10210, "value has to be set", v.type() != EOO);
 
-        try {
-            setElement(n.valuestr(), v, o);
-            thisTime.insert(n.valuestr());
-            _storedNames.insert(n.valuestr());
-        } catch (const DBException& setElemEx) {
-            error() << "unable to load stored JavaScript function " << n.valuestr()
-                    << "(): " << setElemEx.what() << endl;
-        }
+        setElement(n.valuestr(), v, o);
+        thisTime.insert(n.valuestr());
+        _storedNames.insert(n.valuestr());
     }
 
     // remove things from scope that were removed from the system.js collection
