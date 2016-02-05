@@ -185,7 +185,7 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     if (scope->_hasOutOfMemoryException) {
         scope->_status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
     } else if (scope->isKillPending()) {
-        scope->_status = Status(ErrorCodes::JSInterpreterFailure, "Interrupted by the host");
+        scope->_status = Status(ErrorCodes::Interrupted, "Interrupted by the host");
     }
 
     if (!scope->_status.isOK()) {
