@@ -13,7 +13,7 @@ bigString = "";
 while ( bigString.length < 1024 * 50 )
     bigString += "asocsancdnsjfnsdnfsjdhfasdfasdfasdfnsadofnsadlkfnsaldknfsad";
 
-db = s.getDB( "test" )
+db = s.getDB( "test" );
 coll = db.foo;
 
 var i=0;
@@ -26,7 +26,7 @@ assert.writeOK( bulk.execute() );
 
 primary = s.getServer( "test" ).getDB( "test" );
 
-counts = []
+counts = [];
 
 s.printChunks();
 counts.push( s.config.chunks.count() );
@@ -40,8 +40,8 @@ for ( ; i<200; i++ ){
 }
 assert.writeOK( bulk.execute() );
 
-s.printChunks()
-s.printChangeLog()
+s.printChunks();
+s.printChangeLog();
 counts.push( s.config.chunks.count() );
 
 bulk = coll.initializeUnorderedBulkOp();
@@ -51,7 +51,7 @@ for ( ; i<400; i++ ){
 assert.writeOK( bulk.execute() );
 
 s.printChunks();
-s.printChangeLog()
+s.printChangeLog();
 counts.push( s.config.chunks.count() );
 
 bulk = coll.initializeUnorderedBulkOp();
@@ -61,18 +61,18 @@ for ( ; i<700; i++ ){
 assert.writeOK( bulk.execute() );
 
 s.printChunks();
-s.printChangeLog()
+s.printChangeLog();
 counts.push( s.config.chunks.count() );
 
-assert( counts[counts.length-1] > counts[0] , "counts 1 : " + tojson( counts ) )
-sorted = counts.slice(0)
+assert( counts[counts.length-1] > counts[0] , "counts 1 : " + tojson( counts ) );
+sorted = counts.slice(0);
 // Sort doesn't sort numbers correctly by default, resulting in fail
-sorted.sort( function(a, b){ return a - b } )
-assert.eq( counts , sorted , "counts 2 : " + tojson( counts ) )
+sorted.sort( function(a, b){ return a - b; } );
+assert.eq( counts , sorted , "counts 2 : " + tojson( counts ) );
 
-print( counts )
+print( counts );
 
-printjson( db.stats() )
+printjson( db.stats() );
 
 s.stop();
 

@@ -52,11 +52,11 @@ assert.soon( function(){
     doCountsGlobal();
     print("Counts: " + counta + countb);
 
-    return counta > 0 && countb > 0
+    return counta > 0 && countb > 0;
 });
 
 
-print("checkpoint B" )
+print("checkpoint B" );
 
 var missing = [];
 
@@ -82,15 +82,15 @@ for ( i=0; i<j*100; i++ ){
 
 s.printChangeLog();
 
-print("missing: " + tojson( missing ) )
+print("missing: " + tojson( missing ) );
 assert.soon( function(z){ return doCountsGlobal() == j * 100; } , "from each a:" + counta + " b:" + countb + " i:" + i );
-print("checkpoint B.a" )
+print("checkpoint B.a" );
 s.printChunks();
 assert.eq( j * 100 , coll.find().limit(100000000).itcount() , "itcount A" );
 assert.eq( j * 100 , counta + countb , "from each 2 a:" + counta + " b:" + countb + " i:" + i );
 assert( missing.length == 0 , "missing : " + tojson( missing ) );
 
-print("checkpoint C" )
+print("checkpoint C" );
 
 assert( Array.unique( s.config.chunks.find().toArray().map( function(z){ return z.shard; } ) ).length == 2 , "should be using both servers" );
 
@@ -101,7 +101,7 @@ for ( i=0; i<100; i++ ){
     gc();
 }
 
-print("checkpoint D")
+print("checkpoint D");
 
 // test not-sharded cursors
 db = s.getDB("test2" );
@@ -120,9 +120,9 @@ for ( i=0; i<100; i++ ){
 assert.eq(0, db.serverStatus().metrics.cursor.open.total, "cursor2");
 
 // Stop the balancer, otherwise it may grab some connections from the pool for itself
-s.stopBalancer()
+s.stopBalancer();
 
-print("checkpoint E")
+print("checkpoint E");
 
 assert( t.findOne() , "check close 0" );
 
@@ -140,7 +140,7 @@ print("checkpoint F");
 assert.throws(function() {
     s.getDB("test" ).foo.find().sort({ s : 1 }).forEach(function(x) {
         printjsononeline(x.substring(0, x.length > 30 ? 30 : x.length));
-    })
+    });
 });
 
 print("checkpoint G");

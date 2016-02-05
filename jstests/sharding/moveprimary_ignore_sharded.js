@@ -1,17 +1,17 @@
 // Checks that movePrimary doesn't move collections detected as sharded when it begins moving
-var st = new ShardingTest({ shards : 2, mongos : 2, verbose : 1 })
+var st = new ShardingTest({ shards : 2, mongos : 2, verbose : 1 });
 
 // Stop balancer, otherwise mongosB may load information about the database non-deterministically
 st.stopBalancer();
 
-var mongosA = st.s0
-var mongosB = st.s1
+var mongosA = st.s0;
+var mongosB = st.s1;
 
-var adminA = mongosA.getDB( "admin" )
-var adminB = mongosB.getDB( "admin" )
+var adminA = mongosA.getDB( "admin" );
+var adminB = mongosB.getDB( "admin" );
 
-var configA = mongosA.getDB( "config" )
-var configB = mongosB.getDB( "config" )
+var configA = mongosA.getDB( "config" );
+var configB = mongosB.getDB( "config" );
 
 // Populate some data
 assert.writeOK(mongosA.getCollection("foo.coll0").insert({ hello : "world" }));
@@ -37,18 +37,18 @@ printjson( adminA.runCommand({ shardCollection : "bar.coll1", key : { _id : 1 } 
 printjson( adminA.runCommand({ shardCollection : "bar.coll2", key : { _id : 1 } }) );
 
 // All collections are now on primary shard
-var fooPrimaryShard = configA.databases.findOne({ _id : "foo" }).primary
-var barPrimaryShard = configA.databases.findOne({ _id : "bar" }).primary
+var fooPrimaryShard = configA.databases.findOne({ _id : "foo" }).primary;
+var barPrimaryShard = configA.databases.findOne({ _id : "bar" }).primary;
 
-var shards = configA.shards.find().toArray()
-var fooPrimaryShard = fooPrimaryShard == shards[0]._id ? shards[0]  : shards[1]
-var fooOtherShard = fooPrimaryShard._id == shards[0]._id ? shards[1]  : shards[0]
-var barPrimaryShard = barPrimaryShard == shards[0]._id  ? shards[0] : shards[1] 
-var barOtherShard = barPrimaryShard._id == shards[0]._id  ? shards[1] : shards[0] 
+var shards = configA.shards.find().toArray();
+var fooPrimaryShard = fooPrimaryShard == shards[0]._id ? shards[0]  : shards[1];
+var fooOtherShard = fooPrimaryShard._id == shards[0]._id ? shards[1]  : shards[0];
+var barPrimaryShard = barPrimaryShard == shards[0]._id  ? shards[0] : shards[1]; 
+var barOtherShard = barPrimaryShard._id == shards[0]._id  ? shards[1] : shards[0]; 
 
 st.printShardingStatus();
 
-jsTest.log( "Running movePrimary for foo through mongosA ..." )
+jsTest.log( "Running movePrimary for foo through mongosA ..." );
 
 // MongosA should already know about all the collection states
 printjson( adminA.runCommand({ movePrimary : "foo", to : fooOtherShard._id }) );

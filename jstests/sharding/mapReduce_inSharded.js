@@ -4,14 +4,14 @@ var verifyOutput = function(out) {
     assert.eq(out.counts.emit, 51200, "emit count is wrong");
     assert.gt(out.counts.reduce, 99, "reduce count is wrong");
     assert.eq(out.counts.output, 512, "output count is wrong");
-}
+};
 
 var st = new ShardingTest({ shards : 2, verbose : 1, mongos : 1, other : { chunkSize: 1 } });
 st.startBalancer();
 
-st.adminCommand( { enablesharding : "mrShard" } )
+st.adminCommand( { enablesharding : "mrShard" } );
 st.ensurePrimaryShard('mrShard', 'shard0001');
-st.adminCommand( { shardcollection : "mrShard.srcSharded", key : { "_id" : 1 } } )
+st.adminCommand( { shardcollection : "mrShard.srcSharded", key : { "_id" : 1 } } );
 
 var db = st.getDB( "mrShard" );
 
@@ -24,7 +24,7 @@ for (j = 0; j < 100; j++) {
 assert.writeOK(bulk.execute());
 
 function map() { emit(this.i, 1); }
-function reduce(key, values) { return Array.sum(values) } 
+function reduce(key, values) { return Array.sum(values); } 
 
 // sharded src
 var suffix = "InSharded";

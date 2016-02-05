@@ -7,19 +7,19 @@ var mongos = st.s;
 
 var admin = mongos.getDB("admin");
 db = mongos.getDB("test");
-var coll = db.getCollection("stuff")
+var coll = db.getCollection("stuff");
 
 assert.commandWorked(admin.runCommand({ enablesharding : coll.getDB().getName() }));
 st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 
-var data = "x"
-var nsq = 16
-var n = 255
+var data = "x";
+var nsq = 16;
+var n = 255;
 
-for( var i = 0; i < nsq; i++ ) data += data
+for( var i = 0; i < nsq; i++ ) data += data;
 
-dataObj = {}
-for( var i = 0; i < n; i++ ) dataObj["data-" + i] = data
+dataObj = {};
+for( var i = 0; i < n; i++ ) dataObj["data-" + i] = data;
 
 var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < 40; i++ ) {
@@ -29,11 +29,11 @@ assert.writeOK(bulk.execute());
 
 assert.eq( 40 , coll.count() , "prep1" );
 
-printjson( coll.stats() )
+printjson( coll.stats() );
 
-admin.printShardingStatus()
+admin.printShardingStatus();
 
-admin.runCommand({ shardcollection : "" + coll, key : { _id : 1 } })
+admin.runCommand({ shardcollection : "" + coll, key : { _id : 1 } });
 
 assert.lt( 5 , mongos.getDB( "config" ).chunks.find( { ns : "test.stuff" } ).count() , "not enough chunks" );
 

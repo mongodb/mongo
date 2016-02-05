@@ -21,7 +21,7 @@ db = s.getDB( "test" );
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
 
-bigString = ""
+bigString = "";
 while ( bigString.length < 10000 )
     bigString += "asdasdasdasdadasdasdasdasdasdasdasdasda";
 
@@ -42,7 +42,7 @@ primary = s.getServer( "test" ).getDB( "test" );
 secondary = s.getOther( primary ).getDB( "test" );
 
 // Make sure that we don't move that chunk if it goes past what we consider the maximum chunk size
-print("Checkpoint 1a")
+print("Checkpoint 1a");
 max = 200 * 1024 * 1024;
 assert.throws(function() {
         s.adminCommand({ movechunk: "test.foo",
@@ -58,7 +58,7 @@ s.adminCommand( { movechunk : "test.foo" , find : { _id : 1 } , to : secondary.g
 after = s.config.chunks.find().toArray();
 assert.neq( before[0].shard , after[0].shard , "move chunk did not work" );
 
-s.config.changelog.find().forEach( printjson )
+s.config.changelog.find().forEach( printjson );
 
 s.stop();
 

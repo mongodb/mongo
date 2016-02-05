@@ -4,7 +4,7 @@
 // version initialization.
 //
 
-jsTest.log("Start config servers...")
+jsTest.log("Start config servers...");
 
 var configSvrA = MongoRunner.runMongod({ configsvr: "", journal: "", verbose : 2 });
 var configSvrB = MongoRunner.runMongod({ configsvr: "", journal: "", verbose : 2 });

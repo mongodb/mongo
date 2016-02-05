@@ -5,31 +5,31 @@ var st = new ShardingTest({ name: "mongos_no_detect_sharding",
                             shards: 1,
                             mongos: 2 });
 
-var mongos = st.s
-var config = mongos.getDB("config")
+var mongos = st.s;
+var config = mongos.getDB("config");
 
-config.settings.update({ _id : "balancer" }, { $set : { stopped : true } }, true )
-
-
-print( "Creating unsharded connection..." )
+config.settings.update({ _id : "balancer" }, { $set : { stopped : true } }, true );
 
 
-var mongos2 = st._mongos[1]
+print( "Creating unsharded connection..." );
 
-var coll = mongos2.getCollection( "test.foo" )
-coll.insert({ i : 0 })
 
-print( "Sharding collection..." )
+var mongos2 = st._mongos[1];
 
-var admin = mongos.getDB("admin")
+var coll = mongos2.getCollection( "test.foo" );
+coll.insert({ i : 0 });
 
-assert.eq( coll.getShardVersion().ok, 0 )
+print( "Sharding collection..." );
 
-admin.runCommand({ enableSharding : "test" })
-admin.runCommand({ shardCollection : "test.foo", key : { _id : 1 } })
+var admin = mongos.getDB("admin");
 
-print( "Seeing if data gets inserted unsharded..." )
-print( "No splits occur here!" )
+assert.eq( coll.getShardVersion().ok, 0 );
+
+admin.runCommand({ enableSharding : "test" });
+admin.runCommand({ shardCollection : "test.foo", key : { _id : 1 } });
+
+print( "Seeing if data gets inserted unsharded..." );
+print( "No splits occur here!" );
 
 // Insert a bunch of data which should trigger a split
 var bulk = coll.initializeUnorderedBulkOp();
@@ -38,10 +38,10 @@ for( var i = 0; i < 100; i++ ){
 }
 assert.writeOK(bulk.execute());
 
-config.printShardingStatus( true )
+config.printShardingStatus( true );
 
-assert.eq( coll.getShardVersion().ok, 1 )
-assert.eq( 101, coll.find().itcount() )
+assert.eq( coll.getShardVersion().ok, 1 );
+assert.eq( 101, coll.find().itcount() );
 
 st.stop();
 

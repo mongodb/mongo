@@ -11,7 +11,7 @@ initDB = function( name ){
     assert.eq( 3 , c.count() );
     
     return s.getServer( name );
-}
+};
 
 from = initDB( "test1" );
 to = s.getOther( from );

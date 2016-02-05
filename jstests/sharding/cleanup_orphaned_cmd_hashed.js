@@ -69,4 +69,4 @@ jsTest.log( "DONE!" );
 
 st.stop();
 
-})()
+})();

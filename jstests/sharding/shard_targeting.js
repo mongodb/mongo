@@ -17,7 +17,7 @@ var res;
 //
 
 // Shard key is the same with command name.
-s.shardColl("foo", {count: 1}, { count: "" })
+s.shardColl("foo", {count: 1}, { count: "" });
 
 for (var i=0; i<50; i++) {
   db.foo.insert({count: i}); // chunk [MinKey, ""), including numbers
@@ -40,7 +40,7 @@ assert.eq(res.n, 100);
 //
 db.foo.drop();
 // Shard key is the same with command name.
-s.shardColl("foo", {mapReduce: 1}, { mapReduce: "" })
+s.shardColl("foo", {mapReduce: 1}, { mapReduce: "" });
 
 for (var i=0; i<50; i++) {
   db.foo.insert({mapReduce: i}); // to the chunk including number

@@ -68,7 +68,7 @@ assert.eq( 50 , s.config.big.find().itcount() , "C2" );
 assert.eq( 50 , s.config.big.find().count() , "C3" );
 assert.eq( 50 , s.config.big.find().batchSize(5).itcount() , "C4" );
 
-var hashes = []
+var hashes = [];
 
 for ( i=0; i<3; i++ ){
     print( i );

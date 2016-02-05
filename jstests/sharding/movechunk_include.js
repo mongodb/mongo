@@ -25,11 +25,11 @@ function setupMoveChunkTest(st) {
     }
     assert.writeOK(bulk.execute());
 
-    var stats = st.chunkCounts( "foo" )
-    var to = ""
+    var stats = st.chunkCounts( "foo" );
+    var to = "";
     for ( shard in stats ){
         if ( stats[shard] == 0 ) {
-            to = shard
+            to = shard;
             break;
         }
     }
@@ -37,5 +37,5 @@ function setupMoveChunkTest(st) {
                                     find : { _id : 1 } ,
                                     to : to ,
                                     _waitForDelete : true} ); //some tests need this...
-    assert(result, "movechunk failed: " + tojson( result ) )
+    assert(result, "movechunk failed: " + tojson( result ) );
 }

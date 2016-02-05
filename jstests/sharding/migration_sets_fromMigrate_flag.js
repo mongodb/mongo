@@ -163,4 +163,4 @@ assert.eq(1, recipientOplogRes, "fromMigrate flag wasn't set on the recipient sh
 jsTest.log('DONE!');
 st.stop();
 
-})()
+})();

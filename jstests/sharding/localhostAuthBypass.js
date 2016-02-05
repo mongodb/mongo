@@ -36,7 +36,7 @@ var addShard = function(st, shouldPass) {
 
 
 var findEmptyShard = function(st, ns) {
-    var counts = st.chunkCounts( "foo" )
+    var counts = st.chunkCounts( "foo" );
 
     for(shard in counts){
         if(counts[shard] == 0) {
@@ -258,6 +258,6 @@ var runTest = function() {
     extraShards.forEach(function(sh) {
         MongoRunner.stopMongod(sh);
     });
-}
+};
 
 runTest();

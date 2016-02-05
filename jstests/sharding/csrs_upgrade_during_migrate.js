@@ -51,7 +51,7 @@ var st;
         conf.members[secondaryIndex].hidden = true;
         conf.members[secondaryIndex].slaveDelay = delayed ? 30 : 0;
         reconfig(rst, conf);
-    }
+    };
 
     jsTest.log("Setting up SCCC sharded cluster")
     st = new ShardingTest({

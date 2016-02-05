@@ -61,4 +61,4 @@ assert.eq(1, mongos.getDB('config').chunks.count({ns: ns, min: {a: -1}, max: {a:
 
 st.stop();
 
-})()
+})();

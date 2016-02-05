@@ -39,7 +39,7 @@ assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B" );
 
 s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
 //s.adminCommand( { movechunk : "test.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
-s.printChunks()
+s.printChunks();
 
 print( "* A" );
 
@@ -50,7 +50,7 @@ s2.getDB( "test" ).foo.save( { num : 2 } );
 assert.soon( 
     function(){
         return 8 == s2.getDB( "test" ).foo.find().toArray().length;
-    } , "other B 2" , 5000 , 100 )
+    } , "other B 2" , 5000 , 100 );
 
 assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards" );
 

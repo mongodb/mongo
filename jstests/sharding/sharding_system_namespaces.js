@@ -67,5 +67,5 @@ if (Array.contains(storageEngines, "wiredTiger")) {
     checkCollectionOptions(anotherShard.getDB("test"));
 }
 else {
-    print("Skipping test. wiredTiger engine not supported by mongod binary.")
+    print("Skipping test. wiredTiger engine not supported by mongod binary.");
 }

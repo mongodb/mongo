@@ -36,7 +36,7 @@ var checkForSeenNS = function( threadStats, regex ) {
             assert( !( regex.test( seenNSes ) ) );
         }
     }
-}
+};
 
 checkForSeenNS( mongodThreadStats, /^foo.tmp/ );
 checkForSeenNS( mongosThreadStats, /^foo.tmp/ );

@@ -6,19 +6,19 @@ var st = new ShardingTest({ name: "HostNames",
                             mongos: 2,
                             other: { rs : true } });
 
-var rsA = new ReplSetTest({ nodes : 2, name : "rsA" })
-var rsB = new ReplSetTest({ nodes : 2, name : "rsB" })
+var rsA = new ReplSetTest({ nodes : 2, name : "rsA" });
+var rsB = new ReplSetTest({ nodes : 2, name : "rsB" });
 
-rsA.startSet()
-rsB.startSet()
-rsA.initiate()
-rsB.initiate()
-rsA.getPrimary()
-rsB.getPrimary()
+rsA.startSet();
+rsB.startSet();
+rsA.initiate();
+rsB.initiate();
+rsA.getPrimary();
+rsB.getPrimary();
 
-var mongos = st.s
-var config = mongos.getDB("config")
-var admin = mongos.getDB("admin")
+var mongos = st.s;
+var config = mongos.getDB("config");
+var admin = mongos.getDB("admin");
 
 assert( admin.runCommand({ addShard : rsA.getURL(), name : rsB.name }).ok );
 printjson( config.shards.find().toArray() );
@@ -39,7 +39,7 @@ assert.eq(rsA.getURL(), config.shards.findOne({_id:rsB.name})["host"], "Wrong ho
 
 // Re-add shard
 assert( admin.runCommand({ addShard : rsB.getURL(), name : rsA.name }).ok );
-printjson( config.shards.find().toArray() )
+printjson( config.shards.find().toArray() );
 
 assert.eq(2, config.shards.count(), "Error re-adding a shard");
 assert.eq(rsB.getURL(), config.shards.findOne({_id:rsA.name})["host"], "Wrong host for shard rsA 3");

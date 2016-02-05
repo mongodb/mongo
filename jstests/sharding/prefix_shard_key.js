@@ -33,14 +33,14 @@ for( i=0 ; i<100; i++){
 assert.writeOK(bulk.execute());
 
 //no usable index yet, should throw
-assert.throws( function(){ s.adminCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } ) } )
+assert.throws( function(){ s.adminCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } ); } );
 
 //create usable index
 assert.commandWorked(coll.ensureIndex({ num: 1, x: 1 }));
 
 //usable index, but doc with empty 'num' value, so still should throw
 assert.writeOK(coll.insert({ x: -5 }));
-assert.throws( function(){ s.adminCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } ) } )
+assert.throws( function(){ s.adminCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } ); } );
 
 //remove the bad doc.  now should finally succeed
 assert.writeOK(coll.remove({ x: -5 }));
@@ -58,7 +58,7 @@ s.awaitBalance( coll.getName(), db.getName() );
 assert.soon( function(){
     print( "Waiting for migration cleanup to occur..." );
     return coll.count() == coll.find().itcount();
-})
+});
 
 s.stopBalancer();
 
@@ -180,7 +180,7 @@ for( i=0; i < 3; i++ ){
     assert.soon( function(){
         print( "Waiting for migration cleanup to occur..." );
         return coll2.count() == coll2.find().itcount();
-    })
+    });
     
     // check no orphaned docs on the shards
     assert.eq( 0 , shard0.getCollection( coll2 + "" ).find().itcount() );

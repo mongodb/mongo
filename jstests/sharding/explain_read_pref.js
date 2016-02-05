@@ -26,7 +26,7 @@ var assertCorrectTargeting = function(explain, isMongos, secExpected) {
     else {
         assert(isMaster.ismaster);
     }
-}
+};
 
 var testAllModes = function(conn, isMongos) {
 

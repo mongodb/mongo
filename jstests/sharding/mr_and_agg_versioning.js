@@ -1,6 +1,6 @@
 // Test that map reduce and aggregate properly handle shard versioning.
 (function() {
-"use strict"
+"use strict";
 
 var st = new ShardingTest({shards: 2, mongos: 3});
 
@@ -34,14 +34,14 @@ st.shard1.getCollection(collName).insert({_id: numDocs, key: numKeys, value: num
 
 jsTest.log("Doing mapReduce");
 
-var map = function(){ emit( this.key, this.value ) }
+var map = function(){ emit( this.key, this.value ); };
 var reduce = function(k, values){
     var total = 0;
     for(var i = 0; i < values.length; i++) {
         total += values[i];
     }
     return total;
-}
+};
 function validateOutput(output) {
     assert.eq(output.length, numKeys, tojson(output));
     for(var i = 0; i < output.length; i++) {

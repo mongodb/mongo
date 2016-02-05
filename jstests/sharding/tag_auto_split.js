@@ -8,16 +8,16 @@ var s = new ShardingTest({ name: "tag_auto_split",
 
 db = s.getDB( "test" );
 
-s.adminCommand( { enablesharding : "test" } )
+s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 
 assert.eq( 1, s.config.chunks.count() );
 
-sh.addShardTag( "shard0000" , "a" )
+sh.addShardTag( "shard0000" , "a" );
 
-sh.addTagRange( "test.foo" , { _id : 5 } , { _id : 10 } , "a" )
-sh.addTagRange( "test.foo" , { _id : 10 } , { _id : 15 } , "b" )
+sh.addTagRange( "test.foo" , { _id : 5 } , { _id : 10 } , "a" );
+sh.addTagRange( "test.foo" , { _id : 10 } , { _id : 15 } , "b" );
 
 assert.soon( function() {
     //printjson( sh.status() );
@@ -36,16 +36,16 @@ s = new ShardingTest({ name: "tag_auto_split2",
 
 db = s.getDB( "test" );
 
-s.adminCommand( { enablesharding : "test" } )
+s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1, a : 1 } } );
 
 assert.eq( 1, s.config.chunks.count() );
 
-sh.addShardTag( "shard0000" , "a" )
+sh.addShardTag( "shard0000" , "a" );
 
-sh.addTagRange( "test.foo" , { _id : 5 } , { _id : 10 } , "a" )
-sh.addTagRange( "test.foo" , { _id : 10 } , { _id : 15 } , "b" )
+sh.addTagRange( "test.foo" , { _id : 5 } , { _id : 10 } , "a" );
+sh.addTagRange( "test.foo" , { _id : 10 } , { _id : 15 } , "b" );
 
 assert.soon( function() {
     //printjson( sh.status() );

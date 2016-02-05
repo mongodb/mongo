@@ -127,11 +127,11 @@ assert.eq(result.ok, 1, tojson(result));
 s.getDB("admin").runCommand({enableSharding : "test"});
 s.getDB("admin").runCommand({shardCollection : "test.foo", key : {x : 1}});
 
-d1.waitForState( d1.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000 )
+d1.waitForState( d1.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000 );
 
 s.getDB(testUser.db).createUser({user: testUser.username,
                                  pwd: testUser.password,
-                                 roles: jsTest.basicUserRoles})
+                                 roles: jsTest.basicUserRoles});
 s.getDB(testUserReadOnly.db).createUser({user: testUserReadOnly.username,
                                          pwd: testUserReadOnly.password,
                                          roles: jsTest.readOnlyUserRoles});
@@ -170,12 +170,12 @@ shardName = authutil.asCluster(d2.nodes, "jstests/libs/key1",
 print("adding shard "+shardName);
 login(adminUser);
 print("logged in");
-result = s.getDB("admin").runCommand({addShard : shardName})
+result = s.getDB("admin").runCommand({addShard : shardName});
 
 ReplSetTest.awaitRSClientHosts(s.s, d1.nodes, {ok: true });
 ReplSetTest.awaitRSClientHosts(s.s, d2.nodes, {ok: true });
 
-s.getDB("test").foo.remove({})
+s.getDB("test").foo.remove({});
 
 var num = 10000;
 var bulk = s.getDB("test").foo.initializeUnorderedBulkOp();
@@ -201,7 +201,7 @@ assert.soon(function() {
 
 //SERVER-3645
 //assert.eq(s.getDB("test").foo.count(), num+1);
-var numDocs = s.getDB("test").foo.find().itcount()
+var numDocs = s.getDB("test").foo.find().itcount();
 if (numDocs != num) {
     // Missing documents. At this point we're already in a failure mode, the code in this statement
     // is to get a better idea how/why it's failing.
@@ -219,7 +219,7 @@ if (numDocs != num) {
         lastDocNumber = docs[i].x;
         numDocsSeen++;
     }
-    assert.eq(numDocs, numDocsSeen, "More docs discovered on second find()")
+    assert.eq(numDocs, numDocsSeen, "More docs discovered on second find()");
     assert.eq(num - numDocs, missingDocNumbers.length);
 
     load('jstests/libs/trace_missing_docs.js');
@@ -292,11 +292,11 @@ print("result: " + x);
 // Test read only users
 print( "starting read only tests" );
 
-var readOnlyS = new Mongo( s.getDB( "test" ).getMongo().host )
+var readOnlyS = new Mongo( s.getDB( "test" ).getMongo().host );
 var readOnlyDB = readOnlyS.getDB( "test" );
 
 print( "   testing find that should fail" );
-assert.throws( function(){ readOnlyDB.foo.findOne(); } )
+assert.throws( function(){ readOnlyDB.foo.findOne(); } );
 
 print( "   logging in" );
 login( testUserReadOnly , readOnlyS );

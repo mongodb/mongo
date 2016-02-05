@@ -5,10 +5,10 @@
 (function() {
 "use strict";
 
-var st = new ShardingTest({ shards : 1, mongos : 1 })
+var st = new ShardingTest({ shards : 1, mongos : 1 });
 
-var mongos = st.s
-var coll = mongos.getCollection( "foo.bar" )
+var mongos = st.s;
+var coll = mongos.getCollection( "foo.bar" );
 
 jsTestLog( "Stopping config servers" );
 for (var i = 0; i < st._configServers.length; i++) {
@@ -18,17 +18,17 @@ for (var i = 0; i < st._configServers.length; i++) {
 // Make sure mongos has no database info currently loaded
 mongos.getDB( "admin" ).runCommand({ flushRouterConfig : 1 });
 
-jsTestLog( "Config flushed and config servers down!" )
+jsTestLog( "Config flushed and config servers down!" );
 
 // Throws transport error first and subsequent times when loading config data, not no primary
 for( var i = 0; i < 2; i++ ){
     try {
-        coll.findOne()
+        coll.findOne();
         // Should always throw
-        assert( false )
+        assert( false );
     }
     catch( e ) {
-        printjson( e )
+        printjson( e );
 
         // Make sure we get a transport error, and not a no-primary error
         assert(e.code == 8002 ||        // SCCC config down, for v3.0 compatibility.

@@ -17,7 +17,7 @@ assert.commandWorked(testDB.adminCommand({ enableSharding: 'test' }));
 st.ensurePrimaryShard('test', 'shard0000');
 assert.commandWorked(testDB.adminCommand({ shardCollection: 'test.foo', key: { x: 1 }}));
 
-var inserts = []
+var inserts = [];
 for (var i = 0; i < 100; i++) {
     inserts.push({x:i});
 }

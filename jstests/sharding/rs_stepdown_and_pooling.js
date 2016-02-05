@@ -64,7 +64,7 @@ else {
     
         if (result != null) printjson(result);
         assert.eq(null, result);
-    }
+    };
     
     stepDown(primary, 0);
     

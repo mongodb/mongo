@@ -23,7 +23,7 @@ db.printShardingStatus();
 // insert stuff
 var numitems = 1000;
 for(i = 0; i < numitems; i++ ){
-    t.insert( { a: i } )
+    t.insert( { a: i } );
 }
 // check they all got inserted
 assert.eq( t.find().count() , numitems , "count off after inserts" );
@@ -39,7 +39,7 @@ var res = db.adminCommand( { movechunk : ns ,
                              find : { a : 0 } ,
                              bounds : [ chunk.min , chunk.max ] ,
                              to:  "shard0000"  } );
-assert.eq( res.ok , 0 , "moveChunk shouldn't work with invalid specification method")
+assert.eq( res.ok , 0 , "moveChunk shouldn't work with invalid specification method");
 
 // now move a chunk using the lower/upper bound method. should work.
 var res = db.adminCommand( { movechunk : ns ,
@@ -61,4 +61,4 @@ assert.eq( res.ok , 1 , "movechunk using find query didn't work" );
 assert.eq( t.find().itcount() , numitems , "count off after migrate" );
 printjson( t.find().explain() );
 
-s.stop()
+s.stop();

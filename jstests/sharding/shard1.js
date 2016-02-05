@@ -25,11 +25,11 @@ assert.throws( function(){ s.adminCommand({ shardCollection: 'test', key: { x: 1
 assert.throws( function(){ s.adminCommand({ shardCollection: '.foo', key: { x: 1 }}); });
 
 var cconfig = s.config.collections.findOne( { _id : "test.foo" } );
-assert( cconfig , "why no collection entry for test.foo" )
+assert( cconfig , "why no collection entry for test.foo" );
 
-delete cconfig.lastmod
-delete cconfig.dropped
-delete cconfig.lastmodEpoch
+delete cconfig.lastmod;
+delete cconfig.dropped;
+delete cconfig.lastmodEpoch;
 
 assert.eq(cconfig,
           { _id : "test.foo" , key : { num : 1 } , unique : false },

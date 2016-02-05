@@ -61,7 +61,7 @@ adminDb = authenticatedConn.getDB("admin");
 
 var configDb = authenticatedConn.getDB("config");
 
-var inputDb = authenticatedConn.getDB("input")
+var inputDb = authenticatedConn.getDB("input");
 inputDb.createUser({user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
 
 var outputDb = authenticatedConn.getDB("output");

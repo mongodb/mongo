@@ -107,9 +107,9 @@ ReplSetTest.awaitRSClientHosts(collSOk.getMongo(), [rsB.getSecondaries()[0]],
 print("SlaveOK Query...");
 var sOKCount = collSOk.find().itcount();
 
-var collCount = null
+var collCount = null;
 try{
-    print("Normal query...")
+    print("Normal query...");
     collCount = coll.find().itcount();
 }
 catch(e){
@@ -117,7 +117,7 @@ catch(e){
 
     // There may have been a stepdown caused by step 8, so we run this twice in a row. The first
     // time can error out.
-    print("Error may have been caused by stepdown, try again.")
+    print("Error may have been caused by stepdown, try again.");
     collCount = coll.find().itcount();
 }
 
