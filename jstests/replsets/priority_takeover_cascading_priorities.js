@@ -32,6 +32,8 @@
     };
 
     waitForPrimary(0);
+    // Wait until all nodes get the "no-op" of "new primary" after initial sync.
+    waitUntilAllNodesCaughtUp(replSet.nodes);
     replSet.stop(0);
 
     waitForPrimary(1);
