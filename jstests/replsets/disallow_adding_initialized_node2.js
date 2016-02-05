@@ -5,6 +5,9 @@
 // Add B_0 to the replica set A.
 // Start B_0.
 // B_0 should show up in A's replica set status as DOWN.
+
+// This test requires users to persist across a restart.
+// @tags: [requires_persistence]
 (function () {
     'use strict';
 
