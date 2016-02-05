@@ -189,13 +189,7 @@ public:
         int n = cmdObj.getIntField("n");
         bool inc = cmdObj.getBoolField("inc");  // inclusive range?
 
-        if (n <= 0) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::BadValue, "n must be a positive integer"});
-        }
-
         Client::WriteContext ctx(txn, nss.ns());
-
         Collection* collection = ctx.getCollection();
         massert(13417, "captrunc collection not found or empty", collection);
 
