@@ -1332,6 +1332,21 @@ __split_internal_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
 }
 
 /*
+ * __wt_split_drain --
+ *	Wait for ongoing splits to drain.
+ */
+void
+__wt_split_drain(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	while (btree->split_busy > 0)
+		__wt_yield();
+}
+
+/*
  * __split_internal_should_split --
  *	Return if we should split an internal page.
  */
@@ -1383,10 +1398,35 @@ __split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
 static int
 __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *parent;
 	WT_REF *ref;
 	bool parent_hazard;
+
+	btree = S2BT(session);
+	parent = NULL;
+	parent_hazard = false;
+
+	/*
+	 * Disallow internal splits during the final pass of a checkpoint. Most
+	 * splits are already disallowed during checkpoints, but an important
+	 * exception is insert splits. The danger is an insert split creates a
+	 * new chunk of the namespace, and then the internal split will move it
+	 * to a different part of the tree where it will be written; in other
+	 * words, in one part of the tree we'll skip the newly created insert
+	 * split chunk, but we'll write it upon finding it in a different part
+	 * of the tree.
+	 *
+	 * Checkpoints wait until the count of internal splits goes to zero;
+	 * check before doing the increment because it's easy, and afterward
+	 * to avoid any races.
+	 */
+	if (btree->checkpointing != WT_CKPT_OFF)
+		return (__split_internal_unlock(session, page, page_hazard));
+	(void)__wt_atomic_addv32(&btree->split_busy, 1);
+	if (btree->checkpointing != WT_CKPT_OFF)
+		WT_ERR(EBUSY);
 
 	/*
 	 * Page splits trickle up the tree, that is, as leaf pages grow large
@@ -1407,8 +1447,6 @@ __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 	 * Split up the tree.
 	 */
 	for (;;) {
-		parent = NULL;
-		parent_hazard = false;
 		ref = page->pg_intl_parent_ref;
 
 		/* If we don't need to split the page, we're done. */
@@ -1444,6 +1482,8 @@ err:	if (parent != NULL)
 		WT_TRET(
 		    __split_internal_unlock(session, parent, parent_hazard));
 	WT_TRET(__split_internal_unlock(session, page, page_hazard));
+
+	(void)__wt_atomic_subv32(&btree->split_busy, 1);
 
 	/* A page may have been busy, in which case return without error. */
 	WT_RET_BUSY_OK(ret);

@@ -162,6 +162,7 @@ extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPD
 extern int __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[]);
 extern void __wt_split_stash_discard(WT_SESSION_IMPL *session);
 extern void __wt_split_stash_discard_all( WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session);
+extern void __wt_split_drain(WT_SESSION_IMPL *session);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp);
 extern int __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing);
