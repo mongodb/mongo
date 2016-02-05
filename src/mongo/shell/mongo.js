@@ -312,16 +312,14 @@ Mongo.prototype.forceReadMode = function(mode) {
  * and OP_GET_MORE, or "compatibility" for detecting based on wire version).
  */
 Mongo.prototype.readMode = function() {
-    if (this._readMode !== "compatibility") {
-        if ("_readMode" in this) {
-            // We already have determined our read mode. Just return it.
-            return this._readMode;
-        }
+    // Get the readMode from the shell params if we don't have one yet.
+    if (typeof _readMode === "function" && !this.hasOwnProperty("_readMode")) {
+        this._readMode = _readMode();
+    }
 
-        // Get the readMode from the shell params.
-        if (typeof _readMode === "function") {
-            this._readMode = _readMode();
-        }
+    if (this.hasOwnProperty("_readMode") && this._readMode !== "compatibility") {
+        // We already have determined our read mode. Just return it.
+        return this._readMode;
     }
     else {
         // We're in compatibility mode. Determine whether the server supports the find/getMore
