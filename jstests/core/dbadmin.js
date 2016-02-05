@@ -27,7 +27,7 @@ sleep( 5000 );
 
 var after = db.runCommand( "serverStatus" );
 print(after.uptimeEstimate);
-assert.lt( 2 , after.uptimeEstimate , "up1" );
-assert.gt( after.uptimeEstimate , before.uptimeEstimate , "up2" );
+assert.gte( after.uptimeEstimate, before.uptimeEstimate,
+            "uptime estimate should be non-decreasing" );
 
 })();
