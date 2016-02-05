@@ -300,7 +300,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
             // TODO: optimize if block?
             if (mongoutils::str::equals("or", rest)) {
                 if (e.type() != Array)
-                    return {Status(ErrorCodes::BadValue, "$or needs an array")};
+                    return {Status(ErrorCodes::BadValue, "$or must be an array")};
                 std::unique_ptr<OrMatchExpression> temp = stdx::make_unique<OrMatchExpression>();
                 Status s = _parseTreeList(e.Obj(), temp.get(), level);
                 if (!s.isOK())
@@ -308,7 +308,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
                 root->add(temp.release());
             } else if (mongoutils::str::equals("and", rest)) {
                 if (e.type() != Array)
-                    return {Status(ErrorCodes::BadValue, "and needs an array")};
+                    return {Status(ErrorCodes::BadValue, "$and must be an array")};
                 std::unique_ptr<AndMatchExpression> temp = stdx::make_unique<AndMatchExpression>();
                 Status s = _parseTreeList(e.Obj(), temp.get(), level);
                 if (!s.isOK())
@@ -316,7 +316,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
                 root->add(temp.release());
             } else if (mongoutils::str::equals("nor", rest)) {
                 if (e.type() != Array)
-                    return {Status(ErrorCodes::BadValue, "and needs an array")};
+                    return {Status(ErrorCodes::BadValue, "$nor must be an array")};
                 std::unique_ptr<NorMatchExpression> temp = stdx::make_unique<NorMatchExpression>();
                 Status s = _parseTreeList(e.Obj(), temp.get(), level);
                 if (!s.isOK())
