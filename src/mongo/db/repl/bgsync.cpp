@@ -773,7 +773,8 @@ long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
     BSONElement hashElement = oplogEntry[hashFieldName];
     if (hashElement.eoo()) {
         severe() << "Most recent entry in " << rsOplogName << " missing \"" << hashFieldName
-                 << "\" field";
+                 << "\" field. Oplog entry: " << oplogEntry;
+
         fassertFailed(18902);
     }
     if (hashElement.type() != NumberLong) {

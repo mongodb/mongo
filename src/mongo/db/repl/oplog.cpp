@@ -305,7 +305,7 @@ unique_ptr<OplogDocWriter> _logOpWriter(OperationContext* txn,
 }
 }  // end anon namespace
 
-// Truncates the oplog to and including the "truncateTimestamp" entry.
+// Truncates the oplog to but excluding the "truncateTimestamp" entry.
 void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
     const NamespaceString oplogNss(rsOplogName);
     ScopedTransaction transaction(txn, MODE_IX);
@@ -339,8 +339,14 @@ void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
             first = false;
         }
 
-        if (tsElem.timestamp() < truncateTimestamp) {
+        if (tsElem.timestamp() == truncateTimestamp) {
             break;
+        } else if (tsElem.timestamp() < truncateTimestamp) {
+            fassertFailedWithStatusNoTrace(34411,
+                                           Status(ErrorCodes::OplogOutOfOrder,
+                                                  str::stream() << "Can't find "
+                                                                << truncateTimestamp.toString()
+                                                                << " to truncate from!"));
         }
 
         foundSomethingToTruncate = true;
