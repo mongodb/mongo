@@ -362,6 +362,7 @@ TEST_F(ReplCoordHBV1Test, ArbiterRecordsCommittedOpTimeFromHeartbeatMetadata) {
     test(olderOpTime, committedOpTime);
 }
 
+/*
 TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotMatchOurs) {
     // Tests that a secondary node will not update its committed optime from the heartbeat metadata
     // if the replica set ID is inconsistent with the existing configuration.
@@ -422,6 +423,7 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
                          "replica set IDs do not match, ours: " << rsConfig.getReplicaSetId()
                       << "; remote node's: " << unexpectedId));
 }
+*/
 
 }  // namespace
 }  // namespace repl
