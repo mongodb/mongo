@@ -193,19 +193,20 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
     ON_BLOCK_EXIT([this, session] { releaseSession(session); });
     WT_SESSION* s = session->getSession();
 
+    // This gets the token (OpTime) from the last write, before flushing (either the journal, or a
+    // checkpoint), and then reports that token (OpTime) as a durable write.
+    stdx::unique_lock<stdx::mutex> jlk(_journalListenerMutex);
+    JournalListener::Token token = _journalListener->getToken();
+
     // Use the journal when available, or a checkpoint otherwise.
     if (_engine->isDurable()) {
-        {
-            stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
-            JournalListener::Token token = _journalListener->getToken();
-            invariantWTOK(s->log_flush(s, "sync=on"));
-            _journalListener->onDurable(token);
-        }
+        invariantWTOK(s->log_flush(s, "sync=on"));
         LOG(4) << "flushed journal";
     } else {
         invariantWTOK(s->checkpoint(s, NULL));
         LOG(4) << "created checkpoint";
     }
+    _journalListener->onDurable(token);
 }
 
 void WiredTigerSessionCache::closeAll() {
