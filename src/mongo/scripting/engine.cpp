@@ -231,6 +231,10 @@ void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
             thisTime.insert(n.valuestr());
             _storedNames.insert(n.valuestr());
         } catch (const DBException& setElemEx) {
+            if (setElemEx.getCode() == ErrorCodes::Interrupted) {
+                throw;
+            }
+
             error() << "unable to load stored JavaScript function " << n.valuestr()
                     << "(): " << setElemEx.what() << endl;
         }
