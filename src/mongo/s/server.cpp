@@ -108,10 +108,51 @@ ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 static ExitCode initService();
 #endif
 
-bool dbexitCalled = false;
+static AtomicUInt32 shutdownInProgress(0);
 
 bool inShutdown() {
-    return dbexitCalled;
+    return shutdownInProgress.loadRelaxed() != 0;
+}
+void signalShutdown() {
+    // Notify all threads shutdown has started
+    shutdownInProgress.fetchAndAdd(1);
+}
+
+void exitCleanly(ExitCode code) {
+    signalShutdown();
+    {
+        Client& client = cc();
+        ServiceContext::UniqueOperationContext uniqueTxn;
+        OperationContext* txn = client.getOperationContext();
+        if (!txn) {
+            uniqueTxn = client.makeOperationContext();
+            txn = uniqueTxn.get();
+        }
+
+        auto cursorManager = grid.getCursorManager();
+        cursorManager->shutdown();
+        grid.shardRegistry()->shutdown();
+        grid.catalogManager(txn)->shutDown(txn);
+    }
+
+    dbexit(code);
+}
+
+void dbexit(ExitCode rc, const char* why) {
+    audit::logShutdown(ClientBasic::getCurrent());
+
+#if defined(_WIN32)
+    // Windows Service Controller wants to be told when we are done shutting down
+    // and call quickExit itself.
+    //
+    if (rc == EXIT_WINDOWS_SERVICE_STOP) {
+        log() << "dbexit: exiting because Windows service was stopped";
+        return;
+    }
+#endif
+
+    log() << "dbexit: " << why << " rc:" << rc;
+    quickExit(rc);
 }
 
 static BSONObj buildErrReply(const DBException& ex) {
@@ -442,46 +483,3 @@ int main(int argc, char* argv[], char** envp) {
     quickExit(exitCode);
 }
 #endif
-
-void mongo::signalShutdown() {
-    // Notify all threads shutdown has started
-    dbexitCalled = true;
-}
-
-void mongo::exitCleanly(ExitCode code) {
-    // TODO: do we need to add anything?
-    {
-        Client& client = cc();
-        ServiceContext::UniqueOperationContext uniqueTxn;
-        OperationContext* txn = client.getOperationContext();
-        if (!txn) {
-            uniqueTxn = client.makeOperationContext();
-            txn = uniqueTxn.get();
-        }
-
-        auto cursorManager = grid.getCursorManager();
-        cursorManager->shutdown();
-        grid.shardRegistry()->shutdown();
-        grid.catalogManager(txn)->shutDown(txn);
-    }
-
-    mongo::dbexit(code);
-}
-
-void mongo::dbexit(ExitCode rc, const char* why) {
-    dbexitCalled = true;
-    audit::logShutdown(ClientBasic::getCurrent());
-
-#if defined(_WIN32)
-    // Windows Service Controller wants to be told when we are done shutting down
-    // and call quickExit itself.
-    //
-    if (rc == EXIT_WINDOWS_SERVICE_STOP) {
-        log() << "dbexit: exiting because Windows service was stopped";
-        return;
-    }
-#endif
-
-    log() << "dbexit: " << why << " rc:" << rc;
-    quickExit(rc);
-}
