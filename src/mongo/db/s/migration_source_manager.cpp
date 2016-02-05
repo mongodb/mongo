@@ -326,7 +326,10 @@ bool MigrationSourceManager::transferMods(OperationContext* txn,
             return false;
         }
 
-        if (!_sessionId->matches(sessionId)) {
+        // TODO after 3.4 release, !sessionId.isEmpty() can be removed: versions >= 3.2 will
+        // all have sessionId implemented. (two more instances below).
+        // A mongod version < v3.2 will not have sessionId, in which case it is empty and ignored.
+        if (!sessionId.isEmpty() && !_sessionId->matches(sessionId)) {
             errmsg = str::stream() << "requested migration session id " << sessionId.toString()
                                    << " does not match active session id "
                                    << _sessionId->toString();
@@ -482,7 +485,8 @@ bool MigrationSourceManager::clone(OperationContext* txn,
             return false;
         }
 
-        if (!_sessionId->matches(sessionId)) {
+        // A mongod version < v3.2 will not have sessionId, in which case it is empty and ignored.
+        if (!sessionId.isEmpty() && !_sessionId->matches(sessionId)) {
             errmsg = str::stream() << "requested migration session id " << sessionId.toString()
                                    << " does not match active session id "
                                    << _sessionId->toString();
@@ -512,7 +516,8 @@ bool MigrationSourceManager::clone(OperationContext* txn,
             return false;
         }
 
-        if (!_sessionId->matches(sessionId)) {
+        // A mongod version < v3.2 will not have sessionId, in which case it is empty and ignored.
+        if (!sessionId.isEmpty() && !_sessionId->matches(sessionId)) {
             errmsg = str::stream() << "migration session id changed from " << sessionId.toString()
                                    << " to " << _sessionId->toString()
                                    << " while initial clone was active";

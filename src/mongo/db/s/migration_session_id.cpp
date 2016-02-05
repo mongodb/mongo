@@ -92,4 +92,8 @@ std::string MigrationSessionId::toString() const {
     return (_sessionId ? *_sessionId : "");
 }
 
+bool MigrationSessionId::isEmpty() const {
+    return !_sessionId;
+}
+
 }  // namespace mongo

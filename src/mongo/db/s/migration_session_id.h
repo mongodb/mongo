@@ -73,6 +73,8 @@ public:
 
     std::string toString() const;
 
+    bool isEmpty() const;
+
 private:
     MigrationSessionId();
     explicit MigrationSessionId(std::string sessionId);
