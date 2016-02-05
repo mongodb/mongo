@@ -1209,7 +1209,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	uint64_t pages_walked;
 	uint32_t walk_flags;
 	int internal_pages, restarts;
-	bool enough, modified, would_split;
+	bool enough, modified;
 
 	conn = S2C(session);
 	btree = S2BT(session);
@@ -1298,7 +1298,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			page->read_gen = __wt_cache_read_gen_new(session);
 
 fast:		/* If the page can't be evicted, give up. */
-		if (!__wt_page_can_evict(session, ref, &would_split))
+		if (!__wt_page_can_evict(session, ref, NULL))
 			continue;
 
 		/*
