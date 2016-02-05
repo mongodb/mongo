@@ -101,12 +101,6 @@ Status StorageEngineLockFile::open() {
         ::open(_filespec.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (lockFile < 0) {
         int errorcode = errno;
-        if (errorcode == EACCES) {
-            return Status(ErrorCodes::IllegalOperation,
-                          str::stream()
-                              << "Attempted to create a lock file on a read-only directory: "
-                              << _dbpath << " - did you mean to start with --readOnly?");
-        }
         return Status(ErrorCodes::DBPathInUse,
                       str::stream() << "Unable to create/open lock file: " << _filespec << ' '
                                     << errnoWithDescription(errorcode)

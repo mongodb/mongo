@@ -122,12 +122,6 @@ Status StorageEngineLockFile::open() {
 
     if (lockFileHandle == INVALID_HANDLE_VALUE) {
         int errorcode = GetLastError();
-        if (errorcode == ERROR_ACCESS_DENIED) {
-            return Status(ErrorCodes::IllegalOperation,
-                          str::stream()
-                              << "Attempted to create a lock file on a read-only directory: "
-                              << _dbpath << " - did you mean to start with --readOnly?");
-        }
         return Status(ErrorCodes::DBPathInUse,
                       str::stream() << "Unable to create/open lock file: " << _filespec << ' '
                                     << errnoWithDescription(errorcode)
