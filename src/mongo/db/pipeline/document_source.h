@@ -577,6 +577,8 @@ public:
                                                    Pipeline::SourceContainer* container) final;
     void setSource(DocumentSource* Source) final;
 
+    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+
     /**
       Create a filter.
 
@@ -586,7 +588,9 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
-    /// Returns the query in Matcher syntax.
+    /**
+     * Returns the query in MatchExpression syntax.
+     */
     BSONObj getQuery() const;
 
     /** Returns the portion of the match that can safely be promoted to before a $redact.
@@ -610,7 +614,10 @@ private:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    std::unique_ptr<Matcher> matcher;
+    void addDependencies(MatchExpression* expression, DepsTracker* deps, std::string prefix) const;
+
+    std::unique_ptr<MatchExpression> _expression;
+    BSONObj _predicate;
     bool _isTextQuery;
 };
 

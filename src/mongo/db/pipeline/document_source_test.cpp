@@ -2722,6 +2722,111 @@ public:
     }
 };
 
+class DependenciesOrExpression {
+public:
+    void run() {
+        intrusive_ptr<DocumentSourceMatch> match = makeMatch("{$or: [{a: 1}, {'x.y': {$gt: 4}}]}");
+        DepsTracker dependencies;
+        ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+        ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+        ASSERT_EQUALS(1U, dependencies.fields.count("x.y"));
+        ASSERT_EQUALS(2U, dependencies.fields.size());
+        ASSERT_EQUALS(false, dependencies.needWholeDocument);
+        ASSERT_EQUALS(false, dependencies.needTextScore);
+    }
+};
+
+class DependenciesTextExpression {
+public:
+    void run() {
+        intrusive_ptr<DocumentSourceMatch> match = makeMatch("{$text: {$search: 'hello'} }");
+        DepsTracker dependencies;
+        ASSERT_EQUALS(DocumentSource::EXHAUSTIVE_ALL, match->getDependencies(&dependencies));
+        ASSERT_EQUALS(true, dependencies.needWholeDocument);
+        ASSERT_EQUALS(false, dependencies.needTextScore);
+    }
+};
+
+class DependenciesGTEExpression {
+public:
+    void run() {
+        // Parses to {a: {$eq: {notAField: {$gte: 4}}}}.
+        intrusive_ptr<DocumentSourceMatch> match = makeMatch("{a: {notAField: {$gte: 4}}}");
+        DepsTracker dependencies;
+        ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+        ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+        ASSERT_EQUALS(1U, dependencies.fields.size());
+        ASSERT_EQUALS(false, dependencies.needWholeDocument);
+        ASSERT_EQUALS(false, dependencies.needTextScore);
+    }
+};
+
+class DependenciesElemMatchExpression {
+public:
+    void run() {
+        intrusive_ptr<DocumentSourceMatch> match = makeMatch("{a: {$elemMatch: {c: {$gte: 4}}}}");
+        DepsTracker dependencies;
+        ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+        ASSERT_EQUALS(1U, dependencies.fields.count("a.c"));
+        ASSERT_EQUALS(1U, dependencies.fields.size());
+        ASSERT_EQUALS(false, dependencies.needWholeDocument);
+        ASSERT_EQUALS(false, dependencies.needTextScore);
+    }
+};
+
+class DependenciesNotExpression {
+public:
+    void run() {
+        intrusive_ptr<DocumentSourceMatch> match = makeMatch("{b: {$not: {$gte: 4}}}}");
+        DepsTracker dependencies;
+        ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+        ASSERT_EQUALS(1U, dependencies.fields.count("b"));
+        ASSERT_EQUALS(1U, dependencies.fields.size());
+        ASSERT_EQUALS(false, dependencies.needWholeDocument);
+        ASSERT_EQUALS(false, dependencies.needTextScore);
+    }
+};
+
+class DependenciesNorExpression {
+public:
+    void run() {
+        intrusive_ptr<DocumentSourceMatch> match =
+            makeMatch("{$nor: [{'a.b': {$gte: 4}}, {'b.c': {$in: [1, 2]}}]}");
+        DepsTracker dependencies;
+        ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+        ASSERT_EQUALS(1U, dependencies.fields.count("a.b"));
+        ASSERT_EQUALS(1U, dependencies.fields.count("b.c"));
+        ASSERT_EQUALS(2U, dependencies.fields.size());
+        ASSERT_EQUALS(false, dependencies.needWholeDocument);
+        ASSERT_EQUALS(false, dependencies.needTextScore);
+    }
+};
+
+class DependenciesCommentExpression {
+public:
+    void run() {
+        intrusive_ptr<DocumentSourceMatch> match = makeMatch("{$comment: 'misleading?'}");
+        DepsTracker dependencies;
+        ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+        ASSERT_EQUALS(0U, dependencies.fields.size());
+        ASSERT_EQUALS(false, dependencies.needWholeDocument);
+        ASSERT_EQUALS(false, dependencies.needTextScore);
+    }
+};
+
+class DependenciesCommentMatchExpression {
+public:
+    void run() {
+        intrusive_ptr<DocumentSourceMatch> match = makeMatch("{a: 4, $comment: 'irrelevant'}");
+        DepsTracker dependencies;
+        ASSERT_EQUALS(DocumentSource::SEE_NEXT, match->getDependencies(&dependencies));
+        ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+        ASSERT_EQUALS(1U, dependencies.fields.size());
+        ASSERT_EQUALS(false, dependencies.needWholeDocument);
+        ASSERT_EQUALS(false, dependencies.needTextScore);
+    }
+};
+
 class Coalesce {
 public:
     void run() {
@@ -2857,6 +2962,13 @@ public:
 
         add<DocumentSourceMatch::RedactSafePortion>();
         add<DocumentSourceMatch::Coalesce>();
+        add<DocumentSourceMatch::DependenciesOrExpression>();
+        add<DocumentSourceMatch::DependenciesGTEExpression>();
+        add<DocumentSourceMatch::DependenciesElemMatchExpression>();
+        add<DocumentSourceMatch::DependenciesNotExpression>();
+        add<DocumentSourceMatch::DependenciesNorExpression>();
+        add<DocumentSourceMatch::DependenciesCommentExpression>();
+        add<DocumentSourceMatch::DependenciesCommentMatchExpression>();
     }
 };
 

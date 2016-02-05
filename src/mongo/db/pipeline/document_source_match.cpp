@@ -65,8 +65,8 @@ boost::optional<Document> DocumentSourceMatch::getNext() {
     massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
 
     while (boost::optional<Document> next = pSource->getNext()) {
-        // The matcher only takes BSON documents, so we have to make one.
-        if (matcher->matches(next->toBson()))
+        // MatchExpression only takes BSON documents, so we have to make one.
+        if (_expression->matchesBSON(next->toBson()))
             return next;
     }
 
@@ -84,8 +84,12 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::optimizeAt(
     // combine a non-text stage with a text stage, as that may turn an invalid pipeline into a
     // valid one, unbeknownst to the user.
     if (nextMatch && !nextMatch->_isTextQuery) {
-        matcher.reset(new Matcher(BSON("$and" << BSON_ARRAY(getQuery() << nextMatch->getQuery())),
-                                  ExtensionsCallbackNoop()));
+        _predicate = BSON("$and" << BSON_ARRAY(getQuery() << nextMatch->getQuery()));
+
+        StatusWithMatchExpression status =
+            uassertStatusOK(MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop()));
+        _expression = std::move(status.getValue());
+
         container->erase(std::next(itr));
         return itr;
     }
@@ -130,7 +134,7 @@ bool isTypeRedactSafeInComparison(BSONType type) {
     if (type == jstNULL)
         return false;
     if (type == Undefined)
-        return false;  // Currently a Matcher parse error.
+        return false;  // Currently a parse error.
 
     return true;
 }
@@ -274,7 +278,7 @@ Document redactSafePortionTopLevel(BSONObj query) {
             case jstNULL:
                 continue;  // can't look for missing fields
             case Undefined:
-                continue;  // Currently a Matcher parse error.
+                continue;  // Currently a parse error.
 
             case Object: {
                 Document sub = redactSafePortionDollarOps(field.Obj());
@@ -318,7 +322,7 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
 
 static void uassertNoDisallowedClauses(BSONObj query) {
     BSONForEach(e, query) {
-        // can't use the Matcher API because this would segfault the constructor
+        // can't use the MatchExpression API because this would segfault the constructor
         uassert(16395,
                 "$where is not allowed inside of a $match aggregation expression",
                 !str::equals(e.fieldName(), "$where"));
@@ -344,12 +348,47 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
 }
 
 BSONObj DocumentSourceMatch::getQuery() const {
-    return *(matcher->getQuery());
+    return _predicate;
+}
+
+DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* deps) const {
+    if (isTextQuery()) {
+        // A $text aggregation field should return EXHAUSTIVE_ALL, since we don't necessarily know
+        // what field it will be searching without examining indices.
+        deps->needWholeDocument = true;
+        return EXHAUSTIVE_ALL;
+    }
+
+    addDependencies(_expression.get(), deps, "");
+    return SEE_NEXT;
+}
+
+void DocumentSourceMatch::addDependencies(MatchExpression* expression,
+                                          DepsTracker* deps,
+                                          std::string prefix) const {
+    if (!expression->path().empty()) {
+        if (!prefix.empty()) {
+            prefix += ".";
+        }
+
+        prefix += expression->path().toString();
+    }
+
+    if (expression->numChildren()) {
+        for (size_t i = 0; i < expression->numChildren(); i++) {
+            addDependencies(expression->getChild(i), deps, prefix);
+        }
+    } else if (!expression->path().empty()) {
+        deps->fields.insert(prefix);
+    }
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                          const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx),
-      matcher(new Matcher(query.getOwned(), ExtensionsCallbackNoop())),
-      _isTextQuery(isTextQuery(query)) {}
+    : DocumentSource(pExpCtx), _predicate(query.getOwned()), _isTextQuery(isTextQuery(query)) {
+    StatusWithMatchExpression status =
+        uassertStatusOK(MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop()));
+
+    _expression = std::move(status.getValue());
+}
 }
