@@ -1969,15 +1969,13 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	/*
 	 * The act of splitting into the parent releases the pages for eviction;
-	 * ensure the page contents are correct.
+	 * ensure the page contents are consistent.
 	 */
 	WT_WRITE_BARRIER();
 
 	/*
-	 * Split into the parent. On successful return, the original page is no
-	 * longer locked, so we cannot safely look at it.
+	 * Split into the parent.
 	 */
-	page = NULL;
 	if ((ret = __split_parent(
 	    session, ref, split_ref, 2, parent_incr, false, true)) == 0)
 		return (0);
