@@ -197,20 +197,6 @@ private:
                    const HostAndPort& source,
                    stdx::function<DBClientBase*()> getConnection);
 
-    /**
-     * Evaluate if the current sync source is still good.
-     * "syncSource" is the name of the current sync source, which will be used to look up the
-     * member's heartbeat data.
-     * "syncSourceLastOpTime" is the last OpTime the sync source has. This is passed in because the
-     * data stored from heartbeats could be too stale and would cause unnecessary sync source
-     * changes.
-     * "syncSourceHasSyncSource" indicates whether our sync source is currently syncing from another
-     * member.
-     */
-    bool _shouldChangeSyncSource(const HostAndPort& syncSource,
-                                 const OpTime& syncSourceLastOpTime,
-                                 bool syncSourceHasSyncSource);
-
     // restart syncing
     void start(OperationContext* txn);
 
