@@ -6,12 +6,12 @@ are welcome to modify and redistribute it under the terms of
 <b>version 2</b></a> or
 <a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
 <b>version 3</b></a> of the
-<b>GNU General Public License</b></a>
+<b>GNU General Public License</b>
 as published by the Free Software Foundation. This program is
 distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or
 FITNESS FOR A PARTICULAR PURPOSE.  See the
-<b>GNU General Public License</b></a> for details.
+<b>GNU General Public License</b> for details.
 
 Additionally, portions of the WiredTiger distribution are distributed
 under the terms of the
@@ -45,6 +45,15 @@ of the WiredTiger library should comply with these copyrights.
 @row{\c src/support/hash_city.c, Google\, Inc., <a href="http://www.opensource.org/licenses/MIT">The MIT License</a>}
 @row{\c src/support/hash_fnv.c, Authors, Public Domain}
 </table>
+
+@section license_crc32-vpmsum 3rd party software included in the WiredTiger library on PPC64: crc32-vpmsum
+
+The PPC64 and PPC64LE builds of WiredTiger include the 3rd party software component "crc32-vpmsum" to
+use POWER8 hardware acceleration for CRC32. This library is dual-licensed
+under <b>GNU General Public License</b>
+<a href="http://www.gnu.org/licenses/gpl-2.0-standalone.html"> version 2 or later</a>
+and <a href="https://www.apache.org/licenses/LICENSE-2.0">
+Apache License 2.0 </a>. See <b>src/support/power8/LICENSE.TXT</b>.
 
 @section license_leveldb 3rd party software optionally included in the WiredTiger library: LevelDB
 
