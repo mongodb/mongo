@@ -3992,8 +3992,6 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		} else {
 			WT_RET(
 			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
-			if (upd == NULL)
-				continue;
 			recno = WT_INSERT_RECNO(ins);
 		}
 		for (;;) {
@@ -4548,8 +4546,6 @@ compare:		/*
 		} else {
 			WT_ERR(
 			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
-			if (upd == NULL)
-				continue;
 			n = WT_INSERT_RECNO(ins);
 		}
 		while (src_recno <= n) {
