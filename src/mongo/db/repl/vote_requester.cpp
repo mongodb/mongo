@@ -48,12 +48,12 @@ VoteRequester::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
                                     long long candidateIndex,
                                     long long term,
                                     bool dryRun,
-                                    OpTime lastOplogEntry)
+                                    OpTime lastDurableOpTime)
     : _rsConfig(rsConfig),
       _candidateIndex(candidateIndex),
       _term(term),
       _dryRun(dryRun),
-      _lastOplogEntry(lastOplogEntry) {
+      _lastDurableOpTime(lastDurableOpTime) {
     // populate targets with all voting members that aren't this node
     long long index = 0;
     for (auto member = _rsConfig.membersBegin(); member != _rsConfig.membersEnd(); member++) {
@@ -75,10 +75,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     requestVotesCmdBuilder.append("candidateIndex", _candidateIndex);
     requestVotesCmdBuilder.append("configVersion", _rsConfig.getConfigVersion());
 
-    BSONObjBuilder lastCommittedOp(requestVotesCmdBuilder.subobjStart("lastCommittedOp"));
-    lastCommittedOp.append("ts", _lastOplogEntry.getTimestamp());
-    lastCommittedOp.append("t", _lastOplogEntry.getTerm());
-    lastCommittedOp.done();
+    _lastDurableOpTime.append(&requestVotesCmdBuilder, "lastCommittedOp");
 
     const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();
 
@@ -150,9 +147,9 @@ StatusWith<ReplicationExecutor::EventHandle> VoteRequester::start(
     long long candidateIndex,
     long long term,
     bool dryRun,
-    OpTime lastOplogEntry,
+    OpTime lastDurableOpTime,
     const stdx::function<void()>& onCompletion) {
-    _algorithm.reset(new Algorithm(rsConfig, candidateIndex, term, dryRun, lastOplogEntry));
+    _algorithm.reset(new Algorithm(rsConfig, candidateIndex, term, dryRun, lastDurableOpTime));
     _runner.reset(new ScatterGatherRunner(_algorithm.get()));
     return _runner->start(executor, onCompletion);
 }

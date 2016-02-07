@@ -2396,7 +2396,7 @@ void TopologyCoordinatorImpl::processReplSetRequestVotes(const ReplSetRequestVot
     } else if (args.getSetName() != _rsConfig.getReplSetName()) {
         response->setVoteGranted(false);
         response->setReason("candidate's set name differs from mine");
-    } else if (args.getLastCommittedOp() < lastAppliedOpTime) {
+    } else if (args.getLastDurableOpTime() < lastAppliedOpTime) {
         response->setVoteGranted(false);
         response->setReason("candidate's data is staler than mine");
     } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
