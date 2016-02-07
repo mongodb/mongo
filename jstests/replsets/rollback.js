@@ -72,7 +72,7 @@ load("jstests/replsets/rslib.js");
             }
             // unlikely secondary isn't keeping up, but let's avoid possible intermittent 
             // issues with that.
-            bulk.execute({ w: 2 });
+            assert.writeOK(bulk.execute({ w: 2 }));
 
             var op = a.getSisterDB("local").oplog.rs.find().sort({ $natural: 1 }).limit(1)[0];
             if (tojson(op.h) != tojson(first.h)) {
@@ -97,11 +97,11 @@ load("jstests/replsets/rslib.js");
 
     conns[0].disconnect(conns[1]);
     conns[0].disconnect(conns[2]);
-    replTest.waitForState(replTest.nodes[1], ReplSetTest.State.PRIMARY, 60 * 1000);
+    replTest.waitForState(b.getMongo(), ReplSetTest.State.PRIMARY, 60 * 1000);
 
     // These 97 documents will be rolled back eventually.
     for (var i = 4; i <= 100; i++) {
-        b.bar.insert({ q: i });
+        assert.writeOK(b.bar.insert({ q: i }));
     }
     assert.eq(100, b.bar.count(), "u.count");
 
