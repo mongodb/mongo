@@ -520,8 +520,11 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         myIndex = StatusWith<int>(-1);
     }
     const ReplicaSetConfig oldConfig = _rsConfig;
+    // If we do not have an index, we should pass -1 as our index to avoid falsely adding ourself to
+    // the data structures inside of the TopologyCoordinator.
+    const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
     const PostMemberStateUpdateAction action =
-        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex.getValue());
+        _setCurrentRSConfig_inlock(cbData, newConfig, myIndexValue);
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
