@@ -40,7 +40,9 @@ const std::string kCandidateIndexFieldName = "candidateIndex";
 const std::string kCommandName = "replSetRequestVotes";
 const std::string kConfigVersionFieldName = "configVersion";
 const std::string kDryRunFieldName = "dryRun";
-const std::string kLastCommittedOpFieldName = "lastCommittedOp";
+// The underlying field name is inaccurate, but changing it requires a fair amount of cross
+// compatibility work for no real benefit.
+const std::string kLastDurableOpTimeFieldName = "lastCommittedOp";
 const std::string kOkFieldName = "ok";
 const std::string kReasonFieldName = "reason";
 const std::string kSetNameFieldName = "setName";
@@ -52,7 +54,7 @@ const std::string kLegalArgsFieldNames[] = {
     kCommandName,
     kConfigVersionFieldName,
     kDryRunFieldName,
-    kLastCommittedOpFieldName,
+    kLastDurableOpTimeFieldName,
     kSetNameFieldName,
     kTermFieldName,
 };
@@ -89,7 +91,7 @@ Status ReplSetRequestVotesArgs::initialize(const BSONObj& argsObj) {
     if (!status.isOK())
         return status;
 
-    status = bsonExtractOpTimeField(argsObj, kLastCommittedOpFieldName, &_lastCommittedOp);
+    status = bsonExtractOpTimeField(argsObj, kLastDurableOpTimeFieldName, &_lastDurableOpTime);
     if (!status.isOK())
         return status;
 
@@ -112,8 +114,8 @@ long long ReplSetRequestVotesArgs::getConfigVersion() const {
     return _cfgver;
 }
 
-OpTime ReplSetRequestVotesArgs::getLastCommittedOp() const {
-    return _lastCommittedOp;
+OpTime ReplSetRequestVotesArgs::getLastDurableOpTime() const {
+    return _lastDurableOpTime;
 }
 
 bool ReplSetRequestVotesArgs::isADryRun() const {
@@ -127,7 +129,7 @@ void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
     builder->append(kTermFieldName, _term);
     builder->appendIntOrLL(kCandidateIndexFieldName, _candidateIndex);
     builder->appendIntOrLL(kConfigVersionFieldName, _cfgver);
-    _lastCommittedOp.append(builder, kLastCommittedOpFieldName);
+    _lastDurableOpTime.append(builder, kLastDurableOpTimeFieldName);
 }
 
 Status ReplSetRequestVotesResponse::initialize(const BSONObj& argsObj) {

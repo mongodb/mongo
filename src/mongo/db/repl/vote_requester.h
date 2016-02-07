@@ -65,7 +65,7 @@ public:
                   long long candidateIndex,
                   long long term,
                   bool dryRun,
-                  OpTime lastOplogEntry);
+                  OpTime lastDurableOpTime);
         virtual ~Algorithm();
         virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
         virtual void processResponse(const executor::RemoteCommandRequest& request,
@@ -89,7 +89,7 @@ public:
         const long long _candidateIndex;
         const long long _term;
         bool _dryRun = false;  // this bool indicates this is a mock election when true
-        const OpTime _lastOplogEntry;
+        const OpTime _lastDurableOpTime;
         std::vector<HostAndPort> _targets;
         unordered_set<HostAndPort> _responders;
         bool _staleTerm = false;
@@ -115,7 +115,7 @@ public:
         long long candidateIndex,
         long long term,
         bool dryRun,
-        OpTime lastOplogEntry,
+        OpTime lastDurableOpTime,
         const stdx::function<void()>& onCompletion = stdx::function<void()>());
 
     /**
