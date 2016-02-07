@@ -276,6 +276,9 @@ bool _waitForMajority(OperationContext* txn, std::string* errMsg) {
                                 << durationCount<Seconds>(elapsedTime)
                                 << " seconds while waiting"
                                    " for deletions to be replicated to majority nodes";
+    } else if (replStatus.status.code() == ErrorCodes::InterruptedAtShutdown) {
+        *errMsg = str::stream() << "rangeDeleter interrupted by shutdown while waiting for "
+                                   "deletions to be replicated to a majority of nodes";
     } else {
         LOG(elapsedTime < Seconds(30) ? 1 : 0)
             << "rangeDeleter took " << durationCount<Seconds>(elapsedTime) << " seconds "
