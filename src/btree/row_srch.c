@@ -15,7 +15,7 @@
  */
 static inline int
 __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-    WT_INSERT_HEAD *inshead, WT_ITEM *srch_key, bool *donep)
+    WT_INSERT_HEAD *ins_head, WT_ITEM *srch_key, bool *donep)
 {
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
@@ -27,7 +27,7 @@ __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	collator = btree->collator;
 	*donep = 0;
 
-	if ((ins = WT_SKIP_LAST(inshead)) == NULL)
+	if ((ins = WT_SKIP_LAST(ins_head)) == NULL)
 		return (0);
 	key.data = WT_INSERT_KEY(ins);
 	key.size = WT_INSERT_KEY_SIZE(ins);
@@ -46,13 +46,13 @@ __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 */
 		for (i = WT_SKIP_MAXDEPTH - 1; i >= 0; i--) {
 			cbt->ins_stack[i] = (i == 0) ? &ins->next[0] :
-			    (inshead->tail[i] != NULL) ?
-			    &inshead->tail[i]->next[i] : &inshead->head[i];
+			    (ins_head->tail[i] != NULL) ?
+			    &ins_head->tail[i]->next[i] : &ins_head->head[i];
 			cbt->next_stack[i] = NULL;
 		}
 		cbt->compare = -cmp;
 		cbt->ins = ins;
-		cbt->ins_head = inshead;
+		cbt->ins_head = ins_head;
 		*donep = 1;
 	}
 	return (0);
@@ -64,7 +64,7 @@ __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
  */
 int
 __wt_search_insert(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *srch_key)
+    WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, WT_ITEM *srch_key)
 {
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
@@ -83,7 +83,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	 */
 	match = skiphigh = skiplow = 0;
 	ins = last_ins = NULL;
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;) {
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
 		if ((ins = *insp) == NULL) {
 			cbt->next_stack[i] = NULL;
 			cbt->ins_stack[i--] = insp--;
@@ -125,7 +125,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	 */
 	cbt->compare = -cmp;
 	cbt->ins = (ins != NULL) ? ins : last_ins;
-	cbt->ins_head = inshead;
+	cbt->ins_head = ins_head;
 	return (0);
 }
 
@@ -210,7 +210,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
 	WT_DECL_RET;
-	WT_INSERT_HEAD *inshead;
+	WT_INSERT_HEAD *ins_head;
 	WT_ITEM *item;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex, *parent_pindex;
@@ -479,16 +479,16 @@ leaf_only:
 			cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
 
 			F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
-			inshead = WT_ROW_INSERT_SMALLEST(page);
+			ins_head = WT_ROW_INSERT_SMALLEST(page);
 		} else {
 			cbt->slot = WT_ROW_SLOT(page,
 			    page->pg_row_d + (page->pg_row_entries - 1));
 
-			inshead = WT_ROW_INSERT_SLOT(page, cbt->slot);
+			ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 		}
 
 		WT_ERR(__search_insert_append(
-		    session, cbt, inshead, srch_key, &done));
+		    session, cbt, ins_head, srch_key, &done));
 		if (done)
 			return (0);
 	}
@@ -583,16 +583,16 @@ leaf_match:	cbt->compare = 0;
 		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
 
 		F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
-		inshead = WT_ROW_INSERT_SMALLEST(page);
+		ins_head = WT_ROW_INSERT_SMALLEST(page);
 	} else {
 		cbt->compare = -1;
 		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d + (base - 1));
 
-		inshead = WT_ROW_INSERT_SLOT(page, cbt->slot);
+		ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 	}
 
 	/* If there's no insert list, we're done. */
-	if (WT_SKIP_FIRST(inshead) == NULL)
+	if (WT_SKIP_FIRST(ins_head) == NULL)
 		return (0);
 
 	/*
@@ -601,11 +601,11 @@ leaf_match:	cbt->compare = 0;
 	 */
 	if (insert) {
 		WT_ERR(__search_insert_append(
-		    session, cbt, inshead, srch_key, &done));
+		    session, cbt, ins_head, srch_key, &done));
 		if (done)
 			return (0);
 	}
-	WT_ERR(__wt_search_insert(session, cbt, inshead, srch_key));
+	WT_ERR(__wt_search_insert(session, cbt, ins_head, srch_key));
 
 	return (0);
 
@@ -628,7 +628,7 @@ int
 __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_INSERT *ins, **start, **stop;
-	WT_INSERT_HEAD *inshead;
+	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	uint32_t choice, entries, i;
 	int level;
@@ -661,10 +661,10 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	 * are potentially badly skewed.
 	 */
 	F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
-	if ((inshead = WT_ROW_INSERT_SMALLEST(page)) == NULL)
+	if ((ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
 		return (WT_NOTFOUND);
 	for (level = WT_SKIP_MAXDEPTH - 1; level >= 0; --level) {
-		start = &inshead->head[level];
+		start = &ins_head->head[level];
 		for (entries = 0, stop = start;
 		    *stop != NULL; stop = &(*stop)->next[level])
 			++entries;
@@ -758,7 +758,7 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		ins = ins->next[0];
 
 	cbt->ins = ins;
-	cbt->ins_head = inshead;
+	cbt->ins_head = ins_head;
 	cbt->compare = 0;
 
 	return (0);
