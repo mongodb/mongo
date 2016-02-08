@@ -473,6 +473,10 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         dassert(cq);
         verify(cq->root()->matchesBSON(oldObj.value(), &matchDetails));
 
+        // If we have matched more than one array position, we cannot perform a positional update
+        // operation.
+        uassert(34411, "ambiguous positional update operation", matchDetails.isValid());
+
         string matchedField;
         if (matchDetails.hasElemMatchKey())
             matchedField = matchDetails.elemMatchKey();

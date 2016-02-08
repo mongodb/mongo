@@ -184,6 +184,12 @@ TEST(ProjectionExecTest, TransformPositionalDollar) {
 
     // Invalid position $ projections.
     testTransform("{'a.$': 1}", "{a: {$size: 1}}", "{a: [5]}", false, "");
+
+    // Ambigous position $ projections.
+    testTransform("{'a.$': 1}", "{$and: [{a: 1}, {a: 2}]}", "{a: [1, 2]}", false, "");
+    testTransform("{'a.$': 1}", "{a: 1, b: 2}", "{a: [1], b: [2]}", false, "");
+    testTransform("{'a.$': 1}", "{a: {$elemMatch: {$lt: 2}}, b: 2}", "{a: [1], b: [2]}", false, "");
+    testTransform("{'a.$': 1}", "{'a.b': 1, 'a.c': 2}", "{a: [{b: 1}, {c: 2}]}", false, "");
 }
 
 //

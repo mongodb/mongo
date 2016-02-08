@@ -73,9 +73,14 @@ public:
 
     void setElemMatchKey(const std::string& elemMatchKey);
 
+    bool isValid() const {
+        return _isValid;
+    }
+
 private:
     bool _loadedRecord;
     bool _elemMatchKeyRequested;
+    bool _isValid;
     std::unique_ptr<std::string> _elemMatchKey;
 };
 }

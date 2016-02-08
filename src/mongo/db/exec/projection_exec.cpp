@@ -264,6 +264,13 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             matchDetails.requestElemMatchKey();
             verify(NULL != _queryExpression);
             verify(_queryExpression->matchesBSON(member->obj.value(), &matchDetails));
+
+            // Performing a positional projection requires valid MatchDetails. For example,
+            // ambiguity caused by multiple implicit array traversal predicates can lead to invalid
+            // match details.
+            if (!matchDetails.isValid()) {
+                return Status(ErrorCodes::InternalError, "ambiguous positional projection");
+            }
         }
 
         Status projStatus = transform(member->obj.value(), &bob, &matchDetails);
@@ -396,6 +403,10 @@ Status ProjectionExec::transform(const BSONObj& in,
         arrayDetails.requestElemMatchKey();
 
         if (matcher->second->matchesBSON(in, &arrayDetails)) {
+            // Since we create a special matcher for each $elemMatch projection, we should always
+            // have valid MatchDetails.
+            invariant(arrayDetails.isValid());
+
             FieldMap::const_iterator fieldIt = _fields.find(elt.fieldName());
             if (_fields.end() == fieldIt) {
                 return Status(ErrorCodes::BadValue,

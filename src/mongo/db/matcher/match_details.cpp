@@ -38,7 +38,7 @@ namespace mongo {
 
 using std::string;
 
-MatchDetails::MatchDetails() : _elemMatchKeyRequested() {
+MatchDetails::MatchDetails() : _elemMatchKeyRequested(false), _isValid(true) {
     resetOutput();
 }
 
@@ -58,6 +58,9 @@ std::string MatchDetails::elemMatchKey() const {
 
 void MatchDetails::setElemMatchKey(const std::string& elemMatchKey) {
     if (_elemMatchKeyRequested) {
+        if (_elemMatchKey) {
+            _isValid = false;
+        }
         _elemMatchKey.reset(new std::string(elemMatchKey));
     }
 }
