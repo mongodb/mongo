@@ -1680,7 +1680,8 @@ public:
         shared_ptr<DBConfig> confOut = status.getValue();
 
         vector<ChunkPtr> chunks;
-        if (confOut->isSharded(config.outputOptions.finalNamespace)) {
+        bool outputIsSharded = confOut->isSharded(config.outputOptions.finalNamespace);
+        if (outputIsSharded) {
             ChunkManagerPtr cm = confOut->getChunkManager(txn, config.outputOptions.finalNamespace);
 
             // Fetch result from other shards 1 chunk at a time. It would be better to do
@@ -1701,10 +1702,12 @@ public:
         BSONObj query;
         BSONArrayBuilder chunkSizes;
         while (true) {
-            Status status = _checkForCatalogManagerChange(grid.forwardingCatalogManager(),
-                                                          initialConfigServerMode);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+            if (outputIsSharded) {
+                Status status = _checkForCatalogManagerChange(grid.forwardingCatalogManager(),
+                                                              initialConfigServerMode);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status);
+                }
             }
 
             ChunkPtr chunk;
@@ -1725,10 +1728,12 @@ public:
             int chunkSize = 0;
 
             while (cursor.more() || !values.empty()) {
-                status = _checkForCatalogManagerChange(grid.forwardingCatalogManager(),
-                                                       initialConfigServerMode);
-                if (!status.isOK()) {
-                    return appendCommandStatus(result, status);
+                if (outputIsSharded) {
+                    Status status = _checkForCatalogManagerChange(grid.forwardingCatalogManager(),
+                                                                  initialConfigServerMode);
+                    if (!status.isOK()) {
+                        return appendCommandStatus(result, status);
+                    }
                 }
 
                 BSONObj t;
