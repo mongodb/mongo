@@ -501,7 +501,7 @@ var ReplSetTest = function(opts) {
         var config  = cfg || this.getReplSetConfig();
         var cmd     = {};
         var cmdKey  = initCmd || 'replSetInitiate';
-        timeout = timeout || 60000;
+        timeout = timeout || 120000;
         if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
             config.protocolVersion = 0;
         }
