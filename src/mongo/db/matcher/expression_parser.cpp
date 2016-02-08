@@ -251,8 +251,12 @@ StatusWithMatchExpression MatchExpressionParser::_parseSubField(const BSONObj& c
         case BSONObj::opGEO_INTERSECTS:
             return expressionParserGeoCallback(name, x, context);
 
-        // Handles bitwise query operators.
+        case BSONObj::opNEAR:
+            return {Status(ErrorCodes::BadValue,
+                           mongoutils::str::stream() << "near must be first in: " << context)};
 
+
+        // Handles bitwise query operators.
         case BSONObj::opBITS_ALL_SET: {
             return _parseBitTest<BitsAllSetMatchExpression>(name, e);
         }
