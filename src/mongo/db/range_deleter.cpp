@@ -259,7 +259,7 @@ const int kWTimeoutMillis = 60 * 60 * 1000;
 
 bool _waitForMajority(OperationContext* txn, std::string* errMsg) {
     const WriteConcernOptions writeConcern(
-        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, kWTimeoutMillis);
+        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::NONE, kWTimeoutMillis);
 
     repl::ReplicationCoordinator::StatusAndDuration replStatus =
         repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpForClient(txn,
