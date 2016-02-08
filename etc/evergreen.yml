@@ -336,7 +336,7 @@ functions:
 
           # Run jstestfuzz self-tests; redirect to /dev/null to avoid polluting the logs.
           echo "jstestfuzz self-tests are starting"
-          npm test > /dev/null 2>&1
+          npm test > /dev/null
           echo "jstestfuzz self-tests finished"
 
           npm start -- --jsTestsDir ../jstests
