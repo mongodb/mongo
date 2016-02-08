@@ -192,9 +192,9 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 		 * we want to recreate the metadata from the backup.
 		 */
 		if (exist_backup) {
-			__wt_msg(session, "Both %s and %s exist. "
+			WT_RET(__wt_msg(session, "Both %s and %s exist. "
 			    "Recreating metadata from backup.",
-			    WT_METADATA_TURTLE, WT_METADATA_BACKUP);
+			    WT_METADATA_TURTLE, WT_METADATA_BACKUP));
 			WT_RET(__wt_remove_if_exists(
 			    session, WT_METAFILE));
 			WT_RET(__wt_remove_if_exists(
