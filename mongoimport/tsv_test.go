@@ -12,7 +12,7 @@ import (
 func TestTSVStreamDocument(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UnitTestType)
 	Convey("With a TSV input reader", t, func() {
-		Convey("integer valued strings should be converted", func() {
+		Convey("integer valued strings should be converted tsv1", func() {
 			contents := "1\t2\t3e\n"
 			fields := []string{"a", "b", "c"}
 			expectedRead := bson.D{
@@ -26,7 +26,7 @@ func TestTSVStreamDocument(t *testing.T) {
 			So(<-docChan, ShouldResemble, expectedRead)
 		})
 
-		Convey("integer valued strings should be converted", func() {
+		Convey("integer valued strings should be converted tsv2", func() {
 			contents := "a\tb\t\"cccc,cccc\"\td\n"
 			fields := []string{"a", "b", "c"}
 			expectedRead := bson.D{

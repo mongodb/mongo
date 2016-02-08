@@ -4,25 +4,45 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go/build"
+
 	"github.com/smartystreets/goconvey/convey/reporting"
+	"github.com/smartystreets/goconvey/web/server/messaging"
 )
 
 type Package struct {
-	Active bool
-	Path   string
-	Name   string
-	Error  error
-	Output string
-	Result *PackageResult
+	Path          string
+	Name          string
+	Ignored       bool
+	Disabled      bool
+	BuildTags     []string
+	TestArguments []string
+	Error         error
+	Output        string
+	Result        *PackageResult
+
+	HasImportCycle bool
 }
 
-func NewPackage(path string) *Package {
+func NewPackage(folder *messaging.Folder, hasImportCycle bool) *Package {
 	self := new(Package)
-	self.Active = true
-	self.Path = path
-	self.Name = resolvePackageName(path)
+	self.Path = folder.Path
+	self.Name = resolvePackageName(self.Path)
 	self.Result = NewPackageResult(self.Name)
+	self.Ignored = folder.Ignored
+	self.Disabled = folder.Disabled
+	self.BuildTags = folder.BuildTags
+	self.TestArguments = folder.TestArguments
+	self.HasImportCycle = hasImportCycle
 	return self
+}
+
+func (self *Package) Active() bool {
+	return !self.Disabled && !self.Ignored
+}
+
+func (self *Package) HasUsableResult() bool {
+	return self.Active() && (self.Error == nil || (self.Output != ""))
 }
 
 type CompleteOutput struct {
@@ -33,6 +53,7 @@ type CompleteOutput struct {
 
 var ( // PackageResult.Outcome values:
 	Ignored         = "ignored"
+	Disabled        = "disabled"
 	Passed          = "passed"
 	Failed          = "failed"
 	Panicked        = "panicked"
@@ -40,6 +61,8 @@ var ( // PackageResult.Outcome values:
 	NoTestFiles     = "no test files"
 	NoTestFunctions = "no test functions"
 	NoGoFiles       = "no go code"
+
+	TestRunAbortedUnexpectedly = "test run aborted unexpectedly"
 )
 
 type PackageResult struct {
@@ -82,13 +105,13 @@ func NewTestResult(testName string) *TestResult {
 }
 
 func resolvePackageName(path string) string {
-	index := strings.Index(path, endGoPath)
-	if index < 0 {
-		return path
+	pkg, err := build.ImportDir(path, build.FindOnly)
+	if err == nil {
+		return pkg.ImportPath
 	}
-	packageBeginning := index + len(endGoPath)
-	name := path[packageBeginning:]
-	return name
+
+	nameArr := strings.Split(path, endGoPath)
+	return nameArr[len(nameArr)-1]
 }
 
 const (

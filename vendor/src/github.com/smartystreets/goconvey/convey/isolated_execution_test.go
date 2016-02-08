@@ -1,9 +1,9 @@
 package convey
 
 import (
-	"time"
 	"strconv"
 	"testing"
+	"time"
 )
 
 func TestSingleScope(t *testing.T) {
@@ -92,6 +92,28 @@ func TestSingleScopeWithConveyAndNestedReset(t *testing.T) {
 	expectEqual(t, "1a", output)
 }
 
+func TestPanicingReset(t *testing.T) {
+	output := prepare()
+
+	Convey("1", t, func() {
+		output += "1"
+
+		Reset(func() {
+			panic("nooo")
+		})
+
+		Convey("runs since the reset hasn't yet", func() {
+			output += "a"
+		})
+
+		Convey("but this doesnt", func() {
+			output += "nope"
+		})
+	})
+
+	expectEqual(t, "1a", output)
+}
+
 func TestSingleScopeWithMultipleRegistrationsAndReset(t *testing.T) {
 	output := prepare()
 
@@ -154,14 +176,24 @@ func Test_Panic_AtHigherLevelScopePreventsChildScopesFromRunning(t *testing.T) {
 	output := prepare()
 
 	Convey("This step panics", t, func() {
-		Convey("this should NOT be executed", func() {
+		Convey("this happens, because the panic didn't happen yet", func() {
 			output += "1"
 		})
 
+		output += "a"
+
+		Convey("this should NOT be executed", func() {
+			output += "2"
+		})
+
+		output += "b"
+
 		panic("Hi")
+
+		output += "nope"
 	})
 
-	expectEqual(t, "", output)
+	expectEqual(t, "1ab", output)
 }
 
 func Test_Panic_InChildScopeDoes_NOT_PreventExecutionOfSiblingScopes(t *testing.T) {
@@ -719,6 +751,21 @@ func TestMultipleInvocationInheritance2(t *testing.T) {
 	})
 
 	expectEqual(t, "A1 A2 A3 B1 B2 A1 A2 A3 C1 C2 C3 ", output)
+}
+
+func TestSetDefaultFailureMode(t *testing.T) {
+	output := prepare()
+
+	SetDefaultFailureMode(FailureContinues) // the default is normally FailureHalts
+	defer SetDefaultFailureMode(FailureHalts)
+
+	Convey("A", t, func() {
+		output += "A1 "
+		So(true, ShouldBeFalse)
+		output += "A2 "
+	})
+
+	expectEqual(t, "A1 A2 ", output)
 }
 
 func prepare() string {

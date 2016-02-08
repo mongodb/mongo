@@ -1,14 +1,10 @@
 package contract
 
-import (
-	"net/http"
-	"os"
-	"path/filepath"
-)
+import "net/http"
 
 type (
 	Server interface {
-		ReceiveUpdate(*CompleteOutput)
+		ReceiveUpdate(root string, update *CompleteOutput)
 		Watch(writer http.ResponseWriter, request *http.Request)
 		Ignore(writer http.ResponseWriter, request *http.Request)
 		Reinstate(writer http.ResponseWriter, request *http.Request)
@@ -25,34 +21,7 @@ type (
 		ClearStatusFlag() bool
 	}
 
-	Scanner interface {
-		Scan() (changed bool)
-	}
-
-	Watcher interface {
-		Root() string
-		Adjust(root string) error
-
-		Deletion(folder string)
-		Creation(folder string)
-
-		Ignore(folders string)
-		Reinstate(folders string)
-
-		WatchedFolders() []*Package
-		IsWatched(folder string) bool
-		IsIgnored(folder string) bool
-	}
-
-	FileSystem interface {
-		Walk(root string, step filepath.WalkFunc)
-		Listing(directory string) ([]os.FileInfo, error)
-		Exists(directory string) bool
-	}
-
 	Shell interface {
-		GoTest(directory, packageName string) (output string, err error)
-		Getenv(key string) string
-		Setenv(key, value string) error
+		GoTest(directory, packageName string, tags, arguments []string) (output string, err error)
 	}
 )

@@ -7,11 +7,15 @@
 
 package reporting
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type story struct {
 	out        *Printer
 	titlesById map[string]string
+	currentKey []string
 }
 
 func (self *story) BeginStory(story *StoryReport) {}
@@ -19,11 +23,14 @@ func (self *story) BeginStory(story *StoryReport) {}
 func (self *story) Enter(scope *ScopeReport) {
 	self.out.Indent()
 
-	if _, found := self.titlesById[scope.ID]; !found {
+	self.currentKey = append(self.currentKey, scope.Title)
+	ID := strings.Join(self.currentKey, "|")
+
+	if _, found := self.titlesById[ID]; !found {
 		self.out.Println("")
 		self.out.Print(scope.Title)
 		self.out.Insert(" ")
-		self.titlesById[scope.ID] = scope.Title
+		self.titlesById[ID] = scope.Title
 	}
 }
 
@@ -46,6 +53,7 @@ func (self *story) Report(report *AssertionResult) {
 
 func (self *story) Exit() {
 	self.out.Dedent()
+	self.currentKey = self.currentKey[:len(self.currentKey)-1]
 }
 
 func (self *story) EndStory() {

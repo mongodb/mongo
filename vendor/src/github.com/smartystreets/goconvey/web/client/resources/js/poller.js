@@ -77,7 +77,7 @@ function Poller(config)
 	{
 		stopDownPoller();
 		doPoll();
-		
+
 		var wasUp = up;
 		up = true;
 		status = data;
@@ -96,7 +96,7 @@ function Poller(config)
 
 	function pollFailed(jqxhr, message, exception)
 	{
-		if (message == "timeout")
+		if (message === "timeout")
 		{
 			log("Poller timeout; re-polling...", req);
 			doPoll();	// in our case, timeout actually means no activity; poll again

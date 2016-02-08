@@ -128,9 +128,6 @@ func (self *testParser) composeCapturedOutput() {
 	self.test.Message = strings.Join(self.otherLines, "\n")
 }
 
-func isJson(line string) bool {
-	return strings.HasPrefix(line, "{")
-}
 func createArrayForJsonItems(lines []string) []byte {
 	jsonArrayItems := strings.Join(lines, "")
 	jsonArrayItems = removeTrailingComma(jsonArrayItems)

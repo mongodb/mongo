@@ -249,7 +249,10 @@ footer .paused .fa {
 
 
 
-
+.story-links a,
+.test-name-link a {
+	color: inherit;
+}
 
 
 
@@ -294,7 +297,8 @@ footer .paused .fa {
 .statusicon.panic, .statusicon.panic .fa, .panic-clr { color: #FF3232; }
 .statusicon.skip, .skip-clr { color: #AAA; }
 
-
+.ansi-green { color: #76C13C; }
+.ansi-yellow   { color: #EA9C4D; }
 
 .log .timestamp {
 	color: #999;

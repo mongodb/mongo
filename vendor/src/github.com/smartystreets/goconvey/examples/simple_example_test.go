@@ -7,6 +7,8 @@ import (
 )
 
 func TestIntegerManipulation(t *testing.T) {
+	t.Parallel()
+
 	Convey("Given a starting integer value", t, func() {
 		x := 42
 

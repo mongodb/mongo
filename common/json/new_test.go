@@ -25,7 +25,7 @@ func TestNewKeyword(t *testing.T) {
 			So(jsonValue, ShouldResemble, BinData{1, "xyz"})
 		})
 
-		Convey("can be used with BinData constructor", func() {
+		Convey("can be used with Boolean constructor", func() {
 			var jsonMap map[string]interface{}
 
 			key := "key"

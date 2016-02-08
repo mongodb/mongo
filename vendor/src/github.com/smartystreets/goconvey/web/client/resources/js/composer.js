@@ -6,7 +6,7 @@ var composer = {
 		if (!scope.title || typeof scope.depth === 'undefined')
 			return false;
 
-		return scope.title.indexOf("Test") === 0 && scope.depth == 0;
+		return scope.title.indexOf("Test") === 0 && scope.depth === 0;
 	},
 	discardLastKey: false
 };
@@ -31,8 +31,8 @@ $(function()
 	$('#input').keydown(function(e)
 	{
 		// 13=Enter, 16=Shift
-		composer.discardLastKey = e.keyCode == 13
-								|| e.keyCode == 16;
+		composer.discardLastKey = e.keyCode === 13
+								|| e.keyCode === 16;
 	}).keyup(function(e)
 	{
 		if (!composer.discardLastKey)
@@ -50,7 +50,7 @@ $(function()
 // Begin Markup.js custom pipes
 Mark.pipes.recursivelyRender = function(val)
 {
-	return !val || val.length == 0 ? "\n" : Mark.up(composer.template, val);
+	return !val || val.length === 0 ? "\n" : Mark.up(composer.template, val);
 }
 
 Mark.pipes.indent = function(val)
@@ -70,9 +70,9 @@ Mark.pipes.safeFunc = function(val)
 
 Mark.pipes.properCase = function(str)
 {
-	if (str.length == 0)
+	if (str.length === 0)
 		return "";
-	
+
 	str = str.charAt(0).toUpperCase() + str.substr(1);
 
 	if (str.length < 2)
@@ -89,7 +89,7 @@ Mark.pipes.properCase = function(str)
 Mark.pipes.showImports = function(item)
 {
 	console.log(item);
-	if (root.title == "(root)" && root.stories.length > 0)
+	if (root.title === "(root)" && root.stories.length > 0)
 		return 'import (\n\t"testing"\n\t. "github.com/smartystreets/goconvey/convey"\n)\n';
 	else
 		return "";
@@ -101,14 +101,14 @@ function generate(input)
 {
 	var root = parseInput(input);
 	$('#output').text(Mark.up(composer.template, root.stories));
-	if (root.stories.length > 0 && root.stories[0].title.substr(0, 4) == "Test")
+	if (root.stories.length > 0 && root.stories[0].title.substr(0, 4) === "Test")
 		$('#output').prepend('import (\n\t"testing"\n\t. "github.com/smartystreets/goconvey/convey"\n)\n\n');
 }
 
 function parseInput(input)
 {
 	lines = input.split("\n");
-	
+
 	if (!lines)
 		return;
 
@@ -136,7 +136,7 @@ function parseInput(input)
 			curScope = curScope.stories[curScope.stories.length - 1];
 			prevScope = curScope;
 		}
-		
+
 		// Don't go crazy, though! (avoid excessive indentation)
 		if (tabs > curScope.depth + 1)
 			tabs = curScope.depth + 1;
@@ -144,7 +144,7 @@ function parseInput(input)
 		// Only top-level Convey() calls need the *testing.T object passed in
 		var showT = composer.isFunc(prevScope)
 					|| (!composer.isFunc(curScope)
-							&& tabs == 0);
+							&& tabs === 0);
 
 		// Save the story at this scope
 		curScope.stories.push({

@@ -47,7 +47,7 @@ func TestReporterIsResetAtTheEndOfTheStory(t *testing.T) {
 
 func TestReporterNoopMethods(t *testing.T) {
 	reporter := NewGoTestReporter()
-	reporter.Enter(NewScopeReport("title", "name"))
+	reporter.Enter(NewScopeReport("title"))
 	reporter.Exit()
 }
 

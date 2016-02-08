@@ -1,7 +1,10 @@
 package executor
 
 import (
+	"errors"
+	"fmt"
 	"log"
+	"strings"
 
 	"github.com/smartystreets/goconvey/web/server/contract"
 )
@@ -20,21 +23,25 @@ func (self *ConcurrentTester) TestAll(folders []*contract.Package) {
 	if self.batchSize == 1 {
 		self.executeSynchronously(folders)
 	} else {
-		newCuncurrentCoordinator(folders, self.batchSize, self.shell).ExecuteConcurrently()
+		newConcurrentCoordinator(folders, self.batchSize, self.shell).ExecuteConcurrently()
 	}
 	return
 }
 
 func (self *ConcurrentTester) executeSynchronously(folders []*contract.Package) {
 	for _, folder := range folders {
-		if !folder.Active {
-			log.Printf("Skipping execution: %s\n", folder.Name)
+		packageName := strings.Replace(folder.Name, "\\", "/", -1)
+		if !folder.Active() {
+			log.Printf("Skipping execution: %s\n", packageName)
 			continue
 		}
-		log.Printf("Executing tests: %s\n", folder.Name)
-		folder.Output, folder.Error = self.shell.GoTest(folder.Path, folder.Name)
-		if folder.Error != nil && folder.Output == "" {
-			panic(folder.Error)
+		if folder.HasImportCycle {
+			message := fmt.Sprintf("can't load package: import cycle not allowed\npackage %s\n\timports %s", packageName, packageName)
+			log.Println(message)
+			folder.Output, folder.Error = message, errors.New(message)
+		} else {
+			log.Printf("Executing tests: %s\n", packageName)
+			folder.Output, folder.Error = self.shell.GoTest(folder.Path, packageName, folder.BuildTags, folder.TestArguments)
 		}
 	}
 }
