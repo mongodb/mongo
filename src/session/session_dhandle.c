@@ -454,7 +454,7 @@ __session_get_dhandle(
 	 * We didn't find a match in the session cache, search the shared
 	 * handle list and cache the handle we find.
 	 */
-	WT_WITH_HANDLE_LIST_LOCK(session, ret,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __session_find_shared_dhandle(session, uri, checkpoint));
 	if (ret == 0)
 		ret = __session_add_dhandle(session, NULL);
@@ -511,7 +511,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
 
 			WT_WITH_SCHEMA_LOCK(session, ret,
-			    WT_WITH_HANDLE_LIST_LOCK(session, ret,
+			    WT_WITH_HANDLE_LIST_LOCK(session,
 				ret = __wt_session_get_btree(
 				session, uri, checkpoint, cfg, flags)));
 

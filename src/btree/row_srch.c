@@ -9,18 +9,17 @@
 #include "wt_internal.h"
 
 /*
- * __wt_search_insert_append --
+ * __search_insert_append --
  *	Fast append search of a row-store insert list, creating a skiplist stack
  * as we go.
  */
 static inline int
-__wt_search_insert_append(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool *donep)
+__search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
+    WT_INSERT_HEAD *ins_head, WT_ITEM *srch_key, bool *donep)
 {
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
 	WT_INSERT *ins;
-	WT_INSERT_HEAD *inshead;
 	WT_ITEM key;
 	int cmp, i;
 
@@ -28,8 +27,7 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
 	collator = btree->collator;
 	*donep = 0;
 
-	inshead = cbt->ins_head;
-	if ((ins = WT_SKIP_LAST(inshead)) == NULL)
+	if ((ins = WT_SKIP_LAST(ins_head)) == NULL)
 		return (0);
 	key.data = WT_INSERT_KEY(ins);
 	key.size = WT_INSERT_KEY_SIZE(ins);
@@ -48,12 +46,13 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
 		 */
 		for (i = WT_SKIP_MAXDEPTH - 1; i >= 0; i--) {
 			cbt->ins_stack[i] = (i == 0) ? &ins->next[0] :
-			    (inshead->tail[i] != NULL) ?
-			    &inshead->tail[i]->next[i] : &inshead->head[i];
+			    (ins_head->tail[i] != NULL) ?
+			    &ins_head->tail[i]->next[i] : &ins_head->head[i];
 			cbt->next_stack[i] = NULL;
 		}
 		cbt->compare = -cmp;
 		cbt->ins = ins;
+		cbt->ins_head = ins_head;
 		*donep = 1;
 	}
 	return (0);
@@ -64,20 +63,18 @@ __wt_search_insert_append(WT_SESSION_IMPL *session,
  *	Search a row-store insert list, creating a skiplist stack as we go.
  */
 int
-__wt_search_insert(
-    WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key)
+__wt_search_insert(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, WT_ITEM *srch_key)
 {
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
 	WT_INSERT *ins, **insp, *last_ins;
-	WT_INSERT_HEAD *inshead;
 	WT_ITEM key;
 	size_t match, skiphigh, skiplow;
 	int cmp, i;
 
 	btree = S2BT(session);
 	collator = btree->collator;
-	inshead = cbt->ins_head;
 	cmp = 0;				/* -Wuninitialized */
 
 	/*
@@ -86,7 +83,7 @@ __wt_search_insert(
 	 */
 	match = skiphigh = skiplow = 0;
 	ins = last_ins = NULL;
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;) {
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
 		if ((ins = *insp) == NULL) {
 			cbt->next_stack[i] = NULL;
 			cbt->ins_stack[i--] = insp--;
@@ -128,6 +125,7 @@ __wt_search_insert(
 	 */
 	cbt->compare = -cmp;
 	cbt->ins = (ins != NULL) ? ins : last_ins;
+	cbt->ins_head = ins_head;
 	return (0);
 }
 
@@ -212,6 +210,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
 	WT_DECL_RET;
+	WT_INSERT_HEAD *ins_head;
 	WT_ITEM *item;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex, *parent_pindex;
@@ -486,24 +485,18 @@ leaf_only:
 			cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
 
 			F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
-			cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
+			ins_head = WT_ROW_INSERT_SMALLEST(page);
 		} else {
 			cbt->slot = WT_ROW_SLOT(page,
 			    page->pg_row_d + (page->pg_row_entries - 1));
 
-			cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
+			ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 		}
 
-		WT_ERR(
-		    __wt_search_insert_append(session, cbt, srch_key, &done));
+		WT_ERR(__search_insert_append(
+		    session, cbt, ins_head, srch_key, &done));
 		if (done)
 			return (0);
-
-		/*
-		 * Don't leave the insert list head set, code external to the
-		 * search uses it.
-		 */
-		cbt->ins_head = NULL;
 	}
 
 	/*
@@ -596,16 +589,16 @@ leaf_match:	cbt->compare = 0;
 		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
 
 		F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
-		cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
+		ins_head = WT_ROW_INSERT_SMALLEST(page);
 	} else {
 		cbt->compare = -1;
 		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d + (base - 1));
 
-		cbt->ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
+		ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 	}
 
 	/* If there's no insert list, we're done. */
-	if (WT_SKIP_FIRST(cbt->ins_head) == NULL)
+	if (WT_SKIP_FIRST(ins_head) == NULL)
 		return (0);
 
 	/*
@@ -613,12 +606,12 @@ leaf_match:	cbt->compare = 0;
 	 * catch cursors repeatedly inserting at a single point.
 	 */
 	if (insert) {
-		WT_ERR(
-		    __wt_search_insert_append(session, cbt, srch_key, &done));
+		WT_ERR(__search_insert_append(
+		    session, cbt, ins_head, srch_key, &done));
 		if (done)
 			return (0);
 	}
-	WT_ERR(__wt_search_insert(session, cbt, srch_key));
+	WT_ERR(__wt_search_insert(session, cbt, ins_head, srch_key));
 
 	return (0);
 
@@ -667,19 +660,16 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	/*
 	 * If the tree is new (and not empty), it might have a large insert
 	 * list.
-	 */
-	F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
-	if ((cbt->ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
-		return (WT_NOTFOUND);
-
-	/*
+	 *
 	 * Walk down the list until we find a level with at least 50 entries,
 	 * that's where we'll start rolling random numbers. The value 50 is
 	 * used to ignore levels with only a few entries, that is, levels which
 	 * are potentially badly skewed.
 	 */
-	for (ins_head = cbt->ins_head,
-	    level = WT_SKIP_MAXDEPTH - 1; level >= 0; --level) {
+	F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
+	if ((ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
+		return (WT_NOTFOUND);
+	for (level = WT_SKIP_MAXDEPTH - 1; level >= 0; --level) {
 		start = &ins_head->head[level];
 		for (entries = 0, stop = start;
 		    *stop != NULL; stop = &(*stop)->next[level])
@@ -774,6 +764,7 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		ins = ins->next[0];
 
 	cbt->ins = ins;
+	cbt->ins_head = ins_head;
 	cbt->compare = 0;
 
 	return (0);

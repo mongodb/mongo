@@ -26,12 +26,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <wt_internal.h>
+
 #include <lz4.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <wt_internal.h>
 
 /* Local compressor structure. */
 typedef struct {

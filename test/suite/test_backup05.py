@@ -71,7 +71,7 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
         session.verify(self.uri)
         conn.close()
 
-    def test_backup(self):
+    def backup(self):
         '''Check manual fsyncLock backup strategy'''
 
         # Here's the strategy:
@@ -94,6 +94,10 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
                 self.check_manual_backup(i, ".", "RESTART")
             else:
                 self.session.verify(self.uri)
+
+    def test_backup(self):
+        with self.expectedStdoutPattern('Recreating metadata'):
+            self.backup()
 
 if __name__ == '__main__':
     wttest.run()

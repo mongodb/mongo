@@ -644,7 +644,7 @@ __wt_conn_dhandle_discard_single(
 		F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
 
 	/* Try to remove the handle, protected by the data handle lock. */
-	WT_WITH_HANDLE_LIST_LOCK(session, tret,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    tret = __conn_dhandle_remove(session, final));
 	WT_TRET(tret);
 
