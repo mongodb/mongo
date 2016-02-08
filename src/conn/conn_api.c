@@ -1541,6 +1541,9 @@ open_wt:
 	conn->is_new = exist ? 0 : 1;
 
 	if (conn->is_new) {
+		if (F_ISSET(conn, WT_CONN_READONLY))
+			WT_ERR_MSG(session, EINVAL, "Creating a new database is"
+			    " incompatible with read-only configuration.");
 		len = (size_t)snprintf(buf, sizeof(buf),
 		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
 		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));

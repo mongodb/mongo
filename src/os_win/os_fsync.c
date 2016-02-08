@@ -46,7 +46,9 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: FlushFileBuffers",
 	    fh->name));
 
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY ||
+	    WT_STRING_MATCH(fh->name, WT_SINGLETHREAD,
+	    strlen(WT_SINGLETHREAD))));
 	if ((ret = FlushFileBuffers(fh->filehandle)) == FALSE)
 		WT_RET_MSG(session,
 		    __wt_errno(), "%s FlushFileBuffers error", fh->name);
