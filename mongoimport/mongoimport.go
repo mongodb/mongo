@@ -349,7 +349,10 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 		processingErrChan <- imp.ingestDocuments(readDocs)
 	}()
 
-	return imp.insertionCount, channelQuorumError(processingErrChan, 2)
+	// expressions are evaluated from left to right so wait for the channels
+	// to complete before we read from imp.insertionCount
+	e1 := channelQuorumError(processingErrChan, 2)
+	return imp.insertionCount, e1
 }
 
 // ingestDocuments accepts a channel from which it reads documents to be inserted
