@@ -2,15 +2,6 @@
 
 # Complain about unused statistics fields.
 t=__wt.$$
-t1=xx.search
-t2=xx.files
-t3=xx.output
-t4=xx.bad1
-t5=xx.bad2
-t6=xx.search2
-t7=xx.bad3
-t8=xx.search3
-t9=xx.bad4
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 # List of files to search: skip stat.c, it lists all of the fields by
@@ -21,22 +12,6 @@ l=`sed \
     -e '/^$/d' \
     -e 's,^,../,' filelist`
 l="$l `echo ../src/include/*.i`"
-
-echo "$l" > $t2
-
-fsearch=`sed \
-    -e 's/^	int64_t \([a-z_*]*\);$/\1/p' \
-    -e d ../src/include/stat.h |
-    sort`
-echo "$fsearch" > $t1
-#fgrep -who "$fsearch" $l > $t3
-xx=`cat $t1 $t3 | sort | uniq -u`
-cat $t1 $t3| sort | uniq -u > $t4
-fgrep -who "$xx" $l > $t6
-cat $t4 $t6 | sort | uniq -u > $t5
-xx=`cat $t4 $t6 | sort | uniq -u`
-fgrep -who "$xx" $l > $t8
-cat $t5 $t8 | sort | uniq -u > $t7
 
 (
 # Get the list of statistics fields.
