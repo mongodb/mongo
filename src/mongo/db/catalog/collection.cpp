@@ -926,24 +926,16 @@ void validateIndexKeyCount(OperationContext* txn,
                            int64_t numIdxKeys,
                            int64_t numRecs,
                            ValidateResults* results) {
-    if (!failIndexKeyTooLong) {
-        string warning =
-            "the server is configured with {failIndexKeyTooLong: false}. Validation failures "
-            "resulting from having fewer index entries than documents are downgraded from errors "
-            "to warnings";
-        results->warnings.push_back(warning);
-    }
-
     if (idx.isIdIndex() && numIdxKeys != numRecs) {
         string msg = str::stream() << "number of _id index entries (" << numIdxKeys
                                    << ") does not match the number of documents (" << numRecs
                                    << ")";
 
-        if (failIndexKeyTooLong) {
+        if (!failIndexKeyTooLong && (numIdxKeys < numRecs)) {
+            results->warnings.push_back(msg);
+        } else {
             results->errors.push_back(msg);
             results->valid = false;
-        } else {
-            results->warnings.push_back(msg);
         }
 
         return;  // Avoid failing the next two checks, they just add redundant/confusing messages
@@ -963,11 +955,11 @@ void validateIndexKeyCount(OperationContext* txn,
                                    << " is not sparse or partial, but has fewer entries ("
                                    << numIdxKeys << ") than documents (" << numRecs << ")";
 
-        if (failIndexKeyTooLong) {
+        if (!failIndexKeyTooLong) {
+            results->warnings.push_back(msg);
+        } else {
             results->errors.push_back(msg);
             results->valid = false;
-        } else {
-            results->warnings.push_back(msg);
         }
     }
 }
@@ -986,6 +978,13 @@ Status Collection::validate(OperationContext* txn,
         return status;
 
     {  // indexes
+        if (!failIndexKeyTooLong) {
+            string warning =
+                "The server is configured with the failIndexKeyTooLong parameter set to false. "
+                "Validation failures that result from having fewer index entries than documents "
+                "have been downgraded from errors to warnings";
+            results->warnings.push_back(warning);
+        }
         output->append("nIndexes", _indexCatalog.numIndexesReady(txn));
         int idxn = 0;
         try {
