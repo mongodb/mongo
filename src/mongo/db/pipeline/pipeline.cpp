@@ -340,10 +340,16 @@ BSONObj Pipeline::getInitialQuery() const {
 
     /* look for an initial $match */
     DocumentSourceMatch* match = dynamic_cast<DocumentSourceMatch*>(sources.front().get());
-    if (!match)
-        return BSONObj();
+    if (match) {
+        return match->getQuery();
+    }
 
-    return match->getQuery();
+    DocumentSourceGeoNear* geoNear = dynamic_cast<DocumentSourceGeoNear*>(sources.front().get());
+    if (geoNear) {
+        return geoNear->getQuery();
+    }
+
+    return BSONObj();
 }
 
 bool Pipeline::needsPrimaryShardMerger() const {

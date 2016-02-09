@@ -1270,6 +1270,10 @@ public:
         return limit;
     }
 
+    BSONObj getQuery() const {
+        return query;
+    };
+
     // this should only be used for testing
     static boost::intrusive_ptr<DocumentSourceGeoNear> create(
         const boost::intrusive_ptr<ExpressionContext>& pCtx);

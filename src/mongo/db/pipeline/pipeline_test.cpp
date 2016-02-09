@@ -627,9 +627,36 @@ class LookUp : public needsPrimaryShardMergerBase {
 }  // namespace Sharded
 }  // namespace Optimizations
 
+namespace {
+
+TEST(PipelineInitialSource, GeoNearInitialQuery) {
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$geoNear: {distanceField: 'd', near: [0, 0], query: {a: 1}}}]}");
+
+    OperationContextNoop _opCtx;
+    intrusive_ptr<ExpressionContext> ctx =
+        new ExpressionContext(&_opCtx, NamespaceString("a.collection"));
+    string errmsg;
+    intrusive_ptr<Pipeline> pipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
+    ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 1));
+}
+
+TEST(PipelineInitialSource, MatchInitialQuery) {
+    const BSONObj inputBson = fromjson("{pipeline: [{$match: {'a': 4}}]}");
+
+    OperationContextNoop _opCtx;
+    intrusive_ptr<ExpressionContext> ctx =
+        new ExpressionContext(&_opCtx, NamespaceString("a.collection"));
+    string errmsg;
+    intrusive_ptr<Pipeline> pipe = Pipeline::parseCommand(errmsg, inputBson, ctx);
+    ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 4));
+}
+}
+
+
 class All : public Suite {
 public:
-    All() : Suite("pipeline") {}
+    All() : Suite("PipelineOptimizations") {}
     void setupTests() {
         add<Optimizations::Local::RemoveSkipZero>();
         add<Optimizations::Local::MoveLimitBeforeProject>();
