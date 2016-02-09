@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
@@ -39,6 +40,8 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
+
+extern std::atomic<bool> failIndexKeyTooLong;  // NOLINT
 
 class BSONObjBuilder;
 class MatchExpression;

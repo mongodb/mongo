@@ -604,6 +604,7 @@ struct ValidateResults {
     }
     bool valid;
     std::vector<std::string> errors;
+    std::vector<std::string> warnings;
 };
 
 /**
