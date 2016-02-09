@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_readonly01.py
-#   Transactions: Test readonly mode
+#   Readonly: Test readonly mode.
 #
 
 import fnmatch, os, shutil, time

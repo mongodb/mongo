@@ -424,9 +424,9 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		/*
 		 * Set up the config for each chunk.
 		 *
-		 * Make the memory_page_max double the chunk size, so application
-		 * threads don't immediately try to force evict the chunk when the
-		 * worker thread clears the NO_EVICTION flag.
+		 * Make the memory_page_max double the chunk size, so
+		 * application threads don't immediately try to force evict
+		 * the chunk when the worker thread clears the NO_EVICTION flag.
 		 */
 		WT_ERR(__wt_scr_alloc(session, 0, &buf));
 		WT_ERR(__wt_buf_fmt(session, buf,
