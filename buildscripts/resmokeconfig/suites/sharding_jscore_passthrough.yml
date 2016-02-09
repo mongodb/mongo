@@ -24,7 +24,6 @@ selector:
     - jstests/core/geo_s2cursorlimitskip.js  # profiling.
     - jstests/core/geo_update_btree2.js  # notablescan.
     - jstests/core/index_bigkeys_nofail.js  # failIndexKeyTooLong.
-    - jstests/core/index_bigkeys_validation.js  # failIndexKeyTooLong.
     - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
     - jstests/core/notablescan.js  # notablescan.
     - jstests/core/profile*.js  # profiling.
