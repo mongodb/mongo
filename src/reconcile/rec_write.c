@@ -363,6 +363,17 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, __wt_page_is_modified(page));
 
 	/*
+	 * Reconciliation locks the page for three reasons:
+	 *    Reconciliation reads the lists of page updates, obsolete updates
+	 * cannot be discarded while reconciliation is in progress;
+	 *    The compaction process reads page modification information, which
+	 * reconciliation modifies;
+	 *    In-memory splits: reconciliation of an internal page cannot handle
+	 * a child page splitting during the reconciliation.
+	 */
+	WT_RET(__wt_fair_lock(session, &page->page_lock));
+
+	/*
 	 * Check that transaction time always moves forward for a given page.
 	 * If this check fails, reconciliation can free something that a future
 	 * reconciliation will need.
@@ -375,17 +386,6 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_RET(__rec_write_init(
 	    session, ref, flags, salvage, &session->reconcile));
 	r = session->reconcile;
-
-	/*
-	 * Reconciliation locks the page for three reasons:
-	 *    Reconciliation reads the lists of page updates, obsolete updates
-	 * cannot be discarded while reconciliation is in progress;
-	 *    The compaction process reads page modification information, which
-	 * reconciliation modifies;
-	 *    In-memory splits: reconciliation of an internal page cannot handle
-	 * a child page splitting during the reconciliation.
-	 */
-	WT_RET(__wt_fair_lock(session, &page->page_lock));
 
 	/* Reconcile the page. */
 	switch (page->type) {
