@@ -834,6 +834,89 @@ TEST_F(ReplCoordElectV1Test, SchedulesPriorityTakeoverIfNodeHasHigherPriorityTha
     ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
 }
 
+TEST_F(ReplCoordElectV1Test, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
+    // Start up and become electable.
+    OperationContextNoop txn;
+    assertStartSuccess(
+        BSON("_id"
+             << "mySet"
+             << "version" << 2 << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "node1:12345")
+                           << BSON("_id" << 3 << "host"
+                                         << "node3:12345") << BSON("_id" << 2 << "host"
+                                                                         << "node2:12345"))
+             << "settings" << BSON("heartbeatIntervalMillis" << 100)),
+        HostAndPort("node1", 12345));
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
+    simulateEnoughHeartbeatsForElectability();
+
+    // Advance to dry run vote request phase.
+    NetworkInterfaceMock* net = getNet();
+    net->enterNetwork();
+    while (TopologyCoordinator::Role::candidate != getTopoCoord().getRole()) {
+        net->runUntil(net->now() + Seconds(1));
+        if (!net->hasReadyRequests()) {
+            continue;
+        }
+        net->blackHole(net->getNextReadyRequest());
+    }
+    net->exitNetwork();
+    ASSERT(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+
+    // Submit a reconfig and confirm it cancels the election.
+    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
+        BSON("_id"
+             << "mySet"
+             << "version" << 4 << "members" << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                     << "node1:12345")
+                                                          << BSON("_id" << 2 << "host"
+                                                                        << "node2:12345"))),
+        true};
+
+    BSONObjBuilder result;
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(&txn, config, &result));
+    ASSERT(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+}
+
+TEST_F(ReplCoordElectV1Test, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase) {
+    // Start up and become electable.
+    OperationContextNoop txn;
+    assertStartSuccess(
+        BSON("_id"
+             << "mySet"
+             << "version" << 2 << "members"
+             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                      << "node1:12345")
+                           << BSON("_id" << 3 << "host"
+                                         << "node3:12345") << BSON("_id" << 2 << "host"
+                                                                         << "node2:12345"))
+             << "settings" << BSON("heartbeatIntervalMillis" << 100)),
+        HostAndPort("node1", 12345));
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
+    simulateEnoughHeartbeatsForElectability();
+    simulateSuccessfulDryRun();
+    ASSERT(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+
+    // Submit a reconfig and confirm it cancels the election.
+    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
+        BSON("_id"
+             << "mySet"
+             << "version" << 4 << "members" << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                     << "node1:12345")
+                                                          << BSON("_id" << 2 << "host"
+                                                                        << "node2:12345"))),
+        true};
+
+    BSONObjBuilder result;
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(&txn, config, &result));
+    ASSERT(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

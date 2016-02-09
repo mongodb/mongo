@@ -2686,6 +2686,21 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
 
     // Must get this before changing our config.
     OpTime myOptime = _getMyLastAppliedOpTime_inlock();
+    // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
+    if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+        if (isV1ElectionProtocol()) {
+            invariant(_voteRequester);
+            _voteRequester->cancel(&_replExecutor);
+        } else {
+            invariant(_freshnessChecker);
+            _freshnessChecker->cancel(&_replExecutor);
+            if (_electCmdRunner) {
+                _electCmdRunner->cancel(&_replExecutor);
+            }
+        }
+        // Wait for the election to complete and the node's Role to be set to follower.
+        _replExecutor.waitForEvent(_electionFinishedEvent);
+    }
     _topCoord->updateConfig(newConfig, myIndex, _replExecutor.now(), myOptime);
     _cachedTerm = _topCoord->getTerm();
     const ReplicaSetConfig oldConfig = _rsConfig;
