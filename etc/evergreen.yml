@@ -2464,7 +2464,7 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --nojournal
+    test_flags: --nojournal --excludeWithAnyTags=requires_journaling
   tasks:
   - name: compile
     distros:

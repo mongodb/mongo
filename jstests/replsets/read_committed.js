@@ -1,4 +1,6 @@
 /**
+ * @tags: [requires_journaling]
+ *
  * Test basic read committed functionality, including:
  *  - Writes with writeConcern 'majority' should be visible once the write completes.
  *  - With the only data-bearing secondary down, committed reads should not include newly inserted

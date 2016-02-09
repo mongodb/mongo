@@ -1,4 +1,6 @@
 /**
+ * @tags: [requires_journaling]
+ *
  * Tests that writeConcern 'majority' writes succeed and are visible in a replica set that has one
  * data-bearing node and two arbiters.
  */
