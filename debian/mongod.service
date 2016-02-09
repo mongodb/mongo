@@ -4,8 +4,8 @@ After=network.target
 Documentation=https://docs.mongodb.org/manual
 
 [Service]
-User=mongod
-Group=mongod
+User=mongodb
+Group=mongodb
 ExecStart=/usr/bin/mongod --quiet --config /etc/mongod.conf
 
 [Install]
