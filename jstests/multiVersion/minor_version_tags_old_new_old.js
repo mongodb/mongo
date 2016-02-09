@@ -9,7 +9,7 @@
                   n2 : { binVersion : newVersion },
                   n3 : { binVersion : oldVersion },
                   n4 : { binVersion : newVersion },
-                  n5 : { binVersion : oldVersion } }
+                  n5 : { binVersion : oldVersion } };
     var host = getHostName();
     var name = 'tags';
 
