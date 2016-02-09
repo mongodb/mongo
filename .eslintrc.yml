@@ -1,0 +1,7 @@
+env:
+  es6: true
+  mongo: true
+
+rules:
+  no-extra-semi: 2
+  semi: 2
