@@ -30,6 +30,10 @@ if [ -f "$SYSCONFIG" ]; then
     . "$SYSCONFIG"
 fi
 
+if [ -z "$PIDFILEPATH" ]; then
+    PIDFILEPATH="/var/run/mongodb/mongod.pid"
+fi
+
 PIDDIR=`dirname $PIDFILEPATH`
 
 # Handle NUMA access to CPUs (SERVER-3574)
