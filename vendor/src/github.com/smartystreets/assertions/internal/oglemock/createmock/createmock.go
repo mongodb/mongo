@@ -35,10 +35,15 @@ import (
 	_ "github.com/smartystreets/assertions/internal/oglemock/generate"
 )
 
+var fSamePackage = flag.Bool(
+	"same_package",
+	false,
+	"Generate output appropriate for including in the same package as the "+
+		"mocked interfaces.")
+
 // A template for generated code that is used to print the result.
 const tmplStr = `
-{{$inputPkg := .InputPkg}}
-{{$outputPkg := .OutputPkg}}
+{{$interfacePkgPath := .InterfacePkgPath}}
 
 package main
 
@@ -58,11 +63,15 @@ func main() {
 
 	interfaces := []reflect.Type{
 		{{range $typeName := .TypeNames}}
-			getTypeForPtr((*{{base $inputPkg}}.{{$typeName}})(nil)),
+			getTypeForPtr((*{{pathBase $interfacePkgPath}}.{{$typeName}})(nil)),
 		{{end}}
 	}
 
-	err := generate.GenerateMockSource(os.Stdout, "{{$outputPkg}}", interfaces)
+	err := generate.GenerateMockSource(
+		os.Stdout,
+		"{{.OutputPkgPath}}",
+		interfaces)
+
 	if err != nil {
 		log.Fatalf("Error generating mock source: %v", err)
 	}
@@ -74,8 +83,11 @@ func main() {
 type importMap map[string]string
 
 type tmplArg struct {
-	InputPkg  string
-	OutputPkg string
+	// The full path of the package from which the interfaces come.
+	InterfacePkgPath string
+
+	// The package path to assume for the generated code.
+	OutputPkgPath string
 
 	// Imports needed by the generated code.
 	Imports importMap
@@ -148,13 +160,19 @@ func run() error {
 	binaryPath := path.Join(tmpDir, "tool")
 
 	// Create an appropriate template argument.
-	var arg tmplArg
-	arg.InputPkg = cmdLineArgs[0]
-	arg.OutputPkg = "mock_" + path.Base(arg.InputPkg)
-	arg.TypeNames = cmdLineArgs[1:]
+	arg := tmplArg{
+		InterfacePkgPath: cmdLineArgs[0],
+		TypeNames:        cmdLineArgs[1:],
+	}
+
+	if *fSamePackage {
+		arg.OutputPkgPath = arg.InterfacePkgPath
+	} else {
+		arg.OutputPkgPath = "mock_" + path.Base(arg.InterfacePkgPath)
+	}
 
 	arg.Imports = make(importMap)
-	arg.Imports[path.Base(arg.InputPkg)] = arg.InputPkg
+	arg.Imports[path.Base(arg.InterfacePkgPath)] = arg.InterfacePkgPath
 	arg.Imports["generate"] = "github.com/smartystreets/assertions/internal/oglemock/generate"
 	arg.Imports["log"] = "log"
 	arg.Imports["os"] = "os"
@@ -165,7 +183,7 @@ func run() error {
 	tmpl := template.Must(
 		template.New("code").Funcs(
 			template.FuncMap{
-				"base": path.Base,
+				"pathBase": path.Base,
 			}).Parse(tmplStr))
 	if err := tmpl.Execute(codeFile, arg); err != nil {
 		return errors.New(fmt.Sprintf("Error executing template: %v", err))
@@ -180,7 +198,8 @@ func run() error {
 
 	if err != nil {
 		// Did the compilation fail due to the user-specified package not being found?
-		if pkg := findUnknownPackage(buildOutput); pkg != nil && *pkg == arg.InputPkg {
+		pkg := findUnknownPackage(buildOutput)
+		if pkg != nil && *pkg == arg.InterfacePkgPath {
 			return errors.New(fmt.Sprintf("Unknown package: %s", *pkg))
 		}
 
@@ -220,7 +239,7 @@ func run() error {
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Println(err.Error())
+		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)
 	}
 }

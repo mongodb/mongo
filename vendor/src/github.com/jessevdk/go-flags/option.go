@@ -3,6 +3,8 @@ package flags
 import (
 	"fmt"
 	"reflect"
+	"strings"
+	"syscall"
 	"unicode/utf8"
 )
 
@@ -35,7 +37,7 @@ type Option struct {
 
 	// If true, specifies that the argument to an option flag is optional.
 	// When no argument to the flag is specified on the command line, the
-	// value of Default will be set in the field this option represents.
+	// value of OptionalValue will be set in the field this option represents.
 	// This is only valid for non-boolean options.
 	OptionalArgument bool
 
@@ -59,6 +61,12 @@ type Option struct {
 	// passwords.
 	DefaultMask string
 
+	// If non empty, only a certain set of values is allowed for an option.
+	Choices []string
+
+	// If true, the option is not displayed in the help or man page
+	Hidden bool
+
 	// The group which the option belongs to
 	group *Group
 
@@ -71,8 +79,11 @@ type Option struct {
 	// Determines if the option will be always quoted in the INI output
 	iniQuote bool
 
-	tag   multiTag
-	isSet bool
+	tag            multiTag
+	isSet          bool
+	preventDefault bool
+
+	defaultLiteral string
 }
 
 // LongNameWithNamespace returns the option's long name with the group namespaces
@@ -154,4 +165,250 @@ func (option *Option) String() string {
 // Value returns the option value as an interface{}.
 func (option *Option) Value() interface{} {
 	return option.value.Interface()
+}
+
+// IsSet returns true if option has been set
+func (option *Option) IsSet() bool {
+	return option.isSet
+}
+
+// Set the value of an option to the specified value. An error will be returned
+// if the specified value could not be converted to the corresponding option
+// value type.
+func (option *Option) set(value *string) error {
+	kind := option.value.Type().Kind()
+
+	if (kind == reflect.Map || kind == reflect.Slice) && !option.isSet {
+		option.empty()
+	}
+
+	option.isSet = true
+	option.preventDefault = true
+
+	if len(option.Choices) != 0 {
+		found := false
+
+		for _, choice := range option.Choices {
+			if choice == *value {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			allowed := strings.Join(option.Choices[0:len(option.Choices)-1], ", ")
+
+			if len(option.Choices) > 1 {
+				allowed += " or " + option.Choices[len(option.Choices)-1]
+			}
+
+			return newErrorf(ErrInvalidChoice,
+				"Invalid value `%s' for option `%s'. Allowed values are: %s",
+				*value, option, allowed)
+		}
+	}
+
+	if option.isFunc() {
+		return option.call(value)
+	} else if value != nil {
+		return convert(*value, option.value, option.tag)
+	}
+
+	return convert("", option.value, option.tag)
+}
+
+func (option *Option) canCli() bool {
+	return option.ShortName != 0 || len(option.LongName) != 0
+}
+
+func (option *Option) canArgument() bool {
+	if u := option.isUnmarshaler(); u != nil {
+		return true
+	}
+
+	return !option.isBool()
+}
+
+func (option *Option) emptyValue() reflect.Value {
+	tp := option.value.Type()
+
+	if tp.Kind() == reflect.Map {
+		return reflect.MakeMap(tp)
+	}
+
+	return reflect.Zero(tp)
+}
+
+func (option *Option) empty() {
+	if !option.isFunc() {
+		option.value.Set(option.emptyValue())
+	}
+}
+
+func (option *Option) clearDefault() {
+	usedDefault := option.Default
+
+	if envKey := option.EnvDefaultKey; envKey != "" {
+		// os.Getenv() makes no distinction between undefined and
+		// empty values, so we use syscall.Getenv()
+		if value, ok := syscall.Getenv(envKey); ok {
+			if option.EnvDefaultDelim != "" {
+				usedDefault = strings.Split(value,
+					option.EnvDefaultDelim)
+			} else {
+				usedDefault = []string{value}
+			}
+		}
+	}
+
+	if len(usedDefault) > 0 {
+		option.empty()
+
+		for _, d := range usedDefault {
+			option.set(&d)
+		}
+	} else {
+		tp := option.value.Type()
+
+		switch tp.Kind() {
+		case reflect.Map:
+			if option.value.IsNil() {
+				option.empty()
+			}
+		case reflect.Slice:
+			if option.value.IsNil() {
+				option.empty()
+			}
+		}
+	}
+}
+
+func (option *Option) valueIsDefault() bool {
+	// Check if the value of the option corresponds to its
+	// default value
+	emptyval := option.emptyValue()
+
+	checkvalptr := reflect.New(emptyval.Type())
+	checkval := reflect.Indirect(checkvalptr)
+
+	checkval.Set(emptyval)
+
+	if len(option.Default) != 0 {
+		for _, v := range option.Default {
+			convert(v, checkval, option.tag)
+		}
+	}
+
+	return reflect.DeepEqual(option.value.Interface(), checkval.Interface())
+}
+
+func (option *Option) isUnmarshaler() Unmarshaler {
+	v := option.value
+
+	for {
+		if !v.CanInterface() {
+			break
+		}
+
+		i := v.Interface()
+
+		if u, ok := i.(Unmarshaler); ok {
+			return u
+		}
+
+		if !v.CanAddr() {
+			break
+		}
+
+		v = v.Addr()
+	}
+
+	return nil
+}
+
+func (option *Option) isBool() bool {
+	tp := option.value.Type()
+
+	for {
+		switch tp.Kind() {
+		case reflect.Bool:
+			return true
+		case reflect.Slice:
+			return (tp.Elem().Kind() == reflect.Bool)
+		case reflect.Func:
+			return tp.NumIn() == 0
+		case reflect.Ptr:
+			tp = tp.Elem()
+		default:
+			return false
+		}
+	}
+}
+
+func (option *Option) isFunc() bool {
+	return option.value.Type().Kind() == reflect.Func
+}
+
+func (option *Option) call(value *string) error {
+	var retval []reflect.Value
+
+	if value == nil {
+		retval = option.value.Call(nil)
+	} else {
+		tp := option.value.Type().In(0)
+
+		val := reflect.New(tp)
+		val = reflect.Indirect(val)
+
+		if err := convert(*value, val, option.tag); err != nil {
+			return err
+		}
+
+		retval = option.value.Call([]reflect.Value{val})
+	}
+
+	if len(retval) == 1 && retval[0].Type() == reflect.TypeOf((*error)(nil)).Elem() {
+		if retval[0].Interface() == nil {
+			return nil
+		}
+
+		return retval[0].Interface().(error)
+	}
+
+	return nil
+}
+
+func (option *Option) updateDefaultLiteral() {
+	defs := option.Default
+	def := ""
+
+	if len(defs) == 0 && option.canArgument() {
+		var showdef bool
+
+		switch option.field.Type.Kind() {
+		case reflect.Func, reflect.Ptr:
+			showdef = !option.value.IsNil()
+		case reflect.Slice, reflect.String, reflect.Array:
+			showdef = option.value.Len() > 0
+		case reflect.Map:
+			showdef = !option.value.IsNil() && option.value.Len() > 0
+		default:
+			zeroval := reflect.Zero(option.field.Type)
+			showdef = !reflect.DeepEqual(zeroval.Interface(), option.value.Interface())
+		}
+
+		if showdef {
+			def, _ = convertToString(option.value, option.tag)
+		}
+	} else if len(defs) != 0 {
+		l := len(defs) - 1
+
+		for i := 0; i < l; i++ {
+			def += quoteIfNeeded(defs[i]) + ", "
+		}
+
+		def += quoteIfNeeded(defs[l])
+	}
+
+	option.defaultLiteral = def
 }

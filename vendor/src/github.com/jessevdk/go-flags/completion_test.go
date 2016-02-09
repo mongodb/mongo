@@ -268,6 +268,11 @@ func TestParserCompletion(t *testing.T) {
 
 		p := NewParser(&completionTestOptions, None)
 
+		p.CompletionHandler = func(items []Completion) {
+			comp := &completion{parser: p}
+			comp.print(items, test.ShowDescriptions)
+		}
+
 		_, err := p.ParseArgs(test.Args)
 
 		w.Close()

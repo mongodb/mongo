@@ -17,6 +17,7 @@ package oglematchers_test
 
 import (
 	"errors"
+
 	. "github.com/jacobsa/oglematchers"
 	. "github.com/jacobsa/ogletest"
 )
@@ -91,6 +92,23 @@ func (t *AnyOfTest) OneFatal() {
 
 	err := matcher.Matches(0)
 	ExpectThat(err, Error(Equals("taco")))
+}
+
+func (t *AnyOfTest) OneNil() {
+	var err error
+	matcher := AnyOf(
+		13,
+		nil,
+		19,
+	)
+
+	// No match
+	err = matcher.Matches(14)
+	ExpectNe(nil, err)
+
+	// Match
+	err = matcher.Matches(nil)
+	ExpectEq(nil, err)
 }
 
 func (t *AnyOfTest) AllFalseAndNotEqual() {

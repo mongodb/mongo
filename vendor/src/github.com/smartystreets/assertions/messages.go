@@ -45,7 +45,7 @@ const ( // collections
 	shouldNotHaveBeenEmpty         = "Expected %+v to NOT be empty (but it was)!"
 	shouldHaveBeenAValidInteger    = "You must provide a valid integer (was %v)!"
 	shouldHaveBeenAValidLength     = "You must provide a valid positive integer (was %v)!"
-	shouldHaveHadLength            = "Expected %+v to have length equal to '%v', but it wasn't!"
+	shouldHaveHadLength            = "Expected %+v (length: %v) to have length equal to '%v', but it wasn't!"
 )
 
 const ( // strings

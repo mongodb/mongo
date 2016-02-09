@@ -27,6 +27,10 @@ static long SSL_CTX_set_options_not_a_macro(SSL_CTX* ctx, long options) {
    return SSL_CTX_set_options(ctx, options);
 }
 
+static long SSL_CTX_clear_options_not_a_macro(SSL_CTX* ctx, long options) {
+   return SSL_CTX_clear_options(ctx, options);
+}
+
 static long SSL_CTX_set_mode_not_a_macro(SSL_CTX* ctx, long modes) {
    return SSL_CTX_set_mode(ctx, modes);
 }
@@ -56,7 +60,7 @@ static long SSL_CTX_add_extra_chain_cert_not_a_macro(SSL_CTX* ctx, X509 *cert) {
 #endif
 
 static const SSL_METHOD *OUR_TLSv1_1_method() {
-#ifdef TLS1_1_VERSION
+#if defined(TLS1_1_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
     return TLSv1_1_method();
 #else
     return NULL;
@@ -64,7 +68,7 @@ static const SSL_METHOD *OUR_TLSv1_1_method() {
 }
 
 static const SSL_METHOD *OUR_TLSv1_2_method() {
-#ifdef TLS1_2_VERSION
+#if defined(TLS1_2_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
     return TLSv1_2_method();
 #else
     return NULL;
@@ -102,6 +106,9 @@ var (
 
 type Ctx struct {
 	ctx       *C.SSL_CTX
+	cert      *Certificate
+	chain     []*Certificate
+	key       PrivateKey
 	verify_cb VerifyCallback
 }
 
@@ -128,10 +135,13 @@ func newCtx(method *C.SSL_METHOD) (*Ctx, error) {
 type SSLVersion int
 
 const (
-	SSLv3      SSLVersion = 0x02
-	TLSv1      SSLVersion = 0x03
-	TLSv1_1    SSLVersion = 0x04
-	TLSv1_2    SSLVersion = 0x05
+	SSLv3   SSLVersion = 0x02 // Vulnerable to "POODLE" attack.
+	TLSv1   SSLVersion = 0x03
+	TLSv1_1 SSLVersion = 0x04
+	TLSv1_2 SSLVersion = 0x05
+
+	// Make sure to disable SSLv2 and SSLv3 if you use this. SSLv3 is vulnerable
+	// to the "POODLE" attack, and SSLv2 is what, just don't even.
 	AnyVersion SSLVersion = 0x06
 )
 
@@ -179,7 +189,12 @@ func NewCtxFromFiles(cert_file string, key_file string) (*Ctx, error) {
 		return nil, err
 	}
 
-	cert, err := LoadCertificateFromPEM(cert_bytes)
+	certs := SplitPEM(cert_bytes)
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("No PEM certificate found in '%s'", cert_file)
+	}
+	first, certs := certs[0], certs[1:]
+	cert, err := LoadCertificateFromPEM(first)
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +202,17 @@ func NewCtxFromFiles(cert_file string, key_file string) (*Ctx, error) {
 	err = ctx.UseCertificate(cert)
 	if err != nil {
 		return nil, err
+	}
+
+	for _, pem := range certs {
+		cert, err := LoadCertificateFromPEM(pem)
+		if err != nil {
+			return nil, err
+		}
+		err = ctx.AddChainCertificate(cert)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	key_bytes, err := ioutil.ReadFile(key_file)
@@ -223,6 +249,7 @@ const (
 func (c *Ctx) UseCertificate(cert *Certificate) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	c.cert = cert
 	if int(C.SSL_CTX_use_certificate(c.ctx, cert.x)) != 1 {
 		return errorFromErrorQueue()
 	}
@@ -345,6 +372,7 @@ func (c *Ctx) SetClientCAList(caList *StackOfX509Name) {
 func (c *Ctx) AddChainCertificate(cert *Certificate) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	c.chain = append(c.chain, cert)
 	if int(C.SSL_CTX_add_extra_chain_cert_not_a_macro(c.ctx, cert.x)) != 1 {
 		return errorFromErrorQueue()
 	}
@@ -356,6 +384,7 @@ func (c *Ctx) AddChainCertificate(cert *Certificate) error {
 func (c *Ctx) UsePrivateKey(key PrivateKey) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	c.key = key
 	if int(C.SSL_CTX_use_PrivateKey(c.ctx, key.evpPKey())) != 1 {
 		return errorFromErrorQueue()
 	}
@@ -364,7 +393,38 @@ func (c *Ctx) UsePrivateKey(key PrivateKey) error {
 
 type CertificateStore struct {
 	store *C.X509_STORE
-	ctx   *Ctx // for gc
+	// for GC
+	ctx   *Ctx
+	certs []*Certificate
+}
+
+// Allocate a new, empty CertificateStore
+func NewCertificateStore() (*CertificateStore, error) {
+	s := C.X509_STORE_new()
+	if s == nil {
+		return nil, errors.New("failed to allocate X509_STORE")
+	}
+	store := &CertificateStore{store: s}
+	runtime.SetFinalizer(store, func(s *CertificateStore) {
+		C.X509_STORE_free(s.store)
+	})
+	return store, nil
+}
+
+// Parse a chained PEM file, loading all certificates into the Store.
+func (s *CertificateStore) LoadCertificatesFromPEM(data []byte) error {
+	pems := SplitPEM(data)
+	for _, pem := range pems {
+		cert, err := LoadCertificateFromPEM(pem)
+		if err != nil {
+			return err
+		}
+		err = s.AddCertificate(cert)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // GetCertificateStore returns the context's certificate store that will be
@@ -382,6 +442,7 @@ func (c *Ctx) GetCertificateStore() *CertificateStore {
 func (s *CertificateStore) AddCertificate(cert *Certificate) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	s.certs = append(s.certs, cert)
 	if int(C.X509_STORE_add_cert(s.store, cert.x)) != 1 {
 		return errorFromErrorQueue()
 	}
@@ -550,6 +611,11 @@ const (
 // http://www.openssl.org/docs/ssl/SSL_CTX_set_options.html
 func (c *Ctx) SetOptions(options Options) Options {
 	return Options(C.SSL_CTX_set_options_not_a_macro(
+		c.ctx, C.long(options)))
+}
+
+func (c *Ctx) ClearOptions(options Options) Options {
+	return Options(C.SSL_CTX_clear_options_not_a_macro(
 		c.ctx, C.long(options)))
 }
 

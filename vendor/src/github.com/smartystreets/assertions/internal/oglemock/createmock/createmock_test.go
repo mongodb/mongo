@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	. "github.com/smartystreets/assertions/internal/ogletest"
 	"go/build"
 	"io/ioutil"
 	"os"
@@ -27,6 +26,8 @@ import (
 	"path"
 	"syscall"
 	"testing"
+
+	. "github.com/smartystreets/assertions/internal/ogletest"
 )
 
 var dumpNew = flag.Bool("dump_new", false, "Dump new golden files.")
@@ -91,7 +92,7 @@ func (t *CreateMockTest) runGoldenTest(
 	ExpectEq(expectedReturnCode, actualReturnCode)
 
 	// Read the golden file.
-	goldenPath := path.Join("test_cases", "golden."+caseName)
+	goldenPath := path.Join("testdata", "golden."+caseName)
 	goldenData := readFileOrDie(goldenPath)
 
 	// Compare the two.
@@ -187,6 +188,23 @@ func (t *CreateMockTest) UnknownInterface() {
 		"Frobnicator")
 }
 
+func (t *CreateMockTest) GCSBucket() {
+	t.runGoldenTest(
+		"gcs_bucket",
+		0,
+		"github.com/smartystreets/assertions/internal/oglemock/createmock/testdata/gcs",
+		"Bucket")
+}
+
+func (t *CreateMockTest) GCSBucket_SamePackage() {
+	t.runGoldenTest(
+		"gcs_bucket_same_package",
+		0,
+		"--same_package",
+		"github.com/smartystreets/assertions/internal/oglemock/createmock/testdata/gcs",
+		"Bucket")
+}
+
 func (t *CreateMockTest) IoReaderAndWriter() {
 	t.runCompilationTest(
 		"io",
@@ -204,12 +222,12 @@ func (t *CreateMockTest) OsFileInfo() {
 
 func (t *CreateMockTest) ComplicatedSamplePackage() {
 	t.runCompilationTest(
-		"github.com/smartystreets/assertions/internal/oglemock/generate/test_cases/complicated_pkg",
+		"github.com/smartystreets/assertions/internal/oglemock/generate/testdata/complicated_pkg",
 		"ComplicatedThing")
 }
 
 func (t *CreateMockTest) RenamedSamplePackage() {
 	t.runCompilationTest(
-		"github.com/smartystreets/assertions/internal/oglemock/generate/test_cases/renamed_pkg",
+		"github.com/smartystreets/assertions/internal/oglemock/generate/testdata/renamed_pkg",
 		"SomeInterface")
 }

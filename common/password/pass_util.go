@@ -17,5 +17,6 @@ func IsTerminal() bool {
 }
 
 func GetPass() string {
-	return string(gopass.GetPasswd())
+	pass, _ := gopass.GetPasswd()
+	return string(pass)
 }

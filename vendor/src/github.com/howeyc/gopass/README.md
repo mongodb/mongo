@@ -1,4 +1,4 @@
-# getpasswd in Go
+# getpasswd in Go [![GoDoc](https://godoc.org/github.com/howeyc/gopass?status.svg)](https://godoc.org/github.com/howeyc/gopass)
 
 Retrieve password from user terminal input without echo
 

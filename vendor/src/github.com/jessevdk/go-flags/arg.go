@@ -12,6 +12,9 @@ type Arg struct {
 	// A description of the positional argument (used in the help)
 	Description string
 
+	// Whether a positional argument is required
+	Required int
+
 	value reflect.Value
 	tag   multiTag
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/smartystreets/assertions/internal/oglematchers"
+	"github.com/smartystreets/assertions/internal/go-render/render"
 )
 
 // default acceptable delta for ShouldAlmostEqual
@@ -149,15 +150,8 @@ func ShouldResemble(actual interface{}, expected ...interface{}) string {
 	}
 
 	if matchError := oglematchers.DeepEquals(expected[0]).Matches(actual); matchError != nil {
-		expectedSyntax := fmt.Sprintf("%#v", expected[0])
-		actualSyntax := fmt.Sprintf("%#v", actual)
-		var message string
-		if expectedSyntax == actualSyntax {
-			message = fmt.Sprintf(shouldHaveResembledTypeMismatch, expected[0], expected[0], actual, actual)
-		} else {
-			message = fmt.Sprintf(shouldHaveResembled, expected[0], actual)
-		}
-		return serializer.serializeDetailed(expected[0], actual, message)
+		return serializer.serializeDetailed(expected[0], actual,
+			fmt.Sprintf(shouldHaveResembled, render.Render(expected[0]), render.Render(actual)))
 	}
 
 	return success
@@ -168,7 +162,7 @@ func ShouldNotResemble(actual interface{}, expected ...interface{}) string {
 	if message := need(1, expected); message != success {
 		return message
 	} else if ShouldResemble(actual, expected[0]) == success {
-		return fmt.Sprintf(shouldNotHaveResembled, actual, expected[0])
+		return fmt.Sprintf(shouldNotHaveResembled, render.Render(actual), render.Render(expected[0]))
 	}
 	return success
 }

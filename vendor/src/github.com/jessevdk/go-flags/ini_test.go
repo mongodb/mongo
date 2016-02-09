@@ -71,6 +71,12 @@ EnvDefault1 = env-def
 ; Test env-default2 value
 EnvDefault2 = env-def
 
+; Option with named argument
+OptionWithArgName =
+
+; Option with choices
+OptionWithChoices =
+
 ; Option only available in ini
 only-ini =
 
@@ -126,6 +132,12 @@ EnvDefault1 = env-def
 ; Test env-default2 value
 EnvDefault2 = env-def
 
+; Option with named argument
+; OptionWithArgName =
+
+; Option with choices
+; OptionWithChoices =
+
 ; Option only available in ini
 ; only-ini =
 
@@ -178,6 +190,12 @@ EnvDefault1 = env-def
 ; Test env-default2 value
 EnvDefault2 = env-def
 
+; Option with named argument
+; OptionWithArgName =
+
+; Option with choices
+; OptionWithChoices =
+
 ; Option only available in ini
 ; only-ini =
 
@@ -227,6 +245,92 @@ EnvDefault2 = env-def
 
 		msg := fmt.Sprintf("with arguments %+v and ini options %b", test.args, test.options)
 		assertDiff(t, got, expected, msg)
+	}
+}
+
+func TestReadIni_flagEquivalent(t *testing.T) {
+	type options struct {
+		Opt1 bool `long:"opt1"`
+
+		Group1 struct {
+			Opt2 bool `long:"opt2"`
+		} `group:"group1"`
+
+		Group2 struct {
+			Opt3 bool `long:"opt3"`
+		} `group:"group2" namespace:"ns1"`
+
+		Cmd1 struct {
+			Opt4 bool `long:"opt4"`
+			Opt5 bool `long:"foo.opt5"`
+
+			Group1 struct {
+				Opt6 bool `long:"opt6"`
+				Opt7 bool `long:"foo.opt7"`
+			} `group:"group1"`
+
+			Group2 struct {
+				Opt8 bool `long:"opt8"`
+			} `group:"group2" namespace:"ns1"`
+		} `command:"cmd1"`
+	}
+
+	a := `
+opt1=true
+
+[group1]
+opt2=true
+
+[group2]
+ns1.opt3=true
+
+[cmd1]
+opt4=true
+foo.opt5=true
+
+[cmd1.group1]
+opt6=true
+foo.opt7=true
+
+[cmd1.group2]
+ns1.opt8=true
+`
+	b := `
+opt1=true
+opt2=true
+ns1.opt3=true
+
+[cmd1]
+opt4=true
+foo.opt5=true
+opt6=true
+foo.opt7=true
+ns1.opt8=true
+`
+
+	parse := func(readIni string) (opts options, writeIni string) {
+		p := NewNamedParser("TestIni", Default)
+		p.AddGroup("Application Options", "The application options", &opts)
+
+		inip := NewIniParser(p)
+		err := inip.Parse(strings.NewReader(readIni))
+
+		if err != nil {
+			t.Fatalf("Unexpected error: %s\n\nFile:\n%s", err, readIni)
+		}
+
+		var b bytes.Buffer
+		inip.Write(&b, Default)
+
+		return opts, b.String()
+	}
+
+	aOpt, aIni := parse(a)
+	bOpt, bIni := parse(b)
+
+	assertDiff(t, aIni, bIni, "")
+	if !reflect.DeepEqual(aOpt, bOpt) {
+		t.Errorf("not equal")
 	}
 }
 
@@ -569,7 +673,8 @@ other = subgroup
 
 func TestIniNoIni(t *testing.T) {
 	var opts struct {
-		Value string `short:"v" long:"value" no-ini:"yes"`
+		NoValue string `short:"n" long:"novalue" no-ini:"yes"`
+		Value   string `short:"v" long:"value"`
 	}
 
 	p := NewNamedParser("TestIni", Default)
@@ -577,8 +682,10 @@ func TestIniNoIni(t *testing.T) {
 
 	inip := NewIniParser(p)
 
+	// read INI
 	inic := `[Application Options]
-value = some value
+novalue = some value
+value = some other value
 `
 
 	b := strings.NewReader(inic)
@@ -594,9 +701,33 @@ value = some value
 		t.Errorf("Expected opts.Add.Name to be %d, but got %d", v, iniError.LineNumber)
 	}
 
-	if v := "unknown option: value"; iniError.Message != v {
+	if v := "unknown option: novalue"; iniError.Message != v {
 		t.Errorf("Expected opts.Add.Name to be %s, but got %s", v, iniError.Message)
 	}
+
+	// write INI
+	opts.NoValue = "some value"
+	opts.Value = "some other value"
+
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatalf("Cannot create temporary file: %s", err)
+	}
+	defer os.Remove(file.Name())
+
+	err = inip.WriteFile(file.Name(), IniIncludeDefaults)
+	if err != nil {
+		t.Fatalf("Could not write ini file: %s", err)
+	}
+
+	found, err := ioutil.ReadFile(file.Name())
+	if err != nil {
+		t.Fatalf("Could not read written ini file: %s", err)
+	}
+
+	expected := "[Application Options]\nValue = some other value\n\n"
+
+	assertDiff(t, string(found), expected, "ini content")
 }
 
 func TestIniParse(t *testing.T) {
@@ -625,6 +756,94 @@ func TestIniParse(t *testing.T) {
 	if opts.Value != 123 {
 		t.Fatalf("Expected Value to be \"123\" but was \"%d\"", opts.Value)
 	}
+}
+
+func TestIniCliOverrides(t *testing.T) {
+	file, err := ioutil.TempFile("", "")
+
+	if err != nil {
+		t.Fatalf("Cannot create temporary file: %s", err)
+	}
+
+	defer os.Remove(file.Name())
+
+	_, err = file.WriteString("values = 123\n")
+	_, err = file.WriteString("values = 456\n")
+
+	if err != nil {
+		t.Fatalf("Cannot write to temporary file: %s", err)
+	}
+
+	file.Close()
+
+	var opts struct {
+		Values []int `long:"values"`
+	}
+
+	p := NewParser(&opts, Default)
+	err = NewIniParser(p).ParseFile(file.Name())
+
+	if err != nil {
+		t.Fatalf("Could not parse ini: %s", err)
+	}
+
+	_, err = p.ParseArgs([]string{"--values", "111", "--values", "222"})
+
+	if err != nil {
+		t.Fatalf("Failed to parse arguments: %s", err)
+	}
+
+	if len(opts.Values) != 2 {
+		t.Fatalf("Expected Values to contain two elements, but got %d", len(opts.Values))
+	}
+
+	if opts.Values[0] != 111 {
+		t.Fatalf("Expected Values[0] to be 111, but got '%d'", opts.Values[0])
+	}
+
+	if opts.Values[1] != 222 {
+		t.Fatalf("Expected Values[0] to be 222, but got '%d'", opts.Values[1])
+	}
+}
+
+func TestIniOverrides(t *testing.T) {
+	file, err := ioutil.TempFile("", "")
+
+	if err != nil {
+		t.Fatalf("Cannot create temporary file: %s", err)
+	}
+
+	defer os.Remove(file.Name())
+
+	_, err = file.WriteString("value-with-default = \"ini-value\"\n")
+	_, err = file.WriteString("value-with-default-override-cli = \"ini-value\"\n")
+
+	if err != nil {
+		t.Fatalf("Cannot write to temporary file: %s", err)
+	}
+
+	file.Close()
+
+	var opts struct {
+		ValueWithDefault            string `long:"value-with-default" default:"value"`
+		ValueWithDefaultOverrideCli string `long:"value-with-default-override-cli" default:"value"`
+	}
+
+	p := NewParser(&opts, Default)
+	err = NewIniParser(p).ParseFile(file.Name())
+
+	if err != nil {
+		t.Fatalf("Could not parse ini: %s", err)
+	}
+
+	_, err = p.ParseArgs([]string{"--value-with-default-override-cli", "cli-value"})
+
+	if err != nil {
+		t.Fatalf("Failed to parse arguments: %s", err)
+	}
+
+	assertString(t, opts.ValueWithDefault, "ini-value")
+	assertString(t, opts.ValueWithDefaultOverrideCli, "cli-value")
 }
 
 func TestWriteFile(t *testing.T) {

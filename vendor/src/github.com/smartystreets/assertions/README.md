@@ -4,8 +4,14 @@
 
 Package assertions contains the implementations for all assertions which are
 referenced in goconvey's `convey` package
-(github.com/smartystreets/goconvey/convey) for use with the So(...) method. They
-can also be used in traditional Go test functions and even in applicaitons.
+(github.com/smartystreets/goconvey/convey) and gunit
+(github.com/smartystreets/gunit) for use with the So(...) method. They can also
+be used in traditional Go test functions and even in applications.
+
+Many of the assertions lean heavily on work done by Aaron Jacobs in his
+excellent oglematchers library. (https://github.com/jacobsa/oglematchers) The
+ShouldResemble assertion leans heavily on work done by Daniel Jacques in his
+very helpful go-render library. (https://github.com/luci/go-render)
 
 ## Usage
 
@@ -263,8 +269,9 @@ duration specified relative to the other time.Time.
 ```go
 func ShouldHaveLength(actual interface{}, expected ...interface{}) string
 ```
-ShouldHaveLength receives a collection and a positive integer and asserts that
-the length of the collection is equal to the integer provided.
+ShouldHaveLength receives 2 parameters. The first is a collection to check the
+length of, the second being the expected length. It obeys the rules specified by
+the len function for determining length: http://golang.org/pkg/builtin/#len
 
 #### func  ShouldHaveSameTypeAs
 
@@ -544,6 +551,20 @@ func (this *Assertion) So(actual interface{}, assert assertion, expected ...inte
 ```
 So calls the standalone So function and additionally, calls t.Error in failure
 scenarios.
+
+#### type FailureView
+
+```go
+type FailureView struct {
+	Message  string `json:"Message"`
+	Expected string `json:"Expected"`
+	Actual   string `json:"Actual"`
+}
+```
+
+This struct is also declared in
+github.com/smartystreets/goconvey/convey/reporting. The json struct tags should
+be equal in both declarations.
 
 #### type Serializer
 

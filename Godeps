@@ -1,11 +1,11 @@
 gopkg.in/mgo.v2                         e30de8ac9ae3b30df7065f766c71f88bba7d4e49
-gopkg.in/tomb.v2                        14b3d72120e8d10ea6e6b7f87f7175734b1faab8	github.com/go-tomb/tomb
+gopkg.in/tomb.v2                        14b3d72120e8d10ea6e6b7f87f7175734b1faab8
 github.com/jtolds/gls                   8ddce2a84170772b95dd5d576c48d517b22cac63
 github.com/jacobsa/oglematchers         3ecefc49db07722beca986d9bb71ddd026b133f0
-github.com/smartystreets/assertions     5de9043ec1a39cc97edc838ef7236538a55b30a4
-github.com/smartystreets/goconvey       995f5b2e021c69b8b028ba6d0b05c1dd500783db
-github.com/jessevdk/go-flags            5e118789801496c93ba210d34ef1f2ce5a9173bd
-github.com/3rf/mongo-lint               f6cf4f8a7d07167375b035d186a1e8b3ebf28aa3
+github.com/smartystreets/assertions     287b4346dc4e71a038c346375a9d572453bc469b
+github.com/smartystreets/goconvey       bf58a9a1291224109919756b4dcc469c670cc7e4
+github.com/jessevdk/go-flags            97448c91aac742cbca3d020b3e769013a420a06f
+github.com/3rf/mongo-lint               3550fdcf1f43b89aaeabaa4559eaae6dc4407e42
 github.com/spacemonkeygo/openssl        4c6dbafa5ec35b3ffc6a1b1e1fe29c3eba2053ec	github.com/10gen/openssl
-github.com/howeyc/gopass                2c70fa70727c953c51695f800f25d6b44abb368e
-golang.org/x/crypto                     c57d4a71915a248dbad846d60825145062b4c18e
+github.com/howeyc/gopass                44476384cd4721b68705e72f19e95d1a3a504370
+golang.org/x/crypto                     1f22c0103821b9390939b6776727195525381532

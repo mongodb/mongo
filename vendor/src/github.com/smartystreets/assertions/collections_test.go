@@ -132,16 +132,16 @@ func TestShouldHaveLength(t *testing.T) {
 	fail(t, so([]string{}, ShouldHaveLength, 1, 2), "This assertion requires exactly 1 comparison values (you provided 2).")
 	fail(t, so([]string{}, ShouldHaveLength, -10), "You must provide a valid positive integer (was -10)!")
 
-	fail(t, so([]int{}, ShouldHaveLength, 1), "Expected [] to have length equal to '1', but it wasn't!")             // empty slice
-	fail(t, so([]interface{}{}, ShouldHaveLength, 1), "Expected [] to have length equal to '1', but it wasn't!")     // empty slice
-	fail(t, so(map[string]int{}, ShouldHaveLength, 1), "Expected map[] to have length equal to '1', but it wasn't!") // empty map
-	fail(t, so("", ShouldHaveLength, 1), "Expected  to have length equal to '1', but it wasn't!")                    // empty string
-	fail(t, so(&[]int{}, ShouldHaveLength, 1), "Expected &[] to have length equal to '1', but it wasn't!")           // pointer to empty slice
-	fail(t, so(&[0]int{}, ShouldHaveLength, 1), "Expected &[] to have length equal to '1', but it wasn't!")          // pointer to empty array
-	c := make(chan int, 0)                                                                                           // non-empty channel
-	fail(t, so(c, ShouldHaveLength, 1), fmt.Sprintf("Expected %+v to have length equal to '1', but it wasn't!", c))
+	fail(t, so([]int{}, ShouldHaveLength, 1), "Expected [] (length: 0) to have length equal to '1', but it wasn't!")             // empty slice
+	fail(t, so([]interface{}{}, ShouldHaveLength, 1), "Expected [] (length: 0) to have length equal to '1', but it wasn't!")     // empty slice
+	fail(t, so(map[string]int{}, ShouldHaveLength, 1), "Expected map[] (length: 0) to have length equal to '1', but it wasn't!") // empty map
+	fail(t, so("", ShouldHaveLength, 1), "Expected  (length: 0) to have length equal to '1', but it wasn't!")                    // empty string
+	fail(t, so(&[]int{}, ShouldHaveLength, 1), "Expected &[] (length: 0) to have length equal to '1', but it wasn't!")           // pointer to empty slice
+	fail(t, so(&[0]int{}, ShouldHaveLength, 1), "Expected &[] (length: 0) to have length equal to '1', but it wasn't!")          // pointer to empty array
+	c := make(chan int, 0)                                                                                                       // non-empty channel
+	fail(t, so(c, ShouldHaveLength, 1), fmt.Sprintf("Expected %+v (length: 0) to have length equal to '1', but it wasn't!", c))
 	c = make(chan int) // empty channel
-	fail(t, so(c, ShouldHaveLength, 1), fmt.Sprintf("Expected %+v to have length equal to '1', but it wasn't!", c))
+	fail(t, so(c, ShouldHaveLength, 1), fmt.Sprintf("Expected %+v (length: 0) to have length equal to '1', but it wasn't!", c))
 
 	pass(t, so([]int{1}, ShouldHaveLength, 1))                // non-empty slice
 	pass(t, so([]interface{}{1}, ShouldHaveLength, 1))        // non-empty slice

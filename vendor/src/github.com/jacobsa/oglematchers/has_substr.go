@@ -25,18 +25,12 @@ import (
 // HasSubstr returns a matcher that matches strings containing s as a
 // substring.
 func HasSubstr(s string) Matcher {
-	return &hasSubstrMatcher{s}
+	return NewMatcher(
+		func(c interface{}) error { return hasSubstr(s, c) },
+		fmt.Sprintf("has substring \"%s\"", s))
 }
 
-type hasSubstrMatcher struct {
-	needle string
-}
-
-func (m *hasSubstrMatcher) Description() string {
-	return fmt.Sprintf("has substring \"%s\"", m.needle)
-}
-
-func (m *hasSubstrMatcher) Matches(c interface{}) error {
+func hasSubstr(needle string, c interface{}) error {
 	v := reflect.ValueOf(c)
 	if v.Kind() != reflect.String {
 		return NewFatalError("which is not a string")
@@ -44,7 +38,7 @@ func (m *hasSubstrMatcher) Matches(c interface{}) error {
 
 	// Perform the substring search.
 	haystack := v.String()
-	if strings.Contains(haystack, m.needle) {
+	if strings.Contains(haystack, needle) {
 		return nil
 	}
 

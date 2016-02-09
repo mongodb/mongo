@@ -6,12 +6,12 @@ install:
   - go build -v ./...
 
   # linting
-  - go get code.google.com/p/go.tools/cmd/vet
+  - go get golang.org/x/tools/cmd/vet
   - go get github.com/golang/lint
   - go install github.com/golang/lint/golint
 
   # code coverage
-  - go get code.google.com/p/go.tools/cmd/cover
+  - go get golang.org/x/tools/cmd/cover
   - go get github.com/onsi/ginkgo/ginkgo
   - go get github.com/modocache/gover
   - if [ "$TRAVIS_SECURE_ENV_VARS" = "true" ]; then go get github.com/mattn/goveralls; fi

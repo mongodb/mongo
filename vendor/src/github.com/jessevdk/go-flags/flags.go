@@ -84,7 +84,9 @@ The following is a list of tags for struct fields supported by go-flags:
                       displayed in generated man pages (optional)
     no-flag:          if non-empty this field is ignored as an option (optional)
 
-    optional:       whether an argument of the option is optional (optional)
+    optional:       whether an argument of the option is optional. When an
+                    argument is optional it can only be specified using
+                    --option=argument (optional)
     optional-value: the value of an optional option when the option occurs
                     without an argument. This tag can be specified multiple
                     times in the case of maps or slices (optional)
@@ -102,8 +104,11 @@ The following is a list of tags for struct fields supported by go-flags:
     env-delim:      the 'env' default value from environment is split into
                     multiple values with the given delimiter string, use with
                     slices and maps (optional)
-    value-name:     the name of the argument value (to be shown in the help,
+    value-name:     the name of the argument value (to be shown in the help)
                     (optional)
+    choice:         limits the values for an option to a set of values.
+                    This tag can be specified mltiple times (optional)
+    hidden:         the option is not visible in the help or man page.
 
     base: a base (radix) used to convert strings to integer values, the
           default base is 10 (i.e. decimal) (optional)
@@ -133,7 +138,16 @@ The following is a list of tags for struct fields supported by go-flags:
                           then all remaining arguments will be added to it.
                           Positional arguments are optional by default,
                           unless the "required" tag is specified together
-                          with the "positional-args" tag (optional)
+                          with the "positional-args" tag. The "required" tag
+                          can also be set on the individual rest argument
+                          fields, to require only the first N positional
+                          arguments. If the "required" tag is set on the
+                          rest arguments slice, then its value determines
+                          the minimum amount of rest arguments that needs to
+                          be provided (e.g. `required:"2"`) (optional)
+    positional-arg-name:  used on a field in a positional argument struct; name
+                          of the positional argument placeholder to be shown in
+                          the help (optional)
 
 Either the `short:` tag or the `long:` must be specified to make the field eligible as an
 option.
@@ -179,12 +193,16 @@ the Commander interface, then its Execute method will be run with the
 remaining command line arguments.
 
 Command structs can have options which become valid to parse after the
-command has been specified on the command line. It is currently not valid
-to specify options from the parent level of the command after the command
-name has occurred. Thus, given a top-level option "-v" and a command "add":
+command has been specified on the command line, in addition to the options
+of all the parent commands. I.e. considering a -v flag on the parser and an
+add command, the following are equivalent:
 
-    Valid:   ./app -v add
-    Invalid: ./app add -v
+    ./app -v add
+    ./app add -v
+
+However, if the -v flag is defined on the add command, then the first of
+the two examples above would fail since the -v flag is not defined before
+the add command.
 
 
 Completion

@@ -1,8 +1,14 @@
 // Package assertions contains the implementations for all assertions which
 // are referenced in goconvey's `convey` package
-// (github.com/smartystreets/goconvey/convey) for use with the So(...) method.
+// (github.com/smartystreets/goconvey/convey) and gunit (github.com/smartystreets/gunit)
+// for use with the So(...) method.
 // They can also be used in traditional Go test functions and even in
-// applicaitons.
+// applications.
+//
+// Many of the assertions lean heavily on work done by Aaron Jacobs in his excellent oglematchers library.
+// (https://github.com/jacobsa/oglematchers)
+// The ShouldResemble assertion leans heavily on work done by Daniel Jacques in his very helpful go-render library.
+// (https://github.com/luci/go-render)
 package assertions
 
 import (

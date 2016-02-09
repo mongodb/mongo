@@ -220,31 +220,25 @@ func ShouldHaveLength(actual interface{}, expected ...interface{}) string {
 
 	value := reflect.ValueOf(actual)
 	switch value.Kind() {
-	case reflect.Slice:
+	case reflect.Slice,
+		reflect.Chan,
+		reflect.Map,
+		reflect.String:
 		if int64(value.Len()) == expectedLen {
 			return success
-		}
-	case reflect.Chan:
-		if int64(value.Len()) == expectedLen {
-			return success
-		}
-	case reflect.Map:
-		if int64(value.Len()) == expectedLen {
-			return success
-		}
-	case reflect.String:
-		if int64(value.Len()) == expectedLen {
-			return success
+		} else {
+			return fmt.Sprintf(shouldHaveHadLength, actual, value.Len(), expectedLen)
 		}
 	case reflect.Ptr:
 		elem := value.Elem()
 		kind := elem.Kind()
-		if (kind == reflect.Slice || kind == reflect.Array) && int64(elem.Len()) == expectedLen {
-			return success
+		if kind == reflect.Slice || kind == reflect.Array {
+			if int64(elem.Len()) == expectedLen {
+				return success
+			} else {
+				return fmt.Sprintf(shouldHaveHadLength, actual, elem.Len(), expectedLen)
+			}
 		}
-	default:
-		return fmt.Sprintf(shouldHaveBeenAValidCollection, reflect.TypeOf(actual))
 	}
-
-	return fmt.Sprintf(shouldHaveHadLength, actual, expectedLen)
+	return fmt.Sprintf(shouldHaveBeenAValidCollection, reflect.TypeOf(actual))
 }

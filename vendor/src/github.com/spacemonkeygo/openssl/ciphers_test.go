@@ -251,3 +251,57 @@ func TestBadAAD(t *testing.T) {
 	}
 	checkEqual(t, plaintext_out, plaintext)
 }
+
+func TestNonAuthenticatedEncryption(t *testing.T) {
+	key := []byte("never gonna give you up, never g")
+	iv := []byte("onna let you dow")
+	plaintext1 := "n, never gonna run around"
+	plaintext2 := " and desert you"
+
+	cipher, err := GetCipherByName("aes-256-cbc")
+	if err != nil {
+		t.Fatal("Could not get cipher: ", err)
+	}
+
+	eCtx, err := NewEncryptionCipherCtx(cipher, nil, key, iv)
+	if err != nil {
+		t.Fatal("Could not create encryption context: ", err)
+	}
+	cipherbytes, err := eCtx.EncryptUpdate([]byte(plaintext1))
+	if err != nil {
+		t.Fatal("EncryptUpdate(plaintext1) failure: ", err)
+	}
+	ciphertext := string(cipherbytes)
+	cipherbytes, err = eCtx.EncryptUpdate([]byte(plaintext2))
+	if err != nil {
+		t.Fatal("EncryptUpdate(plaintext2) failure: ", err)
+	}
+	ciphertext += string(cipherbytes)
+	cipherbytes, err = eCtx.EncryptFinal()
+	if err != nil {
+		t.Fatal("EncryptFinal() failure: ", err)
+	}
+	ciphertext += string(cipherbytes)
+
+	dCtx, err := NewDecryptionCipherCtx(cipher, nil, key, iv)
+	if err != nil {
+		t.Fatal("Could not create decryption context: ", err)
+	}
+	plainbytes, err := dCtx.DecryptUpdate([]byte(ciphertext[:15]))
+	if err != nil {
+		t.Fatal("DecryptUpdate(ciphertext part 1) failure: ", err)
+	}
+	plainOutput := string(plainbytes)
+	plainbytes, err = dCtx.DecryptUpdate([]byte(ciphertext[15:]))
+	if err != nil {
+		t.Fatal("DecryptUpdate(ciphertext part 2) failure: ", err)
+	}
+	plainOutput += string(plainbytes)
+	plainbytes, err = dCtx.DecryptFinal()
+	if err != nil {
+		t.Fatal("DecryptFinal() failure: ", err)
+	}
+	plainOutput += string(plainbytes)
+
+	checkEqual(t, []byte(plainOutput), plaintext1+plaintext2)
+}

@@ -51,6 +51,10 @@ const (
 
 	// ErrUnknownCommand indicates that an unknown command was specified.
 	ErrUnknownCommand
+
+	// ErrInvalidChoice indicates an invalid option value which only allows
+	// a certain number of choices.
+	ErrInvalidChoice
 )
 
 func (e ErrorType) String() string {
@@ -81,6 +85,8 @@ func (e ErrorType) String() string {
 		return "command required"
 	case ErrUnknownCommand:
 		return "unknown command"
+	case ErrInvalidChoice:
+		return "invalid choice"
 	}
 
 	return "unrecognized error type"

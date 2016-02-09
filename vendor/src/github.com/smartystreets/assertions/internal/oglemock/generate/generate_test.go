@@ -18,17 +18,18 @@ package generate_test
 import (
 	"bytes"
 	"flag"
-	. "github.com/smartystreets/assertions/internal/oglematchers"
-	"github.com/smartystreets/assertions/internal/oglemock/generate"
-	"github.com/smartystreets/assertions/internal/oglemock/generate/test_cases/complicated_pkg"
-	"github.com/smartystreets/assertions/internal/oglemock/generate/test_cases/renamed_pkg"
-	. "github.com/smartystreets/assertions/internal/ogletest"
 	"image"
 	"io"
 	"io/ioutil"
 	"path"
 	"reflect"
 	"testing"
+
+	. "github.com/smartystreets/assertions/internal/oglematchers"
+	"github.com/smartystreets/assertions/internal/oglemock/generate"
+	"github.com/smartystreets/assertions/internal/oglemock/generate/testdata/complicated_pkg"
+	"github.com/smartystreets/assertions/internal/oglemock/generate/testdata/renamed_pkg"
+	. "github.com/smartystreets/assertions/internal/ogletest"
 )
 
 var dumpNew = flag.Bool("dump_new", false, "Dump new golden files.")
@@ -45,6 +46,7 @@ func init()                     { RegisterTestSuite(&GenerateTest{}) }
 
 func (t *GenerateTest) runGoldenTest(
 	caseName string,
+	outputPkgPath string,
 	nilPtrs ...interface{}) {
 	// Make a slice of interface types to give to GenerateMockSource.
 	interfaces := make([]reflect.Type, len(nilPtrs))
@@ -54,11 +56,11 @@ func (t *GenerateTest) runGoldenTest(
 
 	// Create the mock source.
 	buf := new(bytes.Buffer)
-	err := generate.GenerateMockSource(buf, "some_pkg", interfaces)
+	err := generate.GenerateMockSource(buf, outputPkgPath, interfaces)
 	AssertEq(nil, err, "Error from GenerateMockSource: %v", err)
 
 	// Read the golden file.
-	goldenPath := path.Join("test_cases", "golden."+caseName+".go")
+	goldenPath := path.Join("testdata", "golden."+caseName+".go")
 	goldenData := readFileOrDie(goldenPath)
 
 	// Compare the two.
@@ -90,7 +92,7 @@ func readFileOrDie(path string) []byte {
 // Tests
 ////////////////////////////////////////////////////////////
 
-func (t *GenerateTest) EmptyPackageName() {
+func (t *GenerateTest) EmptyOutputPackagePath() {
 	err := generate.GenerateMockSource(
 		new(bytes.Buffer),
 		"",
@@ -98,7 +100,7 @@ func (t *GenerateTest) EmptyPackageName() {
 			reflect.TypeOf((*io.Reader)(nil)).Elem(),
 		})
 
-	ExpectThat(err, Error(HasSubstr("Package name")))
+	ExpectThat(err, Error(HasSubstr("Package path")))
 	ExpectThat(err, Error(HasSubstr("non-empty")))
 }
 
@@ -129,6 +131,16 @@ func (t *GenerateTest) IoReaderAndWriter() {
 	// Mock io.Reader and io.Writer.
 	t.runGoldenTest(
 		"io_reader_writer",
+		"some/pkg",
+		(*io.Reader)(nil),
+		(*io.Writer)(nil))
+}
+
+func (t *GenerateTest) IoReaderAndWriter_SamePackage() {
+	// Mock io.Reader and io.Writer.
+	t.runGoldenTest(
+		"io_reader_writer_same_package",
+		"io",
 		(*io.Reader)(nil),
 		(*io.Writer)(nil))
 }
@@ -136,6 +148,7 @@ func (t *GenerateTest) IoReaderAndWriter() {
 func (t *GenerateTest) Image() {
 	t.runGoldenTest(
 		"image",
+		"some/pkg",
 		(*image.Image)(nil),
 		(*image.PalettedImage)(nil))
 }
@@ -143,11 +156,13 @@ func (t *GenerateTest) Image() {
 func (t *GenerateTest) ComplicatedPackage() {
 	t.runGoldenTest(
 		"complicated_pkg",
+		"some/pkg",
 		(*complicated_pkg.ComplicatedThing)(nil))
 }
 
 func (t *GenerateTest) RenamedPackage() {
 	t.runGoldenTest(
 		"renamed_pkg",
+		"some/pkg",
 		(*tony.SomeInterface)(nil))
 }
