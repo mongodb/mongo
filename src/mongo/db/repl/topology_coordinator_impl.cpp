@@ -1492,10 +1492,7 @@ const MemberConfig* TopologyCoordinatorImpl::_currentPrimaryMember() const {
 }
 
 void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::CallbackArgs& data,
-                                                    Date_t now,
-                                                    unsigned selfUptime,
-                                                    const OpTime& lastOpApplied,
-                                                    const OpTime& lastCommittedOpTime,
+                                                    const ReplSetStatusArgs& rsStatusArgs,
                                                     BSONObjBuilder* response,
                                                     Status* result) {
     if (data.status == ErrorCodes::CallbackCanceled) {
@@ -1506,12 +1503,14 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
     // output for each member
     vector<BSONObj> membersOut;
     const MemberState myState = getMemberState();
+    const Date_t now = rsStatusArgs.now;
+    const OpTime& lastOpApplied = rsStatusArgs.lastOpApplied;
 
     if (_selfIndex == -1) {
         // We're REMOVED or have an invalid config
         response->append("state", static_cast<int>(myState.s));
         response->append("stateStr", myState.toString());
-        response->append("uptime", selfUptime);
+        response->append("uptime", rsStatusArgs.selfUptime);
 
         if (_rsConfig.getProtocolVersion() == 1) {
             BSONObjBuilder opTime(response->subobjStart("optime"));
@@ -1546,7 +1545,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
             bb.append("health", 1.0);
             bb.append("state", static_cast<int>(myState.s));
             bb.append("stateStr", myState.toString());
-            bb.append("uptime", selfUptime);
+            bb.append("uptime", rsStatusArgs.selfUptime);
             if (!_selfConfig().isArbiter()) {
                 if (_rsConfig.getProtocolVersion() == 1) {
                     BSONObjBuilder opTime(bb.subobjStart("optime"));
@@ -1664,7 +1663,12 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
     response->append("heartbeatIntervalMillis",
                      durationCount<Milliseconds>(_rsConfig.getHeartbeatInterval()));
 
-    lastCommittedOpTime.append(response, "lastCommittedOpTime");
+    BSONObjBuilder optimes;
+    rsStatusArgs.lastCommittedOpTime.append(&optimes, "lastCommittedOpTime");
+    if (!rsStatusArgs.readConcernMajorityOpTime.isNull()) {
+        rsStatusArgs.readConcernMajorityOpTime.append(&optimes, "readConcernMajorityOpTime");
+    }
+    response->append("OpTimes", optimes.obj());
 
     response->append("members", membersOut);
     *result = Status::OK();

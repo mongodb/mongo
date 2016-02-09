@@ -1871,15 +1871,18 @@ bool ReplicationCoordinatorImpl::prepareOldReplSetUpdatePositionCommand(
 
 Status ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* response) {
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
-    _scheduleWorkAndWaitForCompletion(stdx::bind(&TopologyCoordinator::prepareStatusResponse,
-                                                 _topCoord.get(),
-                                                 stdx::placeholders::_1,
-                                                 _replExecutor.now(),
-                                                 time(0) - serverGlobalParams.started,
-                                                 getMyLastAppliedOpTime(),
-                                                 getLastCommittedOpTime(),
-                                                 response,
-                                                 &result));
+    _scheduleWorkAndWaitForCompletion(
+        stdx::bind(&TopologyCoordinator::prepareStatusResponse,
+                   _topCoord.get(),
+                   stdx::placeholders::_1,
+                   TopologyCoordinator::ReplSetStatusArgs{
+                       _replExecutor.now(),
+                       static_cast<unsigned>(time(0) - serverGlobalParams.started),
+                       getMyLastAppliedOpTime(),
+                       getLastCommittedOpTime(),
+                       getCurrentCommittedSnapshotOpTime()},
+                   response,
+                   &result));
     return result;
 }
 

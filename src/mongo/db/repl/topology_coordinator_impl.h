@@ -192,10 +192,7 @@ public:
                                               const OpTime& lastOpDurable,
                                               ReplSetHeartbeatResponse* response);
     virtual void prepareStatusResponse(const ReplicationExecutor::CallbackArgs& data,
-                                       Date_t now,
-                                       unsigned uptime,
-                                       const OpTime& lastOpApplied,
-                                       const OpTime& lastCommittedOpTime,
+                                       const ReplSetStatusArgs& rsStatusArgs,
                                        BSONObjBuilder* response,
                                        Status* result);
     virtual void fillIsMasterForReplSet(IsMasterResponse* response);

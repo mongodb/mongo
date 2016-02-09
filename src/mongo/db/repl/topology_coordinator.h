@@ -244,12 +244,17 @@ public:
                                               const OpTime& lastOpDurable,
                                               ReplSetHeartbeatResponse* response) = 0;
 
+    struct ReplSetStatusArgs {
+        Date_t now;
+        unsigned selfUptime;
+        const OpTime& lastOpApplied;
+        const OpTime& lastCommittedOpTime;
+        const OpTime& readConcernMajorityOpTime;
+    };
+
     // produce a reply to a status request
     virtual void prepareStatusResponse(const ReplicationExecutor::CallbackArgs& data,
-                                       Date_t now,
-                                       unsigned uptime,
-                                       const OpTime& lastOpApplied,
-                                       const OpTime& lastCommittedOpTime,
+                                       const ReplSetStatusArgs& rsStatusArgs,
                                        BSONObjBuilder* response,
                                        Status* result) = 0;
 
