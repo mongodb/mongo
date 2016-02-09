@@ -39,7 +39,6 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_readonly01'
     create = True
     entries = 10000
-    extra_entries = 5
 
     #
     # We want a list of directory writable or readonly.

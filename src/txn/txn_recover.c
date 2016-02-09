@@ -449,6 +449,20 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 */
 	if (!was_backup) {
 		r.metadata_only = true;
+		/*
+		 * If this is a read-only connection, check if the checkpoint
+		 * LSN in the metadata file is up to date, indicating a clean
+		 * shutdown.
+		 */
+		if (F_ISSET(conn, WT_CONN_READONLY)) {
+			WT_ERR(__wt_log_needs_recovery(
+			    session, &metafile->ckpt_lsn, &needs_rec));
+			if (needs_rec) {
+				WT_ERR_MSG(session, WT_RUN_RECOVERY,
+				    "Read-only database needs recovery");
+				WT_ERR(WT_RUN_RECOVERY);
+			}
+		}
 		if (WT_IS_INIT_LSN(&metafile->ckpt_lsn))
 			WT_ERR(__wt_log_scan(session,
 			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
