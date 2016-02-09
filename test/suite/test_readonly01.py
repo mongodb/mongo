@@ -36,7 +36,7 @@ from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
 class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
-    t1 = 'table:test_readonly01_1'
+    tablename = 'test_readonly01'
     create = True
     entries = 10000
     extra_entries = 5
@@ -58,13 +58,19 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     types = [
-        ('lsm', dict(tabletype='lsm',
+        ('lsm', dict(tabletype='lsm', uri='lsm',
                     create_params = 'key_format=i,value_format=i')),
-        ('row', dict(tabletype='row',
+        ('file-row', dict(tabletype='row', uri='file',
                     create_params = 'key_format=i,value_format=i')),
-        ('var', dict(tabletype='var',
+        ('file-var', dict(tabletype='var', uri='file',
                     create_params = 'key_format=r,value_format=i')),
-        ('fix', dict(tabletype='fix',
+        ('file-fix', dict(tabletype='fix', uri='file',
+                    create_params = 'key_format=r,value_format=8t')),
+        ('table-row', dict(tabletype='row', uri='table',
+                    create_params = 'key_format=i,value_format=i')),
+        ('table-var', dict(tabletype='var', uri='table',
+                    create_params = 'key_format=r,value_format=i')),
+        ('table-fix', dict(tabletype='fix', uri='table',
                     create_params = 'key_format=r,value_format=8t')),
     ]
 
@@ -105,14 +111,15 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
         #    - Open connection readonly
         #    - Confirm we can read the data.
         #
-        self.session.create(self.t1, self.create_params)
-        c = self.session.open_cursor(self.t1, None, None)
+        tablearg = self.uri + ':' + self.tablename
+        self.session.create(tablearg, self.create_params)
+        c = self.session.open_cursor(tablearg, None, None)
         for i in range(self.entries):
             c[i+1] = i % 255
         # Close the connection.  Reopen readonly
         self.create = False
         self.close_reopen()
-        c = self.session.open_cursor(self.t1, None, None)
+        c = self.session.open_cursor(tablearg, None, None)
         i = 0
         for key, value in c:
             self.assertEqual(i+1, key)

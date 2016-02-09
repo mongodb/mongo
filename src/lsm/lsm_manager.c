@@ -212,8 +212,10 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	manager = &conn->lsm_manager;
 
-	if (F_ISSET(conn, WT_CONN_READONLY))
+	if (F_ISSET(conn, WT_CONN_READONLY)) {
+		manager->lsm_workers = 0;
 		return (0);
+	}
 	/*
 	 * We need at least a manager, a switch thread and a generic
 	 * worker.
@@ -286,6 +288,8 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	manager = &conn->lsm_manager;
 	removed = 0;
 
+	WT_ASSERT(session, !F_ISSET(conn, WT_CONN_READONLY) ||
+	    manager->lsm_workers == 0);
 	if (manager->lsm_workers > 0) {
 		/*
 		 * Stop the main LSM manager thread first.
