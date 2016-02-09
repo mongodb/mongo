@@ -56,9 +56,6 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
         ('logging', dict(logcfg='log=(archive=false,enabled,file_max=100K),')),
         ('no_logging', dict(logcfg='log=(enabled=false),')),
     ]
-    log_list = [
-        ('no_logging', dict(logcfg='log=(enabled=false),')),
-    ]
 
     types = [
         ('lsm', dict(tabletype='lsm',

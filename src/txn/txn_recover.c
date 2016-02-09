@@ -501,6 +501,9 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 		WT_ERR(WT_RUN_RECOVERY);
 	}
 
+	if (F_ISSET(conn, WT_CONN_READONLY))
+		goto done;
+
 	/*
 	 * Recovery can touch more data than fits in cache, so it relies on
 	 * regular eviction to manage paging.  Start eviction threads for
@@ -510,7 +513,8 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	eviction_started = true;
 
 	/*
-	 * Always run recovery even if it was a clean shutdown.
+	 * Always run recovery even if it was a clean shutdown only if
+	 * this is not a read-only connection.
 	 * We can consider skipping it in the future.
 	 */
 	if (WT_IS_INIT_LSN(&r.ckpt_lsn))
