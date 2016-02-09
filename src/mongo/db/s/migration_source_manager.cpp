@@ -40,6 +40,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
@@ -433,8 +434,10 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
     bool isLargeChunk = false;
     unsigned long long recCount = 0;
 
+    BSONObj obj;
     RecordId recordId;
-    while (PlanExecutor::ADVANCED == exec->getNext(NULL, &recordId)) {
+    PlanExecutor::ExecState state;
+    while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &recordId))) {
         if (!isLargeChunk) {
             stdx::lock_guard<stdx::mutex> lk(_cloneLocsMutex);
             _cloneLocs.insert(recordId);
@@ -445,6 +448,12 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
             // Continue on despite knowing that it will fail, just to get the correct value for
             // recCount
         }
+    }
+
+    if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
+        errmsg = "Executor error while scanning for documents belonging to chunk: " +
+            WorkingSetCommon::toStatusString(obj);
+        return false;
     }
 
     exec.reset();
