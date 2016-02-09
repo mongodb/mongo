@@ -54,7 +54,6 @@
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
@@ -927,17 +926,11 @@ void validateIndexKeyCount(OperationContext* txn,
                            int64_t numRecs,
                            ValidateResults* results) {
     if (idx.isIdIndex() && numIdxKeys != numRecs) {
-        string msg = str::stream() << "number of _id index entries (" << numIdxKeys
+        string err = str::stream() << "number of _id index entries (" << numIdxKeys
                                    << ") does not match the number of documents (" << numRecs
                                    << ")";
-
-        if (!failIndexKeyTooLong && (numIdxKeys < numRecs)) {
-            results->warnings.push_back(msg);
-        } else {
-            results->errors.push_back(msg);
-            results->valid = false;
-        }
-
+        results->errors.push_back(err);
+        results->valid = false;
         return;  // Avoid failing the next two checks, they just add redundant/confusing messages
     }
     if (!idx.isMultikey(txn) && numIdxKeys > numRecs) {
@@ -951,16 +944,11 @@ void validateIndexKeyCount(OperationContext* txn,
     //  index plugin with different semantics.
     if (!idx.isSparse() && !idx.isPartial() && idx.getAccessMethodName() == "" &&
         numIdxKeys < numRecs) {
-        string msg = str::stream() << "index " << idx.indexName()
+        string err = str::stream() << "index " << idx.indexName()
                                    << " is not sparse or partial, but has fewer entries ("
                                    << numIdxKeys << ") than documents (" << numRecs << ")";
-
-        if (!failIndexKeyTooLong) {
-            results->warnings.push_back(msg);
-        } else {
-            results->errors.push_back(msg);
-            results->valid = false;
-        }
+        results->errors.push_back(err);
+        results->valid = false;
     }
 }
 }  // namespace
@@ -978,13 +966,6 @@ Status Collection::validate(OperationContext* txn,
         return status;
 
     {  // indexes
-        if (!failIndexKeyTooLong) {
-            string warning =
-                "The server is configured with the failIndexKeyTooLong parameter set to false. "
-                "Validation failures that result from having fewer index entries than documents "
-                "have been downgraded from errors to warnings";
-            results->warnings.push_back(warning);
-        }
         output->append("nIndexes", _indexCatalog.numIndexesReady(txn));
         int idxn = 0;
         try {

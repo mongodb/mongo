@@ -107,22 +107,17 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
+        result.appendBool("valid", results.valid);
+        result.append("errors", results.errors);
+
         if (!full) {
-            results.warnings.push_back(
+            result.append(
+                "warning",
                 "Some checks omitted for speed. use {full:true} option to do more thorough scan.");
         }
 
-        result.appendBool("valid", results.valid);
-        result.append("warnings", results.warnings);
-        result.append("errors", results.errors);
-
         if (!results.valid) {
-            result.append("advice",
-                          "A corrupt namespace has been detected. See "
-                          "http://dochub.mongodb.org/core/data-recovery for recovery steps. Note "
-                          "that validation failures may also result from running a server with the "
-                          "failIndexKeyTooLong parameter set to false and later disabling the "
-                          "parameter.");
+            result.append("advice", "ns corrupt. See http://dochub.mongodb.org/core/data-recovery");
         }
 
         return true;
