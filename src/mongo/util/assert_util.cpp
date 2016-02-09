@@ -303,4 +303,24 @@ string ExceptionInfo::toString() const {
     ss << "exception: " << code << " " << msg;
     return ss.str();
 }
+}  // namespace mongo
+
+// When BOOST_ENABLE_ASSERT_DEBUG_HANDLER is defined, we can add our own callbacks for BOOST & ASIO
+namespace boost {
+void assertion_failed(char const* expr, char const* function, char const* file, long line) {
+    mongo::log() << "Boost assert failure " << expr << ' ' << function << ' ' << file << ' ' << dec
+                 << line << endl;
+    mongo::breakpoint();
+    mongo::log() << "\n\n***aborting after boost assert() failure\n\n" << endl;
+    mongo::quickExit(mongo::EXIT_ABRUPT);
 }
+
+void assertion_failed_msg(
+    char const* expr, char const* msg, char const* function, char const* file, long line) {
+    mongo::log() << "Boost assert failure " << expr << ' ' << msg << ' ' << function << ' ' << file
+                 << ' ' << dec << line << endl;
+    mongo::breakpoint();
+    mongo::log() << "\n\n***aborting after boost assert() failure\n\n" << endl;
+    mongo::quickExit(mongo::EXIT_ABRUPT);
+}
+}  // namespace boost
