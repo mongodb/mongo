@@ -1401,7 +1401,7 @@ __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 	 * split chunk, but we'll write it upon finding it in a different part
 	 * of the tree.
 	 */
-	if (btree->checkpointing == WT_CKPT_RUNNING)
+	if (btree->checkpointing != WT_CKPT_OFF)
 		return (__split_internal_unlock(session, page, page_hazard));
 
 	/*
