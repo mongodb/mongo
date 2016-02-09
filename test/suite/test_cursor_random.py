@@ -137,7 +137,7 @@ class test_cursor_random_column(wttest.WiredTigerTestCase):
 
     def test_cursor_random_column(self):
         self.session.create(self.uri, 'key_format=r,value_format=S')
-        msg = '/Operation not supported/'
+        msg = '/next_random .* not supported/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
             self.session.open_cursor(self.uri, None, "next_random=true"), msg)
 
