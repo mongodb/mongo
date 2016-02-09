@@ -125,17 +125,15 @@ struct __wt_btree {
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
+	uint64_t checkpoint_gen;	/* Checkpoint generation */
+	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
+	uint64_t write_gen;		/* Write generation */
+
 	WT_REF  *evict_ref;		/* Eviction thread's location */
 	uint64_t evict_priority;	/* Relative priority of cached pages */
 	u_int    evict_walk_period;	/* Skip this many LRU walks */
 	u_int    evict_walk_skips;	/* Number of walks skipped */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
-
-	volatile uint32_t split_busy;	/* Count of threads in internal split */
-
-	uint64_t checkpoint_gen;	/* Checkpoint generation */
-	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
-	uint64_t write_gen;		/* Write generation */
 
 	enum {
 		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING

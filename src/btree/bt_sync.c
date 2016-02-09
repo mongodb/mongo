@@ -119,8 +119,6 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		if (evict_reset)
 			__wt_evict_file_exclusive_off(session);
 
-		__wt_split_drain(session);
-
 		WT_PUBLISH(btree->checkpointing, WT_CKPT_RUNNING);
 
 		/* Write all dirty in-cache pages. */
