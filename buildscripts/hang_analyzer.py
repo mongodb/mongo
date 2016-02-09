@@ -31,7 +31,7 @@ if sys.platform == "win32":
 def call(a = []):
     sys.stdout.write(str(a) + "\n")
     sys.stdout.flush()
-    ret = subprocess.call(a);
+    ret = subprocess.call(a)
     if( ret != 0):
         sys.stderr.write("Bad exit code %d\n" % (ret))
         raise Exception()
@@ -104,13 +104,13 @@ class WindowsDumper(object):
         rootDir = shell.SHGetFolderPath(0, shellcon.CSIDL_PROGRAM_FILESX86, None, 0)
 
         for i in range(0,2):
-            pathToTest = os.path.join(rootDir, "Windows Kits", "8." + str(i), "Debuggers", "x64" );
+            pathToTest = os.path.join(rootDir, "Windows Kits", "8." + str(i), "Debuggers", "x64" )
             sys.stdout.write("Checking for debugger in %s\n" % pathToTest)
             if(os.path.exists(pathToTest)):
                 return os.path.join(pathToTest, "cdb.exe")
         return None
 
-    def dump_info(self, pid, stream):
+    def dump_info(self, pid, process_name, stream):
         """Dump useful information to the console"""
         dbg = self.__find_debugger()
 
@@ -124,15 +124,17 @@ class WindowsDumper(object):
             ".symfix",  # Fixup symbol path
             ".reload",  # Reload symbols
             "!peb",     # Dump current exe, & environment variables
-            "lm",       # Dump loaded modoules
+            "lm",       # Dump loaded modules
             "~* k 100", # Dump All Threads
+            ".dump /ma /u dump_" + process_name + ".mdmp",
+                        # Dump to file, dump_<process name>_<time stamp>_<pid in hex>.mdmp
             ".detach",  # Detach
             "q"         # Quit
             ]
 
         call([dbg, '-c', ";".join(cmds), '-p', str(pid)])
 
-        stream.write("INFO: Done analyzing process\n");
+        stream.write("INFO: Done analyzing process\n")
 
     def dump_core(self, pid, output_file):
         """Take a dump of pid to specified file"""
@@ -146,13 +148,13 @@ class WindowsDumper(object):
 
         call([dbg, '-c', ".dump /ma %s;.detach;q" % output_file, '-p', str(pid)] )
 
-        sys.stdout.write("INFO: Done analyzing process\n");
+        sys.stdout.write("INFO: Done analyzing process\n")
 
 class WindowsProcessList(object):
 
     def __find_ps(self):
         """Finds tasklist """
-        return os.path.join(os.environ["windir"], "system32", "tasklist.exe")
+        return os.path.join(os.environ["WINDIR"], "system32", "tasklist.exe")
 
     def dump_processes(self):
         """Get list of [Pid, Process Name]"""
@@ -167,7 +169,7 @@ class WindowsProcessList(object):
 
         p = [[int(row[1]), row[0]] for row in csvReader if row[1] != "PID"]
 
-        sys.stdout.write("INFO: Done analyzing process\n");
+        sys.stdout.write("INFO: Done analyzing process\n")
 
         return p
 
@@ -178,7 +180,7 @@ class LLDBDumper(object):
         """Finds the installed debugger"""
         return find_program('lldb', ['/usr/bin'])
 
-    def dump_info(self, pid, stream):
+    def dump_info(self, pid, process_name, stream):
         dbg = self.__find_debugger()
 
         if dbg is None:
@@ -225,11 +227,11 @@ class LLDBDumper(object):
         call(['cat', tf.name])
         call([dbg, '--source', tf.name])
 
-        stream.write("INFO: Done analyzing process\n");
+        stream.write("INFO: Done analyzing process\n")
 
     def dump_core(self, pid, output_file):
         """Take a dump of pid to specified file"""
-        sys.stderr.write("ERROR: lldb does not support dumps, stupid debugger\n");
+        sys.stderr.write("ERROR: lldb does not support dumps, stupid debugger\n")
 
 class DarwinProcessList(object):
 
@@ -250,7 +252,7 @@ class DarwinProcessList(object):
 
         p = [[int(row[0]), row[1]] for row in csvReader if row[0] != "PID"]
 
-        sys.stdout.write("INFO: Done analyzing process\n");
+        sys.stdout.write("INFO: Done analyzing process\n")
 
         return p
 
@@ -261,7 +263,7 @@ class GDBDumper(object):
         """Finds the installed debugger"""
         return find_program('gdb', ['/usr/bin'])
 
-    def dump_info(self, pid, stream):
+    def dump_info(self, pid, process_name, stream):
         dbg = self.__find_debugger()
 
         if dbg is None:
@@ -281,7 +283,7 @@ class GDBDumper(object):
 
         call([dbg, "--quiet"] + list( itertools.chain.from_iterable([['-ex', b] for b in cmds])))
 
-        stream.write("INFO: Done analyzing process\n");
+        stream.write("INFO: Done analyzing process\n")
 
     def _find_gcore(self):
         """Finds the installed gcore"""
@@ -301,9 +303,9 @@ class GDBDumper(object):
 
         sys.stdout.write("INFO: Debugger %s, analyzing %d to %s\n" % (dbg, pid, output_file))
 
-        call([dbg, "-o", output_file, str(pid)]);
+        call([dbg, "-o", output_file, str(pid)])
 
-        sys.stdout.write("INFO: Done analyzing process\n");
+        sys.stdout.write("INFO: Done analyzing process\n")
 
         # GCore appends the pid to the output file name
         return output_file + "." + str(pid)
@@ -328,7 +330,7 @@ class LinuxProcessList(object):
 
         p = [[int(row[0]), os.path.split(row[1])[1]] for row in csvReader if row[0] != "PID"]
 
-        sys.stdout.write("INFO: Done analyzing process\n");
+        sys.stdout.write("INFO: Done analyzing process\n")
 
         return p
 
@@ -434,12 +436,12 @@ def main():
         # Dump all other processes first since signaling the python script interrupts it
         for process in [a for a in processes if not a[1].startswith("python")]:
             sys.stdout.write("Dumping process %d of %s\n" % (process[0], process[1]))
-            dbg.dump_info(process[0], sys.stdout)
+            dbg.dump_info(process[0], process[1], sys.stdout)
 
         for process in [a for a in processes if a[1].startswith("python")]:
             signal_process(process[0])
 
-            dbg.dump_info(process[0], sys.stdout)
+            dbg.dump_info(process[0], process[1], sys.stdout)
 
     # Suspend the timer so we can exit cleanly
     timer.cancel()
