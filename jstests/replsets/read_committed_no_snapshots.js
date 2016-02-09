@@ -1,4 +1,11 @@
-// Test basic read committed maxTimeMS timeout while waiting for a committedSnapshot
+/**
+ * @tags: [requires_journaling]
+ *
+ * Test basic read committed maxTimeMS timeout while waiting for a committed snapshot:
+ *  - Reads with an 'afterOpTime' snapshot >= current time should be able to see things that
+ *    happened before or at that opTime.
+ *  - Reads should time out if there are no snapshots available on secondary.
+ */
 
 load("jstests/replsets/rslib.js");
 

@@ -1,4 +1,11 @@
-// Test basic read committed functionality on a secondary.
+/**
+ * @tags: [requires_journaling]
+ *
+ * Test basic read committed functionality on a secondary:
+ *  - Updates should not be visible until they are in the blessed snapshot.
+ *  - Updates should be visible once they are in the blessed snapshot.
+ */
+
 (function() {
 "use strict";
 

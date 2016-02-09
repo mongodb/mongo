@@ -1,5 +1,10 @@
-// Test read committed and writeConcern: "majority" work properly with all other nodes being
-// arbiters.
+/**
+ * @tags: [requires_journaling]
+ *
+ * Tests that writeConcern 'majority' writes succeed and are visible in a replica set that has one
+ * data-bearing node and two arbiters.
+ */
+
 (function() {
 "use strict";
 

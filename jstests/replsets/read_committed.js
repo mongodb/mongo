@@ -1,4 +1,13 @@
-// Test basic read committed functionality.
+/**
+ * @tags: [requires_journaling]
+ *
+ * Test basic read committed functionality, including:
+ *  - Writes with writeConcern 'majority' should be visible once the write completes.
+ *  - With the only data-bearing secondary down, committed reads should not include newly inserted
+ *    data.
+ *  - When data-bearing node comes back up and catches up, writes should be readable.
+ */
+
 (function() {
 "use strict";
 
