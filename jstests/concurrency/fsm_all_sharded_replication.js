@@ -29,10 +29,6 @@ var blacklist = [
     'map_reduce_replace.js',
     'map_reduce_replace_nonexistent.js',
 
-    // Disabled because the TTL monitor can delete documents in the background while we're comparing
-    // dbhashes between the primaries and secondaries of the replica-set shards (SERVER-21881).
-    'indexed_insert_ttl.js',
-
     // Disabled due to MongoDB restrictions and/or workload restrictions
 
     // These workloads sometimes trigger 'Could not lock auth data update lock'

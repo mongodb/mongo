@@ -34,10 +34,6 @@ var blacklist = [
     // concurrent chunk migration may cause duplicate or missing results'
     'yield_geo_near_dedup.js',
 
-    // Disabled because the TTL monitor can delete documents in the background while we're comparing
-    // dbhashes between the primaries and secondaries of the replica-set shards (SERVER-21881).
-    'indexed_insert_ttl.js',
-
     // Disabled due to MongoDB restrictions and/or workload restrictions
 
     // These workloads sometimes trigger 'Could not lock auth data update lock'
