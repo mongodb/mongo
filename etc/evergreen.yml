@@ -73,6 +73,7 @@ variables:
   - enterprise-ubuntu1404-64
   - enterprise-ubuntu1504-ppc64le
   - enterprise-debian71-64
+  - enterprise-debian81-64
   - linux-32
   - linux-64
   - amazon
@@ -84,6 +85,7 @@ variables:
   - ubuntu1204
   - ubuntu1404
   - debian71
+  - debian81
   - solaris-64-bit
   - osx
 
@@ -98,6 +100,7 @@ variables:
   - enterprise-ubuntu1404-64
   - enterprise-ubuntu1504-ppc64le
   - enterprise-debian71-64
+  - enterprise-debian81-64
   - rhel55
   - rhel62
   - rhel70
@@ -107,6 +110,7 @@ variables:
   - ubuntu1404
   - amazon
   - debian71
+  - debian81
 
 #######################################
 #            Functions                #
@@ -5134,7 +5138,7 @@ buildvariants:
     push_arch: x86_64-enterprise-debian81
     compile_flags: --ssl MONGO_DISTMOD=debian81 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    has_packages: false
+    has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: x86_64
     packager_distro: debian81
@@ -5164,9 +5168,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 
 - name: debian71
@@ -5298,7 +5302,7 @@ buildvariants:
     push_arch: x86_64-debian81
     compile_flags: --ssl MONGO_DISTMOD=debian81 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    has_packages: false
+    has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
     packager_distro: debian81
@@ -5392,9 +5396,9 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  # - name: push
-  #   distros:
-  #   - rhel55-test
+  - name: push
+    distros:
+    - rhel55-test
 
 
 ################################

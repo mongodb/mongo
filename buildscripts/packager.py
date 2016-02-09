@@ -216,6 +216,8 @@ class Distro(object):
         elif self.n == 'debian':
             if build_os == 'debian71':
                 return 'wheezy'
+            elif build_os == 'debian81':
+                return 'jessie'
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
         else:
@@ -246,7 +248,7 @@ class Distro(object):
         elif self.n == 'ubuntu':
             return [ "ubuntu1204", "ubuntu1404" ]
         elif self.n == 'debian':
-            return [ "debian71" ]
+            return [ "debian71", "debian81" ]
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -453,11 +455,17 @@ def make_deb(distro, build_os, arch, spec, srcdir):
     suffix=spec.suffix()
     sdir=setupdir(distro, build_os, arch, spec)
     if re.search("debian", distro.name()):
-        os.link(sdir+"debian/init.d", sdir+"debian/%s%s-server.mongod.init" % (distro.pkgbase(), suffix))
         os.unlink(sdir+"debian/mongod.upstart")
+        if build_os == "debian71":
+            os.link(sdir+"debian/init.d", sdir+"debian/%s%s-server.mongod.init" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/mongod.service")
+        else:
+            os.link(sdir+"debian/mongod.service", sdir+"debian/%s%s-server.mongod.service" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/init.d")
     elif re.search("ubuntu", distro.name()):
         os.link(sdir+"debian/mongod.upstart", sdir+"debian/%s%s-server.mongod.upstart" % (distro.pkgbase(), suffix))
         os.unlink(sdir+"debian/init.d")
+        os.unlink(sdir+"debian/mongod.service")
     else:
         raise Exception("unknown debianoid flavor: not debian or ubuntu?")
     # Rewrite the control and rules files
@@ -647,7 +655,7 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     # all of this is to let us do our work with some guarantee that
     # we're not clobbering anything that doesn't belong to us.
     #
-    # On RHEL systems, --rcfile will generally be used and 
+    # On RHEL systems, --rcfile will generally be used and
     # --macros will be used in Ubuntu.
     #
     macrofiles=[l for l in backtick(["rpm", "--showrc"]).split("\n") if l.startswith("macrofiles")]
@@ -668,7 +676,7 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     # Put the specfile and the tar'd up binaries and stuff in
     # place.
     #
-    # The version of rpm and rpm tools in RHEL 5.5 can't interpolate the 
+    # The version of rpm and rpm tools in RHEL 5.5 can't interpolate the
     # %{dynamic_version} macro, so do it manually
     with open(specfile, "r") as spec_source:
       with open(topdir+"SPECS/" + os.path.basename(specfile), "w") as spec_dest:
@@ -736,5 +744,3 @@ def is_valid_file(parser, filename):
 
 if __name__ == "__main__":
     main(sys.argv)
-
-
