@@ -351,6 +351,20 @@ add_option('use-system-asio',
     nargs=0,
 )
 
+add_option('icu',
+    choices=['on', 'off'],
+    const='on',
+    default='off',
+    help='Enable ICU',
+    nargs='?',
+    type='choice',
+)
+
+add_option('use-system-icu',
+    help="use system version of ICU",
+    nargs=0,
+)
+
 add_option('use-system-intel_decimal128',
     help='use system version of intel decimal128',
     nargs=0,
@@ -1454,6 +1468,11 @@ if get_option('wiredtiger') == 'on':
 if get_option('experimental-decimal-support') == 'on':
     env.SetConfigHeaderDefine("MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT")
 
+icuEnabled = False
+if get_option('icu') == 'on':
+    icuEnabled = True
+    env.SetConfigHeaderDefine("MONGO_CONFIG_ICU_ENABLED")
+
 if env['TARGET_ARCH'] == 'i386':
     # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',
     # and the tuning to 'generic'. The choice of 'nocona' is selected because it
@@ -2538,6 +2557,7 @@ Export('module_sconscripts')
 Export("debugBuild optBuild")
 Export("wiredtiger")
 Export("endian")
+Export("icuEnabled")
 
 def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])

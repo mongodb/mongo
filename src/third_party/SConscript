@@ -2,12 +2,14 @@
 
 Import("env use_system_version_of_library usemozjs boostSuffix get_option")
 Import("wiredtiger")
+Import("icuEnabled")
 
 snappySuffix = '-1.1.3'
 zlibSuffix = '-1.2.8'
 pcreSuffix = "-8.38"
 mozjsSuffix = '-38'
 yamlSuffix = '-0.5.3'
+icuSuffix = '-56.1'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
@@ -76,6 +78,10 @@ if not use_system_version_of_library('asio'):
 if not use_system_version_of_library('intel_decimal128'):
     thirdPartyIncludePathList.append(
         ('intel_decimal128', '#/src/third_party/IntelRDFPMathLib20U1/LIBRARY'))
+
+if icuEnabled and not use_system_version_of_library('icu'):
+    thirdPartyIncludePathList.append(
+        ('icu', '#/src/third_party/icu4c' + icuSuffix + '/source'))
 
 def injectAllThirdPartyIncludePaths(thisEnv):
     thisEnv.PrependUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
@@ -355,4 +361,23 @@ if get_option("experimental-decimal-support") == "on":
         target="shim_intel_decimal128",
         source=[
             'shim_intel_decimal128.cpp'
+        ])
+
+if icuEnabled:
+    if use_system_version_of_library('icu'):
+        # TODO
+        icuEnv = env.Clone()
+    else:
+        icuEnv = env.Clone()
+        icuEnv.InjectThirdPartyIncludePaths(libraries=['icu'])
+        icuEnv.SConscript('icu4c' + icuSuffix + '/source/SConscript', exports={ 'env' : icuEnv })
+        icuEnv = icuEnv.Clone(
+            LIBDEPS=[
+                'icu4c' + icuSuffix + '/source/icu_i18n',
+            ])
+
+    icuEnv.Library(
+        target='shim_icu',
+        source=[
+            'shim_icu.cpp',
         ])
