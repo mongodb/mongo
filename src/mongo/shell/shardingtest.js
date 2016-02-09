@@ -1146,6 +1146,7 @@ var ShardingTest = function(params) {
         }
 
         startOptions = Object.merge(startOptions, otherParams.configOptions);
+        rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
 
         var nodeOptions = [];
         for (var i = 0; i < numConfigs; ++i) {
