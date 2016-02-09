@@ -91,7 +91,7 @@ class test_readonly02(wttest.WiredTigerTestCase, suite_subprocess):
         ''' Close the connection and reopen readonly'''
         #
         # Close the original connection.  Reopen readonly and also with
-        # the given 
+        # the given configuration string.
         #
         self.close_conn()
         conn_params = self.conn_params_rd + cfg
