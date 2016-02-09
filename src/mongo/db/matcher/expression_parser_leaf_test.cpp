@@ -832,6 +832,40 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumber) {
     ASSERT_FALSE(tmeNumber->matchesBSON(fromjson("{a: ''}")));
 }
 
+TEST(MatchExpressionParserLeafTest, InvalidTypeCodeLessThanMinKeyFailsToParse) {
+    StatusWithMatchExpression typeNumber = MatchExpressionParser::parse(
+        fromjson("{a: {$type: -20}}"), ExtensionsCallbackDisallowExtensions());
+    ASSERT_NOT_OK(typeNumber.getStatus());
+}
+
+TEST(MatchExpressionParserLeafTest, InvalidTypeCodeGreaterThanMaxKeyFailsToParse) {
+    StatusWithMatchExpression typeNumber = MatchExpressionParser::parse(
+        fromjson("{a: {$type: 400}}"), ExtensionsCallbackDisallowExtensions());
+    ASSERT_NOT_OK(typeNumber.getStatus());
+}
+
+TEST(MatchExpressionParserLeafTest, InvalidTypeCodeUnusedBetweenMinAndMaxFailsToParse) {
+    StatusWithMatchExpression typeNumber = MatchExpressionParser::parse(
+        fromjson("{a: {$type: 62}}"), ExtensionsCallbackDisallowExtensions());
+    ASSERT_NOT_OK(typeNumber.getStatus());
+}
+
+TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
+    std::vector<BSONType> validTypes{
+        MinKey,     EOO,       NumberDouble,  String,     Object,        Array, BinData, Undefined,
+        jstOID,     Bool,      Date,          jstNULL,    RegEx,         DBRef, Code,    Symbol,
+        CodeWScope, NumberInt, bsonTimestamp, NumberLong, NumberDecimal, MaxKey};
+
+    for (auto type : validTypes) {
+        BSONObj predicate = BSON("a" << BSON("$type" << type));
+        auto expression =
+            MatchExpressionParser::parse(predicate, ExtensionsCallbackDisallowExtensions());
+        ASSERT_OK(expression.getStatus());
+        auto typeExpression = static_cast<TypeMatchExpression*>(expression.getValue().get());
+        ASSERT_EQ(type, typeExpression->getType());
+    }
+}
+
 TEST(MatchExpressionParserTest, BitTestMatchExpressionValidMask) {
     const double k2Power53 = scalbn(1, 32);
 

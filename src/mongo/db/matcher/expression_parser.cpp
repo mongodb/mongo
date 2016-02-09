@@ -625,14 +625,14 @@ StatusWithMatchExpression MatchExpressionParser::_parseType(const char* name,
 
     std::unique_ptr<TypeMatchExpression> temp = stdx::make_unique<TypeMatchExpression>();
 
-    BSONType typeInt;
+    int typeInt;
 
     // The element can be a number (the BSON type number) or a string representing the name
     // of the type.
     if (elt.isNumber()) {
-        typeInt = static_cast<BSONType>(elt.numberInt());
+        typeInt = elt.numberInt();
         if (elt.type() != NumberInt && typeInt != elt.number()) {
-            typeInt = static_cast<BSONType>(-1);
+            typeInt = -1;
         }
     } else {
         invariant(elt.type() == BSONType::String);

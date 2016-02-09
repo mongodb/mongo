@@ -41,6 +41,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -419,9 +420,14 @@ const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMa
     {"maxKey", MaxKey},
     {"minKey", MinKey}};
 
-Status TypeMatchExpression::initWithBSONType(StringData path, BSONType type) {
+Status TypeMatchExpression::initWithBSONType(StringData path, int type) {
+    if (!isValidBSONType(type)) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid numerical $type code: " << type);
+    }
+
     _path = path;
-    _type = type;
+    _type = static_cast<BSONType>(type);
     return _elementPath.init(_path);
 }
 

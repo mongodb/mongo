@@ -106,6 +106,11 @@ enum BSONType {
  */
 const char* typeName(BSONType type);
 
+/**
+ * Returns whether or not 'type' can be converted to a valid BSONType.
+ */
+bool isValidBSONType(int type);
+
 /* subtypes of BinData.
    bdtCustom and above are ones that the JS compiler understands, but are
    opaque to the database.
