@@ -1,8 +1,27 @@
-#define CRC_TABLE
+/*-
+ *  Copyright 2016 MongoDB, Inc.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  Local modifications to add __powerpc64__ conditional defines, and
+ *  code formatting fixes.
+ */
+#if defined(__powerpc64__)
+#define	CRC_TABLE
 #include "crc32_constants.h"
 
-#define VMX_ALIGN	16
-#define VMX_ALIGN_MASK	(VMX_ALIGN-1)
+#define	VMX_ALIGN	16
+#define	VMX_ALIGN_MASK	(VMX_ALIGN-1)
 
 #ifdef REFLECT
 static unsigned int crc32_align(unsigned int crc, unsigned char *p,
@@ -10,7 +29,7 @@ static unsigned int crc32_align(unsigned int crc, unsigned char *p,
 {
 	while (len--)
 		crc = crc_table[(crc ^ *p++) & 0xff] ^ (crc >> 8);
-	return crc;
+	return (crc);
 }
 #else
 static unsigned int crc32_align(unsigned int crc, unsigned char *p,
@@ -18,7 +37,7 @@ static unsigned int crc32_align(unsigned int crc, unsigned char *p,
 {
 	while (len--)
 		crc = crc_table[((crc >> 24) ^ *p++) & 0xff] ^ (crc << 8);
-	return crc;
+	return (crc);
 }
 #endif
 
@@ -60,5 +79,6 @@ out:
 	crc ^= 0xffffffff;
 #endif
 
-	return crc;
+	return (crc);
 }
+#endif

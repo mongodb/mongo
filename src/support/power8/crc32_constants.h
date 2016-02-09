@@ -1,6 +1,23 @@
-#define CRC 0x1edc6f41
-#define CRC_XOR
-#define REFLECT
+/*-
+ *  Copyright 2016 MongoDB, Inc.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  Local modifications to format long lines.
+ */
+#define	CRC 0x1edc6f41
+#define	CRC_XOR
+#define	REFLECT
 
 #ifndef __ASSEMBLY__
 #ifdef CRC_TABLE
@@ -72,7 +89,7 @@ static const unsigned int crc_table[] = {
 
 #endif
 #else
-#define MAX_SIZE	32768
+#define	MAX_SIZE	32768
 .constants:
 
 	/* Reduce 262144 kbits to 1024 bits */
@@ -843,32 +860,42 @@ static const unsigned int crc_table[] = {
 
 .short_constants:
 
-	/* Reduce final 1024-2048 bits to 64 bits, shifting 32 bits to include the trailing 32 bits of zeros */
-	/* x^1952 mod p(x)`, x^1984 mod p(x)`, x^2016 mod p(x)`, x^2048 mod p(x)` */
+	/* Reduce final 1024-2048 bits to 64 bits, shifting 32 bits to include
+	   the trailing 32 bits of zeros */
+	/* x^1952 mod p(x)`, x^1984 mod p(x)`, x^2016 mod p(x)`,
+	   x^2048 mod p()`x */
 	.octa 0x7fec2963e5bf80485cf015c388e56f72
 
-	/* x^1824 mod p(x)`, x^1856 mod p(x)`, x^1888 mod p(x)`, x^1920 mod p(x)` */
+	/* x^1824 mod p(x)`, x^1856 mod p(x)`, x^1888 mod p(x)`,
+	   x^1920 mod p(x)` */
 	.octa 0x38e888d4844752a9963a18920246e2e6
 
-	/* x^1696 mod p(x)`, x^1728 mod p(x)`, x^1760 mod p(x)`, x^1792 mod p(x)` */
+	/* x^1696 mod p(x)`, x^1728 mod p(x)`, x^1760 mod p(x)`,
+	   x^1792 mod p(x)` */
 	.octa 0x42316c00730206ad419a441956993a31
 
-	/* x^1568 mod p(x)`, x^1600 mod p(x)`, x^1632 mod p(x)`, x^1664 mod p(x)` */
+	/* x^1568 mod p(x)`, x^1600 mod p(x)`, x^1632 mod p(x)`,
+	   x^1664 mod p(x)` */
 	.octa 0x543d5c543e65ddf9924752ba2b830011
 
-	/* x^1440 mod p(x)`, x^1472 mod p(x)`, x^1504 mod p(x)`, x^1536 mod p(x)` */
+	/* x^1440 mod p(x)`, x^1472 mod p(x)`, x^1504 mod p(x)`,
+	   x^1536 mod p(x)` */
 	.octa 0x78e87aaf56767c9255bd7f9518e4a304
 
-	/* x^1312 mod p(x)`, x^1344 mod p(x)`, x^1376 mod p(x)`, x^1408 mod p(x)` */
+	/* x^1312 mod p(x)`, x^1344 mod p(x)`, x^1376 mod p(x)`,
+	   x^1408 mod p(x)` */
 	.octa 0x8f68fcec1903da7f6d76739fe0553f1e
 
-	/* x^1184 mod p(x)`, x^1216 mod p(x)`, x^1248 mod p(x)`, x^1280 mod p(x)` */
+	/* x^1184 mod p(x)`, x^1216 mod p(x)`, x^1248 mod p(x)`,
+	   x^1280 mod p(x)` */
 	.octa 0x3f4840246791d588c133722b1fe0b5c3
 
-	/* x^1056 mod p(x)`, x^1088 mod p(x)`, x^1120 mod p(x)`, x^1152 mod p(x)` */
+	/* x^1056 mod p(x)`, x^1088 mod p(x)`, x^1120 mod p(x)`,
+	   x^1152 mod p(x)` */
 	.octa 0x34c96751b04de25a64b67ee0e55ef1f3
 
-	/* x^928 mod p(x)`, x^960 mod p(x)`, x^992 mod p(x)`, x^1024 mod p(x)` */
+	/* x^928 mod p(x)`, x^960 mod p(x)`, x^992 mod p(x)`,
+	   x^1024 mod p(x)` */
 	.octa 0x156c8e180b4a395b069db049b8fdb1e7
 
 	/* x^800 mod p(x)`, x^832 mod p(x)`, x^864 mod p(x)`, x^896 mod p(x)` */
@@ -891,7 +918,6 @@ static const unsigned int crc_table[] = {
 
 	/* x^32 mod p(x)`, x^64 mod p(x)`, x^96 mod p(x)`, x^128 mod p(x)` */
 	.octa 0x82f63b786ea2d55ca66805eb18b8ea18
-
 
 .barrett_constants:
 	/* 33 bit reflected Barrett constant m - (4^32)/n */

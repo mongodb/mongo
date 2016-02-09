@@ -73,7 +73,7 @@ win_filelist()
 	    -e 's;os_posix/os_time.c;os_win/os_time.c;' \
 	    -e 's;os_posix/os_yield.c;os_win/os_yield.c;'
 	 echo 'src/os_win/os_snprintf.c'
-	 echo 'src/os_win/os_vsnprintf.c') < filelist | sort > $t
+	 echo 'src/os_win/os_vsnprintf.c') < filelist | grep -v power8 | sort > $t
 	 cmp $t $f > /dev/null 2>&1 ||
 	     (echo "Building $f" && rm -f $f && cp $t $f)
 }
