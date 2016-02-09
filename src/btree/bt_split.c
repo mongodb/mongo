@@ -1787,8 +1787,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		    type, WT_INSERT_RECNO(moved_ins), 0, false, &right));
 
 	/*
-	 * The new page is dirty by definition, column-store splits update the
-	 * page-modify structure, so create it now.
+	 * The new page is dirty by definition, plus column-store splits update
+	 * the page-modify structure, so create it now.
 	 */
 	WT_ERR(__wt_page_modify_init(session, right));
 	__wt_page_modify_set(session, right);
@@ -1827,15 +1827,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		    page->modify->mod_split_recno == WT_RECNO_OOB);
 		page->modify->mod_split_recno = child->key.recno;
 	}
-
-	/*
-	 * We modified the page above, which will have set the first dirty
-	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Set the first dirty
-	 * transaction to an impossibly old value so this page is never skipped
-	 * in a checkpoint.
-	 */
-	right->modify->first_dirty_txn = WT_TXN_FIRST;
 
 	/*
 	 * Calculate how much memory we're moving: figure out how deep the skip
@@ -1935,15 +1926,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 #endif
 
 	/*
-	 * Update the page accounting.
-	 *
-	 * XXX
-	 * If we fail to split the parent, the page's accounting will be wrong.
-	 */
-	__wt_cache_page_inmem_decr(session, page, page_decr);
-	__wt_cache_page_inmem_incr(session, right, right_incr);
-
-	/*
 	 * We perform insert splits concurrently with checkpoints, where the
 	 * requirement is a checkpoint must include either the original page
 	 * or both new pages. The page we're splitting is dirty, but that's
@@ -1951,6 +1933,24 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * value so this page is not skipped by a checkpoint.
 	 */
 	page->modify->first_dirty_txn = WT_TXN_FIRST;
+
+	/*
+	 * We modified the page above, which will have set the first dirty
+	 * transaction to the last transaction current running.  However, the
+	 * updates we installed may be older than that.  Set the first dirty
+	 * transaction to an impossibly old value so this page is never skipped
+	 * in a checkpoint.
+	 */
+	right->modify->first_dirty_txn = WT_TXN_FIRST;
+
+	/*
+	 * Update the page accounting.
+	 *
+	 * XXX
+	 * If we fail to split the parent, the page's accounting will be wrong.
+	 */
+	__wt_cache_page_inmem_decr(session, page, page_decr);
+	__wt_cache_page_inmem_incr(session, right, right_incr);
 
 	/*
 	 * The act of splitting into the parent releases the pages for eviction;
