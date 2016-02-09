@@ -92,4 +92,34 @@ const char* typeName(BSONType type) {
     }
 }
 
+bool isValidBSONType(int type) {
+    switch (type) {
+        case MinKey:
+        case EOO:
+        case NumberDouble:
+        case String:
+        case Object:
+        case Array:
+        case BinData:
+        case Undefined:
+        case jstOID:
+        case Bool:
+        case Date:
+        case jstNULL:
+        case RegEx:
+        case DBRef:
+        case Code:
+        case Symbol:
+        case CodeWScope:
+        case NumberInt:
+        case bsonTimestamp:
+        case NumberLong:
+        case NumberDecimal:
+        case MaxKey:
+            return true;
+        default:
+            return false;
+    }
+}
+
 }  // namespace mongo

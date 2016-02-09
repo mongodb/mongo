@@ -396,8 +396,10 @@ public:
 
     /**
      * Initialize as matching against a specific BSONType.
+     *
+     * Returns a non-OK status if 'type' cannot be converted to a valid BSONType.
      */
-    Status initWithBSONType(StringData path, BSONType type);
+    Status initWithBSONType(StringData path, int type);
 
     /**
      * Initialize as matching against all number types (NumberDouble, NumberLong, and NumberInt).
