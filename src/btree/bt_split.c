@@ -1944,6 +1944,15 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_cache_page_inmem_incr(session, right, right_incr);
 
 	/*
+	 * We perform insert splits concurrently with checkpoints, where the
+	 * requirement is a checkpoint must include either the original page
+	 * or both new pages. The page we're splitting is dirty, but that's
+	 * insufficient: set the first dirty transaction to an impossibly old
+	 * value so this page is not skipped by a checkpoint.
+	 */
+	page->modify->first_dirty_txn = WT_TXN_FIRST;
+
+	/*
 	 * The act of splitting into the parent releases the pages for eviction;
 	 * ensure the page contents are consistent.
 	 */
