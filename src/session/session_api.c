@@ -20,10 +20,12 @@ int
 __wt_session_notsup_cfg(
     WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(wt_session);
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
 	WT_UNUSED(config);
 
-	return (ENOTSUP);
+	WT_RET_MSG(session, ENOTSUP, "Unsupported session method");
 }
 
 /*
@@ -35,11 +37,13 @@ int
 __wt_session_notsup_uri(
     WT_SESSION *wt_session, const char *uri, const char *config)
 {
-	WT_UNUSED(wt_session);
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
 	WT_UNUSED(uri);
 	WT_UNUSED(config);
 
-	return (ENOTSUP);
+	WT_RET_MSG(session, ENOTSUP, "Unsupported session method");
 }
 
 /*
@@ -577,7 +581,7 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	SESSION_API_CALL_NOCONF(session, log_printf);
 
 	if (F_ISSET(S2C(session), WT_CONN_READONLY))
-		WT_ERR(ENOTSUP);
+		WT_ERR_MSG(session, ENOTSUP, "Unsupported session method");
 
 	va_start(ap, fmt);
 	ret = __wt_log_vprintf(session, fmt, ap);
@@ -601,7 +605,7 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, rebalance, config, cfg);
 
 	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY | WT_CONN_READONLY))
-		WT_ERR(ENOTSUP);
+		WT_ERR_MSG(session, ENOTSUP, "Unsupported session method");
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session, ret,
@@ -627,7 +631,7 @@ __session_rename(WT_SESSION *wt_session,
 	SESSION_API_CALL(session, rename, config, cfg);
 
 	if (F_ISSET(S2C(session), WT_CONN_READONLY))
-		WT_ERR(ENOTSUP);
+		WT_ERR_MSG(session, ENOTSUP, "Unsupported session method");
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_str_name_check(session, uri));
@@ -990,7 +994,7 @@ __session_truncate(WT_SESSION *wt_session,
 	WT_STAT_FAST_CONN_INCR(session, cursor_truncate);
 
 	if (F_ISSET(S2C(session), WT_CONN_READONLY))
-		WT_ERR(ENOTSUP);
+		WT_ERR_MSG(session, ENOTSUP, "Unsupported session method");
 
 	/*
 	 * If the URI is specified, we don't need a start/stop, if start/stop

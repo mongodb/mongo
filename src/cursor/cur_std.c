@@ -15,9 +15,10 @@
 int
 __wt_cursor_notsup(WT_CURSOR *cursor)
 {
-	WT_UNUSED(cursor);
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)cursor->session;
+	WT_RET_MSG(session, ENOTSUP, "Unsupported cursor operation");
 }
 
 /*
