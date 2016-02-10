@@ -1,0 +1,23 @@
+selector:
+  js_test:
+    roots:
+        - jstests/dump/*.js
+        - jstests/restore/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        eval_prepend: "load('jstests/libs/servers.js'); load('jstests/libs/servers_misc.js');"
+        eval: "load('jstests/configs/archive_targets.js');"
+        readMode: commands
+    hooks:
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1
+
+
