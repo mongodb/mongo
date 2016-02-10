@@ -427,12 +427,12 @@ void prefetchOps(const std::deque<SyncTail::OplogEntry>& ops, OldThreadPool* pre
 }
 
 // Doles out all the work to the writer pool threads and waits for them to complete
-void applyOps(const std::vector<std::vector<BSONObj>>& writerVectors,
+void applyOps(const std::vector<std::vector<SyncTail::OplogEntry>>& writerVectors,
               OldThreadPool* writerPool,
               SyncTail::MultiSyncApplyFunc func,
               SyncTail* sync) {
     TimerHolder timer(&applyBatchStats);
-    for (std::vector<std::vector<BSONObj>>::const_iterator it = writerVectors.begin();
+    for (std::vector<std::vector<SyncTail::OplogEntry>>::const_iterator it = writerVectors.begin();
          it != writerVectors.end();
          ++it) {
         if (!it->empty()) {
@@ -473,7 +473,7 @@ private:
 
 void fillWriterVectors(OperationContext* txn,
                        const std::deque<SyncTail::OplogEntry>& ops,
-                       std::vector<std::vector<BSONObj>>* writerVectors) {
+                       std::vector<std::vector<SyncTail::OplogEntry>>* writerVectors) {
     const bool supportsDocLocking =
         getGlobalServiceContext()->getGlobalStorageEngine()->supportsDocLocking();
     const uint32_t numWriters = writerVectors->size();
@@ -508,7 +508,15 @@ void fillWriterVectors(OperationContext* txn,
             MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
         }
 
-        (*writerVectors)[hash % numWriters].push_back(op.raw);
+        if (op.opType == "i" && isCapped(txn, hashedNs)) {
+            // Mark capped collection ops before storing them to ensure we do not attempt to bulk
+            // insert them.
+            SyncTail::OplogEntry modifiedOp = op;
+            modifiedOp.isForCappedCollection = true;
+            (*writerVectors)[hash % numWriters].push_back(modifiedOp);
+        } else {
+            (*writerVectors)[hash % numWriters].push_back(op);
+        }
     }
 }
 
@@ -524,7 +532,7 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
         prefetchOps(ops.getDeque(), &_prefetcherPool);
     }
 
-    std::vector<std::vector<BSONObj>> writerVectors(replWriterThreadCount);
+    std::vector<std::vector<SyncTail::OplogEntry>> writerVectors(replWriterThreadCount);
 
     fillWriterVectors(txn, ops.getDeque(), &writerVectors);
     LOG(2) << "replication batch size is " << ops.getDeque().size() << endl;
@@ -1005,7 +1013,7 @@ static void initializeWriterThread() {
 }
 
 // This free function is used by the writer threads to apply each op
-void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
+void multiSyncApply(const std::vector<SyncTail::OplogEntry>& ops, SyncTail* st) {
     using OplogEntry = SyncTail::OplogEntry;
 
     std::vector<OplogEntry> oplogEntries(ops.begin(), ops.end());
@@ -1037,7 +1045,8 @@ void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
          oplogEntriesIterator != oplogEntryPointers.end();
          ++oplogEntriesIterator) {
         OplogEntry* entry = *oplogEntriesIterator;
-        if (entry->opType[0] == 'i' && oplogEntriesIterator > doNotGroupBeforePoint) {
+        if (entry->opType[0] == 'i' && !entry->isForCappedCollection &&
+            oplogEntriesIterator > doNotGroupBeforePoint) {
             // Attempt to group inserts if possible.
             std::vector<BSONObj> toInsert;
             int batchSize = 0;
@@ -1120,7 +1129,7 @@ void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
 }
 
 // This free function is used by the initial sync writer threads to apply each op
-void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
+void multiInitialSyncApply(const std::vector<SyncTail::OplogEntry>& ops, SyncTail* st) {
     initializeWriterThread();
 
     OperationContextImpl txn;
@@ -1132,14 +1141,16 @@ void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
 
     bool convertUpdatesToUpserts = false;
 
-    for (std::vector<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
+    for (std::vector<SyncTail::OplogEntry>::const_iterator it = ops.begin(); it != ops.end();
+         ++it) {
         try {
-            const Status s = SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts);
+            const Status s = SyncTail::syncApply(&txn, it->raw, convertUpdatesToUpserts);
             if (!s.isOK()) {
-                if (st->shouldRetry(&txn, *it)) {
-                    const Status s2 = SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts);
+                if (st->shouldRetry(&txn, it->raw)) {
+                    const Status s2 = SyncTail::syncApply(&txn, it->raw, convertUpdatesToUpserts);
                     if (!s2.isOK()) {
-                        severe() << "Error applying operation (" << it->toString() << "): " << s2;
+                        severe() << "Error applying operation (" << it->raw.toString()
+                                 << "): " << s2;
                         fassertFailedNoTrace(15915);
                     }
                 }
@@ -1150,7 +1161,7 @@ void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
             }
         } catch (const DBException& e) {
             severe() << "writer worker caught exception: " << causedBy(e)
-                     << " on: " << it->toString();
+                     << " on: " << it->raw.toString();
 
             if (inShutdown()) {
                 return;

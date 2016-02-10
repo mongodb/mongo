@@ -51,7 +51,33 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc = stdx::function<void(const std::vector<BSONObj>& ops, SyncTail* st)>;
+    /**
+     * A parsed oplog entry.
+     *
+     * This only includes the fields used by the code using this object at the time this was
+     * written. As more code uses this, more fields should be added.
+     *
+     * All unowned members (such as StringDatas and BSONElements) point into the raw BSON.
+     * All StringData members are guaranteed to be NUL terminated.
+     */
+    struct OplogEntry {
+        explicit OplogEntry(const BSONObj& raw);
+
+        // This member is not parsed from the BSON and is instead populated by fillWriterVectors.
+        bool isForCappedCollection = false;
+
+        BSONObj raw;  // Owned.
+
+        StringData ns = "";
+        StringData opType = "";
+
+        BSONElement version;
+        BSONElement o;
+        BSONElement o2;
+    };
+
+    using MultiSyncApplyFunc =
+        stdx::function<void(const std::vector<OplogEntry>& ops, SyncTail* st)>;
 
     /**
      * Type of function to increment "repl.apply.ops" server status metric.
@@ -99,28 +125,6 @@ public:
 
     void oplogApplication();
     bool peek(BSONObj* obj);
-
-    /**
-     * A parsed oplog entry.
-     *
-     * This only includes the fields used by the code using this object at the time this was
-     * written. As more code uses this, more fields should be added.
-     *
-     * All unowned members (such as StringDatas and BSONElements) point into the raw BSON.
-     * All StringData members are guaranteed to be NUL terminated.
-     */
-    struct OplogEntry {
-        explicit OplogEntry(const BSONObj& raw);
-
-        BSONObj raw;  // Owned.
-
-        StringData ns = "";
-        StringData opType = "";
-
-        BSONElement version;
-        BSONElement o;
-        BSONElement o2;
-    };
 
     class OpQueue {
     public:
@@ -199,8 +203,8 @@ private:
 };
 
 // These free functions are used by the thread pool workers to write ops to the db.
-void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
-void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
+void multiSyncApply(const std::vector<SyncTail::OplogEntry>& ops, SyncTail* st);
+void multiInitialSyncApply(const std::vector<SyncTail::OplogEntry>& ops, SyncTail* st);
 
 }  // namespace repl
 }  // namespace mongo
