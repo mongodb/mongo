@@ -136,10 +136,7 @@ var DBExplainQuery = (function() {
 
             // Explain always gets pretty printed.
             this._query._prettyShell = true;
-
-            // Explain always passes a negative value for limit.
-            this._query._limit = Math.abs(this._query._limit) * -1;
-
+            
             if (this._mongo.hasExplainCommand()) {
                 // The wire protocol version indicates that the server has the explain command.
                 // Convert this explain query into an explain command, and send the command to
