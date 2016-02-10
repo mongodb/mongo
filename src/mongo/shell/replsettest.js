@@ -4,11 +4,11 @@
  * {@link #awaitSecondaryNodes} to block till the  set is fully operational).
  * Note that some of the replica start up parameters are not passed here,
  * but to the #startSet method.
- * 
+ *
  * @param {Object|string} opts If this value is a string, it specifies the connection string for
  *      a MongoD host to be used for recreating a ReplSetTest from. Otherwise, if it is an object,
  *      it must have the following contents:
- * 
+ *
  *   {
  *     name {string}: name of this replica set. Default: 'testReplSet'
  *     host {string}: name of the host machine. Hostname will be used
@@ -25,10 +25,10 @@
  *          If object has a special "rsConfig" field then those options will be used for each
  *          replica set member config options when used to initialize the replica set, or
  *          building the config with getReplSetConfig()
- * 
+ *
  *        Format for Array:
  *           An array of replica member option Object. @see MongoRunner.runMongod
- * 
+ *
  *        Note: For both formats, a special boolean property 'arbiter' can be
  *          specified to denote a member is an arbiter.
  *
@@ -36,13 +36,13 @@
  *           formats to configure the options for the mongobridge corresponding to that node. These
  *           options are merged with the opts.bridgeOptions options, where the node-specific options
  *           take precedence.
- * 
+ *
  *     nodeOptions {Object}: Options to apply to all nodes in the replica set.
  *        Format for Object:
  *          { cmdline-param-with-no-arg : "",
  *            param-with-arg : arg }
- *        This turns into "mongod --cmdline-param-with-no-arg --param-with-arg arg" 
- *  
+ *        This turns into "mongod --cmdline-param-with-no-arg --param-with-arg arg"
+ *
  *     oplogSize {number}: Default: 40
  *     useSeedList {boolean}: Use the connection string format of this set
  *        as the replica set name (overrides the name property). Default: false
@@ -60,7 +60,7 @@
  *        Example:
  *              settings: { chainingAllowed: false, ... }
  *   }
- * 
+ *
  * Member variables:
  *  nodes {Array.<Mongo>} - connection to replica set members
  */
@@ -94,7 +94,7 @@ var ReplSetTest = function(opts) {
     function _clearLiveNodes() {
         self.liveNodes = { master: null, slaves: [] };
     }
-    
+
     /**
      * Returns the config document reported from the specified connection.
      */
@@ -130,7 +130,7 @@ var ReplSetTest = function(opts) {
 
     /**
      * Wait for a rs indicator to go to a particular state or states.
-     * 
+     *
      * @param node is a single node or list of nodes, by id or conn
      * @param states is a single state or list of states
      * @param ind is the indicator specified
@@ -243,7 +243,7 @@ var ReplSetTest = function(opts) {
 
     /**
      * Wait for a health indicator to go to a particular state or states.
-     * 
+     *
      * @param node is a single node or list of nodes, by id or conn
      * @param state is a single state or list of states. ReplSetTest.Health.DOWN can
      *     only be used in cases when there is a primary available or slave[0] can
@@ -260,13 +260,52 @@ var ReplSetTest = function(opts) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({ replSetGetStatus: 1 }));
         var connStatus = replSetStatus.members.filter(m => m.self)[0];
-        if (!connStatus.optime) {
+        return connStatus.optime;
+    }
+
+    /**
+     * Returns the OpTime timestamp for the specified host by issuing replSetGetStatus.
+     */
+    function _getLastOpTimeTimestamp(conn) {
+        var myOpTime = _getLastOpTime(conn);
+        if (!myOpTime) {
             // Must be an ARBITER
             return undefined;
         }
 
-        var myOpTime = connStatus.optime;
         return myOpTime.ts ? myOpTime.ts : myOpTime;
+    }
+
+    /**
+     * Returns the last committed OpTime for the replicaset as known by the host.
+     */
+    function _getLastCommittedOpTime(conn) {
+        var replSetStatus =
+            assert.commandWorked(conn.getDB("admin").runCommand({ replSetGetStatus: 1 }));
+        return replSetStatus.OpTimes.lastCommittedOpTime;
+    }
+
+    /**
+     * Returns the {readConcern: majority} OpTime for the host.
+     * This is the OpTime of the host's "majority committed" snapshot.
+     */
+    function getReadConcernMajorityOpTime(conn) {
+        var replSetStatus =
+            assert.commandWorked(conn.getDB("admin").runCommand({ replSetGetStatus: 1 }));
+        return replSetStatus.OpTimes.readConcernMajorityOpTime;
+    }
+
+    function _isEarlierOpTime(ot1, ot2) {
+        ot1 = ot1.t ? ot1 : { ts: ot1, t: -1 };
+        ot2 = ot2.t ? ot2 : { ts: ot2, t: -1 };
+
+        // If one has a lower term, choose that one.
+        if (!friendlyEqual(ot1.t, ot2.t)) {
+            return ot1.t < ot2.t;
+        }
+
+        // Otherwise choose the one with the lower timestamp.
+        return ot1.ts < ot2.ts;
     }
 
     /**
@@ -553,19 +592,10 @@ var ReplSetTest = function(opts) {
     this.awaitLastOpCommitted = function() {
         var rst = this;
         var master = rst.getPrimary();
-        var lastOp = master.getDB('local').oplog.rs.find().sort({ $natural: -1 }).limit(1).next();
+        var masterOpTime = _getLastOpTime(master);
 
-        var opTime;
-        var filter;
-        if (this.getReplSetConfig().protocolVersion === 1) {
-            opTime = {ts: lastOp.ts, t: lastOp.t};
-            filter = opTime;
-        } else {
-            opTime = {ts: lastOp.ts, t: -1};
-            filter = {ts: lastOp.ts};
-        }
-
-        print("Waiting for op with OpTime " + tojson(opTime) + " to be committed on all secondaries");
+        print("Waiting for op with OpTime " + tojson(masterOpTime) +
+            " to be committed on all secondaries");
 
         assert.soon(function() {
             for (var i = 0; i < rst.nodes.length; i++) {
@@ -577,24 +607,13 @@ var ReplSetTest = function(opts) {
                     continue;
                 }
 
-                res = node.getDB('local').runCommand({find: 'oplog.rs',
-                                                      filter: filter,
-                                                      readConcern: {level: "majority",
-                                                                    afterOpTime: opTime},
-                                                      maxTimeMS: 1000});
-                if (!res.ok) {
-                    printjson(res);
-                    return false;
-                }
-
-                var cursor = new DBCommandCursor(node, res);
-                if (!cursor.hasNext()) {
+                if (_isEarlierOpTime(getReadConcernMajorityOpTime(node), masterOpTime)) {
                     return false;
                 }
             }
 
             return true;
-        }, "Op failed to become committed on all secondaries: " + tojson(lastOp));
+        }, "Op with OpTime " + tojson(masterOpTime) + " failed to be committed on all secondaries");
     };
 
     this.awaitReplication = function(timeout) {
@@ -607,7 +626,7 @@ var ReplSetTest = function(opts) {
             var master = self.getPrimary();
             assert.soon(function() {
                 try {
-                    masterLatestOpTime = _getLastOpTime(master);
+                    masterLatestOpTime = _getLastOpTimeTimestamp(master);
                 }
                 catch(e) {
                     print("ReplSetTest caught exception " + e);
@@ -629,13 +648,13 @@ var ReplSetTest = function(opts) {
         try {
             master = this.getPrimary();
             configVersion = this.getConfigFromPrimary().version;
-            masterOpTime = _getLastOpTime(master);
+            masterOpTime = _getLastOpTimeTimestamp(master);
             masterName = master.toString().substr(14); // strip "connection to "
         }
         catch (e) {
             master = this.getPrimary();
             configVersion = this.getConfigFromPrimary().version;
-            masterOpTime = _getLastOpTime(master);
+            masterOpTime = _getLastOpTimeTimestamp(master);
             masterName = master.toString().substr(14); // strip "connection to "
         }
 
@@ -663,7 +682,7 @@ var ReplSetTest = function(opts) {
                         if (slaveConfigVersion > configVersion) {
                             master = this.getPrimary();
                             configVersion = master.getDB("local")['system.replset'].findOne().version;
-                            masterOpTime = _getLastOpTime(master);
+                            masterOpTime = _getLastOpTimeTimestamp(master);
                             masterName = master.toString().substr(14); // strip "connection to "
 
                             print("ReplSetTest awaitReplication: timestamp for primary, " +
@@ -686,9 +705,9 @@ var ReplSetTest = function(opts) {
 
                     slave.getDB("admin").getMongo().setSlaveOk();
 
-                    var ts = _getLastOpTime(slave);
+                    var ts = _getLastOpTimeTimestamp(slave);
                     if (masterLatestOpTime.t < ts.t || (masterLatestOpTime.t == ts.t && masterLatestOpTime.i < ts.i)) {
-                        masterLatestOpTime = _getLastOpTime(master);
+                        masterLatestOpTime = _getLastOpTimeTimestamp(master);
                         print("ReplSetTest awaitReplication: timestamp for " + slaveName +
                               " is newer, resetting latest to " + tojson(masterLatestOpTime));
                         return false;
@@ -735,8 +754,8 @@ var ReplSetTest = function(opts) {
 
     /**
      * Starts up a server.  Options are saved by default for subsequent starts.
-     * 
-     * 
+     *
+     *
      * Options { remember : true } re-applies the saved options from a prior start.
      * Options { noRemember : true } ignores the current properties.
      * Options { appendOptions : true } appends the current options to those remembered.
@@ -744,32 +763,32 @@ var ReplSetTest = function(opts) {
      *
      * @param {int|conn|[int|conn]} n array or single server number (0, 1, 2, ...) or conn
      * @param {object} [options]
-     * @param {boolean} [restart] If false, the data directory will be cleared 
+     * @param {boolean} [restart] If false, the data directory will be cleared
      *   before the server starts.  Default: false.
-     * 
+     *
      */
     this.start = function(n, options, restart, wait) {
         if (n.length) {
             var nodes = n;
             var started = [];
-            
+
             for(var i = 0; i < nodes.length; i++) {
                 if (this.start(nodes[i], Object.merge({}, options), restart, wait)) {
                     started.push(nodes[i]);
                 }
             }
-            
+
             return started;
         }
 
         // TODO: should we do something special if we don't currently know about this node?
         n = this.getNodeId(n);
-        
+
         print("ReplSetTest n is : " + n);
-        
+
         var defaults = { useHostName : this.useHostName,
-                         oplogSize : this.oplogSize, 
-                         keyFile : this.keyFile, 
+                         oplogSize : this.oplogSize,
+                         keyFile : this.keyFile,
                          port : _useBridge ? _unbridgedPorts[n] : this.ports[n],
                          noprealloc : "",
                          smallfiles : "",
@@ -777,12 +796,12 @@ var ReplSetTest = function(opts) {
                          dbpath : "$set-$node" };
 
         //
-        // Note : this replaces the binVersion of the shared startSet() options the first time 
+        // Note : this replaces the binVersion of the shared startSet() options the first time
         // through, so the full set is guaranteed to have different versions if size > 1.  If using
         // start() independently, independent version choices will be made
         //
         if (options && options.binVersion) {
-            options.binVersion = 
+            options.binVersion =
                 MongoRunner.versionIterator(options.binVersion);
         }
 
@@ -794,7 +813,7 @@ var ReplSetTest = function(opts) {
 
         var pathOpts = { node : n, set : this.name };
         options.pathOpts = Object.merge(options.pathOpts || {}, pathOpts);
-        
+
         if (tojson(options) != tojson({}))
             printjson(options);
 
@@ -827,12 +846,12 @@ var ReplSetTest = function(opts) {
         } else {
             this.nodes[n] = conn;
         }
-        
+
         // Add replica set specific attributes.
         this.nodes[n].nodeId = n;
-                
+
         printjson(this.nodes);
-            
+
         wait = wait || false;
         if (! wait.toFixed) {
             if (wait) wait = 0;
@@ -849,12 +868,12 @@ var ReplSetTest = function(opts) {
 
     /**
      * Restarts a db without clearing the data directory by default.  If the server is not
-     * stopped first, this function will not work.  
-     * 
+     * stopped first, this function will not work.
+     *
      * Option { startClean : true } forces clearing the data directory.
      * Option { auth : Object } object that contains the auth details for admin credentials.
      *   Should contain the fields 'user' and 'pwd'
-     * 
+     *
      * @param {int|conn|[int|conn]} n array or single server number (0, 1, 2, ...) or conn
      */
     this.restart = function(n, options, signal, wait) {
@@ -863,7 +882,7 @@ var ReplSetTest = function(opts) {
             wait = signal;
             signal = undefined;
         }
-        
+
         this.stop(n, signal, options);
 
         var started = this.start(n, options, true, wait);
@@ -898,21 +917,21 @@ var ReplSetTest = function(opts) {
         // Flatten array of nodes to stop
         if (n.length) {
             var nodes = n;
-            
+
             var stopped = [];
             for(var i = 0; i < nodes.length; i++) {
                 if (this.stop(nodes[i], signal, opts))
                     stopped.push(nodes[i]);
             }
-            
+
             return stopped;
         }
-        
+
         // Can specify wait as second parameter, if using default signal
         if (signal == true || signal == false) {
             signal = undefined;
         }
-        
+
         n = this.getNodeId(n);
 
         var port = _useBridge ? _unbridgedPorts[n] : this.ports[n];
@@ -969,34 +988,34 @@ var ReplSetTest = function(opts) {
                         this.lastDoc = nextDoc;
                     return nextDoc;
                 };
-                
+
                 this.getLastDoc = function() {
                     if (this.lastDoc)
                         return this.lastDoc;
                     return this.next();
                 };
-                
+
                 this.hasNext = function() {
                     if (!this.cursor)
                         throw Error("reader is not open!");
                     return this.cursor.hasNext();
                 };
-                
+
                 this.query = function(ts) {
                     var coll = this.getOplogColl();
                     var query = {"ts": {"$gte": ts ? ts : new Timestamp()}};
                     this.cursor = coll.find(query).sort({$natural:1});
                     this.cursor.addOption(DBQuery.Option.oplogReplay);
                 };
-                
+
                 this.getFirstDoc = function() {
                     return this.getOplogColl().find().sort({$natural:1}).limit(-1).next();
                 };
-                
+
                 this.getOplogColl = function () {
                     return this.mongo.getDB("local")["oplog.rs"];
                 };
-                
+
                 this.lastDoc = null;
                 this.cursor = null;
                 this.mongo = mongo;
@@ -1015,7 +1034,7 @@ var ReplSetTest = function(opts) {
                 }
             }
 
-            // start all oplogReaders at the same place. 
+            // start all oplogReaders at the same place.
             for (i = 0; i < rsSize; i++) {
                 readers[i].query(largestTS);
             }
@@ -1024,7 +1043,7 @@ var ReplSetTest = function(opts) {
             while (firstReader.hasNext()) {
                 var ts = firstReader.next().ts;
                 for(i = 1; i < rsSize; i++) {
-                    assert.eq(ts, 
+                    assert.eq(ts,
                               readers[i].next().ts,
                               " non-matching ts for node: " + readers[i].mongo);
                 }
@@ -1224,5 +1243,5 @@ ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
         return false;
     },
     'timed out waiting for replica set client to recognize hosts',
-    timeout);  
+    timeout);
 };
