@@ -544,6 +544,7 @@ var ReplSetTest = function(opts) {
     /**
      * Waits for the last oplog entry on the primary to be visible in the committed snapshop view
      * of the oplog on *all* secondaries.
+     * Returns last oplog entry.
      */
     this.awaitLastOpCommitted = function() {
         var rst = this;
@@ -590,6 +591,8 @@ var ReplSetTest = function(opts) {
 
             return true;
         }, "Op failed to become committed on all secondaries: " + tojson(lastOp));
+
+        return lastOp;
     };
 
     this.awaitReplication = function(timeout) {

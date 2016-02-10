@@ -1391,6 +1391,13 @@ bool Command::run(OperationContext* txn,
                 auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcernArgs);
                 readConcernResult.appendInfo(&inPlaceReplyBob);
                 if (!readConcernResult.getStatus().isOK()) {
+                    if (ErrorCodes::ExceededTimeLimit == readConcernResult.getStatus()) {
+                        const int debugLevel = serverGlobalParams.configsvr ? 0 : 2;
+                        LOG(debugLevel)
+                            << "Command on database " << request.getDatabase()
+                            << " timed out waiting for read concern to be satisfied. Command: "
+                            << getRedactedCopyForLogging(request.getCommandArgs());
+                    }
                     auto result =
                         appendCommandStatus(inPlaceReplyBob, readConcernResult.getStatus());
                     inPlaceReplyBob.doneFast();
