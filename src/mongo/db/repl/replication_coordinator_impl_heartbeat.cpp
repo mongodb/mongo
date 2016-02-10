@@ -588,8 +588,6 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     // Only reset the callback handle if it matches, otherwise more will be coming through
     if (cbData.myHandle == _handleLivenessTimeoutCbh) {
         _handleLivenessTimeoutCbh = CallbackHandle();
-    } else {
-        warning() << "The liveness timeout does not match callback handle, so not resetting it.";
     }
     if (!cbData.status.isOK()) {
         return;
