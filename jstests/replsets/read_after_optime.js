@@ -5,10 +5,8 @@
 
 var replTest = new ReplSetTest({ nodes: 2 });
 replTest.startSet();
-
-var config = replTest.getReplSetConfig();
-replTest.initiate(config);
-config = replTest.getConfigFromPrimary();
+replTest.initiate();
+var config = replTest.getConfigFromPrimary();
 
 var runTest = function(testDB, primaryConn) {
     primaryConn.getDB('test').user.insert({ x: 1 }, { writeConcern: { w: 2 }});
@@ -24,25 +22,69 @@ var runTest = function(testDB, primaryConn) {
     }
 
     // Test timeout with maxTimeMS
-    var res = assert.commandFailed(testDB.runCommand({
-        find: 'user',
-        filter: { x: 1 },
-        readConcern: {
-            afterOpTime: { ts: twoSecTS, t: term }
-        },
-        maxTimeMS: 1000
-    }));
+    var runTimeoutTest = function() {
+        var timeoutResult = assert.commandFailedWithCode(
+            testDB.runCommand({
+                find: 'user',
+                filter: { x: 1 },
+                readConcern: {
+                    afterOpTime: { ts: twoSecTS, t: term }
+                },
+                maxTimeMS: 5000,
+            }),
+            ErrorCodes.ExceededTimeLimit
+        );
+        assert.gt(timeoutResult.waitedMS, 500);
+    };
 
-    assert.eq(50, res.code, tojson(res)); // ErrorCodes::ExceededTimeLimit
-    assert.gt(res.waitedMS, 500);
-    assert.lt(res.waitedMS, 2500);
+    var countLogMessages = function(msg) {
+        var total = 0;
+        var logMessages = assert.commandWorked(testDB.adminCommand({getLog: 'global'})).log;
+        for (var i = 0; i < logMessages.length; i++) {
+            if (logMessages[i].indexOf(msg) != -1) {
+                total++;
+            }
+        }
+        return total;
+    };
+
+    var checkLog = function(msg, expectedCount) {
+        var count;
+        assert.soon(function() {
+            count = countLogMessages(msg);
+            return expectedCount == count;
+            },
+            'Expected ' + expectedCount + ', but instead saw ' + count +
+                ' log entries containing the following message: ' + msg,
+            60000,
+            300);
+    };
+
+    // Run the time out test 3 times with replication debug log level increased to 2
+    // for first and last run. The time out message should be logged twice.
+    testDB.setLogLevel(2, 'command');
+    runTimeoutTest();
+    testDB.setLogLevel(0, 'command');
+
+    var msg = 'Command on database ' + testDB.getName() +
+        ' timed out waiting for read concern to be satisfied. Command:';
+    checkLog(msg, 1);
+
+    // Read concern timed out message should not be logged.
+    runTimeoutTest();
+
+    testDB.setLogLevel(2, 'command');
+    runTimeoutTest();
+    testDB.setLogLevel(0, 'command');
+
+    checkLog(msg, 2);
 
     // Test read on future afterOpTime that will eventually occur.
     var insertFunc = startParallelShell(
         "sleep(2100); db.user.insert({ y: 1 }, { writeConcern: { w: 2 }});",
         primaryConn.port);
 
-    res = assert.commandWorked(testDB.runCommand({
+    var res = assert.commandWorked(testDB.runCommand({
         find: 'user',
         filter: { x: 1 },
         readConcern: {
