@@ -66,6 +66,7 @@ executor:
         eval: "var testingReplication = true; load('jstests/libs/override_methods/set_majority_read_and_write_concerns.js');"
         readMode: commands
     hooks:
+    - class: ValidateCollections
     - class: CheckReplDBHash
     fixture:
       class: ReplicaSetFixture

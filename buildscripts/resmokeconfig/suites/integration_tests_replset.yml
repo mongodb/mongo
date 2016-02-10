@@ -6,6 +6,7 @@ executor:
   cpp_integration_test:
     config: {}
     hooks:
+    - class: ValidateCollections
     - class: CheckReplDBHash
     fixture:
       class: ReplicaSetFixture

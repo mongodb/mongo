@@ -9,6 +9,7 @@ executor:
       shell_options:
         readMode: commands
     hooks:
+    - class: ValidateCollections
     - class: CheckReplDBHash
     fixture:
       class: ReplicaSetFixture
