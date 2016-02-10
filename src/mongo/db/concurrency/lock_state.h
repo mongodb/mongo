@@ -32,6 +32,7 @@
 
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
@@ -91,6 +92,8 @@ public:
     LockerImpl();
 
     virtual ~LockerImpl();
+
+    virtual ClientState getClientState() const;
 
     virtual LockerId getId() const {
         return _id;
@@ -178,9 +181,9 @@ private:
 
     /**
      * The main functionality of the unlock method, except accepts iterator in order to avoid
-     * additional lookups during unlockAll.
+     * additional lookups during unlockAll. Frees locks immediately, so must not call inside WUOW.
      */
-    bool _unlockImpl(LockRequestsMap::Iterator& it);
+    bool _unlockImpl(LockRequestsMap::Iterator* it);
 
     /**
      * MMAP V1 locking code yields and re-acquires the flush lock occasionally in order to
@@ -188,7 +191,6 @@ private:
      * acquired. It is based on the type of the operation (IS for readers, IX for writers).
      */
     LockMode _getModeForMMAPV1FlushLock() const;
-
 
     // Used to disambiguate different lockers
     const LockerId _id;
@@ -216,6 +218,9 @@ private:
 
     // Mode for which the Locker acquired a ticket, or MODE_NONE if no ticket was acquired.
     LockMode _modeForTicket = MODE_NONE;
+
+    // Indicates whether the client is active reader/writer or is queued.
+    AtomicWord<ClientState> _clientState{kInactive};
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //

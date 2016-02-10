@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <valarray>
+
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/lock_stats.h"
@@ -48,36 +50,18 @@ public:
     }
 
     virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
-        int numTotal = 0;
-        int numWriteLocked = 0;
-        int numReadLocked = 0;
-        int numWaitingRead = 0;
-        int numWaitingWrite = 0;
+        std::valarray<int> clientStatusCounts(5);
 
         // This returns the blocked lock states
         for (ServiceContext::LockedClientsCursor cursor(txn->getClient()->getServiceContext());
              Client* client = cursor.next();) {
             invariant(client);
-            ++numTotal;
             stdx::unique_lock<Client> uniqueLock(*client);
 
             const OperationContext* opCtx = client->getOperationContext();
-            if (opCtx == NULL)
-                continue;
-
-            if (opCtx->lockState()->isWriteLocked()) {
-                numWriteLocked++;
-
-                if (opCtx->lockState()->getWaitingResource().isValid()) {
-                    numWaitingWrite++;
-                }
-            } else if (opCtx->lockState()->isReadLocked()) {
-                numReadLocked++;
-
-                if (opCtx->lockState()->getWaitingResource().isValid()) {
-                    numWaitingRead++;
-                }
-            }
+            auto state = opCtx ? opCtx->lockState()->getClientState() : Locker::kInactive;
+            invariant(state < sizeof(clientStatusCounts));
+            clientStatusCounts[state]++;
         }
 
         // Construct the actual return value out of the mutex
@@ -88,18 +72,20 @@ public:
         {
             BSONObjBuilder currentQueueBuilder(ret.subobjStart("currentQueue"));
 
-            currentQueueBuilder.append("total", numWaitingRead + numWaitingWrite);
-            currentQueueBuilder.append("readers", numWaitingRead);
-            currentQueueBuilder.append("writers", numWaitingWrite);
+            currentQueueBuilder.append("total",
+                                       clientStatusCounts[Locker::kQueuedReader] +
+                                           clientStatusCounts[Locker::kQueuedWriter]);
+            currentQueueBuilder.append("readers", clientStatusCounts[Locker::kQueuedReader]);
+            currentQueueBuilder.append("writers", clientStatusCounts[Locker::kQueuedWriter]);
             currentQueueBuilder.done();
         }
 
         {
             BSONObjBuilder activeClientsBuilder(ret.subobjStart("activeClients"));
 
-            activeClientsBuilder.append("total", numTotal);
-            activeClientsBuilder.append("readers", numReadLocked);
-            activeClientsBuilder.append("writers", numWriteLocked);
+            activeClientsBuilder.append("total", clientStatusCounts.sum());
+            activeClientsBuilder.append("readers", clientStatusCounts[Locker::kActiveReader]);
+            activeClientsBuilder.append("writers", clientStatusCounts[Locker::kActiveWriter]);
             activeClientsBuilder.done();
         }
 
