@@ -998,6 +998,7 @@ public:
 
 class ExpressionObject final : public Expression {
 public:
+    using FieldMap = std::map<std::string, boost::intrusive_ptr<Expression>>;
     boost::intrusive_ptr<Expression> optimize() final;
     bool isSimple() final;
     void addDependencies(DepsTracker* deps, std::vector<std::string>* path = NULL) const final;
@@ -1088,12 +1089,15 @@ public:
         _excludeId = b;
     }
 
+    const FieldMap& getChildExpressions() const {
+        return _expressions;
+    }
+
 private:
     explicit ExpressionObject(bool atRoot);
 
     // Mapping from fieldname to the Expression that generates its value.
     // NULL expression means inclusion from source document.
-    typedef std::map<std::string, boost::intrusive_ptr<Expression>> FieldMap;
     FieldMap _expressions;
 
     // this is used to maintain order for generated fields not in the source document

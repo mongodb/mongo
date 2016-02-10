@@ -99,4 +99,19 @@ void DocumentSource::serializeToArray(vector<Value>& array, bool explain) const 
         array.push_back(entry);
     }
 }
+
+BSONObjSet DocumentSource::allPrefixes(BSONObj obj) {
+    BSONObjSet out;
+
+    BSONObj last = {};
+    for (auto&& field : obj) {
+        BSONObjBuilder builder(last.objsize() + field.size());
+        builder.appendElements(last);
+        builder.append(field);
+        last = builder.obj();
+        out.insert(last);
+    }
+
+    return out;
+}
 }

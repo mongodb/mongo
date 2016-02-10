@@ -369,6 +369,17 @@ public:
      */
     void enqueue(const BSONObj& obj);
 
+    /**
+     * Helper method which returns a set of BSONObj, where each represents a sort order of our
+     * output.
+     */
+    BSONObjSet getOutputSorts() {
+        if (_qs && _qs->root) {
+            return _qs->root->getSort();
+        }
+        return BSONObjSet();
+    }
+
 private:
     ExecState getNextImpl(Snapshotted<BSONObj>* objOut, RecordId* dlOut);
 

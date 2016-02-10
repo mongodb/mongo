@@ -128,6 +128,32 @@ BSONObj DocumentSourceLookUp::queryForInput(const Document& input) const {
     return query.obj();
 }
 
+BSONObjSet DocumentSourceLookUp::getOutputSorts() {
+    BSONObjSet out;
+
+    BSONObjSet inputSort = pSource->getOutputSorts();
+    std::string asPath = _as.getPath(false);
+
+    for (auto&& sortObj : inputSort) {
+        // Truncate each sortObj at the '_as' path.
+        BSONObjBuilder outputSort;
+
+        for (BSONElement fieldSort : sortObj) {
+            if (fieldSort.fieldNameStringData() == asPath) {
+                break;
+            }
+            outputSort.append(fieldSort);
+        }
+
+        BSONObj outSortObj = outputSort.obj();
+        if (!outSortObj.isEmpty()) {
+            out.insert(outSortObj);
+        }
+    }
+
+    return out;
+}
+
 boost::optional<Document> DocumentSourceLookUp::unwindResult() {
     const boost::optional<FieldPath> indexPath(_unwindSrc->indexPath());
 

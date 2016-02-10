@@ -200,6 +200,31 @@ boost::optional<Document> DocumentSourceUnwind::getNext() {
     return out;
 }
 
+BSONObjSet DocumentSourceUnwind::getOutputSorts() {
+    BSONObjSet out;
+    std::string unwoundPath = getUnwindPath();
+    BSONObjSet inputSort = pSource->getOutputSorts();
+
+    for (auto&& sortObj : inputSort) {
+        // Truncate each sortObj at the unwindPath.
+        BSONObjBuilder outputSort;
+
+        for (BSONElement fieldSort : sortObj) {
+            if (fieldSort.fieldNameStringData() == unwoundPath) {
+                break;
+            }
+            outputSort.append(fieldSort);
+        }
+
+        BSONObj outSortObj = outputSort.obj();
+        if (!outSortObj.isEmpty()) {
+            out.insert(outSortObj);
+        }
+    }
+
+    return out;
+}
+
 Value DocumentSourceUnwind::serialize(bool explain) const {
     return Value(DOC(getSourceName() << DOC(
                          "path" << _unwindPath.getPath(true) << "preserveNullAndEmptyArrays"

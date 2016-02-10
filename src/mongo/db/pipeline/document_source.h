@@ -128,6 +128,13 @@ public:
     virtual void setSource(DocumentSource* pSource);
 
     /**
+     * Gets a BSONObjSet representing the sort order(s) of the output of the stage.
+     */
+    virtual BSONObjSet getOutputSorts() {
+        return BSONObjSet();
+    }
+
+    /**
      * Returns an optimized DocumentSource that is semantically equivalent to this one, or
      * nullptr if this stage is a no-op. Implementations are allowed to modify themselves
      * in-place and return a pointer to themselves. For best results, first optimize the pipeline
@@ -213,6 +220,13 @@ public:
      * this file.
      */
     static void registerParser(std::string name, Parser parser);
+
+    /**
+     * Given a BSONObj, construct a BSONObjSet consisting of all prefixes of that object. For
+     * example, given {a: 1, b: 1, c: 1}, this will return a set: {{a: 1}, {a: 1, b: 1}, {a: 1, b:
+     * 1, c: 1}}.
+     */
+    static BSONObjSet allPrefixes(BSONObj obj);
 
 protected:
     /**
@@ -335,6 +349,9 @@ public:
     ~DocumentSourceCursor() final;
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
+    BSONObjSet getOutputSorts() final {
+        return _exec->getOutputSorts();
+    }
     /**
      * Attempts to combine with any subsequent $limit stages by setting the internal '_limit' field.
      */
@@ -431,73 +448,90 @@ private:
 
 class DocumentSourceGroup final : public DocumentSource, public SplittableDocumentSource {
 public:
-    // virtuals from DocumentSource
-    boost::optional<Document> getNext() final;
-    const char* getSourceName() const final;
+    using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
+    using GroupsMap = std::unordered_map<Value, Accumulators, Value::Hash>;
+
+    // Virtuals from DocumentSource.
     boost::intrusive_ptr<DocumentSource> optimize() final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
-    void dispose() final;
     Value serialize(bool explain = false) const final;
+    boost::optional<Document> getNext() final;
+    void dispose() final;
+    const char* getSourceName() const final;
+    BSONObjSet getOutputSorts() final;
 
     static boost::intrusive_ptr<DocumentSourceGroup> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /**
-      Add an accumulator.
+     * This is a convenience method that uses create(), and operates on a BSONElement that has been
+     * determined to be an Object with an element named $group.
+     */
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-      Accumulators become fields in the Documents that result from
-      grouping.  Each unique group document must have it's own
-      accumulator; the accumulator factory is used to create that.
-
-      @param fieldName the name the accumulator result will have in the
-            result documents
-      @param pAccumulatorFactory used to create the accumulator for the
-            group field
+    /**
+     * Add an accumulator.
+     *
+     * Accumulators become fields in the Documents that result from grouping. Each unique group
+     * document must have it's own accumulator; the accumulator factory is used to create that.
+     *
+     * 'fieldName' is the name the accumulator result will have in the result documents and
+     * 'AccumulatorFactory' is used to create the accumulator for the group field.
      */
     void addAccumulator(const std::string& fieldName,
                         Accumulator::Factory accumulatorFactory,
                         const boost::intrusive_ptr<Expression>& pExpression);
 
-    /// Tell this source if it is doing a merge from shards. Defaults to false.
+    /**
+     * Tell this source if it is doing a merge from shards. Defaults to false.
+     */
     void setDoingMerge(bool doingMerge) {
         _doingMerge = doingMerge;
     }
 
-    /**
-      Create a grouping DocumentSource from BSON.
+    bool isStreaming() const {
+        return _streaming;
+    }
 
-      This is a convenience method that uses the above, and operates on
-      a BSONElement that has been deteremined to be an Object with an
-      element named $group.
-
-      @param pBsonElement the BSONELement that defines the group
-      @param pExpCtx the expression context
-      @returns the grouping DocumentSource
-     */
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    // Virtuals for SplittableDocumentSource
+    // Virtuals for SplittableDocumentSource.
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
 
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    /// Spill groups map to disk and returns an iterator to the file.
+    /**
+     * getNext() dispatches to one of these three depending on what type of $group it is. All three
+     * of these methods expect '_currentAccumulators' to have been reset before being called, and
+     * also expect initialize() to have been called already.
+     */
+    boost::optional<Document> getNextStreaming();
+    boost::optional<Document> getNextSpilled();
+    boost::optional<Document> getNextStandard();
+
+    /**
+     * Attempt to identify an input sort order that allows us to turn into a streaming $group. If we
+     * find one, return it. Otherwise, return boost::none.
+     */
+    boost::optional<BSONObj> findRelevantInputSort() const;
+
+    /**
+     * Before returning anything, this source must prepare itself. In a streaming $group,
+     * initialize() requests the first document from the previous source, and uses it to prepare the
+     * accumulators. In an unsorted $group, initialize() exhausts the previous source before
+     * returning. The '_initialized' boolean indicates that initialize() has been called.
+     */
+    void initialize();
+
+    /**
+     * Spill groups map to disk and returns an iterator to the file. Note: Since a sorted $group
+     * does not exhaust the previous stage before returning, and thus does not maintain as large a
+     * store of documents at any one time, only an unsorted group can spill to disk.
+     */
     std::shared_ptr<Sorter<Value, Value>::Iterator> spill();
 
-    // Only used by spill. Would be function-local if that were legal in C++03.
-    class SpillSTLComparator;
-
-    /*
-      Before returning anything, this source must fetch everything from
-      the underlying source and group it.  populate() is used to do that
-      on the first call to any method on this source.  The populated
-      boolean indicates that this has been done.
-     */
-    void populate();
-    bool populated;
+    Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
 
     /**
      * Parses the raw id expression into _idExpressions and possibly _idFieldNames.
@@ -515,46 +549,43 @@ private:
      */
     Value expandId(const Value& val);
 
-
-    typedef std::vector<boost::intrusive_ptr<Accumulator>> Accumulators;
-    typedef std::unordered_map<Value, Accumulators, Value::Hash> GroupsMap;
-    GroupsMap groups;
-
-    /*
-      The field names for the result documents and the accumulator
-      factories for the result documents.  The Expressions are the
-      common expressions used by each instance of each accumulator
-      in order to find the right-hand side of what gets added to the
-      accumulator.  Note that each of those is the same for each group,
-      so we can share them across all groups by adding them to the
-      accumulators after we use the factories to make a new set of
-      accumulators for each new group.
-
-      These three vectors parallel each other.
-    */
+    /**
+     * 'vFieldName' contains the field names for the result documents, 'vpAccumulatorFactory'
+     * contains the accumulator factories for the result documents, and 'vpExpression' contains the
+     * common expressions used by each instance of each accumulator in order to find the right-hand
+     * side of what gets added to the accumulator. These three vectors parallel each other.
+     */
     std::vector<std::string> vFieldName;
     std::vector<Accumulator::Factory> vpAccumulatorFactory;
     std::vector<boost::intrusive_ptr<Expression>> vpExpression;
 
-
-    Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
-
     bool _doingMerge;
-    bool _spilled;
-    const bool _extSortAllowed;
-    const int _maxMemoryUsageBytes;
+    int _maxMemoryUsageBytes;
     std::unique_ptr<Variables> _variables;
     std::vector<std::string> _idFieldNames;  // used when id is a document
     std::vector<boost::intrusive_ptr<Expression>> _idExpressions;
 
-    // only used when !_spilled
-    GroupsMap::iterator groupsIterator;
+    BSONObj _inputSort;
+    bool _streaming;
+    bool _initialized;
 
-    // only used when _spilled
-    std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
-    std::pair<Value, Value> _firstPartOfNextGroup;
     Value _currentId;
     Accumulators _currentAccumulators;
+
+    GroupsMap groups;
+
+    bool _spilled;
+
+    // Only used when '_spilled' is false.
+    GroupsMap::iterator groupsIterator;
+
+    // Only used when '_spilled' is true.
+    std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
+    const bool _extSortAllowed;
+
+    std::pair<Value, Value> _firstPartOfNextGroup;
+    // Only used when '_sorted' is true.
+    boost::optional<Document> _firstDocOfNextGroup;
 };
 
 /**
@@ -590,6 +621,9 @@ public:
     const char* getSourceName() const final;
     Value serialize(bool explain = false) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
+    BSONObjSet getOutputSorts() final {
+        return pSource ? pSource->getOutputSorts() : BSONObjSet();
+    }
     /**
      * Attempts to combine with any subsequent $match stages, joining the query objects with a
      * $and.
@@ -714,6 +748,9 @@ public:
     bool isValidInitialSource() const override {
         return true;
     }
+    BSONObjSet getOutputSorts() override {
+        return sorts;
+    }
 
     static boost::intrusive_ptr<DocumentSourceMock> create();
 
@@ -727,6 +764,8 @@ public:
     // Return documents from front of queue.
     std::deque<Document> queue;
     bool disposed = false;
+
+    BSONObjSet sorts;
 };
 
 class DocumentSourceOut final : public DocumentSource,
@@ -941,6 +980,9 @@ public:
     // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
+    BSONObjSet getOutputSorts() final {
+        return pSource ? pSource->getOutputSorts() : BSONObjSet();
+    }
     /**
      * Attempts to combine with a subsequent $limit stage, setting 'limit' appropriately.
      */
@@ -1004,6 +1046,11 @@ public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
     void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
+
+    BSONObjSet getOutputSorts() final {
+        return allPrefixes(_sort);
+    }
+
     /**
      * Attempts to move a subsequent $match stage before the $sort, reducing the number of
      * documents that pass through the stage. Also attempts to absorb a subsequent $limit stage so
@@ -1099,6 +1146,8 @@ private:
     void populate();
     bool populated;
 
+    BSONObj _sort;
+
     SortOptions makeSortOptions() const;
 
     // This is used to merge pre-sorted results from a DocumentSourceMergeCursors.
@@ -1160,6 +1209,9 @@ public:
                                                    Pipeline::SourceContainer* container) final;
     Value serialize(bool explain = false) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
+    BSONObjSet getOutputSorts() final {
+        return pSource ? pSource->getOutputSorts() : BSONObjSet();
+    }
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
         return SEE_NEXT;  // This doesn't affect needed fields
@@ -1218,6 +1270,7 @@ public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
     Value serialize(bool explain = false) const final;
+    BSONObjSet getOutputSorts() final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
@@ -1284,6 +1337,9 @@ public:
         return true;
     }
     Value serialize(bool explain = false) const final;
+    BSONObjSet getOutputSorts() final {
+        return {BSON(distanceField->getPath(false) << -1)};
+    }
 
     // Virtuals for SplittableDocumentSource
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
@@ -1350,6 +1406,7 @@ public:
                                                    Pipeline::SourceContainer* container) final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     void dispose() final;
+    BSONObjSet getOutputSorts() final;
 
     bool needsPrimaryShard() const final {
         return true;
