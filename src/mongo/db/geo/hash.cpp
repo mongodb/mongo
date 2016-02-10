@@ -200,7 +200,11 @@ void GeoHash::unhash_slow(unsigned* x, unsigned* y) const {
 }
 
 void GeoHash::unhash(unsigned* x, unsigned* y) const {
+#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
     unhash_fast(x, y);
+#else
+    unhash_slow(x, y);
+#endif
 }
 
 /** Is the 'bit'-th most significant bit set?  (NOT the least significant) */
