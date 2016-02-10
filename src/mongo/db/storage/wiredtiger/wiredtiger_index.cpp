@@ -441,7 +441,6 @@ public:
 
     ~BulkBuilder() {
         _cursor->close(_cursor);
-        WiredTigerRecoveryUnit::get(_txn)->getSessionCache()->releaseSession(_session);
     }
 
 protected:
@@ -468,7 +467,7 @@ protected:
 
     const Ordering _ordering;
     OperationContext* const _txn;
-    WiredTigerSession* const _session;
+    UniqueWiredTigerSession const _session;
     WT_CURSOR* const _cursor;
 };
 

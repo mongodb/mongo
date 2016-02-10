@@ -49,6 +49,16 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, int epoch)
     invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
 }
 
+WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, WiredTigerSessionCache* cache, int epoch)
+    : _epoch(epoch),
+      _cache(cache),
+      _session(NULL),
+      _cursorGen(0),
+      _cursorsCached(0),
+      _cursorsOut(0) {
+    invariantWTOK(conn->open_session(conn, NULL, "isolation=snapshot", &_session));
+}
+
 WiredTigerSession::~WiredTigerSession() {
     if (_session) {
         invariantWTOK(_session->close(_session, NULL));
@@ -164,8 +174,7 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
     // When forcing a checkpoint with journaling enabled, don't synchronize with other
     // waiters, as a log flush is much cheaper than a full checkpoint.
     if (forceCheckpoint && _engine->isDurable()) {
-        WiredTigerSession* session = getSession();
-        ON_BLOCK_EXIT([this, session] { releaseSession(session); });
+        UniqueWiredTigerSession session = getSession();
         WT_SESSION* s = session->getSession();
         {
             stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
@@ -189,8 +198,7 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
     _lastSyncTime.store(current + 1);
 
     // Nobody has synched yet, so we have to sync ourselves.
-    WiredTigerSession* session = getSession();
-    ON_BLOCK_EXIT([this, session] { releaseSession(session); });
+    auto session = getSession();
     WT_SESSION* s = session->getSession();
 
     // This gets the token (OpTime) from the last write, before flushing (either the journal, or a
@@ -228,7 +236,7 @@ bool WiredTigerSessionCache::isEphemeral() {
     return _engine && _engine->isEphemeral();
 }
 
-WiredTigerSession* WiredTigerSessionCache::getSession() {
+UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
     invariant(!(_shuttingDown.loadRelaxed() & kShuttingDownMask));
@@ -240,12 +248,12 @@ WiredTigerSession* WiredTigerSessionCache::getSession() {
             // discarding older ones
             WiredTigerSession* cachedSession = _sessions.back();
             _sessions.pop_back();
-            return cachedSession;
+            return UniqueWiredTigerSession(cachedSession);
         }
     }
 
     // Outside of the cache partition lock, but on release will be put back on the cache
-    return new WiredTigerSession(_conn, _epoch.load());
+    return UniqueWiredTigerSession(new WiredTigerSession(_conn, this, _epoch.load()));
 }
 
 void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
@@ -291,8 +299,14 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         _engine->dropAllQueued();
 }
 
+
 void WiredTigerSessionCache::setJournalListener(JournalListener* jl) {
     stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
     _journalListener = jl;
 }
+
+void WiredTigerSessionCache::WiredTigerSessionDeleter::operator()(
+    WiredTigerSession* session) const {
+    session->_cache->releaseSession(session);
 }
+}  // namespace mongo

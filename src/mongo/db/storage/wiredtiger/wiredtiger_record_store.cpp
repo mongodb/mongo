@@ -1479,11 +1479,10 @@ Status WiredTigerRecordStore::compact(OperationContext* txn,
                                       CompactStats* stats) {
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
     if (!cache->isEphemeral()) {
-        WiredTigerSession* session = cache->getSession();
+        UniqueWiredTigerSession session = cache->getSession();
         WT_SESSION* s = session->getSession();
         int ret = s->compact(s, getURI().c_str(), "timeout=0");
         invariantWTOK(ret);
-        cache->releaseSession(session);
     }
     return Status::OK();
 }

@@ -47,7 +47,6 @@ namespace mongo {
 
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
     : _sessionCache(sc),
-      _session(NULL),
       _inUnitOfWork(false),
       _active(false),
       _myTransactionCount(1),
@@ -56,10 +55,6 @@ WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork);
     _abort();
-    if (_session) {
-        _sessionCache->releaseSession(_session);
-        _session = NULL;
-    }
 }
 
 void WiredTigerRecoveryUnit::reportState(BSONObjBuilder* b) const {
@@ -174,12 +169,12 @@ WiredTigerSession* WiredTigerRecoveryUnit::getSession(OperationContext* opCtx) {
     if (!_active) {
         _txnOpen(opCtx);
     }
-    return _session;
+    return _session.get();
 }
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn(OperationContext* opCtx) {
     _ensureSession();
-    return _session;
+    return _session.get();
 }
 
 void WiredTigerRecoveryUnit::abandonSnapshot() {
