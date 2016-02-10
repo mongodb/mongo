@@ -584,6 +584,19 @@ TEST(MatchExpressionParserLeafTest, RegexBad) {
     ASSERT_FALSE(result.isOK());
 }
 
+TEST(MatchExpressionParserLeafTest, RegexEmbeddedNULByte) {
+    BSONObj query = BSON("x" << BSON("$regex"
+                                     << "^a\\x00b"));
+    StatusWithMatchExpression result =
+        MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
+    ASSERT_TRUE(result.isOK());
+
+    StringData value("a\0b", StringData::LiteralTag());
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << value)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "a")));
+}
+
 TEST(MatchExpressionParserLeafTest, ExistsYes1) {
     BSONObjBuilder b;
     b.appendBool("$exists", true);
