@@ -57,6 +57,17 @@ public:
      */
     static void setGlobalThrottling(class TicketHolder* reading, class TicketHolder* writing);
 
+    /**
+     * State for reporting the number of active and queued reader and writer clients.
+     */
+    enum ClientState { kInactive, kActiveReader, kActiveWriter, kQueuedReader, kQueuedWriter };
+
+    /**
+     * Return whether client is holding any locks (active), or is queued on any locks or waiting
+     * for a ticket (throttled).
+     */
+    virtual ClientState getClientState() const = 0;
+
     virtual LockerId getId() const = 0;
 
     /**

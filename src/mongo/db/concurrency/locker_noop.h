@@ -41,6 +41,10 @@ class LockerNoop : public Locker {
 public:
     LockerNoop() {}
 
+    virtual ClientState getClientState() const {
+        invariant(false);
+    }
+
     virtual LockerId getId() const {
         invariant(false);
     }

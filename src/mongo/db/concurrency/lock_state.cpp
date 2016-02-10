@@ -247,22 +247,6 @@ void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
 
 namespace {
 TicketHolder* ticketHolders[LockModesCount] = {};
-
-void acquireTicket(LockMode mode) {
-    auto holder = ticketHolders[mode];
-    if (holder) {
-        holder->waitForTicket();
-    }
-}
-
-void releaseTicket(LockMode* mode) {
-    invariant(*mode != MODE_NONE);
-    auto holder = ticketHolders[*mode];
-    *mode = MODE_NONE;
-    if (holder) {
-        holder->release();
-    }
-}
 }  // namespace
 
 
@@ -290,6 +274,17 @@ LockerImpl<IsForMMAPV1>::~LockerImpl() {
 }
 
 template <bool IsForMMAPV1>
+Locker::ClientState LockerImpl<IsForMMAPV1>::getClientState() const {
+    auto state = _clientState.load();
+    if (state == kActiveReader && hasLockPending())
+        state = kQueuedReader;
+    if (state == kActiveWriter && hasLockPending())
+        state = kQueuedWriter;
+
+    return state;
+}
+
+template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode, unsigned timeoutMs) {
     LockResult result = lockGlobalBegin(mode);
     if (result == LOCK_WAITING) {
@@ -307,7 +302,13 @@ template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::lockGlobalBegin(LockMode mode) {
     dassert(isLocked() == (_modeForTicket != MODE_NONE));
     if (_modeForTicket == MODE_NONE) {
-        acquireTicket(mode);
+        const bool reader = isSharedLockMode(mode);
+        auto holder = ticketHolders[mode];
+        if (holder) {
+            _clientState.store(reader ? kQueuedReader : kQueuedWriter);
+            holder->waitForTicket();
+        }
+        _clientState.store(reader ? kActiveReader : kActiveWriter);
         _modeForTicket = mode;
     }
     const LockResult result = lockBegin(resourceIdGlobal, mode);
@@ -371,6 +372,8 @@ bool LockerImpl<IsForMMAPV1>::unlockAll() {
         return false;
     }
 
+    invariant(!inAWriteUnitOfWork());
+
     LockRequestsMap::Iterator it = _requests.begin();
     while (!it.finished()) {
         // If we're here we should only have one reference to any lock. It is a programming
@@ -379,7 +382,7 @@ bool LockerImpl<IsForMMAPV1>::unlockAll() {
         if (it.key().getType() == RESOURCE_GLOBAL) {
             it.next();
         } else {
-            invariant(_unlockImpl(it));
+            invariant(_unlockImpl(&it));
         }
     }
 
@@ -443,7 +446,12 @@ void LockerImpl<IsForMMAPV1>::downgrade(ResourceId resId, LockMode newMode) {
 template <bool IsForMMAPV1>
 bool LockerImpl<IsForMMAPV1>::unlock(ResourceId resId) {
     LockRequestsMap::Iterator it = _requests.find(resId);
-    return _unlockImpl(it);
+    if (inAWriteUnitOfWork() && shouldDelayUnlock(it.key(), (it->mode))) {
+        _resourcesToUnlockAtEndOfUnitOfWork.push(it.key());
+        return false;
+    }
+
+    return _unlockImpl(&it);
 }
 
 template <bool IsForMMAPV1>
@@ -762,12 +770,7 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
     // Cleanup the state, since this is an unused lock now
     if (result != LOCK_OK) {
         LockRequestsMap::Iterator it = _requests.find(resId);
-        if (globalLockManager.unlock(it.objAddr())) {
-            if (resId == resourceIdGlobal)
-                releaseTicket(&_modeForTicket);
-            scoped_spinlock scopedLock(_lock);
-            it.remove();
-        }
+        _unlockImpl(&it);
     }
 
     if (yieldFlushLock) {
@@ -780,18 +783,20 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
 }
 
 template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::_unlockImpl(LockRequestsMap::Iterator& it) {
-    if (inAWriteUnitOfWork() && shouldDelayUnlock(it.key(), it->mode)) {
-        _resourcesToUnlockAtEndOfUnitOfWork.push(it.key());
-        return false;
-    }
-
-    if (globalLockManager.unlock(it.objAddr())) {
-        if (it.key() == resourceIdGlobal)
-            releaseTicket(&_modeForTicket);
+bool LockerImpl<IsForMMAPV1>::_unlockImpl(LockRequestsMap::Iterator* it) {
+    if (globalLockManager.unlock(it->objAddr())) {
+        if (it->key() == resourceIdGlobal) {
+            invariant(_modeForTicket != MODE_NONE);
+            auto holder = ticketHolders[_modeForTicket];
+            _modeForTicket = MODE_NONE;
+            if (holder) {
+                holder->release();
+            }
+            _clientState.store(kInactive);
+        }
 
         scoped_spinlock scopedLock(_lock);
-        it.remove();
+        it->remove();
 
         return true;
     }
