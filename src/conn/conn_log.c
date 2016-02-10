@@ -633,7 +633,7 @@ restart:
 				if (slot->slot_start_lsn.l.offset !=
 				    slot->slot_last_offset)
 					slot->slot_start_lsn.l.offset =
-					    slot->slot_last_offset;
+					    (uint32_t)slot->slot_last_offset;
 				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;
 				WT_ERR(__wt_cond_signal(
