@@ -55,3 +55,11 @@ test(db.jstests_query_oplogreplay);
 
 // test on real oplog
 test(db.getSiblingDB('local').oplog.jstests_query_oplogreplay);
+
+// test on non-capped collection
+var coll = db.jstests_query_oplogreplay;
+coll.drop();
+assert.commandWorked(coll.getDB().createCollection(coll.getName()));
+var res = assert.throws(function() {
+        coll.find({ts: {$gt: "abcd"}}).addOption(DBQuery.Option.oplogReplay).next();
+    });

@@ -481,6 +481,11 @@ StatusWith<unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
     invariant(collection);
     invariant(cq.get());
 
+    if (!collection->isCapped()) {
+        return Status(ErrorCodes::BadValue,
+                      "OplogReplay cursor requested on non-capped collection");
+    }
+
     // A query can only do oplog start finding if it has a top-level $gt or $gte predicate over
     // the "ts" field (the operation's timestamp). Find that predicate and pass it to
     // the OplogStart stage.

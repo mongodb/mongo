@@ -621,6 +621,11 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.OplogReplayMode";
+
+        // Create a capped collection of size 10.
+        _client.dropCollection(ns);
+        _client.createCollection(ns, 10, true);
+
         insert(ns, BSON("ts" << 0));
         insert(ns, BSON("ts" << 1));
         insert(ns, BSON("ts" << 2));
@@ -655,6 +660,11 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.OplogReplaySlaveReadTill";
+
+        // Create a capped collection of size 10.
+        _client.dropCollection(ns);
+        _client.createCollection(ns, 10, true);
+
         ScopedTransaction transaction(&_txn, MODE_IX);
         Lock::DBLock lk(_txn.lockState(), "unittests", MODE_X);
         OldClientContext ctx(&_txn, ns);
@@ -695,6 +705,11 @@ public:
     }
     void run() {
         const char* ns = "unittests.querytests.OplogReplayExplain";
+
+        // Create a capped collection of size 10.
+        _client.dropCollection(ns);
+        _client.createCollection(ns, 10, true);
+
         insert(ns, BSON("ts" << 0));
         insert(ns, BSON("ts" << 1));
         insert(ns, BSON("ts" << 2));
