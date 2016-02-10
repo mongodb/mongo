@@ -10,6 +10,7 @@ executor:
         rpcProtocols: opQueryOnly
         readMode: commands
     hooks:
+    - class: ValidateCollections
     - class: CleanEveryN
       n: 20
     fixture:

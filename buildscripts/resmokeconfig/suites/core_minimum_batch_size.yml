@@ -22,6 +22,7 @@ executor:
         readMode: commands
         eval: load("jstests/libs/override_methods/find_batch_size.js");
     hooks:
+    - class: ValidateCollections
     - class: CleanEveryN
       n: 20
     fixture:

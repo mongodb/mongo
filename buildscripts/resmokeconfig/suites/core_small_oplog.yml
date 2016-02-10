@@ -15,6 +15,7 @@ executor:
         eval: "testingReplication = true;"
         readMode: commands
     hooks:
+    - class: ValidateCollections
     - class: CheckReplDBHash
     fixture:
       class: MasterSlaveFixture

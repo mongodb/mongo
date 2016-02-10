@@ -8,6 +8,7 @@ selector:
 executor:
   js_test:
     hooks:
+    - class: ValidateCollections
     fixture:
       class: MongoDFixture
       mongod_options:

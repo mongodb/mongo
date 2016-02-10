@@ -14,6 +14,7 @@ executor:
             storageEngine: mmapv1
         readMode: commands
     hooks:
+    - class: ValidateCollections
     - class: CleanEveryN
       n: 20
     fixture:
