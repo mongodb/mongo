@@ -149,7 +149,12 @@ void SyncClusterConnection::_checkLast() {
         try {
             if (!_conns[i]->runCommand("admin", BSON("getlasterror" << 1 << "fsync" << 1), res))
                 err = "cmd failed: ";
-        } catch (std::exception& e) {
+        } catch (const DBException& e) {
+            if (e.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
+            err += e.what();
+        } catch (const std::exception& e) {
             err += e.what();
         } catch (...) {
             err += "unknown failure";
@@ -329,6 +334,9 @@ void SyncClusterConnection::_auth(const BSONObj& params) {
             (*it)->auth(params);
             authed = true;
         } catch (const DBException& e) {
+            if (e.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
             // auth will be retried on reconnect
             lastErrmsg = e.what();
             authed = false;
@@ -423,7 +431,13 @@ unique_ptr<DBClientCursor> SyncClusterConnection::_queryOnActive(const string& n
 
             log() << "query on " << ns << ": " << query.toString()
                   << " failed to: " << _conns[i]->toString() << " no data" << endl;
-        } catch (std::exception& e) {
+        } catch (const DBException& e) {
+            if (e.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
+            log() << "query on " << ns << ": " << query.toString()
+                  << " failed to: " << _conns[i]->toString() << " exception: " << e.what() << endl;
+        } catch (const std::exception& e) {
             log() << "query on " << ns << ": " << query.toString()
                   << " failed to: " << _conns[i]->toString() << " exception: " << e.what() << endl;
         } catch (...) {
@@ -582,6 +596,11 @@ bool SyncClusterConnection::call(Message& toSend,
                 return ok;
             }
             log() << "call failed to: " << _conns[i]->toString() << " no data" << endl;
+        } catch (const DBException& e) {
+            if (e.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
+            log() << "call failed to: " << _conns[i]->toString() << " exception" << endl;
         } catch (...) {
             log() << "call failed to: " << _conns[i]->toString() << " exception" << endl;
         }
