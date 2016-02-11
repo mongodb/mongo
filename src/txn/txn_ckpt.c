@@ -243,6 +243,10 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 	if (F_ISSET(S2BT(session), WT_BTREE_NO_CHECKPOINT))
 		return (0);
 
+	/* Make sure there is space for the next entry. */
+	WT_RET(__wt_realloc_def(session, &session->ckpt_handle_allocated,
+	    session->ckpt_handle_next + 1, &session->ckpt_handle));
+
 	/* Not strictly necessary, but cleaner to clear the current handle. */
 	name = session->dhandle->name;
 	session->dhandle = NULL;
@@ -250,9 +254,6 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 	if ((ret = __wt_session_get_btree(session, name, NULL, NULL, 0)) != 0)
 		return (ret == EBUSY ? 0 : ret);
 
-	/* Make sure there is space for the next entry. */
-	WT_RET(__wt_realloc_def(session, &session->ckpt_handle_allocated,
-	    session->ckpt_handle_next + 1, &session->ckpt_handle));
 	session->ckpt_handle[session->ckpt_handle_next++] = session->dhandle;
 	return (0);
 }
