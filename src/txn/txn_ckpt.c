@@ -401,6 +401,16 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	session->isolation = txn->isolation = WT_ISO_READ_COMMITTED;
 	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
 
+	/*
+	 * The underlying flush routine scheduled an asynchronous flush
+	 * after writing the leaf pages, but in order to minimize I/O
+	 * while holding the schema lock, do a flush and wait for the
+	 * completion. Do it after flushing the pages to give the
+	 * asynchronous flush as much time as possible before we wait.
+	 */
+	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
+		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
+
 	/* Start the checkpoint for real. */
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = true;
@@ -521,7 +531,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * updated by full checkpoints so only checkpoint the metadata for
 	 * full or non-logged checkpoints.
 	 *
-	 * XXX lots of overlap with __wt_meta_track_off.
+	 * This is very similar to __wt_meta_track_off, ideally they would be
+	 * merged.
 	 */
 	if (full || !logging) {
 		session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
