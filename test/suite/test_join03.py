@@ -37,11 +37,6 @@ class test_join03(wttest.WiredTigerTestCase):
     table_name1 = 'test_join03'
     nentries = 100
 
-    scenarios = [
-        ('no-collator', dict(collate=False)),
-#        ('collator', dict(collate=True))
-    ]
-
     # Return the wiredtiger_open extension argument for a shared library.
     def extensionArg(self, exts):
         extfiles = []
@@ -63,9 +58,7 @@ class test_join03(wttest.WiredTigerTestCase):
 
     # Override WiredTigerTestCase, we have extensions.
     def setUpConnectionOpen(self, dir):
-        extarg = self.extensionArg([
-            ('extractors', 'csv', 'csv_extractor'),
-            ('collators', 'revint', 'revint_collator')])
+        extarg = self.extensionArg([('extractors', 'csv', 'csv_extractor')])
         connarg = 'create,error_prefix="{0}: ",{1}'.format(
             self.shortid(), extarg)
         conn = self.wiredtiger_open(dir, connarg)
@@ -97,18 +90,14 @@ class test_join03(wttest.WiredTigerTestCase):
     # Common function for testing the most basic functionality
     # of joins
     def join(self, csvformat, args0, args1):
-        collator = 'collator=revint,' if self.collate else ''
-
-        self.session.create('table:join03', 'key_format=i' +
+        self.session.create('table:join03', 'key_format=r' +
                             ',value_format=S,columns=(k,v)')
         fmt = csvformat[0]
         self.session.create('index:join03:index0','key_format=' + fmt + ',' +
-                            (collator if fmt == 'i' else '') +
                             'extractor=csv,app_metadata={"format" : "' +
                             fmt + '","field" : "0"}')
         fmt = csvformat[1]
         self.session.create('index:join03:index1','key_format=' + fmt + ',' +
-                            (collator if fmt == 'i' else '') +
                             'extractor=csv,app_metadata={"format" : "' +
                             fmt + '","field" : "1"}')
 

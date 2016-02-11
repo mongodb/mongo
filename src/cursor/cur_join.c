@@ -319,8 +319,8 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			 */
 			WT_ERR(__wt_struct_repack(session,
 			    cindex->child->key_format,
-			    (entry->repack_format ? entry->repack_format :
-			    cindex->iface.key_format),
+			    (entry->repack_format != NULL ?
+			    entry->repack_format : cindex->iface.key_format),
 			    &cindex->child->key, &curkey));
 		}
 		for (end = &entry->ends[skip]; end < endmax; end++) {
@@ -381,8 +381,8 @@ __curjoin_endpoint_init_key(WT_SESSION_IMPL *session,
 			cindex = (WT_CURSOR_INDEX *)endpoint->cursor;
 			WT_ERR(__wt_struct_repack(session,
 			    cindex->child->key_format,
-			    (entry->repack_format ? entry->repack_format :
-			    cindex->iface.key_format),
+			    (entry->repack_format != NULL ?
+			    entry->repack_format : cindex->iface.key_format),
 			    &cindex->child->key, &endpoint->key));
 		} else {
 			k = &((WT_CURSOR_TABLE *)cursor)->cg_cursors[0]->key;
