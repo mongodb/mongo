@@ -275,12 +275,20 @@ __wt_row_search(WT_SESSION_IMPL *session,
 		goto leaf_only;
 	}
 
+	if (0) {
+restart:	/*
+		 * Discard the currently held page and restart the search from
+		 * the root.
+		 */
+		WT_RET(__wt_page_release(session, current, 0));
+		skiphigh = skiplow = 0;
+	}
+
 	/* Search the internal pages of the tree. */
-restart_root:
 	current = &btree->root;
 	for (depth = 2, pindex = NULL;; ++depth) {
 		parent_pindex = pindex;
-restart_page:	page = current->page;
+		page = current->page;
 		if (page->type != WT_PAGE_ROW_INT)
 			break;
 
@@ -419,20 +427,20 @@ restart_page:	page = current->page;
 		if (pindex->entries == base) {
 append:			if (parent_pindex != NULL &&
 			    __wt_split_intl_race(
-			    session, current->home, parent_pindex)) {
-				if ((ret = __wt_page_release(
-				    session, current, 0)) != 0)
-					return (ret);
-
-				skiplow = skiphigh = 0;
-				goto restart_root;
-			}
+			    session, current->home, parent_pindex))
+				goto restart;
 		}
 
 descend:	/*
 		 * Swap the current page for the child page. If the page splits
-		 * while we're retrieving it, restart the search in the current
-		 * page; otherwise return on error, the swap call ensures we're
+		 * while we're retrieving it, restart the search at the root.
+		 * We cannot restart in the "current" page; for example, if a
+		 * thread is appending to the tree, the page it's waiting for
+		 * did an insert-split into the parent, then the parent split
+		 * into its parent, the name space we are searching for may have
+		 * moved above the current page in the tree.
+		 *
+		 * On other error, simply return, the swap call ensures we're
 		 * holding nothing on failure.
 		 */
 		if ((ret = __wt_page_swap(
@@ -440,10 +448,8 @@ descend:	/*
 			current = descent;
 			continue;
 		}
-		if (ret == WT_RESTART) {
-			skiphigh = skiplow = 0;
-			goto restart_page;
-		}
+		if (ret == WT_RESTART)
+			goto restart;
 		return (ret);
 	}
 
@@ -778,11 +784,19 @@ __wt_row_random_descent(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_REF *current, *descent;
 
 	btree = S2BT(session);
+	current = NULL;
 
 	__cursor_pos_clear(cbt);
 
-restart_root:
-	/* Walk the internal pages of the tree. */
+	if (0) {
+restart:	/*
+		 * Discard the currently held page and restart the search from
+		 * the root.
+		 */
+		WT_RET(__wt_page_release(session, current, 0));
+	}
+
+	/* Search the internal pages of the tree. */
 	current = &btree->root;
 	for (;;) {
 		page = current->page;
@@ -794,22 +808,19 @@ restart_root:
 		    __wt_random(&session->rnd) % pindex->entries];
 
 		/*
-		 * Swap the parent page for the child page; return on error,
-		 * the swap function ensures we're holding nothing on failure.
+		 * Swap the current page for the child page. If the page splits
+		 * while we're retrieving it, restart the search at the root.
+		 *
+		 * On other error, simply return, the swap call ensures we're
+		 * holding nothing on failure.
 		 */
 		if ((ret = __wt_page_swap(
 		    session, current, descent, WT_READ_RESTART_OK)) == 0) {
 			current = descent;
 			continue;
 		}
-		/*
-		 * Restart is returned if we find a page that's been split; the
-		 * held page isn't discarded when restart is returned, discard
-		 * it and restart the search from the top of the tree.
-		 */
-		if (ret == WT_RESTART &&
-		    (ret = __wt_page_release(session, current, 0)) == 0)
-			goto restart_root;
+		if (ret == WT_RESTART)
+			goto restart;
 		return (ret);
 	}
 

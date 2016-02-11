@@ -289,7 +289,8 @@ struct __wt_cursor_join_iter {
 	WT_CURSOR_JOIN_ENTRY	*entry;
 	WT_CURSOR		*cursor;
 	WT_ITEM			*curkey;
-	bool			 advance;
+	bool			 positioned;
+	bool			 isequal;	/* advancing means we're done */
 };
 
 struct __wt_cursor_join_endpoint {
@@ -302,14 +303,17 @@ struct __wt_cursor_join_endpoint {
 #define	WT_CURJOIN_END_GT	0x04		/* include values >  cursor */
 #define	WT_CURJOIN_END_GE	(WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ)
 #define	WT_CURJOIN_END_LE	(WT_CURJOIN_END_LT | WT_CURJOIN_END_EQ)
-#define	WT_CURJOIN_END_OWN_KEY	0x08		/* must free key's data */
 	uint8_t			 flags;		/* range for this endpoint */
 };
+#define	WT_CURJOIN_END_RANGE(endp)					\
+	((endp)->flags &						\
+	    (WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ | WT_CURJOIN_END_LT))
 
 struct __wt_cursor_join_entry {
 	WT_INDEX		*index;
 	WT_CURSOR		*main;		/* raw main table cursor */
 	WT_BLOOM		*bloom;		/* Bloom filter handle */
+	char			*repack_format; /* target format for repack */
 	uint32_t		 bloom_bit_count; /* bits per item in bloom */
 	uint32_t		 bloom_hash_count; /* hash functions in bloom */
 	uint64_t		 count;		/* approx number of matches */
