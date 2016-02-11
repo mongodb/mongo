@@ -504,14 +504,13 @@ __curstat_join_init(WT_SESSION_IMPL *session,
     WT_CURSOR *curjoin, const char *cfg[], WT_CURSOR_STAT *cst)
 {
 	WT_CURSOR_JOIN *cjoin;
-	WT_DECL_RET;
 
 	WT_UNUSED(cfg);
 
 	if (curjoin == NULL && cst->u.join_stats_group.join_cursor != NULL)
 		curjoin = &cst->u.join_stats_group.join_cursor->iface;
 	if (curjoin == NULL || !WT_PREFIX_MATCH(curjoin->uri, "join:"))
-		WT_ERR_MSG(session, EINVAL,
+		WT_RET_MSG(session, EINVAL,
 		    "join cursor must be used with statistics:join");
 	cjoin = (WT_CURSOR_JOIN *)curjoin;
 	memset(&cst->u.join_stats_group, 0, sizeof(WT_JOIN_STATS_GROUP));
@@ -522,8 +521,7 @@ __curstat_join_init(WT_SESSION_IMPL *session,
 	cst->stats_count = sizeof(WT_JOIN_STATS) / sizeof(int64_t);
 	cst->stats_desc = __curstat_join_desc;
 	cst->next_set = __curstat_join_next_set;
-
-err:	return (ret);
+	return (0);
 }
 
 /*

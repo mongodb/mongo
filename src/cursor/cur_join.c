@@ -74,18 +74,16 @@ static int
 __curjoin_pack_recno(WT_SESSION_IMPL *session, uint64_t r, uint8_t *buf,
     size_t bufsize, WT_ITEM *item)
 {
-	WT_DECL_RET;
 	WT_SESSION *wtsession;
 	size_t sz;
 
 	wtsession = (WT_SESSION *)session;
-	WT_ERR(wiredtiger_struct_size(wtsession, &sz, "r", r));
+	WT_RET(wiredtiger_struct_size(wtsession, &sz, "r", r));
 	WT_ASSERT(session, sz < bufsize);
-	WT_ERR(wiredtiger_struct_pack(wtsession, buf, bufsize, "r", r));
+	WT_RET(wiredtiger_struct_pack(wtsession, buf, bufsize, "r", r));
 	item->size = sz;
 	item->data = buf;
-
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -99,12 +97,11 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 {
 	WT_CURSOR *firstcg_cur;
 	WT_CURSOR_JOIN *cjoin;
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	uint64_t r;
 
 	if (iter->positioned)
-		WT_ERR(iter->cursor->next(iter->cursor));
+		WT_RET(iter->cursor->next(iter->cursor));
 	else
 		iter->positioned = true;
 
@@ -121,7 +118,7 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 		firstcg_cur = ((WT_CURSOR_TABLE *)iter->cursor)->cg_cursors[0];
 	if (WT_CURSOR_RECNO(&cjoin->iface)) {
 		r = *(uint64_t *)firstcg_cur->key.data;
-		WT_ERR(__curjoin_pack_recno(session, r, cjoin->recno_buf,
+		WT_RET(__curjoin_pack_recno(session, r, cjoin->recno_buf,
 		    sizeof(cjoin->recno_buf), primkey));
 		*rp = r;
 	} else {
@@ -131,8 +128,7 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 	iter->curkey = primkey;
 	iter->entry->stats.actual_count++;
 	iter->entry->stats.accesses++;
-
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -143,17 +139,14 @@ err:	return (ret);
 static int
 __curjoin_entry_iter_reset(WT_CURSOR_JOIN_ITER *iter)
 {
-	WT_DECL_RET;
-
 	if (iter->positioned) {
-		WT_ERR(iter->cursor->reset(iter->cursor));
-		WT_ERR(__wt_cursor_dup_position(
+		WT_RET(iter->cursor->reset(iter->cursor));
+		WT_RET(__wt_cursor_dup_position(
 		    iter->cjoin->entries[0].ends[0].cursor, iter->cursor));
 		iter->positioned = false;
 		iter->entry->stats.actual_count = 0;
 	}
-
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -371,7 +364,6 @@ __curjoin_endpoint_init_key(WT_SESSION_IMPL *session,
 {
 	WT_CURSOR *cursor;
 	WT_CURSOR_INDEX *cindex;
-	WT_DECL_RET;
 	WT_ITEM *k;
 	uint64_t r;
 
@@ -379,7 +371,7 @@ __curjoin_endpoint_init_key(WT_SESSION_IMPL *session,
 		if (entry->index != NULL) {
 			/* Extract and save the index's logical key. */
 			cindex = (WT_CURSOR_INDEX *)endpoint->cursor;
-			WT_ERR(__wt_struct_repack(session,
+			WT_RET(__wt_struct_repack(session,
 			    cindex->child->key_format,
 			    (entry->repack_format != NULL ?
 			    entry->repack_format : cindex->iface.key_format),
@@ -388,7 +380,7 @@ __curjoin_endpoint_init_key(WT_SESSION_IMPL *session,
 			k = &((WT_CURSOR_TABLE *)cursor)->cg_cursors[0]->key;
 			if (WT_CURSOR_RECNO(cursor)) {
 				r = *(uint64_t *)k->data;
-				WT_ERR(__curjoin_pack_recno(session, r,
+				WT_RET(__curjoin_pack_recno(session, r,
 				    endpoint->recno_buf,
 				    sizeof(endpoint->recno_buf),
 				    &endpoint->key));
@@ -397,8 +389,7 @@ __curjoin_endpoint_init_key(WT_SESSION_IMPL *session,
 				endpoint->key = *k;
 		}
 	}
-
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -511,29 +502,28 @@ __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 {
 	WT_COLLATOR *collator;
 	WT_CURSOR_JOIN_ENDPOINT *end, *endmax;
-	WT_DECL_RET;
 	int cmp;
 
 	collator = (entry->index != NULL) ? entry->index->collator : NULL;
 	endmax = &entry->ends[entry->ends_next];
 	for (end = &entry->ends[skip_left ? 1 : 0]; end < endmax; end++) {
-		WT_ERR(__wt_compare(session, collator, curkey, &end->key,
+		WT_RET(__wt_compare(session, collator, curkey, &end->key,
 		    &cmp));
 		if (!F_ISSET(end, WT_CURJOIN_END_LT)) {
 			if (cmp < 0 ||
 			    (cmp == 0 &&
 			    !F_ISSET(end, WT_CURJOIN_END_EQ)) ||
 			    (cmp > 0 && !F_ISSET(end, WT_CURJOIN_END_GT)))
-				WT_ERR(WT_NOTFOUND);
+				WT_RET(WT_NOTFOUND);
 		} else {
 			if (cmp > 0 ||
 			    (cmp == 0 &&
 			    !F_ISSET(end, WT_CURJOIN_END_EQ)) ||
 			    (cmp < 0 && !F_ISSET(end, WT_CURJOIN_END_LT)))
-				WT_ERR(WT_NOTFOUND);
+				WT_RET(WT_NOTFOUND);
 		}
 	}
-err:	return (ret);
+	return (0);
 }
 
 typedef struct {
