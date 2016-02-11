@@ -296,15 +296,21 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 	WT_RET(__wt_scr_alloc(session, allocsize, &buf));
 	memset(buf->mem, 0, allocsize);
 
+	/*
+	 * Checksum a little-endian version of the header, and write everything
+	 * in little-endian format. The checksum is (potentially) returned in a
+	 * big-endian format, swap it into place in a separate step.
+	 */
 	desc = buf->mem;
 	desc->magic = WT_BLOCK_MAGIC;
 	desc->majorv = WT_BLOCK_MAJOR_VERSION;
 	desc->minorv = WT_BLOCK_MINOR_VERSION;
-
-	/* Update the checksum. */
 	desc->cksum = 0;
+	__wt_block_desc_byteswap(desc);
 	desc->cksum = __wt_cksum(desc, allocsize);
-
+#ifdef WORDS_BIGENDIAN
+	desc->cksum = __wt_bswap32(desc->cksum);
+#endif
 	ret = __wt_write(session, fh, (wt_off_t)0, (size_t)allocsize, desc);
 
 	__wt_scr_free(session, &buf);
@@ -321,7 +327,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_BLOCK_DESC *desc;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	uint32_t cksum;
+	uint32_t cksum_calculate, cksum_tmp;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
 	WT_RET(__wt_scr_alloc(session, block->allocsize, &buf));
@@ -330,14 +336,19 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_ERR(__wt_read(session,
 	    block->fh, (wt_off_t)0, (size_t)block->allocsize, buf->mem));
 
+	/*
+	 * Handle little- and big-endian objects. Objects are written in little-
+	 * endian format: save the header checksum, and calculate the checksum
+	 * for the header in its little-endian form. Then, restore the header's
+	 * checksum, and byte-swap the whole thing as necessary, leaving us with
+	 * a calculated checksum that should match the checksum in the header.
+	 */
 	desc = buf->mem;
-	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
-	    "%s: magic %" PRIu32
-	    ", major/minor: %" PRIu32 "/%" PRIu32
-	    ", checksum %#" PRIx32,
-	    block->name, desc->magic,
-	    desc->majorv, desc->minorv,
-	    desc->cksum));
+	cksum_tmp = desc->cksum;
+	desc->cksum = 0;
+	cksum_calculate = __wt_cksum(desc, block->allocsize);
+	desc->cksum = cksum_tmp;
+	__wt_block_desc_byteswap(desc);
 
 	/*
 	 * We fail the open if the checksum fails, or the magic number is wrong
@@ -348,10 +359,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * may have entered the wrong file name, and is now frantically pounding
 	 * their interrupt key.
 	 */
-	cksum = desc->cksum;
-	desc->cksum = 0;
-	if (desc->magic != WT_BLOCK_MAGIC ||
-	    cksum != __wt_cksum(desc, block->allocsize))
+	if (desc->magic != WT_BLOCK_MAGIC || desc->cksum != cksum_calculate)
 		WT_ERR_MSG(session, WT_ERROR,
 		    "%s does not appear to be a WiredTiger file", block->name);
 
@@ -364,6 +372,14 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    "is version %d/%d",
 		    WT_BLOCK_MAJOR_VERSION, WT_BLOCK_MINOR_VERSION,
 		    desc->majorv, desc->minorv);
+
+	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
+	    "%s: magic %" PRIu32
+	    ", major/minor: %" PRIu32 "/%" PRIu32
+	    ", checksum %#" PRIx32,
+	    block->name, desc->magic,
+	    desc->majorv, desc->minorv,
+	    desc->cksum));
 
 err:	__wt_scr_free(session, &buf);
 	return (ret);

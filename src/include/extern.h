@@ -190,7 +190,7 @@ extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session, WT_ITEM *key, u_int s
 extern int __wt_update_alloc( WT_SESSION_IMPL *session, WT_ITEM *value, WT_UPDATE **updp, size_t *sizep);
 extern WT_UPDATE *__wt_update_obsolete_check( WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd);
 extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd);
-extern int __wt_search_insert( WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key);
+extern int __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, WT_ITEM *srch_key);
 extern int __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt, bool insert);
 extern int __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_row_random_descent(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
@@ -453,6 +453,7 @@ extern int __wt_ext_metadata_search(WT_EXTENSION_API *wt_api, WT_SESSION *wt_ses
 extern int __wt_ext_metadata_update(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *key, const char *value);
 extern int __wt_metadata_get_ckptlist( WT_SESSION *session, const char *name, WT_CKPT **ckptbasep);
 extern void __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase);
+extern void __wt_metadata_init(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor_open( WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp);
 extern int __wt_metadata_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
 extern int __wt_metadata_cursor_release(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
@@ -550,7 +551,7 @@ extern int __wt_struct_size(WT_SESSION_IMPL *session, size_t *sizep, const char 
 extern int __wt_struct_pack(WT_SESSION_IMPL *session, void *buffer, size_t size, const char *fmt, ...);
 extern int __wt_struct_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt, ...);
 extern int __wt_struct_unpack_size(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt, size_t *resultp);
-extern int __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt, const char *outfmt, const WT_ITEM *inbuf, WT_ITEM *outbuf, void **reallocp);
+extern int __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt, const char *outfmt, const WT_ITEM *inbuf, WT_ITEM *outbuf);
 extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell);
 extern void __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page, uint8_t **addrp, size_t *addr_sizep, const void *value, size_t value_size);

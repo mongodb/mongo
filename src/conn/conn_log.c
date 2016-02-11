@@ -180,9 +180,10 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 * disk and the checkpoint LSN.
 	 */
 	if (backup_file != 0)
-		min_lognum = WT_MIN(log->ckpt_lsn.file, backup_file);
+		min_lognum = WT_MIN(log->ckpt_lsn.l.file, backup_file);
 	else
-		min_lognum = WT_MIN(log->ckpt_lsn.file, log->sync_lsn.file);
+		min_lognum = WT_MIN(
+		    log->ckpt_lsn.l.file, log->sync_lsn.l.file);
 	WT_RET(__wt_verbose(session, WT_VERB_LOG,
 	    "log_archive: archive to log number %" PRIu32, min_lognum));
 
@@ -218,8 +219,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 * Indicate what is our new earliest LSN.  It is the start
 	 * of the log file containing the last checkpoint.
 	 */
-	log->first_lsn.file = min_lognum;
-	log->first_lsn.offset = 0;
+	WT_SET_LSN(&log->first_lsn, min_lognum, 0);
 
 	if (0)
 err:		__wt_err(session, ret, "log archive server error");
@@ -317,7 +317,7 @@ __wt_log_truncate_files(
 	backup_file = 0;
 	if (cursor != NULL)
 		backup_file = WT_CURSOR_BACKUP_ID(cursor);
-	WT_ASSERT(session, backup_file <= log->alloc_lsn.file);
+	WT_ASSERT(session, backup_file <= log->alloc_lsn.l.file);
 	WT_RET(__wt_verbose(session, WT_VERB_LOG,
 	    "log_truncate_files: Archive once up to %" PRIu32,
 	    backup_file));
@@ -367,7 +367,7 @@ __log_file_server(void *arg)
 			 * could see mismatched settings.  If we do, yield
 			 * until it is set.  This should rarely happen.
 			 */
-			while (log->log_close_lsn.file < filenum)
+			while (log->log_close_lsn.l.file < filenum)
 				__wt_yield();
 
 			if (__wt_log_cmp(
@@ -398,10 +398,10 @@ __log_file_server(void *arg)
 				 * actual data and has minimal pre-allocated
 				 * zeroed space.
 				 */
-				WT_ERR(__wt_ftruncate(
-				    session, close_fh, close_end_lsn.offset));
-				close_end_lsn.file++;
-				close_end_lsn.offset = 0;
+				WT_ERR(__wt_ftruncate(session,
+				    close_fh, close_end_lsn.l.offset));
+				WT_SET_LSN(&close_end_lsn,
+				    close_end_lsn.l.file + 1, 0);
 				__wt_spin_lock(session, &log->log_sync_lock);
 				locked = true;
 				WT_ERR(__wt_close(session, &close_fh));
@@ -440,9 +440,9 @@ __log_file_server(void *arg)
 				 * this worker thread process that older file
 				 * immediately.
 				 */
-				if ((log->sync_lsn.file <
-				    log->bg_sync_lsn.file) ||
-				    (log->sync_lsn.file < min_lsn.file))
+				if ((log->sync_lsn.l.file <
+				    log->bg_sync_lsn.l.file) ||
+				    (log->sync_lsn.l.file < min_lsn.l.file))
 					continue;
 				WT_ERR(__wt_fsync(session, log->log_fh));
 				__wt_spin_lock(session, &log->log_sync_lock);
@@ -454,7 +454,8 @@ __log_file_server(void *arg)
 				if (__wt_log_cmp(
 				    &log->sync_lsn, &min_lsn) <= 0) {
 					WT_ASSERT(session,
-					    min_lsn.file == log->sync_lsn.file);
+					    min_lsn.l.file ==
+					    log->sync_lsn.l.file);
 					log->sync_lsn = min_lsn;
 					WT_ERR(__wt_cond_signal(
 					    session, log->log_sync_cond));
@@ -500,9 +501,9 @@ typedef struct {
  *	Return comparison of a written slot pair by LSN.
  */
 #define	WT_WRLSN_ENTRY_CMP_LT(entry1, entry2)				\
-	((entry1).lsn.file < (entry2).lsn.file ||			\
-	((entry1).lsn.file == (entry2).lsn.file &&			\
-	(entry1).lsn.offset < (entry2).lsn.offset))
+	((entry1).lsn.l.file < (entry2).lsn.l.file ||		\
+	((entry1).lsn.l.file == (entry2).lsn.l.file &&		\
+	(entry1).lsn.l.offset < (entry2).lsn.l.offset))
 
 /*
  * __wt_log_wrlsn --
@@ -539,7 +540,7 @@ restart:
 		save_i = i;
 		slot = &log->slot_pool[i++];
 		WT_ASSERT(session, slot->slot_state != 0 ||
-		    slot->slot_release_lsn.file >= log->write_lsn.file);
+		    slot->slot_release_lsn.l.file >= log->write_lsn.l.file);
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 			continue;
 		written[written_i].slot_index = save_i;
@@ -629,10 +630,10 @@ restart:
 				 * the checkpoint LSN is close to the end of
 				 * the record.
 				 */
-				if (slot->slot_start_lsn.offset !=
+				if (slot->slot_start_lsn.l.offset !=
 				    slot->slot_last_offset)
-					slot->slot_start_lsn.offset =
-					    slot->slot_last_offset;
+					slot->slot_start_lsn.l.offset =
+					    (uint32_t)slot->slot_last_offset;
 				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;
 				WT_ERR(__wt_cond_signal(

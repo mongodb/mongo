@@ -64,8 +64,6 @@
 
 #define	EXTPATH	"../../ext/"			/* Extensions path */
 
-#define	BZIP_PATH							\
-	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
 #define	LZ4_PATH							\
 	EXTPATH "compressors/lz4/.libs/libwiredtiger_lz4.so"
 #define	SNAPPY_PATH							\
@@ -144,7 +142,6 @@ typedef struct {
 	FILE *logfp;				/* Log file */
 
 	int replay;				/* Replaying a run. */
-	int track;				/* Track progress */
 	int workers_finished;			/* Operations completed */
 
 	pthread_rwlock_t backup_lock;		/* Hot backup running */
@@ -212,6 +209,7 @@ typedef struct {
 	uint32_t c_merge_max;
 	uint32_t c_mmap;
 	uint32_t c_ops;
+	uint32_t c_quiet;
 	uint32_t c_prefix_compression;
 	uint32_t c_prefix_compression_min;
 	uint32_t c_repeat_data_pct;
@@ -241,14 +239,12 @@ typedef struct {
 	u_int c_checksum_flag;			/* Checksum flag value */
 
 #define	COMPRESS_NONE			1
-#define	COMPRESS_BZIP			2
-#define	COMPRESS_BZIP_RAW		3
-#define	COMPRESS_LZ4			4
-#define	COMPRESS_LZ4_NO_RAW		5
-#define	COMPRESS_LZO			6
-#define	COMPRESS_SNAPPY			7
-#define	COMPRESS_ZLIB			8
-#define	COMPRESS_ZLIB_NO_RAW		9
+#define	COMPRESS_LZ4			2
+#define	COMPRESS_LZ4_NO_RAW		3
+#define	COMPRESS_LZO			4
+#define	COMPRESS_SNAPPY			5
+#define	COMPRESS_ZLIB			6
+#define	COMPRESS_ZLIB_NO_RAW		7
 	u_int c_compression_flag;		/* Compression flag value */
 	u_int c_logging_compression_flag;	/* Log compression flag value */
 

@@ -173,8 +173,8 @@ __page_descend(WT_SESSION_IMPL *session,
 	WT_PAGE_INDEX *pindex;
 
 	/*
-	 * Ref is a child page into which we're descending, and on which we
-	 * have a hazard pointer.
+	 * We're passed a child page into which we're descending, and on which
+	 * we have a hazard pointer.
 	 */
 	for (;; __wt_yield()) {
 		WT_INTL_INDEX_GET(session, page, pindex);

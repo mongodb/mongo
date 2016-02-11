@@ -97,7 +97,7 @@ DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
 DEF_OPT_AS_BOOL(compact, 0, "post-populate compact for LSM merging activity")
 DEF_OPT_AS_STRING(compression, "none",
     "compression extension.  Allowed configuration values are: "
-    "'none', 'bzip', 'lz4', 'snappy', 'zlib'")
+    "'none', 'lz4', 'snappy', 'zlib'")
 DEF_OPT_AS_BOOL(create, 1,
     "do population phase; false to use existing database")
 DEF_OPT_AS_UINT32(database_count, 1,
@@ -110,6 +110,10 @@ DEF_OPT_AS_UINT32(drop_tables, 0,
 DEF_OPT_AS_UINT32(icount, 5000,
     "number of records to initially populate. If multiple tables are "
     "configured the count is spread evenly across all tables.")
+DEF_OPT_AS_UINT32(idle_table_cycle, 0,
+    "Enable regular create and drop of idle tables, value is the maximum "
+    "number of seconds a create or drop is allowed before flagging an error. "
+    "Default 0 which means disabled.")
 DEF_OPT_AS_BOOL(index, 0,
     "Whether to create an index on the value field.")
 DEF_OPT_AS_BOOL(insert_rmw, 0,

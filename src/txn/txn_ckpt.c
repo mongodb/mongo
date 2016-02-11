@@ -377,7 +377,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_WITH_SCHEMA_LOCK(session, ret,
 	    WT_WITH_TABLE_LOCK(session, ret,
-		WT_WITH_HANDLE_LIST_LOCK(session, ret,
+		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __checkpoint_apply_all(
 		    session, cfg, __wt_checkpoint_list, NULL))));
 	WT_ERR(ret);
@@ -798,7 +798,7 @@ __checkpoint_worker(WT_SESSION_IMPL *session,
 	 *  - On connection close when we know there can't be any races.
 	 */
 	WT_ASSERT(session, !need_tracking ||
-	    WT_IS_METADATA(dhandle) || WT_META_TRACKING(session));
+	    WT_IS_METADATA(session, dhandle) || WT_META_TRACKING(session));
 
 	/*
 	 * Set the checkpoint LSN to the maximum LSN so that if logging is
@@ -1121,7 +1121,7 @@ fake:	/*
 	 * recovery and open a checkpoint that isn't yet durable.
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
-	    (WT_IS_METADATA(dhandle) ||
+	    (WT_IS_METADATA(session, dhandle) ||
 	    !F_ISSET(&session->txn, WT_TXN_RUNNING)))
 		WT_ERR(__wt_checkpoint_sync(session, NULL));
 
@@ -1175,7 +1175,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
 	/* Should be holding the schema lock. */
-	WT_ASSERT(session, !WT_IS_METADATA(session->dhandle) ||
+	WT_ASSERT(session, !WT_IS_METADATA(session, session->dhandle) ||
 	    F_ISSET(session, WT_SESSION_LOCKED_METADATA));
 
 	return (__checkpoint_worker(session, cfg, true, true));
@@ -1242,7 +1242,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	/*
 	 * Turn on metadata tracking if:
 	 * - The session is not already doing metadata tracking.
-	 * - The file was bulk loaded.
+	 * - The file was not bulk loaded.
 	 * - The close is not during connection close.
 	 */
 	need_tracking = !WT_META_TRACKING(session) && !bulk && !final;

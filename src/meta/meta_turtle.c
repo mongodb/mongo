@@ -153,10 +153,11 @@ int
 __wt_turtle_init(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	bool exist, exist_incr;
+	bool exist_backup, exist_incr, exist_turtle, load;
 	char *metaconf;
 
 	metaconf = NULL;
+	load = false;
 
 	/*
 	 * Discard any turtle setup file left-over from previous runs.  This
@@ -179,13 +180,29 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * done.
 	 */
 	WT_RET(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
-	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
-	if (exist) {
+	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist_backup));
+	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist_turtle));
+	if (exist_turtle) {
 		if (exist_incr)
 			WT_RET_MSG(session, EINVAL,
 			    "Incremental backup after running recovery "
 			    "is not allowed.");
-	} else {
+		/*
+		 * If we have a backup file and metadata and turtle files,
+		 * we want to recreate the metadata from the backup.
+		 */
+		if (exist_backup) {
+			WT_RET(__wt_msg(session, "Both %s and %s exist. "
+			    "Recreating metadata from backup.",
+			    WT_METADATA_TURTLE, WT_METADATA_BACKUP));
+			WT_RET(__wt_remove_if_exists(session, WT_METAFILE));
+			WT_RET(__wt_remove_if_exists(
+			    session, WT_METADATA_TURTLE));
+			load = true;
+		}
+	} else
+		load = true;
+	if (load) {
 		if (exist_incr)
 			F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 

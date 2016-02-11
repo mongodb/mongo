@@ -329,7 +329,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	 * always inherit from the connection.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "encryption.name", &cval));
-	if (WT_IS_METADATA(btree->dhandle) || cval.len == 0)
+	if (WT_IS_METADATA(session, btree->dhandle) || cval.len == 0)
 		btree->kencryptor = conn->kencryptor;
 	else if (WT_STRING_MATCH("none", cval.str, cval.len))
 		btree->kencryptor = NULL;
@@ -420,7 +420,7 @@ __wt_btree_tree_open(
 	 * Failure to open metadata means that the database is unavailable.
 	 * Try to provide a helpful failure message.
 	 */
-	if (ret != 0 && WT_IS_METADATA(session->dhandle)) {
+	if (ret != 0 && WT_IS_METADATA(session, session->dhandle)) {
 		__wt_errx(session,
 		    "WiredTiger has failed to open its metadata");
 		__wt_errx(session, "This may be due to the database"

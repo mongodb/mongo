@@ -58,8 +58,7 @@ typedef struct {
 } CONFIG;
 
 #define	COMPRESSION_LIST						\
-	"(none | bzip | bzip-raw | lz4 | lz4-noraw | lzo | none | "	\
-	"snappy | zlib | zlib-noraw)"
+	"(none | lz4 | lz4-noraw | snappy | zlib | zlib-noraw)"
 
 static CONFIG c[] = {
 	{ "abort",
@@ -246,6 +245,10 @@ static CONFIG c[] = {
 	{ "prefix_compression_min",
 	  "minimum gain before prefix compression is used",
 	  0x0, 0, 8, 256, &g.c_prefix_compression_min, NULL },
+
+	{ "quiet",
+	  "quiet run (same as -q)",
+	  C_IGNORE|C_BOOL, 0, 0, 0, &g.c_quiet, NULL },
 
 	{ "repeat_data_pct",
 	  "percent duplicate values in row- or var-length column-stores",

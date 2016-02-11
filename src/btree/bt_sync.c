@@ -105,13 +105,13 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		__wt_spin_lock(session, &btree->flush_lock);
 
 		/*
-		 * When internal pages are being reconciled by checkpoint their
-		 * child pages cannot disappear from underneath them or be split
-		 * into them, nor can underlying blocks be freed until the block
-		 * lists for the checkpoint are stable.  Set the checkpointing
-		 * flag to block eviction of dirty pages until the checkpoint's
-		 * internal page pass is complete, then wait for any existing
-		 * eviction to complete.
+		 * In the final checkpoint pass, child pages cannot be evicted
+		 * from underneath internal pages nor can underlying blocks be
+		 * freed until the checkpoint's block lists are stable. Also,
+		 * we cannot split child pages into parents unless we know the
+		 * final pass will write a consistent view of that namespace.
+		 * Set the checkpointing flag to block such actions and wait for
+		 * any problematic eviction or page splits to complete.
 		 */
 		WT_PUBLISH(btree->checkpointing, WT_CKPT_PREPARE);
 
