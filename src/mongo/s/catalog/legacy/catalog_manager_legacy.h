@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+class Query;
+
 /**
  * Implements the catalog manager using the legacy 3-config server protocol.
  */
@@ -199,6 +201,15 @@ private:
                          const std::string& dbname,
                          const BSONObj& cmdObj,
                          BSONObjBuilder* result);
+
+    /**
+     * Runs a query against the config servers with retry logic.
+     */
+    StatusWith<std::vector<BSONObj>> _findOnConfig(const std::string& ns,
+                                                   const Query& query,
+                                                   int limit);
+
+    StatusWith<BSONObj> _findOneOnConfig(const std::string& ns, const Query& query);
 
     // Parsed config server hosts, as specified on the command line.
     ConnectionString _configServerConnectionString;

@@ -92,6 +92,8 @@ using str::stream;
 
 namespace {
 
+const int kMaxReadRetry = 3;
+
 bool validConfigWC(const BSONObj& writeConcern) {
     BSONElement elem(writeConcern["w"]);
     if (elem.eoo()) {
@@ -448,17 +450,16 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerLegacy::getDatabase(Operation
         return OpTimePair<DatabaseType>(dbt);
     }
 
-    ScopedDbConnection conn(_configServerConnectionString, 30.0);
+    auto dbObj = _findOneOnConfig(DatabaseType::ConfigNS, BSON(DatabaseType::name(dbName)));
+    if (!dbObj.isOK()) {
+        return dbObj.getStatus();
+    }
 
-    BSONObj dbObj = conn->findOne(DatabaseType::ConfigNS, BSON(DatabaseType::name(dbName)));
-    if (dbObj.isEmpty()) {
-        conn.done();
+    if (dbObj.getValue().isEmpty()) {
         return {ErrorCodes::NamespaceNotFound, stream() << "database " << dbName << " not found"};
     }
 
-    conn.done();
-
-    auto parseStatus = DatabaseType::fromBSON(dbObj);
+    auto parseStatus = DatabaseType::fromBSON(dbObj.getValue());
 
     if (!parseStatus.isOK()) {
         return parseStatus.getStatus();
@@ -469,18 +470,17 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerLegacy::getDatabase(Operation
 
 StatusWith<OpTimePair<CollectionType>> CatalogManagerLegacy::getCollection(
     OperationContext* txn, const std::string& collNs) {
-    ScopedDbConnection conn(_configServerConnectionString, 30.0);
+    auto collObj = _findOneOnConfig(CollectionType::ConfigNS, BSON(CollectionType::fullNs(collNs)));
+    if (!collObj.isOK()) {
+        return collObj.getStatus();
+    }
 
-    BSONObj collObj = conn->findOne(CollectionType::ConfigNS, BSON(CollectionType::fullNs(collNs)));
-    if (collObj.isEmpty()) {
-        conn.done();
+    if (collObj.getValue().isEmpty()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       stream() << "collection " << collNs << " not found");
     }
 
-    conn.done();
-
-    auto parseStatus = CollectionType::fromBSON(collObj);
+    auto parseStatus = CollectionType::fromBSON(collObj.getValue());
 
     if (!parseStatus.isOK()) {
         return parseStatus.getStatus();
@@ -500,17 +500,14 @@ Status CatalogManagerLegacy::getCollections(OperationContext* txn,
                       (string) "^" + pcrecpp::RE::QuoteMeta(*dbName) + "\\.");
     }
 
-    ScopedDbConnection conn(_configServerConnectionString, 30.0);
+    auto result = _findOnConfig(CollectionType::ConfigNS, Query(b.obj()), 0);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
 
-    std::unique_ptr<DBClientCursor> cursor(
-        _safeCursor(conn->query(CollectionType::ConfigNS, b.obj())));
-
-    while (cursor->more()) {
-        const BSONObj collObj = cursor->next();
-
+    for (auto& collObj : result.getValue()) {
         const auto collectionResult = CollectionType::fromBSON(collObj);
         if (!collectionResult.isOK()) {
-            conn.done();
             collections->clear();
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "error while parsing " << CollectionType::ConfigNS
@@ -521,7 +518,6 @@ Status CatalogManagerLegacy::getCollections(OperationContext* txn,
         collections->push_back(collectionResult.getValue());
     }
 
-    conn.done();
     return Status::OK();
 }
 
@@ -653,36 +649,32 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
 
 StatusWith<SettingsType> CatalogManagerLegacy::getGlobalSettings(OperationContext* txn,
                                                                  const string& key) {
-    try {
-        ScopedDbConnection conn(_configServerConnectionString, 30);
-        BSONObj settingsDoc = conn->findOne(SettingsType::ConfigNS, BSON(SettingsType::key(key)));
-        conn.done();
-
-        if (settingsDoc.isEmpty()) {
-            return Status(ErrorCodes::NoMatchingDocument,
-                          str::stream() << "can't find settings document with key: " << key);
-        }
-
-        StatusWith<SettingsType> settingsResult = SettingsType::fromBSON(settingsDoc);
-        if (!settingsResult.isOK()) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "error while parsing settings document: " << settingsDoc
-                                        << " : " << settingsResult.getStatus().toString());
-        }
-
-        const SettingsType& settings = settingsResult.getValue();
-
-        Status validationStatus = settings.validate();
-        if (!validationStatus.isOK()) {
-            return validationStatus;
-        }
-
-        return settingsResult;
-    } catch (const DBException& ex) {
-        return Status(ErrorCodes::OperationFailed,
-                      str::stream() << "unable to successfully obtain "
-                                    << "config.settings document: " << causedBy(ex));
+    auto settingsDocStatus = _findOneOnConfig(SettingsType::ConfigNS, BSON(SettingsType::key(key)));
+    if (!settingsDocStatus.isOK()) {
+        return settingsDocStatus.getStatus();
     }
+    auto settingsDoc = settingsDocStatus.getValue();
+
+    if (settingsDoc.isEmpty()) {
+        return Status(ErrorCodes::NoMatchingDocument,
+                      str::stream() << "can't find settings document with key: " << key);
+    }
+
+    StatusWith<SettingsType> settingsResult = SettingsType::fromBSON(settingsDoc);
+    if (!settingsResult.isOK()) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "error while parsing settings document: " << settingsDoc
+                                    << " : " << settingsResult.getStatus().toString());
+    }
+
+    const SettingsType& settings = settingsResult.getValue();
+
+    Status validationStatus = settings.validate();
+    if (!validationStatus.isOK()) {
+        return validationStatus;
+    }
+
+    return settingsResult;
 }
 
 Status CatalogManagerLegacy::getDatabasesForShard(OperationContext* txn,
@@ -690,32 +682,22 @@ Status CatalogManagerLegacy::getDatabasesForShard(OperationContext* txn,
                                                   vector<string>* dbs) {
     dbs->clear();
 
-    try {
-        ScopedDbConnection conn(_configServerConnectionString, 30.0);
-        std::unique_ptr<DBClientCursor> cursor(_safeCursor(
-            conn->query(DatabaseType::ConfigNS, Query(BSON(DatabaseType::primary(shardName))))));
-        if (!cursor.get()) {
-            conn.done();
-            return Status(ErrorCodes::HostUnreachable,
-                          str::stream() << "unable to open cursor for " << DatabaseType::ConfigNS);
+    auto result =
+        _findOnConfig(DatabaseType::ConfigNS, Query(BSON(DatabaseType::primary(shardName))), 0);
+
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    for (auto& dbObj : result.getValue()) {
+        string dbName;
+        Status status = bsonExtractStringField(dbObj, DatabaseType::name(), &dbName);
+        if (!status.isOK()) {
+            dbs->clear();
+            return status;
         }
 
-        while (cursor->more()) {
-            BSONObj dbObj = cursor->nextSafe();
-
-            string dbName;
-            Status status = bsonExtractStringField(dbObj, DatabaseType::name(), &dbName);
-            if (!status.isOK()) {
-                dbs->clear();
-                return status;
-            }
-
-            dbs->push_back(dbName);
-        }
-
-        conn.done();
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+        dbs->push_back(dbName);
     }
 
     return Status::OK();
@@ -729,37 +711,23 @@ Status CatalogManagerLegacy::getChunks(OperationContext* txn,
                                        repl::OpTime* opTime) {
     chunks->clear();
 
-    try {
-        ScopedDbConnection conn(_configServerConnectionString, 30.0);
+    auto result =
+        _findOnConfig(ChunkType::ConfigNS, Query(query).sort(sort), limit.get_value_or(0));
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
 
-        const Query queryWithSort(Query(query).sort(sort));
-
-        std::unique_ptr<DBClientCursor> cursor(
-            _safeCursor(conn->query(ChunkType::ConfigNS, queryWithSort, limit.get_value_or(0))));
-        if (!cursor.get()) {
-            conn.done();
-            return Status(ErrorCodes::HostUnreachable, "unable to open chunk cursor");
+    for (auto& chunkObj : result.getValue()) {
+        StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(chunkObj);
+        if (!chunkRes.isOK()) {
+            chunks->clear();
+            return {ErrorCodes::FailedToParse,
+                    stream() << "Failed to parse chunk with id ("
+                             << chunkObj[ChunkType::name()].toString()
+                             << "): " << chunkRes.getStatus().toString()};
         }
 
-        while (cursor->more()) {
-            BSONObj chunkObj = cursor->nextSafe();
-
-            StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(chunkObj);
-            if (!chunkRes.isOK()) {
-                conn.done();
-                chunks->clear();
-                return {ErrorCodes::FailedToParse,
-                        stream() << "Failed to parse chunk with id ("
-                                 << chunkObj[ChunkType::name()].toString()
-                                 << "): " << chunkRes.getStatus().toString()};
-            }
-
-            chunks->push_back(chunkRes.getValue());
-        }
-
-        conn.done();
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+        chunks->push_back(chunkRes.getValue());
     }
 
     return Status::OK();
@@ -770,33 +738,22 @@ Status CatalogManagerLegacy::getTagsForCollection(OperationContext* txn,
                                                   std::vector<TagsType>* tags) {
     tags->clear();
 
-    try {
-        ScopedDbConnection conn(_configServerConnectionString, 30);
-        std::unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query(
-            TagsType::ConfigNS, Query(BSON(TagsType::ns(collectionNs))).sort(TagsType::min()))));
-        if (!cursor.get()) {
-            conn.done();
-            return Status(ErrorCodes::HostUnreachable, "unable to open tags cursor");
+    auto result = _findOnConfig(
+        TagsType::ConfigNS, Query(BSON(TagsType::ns(collectionNs))).sort(TagsType::min()), 0);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    for (auto& tagObj : result.getValue()) {
+        StatusWith<TagsType> tagRes = TagsType::fromBSON(tagObj);
+        if (!tagRes.isOK()) {
+            tags->clear();
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "Failed to parse tag: " << tagRes.getStatus().toString());
         }
 
-        while (cursor->more()) {
-            BSONObj tagObj = cursor->nextSafe();
-
-            StatusWith<TagsType> tagRes = TagsType::fromBSON(tagObj);
-            if (!tagRes.isOK()) {
-                tags->clear();
-                conn.done();
-                return Status(ErrorCodes::FailedToParse,
-                              str::stream()
-                                  << "Failed to parse tag: " << tagRes.getStatus().toString());
-            }
-
-            tags->push_back(tagRes.getValue());
-        }
-
-        conn.done();
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+        tags->push_back(tagRes.getValue());
     }
 
     return Status::OK();
@@ -805,26 +762,20 @@ Status CatalogManagerLegacy::getTagsForCollection(OperationContext* txn,
 StatusWith<string> CatalogManagerLegacy::getTagForChunk(OperationContext* txn,
                                                         const std::string& collectionNs,
                                                         const ChunkType& chunk) {
-    BSONObj tagDoc;
+    Query query(BSON(TagsType::ns(collectionNs) << TagsType::min() << BSON("$lte" << chunk.getMin())
+                                                << TagsType::max()
+                                                << BSON("$gte" << chunk.getMax())));
 
-    try {
-        ScopedDbConnection conn(_configServerConnectionString, 30);
-
-        Query query(BSON(TagsType::ns(collectionNs)
-                         << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
-                         << BSON("$gte" << chunk.getMax())));
-
-        tagDoc = conn->findOne(TagsType::ConfigNS, query);
-        conn.done();
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+    auto tagDoc = _findOneOnConfig(TagsType::ConfigNS, query);
+    if (!tagDoc.isOK()) {
+        return tagDoc.getStatus();
     }
 
-    if (tagDoc.isEmpty()) {
+    if (tagDoc.getValue().isEmpty()) {
         return std::string("");
     }
 
-    auto status = TagsType::fromBSON(tagDoc);
+    auto status = TagsType::fromBSON(tagDoc.getValue());
     if (status.isOK()) {
         return status.getValue().getTag();
     }
@@ -834,17 +785,15 @@ StatusWith<string> CatalogManagerLegacy::getTagForChunk(OperationContext* txn,
 
 StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerLegacy::getAllShards(
     OperationContext* txn) {
-    std::vector<ShardType> shards;
-    ScopedDbConnection conn(_configServerConnectionString, 30.0);
-    std::unique_ptr<DBClientCursor> cursor(
-        _safeCursor(conn->query(ShardType::ConfigNS, BSONObj())));
-    while (cursor->more()) {
-        BSONObj shardObj = cursor->nextSafe();
+    auto result = _findOnConfig(ShardType::ConfigNS, Query(), 0);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
 
+    std::vector<ShardType> shards;
+    for (auto& shardObj : result.getValue()) {
         StatusWith<ShardType> shardRes = ShardType::fromBSON(shardObj);
         if (!shardRes.isOK()) {
-            shards.clear();
-            conn.done();
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse shard with id ("
                                         << shardObj[ShardType::name()].toString()
@@ -853,7 +802,6 @@ StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerLegacy::getAllShard
 
         shards.push_back(shardRes.getValue());
     }
-    conn.done();
 
     return OpTimePair<std::vector<ShardType>>{std::move(shards)};
 }
@@ -961,6 +909,55 @@ bool CatalogManagerLegacy::_runReadCommand(OperationContext* txn,
     } catch (const DBException& ex) {
         return Command::appendCommandStatus(*result, ex.toStatus());
     }
+}
+
+StatusWith<std::vector<BSONObj>> CatalogManagerLegacy::_findOnConfig(const std::string& ns,
+                                                                     const Query& query,
+                                                                     int limit) {
+    for (int retry = 1; retry <= kMaxReadRetry; ++retry) {
+        try {
+            ScopedDbConnection conn(_configServerConnectionString, 30.0);
+
+            std::unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query(ns, query, limit)));
+            if (!cursor.get()) {
+                conn.done();
+                return Status(ErrorCodes::HostUnreachable,
+                              str::stream() << "unable to open config server cursor on ns: " << ns);
+            }
+
+            std::vector<BSONObj> results;
+            while (cursor->more()) {
+                results.push_back(cursor->nextSafe().getOwned());
+            }
+
+            conn.done();
+            return results;
+        } catch (const DBException& ex) {
+            if (ex.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
+            if (retry < kMaxReadRetry &&
+                ShardRegistry::kAllRetriableErrors.count(ErrorCodes::fromInt(ex.getCode()))) {
+                continue;
+            }
+            return ex.toStatus();
+        }
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+StatusWith<BSONObj> CatalogManagerLegacy::_findOneOnConfig(const string& ns, const Query& query) {
+    auto result = _findOnConfig(ns, query, 1);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    if (result.getValue().size() == 0) {
+        return BSONObj();
+    }
+    invariant(result.getValue().size() == 1);
+    return result.getValue().front();
 }
 
 Status CatalogManagerLegacy::applyChunkOpsDeprecated(OperationContext* txn,
@@ -1114,13 +1111,15 @@ Status CatalogManagerLegacy::removeConfigDocuments(OperationContext* txn,
 Status CatalogManagerLegacy::_checkDbDoesNotExist(OperationContext* txn,
                                                   const std::string& dbName,
                                                   DatabaseType* db) {
-    ScopedDbConnection conn(_configServerConnectionString, 30);
-
     BSONObjBuilder b;
     b.appendRegex(DatabaseType::name(), (string) "^" + pcrecpp::RE::QuoteMeta(dbName) + "$", "i");
 
-    BSONObj dbObj = conn->findOne(DatabaseType::ConfigNS, b.obj());
-    conn.done();
+    auto result = _findOneOnConfig(DatabaseType::ConfigNS, b.obj());
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    BSONObj dbObj = std::move(result.getValue());
 
     // If our name is exactly the same as the name we want, try loading
     // the database again.
@@ -1151,11 +1150,13 @@ Status CatalogManagerLegacy::_checkDbDoesNotExist(OperationContext* txn,
 StatusWith<string> CatalogManagerLegacy::_generateNewShardName(OperationContext* txn) {
     BSONObj o;
     {
-        ScopedDbConnection conn(_configServerConnectionString, 30);
-        o = conn->findOne(ShardType::ConfigNS,
-                          Query(fromjson("{" + ShardType::name() + ": /^shard/}"))
-                              .sort(BSON(ShardType::name() << -1)));
-        conn.done();
+        auto result = _findOneOnConfig(ShardType::ConfigNS,
+                                       Query(fromjson("{" + ShardType::name() + ": /^shard/}"))
+                                           .sort(BSON(ShardType::name() << -1)));
+        if (!result.isOK()) {
+            return result.getStatus();
+        }
+        o = std::move(result.getValue());
     }
 
     int count = 0;
