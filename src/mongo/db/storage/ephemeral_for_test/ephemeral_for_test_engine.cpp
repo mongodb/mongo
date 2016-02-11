@@ -34,11 +34,16 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_btree_impl.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
+#include "mongo/db/storage/journal_listener.h"
 
 namespace mongo {
 
 RecoveryUnit* EphemeralForTestEngine::newRecoveryUnit() {
-    return new EphemeralForTestRecoveryUnit();
+    return new EphemeralForTestRecoveryUnit([this]() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        JournalListener::Token token = _journalListener->getToken();
+        _journalListener->onDurable(token);
+    });
 }
 
 Status EphemeralForTestEngine::createRecordStore(OperationContext* opCtx,

@@ -34,6 +34,7 @@
 
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -41,11 +42,17 @@ class SortedDataInterface;
 
 class EphemeralForTestRecoveryUnit : public RecoveryUnit {
 public:
+    EphemeralForTestRecoveryUnit(stdx::function<void()> cb = nullptr)
+        : _waitUntilDurableCallback(cb) {}
+
     void beginUnitOfWork(OperationContext* opCtx) final{};
     void commitUnitOfWork() final;
     void abortUnitOfWork() final;
 
     virtual bool waitUntilDurable() {
+        if (_waitUntilDurableCallback) {
+            _waitUntilDurableCallback();
+        }
         return true;
     }
 
@@ -70,6 +77,7 @@ private:
     typedef std::vector<ChangePtr> Changes;
 
     Changes _changes;
+    stdx::function<void()> _waitUntilDurableCallback;
 };
 
 }  // namespace mongo

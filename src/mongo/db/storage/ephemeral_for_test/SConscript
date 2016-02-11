@@ -66,6 +66,7 @@ env.CppUnitTest(
     source=['ephemeral_for_test_engine_test.cpp',
             ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/journal_listener',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'storage_ephemeral_for_test_core',
