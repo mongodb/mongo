@@ -163,11 +163,11 @@ src/support/hazard.c
 src/support/hex.c
 src/support/huffman.c
 src/support/pow.c
+src/support/power8/crc32.S
+src/support/power8/crc32_wrapper.c
 src/support/rand.c
 src/support/scratch.c
 src/support/stat.c
-src/support/power8/crc32.S
-src/support/power8/crc32_wrapper.c
 src/txn/txn.c
 src/txn/txn_ckpt.c
 src/txn/txn_ext.c
