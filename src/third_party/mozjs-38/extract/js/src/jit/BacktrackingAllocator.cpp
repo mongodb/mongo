@@ -206,10 +206,9 @@ BacktrackingAllocator::tryGroupRegisters(uint32_t vreg0, uint32_t vreg1)
 
     // Registers which might spill to the frame's argument slots can only be
     // grouped with other such registers if the frame might access those
-    // arguments through a lazy arguments object.
+    // arguments through a lazy arguments object or rest parameter.
     if (IsArgumentSlotDefinition(reg0->def()) || IsArgumentSlotDefinition(reg1->def())) {
-        JSScript* script = graph.mir().entryBlock()->info().script();
-        if (script && script->argumentsAliasesFormals()) {
+        if (graph.mir().entryBlock()->info().mayReadFrameArgsDirectly()) {
             if (*reg0->def()->output() != *reg1->def()->output())
                 return true;
         }

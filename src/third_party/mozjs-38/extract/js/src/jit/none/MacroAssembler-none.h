@@ -131,12 +131,6 @@ class Assembler : public AssemblerShared
     static void ToggleCall(CodeLocationLabel, bool) { MOZ_CRASH(); }
 
     static uintptr_t GetPointer(uint8_t*) { MOZ_CRASH(); }
-
-    void verifyHeapAccessDisassembly(uint32_t begin, uint32_t end,
-                                     const Disassembler::HeapAccess &heapAccess)
-    {
-        MOZ_CRASH();
-    }
 };
 
 class Operand

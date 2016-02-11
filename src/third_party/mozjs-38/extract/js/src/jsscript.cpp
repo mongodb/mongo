@@ -3899,6 +3899,12 @@ JSScript::hasLoops()
     return false;
 }
 
+bool
+JSScript::mayReadFrameArgsDirectly()
+{
+    return argumentsHasVarBinding() || (function_ && function_->hasRest());
+}
+
 static inline void
 LazyScriptHash(uint32_t lineno, uint32_t column, uint32_t begin, uint32_t end,
                HashNumber hashes[3])
