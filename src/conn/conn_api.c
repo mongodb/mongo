@@ -1478,12 +1478,17 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * If this is a read-only connection and we cannot grab the lock
-	 * file, check if it is because there is not write permission.
-	 * If the failure is due to permission then ignore the error.
-	 * XXX Ignoring a permission error does allow multiple read-only
+	 * file, check if it is because there is not write permission or
+	 * if the file does not exist.  If so, then ignore the error.
+	 * XXX Ignoring the error does allow multiple read-only
 	 * connections to exist at the same time on a read-only directory.
 	 */
-	if (F_ISSET(conn, WT_CONN_READONLY) && ret == EPERM) {
+	if (F_ISSET(conn, WT_CONN_READONLY) &&
+	    (ret == EACCES || ret == ENOENT)) {
+		/*
+		 * If we got an expected permission or non-existence error
+		 * then skip the byte lock.
+		 */
 		ret = 0;
 		goto open_wt;
 	}
@@ -1516,18 +1521,31 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 
 open_wt:
 	/* We own the lock file, optionally create the WiredTiger file. */
-	WT_ERR(__wt_open(session, WT_WIREDTIGER, is_create, false, 0, &fh));
-
+	ret = __wt_open(session, WT_WIREDTIGER, is_create, false, 0, &fh);
 	/*
-	 * Lock the WiredTiger file (for backward compatibility reasons as
-	 * described above).  Immediately release the lock, it's just a test.
+	 * If we're read-only, check for success as well as handled errors.
+	 * Even if we're able to open the WiredTiger file successfully, we
+	 * do not try to lock it.  The lock file test for read-only is the
+	 * only one we do.
 	 */
-	if (__wt_bytelock(fh, (wt_off_t)0, true) != 0) {
-		WT_ERR_MSG(session, EBUSY,
-		    "WiredTiger database is already being managed by another "
-		    "process");
+	if (F_ISSET(conn, WT_CONN_READONLY) &&
+	    (ret == 0 || ret == EACCES || ret == ENOENT))
+		ret = 0;
+	else {
+		WT_ERR(ret);
+
+		/*
+		 * Lock the WiredTiger file (for backward compatibility reasons
+		 * as described above).  Immediately release the lock, it's
+		 * just a test.
+		 */
+		if (__wt_bytelock(fh, (wt_off_t)0, true) != 0) {
+			WT_ERR_MSG(session, EBUSY,
+			    "WiredTiger database is already being managed by "
+			    "another process");
+		}
+		WT_ERR(__wt_bytelock(fh, (wt_off_t)0, false));
 	}
-	WT_ERR(__wt_bytelock(fh, (wt_off_t)0, false));
 
 	/*
 	 * We own the database home, figure out if we're creating it. There are

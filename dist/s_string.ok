@@ -210,6 +210,7 @@ MySecret
 NEEDKEY
 NEEDVALUE
 NOLL
+NOLOCK
 NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
@@ -255,6 +256,7 @@ RNG
 RPC
 RUNDIR
 Radu
+Readonly
 Rebalance
 RedHat
 Redistributions
@@ -437,6 +439,7 @@ checksum
 checksums
 children's
 chk
+chmod
 chongo
 cip
 cjoin
@@ -501,6 +504,7 @@ datasets
 datasource
 datastore
 dbc
+dbs
 dcalloc
 decile
 deciles
@@ -898,6 +902,7 @@ rng
 rocksdb
 rotN
 rotn
+rp
 rpc
 run's
 runtime
