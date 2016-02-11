@@ -1889,15 +1889,18 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * we don't waste space when we write).
 	 */
 	a = maxpagesize;			/* Don't overflow. */
-	split_size = (uint32_t)
-	    WT_ALIGN((a * (u_int)btree->split_pct) / 100, btree->allocsize);
+	split_size = (uint32_t)WT_ALIGN_NEAREST(
+	    (a * (u_int)btree->split_pct) / 100, btree->allocsize);
 
 	/*
-	 * If the result of that calculation is the same as the allocation unit
-	 * (that happens if the maximum size is the same size as an allocation
-	 * unit, use a percentage of the maximum page size).
+	 * Respect the configured split percentage if the calculated split
+	 * size is either zero or a full page. The user has either configured
+	 * an allocation size that matches the page size, or a split
+	 * percentage that is close to zero or one hundred. Rounding is going
+	 * to provide a worse outcome than having a split point that doesn't
+	 * fall on an allocation size boundary in those cases.
 	 */
-	if (split_size == btree->allocsize)
+	if (split_size == 0 || split_size == maxpagesize)
 		split_size = (uint32_t)((a * (u_int)btree->split_pct) / 100);
 
 	return (split_size);
@@ -3285,6 +3288,17 @@ supd_check_complete:
 			}
 		}
 	}
+
+	bnd->entries = r->entries;
+	/* Output a verbose message if we create a page without many entries */
+	if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT) && r->entries < 6)
+		WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+		    "Reconciliation creating a page with %" PRIu32
+		    " entries, memory footprint %" PRIu64
+		    ", page count %" PRIu32 ", %s, split state: %d\n",
+		    r->entries, r->page->memory_footprint, r->bnd_next,
+		    F_ISSET(r, WT_EVICTING) ? "evict" : "checkpoint",
+		    r->bnd_state));
 
 	WT_ERR(__wt_bt_write(session,
 	    buf, addr, &addr_size, false, bnd->already_compressed));

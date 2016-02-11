@@ -34,6 +34,9 @@
 #include <string.h>
 #ifndef _WIN32
 #include <unistd.h>
+#else
+/* snprintf is not supported on <= VS2013 */
+#define	snprintf _snprintf
 #endif
 
 #include <wiredtiger.h>
@@ -47,10 +50,14 @@ static const char *uri = "table:main";
 #define	RECORDS_FILE "records"
 
 #define	ENV_CONFIG						\
-    "create,log=(file_max=10M,archive=false,enabled),"		\
+    "create,log=(file_max=100K,archive=false,enabled),"		\
     "transaction_sync=(enabled,method=none)"
 #define	ENV_CONFIG_REC "log=(recover=on)"
+#define	LOG_FILE_1 "WiredTigerLog.0000000001"
 #define	MAX_VAL	4096
+
+#define	K_SIZE	16
+#define	V_SIZE	256
 
 static void
 usage(void)
@@ -68,22 +75,13 @@ fill_db(void)
 {
 	FILE *fp;
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
-	WT_ITEM data;
-	WT_RAND_STATE rnd;
+	WT_CURSOR *cursor, *logc;
+	WT_LSN lsn, save_lsn;
 	WT_SESSION *session;
-	uint64_t i;
+	uint32_t i, max_key, min_key, units, unused;
 	int ret;
-	uint8_t buf[MAX_VAL];
-
-	__wt_random_init(&rnd);
-	memset(buf, 0, sizeof(buf));
-	/*
-	 * Initialize the first 25% to random values.  Leave a bunch of data
-	 * space at the end to emphasize zero data.
-	 */
-	for (i = 0; i < MAX_VAL/4; i++)
-		buf[i] = (uint8_t)__wt_random(&rnd);
+	bool first;
+	char k[K_SIZE], v[V_SIZE];
 
 	/*
 	 * Run in the home directory so that the records file is in there too.
@@ -94,7 +92,7 @@ fill_db(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		testutil_die(ret, "WT_CONNECTION:open_session");
 	if ((ret = session->create(session,
-	    uri, "key_format=Q,value_format=u")) != 0)
+	    uri, "key_format=S,value_format=S")) != 0)
 		testutil_die(ret, "WT_SESSION.create: %s", uri);
 	if ((ret =
 	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
@@ -110,25 +108,60 @@ fill_db(void)
 	 * Set to no buffering.
 	 */
 	setvbuf(fp, NULL, _IONBF, 0);
+	save_lsn.l.file = 0;
 
 	/*
-	 * Write data into the table until we are killed by the parent.
-	 * The data in the buffer is already set to random content.
+	 * Write data into the table until we move to log file 2.
+	 * We do the calculation below so that we don't have to walk the
+	 * log for every record.
+	 *
+	 * Calculate about how many records should fit in the log file.
+	 * Subtract a bunch for metadata and file creation records.
+	 * Then subtract out a few more records to be conservative.
 	 */
-	data.data = buf;
-	for (i = 0;; ++i) {
-		data.size = __wt_random(&rnd) % MAX_VAL;
-		cursor->set_key(cursor, i);
-		cursor->set_value(cursor, &data);
+	units = (K_SIZE + V_SIZE) / 128 + 1;
+	min_key = 90000 / (units * 128) - 15;
+	max_key = min_key * 2;
+	first = true;
+	for (i = 0; i < max_key; ++i) {
+		snprintf(k, sizeof(k), "key%03d", (int)i);
+		snprintf(v, sizeof(v), "value%0*d",
+		    (int)(V_SIZE - strlen("value")), (int)i);
+		cursor->set_key(cursor, k);
+		cursor->set_value(cursor, v);
 		if ((ret = cursor->insert(cursor)) != 0)
 			testutil_die(ret, "WT_CURSOR.insert");
-		/*
-		 * Save the key separately for checking later.
-		 */
-		if (fprintf(fp, "%" PRIu64 "\n", i) == -1)
-			testutil_die(errno, "fprintf");
-		if (i % 5000)
-			__wt_yield();
+
+		if (i > min_key) {
+			if ((ret = session->open_cursor(
+			    session, "log:", NULL, NULL, &logc)) != 0)
+				testutil_die(ret, "open_cursor: log");
+			if (save_lsn.l.file != 0) {
+				logc->set_key(logc,
+				    save_lsn.l.file, save_lsn.l.offset, 0);
+				if ((ret = logc->search(logc)) != 0)
+					testutil_die(errno, "search");
+			}
+			while ((ret = logc->next(logc)) == 0) {
+				if ((ret = logc->get_key(logc,
+				    &lsn.l.file, &lsn.l.offset, &unused)) != 0)
+					testutil_die(errno, "get_key");
+				if (lsn.l.file < 2)
+					save_lsn = lsn;
+				else {
+					if (first)
+						testutil_die(EINVAL,
+						    "min_key too high");
+					if (fprintf(fp,
+					    "%" PRIu32 " %" PRIu32 "\n",
+					    save_lsn.l.offset, i - 1) == -1)
+						testutil_die(errno, "fprintf");
+					fclose(fp);
+					abort();
+				}
+			}
+			first = false;
+		}
 	}
 }
 
@@ -142,27 +175,22 @@ main(int argc, char *argv[])
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	WT_RAND_STATE rnd;
-	uint64_t key;
-	uint32_t absent, count, timeout;
+	uint64_t new_offset, offset;
+	uint32_t count, max_key;
 	int ch, status, ret;
 	pid_t pid;
-	char *working_dir;
+	const char *working_dir;
 
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		progname = argv[0];
 	else
 		++progname;
 
-	working_dir = NULL;
-	timeout = 10;
-	while ((ch = __wt_getopt(progname, argc, argv, "h:t:")) != EOF)
+	working_dir = "WT_TEST.truncated-log";
+	while ((ch = __wt_getopt(progname, argc, argv, "h:")) != EOF)
 		switch (ch) {
 		case 'h':
 			working_dir = __wt_optarg;
-			break;
-		case 't':
-			timeout = (uint32_t)atoi(__wt_optarg);
 			break;
 		default:
 			usage();
@@ -189,18 +217,7 @@ main(int argc, char *argv[])
 	}
 
 	/* parent */
-	__wt_random_init(&rnd);
-	/* Sleep for the configured amount of time before killing the child. */
-	printf("Parent: sleep %" PRIu32 " seconds, then kill child\n", timeout);
-	sleep(timeout);
-
-	/*
-	 * !!! It should be plenty long enough to make sure more than one
-	 * log file exists.  If wanted, that check would be added here.
-	 */
-	printf("Kill child\n");
-	if (kill(pid, SIGKILL) != 0)
-		testutil_die(errno, "kill");
+	/* Wait for child to kill itself. */
 	waitpid(pid, &status, 0);
 
 	/*
@@ -209,6 +226,21 @@ main(int argc, char *argv[])
 	 */
 	chdir(home);
 	printf("Open database, run recovery and verify content\n");
+	if ((fp = fopen(RECORDS_FILE, "r")) == NULL)
+		testutil_die(errno, "fopen");
+	ret = fscanf(fp, "%" SCNu64 " %" SCNu32 "\n", &offset, &max_key);
+	fclose(fp);
+	if (ret != 2)
+		testutil_die(errno, "fscanf");
+	/*
+	 * The offset is the beginning of the last record.  Truncate to
+	 * the middle of that last record (i.e. ahead of that offset).
+	 */
+	new_offset = offset + V_SIZE;
+	printf("Parent: Truncate to %u\n", (uint32_t)new_offset);
+	if ((ret = truncate(LOG_FILE_1, (wt_off_t)new_offset)) != 0)
+		testutil_die(errno, "truncate");
+
 	if ((ret = wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -217,33 +249,18 @@ main(int argc, char *argv[])
 	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
 		testutil_die(ret, "WT_SESSION.open_cursor: %s", uri);
 
-	if ((fp = fopen(RECORDS_FILE, "r")) == NULL)
-		testutil_die(errno, "fopen");
-
 	/*
 	 * For every key in the saved file, verify that the key exists
 	 * in the table after recovery.  Since we did write-no-sync, we
 	 * expect every key to have been recovered.
 	 */
-	for (absent = count = 0;; ++count) {
-		ret = fscanf(fp, "%" SCNu64 "\n", &key);
-		if (ret != EOF && ret != 1)
-			testutil_die(errno, "fscanf");
-		if (ret == EOF)
-			break;
-		cursor->set_key(cursor, key);
-		if ((ret = cursor->search(cursor)) != 0) {
-			if (ret != WT_NOTFOUND)
-				testutil_die(ret, "search");
-			printf("no record with key %" PRIu64 "\n", key);
-			++absent;
-		}
-	}
-	fclose(fp);
+	count = 0;
+	while ((ret = cursor->next(cursor)) == 0)
+		++count;
 	if ((ret = conn->close(conn, NULL)) != 0)
 		testutil_die(ret, "WT_CONNECTION:close");
-	if (absent) {
-		printf("%u record(s) absent from %u\n", absent, count);
+	if (count > max_key) {
+		printf("expected %u records found %u\n", max_key, count);
 		return (EXIT_FAILURE);
 	}
 	printf("%u records verified\n", count);
