@@ -46,6 +46,11 @@ void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
     } catch (...) {
         std::terminate();
     }
+
+    // This ensures that the journal listener gets called on each commit.
+    // SERVER-22575: Remove this once we add a generic mechanism to periodically wait
+    // for durability.
+    waitUntilDurable();
 }
 
 void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
