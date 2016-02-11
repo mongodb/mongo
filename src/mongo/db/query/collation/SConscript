@@ -1,0 +1,88 @@
+# -*- mode: python -*-
+
+Import("env")
+Import("icuEnabled")
+
+env = env.Clone()
+
+env.InjectThirdPartyIncludePaths("icu")
+
+env.Append(
+    CPPDEFINES=[
+        'U_USING_ICU_NAMESPACE=0',
+    ],
+)
+
+env.Library(
+    target="collator_interface",
+    source=[
+        "collation_spec.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.CppUnitTest(
+    target="collation_spec_test",
+    source=[
+        "collation_spec_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_interface",
+    ],
+)
+
+env.Library(
+    target="collation_spec_serializer",
+    source=[
+        "collation_spec_serializer.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "collator_interface",
+    ],
+)
+
+env.CppUnitTest(
+    target="collation_spec_serializer_test",
+    source=[
+        "collation_spec_serializer_test.cpp",
+    ],
+    LIBDEPS=[
+        "collation_spec_serializer",
+    ],
+)
+
+if icuEnabled:
+    env.Library(
+        target="collator_icu",
+        source=[
+            "collator_factory_icu.cpp",
+            "collator_interface_icu.cpp",
+        ],
+        LIBDEPS=[
+            "$BUILD_DIR/mongo/base",
+            "$BUILD_DIR/third_party/shim_icu",
+            "collator_interface",
+        ],
+    )
+
+    env.CppUnitTest(
+        target="collator_interface_icu_test",
+        source=[
+            "collator_interface_icu_test.cpp",
+        ],
+        LIBDEPS=[
+            "collator_icu",
+        ],
+    )
+
+    env.CppUnitTest(
+        target="collator_factory_icu_test",
+        source=[
+            "collator_factory_icu_test.cpp",
+        ],
+        LIBDEPS=[
+            "collator_icu",
+        ],
+    )

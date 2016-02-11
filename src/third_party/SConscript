@@ -81,7 +81,9 @@ if not use_system_version_of_library('intel_decimal128'):
 
 if icuEnabled and not use_system_version_of_library('icu'):
     thirdPartyIncludePathList.append(
-        ('icu', '#/src/third_party/icu4c' + icuSuffix + '/source'))
+        ('icu', '#/src/third_party/icu4c' + icuSuffix + '/source/common'))
+    thirdPartyIncludePathList.append(
+        ('icu', '#/src/third_party/icu4c' + icuSuffix + '/source/i18n'))
 
 def injectAllThirdPartyIncludePaths(thisEnv):
     thisEnv.PrependUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])

@@ -2,6 +2,12 @@
 
 Import("env")
 
+env.SConscript(
+    dirs=[
+        "collation",
+    ],
+)
+
 env.Library(
     target='query_planner',
     source=[

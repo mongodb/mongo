@@ -6,14 +6,10 @@ env = env.Clone()
 
 env.Append(
     CPPDEFINES=[
-        'U_USING_ICU_NAMESPACE=0',
-        'U_STATIC_IMPLEMENTATION=1',
+        'U_CHARSET_ISUTF8=1',
         'U_I18N_IMPLEMENTATION=1',
+        'U_STATIC_IMPLEMENTATION=1',
     ],
-    CPPPATH=[
-        'common',
-        'i18n',
-    ]
 )
 
 def removeIfPresent(lst, item):
