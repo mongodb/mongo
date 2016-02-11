@@ -250,7 +250,7 @@ public:
 
         pipeline.front()->optimizeAt(pipeline.begin(), &pipeline);
 
-        ASSERT_EQUALS(pipeline.size(), 4);
+        ASSERT_EQUALS(pipeline.size(), 4U);
         ASSERT(dynamic_cast<DocumentSourceMatch*>(pipeline.front().get()));
     }
 };
@@ -307,7 +307,7 @@ public:
 
         limit()->optimizeAt(container.begin(), &container);
         ASSERT_EQUALS(5, static_cast<DocumentSourceLimit*>(limit())->getLimit());
-        ASSERT_EQUALS(1, container.size());
+        ASSERT_EQUALS(1U, container.size());
     }
 };
 
@@ -1476,19 +1476,19 @@ public:
 
         container.push_back(mkLimit(10));
         sort()->optimizeAt(container.begin(), &container);
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(sort()->getLimit(), 10);
 
         // unchanged
         container.push_back(mkLimit(15));
         sort()->optimizeAt(container.begin(), &container);
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(sort()->getLimit(), 10);
 
         // reduced
         container.push_back(mkLimit(5));
         sort()->optimizeAt(container.begin(), &container);
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(sort()->getLimit(), 5);
 
         vector<Value> arr;
@@ -2558,19 +2558,19 @@ public:
         container.push_back(DocumentSourceLimit::create(ctx(), 200));
         geoNear->optimizeAt(container.begin(), &container);
 
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(geoNear->getLimit(), DocumentSourceGeoNear::kDefaultLimit);
 
         container.push_back(DocumentSourceLimit::create(ctx(), 50));
         geoNear->optimizeAt(container.begin(), &container);
 
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(geoNear->getLimit(), 50);
 
         container.push_back(DocumentSourceLimit::create(ctx(), 30));
         geoNear->optimizeAt(container.begin(), &container);
 
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(geoNear->getLimit(), 30);
     }
 };
@@ -2740,12 +2740,12 @@ public:
         container.push_back(match2);
         match1->optimizeAt(container.begin(), &container);
 
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}]}"));
 
         container.push_back(match3);
         match1->optimizeAt(container.begin(), &container);
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(match1->getQuery(),
                       fromjson(
                           "{'$and': [{'$and': [{a:1}, {b:1}]},"
