@@ -45,6 +45,7 @@ static char home[HOME_SIZE];		/* Program working dir */
 static char home_rd[HOME_SIZE];		/* Read-only dir */
 static char home_rd2[HOME_SIZE];	/* Read-only dir */
 static const char *progname;		/* Program name */
+static const char *saved_argv0;		/* Program name */
 static const char *uri = "table:main";
 
 #define	ENV_CONFIG						\
@@ -141,6 +142,10 @@ main(int argc, char *argv[])
 		progname = argv[0];
 	else
 		++progname;
+	/*
+	 * Needed unaltered for system command later.
+	 */
+	saved_argv0 = argv[0];
 
 	working_dir = "WT_RD";
 	child = false;
@@ -254,7 +259,7 @@ main(int argc, char *argv[])
 	 * the child even though it should not be.  So use 'system' to spawn
 	 * an entirely new process.
 	 */
-	(void)snprintf(cmd, sizeof(cmd), "%s -C", progname);
+	(void)snprintf(cmd, sizeof(cmd), "%s -C", saved_argv0);
 	if ((status = system(cmd)) < 0)
 		testutil_die(status, "system");
 
