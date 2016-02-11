@@ -226,19 +226,19 @@ public:
         source()->optimizeAt(container.begin(), &container);
 
         // initial limit becomes limit of cursor
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(source()->getLimit(), 10);
 
         container.push_back(mkLimit(2));
         source()->optimizeAt(container.begin(), &container);
         // smaller limit lowers cursor limit
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(source()->getLimit(), 2);
 
         container.push_back(mkLimit(3));
         source()->optimizeAt(container.begin(), &container);
         // higher limit doesn't effect cursor limit
-        ASSERT_EQUALS(container.size(), 1);
+        ASSERT_EQUALS(container.size(), 1U);
         ASSERT_EQUALS(source()->getLimit(), 2);
 
         // The cursor allows exactly 2 documents through
