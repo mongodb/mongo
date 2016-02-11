@@ -143,18 +143,10 @@ JSRuntime::createJitRuntime(JSContext* cx)
     jitRuntime_ = jrt;
 
     if (!jitRuntime_->initialize(cx)) {
-        js_ReportOutOfMemory(cx);
-
-        js_delete(jitRuntime_);
-        jitRuntime_ = nullptr;
-
-        JSCompartment* comp = cx->runtime()->atomsCompartment();
-        if (comp->jitCompartment_) {
-            js_delete(comp->jitCompartment_);
-            comp->jitCompartment_ = nullptr;
-        }
-
-        return nullptr;
+        // Handling OOM here is complicated: if we delete jitRuntime_ now, we
+        // will destroy the ExecutableAllocator, even though there may still be
+        // JitCode instances holding references to ExecutablePools.
+        CrashAtUnhandlableOOM("OOM in createJitRuntime");
     }
 
     return jitRuntime_;
