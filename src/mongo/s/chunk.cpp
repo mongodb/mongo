@@ -513,8 +513,6 @@ bool Chunk::moveAndCommit(OperationContext* txn,
     builder.append("waitForDelete", waitForDelete);
     builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
     _manager->getVersion().appendForCommands(&builder);
-    // TODO(SERVER-20742): Remove this after 3.2, now that we're sending version it is redundant
-    builder.append("epoch", _manager->getVersion().epoch());
 
     ShardConnection fromconn(_getShardConnectionString(txn), "");
     bool worked = fromconn->runCommand("admin", builder.done(), res);

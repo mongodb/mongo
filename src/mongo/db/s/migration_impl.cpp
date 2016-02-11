@@ -103,11 +103,6 @@ Status ChunkMoveOperationState::initialize(const BSONObj& cmdObj) {
         return {ErrorCodes::InvalidOptions, "need to specify shard to move chunk to"};
     }
 
-    Status epochStatus = bsonExtractOIDField(cmdObj, "epoch", &_collectionEpoch);
-    if (!epochStatus.isOK()) {
-        return epochStatus;
-    }
-
     _minKey = cmdObj["min"].Obj();
     if (_minKey.isEmpty()) {
         return {ErrorCodes::InvalidOptions, "need to specify a min"};
@@ -139,6 +134,13 @@ Status ChunkMoveOperationState::initialize(const BSONObj& cmdObj) {
 
         _toShardCS = toShard->getConnString();
     }
+
+    auto& operationVersion = OperationShardVersion::get(_txn);
+    if (!operationVersion.hasShardVersion()) {
+        return Status{ErrorCodes::InvalidOptions, "moveChunk command is missing shard version"};
+    }
+
+    _collectionVersion = operationVersion.getShardVersion(_nss);
 
     return Status::OK();
 }
@@ -179,24 +181,14 @@ ChunkMoveOperationState::acquireMoveMetadata() {
         return Status(ErrorCodes::IncompatibleShardingMetadata, msg);
     }
 
-    {
-        // Mongos >= v3.2 sends the full version, v3.0 only sends the epoch.
-        // TODO(SERVER-20742): Stop parsing epoch separately after 3.2.
-        auto& operationVersion = OperationShardVersion::get(_txn);
-        if (operationVersion.hasShardVersion()) {
-            _collectionVersion = operationVersion.getShardVersion(_nss);
-            _collectionEpoch = _collectionVersion.epoch();
-        }  // else the epoch will already be set from the parsing of the ChunkMoveOperationState
-
-        if (_collectionEpoch != _shardVersion.epoch()) {
-            const string msg = stream() << "moveChunk cannot move chunk "
-                                        << "[" << _minKey << "," << _maxKey << "), "
-                                        << "collection may have been dropped. "
-                                        << "current epoch: " << _shardVersion.epoch()
-                                        << ", cmd epoch: " << _collectionEpoch;
-            warning() << msg;
-            throw SendStaleConfigException(_nss.toString(), msg, _collectionVersion, _shardVersion);
-        }
+    if (_collectionVersion.epoch() != _shardVersion.epoch()) {
+        const string msg = stream() << "moveChunk cannot move chunk "
+                                    << "[" << _minKey << "," << _maxKey << "), "
+                                    << "collection may have been dropped. "
+                                    << "current epoch: " << _shardVersion.epoch()
+                                    << ", cmd epoch: " << _collectionVersion.epoch();
+        warning() << msg;
+        throw SendStaleConfigException(_nss.toString(), msg, _collectionVersion, _shardVersion);
     }
 
     _collMetadata = shardingState->getCollectionMetadata(_nss.ns());
