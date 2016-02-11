@@ -198,7 +198,7 @@ bool GeoNearExpression::parseLegacyQuery(const BSONObj& obj) {
             warning() << "ignoring deprecated option $uniqueDocs";
         } else {
             // In a query document, $near queries can have no non-geo sibling parameters.
-            uasserted(34410,
+            uasserted(34413,
                       str::stream() << "invalid argument in geo near query: " << e.fieldName());
         }
     }
