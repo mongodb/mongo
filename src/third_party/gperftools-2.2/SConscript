@@ -102,6 +102,10 @@ def removeIfPresent(lst, item):
 for to_remove in ['-Werror', "-Wsign-compare","-Wall"]:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
+# GCC on PowerPC under C++11 mode does not define __linux which gperftools depends on
+if env['TARGET_ARCH'] == 'ppc64le':
+    env.Append( CPPDEFINES=[ "__linux"] )
+
 env.Library(
     target='tcmalloc_minimal',
     source=files,

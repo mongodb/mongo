@@ -1032,7 +1032,7 @@ env['TARGET_OS_FAMILY'] = 'posix' if env.TargetOSIs('posix') else env.GetTargetO
 # option as a new variable in the environment.
 if get_option('allocator') == "auto":
     if env.TargetOSIs('windows') or \
-       (env.TargetOSIs('linux') and (env['TARGET_ARCH'] in ['i386', 'x86_64'])):
+       (env.TargetOSIs('linux') and (env['TARGET_ARCH'] in ['i386', 'x86_64', 'ppc64le'])):
         env['MONGO_ALLOCATOR'] = "tcmalloc"
     else:
         env['MONGO_ALLOCATOR'] = "system"
