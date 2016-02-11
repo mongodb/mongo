@@ -62,7 +62,7 @@ usage(void)
 }
 
 static int
-run_child(const char *home)
+run_child(const char *homedir)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
@@ -73,7 +73,7 @@ run_child(const char *home)
 	 * We expect the read-only database will allow the second read-only
 	 * handle to succeed because no one can create or set the lock file.
 	 */
-	if ((ret = wiredtiger_open(home, NULL, ENV_CONFIG_RD, &conn)) != 0)
+	if ((ret = wiredtiger_open(homedir, NULL, ENV_CONFIG_RD, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open readonly");
 
 	/*
@@ -100,7 +100,7 @@ run_child(const char *home)
  * Child process opens both databases readonly.
  */
 static void
-open_dbs(const char *home, const char *home_rd, const char *home_rd2)
+open_dbs(const char *dir, const char *dir_rd, const char *dir_rd2)
 {
 	WT_CONNECTION *conn;
 	int ret;
@@ -110,12 +110,12 @@ open_dbs(const char *home, const char *home_rd, const char *home_rd2)
 	 * We expect opening the writeable home to return an error.
 	 * It is a failure if the child successfully opens that.
 	 */
-	if ((ret = wiredtiger_open(home, NULL, ENV_CONFIG_RD, &conn)) == 0)
+	if ((ret = wiredtiger_open(dir, NULL, ENV_CONFIG_RD, &conn)) == 0)
 		testutil_die(ret, "wiredtiger_open readonly allowed");
 
-	if ((ret = run_child(home_rd)) != 0)
+	if ((ret = run_child(dir_rd)) != 0)
 		testutil_die(ret, "run child 1");
-	if ((ret = run_child(home_rd2)) != 0)
+	if ((ret = run_child(dir_rd2)) != 0)
 		testutil_die(ret, "run child 2");
 	exit(EXIT_SUCCESS);
 }
