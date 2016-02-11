@@ -1,6 +1,6 @@
 /**
  * This test performs an upgrade from SCCC config servers to CSRS config servers while running
- * map reduce jobs and verifies that the map-reduces continue to work properly.
+ * aggregation jobs and verifies that the aggregations continue to work properly.
  *
  * This test restarts nodes and expects the data to still be present.
  * @tags: [requires_persistence]
@@ -37,51 +37,40 @@ load("jstests/libs/csrs_upgrade_util.js");
     coordinator.startNewCSRSNodes();
     coordinator.waitUntilConfigsCaughtUp();
 
-    jsTest.log("Starting mapReduce ops in the background");
+    jsTest.log("Starting aggregation ops in the background");
 
     var joinParallelShell = startParallelShell(
         function() {
-            db = db.getSiblingDB('csrs_upgrade_during_mr');
-            for (var i = 0; i < 500; i++) {
-                if (i % 10 == 0) {
-                    print("Performing map reduce iteration: " + i);
+            db = db.getSiblingDB('csrs_upgrade_during_agg');
+            for (var i = 0; i < 2000; i++) {
+                if (i % 100 == 0) {
+                    print("Performing aggregation iteration: " + i);
                 }
                 // Force mongos to reload chunk distribution from the config servers.
                 assert.commandWorked(db.adminCommand('flushRouterConfig'));
 
-                var map = function() {
-                    emit(this.num, 1);
+                // One aggregate that returns a cursor
+                var cursor = db.unsharded.aggregate([{$group: {_id: "$num"}}, {$sort: {_id: 1}}]);
+                for (var j = 0; j < 4; j++) {
+                    assert.eq(j, cursor.next()._id);
                 }
+                assert(!cursor.hasNext());
 
-                var reduce = function(key, values) {
-                    return Array.sum(values);
-                }
-
-                var res = db.runCommand({mapReduce: 'sharded',
-                                         map: map,
-                                         reduce: reduce,
-                                         out: {replace: 'out1'}});
-                assert.commandWorked(res);
-
-                res = db.runCommand({mapReduce: 'unsharded',
-                                     map: map,
-                                     reduce: reduce,
-                                     out: {replace: 'out2'}});
-                assert.commandWorked(res);
+                // One aggregate that outputs to a collection
+                db.sharded.aggregate([{$group: {_id: "$num"}}, {$sort: {_id: 1}}, {$out: "out"}]);
             }
 
             // Signal to main test thread that parallel shell is finished running.
             assert.writeOK(db.signal.insert({finished: true}));
 
-            jsTestLog("Finished performing mapReduce ops in parallel shell");
+            jsTestLog("Finished performing aggregation ops in parallel shell");
         }, coordinator.getMongos(0).port);
 
-    var outputColl1 = coordinator.getMongos(0).getDB(coordinator.getTestDBName()).out1;
-    var outputColl2 = coordinator.getMongos(0).getDB(coordinator.getTestDBName()).out2;
+    var outputColl = coordinator.getMongos(0).getDB(coordinator.getTestDBName()).out;
 
-    // Wait for parallel shell to start doing mapReduce ops.
+    // Wait for parallel shell to start doing aggregate ops.
     assert.soon(function() {
-                    return outputColl1.findOne();
+                    return outputColl.findOne();
                 });
 
     coordinator.shutdownOneSCCCNode();
@@ -94,9 +83,9 @@ load("jstests/libs/csrs_upgrade_util.js");
 
     joinParallelShell();
 
-    printjson(outputColl1.find().toArray());
-    assert.eq(4, outputColl1.count());
-    assert.eq(4, outputColl2.count());
-    outputColl1.find().forEach(function(x) {assert.eq(500, x.value)});
-    outputColl2.find().forEach(function(x) {assert.eq(500, x.value)});
+    var cursor = outputColl.find();
+    for (var i = 0; i < 4; i++) {
+        assert.eq(i, cursor.next()._id);
+    }
+    assert(!cursor.hasNext());
 }());

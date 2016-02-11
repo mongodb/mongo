@@ -1,6 +1,6 @@
 /**
  * This test performs an upgrade from SCCC config servers to CSRS config servers while running
- * map reduce jobs and verifies that the map-reduces continue to work properly.
+ * distinct commands and verifies that the distinct commands continue to work properly.
  *
  * This test restarts nodes and expects the data to still be present.
  * @tags: [requires_persistence]
@@ -37,51 +37,44 @@ load("jstests/libs/csrs_upgrade_util.js");
     coordinator.startNewCSRSNodes();
     coordinator.waitUntilConfigsCaughtUp();
 
-    jsTest.log("Starting mapReduce ops in the background");
+    jsTest.log("Starting distinct ops in the background");
 
     var joinParallelShell = startParallelShell(
         function() {
-            db = db.getSiblingDB('csrs_upgrade_during_mr');
-            for (var i = 0; i < 500; i++) {
-                if (i % 10 == 0) {
-                    print("Performing map reduce iteration: " + i);
+            db = db.getSiblingDB('csrs_upgrade_during_distinct');
+            for (var i = 0; i < 4000; i++) {
+                if (i % 100 == 0) {
+                    print("Performing distinct iteration: " + i);
                 }
                 // Force mongos to reload chunk distribution from the config servers.
                 assert.commandWorked(db.adminCommand('flushRouterConfig'));
 
-                var map = function() {
-                    emit(this.num, 1);
+                var values1 = db.sharded.distinct('num');
+                var values2 = db.unsharded.distinct('num');
+                assert.eq(4, values1.length);
+                assert.eq(4, values2.length);
+                for (var j = 0; j < 4; j++) {
+                    assert(values1.indexOf(j) >= 0);
+                    assert(values2.indexOf(j) >= 0);
                 }
 
-                var reduce = function(key, values) {
-                    return Array.sum(values);
+                if (i == 0) {
+                    // Insert a document to a special collection to signal to main test thread that
+                    // the parallel shell has started running counts.
+                    assert.writeOK(db.signal.insert({started: true}));
                 }
-
-                var res = db.runCommand({mapReduce: 'sharded',
-                                         map: map,
-                                         reduce: reduce,
-                                         out: {replace: 'out1'}});
-                assert.commandWorked(res);
-
-                res = db.runCommand({mapReduce: 'unsharded',
-                                     map: map,
-                                     reduce: reduce,
-                                     out: {replace: 'out2'}});
-                assert.commandWorked(res);
             }
 
             // Signal to main test thread that parallel shell is finished running.
-            assert.writeOK(db.signal.insert({finished: true}));
+            assert.writeOK(db.signal.update({}, {finished: true}));
 
-            jsTestLog("Finished performing mapReduce ops in parallel shell");
+            jsTestLog("Finished performing distinct ops in parallel shell");
         }, coordinator.getMongos(0).port);
 
-    var outputColl1 = coordinator.getMongos(0).getDB(coordinator.getTestDBName()).out1;
-    var outputColl2 = coordinator.getMongos(0).getDB(coordinator.getTestDBName()).out2;
-
-    // Wait for parallel shell to start doing mapReduce ops.
+    // Wait for parallel shell to start doing distinct ops.
+    var signalColl = coordinator.getMongos(0).getDB(coordinator.getTestDBName()).signal;
     assert.soon(function() {
-                    return outputColl1.findOne();
+                    return signalColl.findOne();
                 });
 
     coordinator.shutdownOneSCCCNode();
@@ -89,14 +82,7 @@ load("jstests/libs/csrs_upgrade_util.js");
     coordinator.switchToCSRSMode();
 
     // Make sure that parallel shell didn't finish running before upgrade was complete.
-    var signalColl = coordinator.getMongos(0).getDB(coordinator.getTestDBName()).signal;
     assert.eq(null, signalColl.findOne({finished: true}));
 
     joinParallelShell();
-
-    printjson(outputColl1.find().toArray());
-    assert.eq(4, outputColl1.count());
-    assert.eq(4, outputColl2.count());
-    outputColl1.find().forEach(function(x) {assert.eq(500, x.value)});
-    outputColl2.find().forEach(function(x) {assert.eq(500, x.value)});
 }());
