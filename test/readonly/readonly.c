@@ -132,7 +132,6 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	uint64_t i;
 	int ch, status, ret;
-	pid_t pid;
 	bool child;
 	const char *working_dir;
 	char cmd[512];
