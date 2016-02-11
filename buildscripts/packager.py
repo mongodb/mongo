@@ -463,9 +463,13 @@ def make_deb(distro, build_os, arch, spec, srcdir):
             os.link(sdir+"debian/mongod.service", sdir+"debian/%s%s-server.mongod.service" % (distro.pkgbase(), suffix))
             os.unlink(sdir+"debian/init.d")
     elif re.search("ubuntu", distro.name()):
-        os.link(sdir+"debian/mongod.upstart", sdir+"debian/%s%s-server.mongod.upstart" % (distro.pkgbase(), suffix))
         os.unlink(sdir+"debian/init.d")
-        os.unlink(sdir+"debian/mongod.service")
+        if build_os in ("ubuntu1204", "ubuntu1404", "ubuntu1410"):
+            os.link(sdir+"debian/mongod.upstart", sdir+"debian/%s%s-server.mongod.upstart" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/mongod.service")
+        else:
+            os.link(sdir+"debian/mongod.service", sdir+"debian/%s%s-server.mongod.service" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/mongod.upstart")
     else:
         raise Exception("unknown debianoid flavor: not debian or ubuntu?")
     # Rewrite the control and rules files
