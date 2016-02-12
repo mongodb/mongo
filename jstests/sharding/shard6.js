@@ -24,7 +24,7 @@ function poolStats( where ){
     printjson( x );
     print( "****\n" + msg + "\n*****" );
     summary += msg + "\n";
-    return total;
+    return [total, x.length];
 }
 
 poolStats( "at start" );
@@ -54,7 +54,16 @@ for ( var i=1; i<10; i++ ){
     poolStats( "after loop : " + i );
 }
 
-assert.eq( connBefore , poolStats( "limit test done"  ) , "limit test conns" );
+// we do not want the number of connections from mongos to mongod to increase
+// but it may have because of the background replica set monitor, and that case is ok.
+// This is due to SERVER-22564.
+limitTestAfterConns = poolStats( "limit test done"  );
+
+// only check the number of connections is the same if the number of hosts we are connected to
+// remains the same. TODO: remove host count check after SERVER-22564 is fixed.
+if( limitTestAfterConns[1] == connBefore[1]) {
+    assert.eq( connBefore[0] , limitTestAfterConns[0], "limit test conns" );
+}
 
 function assertOrder( start , num ){
     var a = db.data.find().skip(start).limit(num).sort( { num : 1 } ).map( function(z){ return z.num; } );
@@ -78,7 +87,6 @@ function doItCount( skip , sort , batchSize ){
     if ( batchSize )
         c.batchSize( batchSize );
     return c.itcount();
-    
 }
 
 function checkItCount( batchSize ){
