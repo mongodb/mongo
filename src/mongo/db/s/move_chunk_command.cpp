@@ -47,6 +47,7 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -178,10 +179,10 @@ public:
         // Initialize our current shard name in the shard state if needed
         shardingState->setShardName(chunkMoveState.getFromShard());
 
-        const auto moveWriteConcernOptions =
-            uassertStatusOK(ChunkMoveWriteConcernOptions::initFromCommand(cmdObj));
-        const auto& secThrottleObj = moveWriteConcernOptions.getSecThrottle();
-        const auto& writeConcern = moveWriteConcernOptions.getWriteConcern();
+        const auto secondaryThrottle =
+            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
+        const auto writeConcernForRangeDeleter = uassertStatusOK(
+            ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(secondaryThrottle));
 
         // Do inline deletion
         bool waitForDelete = cmdObj["waitForDelete"].trueValue();
@@ -267,8 +268,6 @@ public:
                 return false;
             }
 
-            const bool isSecondaryThrottle(writeConcern.shouldWaitForOtherNodes());
-
             BSONObjBuilder recvChunkStartBuilder;
             recvChunkStartBuilder.append("_recvChunkStart", ns);
             migrationSessionId.append(&recvChunkStartBuilder);
@@ -280,12 +279,7 @@ public:
             recvChunkStartBuilder.append("shardKeyPattern", shardKeyPattern);
             recvChunkStartBuilder.append("configServer",
                                          shardingState->getConfigServer(txn).toString());
-            recvChunkStartBuilder.append("secondaryThrottle", isSecondaryThrottle);
-
-            // Follow the same convention in moveChunk.
-            if (isSecondaryThrottle && !secThrottleObj.isEmpty()) {
-                recvChunkStartBuilder.append("writeConcern", secThrottleObj);
-            }
+            secondaryThrottle.append(&recvChunkStartBuilder);
 
             BSONObj res;
 
@@ -481,7 +475,7 @@ public:
                                                     chunkMoveState.getMinKey().getOwned(),
                                                     chunkMoveState.getMaxKey().getOwned(),
                                                     shardKeyPattern));
-        deleterOptions.writeConcern = writeConcern;
+        deleterOptions.writeConcern = writeConcernForRangeDeleter;
         deleterOptions.waitForOpenCursors = true;
         deleterOptions.fromMigrate = true;
         deleterOptions.onlyRemoveOrphanedDocs = true;

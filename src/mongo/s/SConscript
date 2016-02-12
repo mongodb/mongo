@@ -38,11 +38,13 @@ env.Library(
     source=[
         'chunk_diff.cpp',
         'chunk_version.cpp',
+        'migration_secondary_throttle_options.cpp',
         'set_shard_version_request.cpp',
     ],
     LIBDEPS=[
         'catalog/catalog_types',
         '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/lite_parsed_query',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/rpc/metadata',
@@ -92,23 +94,14 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'common',
-        '$BUILD_DIR/mongo/db/service_context',
     ]
 )
 
 env.CppUnitTest(
-    target='chunk_version_test',
+    target='sharding_request_types_test',
     source=[
         'chunk_version_test.cpp',
-    ],
-    LIBDEPS=[
-        'common',
-    ]
-)
-
-env.CppUnitTest(
-    target='set_shard_version_request_test',
-    source=[
+        'migration_secondary_throttle_options_test.cpp',
         'set_shard_version_request_test.cpp',
     ],
     LIBDEPS=[

@@ -46,11 +46,10 @@ namespace {
  */
 enum WriteConcern { W_NONE = 0, W_NORMAL = 1 };
 
-const BSONField<bool> mongosSecondaryThrottleField("_secondaryThrottle", true);
-const BSONField<bool> secondaryThrottleField("secondaryThrottle", true);
-const BSONField<BSONObj> writeConcernField("writeConcern");
-
 }  // namespace
+
+const int WriteConcernOptions::kNoTimeout(0);
+const int WriteConcernOptions::kNoWaiting(-1);
 
 const char WriteConcernOptions::kMajority[] = "majority";
 
@@ -59,12 +58,14 @@ const BSONObj WriteConcernOptions::Acknowledged(BSON("w" << W_NORMAL));
 const BSONObj WriteConcernOptions::Unacknowledged(BSON("w" << W_NONE));
 const BSONObj WriteConcernOptions::Majority(BSON("w" << WriteConcernOptions::kMajority));
 
-
 WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, int timeout)
-    : syncMode(sync), wNumNodes(numNodes), wTimeout(timeout) {}
+    : WriteConcernOptions(numNodes, sync, Milliseconds(timeout)) {}
 
 WriteConcernOptions::WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout)
-    : syncMode(sync), wNumNodes(0), wMode(mode), wTimeout(timeout) {}
+    : WriteConcernOptions(mode, sync, Milliseconds(timeout)) {}
+
+WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout)
+    : syncMode(sync), wNumNodes(numNodes), wTimeout(durationCount<Milliseconds>(timeout)) {}
 
 WriteConcernOptions::WriteConcernOptions(const std::string& mode,
                                          SyncMode sync,
@@ -116,53 +117,6 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
     wTimeout = obj["wtimeout"].numberInt();
 
     return Status::OK();
-}
-
-Status WriteConcernOptions::parseSecondaryThrottle(const BSONObj& doc,
-                                                   BSONObj* rawWriteConcernObj) {
-    string errMsg;
-    bool isSecondaryThrottle;
-    FieldParser::FieldState fieldState =
-        FieldParser::extract(doc, secondaryThrottleField, &isSecondaryThrottle, &errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID) {
-        return Status(ErrorCodes::FailedToParse, errMsg);
-    }
-
-    if (fieldState != FieldParser::FIELD_SET) {
-        fieldState =
-            FieldParser::extract(doc, mongosSecondaryThrottleField, &isSecondaryThrottle, &errMsg);
-
-        if (fieldState == FieldParser::FIELD_INVALID) {
-            return Status(ErrorCodes::FailedToParse, errMsg);
-        }
-    }
-
-    BSONObj dummyBSON;
-    if (!rawWriteConcernObj) {
-        rawWriteConcernObj = &dummyBSON;
-    }
-
-    fieldState = FieldParser::extract(doc, writeConcernField, rawWriteConcernObj, &errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID) {
-        return Status(ErrorCodes::FailedToParse, errMsg);
-    }
-
-    if (!isSecondaryThrottle) {
-        if (!rawWriteConcernObj->isEmpty()) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          "Cannot have write concern when secondary throttle is false");
-        }
-
-        wNumNodes = 1;
-        return Status::OK();
-    }
-
-    if (rawWriteConcernObj->isEmpty()) {
-        return Status(ErrorCodes::WriteConcernNotDefined,
-                      "Secondary throttle is on, but write concern is not specified");
-    }
-
-    return parse(*rawWriteConcernObj);
 }
 
 BSONObj WriteConcernOptions::toBSON() const {

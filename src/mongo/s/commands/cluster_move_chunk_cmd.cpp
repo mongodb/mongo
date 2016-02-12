@@ -44,6 +44,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -224,18 +225,13 @@ public:
             return false;
         }
 
-        unique_ptr<WriteConcernOptions> writeConcern(new WriteConcernOptions());
+        const auto secondaryThrottle =
+            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
 
-        Status status = writeConcern->parseSecondaryThrottle(cmdObj, NULL);
-        if (!status.isOK()) {
-            if (status.code() != ErrorCodes::WriteConcernNotDefined) {
-                errmsg = status.toString();
-                return false;
-            }
-
-            // Let the shard decide what write concern to use.
-            writeConcern.reset();
-        }
+        const unique_ptr<WriteConcernOptions> writeConcern(
+            secondaryThrottle.isWriteConcernSpecified()
+                ? new WriteConcernOptions(secondaryThrottle.getWriteConcern())
+                : nullptr);
 
         BSONObj res;
         if (!chunk->moveAndCommit(txn,

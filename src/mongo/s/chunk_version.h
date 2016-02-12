@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
-#include "mongo/s/optime_pair.h"
 
 namespace mongo {
 

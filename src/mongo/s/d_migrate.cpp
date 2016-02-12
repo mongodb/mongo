@@ -50,6 +50,7 @@
 #include "mongo/db/s/migration_impl.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -274,9 +275,10 @@ public:
         }
 
         // Process secondary throttle settings and assign defaults if necessary.
-        const auto moveWriteConcernOptions =
-            uassertStatusOK(ChunkMoveWriteConcernOptions::initFromCommand(cmdObj));
-        const auto& writeConcern = moveWriteConcernOptions.getWriteConcern();
+        const auto secondaryThrottle =
+            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
+        const auto writeConcern = uassertStatusOK(
+            ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(secondaryThrottle));
 
         BSONObj shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
 

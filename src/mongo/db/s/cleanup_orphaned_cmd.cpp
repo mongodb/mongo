@@ -47,6 +47,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/chunk_move_write_concern_options.h"
+#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -55,11 +57,6 @@ using std::string;
 using str::stream;
 
 namespace {
-
-const int kDefaultWTimeoutMs = 60 * 1000;
-const WriteConcernOptions DefaultWriteConcern(WriteConcernOptions::kMajority,
-                                              WriteConcernOptions::SyncMode::UNSET,
-                                              kDefaultWTimeoutMs);
 
 enum CleanupResult { CleanupResult_Done, CleanupResult_Continue, CleanupResult_Error };
 
@@ -228,37 +225,10 @@ public:
             return false;
         }
 
-        WriteConcernOptions writeConcern;
-        Status status = writeConcern.parseSecondaryThrottle(cmdObj, NULL);
-
-        if (!status.isOK()) {
-            if (status.code() != ErrorCodes::WriteConcernNotDefined) {
-                return appendCommandStatus(result, status);
-            }
-
-            writeConcern = DefaultWriteConcern;
-        } else {
-            repl::ReplicationCoordinator* replCoordinator = repl::getGlobalReplicationCoordinator();
-            Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
-
-            if (replCoordinator->getReplicationMode() ==
-                    repl::ReplicationCoordinator::modeMasterSlave &&
-                writeConcern.shouldWaitForOtherNodes()) {
-                warning() << "cleanupOrphaned cannot check if write concern setting "
-                          << writeConcern.toBSON()
-                          << " can be enforced in a master slave configuration";
-            }
-
-            if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
-                return appendCommandStatus(result, status);
-            }
-        }
-
-        if (writeConcern.shouldWaitForOtherNodes() &&
-            writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
-            // Don't allow no timeout.
-            writeConcern.wTimeout = kDefaultWTimeoutMs;
-        }
+        const auto secondaryThrottle =
+            uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
+        const auto writeConcern = uassertStatusOK(
+            ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(secondaryThrottle));
 
         ShardingState* const shardingState = ShardingState::get(txn);
 
@@ -269,7 +239,7 @@ public:
         }
 
         ChunkVersion shardVersion;
-        status = shardingState->refreshMetadataNow(txn, ns, &shardVersion);
+        Status status = shardingState->refreshMetadataNow(txn, ns, &shardVersion);
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::RemoteChangeDetected) {
                 warning() << "Shard version in transition detected while refreshing "

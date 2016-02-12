@@ -111,7 +111,6 @@ protected:
     ~ChunkDiffUnitTest() = default;
 
     void runTest(bool isInverse) {
-        OperationContextNoop txn;
         int numShards = 10;
         int numInitialChunks = 5;
 
@@ -177,7 +176,7 @@ protected:
         convertBSONArrayToChunkTypes(chunks, &chunksVector);
 
         // Validate initial load
-        differ->calculateConfigDiff(&txn, chunksVector);
+        differ->calculateConfigDiff(nullptr, chunksVector);
         validate(isInverse, chunksVector, ranges, maxVersion, maxShardVersions);
 
         // Generate a lot of diffs, and keep validating that updating from the diffs always gives us
@@ -325,7 +324,7 @@ protected:
             std::vector<ChunkType> chunksVector;
             convertBSONArrayToChunkTypes(chunks, &chunksVector);
 
-            differ->calculateConfigDiff(&txn, chunksVector);
+            differ->calculateConfigDiff(nullptr, chunksVector);
 
             validate(isInverse, chunksVector, ranges, maxVersion, maxShardVersions);
         }

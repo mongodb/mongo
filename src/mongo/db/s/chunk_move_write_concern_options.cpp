@@ -33,74 +33,72 @@
 #include "mongo/db/s/chunk_move_write_concern_options.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-const int kDefaultWriteTimeoutForMigrationMs = 60 * 1000;
-const WriteConcernOptions DefaultWriteConcernForMigration(2,
-                                                          WriteConcernOptions::SyncMode::NONE,
-                                                          kDefaultWriteTimeoutForMigrationMs);
+const Seconds kDefaultWriteTimeoutForMigration(60);
+const WriteConcernOptions kDefaultWriteConcernForMigration(2,
+                                                           WriteConcernOptions::SyncMode::NONE,
+                                                           kDefaultWriteTimeoutForMigration);
+const WriteConcernOptions kWriteConcernLocal(1,
+                                             WriteConcernOptions::SyncMode::NONE,
+                                             WriteConcernOptions::kNoTimeout);
 
 WriteConcernOptions getDefaultWriteConcernForMigration() {
     repl::ReplicationCoordinator* replCoordinator = repl::getGlobalReplicationCoordinator();
     if (replCoordinator->getReplicationMode() == mongo::repl::ReplicationCoordinator::modeReplSet) {
         Status status =
-            replCoordinator->checkIfWriteConcernCanBeSatisfied(DefaultWriteConcernForMigration);
+            replCoordinator->checkIfWriteConcernCanBeSatisfied(kDefaultWriteConcernForMigration);
         if (status.isOK()) {
-            return DefaultWriteConcernForMigration;
+            return kDefaultWriteConcernForMigration;
         }
     }
 
-    return WriteConcernOptions(1, WriteConcernOptions::SyncMode::NONE, 0);
+    return kWriteConcernLocal;
 }
 
 }  // namespace
 
-ChunkMoveWriteConcernOptions::ChunkMoveWriteConcernOptions(BSONObj secThrottleObj,
-                                                           WriteConcernOptions writeConcernOptions)
-    : _secThrottleObj(std::move(secThrottleObj)),
-      _writeConcernOptions(std::move(writeConcernOptions)) {}
+StatusWith<WriteConcernOptions> ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
+    const MigrationSecondaryThrottleOptions& options) {
+    if (options.getSecondaryThrottle() == MigrationSecondaryThrottleOptions::kOff) {
+        return kWriteConcernLocal;
+    }
 
-StatusWith<ChunkMoveWriteConcernOptions> ChunkMoveWriteConcernOptions::initFromCommand(
-    const BSONObj& obj) {
-    BSONObj secThrottleObj;
-    WriteConcernOptions writeConcernOptions;
+    WriteConcernOptions writeConcern;
 
-    Status status = writeConcernOptions.parseSecondaryThrottle(obj, &secThrottleObj);
-    if (!status.isOK()) {
-        if (status.code() != ErrorCodes::WriteConcernNotDefined) {
-            return status;
-        }
+    if (options.isWriteConcernSpecified()) {
+        writeConcern = options.getWriteConcern();
 
-        writeConcernOptions = getDefaultWriteConcernForMigration();
-    } else {
         repl::ReplicationCoordinator* replCoordinator = repl::getGlobalReplicationCoordinator();
 
         if (replCoordinator->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeMasterSlave &&
-            writeConcernOptions.shouldWaitForOtherNodes()) {
+            writeConcern.shouldWaitForOtherNodes()) {
             warning() << "moveChunk cannot check if secondary throttle setting "
-                      << writeConcernOptions.toBSON()
+                      << writeConcern.toBSON()
                       << " can be enforced in a master slave configuration";
         }
 
-        Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcernOptions);
+        Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
         if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
             return status;
         }
+    } else {
+        writeConcern = getDefaultWriteConcernForMigration();
     }
 
-    if (writeConcernOptions.shouldWaitForOtherNodes() &&
-        writeConcernOptions.wTimeout == WriteConcernOptions::kNoTimeout) {
+    if (writeConcern.shouldWaitForOtherNodes() &&
+        writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
         // Don't allow no timeout
-        writeConcernOptions.wTimeout = kDefaultWriteTimeoutForMigrationMs;
+        writeConcern.wTimeout = durationCount<Milliseconds>(kDefaultWriteTimeoutForMigration);
     }
 
-    return ChunkMoveWriteConcernOptions(secThrottleObj, writeConcernOptions);
+    return writeConcern;
 }
 
 }  // namespace mongo
