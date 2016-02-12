@@ -233,7 +233,7 @@ The \c loadtext command reads the standard input for text and loads it
 into a table or file.  The input data should be printable characters,
 with newline delimiters for each key or value.
 
-The \c loadtext command does not create the file if it does not yet
+The \c loadtext command does not create the object if it does not yet
 exist.
 
 In the case of inserting values into a column-store table or file, each
@@ -244,7 +244,7 @@ row-store table or file already exists, data in the table or file will
 be overwritten by the new data.
 
 @subsection util_loadtext_synopsis Synopsis
-<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] loadtext [-f input]</code>
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] loadtext [-f input] uri</code>
 
 @subsection util_loadtext_options Options
 The following are command-specific options for the \c loadtext command:
