@@ -45,7 +45,6 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -69,17 +68,6 @@ int runDbTests(int argc, char** argv) {
 
     checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
     getGlobalServiceContext()->initializeGlobalStorageEngine();
-
-    {
-        auto txn = cc().makeOperationContext();
-
-        // Initialize the sharding state so we can run sharding tests in isolation
-        auto connectHook = stdx::make_unique<CustomConnectHook>(txn.get());
-        ConnectionString::setConnectionHook(connectHook.get());
-        ON_BLOCK_EXIT([] { ConnectionString::setConnectionHook(nullptr); });
-        LegacyDistLockManager::disablePinger();
-        ShardingState::get(txn.get())->initialize(txn.get(), "$dummy:10000");
-    }
 
     int ret = unittest::Suite::run(frameworkGlobalParams.suites,
                                    frameworkGlobalParams.filter,

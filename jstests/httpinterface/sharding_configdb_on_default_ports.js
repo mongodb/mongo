@@ -29,16 +29,5 @@
     c2 = MongoRunner.runMongod({configsvr: "", storageEngine: "wiredTiger"});
     c3 = MongoRunner.runMongod({configsvr: "", storageEngine: "wiredTiger"});
 
-    var configstrs = [
-        getHostPart(c1.host) + "," + c2.host + "," + c3.host,
-        getHostPart(c1.host),
-        "csrs/" + getHostPart(c1.host)
-    ];
-    var failureMessages = [];
-    configstrs.forEach(function (configdb) {
-        if (!MongoRunner.runMongos({configdb: configdb})) {
-            failureMessages.push("Failed to start mongos with configdb=\"" + configdb + "\"");
-        }
-    });
-    assert.eq(0, failureMessages.length, tojson(failureMessages));
+    assert(MongoRunner.runMongos({configdb: "csrs/" + getHostPart(c1.host) }));
 }());

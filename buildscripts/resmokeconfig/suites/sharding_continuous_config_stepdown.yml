@@ -104,9 +104,6 @@ selector:
     - jstests/sharding/replset_config/empty_cluster_init.js
     # Test runs really slow with the primary continuously stepping down
     - jstests/sharding/zbigMapReduce.js
-    # Continuous config server step down only available with CSRS
-    - jstests/sharding/csrs_upgrade_during_migrate.js
-    - jstests/sharding/csrs_upgrade.js
     # Temporarily blacklisted until more robust
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
     - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js

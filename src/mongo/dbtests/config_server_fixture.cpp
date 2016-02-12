@@ -38,7 +38,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/stdx/memory.h"

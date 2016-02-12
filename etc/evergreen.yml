@@ -1635,35 +1635,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: sharding_legacy
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding_legacy
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: sharding_legacy_op_query_WT
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding_legacy --shellReadMode=legacy --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: sharding_legacy_multiversion
-  commands:
-  - func: "do setup"
-  - func: "do multiversion setup"
-  - func: "run tests"
-    vars:
-      path_prefix: PATH=$PATH:/data/multiversion
-      resmoke_args: --suites=sharding_legacy_multiversion
-      run_multiple_jobs: true
-
-- <<: *task_template
   name: snmp
   commands:
   - func: "do setup"
@@ -2289,8 +2260,6 @@ buildvariants:
   - name: replication_WT
   - name: replication_auth
   - name: sharding
-  - name: sharding_legacy
-  - name: sharding_legacy_multiversion
   - name: sharding_WT
   - name: sharding_auth
   - name: slow1
@@ -2436,7 +2405,6 @@ buildvariants:
   - name: replication_WT
   - name: replication_auth
   - name: sharding
-  - name: sharding_legacy
   - name: sharding_WT
   - name: sharding_auth
   - name: slow1
@@ -2666,7 +2634,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2775,7 +2742,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2961,7 +2927,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4031,10 +3996,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_legacy
-  - name: sharding_legacy_op_query_WT
   - name: sharding_op_query_WT
-  - name: sharding_legacy_multiversion
   - name: sharding_csrs_continuous_config_stepdown_WT
   - name: slow1
   - name: slow1_WT
@@ -4195,7 +4157,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4303,7 +4264,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4413,7 +4373,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4646,8 +4605,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_legacy
-  - name: sharding_legacy_op_query_WT
   - name: sharding_op_query_WT
   - name: slow1
   - name: slow1_WT
@@ -4812,7 +4769,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4972,7 +4928,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -5267,7 +5222,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -5381,7 +5335,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -5481,8 +5434,6 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_legacy
-  - name: sharding_legacy_op_query_WT
   - name: sharding_op_query_WT
   - name: slow1
   - name: slow2
@@ -5556,8 +5507,6 @@ buildvariants:
   - name: replication_auth
   - name: sharding
   - name: sharding_auth
-  - name: sharding_legacy
-  - name: sharding_legacy_op_query_WT
   - name: sharding_op_query_WT
   - name: slow1
   - name: slow2
@@ -5742,9 +5691,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_legacy
-  - name: sharding_legacy_op_query_WT
-  - name: sharding_legacy_multiversion
   - name: sharding_op_query_WT
   - name: slow1
   - name: slow1_WT
@@ -5870,7 +5816,6 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_legacy_multiversion
   - name: slow1
   - name: slow1_WT
   - name: slow2
