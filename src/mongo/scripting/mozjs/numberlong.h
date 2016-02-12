@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <jsapi.h>
+
 #include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {
@@ -49,20 +51,27 @@ namespace mozjs {
  */
 struct NumberLongInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
+    static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(toNumber);
         MONGO_DECLARE_JS_FUNCTION(toString);
         MONGO_DECLARE_JS_FUNCTION(valueOf);
         MONGO_DECLARE_JS_FUNCTION(compare);
+        MONGO_DECLARE_JS_FUNCTION(floatApprox);
+        MONGO_DECLARE_JS_FUNCTION(top);
+        MONGO_DECLARE_JS_FUNCTION(bottom);
     };
 
     static const JSFunctionSpec methods[5];
 
     static const char* const className;
+    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
 
-    static long long ToNumberLong(JSContext* cx, JS::HandleObject object);
-    static long long ToNumberLong(JSContext* cx, JS::HandleValue value);
+    static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
+
+    static int64_t ToNumberLong(JSContext* cx, JS::HandleObject object);
+    static int64_t ToNumberLong(JSContext* cx, JS::HandleValue value);
 };
 
 }  // namespace mozjs

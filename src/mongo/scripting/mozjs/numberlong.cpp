@@ -48,36 +48,29 @@ const JSFunctionSpec NumberLongInfo::methods[5] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberLongInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(valueOf, NumberLongInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(compare, NumberLongInfo),
-    JS_FS_END,
-};
+    JS_FS_END};
 
 const char* const NumberLongInfo::className = "NumberLong";
 
-long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
-    JS::RootedObject obj(cx, thisv.toObjectOrNull());
-    return ToNumberLong(cx, obj);
+void NumberLongInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto numLong = static_cast<int*>(JS_GetPrivate(obj));
+
+    if (numLong)
+        delete numLong;
 }
 
-long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
-    ObjectWrapper o(cx, thisv);
+int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
+    auto numLong = static_cast<int64_t*>(JS_GetPrivate(thisv.toObjectOrNull()));
+    return numLong ? *numLong : 0;
+}
 
-    if (!o.hasOwnField(InternedString::top)) {
-        if (!o.hasOwnField(InternedString::floatApprox))
-            uasserted(ErrorCodes::InternalError, "No top and no floatApprox fields");
-
-        return o.getNumberLongLong(InternedString::floatApprox);
-    }
-
-    if (!o.hasOwnField(InternedString::bottom))
-        uasserted(ErrorCodes::InternalError, "top but no bottom field");
-
-    return ((unsigned long long)((long long)o.getNumberLongLong(InternedString::top) << 32) +
-            (unsigned)(o.getNumberLongLong(InternedString::bottom)));
+int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
+    auto numLong = static_cast<int64_t*>(JS_GetPrivate(thisv));
+    return numLong ? *numLong : 0;
 }
 
 void NumberLongInfo::Functions::valueOf::call(JSContext* cx, JS::CallArgs args) {
-    long long out = NumberLongInfo::ToNumberLong(cx, args.thisv());
-
+    int64_t out = NumberLongInfo::ToNumberLong(cx, args.thisv());
     args.rval().setDouble(out);
 }
 
@@ -88,14 +81,15 @@ void NumberLongInfo::Functions::toNumber::call(JSContext* cx, JS::CallArgs args)
 void NumberLongInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     str::stream ss;
 
-    long long val = NumberLongInfo::ToNumberLong(cx, args.thisv());
+    int64_t val = NumberLongInfo::ToNumberLong(cx, args.thisv());
 
-    const long long limit = 2LL << 30;
+    const int64_t limit = 2LL << 30;
 
     if (val <= -limit || limit <= val)
         ss << "NumberLong(\"" << val << "\")";
     else
         ss << "NumberLong(" << val << ")";
+
 
     ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
 }
@@ -103,11 +97,11 @@ void NumberLongInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args)
 void NumberLongInfo::Functions::compare::call(JSContext* cx, JS::CallArgs args) {
     uassert(ErrorCodes::BadValue, "NumberLong.compare() needs 1 argument", args.length() == 1);
     uassert(ErrorCodes::BadValue,
-            "NumberLong.compare() argument must be an object",
-            args.get(0).isObject());
+            "NumberLong.compare() argument must be a NumberLong",
+            getScope(cx)->getProto<NumberLongInfo>().instanceOf(args.get(0)));
 
-    long long thisVal = NumberLongInfo::ToNumberLong(cx, args.thisv());
-    long long otherVal = NumberLongInfo::ToNumberLong(cx, args.get(0));
+    int64_t thisVal = NumberLongInfo::ToNumberLong(cx, args.thisv());
+    int64_t otherVal = NumberLongInfo::ToNumberLong(cx, args.get(0));
 
     int comparison = 0;
     if (thisVal < otherVal) {
@@ -117,6 +111,35 @@ void NumberLongInfo::Functions::compare::call(JSContext* cx, JS::CallArgs args) 
     }
 
     args.rval().setDouble(comparison);
+}
+
+void NumberLongInfo::Functions::floatApprox::call(JSContext* cx, JS::CallArgs args) {
+    int64_t numLong = NumberLongInfo::ToNumberLong(cx, args.thisv());
+    args.rval().setDouble(numLong);
+}
+
+void NumberLongInfo::Functions::top::call(JSContext* cx, JS::CallArgs args) {
+    int64_t numLong = NumberLongInfo::ToNumberLong(cx, args.thisv());
+
+    // values above 2^53 are not accurately represented in JS
+    if (numLong == INT64_MIN || std::abs(numLong) >= 9007199254740992LL) {
+        auto val64 = static_cast<unsigned long long>(numLong);
+        args.rval().setDouble(val64 >> 32);
+    } else {
+        args.rval().setUndefined();
+    }
+}
+
+void NumberLongInfo::Functions::bottom::call(JSContext* cx, JS::CallArgs args) {
+    int64_t numLong = NumberLongInfo::ToNumberLong(cx, args.thisv());
+
+    // values above 2^53 are not accurately represented in JS
+    if (numLong == INT64_MIN || std::abs(numLong) >= 9007199254740992LL) {
+        auto val64 = static_cast<unsigned long long>(numLong);
+        args.rval().setDouble(val64 & 0x00000000FFFFFFFF);
+    } else {
+        args.rval().setUndefined();
+    }
 }
 
 void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
@@ -129,59 +152,97 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
     JS::RootedObject thisv(cx);
 
     scope->getProto<NumberLongInfo>().newObject(&thisv);
+
+    int64_t numLong;
+
     ObjectWrapper o(cx, thisv);
 
-    JS::RootedValue floatApprox(cx);
-    JS::RootedValue top(cx);
-    JS::RootedValue bottom(cx);
-
     if (args.length() == 0) {
-        o.setNumber(InternedString::floatApprox, 0);
+        numLong = 0;
     } else if (args.length() == 1) {
         auto arg = args.get(0);
-        if (arg.isNumber()) {
-            o.setValue(InternedString::floatApprox, arg);
+
+        if (arg.isInt32()) {
+            numLong = arg.toInt32();
+        } else if (arg.isDouble()) {
+            numLong = arg.toDouble();
         } else {
             std::string str = ValueWriter(cx, arg).toString();
-            long long val;
+            int64_t val;
             // For string values we call strtoll because we expect non-number string
-            // values to fail rather than return 0 (which is the behavior of ToInt64.
+            // values to fail rather than return 0 (which is the behavior of ToInt64).
             if (arg.isString())
                 val = parseLL(str.c_str());
-            // Otherwise we call the toNumber on the js value to get the long long value.
+            // Otherwise we call the toNumber on the js value to get the int64_t value.
             else
                 val = ValueWriter(cx, arg).toInt64();
 
-            // values above 2^53 are not accurately represented in JS
-            if (val == INT64_MIN || std::abs(val) >= 9007199254740992LL) {
-                auto val64 = static_cast<unsigned long long>(val);
-                o.setNumber(InternedString::floatApprox, val);
-                o.setNumber(InternedString::top, val64 >> 32);
-                o.setNumber(InternedString::bottom, val64 & 0x00000000ffffffff);
-            } else {
-                o.setNumber(InternedString::floatApprox, val);
-            }
+            numLong = val;
         }
     } else {
         if (!args.get(0).isNumber())
             uasserted(ErrorCodes::BadValue, "floatApprox must be a number");
 
-        if (!args.get(1).isNumber() ||
-            args.get(1).toNumber() !=
-                static_cast<double>(static_cast<uint32_t>(args.get(1).toNumber())))
+        double top;
+        if (args.get(1).isNumber())
+            top = static_cast<double>(static_cast<uint32_t>(args.get(1).toNumber()));
+
+        if (!args.get(1).isNumber() || args.get(1).toNumber() != top)
             uasserted(ErrorCodes::BadValue, "top must be a 32 bit unsigned number");
 
-        if (!args.get(2).isNumber() ||
-            args.get(2).toNumber() !=
-                static_cast<double>(static_cast<uint32_t>(args.get(2).toNumber())))
+        double bot;
+        if (args.get(2).isNumber())
+            bot = static_cast<double>(static_cast<uint32_t>(args.get(2).toNumber()));
+
+        if (!args.get(2).isNumber() || args.get(2).toNumber() != bot)
             uasserted(ErrorCodes::BadValue, "bottom must be a 32 bit unsigned number");
 
-        o.setValue(InternedString::floatApprox, args.get(0));
-        o.setValue(InternedString::top, args.get(1));
-        o.setValue(InternedString::bottom, args.get(2));
+        numLong = (static_cast<uint64_t>(top) << 32) + static_cast<uint64_t>(bot);
     }
 
+    JS_SetPrivate(thisv, new int64_t(numLong));
+
     args.rval().setObjectOrNull(thisv);
+}
+
+void NumberLongInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
+    JS::RootedValue undef(cx);
+    undef.setUndefined();
+
+    // floatapprox
+    if (!JS_DefinePropertyById(
+            cx,
+            proto,
+            getScope(cx)->getInternedStringId(InternedString::floatApprox),
+            undef,
+            JSPROP_READONLY | JSPROP_ENUMERATE,
+            smUtils::wrapConstrainedMethod<Functions::floatApprox, true, NumberLongInfo>,
+            nullptr)) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");
+    }
+
+    // top
+    if (!JS_DefinePropertyById(cx,
+                               proto,
+                               getScope(cx)->getInternedStringId(InternedString::top),
+                               undef,
+                               JSPROP_READONLY | JSPROP_ENUMERATE,
+                               smUtils::wrapConstrainedMethod<Functions::top, true, NumberLongInfo>,
+                               nullptr)) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");
+    }
+
+    // bottom
+    if (!JS_DefinePropertyById(
+            cx,
+            proto,
+            getScope(cx)->getInternedStringId(InternedString::bottom),
+            undef,
+            JSPROP_READONLY | JSPROP_ENUMERATE,
+            smUtils::wrapConstrainedMethod<Functions::bottom, true, NumberLongInfo>,
+            nullptr)) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");
+    }
 }
 
 }  // namespace mozjs
