@@ -7,11 +7,13 @@ Atomicity
 BLOBs
 CFLAGS
 CPPFLAGS
+CRC
 Cheng
 Christoph
 Collet's
 Coverity
 Coverity's
+crc
 DB's
 DBTs
 Datastore
@@ -64,6 +66,7 @@ NOTFOUND
 NUMA
 NoSQL
 OPTYPE
+PPC
 PRELOAD
 README
 Rebalance
@@ -78,6 +81,7 @@ Seward's
 SiH
 TXT
 URIs
+vpmsum
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
