@@ -842,7 +842,7 @@ function appendSetParameterArgs(argArray) {
     if (programName.endsWith('mongod') || programName.endsWith('mongos')
         || programName.startsWith('mongod-') || programName.startsWith('mongos-')) {
         if (jsTest.options().enableTestCommands) {
-            argArray.push.apply(argArray, ['--setParameter', "enableTestCommands=1"]);
+            argArray.push(...['--setParameter', "enableTestCommands=1"]);
         }
         if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-1") {
             var hasAuthMechs = false;
@@ -860,7 +860,7 @@ function appendSetParameterArgs(argArray) {
             }
         }
         if (jsTest.options().auth) {
-            argArray.push.apply(argArray, ['--setParameter', "enableLocalhostAuthBypass=false"]);
+            argArray.push(...['--setParameter', "enableLocalhostAuthBypass=false"]);
         }
 
         // mongos only options. Note: excludes mongos with version suffix (ie. mongos-3.0).
@@ -870,7 +870,7 @@ function appendSetParameterArgs(argArray) {
                 var params = jsTest.options().setParametersMongos.split(",");
                 if (params && params.length > 0) {
                     params.forEach(function(p) {
-                        if (p) argArray.push.apply(argArray, ['--setParameter', p]);
+                        if (p) argArray.push(...['--setParameter', p]);
                     });
                 }
             }
@@ -880,24 +880,24 @@ function appendSetParameterArgs(argArray) {
             // set storageEngine for mongod
             if (jsTest.options().storageEngine) {
                 if ( argArray.indexOf( "--storageEngine" ) < 0 ) {
-                    argArray.push.apply(argArray, ['--storageEngine', jsTest.options().storageEngine]);
+                    argArray.push(...['--storageEngine', jsTest.options().storageEngine]);
                 }
             }
             if (jsTest.options().wiredTigerEngineConfigString) {
-                argArray.push.apply(argArray, ['--wiredTigerEngineConfigString', jsTest.options().wiredTigerEngineConfigString]);
+                argArray.push(...['--wiredTigerEngineConfigString', jsTest.options().wiredTigerEngineConfigString]);
             }
             if (jsTest.options().wiredTigerCollectionConfigString) {
-                argArray.push.apply(argArray, ['--wiredTigerCollectionConfigString', jsTest.options().wiredTigerCollectionConfigString]);
+                argArray.push(...['--wiredTigerCollectionConfigString', jsTest.options().wiredTigerCollectionConfigString]);
             }
             if (jsTest.options().wiredTigerIndexConfigString) {
-                argArray.push.apply(argArray, ['--wiredTigerIndexConfigString', jsTest.options().wiredTigerIndexConfigString]);
+                argArray.push(...['--wiredTigerIndexConfigString', jsTest.options().wiredTigerIndexConfigString]);
             }
             // apply setParameters for mongod
             if (jsTest.options().setParameters) {
                 var params = jsTest.options().setParameters.split(",");
                 if (params && params.length > 0) {
                     params.forEach(function(p) {
-                        if (p) argArray.push.apply(argArray, ['--setParameter', p]);
+                        if (p) argArray.push(...['--setParameter', p]);
                     });
                 }
             }

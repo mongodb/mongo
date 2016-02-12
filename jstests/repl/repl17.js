@@ -16,8 +16,9 @@ slave = rt.start( false );
 sd = slave.getDB( 'd' );
 
 function checkSlaveCount( collection, expectedCount ) {
-    count = sd[ collection ].count();
-    if ( debug = false ) {
+    var count = sd[ collection ].count();
+    var debug = false;
+    if ( debug ) {
         print( collection + ': ' + count );
     }
     return count == expectedCount;

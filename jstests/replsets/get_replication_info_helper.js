@@ -24,7 +24,7 @@
     // Just make sure the following fields exist since it would be hard to predict their values
     assert(replInfo.tFirst, replInfoString);
     assert(replInfo.tLast, replInfoString);
-    assert(replInfo.now), replInfoString;
+    assert(replInfo.now, replInfoString);
 
     // calling this function with and without a primary, should provide sufficient code coverage
     // to catch any JS errors

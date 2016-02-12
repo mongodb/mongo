@@ -1,12 +1,13 @@
 // Matching behavior for $elemMatch applied to a top level element.
 // SERVER-1264
 // SERVER-4180
+var debuggingEnabled = false;
 
 t = db.jstests_arrayfind8;
 t.drop();
 
 function debug( x ) {
-    if ( debuggingEnabled = false ) {
+    if ( debuggingEnabled ) {
         printjson( x );
     }
 }
