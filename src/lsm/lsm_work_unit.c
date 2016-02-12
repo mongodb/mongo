@@ -168,7 +168,7 @@ __wt_lsm_work_switch(
 	*entryp = NULL;
 
 	if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-		WT_WITH_SCHEMA_LOCK(session,
+		WT_WITH_SCHEMA_LOCK(session, ret,
 		    ret = __wt_lsm_tree_switch(session, entry->lsm_tree));
 		/* Failing to complete the switch is fine */
 		if (ret == EBUSY) {
@@ -334,13 +334,27 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/*
 	 * Turn on metadata tracking to ensure the checkpoint gets the
 	 * necessary handle locks.
+	 *
+	 * Ensure that we don't race with a running checkpoint: the checkpoint
+	 * lock protects against us racing with an application checkpoint in
+	 * this chunk.  Don't wait for it, though: checkpoints can take a long
+	 * time, and our checkpoint operation should be very quick.
 	 */
 	WT_ERR(__wt_meta_track_on(session));
-	WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_worker(
-	    session, chunk->uri, __wt_checkpoint, NULL, NULL, 0));
+	F_SET(session, WT_SESSION_LOCK_NO_WAIT);
+	WT_WITH_CHECKPOINT_LOCK(session, ret,
+	    WT_WITH_SCHEMA_LOCK(session, ret,
+		ret = __wt_schema_worker(
+		session, chunk->uri, __wt_checkpoint, NULL, NULL, 0)));
 	WT_TRET(__wt_meta_track_off(session, false, ret != 0));
-	if (ret != 0)
+	F_CLR(session, WT_SESSION_LOCK_NO_WAIT);
+	if (ret != 0) {
+		if (ret == EBUSY) {
+			ret = 0;
+			goto err;
+		}
 		WT_ERR_MSG(session, ret, "LSM checkpoint");
+	}
 
 	/* Now the file is written, get the chunk size. */
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
@@ -514,7 +528,7 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	 * results in the hot backup lock being taken when it updates the
 	 * metadata (which would be too late to prevent our drop).
 	 */
-	WT_WITH_SCHEMA_LOCK(session,
+	WT_WITH_SCHEMA_LOCK(session, ret,
 	    ret = __wt_schema_drop(session, uri, drop_cfg));
 
 	if (ret == 0)

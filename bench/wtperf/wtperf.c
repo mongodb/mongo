@@ -57,6 +57,7 @@ static const CONFIG default_cfg = {
 	0,				/* thread error */
 	0,				/* notify threads to stop */
 	0,				/* in warmup phase */
+	false,				/* Signal for idle cycle thread */
 	0,				/* total seconds running */
 	0,				/* has truncate */
 	{NULL, NULL},			/* the truncate queue */
@@ -86,7 +87,7 @@ static int	 start_threads(CONFIG *,
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*thread_run_wtperf(void *);
 static void	*worker(void *);
-static void	worker_throttle(int64_t, int64_t *, struct timespec *);
+
 static uint64_t	 wtperf_rand(CONFIG_THREAD *);
 static uint64_t	 wtperf_value_range(CONFIG *);
 
@@ -421,7 +422,7 @@ do_range_reads(CONFIG *cfg, WT_CURSOR *cursor)
 static void *
 worker(void *arg)
 {
-	struct timespec start, stop, interval;
+	struct timespec start, stop;
 	CONFIG *cfg;
 	CONFIG_THREAD *thread;
 	TRACK *trk;
@@ -429,7 +430,7 @@ worker(void *arg)
 	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
 	size_t i;
-	int64_t ops, ops_per_txn, throttle_ops;
+	int64_t ops, ops_per_txn;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret, truncated;
@@ -444,7 +445,6 @@ worker(void *arg)
 	ops_per_txn = thread->workload->ops_per_txn;
 	session = NULL;
 	trk = NULL;
-	throttle_ops = 0;
 
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
@@ -477,10 +477,8 @@ worker(void *arg)
 	}
 	/* Setup the timer for throttling. */
 	if (thread->workload->throttle != 0 &&
-	    (ret = __wt_epoch(NULL, &interval)) != 0) {
-		lprintf(cfg, ret, 0, "Get time call failed");
+	    (ret = setup_throttle(thread)) != 0)
 		goto err;
-	}
 
 	/* Setup for truncate */
 	if (thread->workload->truncate != 0)
@@ -730,13 +728,11 @@ op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 			op = thread->workload->ops;
 
 		/*
-		 * Check throttling periodically to avoid taking too
-		 * many time samples.
+		 * Decrement throttle ops and check if we should sleep
+		 * and then get more work to perform.
 		 */
-		if (thread->workload->throttle != 0 &&
-		    throttle_ops++ % THROTTLE_OPS == 0)
-			worker_throttle(thread->workload->throttle,
-			     &throttle_ops, &interval);
+		if (--thread->throttle_cfg.ops_count == 0)
+			worker_throttle(thread);
 	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
@@ -1364,6 +1360,7 @@ execute_populate(CONFIG *cfg)
 	struct timespec start, stop;
 	CONFIG_THREAD *popth;
 	WT_ASYNC_OP *asyncop;
+	pthread_t idle_table_cycle_thread;
 	size_t i;
 	uint64_t last_ops, msecs, print_ops_sec;
 	uint32_t interval, tables;
@@ -1375,6 +1372,10 @@ execute_populate(CONFIG *cfg)
 	    "Starting %" PRIu32
 	    " populate thread(s) for %" PRIu32 " items",
 	    cfg->populate_threads, cfg->icount);
+
+	/* Start cycling idle tables if configured. */
+	if ((ret = start_idle_table_cycle(cfg, &idle_table_cycle_thread)) != 0)
+		return (ret);
 
 	cfg->insert_key = 0;
 
@@ -1503,6 +1504,11 @@ execute_populate(CONFIG *cfg)
 		    (uint64_t)(WT_TIMEDIFF_SEC(stop, start)));
 		assert(tables == 0);
 	}
+
+	/* Stop cycling idle tables. */
+	if ((ret = stop_idle_table_cycle(cfg, idle_table_cycle_thread)) != 0)
+		return (ret);
+
 	return (0);
 }
 
@@ -1552,6 +1558,7 @@ execute_workload(CONFIG *cfg)
 {
 	CONFIG_THREAD *threads;
 	WORKLOAD *workp;
+	pthread_t idle_table_cycle_thread;
 	uint64_t last_ckpts, last_inserts, last_reads, last_truncates;
 	uint64_t last_updates;
 	uint32_t interval, run_ops, run_time;
@@ -1566,6 +1573,10 @@ execute_workload(CONFIG *cfg)
 	last_ckpts = last_inserts = last_reads = last_truncates = 0;
 	last_updates = 0;
 	ret = 0;
+
+	/* Start cycling idle tables. */
+	if ((ret = start_idle_table_cycle(cfg, &idle_table_cycle_thread)) != 0)
+		return (ret);
 
 	if (cfg->warmup != 0)
 		cfg->in_warmup = 1;
@@ -1661,6 +1672,10 @@ execute_workload(CONFIG *cfg)
 
 	/* Notify the worker threads they are done. */
 err:	cfg->stop = 1;
+
+	/* Stop cycling idle tables. */
+	if ((ret = stop_idle_table_cycle(cfg, idle_table_cycle_thread)) != 0)
+		return (ret);
 
 	if ((t_ret = stop_threads(
 	    cfg, (u_int)cfg->workers_cnt, cfg->workers)) != 0 && ret == 0)
@@ -2400,40 +2415,6 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	 * program, leaking memory isn't a concern, and it's simpler that way.
 	 */
 	return (0);
-}
-
-/*
- * TODO: Spread the stalls out, so we don't flood at the start of each
- * second and then pause. Doing this every 10th of a second is probably enough
- */
-static void
-worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
-{
-	struct timespec now;
-	uint64_t usecs_to_complete;
-	if (*ops < throttle)
-		return;
-
-	/* Ignore errors, we don't really care. */
-	if (__wt_epoch(NULL, &now) != 0)
-		return;
-
-	/*
-	 * If we've completed enough operations, reset the counters.
-	 * If we did enough operations in less than a second, sleep for
-	 * the rest of the second.
-	 */
-	usecs_to_complete = WT_TIMEDIFF_US(now, *interval);
-	if (usecs_to_complete < USEC_PER_SEC)
-		(void)usleep((useconds_t)(USEC_PER_SEC - usecs_to_complete));
-
-	/*
-	 * After sleeping, set the interval to the current time.
-	 */
-	if (__wt_epoch(NULL, &now) != 0)
-		return;
-	*ops = 0;
-	*interval = now;
 }
 
 static int

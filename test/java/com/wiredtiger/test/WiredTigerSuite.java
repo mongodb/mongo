@@ -35,6 +35,7 @@ import org.junit.runners.Suite;
     AsyncTest.class,
     AutoCloseTest.class,
     BackupCursorTest.class,
+    ConfigTest.class,
     CursorTest.class,
     CursorTest02.class,
     ExceptionTest.class,

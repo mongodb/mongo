@@ -243,7 +243,7 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 
 	WT_RET(__wt_exist(session, uri + strlen("file:"), &exists));
 	if (exists)
-		WT_WITH_SCHEMA_LOCK(session,
+		WT_WITH_SCHEMA_LOCK(session, ret,
 		    ret = __wt_schema_drop(session, uri, cfg));
 	return (ret);
 }
@@ -954,6 +954,7 @@ __wt_lsm_tree_drop(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
+	int tret;
 	u_int i;
 	bool locked;
 
@@ -997,7 +998,8 @@ __wt_lsm_tree_drop(
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	WT_WITH_HANDLE_LIST_LOCK(session,
-	    WT_TRET(__lsm_tree_discard(session, lsm_tree, false)));
+	    tret = __lsm_tree_discard(session, lsm_tree, false));
+	WT_TRET(tret);
 	return (ret);
 }
 
@@ -1013,6 +1015,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	const char *old;
+	int tret;
 	u_int i;
 	bool locked;
 
@@ -1071,7 +1074,8 @@ err:	if (locked)
 	 * tree will create a new one.
 	 */
 	WT_WITH_HANDLE_LIST_LOCK(session,
-	    WT_TRET(__lsm_tree_discard(session, lsm_tree, false)));
+	    tret = __lsm_tree_discard(session, lsm_tree, false));
+	WT_TRET(tret);
 	return (ret);
 }
 
@@ -1086,6 +1090,7 @@ __wt_lsm_tree_truncate(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
+	int tret;
 	bool locked;
 
 	WT_UNUSED(cfg);
@@ -1133,7 +1138,8 @@ err:	if (locked)
 		 * in a valid (not truncated) tree.
 		 */
 		WT_WITH_HANDLE_LIST_LOCK(session,
-		    WT_TRET(__lsm_tree_discard(session, lsm_tree, false)));
+		    tret = __lsm_tree_discard(session, lsm_tree, false));
+		WT_TRET(tret);
 	}
 	return (ret);
 }

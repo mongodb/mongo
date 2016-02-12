@@ -21,8 +21,12 @@ __wt_decrypt(WT_SESSION_IMPL *session,
 	uint32_t encrypt_len;
 	uint8_t *dst, *src;
 
-	encrypt_len = WT_STORE_SIZE(*((uint32_t *)
-	    ((uint8_t *)in->data + skip)));
+	encrypt_len =
+	    WT_STORE_SIZE(*((uint32_t *)((uint8_t *)in->data + skip)));
+#ifdef WORDS_BIGENDIAN
+	encrypt_len = __wt_bswap32(encrypt_len);
+#endif
+
 	if (encrypt_len > in->size)
 		WT_RET_MSG(session, WT_ERROR,
 		    "corrupted encrypted item: padded size less than "
@@ -104,6 +108,9 @@ __wt_encrypt(WT_SESSION_IMPL *session,
 	 * decryption side.
 	 */
 	*unpadded_lenp = WT_STORE_SIZE(result_len);
+#ifdef WORDS_BIGENDIAN
+	*unpadded_lenp = __wt_bswap32(*unpadded_lenp);
+#endif
 	/*
 	 * Copy in the skipped header bytes, set the final data size.
 	 */

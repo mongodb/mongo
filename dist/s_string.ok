@@ -189,6 +189,7 @@ MALLOC
 MEM
 MEMALIGN
 MERCHANTABILITY
+METADATA
 MONGODB
 MSVC
 MULTIBLOCK
@@ -396,6 +397,7 @@ bool
 boolean
 br
 breakpoint
+bswap
 bt
 btcur
 btmem
@@ -409,6 +411,7 @@ builtin
 builtins
 bytelock
 bytestring
+byteswap
 byvalue
 bzCompressEnd
 bzCompressInit
@@ -831,6 +834,7 @@ perf
 pfx
 poptable
 popthreads
+portably
 pos
 posint
 posix

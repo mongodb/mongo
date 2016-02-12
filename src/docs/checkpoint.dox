@@ -23,11 +23,16 @@ All transactional updates committed before a checkpoint are made durable
 by the checkpoint, therefore the frequency of checkpoints limits the
 volume of data that may be lost due to application or system failure.
 
-When WiredTiger data sources are first opened, they are opened in the
-state of the most recent checkpoint taken on the file, in other words,
-updates after the most recent checkpoint will not appear in the data
-source.  If no checkpoint is found when the data source is opened, the
-data source will appear empty.
+Data sources that are involved in an exclusive operation when the
+checkpoint starts, including bulk load, verify or salvage, will be skipped
+by the checkpoint.  Operations requiring exclusive access may fail with
+an \c EBUSY error if attempted during a checkpoint.
+
+When data sources are first opened, they are opened in the state of the
+most recent checkpoint taken on the file, in other words, updates after the
+most recent checkpoint will not appear in the data source.  If no
+checkpoint is found when the data source is opened, the data source will
+appear empty.
 
 @section checkpoint_server Automatic checkpoints
 
@@ -54,15 +59,16 @@ checkpoint cursor is closed.
 
 @section checkpoint_naming Checkpoint naming
 
-Additionally, checkpoints that do not include LSM trees may optionally
-be given names by the application.  Checkpoints named by the application
-persist until explicitly discarded or the application creates a new
-checkpoint with the same name (which replaces the previous checkpoint
-of that name). If the previous checkpoint cannot be replaced, either
-because a cursor is reading from the previous checkpoint, or backups are
-in progress, the checkpoint will fail.  Because named checkpoints
-persist until discarded or replaced, they can be used to periodically
-snapshot data for later use.
+Additionally, checkpoints that do not include LSM trees may optionally be
+given names by the application.  Because named checkpoints persist until
+discarded or replaced, they can be used to periodically snapshot data for
+later use.
+
+Checkpoints named by the application persist until explicitly discarded or
+the application creates a new checkpoint with the same name (which replaces
+the previous checkpoint of that name). If the previous checkpoint cannot be
+replaced, either because a cursor is reading from the previous checkpoint,
+or backups are in progress, the checkpoint will fail.
 
 Internal checkpoints (that is, checkpoints not named by the application)
 use the reserved name "WiredTigerCheckpoint".  Applications can open the

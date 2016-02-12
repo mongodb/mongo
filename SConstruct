@@ -456,9 +456,11 @@ if useBdb:
 
 t = env.Program("wtperf", [
     "bench/wtperf/config.c",
+    "bench/wtperf/idle_table_cycle.c",
     "bench/wtperf/misc.c",
     "bench/wtperf/track.c",
     "bench/wtperf/wtperf.c",
+    "bench/wtperf/wtperf_throttle.c",
     "bench/wtperf/wtperf_truncate.c",
     ],
     LIBS=[wtlib, shim]  + wtlibs)

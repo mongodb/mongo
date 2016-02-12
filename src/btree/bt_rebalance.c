@@ -141,7 +141,7 @@ __rebalance_internal(WT_SESSION_IMPL *session, WT_REBALANCE_STUFF *rs)
 	 */
 	if (rs->leaf_next > UINT32_MAX)
 		WT_RET_MSG(session, ENOTSUP,
-		    "too many leaf pages to rebalance, %" PRIu64 " pages "
+		    "too many leaf pages to rebalance, %" WT_SIZET_FMT " pages "
 		    "exceeds the maximum of %" PRIu32,
 		    rs->leaf_next, UINT32_MAX);
 	leaf_next = (uint32_t)rs->leaf_next;
@@ -315,7 +315,7 @@ __rebalance_row_walk(
 		case WT_CELL_KEY_OVFL:
 			/*
 			 * Any overflow key that references an internal page is
-			 * no longer of any use.
+			 * of no further use, schedule its blocks to be freed.
 			 *
 			 * We could potentially use the same overflow key being
 			 * freed here for the internal page we're creating, but
@@ -342,38 +342,39 @@ __rebalance_row_walk(
 			first_cell = false;
 			break;
 		case WT_CELL_ADDR_INT:
-			/* An internal page: read it and recursively walk it. */
-			WT_ERR(__wt_bt_read(
-			    session, buf, unpack.data, unpack.size));
-			WT_ERR(__rebalance_row_walk(session, buf->data, rs));
+			/* An internal page, schedule its blocks to be freed. */
 			WT_ERR(__wt_verbose(session, WT_VERB_REBALANCE,
 			    "free-list append internal page: %s",
 			    __wt_addr_string(
 			    session, unpack.data, unpack.size, rs->tmp1)));
 			WT_ERR(__rebalance_fl_append(
 			    session, unpack.data, unpack.size, rs));
+
+			/* Read and recursively walk the page. */
+			WT_ERR(__wt_bt_read(
+			    session, buf, unpack.data, unpack.size));
+			WT_ERR(__rebalance_row_walk(session, buf->data, rs));
 			break;
 		case WT_CELL_ADDR_LEAF:
 		case WT_CELL_ADDR_LEAF_NO:
 			/*
 			 * A leaf page.
-			 * If the internal page key is an overflow, instantiate
-			 * it and use it.
-			 * Else, we can't trust the 0th key on an internal page
-			 * (we generally try not to instantiate them during
-			 * reconciliation because it saves space), so we have to
-			 * get it from the underlying leaf page.
+			 * We can't trust the 0th key on an internal page (we
+			 * often don't store them in reconciliation because it
+			 * saves space), get it from the underlying leaf page.
+			 * Else, if the internal page key is an overflow key,
+			 * instantiate it and use it.
 			 * Else, we can use the internal page's key as is, it's
 			 * sufficient for the page.
 			 */
-			if (key.type == WT_CELL_KEY_OVFL) {
-				WT_ERR(__wt_dsk_cell_data_ref(
-				    session, WT_PAGE_ROW_INT, &key, leafkey));
-				p = leafkey->data;
-				len = leafkey->size;
-			} else if (first_cell) {
+			if (first_cell) {
 				WT_ERR(__rebalance_row_leaf_key(session,
 				    unpack.data, unpack.size, leafkey, rs));
+				p = leafkey->data;
+				len = leafkey->size;
+			} else if (key.type == WT_CELL_KEY_OVFL) {
+				WT_ERR(__wt_dsk_cell_data_ref(
+				    session, WT_PAGE_ROW_INT, &key, leafkey));
 				p = leafkey->data;
 				len = leafkey->size;
 			} else {

@@ -55,7 +55,7 @@ __metadata_init(WT_SESSION_IMPL *session)
 	 * We're single-threaded, but acquire the schema lock regardless: the
 	 * lower level code checks that it is appropriately synchronized.
 	 */
-	WT_WITH_SCHEMA_LOCK(session,
+	WT_WITH_SCHEMA_LOCK(session, ret,
 	    ret = __wt_schema_create(session, WT_METAFILE_URI, NULL));
 
 	return (ret);
@@ -153,10 +153,11 @@ int
 __wt_turtle_init(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	bool exist, exist_incr;
+	bool exist_backup, exist_incr, exist_turtle, load;
 	char *metaconf;
 
 	metaconf = NULL;
+	load = false;
 
 	/*
 	 * Discard any turtle setup file left-over from previous runs.  This
@@ -179,13 +180,29 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * done.
 	 */
 	WT_RET(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
-	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
-	if (exist) {
+	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist_backup));
+	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist_turtle));
+	if (exist_turtle) {
 		if (exist_incr)
 			WT_RET_MSG(session, EINVAL,
 			    "Incremental backup after running recovery "
 			    "is not allowed.");
-	} else {
+		/*
+		 * If we have a backup file and metadata and turtle files,
+		 * we want to recreate the metadata from the backup.
+		 */
+		if (exist_backup) {
+			WT_RET(__wt_msg(session, "Both %s and %s exist. "
+			    "Recreating metadata from backup.",
+			    WT_METADATA_TURTLE, WT_METADATA_BACKUP));
+			WT_RET(__wt_remove_if_exists(session, WT_METAFILE));
+			WT_RET(__wt_remove_if_exists(
+			    session, WT_METADATA_TURTLE));
+			load = true;
+		}
+	} else
+		load = true;
+	if (load) {
 		if (exist_incr)
 			F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 
@@ -200,7 +217,8 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 
 		/* Create the turtle file. */
 		WT_RET(__metadata_config(session, &metaconf));
-		WT_WITH_TURTLE_LOCK(session, ret = __wt_turtle_update(
+		WT_WITH_TURTLE_LOCK(session, ret,
+		    ret = __wt_turtle_update(
 		    session, WT_METAFILE_URI, metaconf));
 		WT_ERR(ret);
 	}

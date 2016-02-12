@@ -402,7 +402,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_ENCRYPTOR *encryptor;
+	WT_ENCRYPTOR *custom, *encryptor;
 	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
 	uint64_t bucket, hash;
@@ -440,12 +440,13 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_ERR(__wt_strndup(session, keyid->str, keyid->len, &kenc->keyid));
 	encryptor = nenc->encryptor;
 	if (encryptor->customize != NULL) {
+		custom = NULL;
 		WT_ERR(encryptor->customize(encryptor, &session->iface,
-		    cfg_arg, &encryptor));
-		if (encryptor == NULL)
-			encryptor = nenc->encryptor;
-		else
+		    cfg_arg, &custom));
+		if (custom != NULL) {
 			kenc->owned = 1;
+			encryptor = custom;
+		}
 	}
 	WT_ERR(encryptor->sizing(encryptor, &session->iface,
 	    &kenc->size_const));
@@ -2065,6 +2066,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * DATABASE HOME, IT'S WHAT WE USE TO DECIDE IF WE'RE CREATING OR NOT.
 	 */
 	WT_ERR(__wt_turtle_init(session));
+
+	__wt_metadata_init(session);
 	WT_ERR(__wt_metadata_cursor(session, NULL));
 
 	/* Start the worker threads and run recovery. */

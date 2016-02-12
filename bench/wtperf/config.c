@@ -156,9 +156,6 @@ config_compress(CONFIG *cfg)
 	if (strcmp(s, "none") == 0) {
 		cfg->compress_ext = NULL;
 		cfg->compress_table = NULL;
-	} else if (strcmp(s, "bzip") == 0) {
-		cfg->compress_ext = BZIP_EXT;
-		cfg->compress_table = BZIP_BLK;
 	} else if (strcmp(s, "lz4") == 0) {
 		cfg->compress_ext = LZ4_EXT;
 		cfg->compress_table = LZ4_BLK;
@@ -237,8 +234,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				continue;
 			}
 			if (STRING_MATCH("throttle", k.str, k.len)) {
-				if ((workp->throttle = v.val) < 0)
-					goto err;
+				workp->throttle = (uint64_t)v.val;
 				continue;
 			}
 			if (STRING_MATCH("insert", k.str, k.len) ||

@@ -20,6 +20,19 @@ __wt_block_map(
 	*(void **)mapp = NULL;
 	*maplenp = 0;
 
+#ifdef WORDS_BIGENDIAN
+	/*
+	 * The underlying objects are little-endian, mapping objects isn't
+	 * currently supported on big-endian systems.
+	 */
+	WT_UNUSED(session);
+	WT_UNUSED(block);
+	WT_UNUSED(mappingcookie);
+#else
+	/* Map support is configurable. */
+	if (!S2C(session)->mmap)
+		return (0);
+
 	/*
 	 * Turn off mapping when verifying the file, because we can't perform
 	 * checksum validation of mapped segments, and verify has to checksum
@@ -48,6 +61,7 @@ __wt_block_map(
 	 * Ignore errors, we'll read the file through the cache if map fails.
 	 */
 	(void)__wt_mmap(session, block->fh, mapp, maplenp, mappingcookie);
+#endif
 
 	return (0);
 }

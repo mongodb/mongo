@@ -80,13 +80,14 @@ __curbackup_close(WT_CURSOR *cursor)
 	int tret;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
+
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	WT_TRET(__backup_cleanup_handles(session, cb));
 	WT_TRET(__wt_cursor_close(cursor));
 	session->bkp_cursor = NULL;
 
-	WT_WITH_SCHEMA_LOCK(session,
+	WT_WITH_SCHEMA_LOCK(session, tret,
 	    tret = __backup_stop(session));		/* Stop the backup. */
 	WT_TRET(tret);
 
@@ -139,7 +140,8 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	 * Start the backup and fill in the cursor's list.  Acquire the schema
 	 * lock, we need a consistent view when creating a copy.
 	 */
-	WT_WITH_SCHEMA_LOCK(session, ret = __backup_start(session, cb, cfg));
+	WT_WITH_SCHEMA_LOCK(session, ret,
+	    ret = __backup_start(session, cb, cfg));
 	WT_ERR(ret);
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */

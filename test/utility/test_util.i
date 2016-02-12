@@ -66,26 +66,17 @@ testutil_die(int e, const char *fmt, ...)
  *	Creates the full intended work directory in buffer.
  */
 static inline void
-testutil_work_dir_from_path(char *buffer, size_t inputSize, char *dir)
+testutil_work_dir_from_path(char *buffer, size_t inputSize, const char *dir)
 {
 	/* If no directory is provided, use the default. */
-	if (dir == NULL) {
-		if (inputSize < sizeof(DEFAULT_DIR))
-			testutil_die(ENOMEM,
-			    "Not enough memory in buffer for directory %s%c%s",
-			    dir, DIR_DELIM, DEFAULT_DIR);
+	if (dir == NULL)
+		dir = DEFAULT_DIR;
 
-		snprintf(buffer, inputSize, DEFAULT_DIR);
-		return;
-	}
-
-	/* Additional bytes for the directory and WT_TEST. */
-	if (inputSize < strlen(dir) + sizeof(DEFAULT_DIR) + sizeof(DIR_DELIM))
+	if (inputSize < strlen(dir) + 1)
 		testutil_die(ENOMEM,
-		    "Not enough memory in buffer for directory %s%c%s",
-		    dir, DIR_DELIM, DEFAULT_DIR);
+		    "Not enough memory in buffer for directory %s", dir);
 
-	snprintf(buffer, inputSize, "%s%c%s", dir, DIR_DELIM, DEFAULT_DIR);
+	strcpy(buffer, dir);
 }
 
 /*

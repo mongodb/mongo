@@ -109,7 +109,7 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 			    cfg, truncate_item->key, trunc_cfg->stone_gap * i);
 			truncate_item->diff =
 			    (trunc_cfg->stone_gap * i) - trunc_cfg->last_key;
-			TAILQ_INSERT_TAIL( &cfg->stone_head, truncate_item, q);
+			TAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
 			trunc_cfg->last_key = trunc_cfg->stone_gap * i;
 			trunc_cfg->num_stones++;
 		}

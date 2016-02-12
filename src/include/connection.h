@@ -175,6 +175,7 @@ struct __wt_connection_impl {
 	WT_SPINLOCK checkpoint_lock;	/* Checkpoint spinlock */
 	WT_SPINLOCK dhandle_lock;	/* Data handle list spinlock */
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
+	WT_SPINLOCK metadata_lock;	/* Metadata update spinlock */
 	WT_SPINLOCK reconfig_lock;	/* Single thread reconfigure */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK table_lock;		/* Table creation spinlock */
@@ -364,6 +365,7 @@ struct __wt_connection_impl {
 	uint32_t	 txn_logsync;	/* Log sync configuration */
 
 	WT_SESSION_IMPL *meta_ckpt_session;/* Metadata checkpoint session */
+	uint64_t	 meta_uri_hash;	/* Metadata file name hash */
 
 	WT_SESSION_IMPL *sweep_session;	   /* Handle sweep session */
 	wt_thread_t	 sweep_tid;	   /* Handle sweep thread */

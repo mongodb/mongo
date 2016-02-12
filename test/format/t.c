@@ -45,10 +45,14 @@ main(int argc, char *argv[])
 
 	config = NULL;
 
+#ifdef _WIN32
+	g.progname = "t_format.exe";
+#else
 	if ((g.progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		g.progname = argv[0];
 	else
 		++g.progname;
+#endif
 
 #if 0
 	/* Configure the GNU malloc for debugging. */
@@ -60,7 +64,7 @@ main(int argc, char *argv[])
 #endif
 
 	/* Track progress unless we're re-directing output to a file. */
-	g.track = isatty(1) ? 1 : 0;
+	g.c_quiet = isatty(1) ? 0 : 1;
 
 	/* Set values from the command line. */
 	home = NULL;
@@ -95,7 +99,7 @@ main(int argc, char *argv[])
 			g.logging = LOG_OPS;
 			break;
 		case 'q':			/* Quiet */
-			g.track = 0;
+			g.c_quiet = 1;
 			break;
 		case 'r':			/* Replay a run */
 			g.replay = 1;
@@ -255,7 +259,7 @@ main(int argc, char *argv[])
 		wts_salvage();
 
 		/* Overwrite the progress line with a completion line. */
-		if (g.track)
+		if (!g.c_quiet)
 			printf("\r%78s\r", " ");
 		printf("%4d: %s, %s (%.0f seconds)\n",
 		    g.run_cnt, g.c_data_source,
@@ -318,8 +322,8 @@ die(int e, const char *fmt, ...)
 	(void)pthread_rwlock_wrlock(&g.death_lock);
 
 	/* Try and turn off tracking so it doesn't obscure the error message. */
-	if (g.track) {
-		g.track = 0;
+	if (!g.c_quiet) {
+		g.c_quiet = 1;
 		fprintf(stderr, "\n");
 	}
 	if (fmt != NULL) {				/* Death message. */
