@@ -246,12 +246,7 @@ func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index Ind
 // CreateCollection creates the collection specified in the intent with the
 // given options.
 func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bson.D) error {
-	jsonCommand, err := bsonutil.ConvertBSONValueToJSON(
-		append(bson.D{{"create", intent.C}}, options...),
-	)
-	if err != nil {
-		return err
-	}
+	command := append(bson.D{{"create", intent.C}}, options...)
 
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
@@ -260,7 +255,7 @@ func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bs
 	defer session.Close()
 
 	res := bson.M{}
-	err = session.DB(intent.DB).Run(jsonCommand, &res)
+	err = session.DB(intent.DB).Run(command, &res)
 	if err != nil {
 		return fmt.Errorf("error running create command: %v", err)
 	}
