@@ -379,6 +379,9 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
 
 int WiredTigerKVEngine::flushAllFiles(bool sync) {
     LOG(1) << "WiredTigerKVEngine::flushAllFiles";
+    if (_ephemeral) {
+        return 0;
+    }
     syncSizeInfo(true);
     _sessionCache->waitUntilDurable(true);
 
