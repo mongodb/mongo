@@ -170,9 +170,9 @@ Status extractFullEqualityMatches(const MatchExpression& root,
  *   Path 'a.b.c' has an eqmatch parent of 'a.b' : 1
  *
  */
-const BSONElement& findParentEqualityElement(const EqualityMatches& equalities,
-                                             const FieldRef& path,
-                                             int* parentPathParts);
+BSONElement findParentEqualityElement(const EqualityMatches& equalities,
+                                      const FieldRef& path,
+                                      int* parentPathParts);
 
 /**
  * Adds the BSON values from equality matches into the given document at the equality match

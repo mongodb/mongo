@@ -247,7 +247,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
 
 static BSONElement findEqualityElement(const EqualityMatches& equalities, const FieldRef& path) {
     int parentPathPart;
-    const BSONElement& parentEl =
+    const BSONElement parentEl =
         pathsupport::findParentEqualityElement(equalities, path, &parentPathPart);
 
     if (parentPathPart == static_cast<int>(path.numParts()))
