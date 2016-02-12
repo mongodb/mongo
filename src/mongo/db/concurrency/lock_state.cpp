@@ -367,7 +367,7 @@ void LockerImpl<IsForMMAPV1>::downgradeGlobalXtoSForMMAPV1() {
 }
 
 template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::unlockAll() {
+bool LockerImpl<IsForMMAPV1>::unlockGlobal() {
     if (!unlock(resourceIdGlobal)) {
         return false;
     }

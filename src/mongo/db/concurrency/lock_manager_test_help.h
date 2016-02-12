@@ -40,7 +40,7 @@ public:
     }
 
     ~LockerForTests() {
-        unlockAll();
+        unlockGlobal();
     }
 };
 

@@ -65,7 +65,7 @@ public:
         invariant(false);
     }
 
-    virtual bool unlockAll() {
+    virtual bool unlockGlobal() {
         invariant(false);
     }
 

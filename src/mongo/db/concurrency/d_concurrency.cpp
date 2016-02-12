@@ -86,7 +86,7 @@ void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
 
 void Lock::GlobalLock::_unlock() {
     if (isLocked()) {
-        _locker->unlockAll();
+        _locker->unlockGlobal();
         _result = LOCK_INVALID;
     }
 }
