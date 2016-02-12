@@ -574,6 +574,9 @@ bool DBClientWithCommands::authenticateInternalUser() {
         auth(getInternalUserAuthParamsWithFallback());
         return true;
     } catch (const UserException& ex) {
+        if (ex.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+            throw;
+        }
         if (!serverGlobalParams.quiet) {
             log() << "can't authenticate to " << toString()
                   << " as internal user, error: " << ex.what();

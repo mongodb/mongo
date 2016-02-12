@@ -61,10 +61,6 @@ namespace {
 const char* const kUserSourceFieldName = "userSource";
 const BSONObj kGetNonceCmd = BSON("getnonce" << 1);
 
-bool isOk(const BSONObj& o) {
-    return getStatusFromCommandResult(o).isOK();
-}
-
 BSONObj getFallbackAuthParams(const BSONObj& params) {
     if (params["fallbackParams"].type() != Object) {
         return BSONObj();
@@ -320,9 +316,11 @@ void authenticateClient(const BSONObj& params,
                       uassertStatusOK(response);
 
                       auto serverResponse = response.getValue().data;
-                      uassert(ErrorCodes::AuthenticationFailed,
-                              serverResponse["errmsg"].str(),
-                              isOk(serverResponse));
+                      auto status = getStatusFromCommandResult(serverResponse);
+                      auto code = status == ErrorCodes::IncompatibleCatalogManager
+                          ? ErrorCodes::IncompatibleCatalogManager
+                          : ErrorCodes::AuthenticationFailed;
+                      uassert(code, serverResponse["errmsg"].str(), status.isOK());
                   });
     }
 }
