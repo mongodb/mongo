@@ -98,6 +98,7 @@ load("jstests/replsets/rslib.js");
     conns[0].disconnect(conns[1]);
     conns[0].disconnect(conns[2]);
     replTest.waitForState(b.getMongo(), ReplSetTest.State.PRIMARY, 60 * 1000);
+    replTest.waitForMaster(30*1000); // Even though it is primary, it might not be master/writable.
 
     // These 97 documents will be rolled back eventually.
     for (var i = 4; i <= 100; i++) {
