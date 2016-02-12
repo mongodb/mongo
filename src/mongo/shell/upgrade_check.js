@@ -138,7 +138,7 @@ var dbUpgradeCheck = function(dbObj, checkDocs) {
 
     // run collection level checks on each collection in the db
     dbObj.getCollectionNames().forEach(function(collName) {
-        if (!collUpgradeCheck(dbObj.getCollection(collName)), checkDocs) {
+        if (!collUpgradeCheck(dbObj.getCollection(collName), checkDocs)) {
             goodSoFar = false;
         }
     });
@@ -198,7 +198,7 @@ DB.prototype.upgradeCheckAllDBs = function(checkDocs) {
 
     // run db level checks on each db
     dbs.databases.forEach(function(dbObj) {
-        if (!dbUpgradeCheck(self.getSiblingDB(dbObj.name)), checkDocs) {
+        if (!dbUpgradeCheck(self.getSiblingDB(dbObj.name), checkDocs)) {
             goodSoFar = false;
         }
     });
