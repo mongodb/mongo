@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -2968,6 +2969,8 @@ public:
 
 namespace DocumentSourceMatch {
 using mongo::DocumentSourceMatch;
+
+using std::unique_ptr;
 
 // Helpers to make a DocumentSourceMatch from a query object or json string
 intrusive_ptr<DocumentSourceMatch> makeMatch(const BSONObj& query) {

@@ -665,6 +665,20 @@ public:
         return _isTextQuery;
     }
 
+    /**
+     * Attempt to split this $match into two stages, where the first is not dependent upon any path
+     * from 'fields', and where applying them in sequence is equivalent to applying this stage once.
+     *
+     * Will return two intrusive_ptrs to new $match stages, where the first pointer is independent
+     * of 'fields', and the second is dependent. Either pointer may be null, so be sure to check the
+     * return value.
+     *
+     * For example, {$match: {a: "foo", "b.c": 4}} split by "b" will return pointers to two stages:
+     * {$match: {a: "foo"}}, and {$match: {"b.c": 4}}.
+     */
+    std::pair<boost::intrusive_ptr<DocumentSource>, boost::intrusive_ptr<DocumentSource>>
+    splitSourceBy(const std::set<std::string>& fields);
+
 private:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -1283,6 +1297,13 @@ public:
     BSONObjSet getOutputSorts() final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
+
+    /**
+     * If the next stage is a $match, the part of the match that is not dependent on the unwound
+     * field can be moved into a new, preceding, $match stage.
+     */
+    Pipeline::SourceContainer::iterator optimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container) final;
 
     /**
      * Creates a new $unwind DocumentSource from a BSON specification.

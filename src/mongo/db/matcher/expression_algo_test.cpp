@@ -38,9 +38,12 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/platform/decimal128.h"
 
 namespace mongo {
+
+using std::unique_ptr;
 
 /**
  * A MatchExpression does not hold the memory for BSONElements, so use ParsedMatchExpression to
@@ -646,6 +649,189 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE) {
     ASSERT_FALSE(expression::isSubsetOf(aNotEqual1.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(bNotEqual1.get(), aExists.get()));
     ASSERT_TRUE(expression::isSubsetOf(aNotEqualNull.get(), aExists.get()));
+}
+
+TEST(IsIndependent, AndIsIndependentOnlyIfChildrenAre) {
+    BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 1}]}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"b"}));
+    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"c"}));
+}
+
+TEST(IsIndependent, ElemMatchIsNotIndependent) {
+    BSONObj matchPredicate = fromjson("{x: {$elemMatch: {y: 1}}}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"x"}));
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"x.y"}));
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"y"}));
+}
+
+TEST(IsIndependent, NorIsIndependentOnlyIfChildrenAre) {
+    BSONObj matchPredicate = fromjson("{$nor: [{a: 1}, {b: 1}]}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"b"}));
+    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"c"}));
+}
+
+TEST(IsIndependent, NotIsIndependentOnlyIfChildrenAre) {
+    BSONObj matchPredicate = fromjson("{a: {$not: {$eq: 1}}}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"b"}));
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a"}));
+}
+
+TEST(IsIndependent, OrIsIndependentOnlyIfChildrenAre) {
+    BSONObj matchPredicate = fromjson("{$or: [{a: 1}, {b: 1}]}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a"}));
+    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"c"}));
+}
+
+TEST(IsIndependent, AndWithDottedFieldPathsIsNotIndependent) {
+    BSONObj matchPredicate = fromjson("{$and: [{'a': 1}, {'a.b': 1}]}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a.b.c"}));
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a.b"}));
+}
+
+TEST(IsIndependent, BallIsIndependentOfBalloon) {
+    BSONObj matchPredicate = fromjson("{'a.ball': 4}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    unique_ptr<MatchExpression> expr = std::move(status.getValue());
+    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"a.balloon"}));
+    ASSERT_TRUE(expression::isIndependentOf(*expr.get(), {"a.b"}));
+    ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a.ball.c"}));
+}
+
+TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
+    BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 1}]}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(status.getValue()), {"b"});
+
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder secondBob;
+    splitExpr.second->serialize(&secondBob);
+
+    ASSERT_EQUALS(firstBob.obj(), fromjson("{a: {$eq: 1}}"));
+    ASSERT_EQUALS(secondBob.obj(), fromjson("{b: {$eq: 1}}"));
+}
+
+TEST(SplitMatchExpression, NorWithIndependentChildrenIsSplittable) {
+    BSONObj matchPredicate = fromjson("{$nor: [{a: 1}, {b: 1}]}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(status.getValue()), {"b"});
+
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder secondBob;
+    splitExpr.second->serialize(&secondBob);
+
+    ASSERT_EQUALS(firstBob.obj(), fromjson("{$nor: [{a: {$eq: 1}}]}"));
+    ASSERT_EQUALS(secondBob.obj(), fromjson("{$nor: [{b: {$eq: 1}}]}"));
+}
+
+TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
+    BSONObj matchPredicate = fromjson("{x: {$not: {$gt: 4}}}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(status.getValue()), {"y"});
+
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+
+    ASSERT_EQUALS(firstBob.obj(), fromjson("{$nor: [{$and: [{x: {$gt: 4}}]}]}"));
+    ASSERT_FALSE(splitExpr.second);
+}
+
+TEST(SplitMatchExpression, OrWithOnlyIndependentChildrenIsNotSplittable) {
+    BSONObj matchPredicate = fromjson("{$or: [{a: 1}, {b: 1}]}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(status.getValue()), {"b"});
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder bob;
+    splitExpr.second->serialize(&bob);
+
+    ASSERT_FALSE(splitExpr.first);
+    ASSERT_EQUALS(bob.obj(), fromjson("{$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}"));
+}
+
+TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
+    BSONObj matchPredicate = fromjson(
+        "{$and: [{x: {$not: {$size: 2}}},"
+        "{$or: [{'a.b' : 3}, {'a.b.c': 4}]},"
+        "{$nor: [{x: {$gt: 4}}, {$and: [{x: {$not: {$eq: 1}}}, {y: 3}]}]}]}");
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop());
+    ASSERT_OK(status.getStatus());
+
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(status.getValue()), {"x"});
+
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder secondBob;
+    splitExpr.second->serialize(&secondBob);
+
+    ASSERT_EQUALS(firstBob.obj(), fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
+    ASSERT_EQUALS(secondBob.obj(),
+                  fromjson(
+                      "{$and: [{$nor: [{$and: [{x: {$size: 2}}]}]}, {$nor: [{x: {$gt: 4}}, {$and: "
+                      "[{$nor: [{$and: [{x: "
+                      "{$eq: 1}}]}]}, {y: {$eq: 3}}]}]}]}"));
 }
 
 }  // namespace mongo

@@ -30,11 +30,16 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 
 namespace mongo {
+
+using std::unique_ptr;
+
 namespace {
 
 bool isComparisonMatchExpression(const MatchExpression* expr) {
@@ -219,6 +224,80 @@ bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
     }
 }
 
+/**
+ * Returns whether the leaf is a $elemMatch expression.
+ */
+bool isElemMatch(const MatchExpression& expr) {
+    return expr.matchType() == MatchExpression::ELEM_MATCH_OBJECT ||
+        expr.matchType() == MatchExpression::ELEM_MATCH_VALUE;
+}
+
+/**
+ * Returns whether 'first' is a prefix of 'second'.
+ */
+bool isPathPrefixOf(const StringData& first, const StringData& second) {
+    if (first == second) {
+        return true;
+    }
+
+    if (first.size() >= second.size()) {
+        return false;
+    }
+
+    return second.startsWith(first) && second[first.size()] == '.';
+}
+
+/**
+ * Returns whether the leaf at 'path' is independent of 'fields'.
+ */
+bool isLeafIndependentOf(const StringData& path, const std::set<std::string>& fields) {
+    // For each field in 'fields', we need to check if that field is a prefix of 'path' or if 'path'
+    // is a prefix of that field. For example, the expression {a.b: {c: 1}} is not independent of
+    // 'a.b.c', and and the expression {a.b.c.d: 1} is not independent of 'a.b.c'.
+    for (StringData field : fields) {
+        if (isPathPrefixOf(path, field) || isPathPrefixOf(field, path)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Creates a MatchExpression that is equivalent to {$and: [children[0], children[1]...]}.
+ */
+unique_ptr<MatchExpression> createAndOfNodes(std::vector<unique_ptr<MatchExpression>>* children) {
+    if (children->empty()) {
+        return nullptr;
+    }
+
+    if (children->size() == 1) {
+        return std::move(children->at(0));
+    }
+
+    unique_ptr<AndMatchExpression> splitAnd = stdx::make_unique<AndMatchExpression>();
+    for (auto&& expr : *children) {
+        splitAnd->add(expr.release());
+    }
+
+    return std::move(splitAnd);
+}
+
+/**
+ * Creates a MatchExpression that is equivalent to {$nor: [children[0], children[1]...]}.
+ */
+unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpression>>* children) {
+    if (children->empty()) {
+        return nullptr;
+    }
+
+    unique_ptr<NorMatchExpression> splitNor = stdx::make_unique<NorMatchExpression>();
+    for (auto&& expr : *children) {
+        splitNor->add(expr.release());
+    }
+
+    return std::move(splitNor);
+}
+
 }  // namespace
 
 namespace expression {
@@ -270,6 +349,83 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
     }
 
     return false;
+}
+
+bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet) {
+    if (expr.isLogical()) {
+        // Any logical expression is independent of 'pathSet' if all its children are independent of
+        // 'pathSet'.
+        for (size_t i = 0; i < expr.numChildren(); i++) {
+            if (!isIndependentOf(*expr.getChild(i), pathSet)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // At this point, we know 'expr' is a leaf. If it is an elemMatch, we do not attempt to
+    // determine if it is independent or not, and instead just return false.
+    return !isElemMatch(expr) && isLeafIndependentOf(expr.path(), pathSet);
+}
+
+std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionBy(
+    unique_ptr<MatchExpression> expr, const std::set<std::string>& fields) {
+    if (isIndependentOf(*expr, fields)) {
+        // 'expr' does not depend upon 'fields', so it can be completely moved.
+        return {std::move(expr), nullptr};
+    }
+    if (!expr->isLogical()) {
+        // 'expr' is a leaf, and was not independent of 'fields'.
+        return {nullptr, std::move(expr)};
+    }
+
+    std::vector<unique_ptr<MatchExpression>> reliant;
+    std::vector<unique_ptr<MatchExpression>> separate;
+
+    switch (expr->matchType()) {
+        case MatchExpression::AND: {
+            auto andExpr = checked_cast<AndMatchExpression*>(expr.get());
+            for (size_t i = 0; i < andExpr->numChildren(); i++) {
+                auto children = splitMatchExpressionBy(andExpr->releaseChild(i), fields);
+
+                invariant(children.first || children.second);
+
+                if (children.first) {
+                    separate.push_back(std::move(children.first));
+                }
+                if (children.second) {
+                    reliant.push_back(std::move(children.second));
+                }
+            }
+            return {createAndOfNodes(&separate), createAndOfNodes(&reliant)};
+        }
+        case MatchExpression::NOR: {
+            // We can split a $nor because !(x | y) is logically equivalent to !x & !y.
+
+            // However, we cannot split each child individually; instead, we must look for a wholly
+            // independent child to split off by itself. As an example of why, with 'b' in
+            // 'fields': $nor: [{$and: [{a: 1}, {b: 1}]}]} will match if a is not 1, or if b is not
+            // 1. However, if we split this into: {$nor: [{$and: [{a: 1}]}]}, and
+            // {$nor: [{$and: [{b: 1}]}]}, a document will only pass both stages if neither a nor b
+            // is equal to 1.
+            auto norExpr = checked_cast<NorMatchExpression*>(expr.get());
+            for (size_t i = 0; i < norExpr->numChildren(); i++) {
+                auto child = norExpr->releaseChild(i);
+                if (isIndependentOf(*child, fields)) {
+                    separate.push_back(std::move(child));
+                } else {
+                    reliant.push_back(std::move(child));
+                }
+            }
+            return {createNorOfNodes(&separate), createNorOfNodes(&reliant)};
+        }
+        case MatchExpression::OR:
+        case MatchExpression::NOT: {
+            // If we aren't independent, we can't safely split.
+            return {nullptr, std::move(expr)};
+        }
+        default: { MONGO_UNREACHABLE; }
+    }
 }
 
 }  // namespace expression

@@ -225,6 +225,41 @@ BSONObjSet DocumentSourceUnwind::getOutputSorts() {
     return out;
 }
 
+Pipeline::SourceContainer::iterator DocumentSourceUnwind::optimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get())) {
+        const bool includeDollarPrefix = false;
+        std::set<std::string> field = {_unwindPath.getPath(includeDollarPrefix)};
+        auto splitMatch = nextMatch->splitSourceBy(field);
+
+        invariant(splitMatch.first || splitMatch.second);
+
+        if (!splitMatch.first && splitMatch.second) {
+            // No optimization was possible.
+            return std::next(itr);
+        }
+
+        container->erase(std::next(itr));
+
+        // If splitMatch.second is not null, then there is a new $match stage to insert after
+        // ourselves.
+        if (splitMatch.second) {
+            container->insert(std::next(itr), std::move(splitMatch.second));
+        }
+
+        if (splitMatch.first) {
+            container->insert(itr, std::move(splitMatch.first));
+            if (std::prev(itr) == container->begin()) {
+                return std::prev(itr);
+            }
+            return std::prev(std::prev(itr));
+        }
+    }
+    return std::next(itr);
+}
+
 Value DocumentSourceUnwind::serialize(bool explain) const {
     return Value(DOC(getSourceName() << DOC(
                          "path" << _unwindPath.getPath(true) << "preserveNullAndEmptyArrays"

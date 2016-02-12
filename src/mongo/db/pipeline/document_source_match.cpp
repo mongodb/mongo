@@ -31,16 +31,19 @@
 #include <cctype>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
+using std::pair;
+using std::unique_ptr;
 using std::string;
 using std::vector;
 
@@ -149,6 +152,13 @@ Document redactSafePortionDollarOps(BSONObj expr) {
     BSONForEach(field, expr) {
         if (field.fieldName()[0] != '$')
             continue;
+
+        if (field.fieldNameStringData() == "$eq") {
+            if (isTypeRedactSafeInComparison(field.type())) {
+                output[field.fieldNameStringData()] = Value(field);
+            }
+            continue;
+        }
 
         switch (BSONObj::MatchType(field.getGtLtOp(BSONObj::Equality))) {
             // These are always ok
@@ -304,7 +314,6 @@ BSONObj DocumentSourceMatch::redactSafePortion() const {
 
 void DocumentSourceMatch::setSource(DocumentSource* source) {
     uassert(17313, "$match with $text is only allowed as the first pipeline stage", !_isTextQuery);
-
     DocumentSource::setSource(source);
 }
 
@@ -318,6 +327,43 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
             return true;
     }
     return false;
+}
+
+pair<intrusive_ptr<DocumentSource>, intrusive_ptr<DocumentSource>>
+DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
+    pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> newExpr(
+        expression::splitMatchExpressionBy(std::move(_expression), fields));
+
+    invariant(newExpr.first || newExpr.second);
+
+    if (!newExpr.first) {
+        // The entire $match dependends on 'fields'.
+        _expression = std::move(newExpr.second);
+        return {nullptr, this};
+    } else if (!newExpr.second) {
+        // This $match is entirely independent of 'fields'.
+        _expression = std::move(newExpr.first);
+        return {this, nullptr};
+    }
+
+    // A MatchExpression requires that it is outlived by the BSONObj it is parsed from. Since the
+    // original BSONObj this $match was created from is no longer equivalent to either of the
+    // MatchExpressions we return, we instead take each of these expressions, serialize them, and
+    // then re-parse them, constructing new BSON that is owned by the DocumentSourceMatch.
+
+    // Build an expression for a new $match stage.
+    BSONObjBuilder firstBob;
+    newExpr.first->serialize(&firstBob);
+
+    intrusive_ptr<DocumentSource> firstMatch(new DocumentSourceMatch(firstBob.obj(), pExpCtx));
+
+    // This $match stage is still needed, so update the MatchExpression as needed.
+    BSONObjBuilder secondBob;
+    newExpr.second->serialize(&secondBob);
+
+    intrusive_ptr<DocumentSource> secondMatch(new DocumentSourceMatch(secondBob.obj(), pExpCtx));
+
+    return {firstMatch, secondMatch};
 }
 
 static void uassertNoDisallowedClauses(BSONObj query) {
@@ -391,4 +437,4 @@ DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
 
     _expression = std::move(status.getValue());
 }
-}
+}  // namespace mongo

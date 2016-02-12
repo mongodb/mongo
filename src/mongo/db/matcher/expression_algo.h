@@ -59,5 +59,35 @@ namespace expression {
  */
 bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs);
 
+/**
+ * Determine if it is possible to split 'expr' into two MatchExpressions, where one is not
+ * dependent on any path from 'pathSet', such that applying the two in sequence is equivalent
+ * to applying 'expr'.
+ *
+ * For example, {a: "foo", b: "bar"} is splittable by "b", while
+ * {$or: [{a: {$eq: "foo"}}, {b: {$eq: "bar"}}]} is not splittable by "b", due to the $or.
+ */
+bool isSplittableBy(const MatchExpression& expr, const std::set<std::string>& pathSet);
+
+/**
+ * Determine if 'expr' is reliant upon any path from 'pathSet'.
+ */
+bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet);
+
+/**
+ * Attempt to split 'expr' into two MatchExpressions, where the first is not reliant upon any
+ * path from 'fields', such that applying the matches in sequence is equivalent to applying
+ * 'expr'. Takes ownership of 'expr'.
+ *
+ * If 'expr' cannot be split, returns {nullptr, expr}. If 'expr' is entirely independent of
+ * 'fields', returns {expr, nullptr}. If 'expr' is partially dependent on 'fields', and partially
+ * independent, returns {exprLeft, exprRight}, where each new MatchExpression contains a portion of
+ * 'expr'.
+ *
+ * Never returns {nullptr, nullptr}.
+ */
+std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
+splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr, const std::set<std::string>& fields);
+
 }  // namespace expression
 }  // namespace mongo

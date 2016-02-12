@@ -65,6 +65,12 @@ public:
         return _expressions[i];
     }
 
+    virtual std::unique_ptr<MatchExpression> releaseChild(size_t i) {
+        auto child = std::unique_ptr<MatchExpression>(_expressions[i]);
+        _expressions[i] = nullptr;
+        return std::move(child);
+    }
+
     virtual std::vector<MatchExpression*>* getChildVector() {
         return &_expressions;
     }

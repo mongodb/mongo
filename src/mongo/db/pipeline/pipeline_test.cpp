@@ -268,6 +268,89 @@ class MatchShouldDuplicateItselfBeforeRedact : public Base {
     }
 };
 
+class MatchShouldSwapWithUnwind : public Base {
+    string inputPipeJson() {
+        return "[{$unwind: '$a.b.c'}, "
+               "{$match: {'b': 1}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {'b': 1}}, "
+               "{$unwind: {path: '$a.b.c'}}]";
+    }
+};
+
+class MatchOnPrefixShouldNotSwapOnUnwind : public Base {
+    string inputPipeJson() {
+        return "[{$unwind: {path: '$a.b.c'}}, "
+               "{$match: {'a.b': 1}}]";
+    }
+    string outputPipeJson() {
+        return "[{$unwind: {path: '$a.b.c'}}, "
+               "{$match: {'a.b': 1}}]";
+    }
+};
+
+class MatchShouldSplitOnUnwind : public Base {
+    string inputPipeJson() {
+        return "[{$unwind: '$a.b'}, "
+               "{$match: {$and: [{f: {$eq: 5}}, "
+               "                 {$nor: [{'a.d': 1, c: 5}, {'a.b': 3, c: 5}]}]}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {$and: [{f: {$eq: 5}},"
+               "                  {$nor: [{$and: [{'a.d': {$eq: 1}}, {c: {$eq: 5}}]}]}]}},"
+               "{$unwind: {path: '$a.b'}}, "
+               "{$match: {$nor: [{$and: [{'a.b': {$eq: 3}}, {c: {$eq: 5}}]}]}}]";
+    }
+};
+
+class MatchShouldNotOptimizeWithElemMatch : public Base {
+    string inputPipeJson() {
+        return "[{$unwind: {path: '$a.b'}}, "
+               "{$match: {a: {$elemMatch: {b: {d: 1}}}}}]";
+    }
+    string outputPipeJson() {
+        return "[{$unwind: {path: '$a.b'}}, "
+               "{$match: {a: {$elemMatch: {b: {d: 1}}}}}]";
+    }
+};
+
+class MatchWithNorOnlySplitsIndependentChildren : public Base {
+    string inputPipeJson() {
+        return "[{$unwind: {path: '$a'}}, "
+               "{$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}, {b: {$eq: 2}} ]}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {$nor: [{b: {$eq: 2}}]}}, "
+               "{$unwind: {path: '$a'}}, "
+               "{$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}]}}]";
+    }
+};
+
+class MatchWithOrDoesNotSplit : public Base {
+    string inputPipeJson() {
+        return "[{$unwind: {path: '$a'}}, "
+               "{$match: {$or: [{a: {$eq: 'dependent'}}, {b: {$eq: 'independent'}}]}}]";
+    }
+    string outputPipeJson() {
+        return "[{$unwind: {path: '$a'}}, "
+               "{$match: {$or: [{a: {$eq: 'dependent'}}, {b: {$eq: 'independent'}}]}}]";
+    }
+};
+
+class UnwindBeforeDoubleMatchShouldRepeatedlyOptimize : public Base {
+    string inputPipeJson() {
+        return "[{$unwind: '$a'}, "
+               "{$match: {b: {$gt: 0}}}, "
+               "{$match: {a: 1, c: 1}}]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {$and: [{b: {$gt: 0}}, {c: {$eq: 1}}]}},"
+               "{$unwind: {path: '$a'}}, "
+               "{$match: {a: {$eq: 1}}}]";
+    }
+};
+
 }  // namespace Local
 
 namespace Sharded {
@@ -674,6 +757,13 @@ public:
         add<Optimizations::Local::LookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex>();
         add<Optimizations::Local::LookupShouldNotCoalesceWithUnwindNotOnAs>();
         add<Optimizations::Local::MatchShouldDuplicateItselfBeforeRedact>();
+        add<Optimizations::Local::MatchShouldSwapWithUnwind>();
+        add<Optimizations::Local::MatchOnPrefixShouldNotSwapOnUnwind>();
+        add<Optimizations::Local::MatchShouldNotOptimizeWithElemMatch>();
+        add<Optimizations::Local::MatchWithNorOnlySplitsIndependentChildren>();
+        add<Optimizations::Local::MatchWithOrDoesNotSplit>();
+        add<Optimizations::Local::MatchShouldSplitOnUnwind>();
+        add<Optimizations::Local::UnwindBeforeDoubleMatchShouldRepeatedlyOptimize>();
         add<Optimizations::Sharded::Empty>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::ShouldCoalesceUnwindOnAs>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::

@@ -122,6 +122,7 @@ docSourceEnv.Library(
         'expression',
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/matcher/expression_algo',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_customization_hooks',
