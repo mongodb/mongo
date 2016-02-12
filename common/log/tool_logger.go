@@ -125,6 +125,12 @@ func init() {
 	}
 }
 
+// IsInVerbosity returns true if the current verbosity level setting is
+// greater than or equal to the given level.
+func IsInVerbosity(minVerb int) bool {
+	return minVerb <= globalToolLogger.verbosity
+}
+
 func Logf(minVerb int, format string, a ...interface{}) {
 	globalToolLogger.Logf(minVerb, format, a...)
 }
