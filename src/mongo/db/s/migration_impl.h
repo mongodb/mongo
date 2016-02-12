@@ -48,39 +48,6 @@ template <typename T>
 class StatusWith;
 
 /**
- * Returns the default write concern for migration cleanup on the donor shard and for cloning
- * documents on the destination shard.
- */
-class ChunkMoveWriteConcernOptions {
-public:
-    /**
-     * Parses the chunk move options from a command object.
-     */
-    static StatusWith<ChunkMoveWriteConcernOptions> initFromCommand(const BSONObj& cmdObj);
-
-    /**
-     * Returns the throttle options to be used when committing migrated documents on the recipient
-     * shard's seconary.
-     */
-    const BSONObj& getSecThrottle() const {
-        return _secThrottleObj;
-    }
-
-    /**
-     * Returns the write concern options.
-     */
-    const WriteConcernOptions& getWriteConcern() const {
-        return _writeConcernOptions;
-    }
-
-private:
-    ChunkMoveWriteConcernOptions(BSONObj secThrottleObj, WriteConcernOptions writeConcernOptions);
-
-    const BSONObj _secThrottleObj;
-    const WriteConcernOptions _writeConcernOptions;
-};
-
-/**
  * Contains all the runtime state for an active move operation and allows persistence of this state
  * to BSON, so it can be resumed. Intended to be used from within a single thread of execution
  * (single OperationContext) at a time and should not be moved between threads.

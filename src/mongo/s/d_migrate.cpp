@@ -46,6 +46,7 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/s/chunk_move_write_concern_options.h"
 #include "mongo/db/s/migration_impl.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"

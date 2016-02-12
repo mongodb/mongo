@@ -33,6 +33,7 @@ env.Library(
 env.Library(
     target='sharding',
     source=[
+        'chunk_move_write_concern_options.cpp',
         'migration_destination_manager.cpp',
         'migration_impl.cpp',
         'migration_source_manager.cpp',
@@ -57,6 +58,7 @@ env.Library(
 env.Library(
     target='commands',
     source=[
+        'cleanup_orphaned_cmd.cpp',
         'merge_chunks_command.cpp',
         'move_chunk_command.cpp',
         'set_shard_version_command.cpp',

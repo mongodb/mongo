@@ -528,7 +528,6 @@ serverOnlyFiles = [
     "clientcursor.cpp",
     "cloner.cpp",
     "commands/apply_ops.cpp",
-    "commands/cleanup_orphaned_cmd.cpp",
     "commands/clone.cpp",
     "commands/clone_collection.cpp",
     "commands/collection_to_capped.cpp",

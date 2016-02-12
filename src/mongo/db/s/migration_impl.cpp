@@ -36,7 +36,6 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharding_state.h"
@@ -62,24 +61,6 @@ namespace {
 
 Tee* const migrateLog = RamLog::get("migrate");
 
-const int kDefaultWriteTimeoutForMigrationMs = 60 * 1000;
-const WriteConcernOptions DefaultWriteConcernForMigration(2,
-                                                          WriteConcernOptions::SyncMode::NONE,
-                                                          kDefaultWriteTimeoutForMigrationMs);
-
-WriteConcernOptions getDefaultWriteConcernForMigration() {
-    repl::ReplicationCoordinator* replCoordinator = repl::getGlobalReplicationCoordinator();
-    if (replCoordinator->getReplicationMode() == mongo::repl::ReplicationCoordinator::modeReplSet) {
-        Status status =
-            replCoordinator->checkIfWriteConcernCanBeSatisfied(DefaultWriteConcernForMigration);
-        if (status.isOK()) {
-            return DefaultWriteConcernForMigration;
-        }
-    }
-
-    return WriteConcernOptions(1, WriteConcernOptions::SyncMode::NONE, 0);
-}
-
 BSONObj createRecvChunkCommitRequest(const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
     builder.append("_recvChunkCommit", 1);
@@ -93,49 +74,6 @@ MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
 MONGO_FP_DECLARE(failMigrationApplyOps);
 
 }  // namespace
-
-ChunkMoveWriteConcernOptions::ChunkMoveWriteConcernOptions(BSONObj secThrottleObj,
-                                                           WriteConcernOptions writeConcernOptions)
-    : _secThrottleObj(std::move(secThrottleObj)),
-      _writeConcernOptions(std::move(writeConcernOptions)) {}
-
-StatusWith<ChunkMoveWriteConcernOptions> ChunkMoveWriteConcernOptions::initFromCommand(
-    const BSONObj& cmdObj) {
-    BSONObj secThrottleObj;
-    WriteConcernOptions writeConcernOptions;
-
-    Status status = writeConcernOptions.parseSecondaryThrottle(cmdObj, &secThrottleObj);
-    if (!status.isOK()) {
-        if (status.code() != ErrorCodes::WriteConcernNotDefined) {
-            return status;
-        }
-
-        writeConcernOptions = getDefaultWriteConcernForMigration();
-    } else {
-        repl::ReplicationCoordinator* replCoordinator = repl::getGlobalReplicationCoordinator();
-
-        if (replCoordinator->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeMasterSlave &&
-            writeConcernOptions.shouldWaitForOtherNodes()) {
-            warning() << "moveChunk cannot check if secondary throttle setting "
-                      << writeConcernOptions.toBSON()
-                      << " can be enforced in a master slave configuration";
-        }
-
-        Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcernOptions);
-        if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
-            return status;
-        }
-    }
-
-    if (writeConcernOptions.shouldWaitForOtherNodes() &&
-        writeConcernOptions.wTimeout == WriteConcernOptions::kNoTimeout) {
-        // Don't allow no timeout
-        writeConcernOptions.wTimeout = kDefaultWriteTimeoutForMigrationMs;
-    }
-
-    return ChunkMoveWriteConcernOptions(secThrottleObj, writeConcernOptions);
-}
 
 ChunkMoveOperationState::ChunkMoveOperationState(OperationContext* txn, NamespaceString ns)
     : _txn(txn), _nss(std::move(ns)) {}
