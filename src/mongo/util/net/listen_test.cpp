@@ -28,6 +28,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -35,6 +36,11 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+static AtomicUInt32 myShutdownInProgress(0);
+bool inShutdown() {
+    return myShutdownInProgress.loadRelaxed() != 0;
+}
 
 namespace {
 
@@ -45,7 +51,6 @@ TEST(Listener, ElapsedTimeCheck) {
     Listener listener("test_listener", "", 0);  // port 0 => any available high port
     listener.setupSockets();
     stdx::thread t([&listener]() { listener.initAndListen(); });
-    t.detach();
     listener.waitUntilListening();
     sleepmillis(kSleepMillis);  // wait for setup.
     long long listenStart = listener.getMyElapsedTimeMillis();
@@ -56,6 +61,8 @@ TEST(Listener, ElapsedTimeCheck) {
     log() << "Listener elapsed time: " << listenDelta << std::endl;
     log() << "Clock elapsed time:    " << clockDelta << std::endl;
     ASSERT_APPROX_EQUAL(listenDelta, clockDelta, kEpsilon);
+    myShutdownInProgress.store(1);
+    t.join();
 }
 
 }  // namespace

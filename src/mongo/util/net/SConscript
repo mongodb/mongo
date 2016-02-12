@@ -59,6 +59,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'network',
     ],
+    NO_CRUTCH = True,
 )
 
 env.Library(
