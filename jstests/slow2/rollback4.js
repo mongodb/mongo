@@ -1,4 +1,8 @@
 // Test a large rollback SERVER-2737
+//
+// This test is disabled on ephemeral storage engines, because it stops one of the data bearing
+// nodes and as such the data would be lost.
+// @tags: [requires_persistence]
 (function() {
 'use strict';
 
@@ -63,4 +67,4 @@ replTest.restart( 0 );
 replTest.awaitSecondaryNodes(5*60*1000);
 replTest.awaitReplication(5*60*1000);
 
-});
+})();
