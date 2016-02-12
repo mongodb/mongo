@@ -118,8 +118,10 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		}
 	}
 
+	logMessageSuffix := "with no metadata"
 	// first create the collection with options from the metadata file
 	if intent.MetadataFile != nil {
+		logMessageSuffix = "using options from metadata"
 		err = intent.MetadataFile.Open()
 		if err != nil {
 			return err
@@ -136,25 +138,23 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 			return fmt.Errorf("error parsing metadata from %v: %v", intent.MetadataLocation, err)
 		}
 
-		if !restore.OutputOptions.NoOptionsRestore {
-			if options != nil {
-				if !collectionExists {
-					log.Logf(log.Info, "creating collection %v using options from metadata", intent.Namespace())
-					err = restore.CreateCollection(intent, options)
-					if err != nil {
-						return fmt.Errorf("error creating collection %v: %v", intent.Namespace(), err)
-					}
-				} else {
-					log.Logf(log.Info, "collection %v already exists", intent.Namespace())
-				}
-			} else {
-				log.Log(log.Info, "no collection options to restore")
-			}
-		} else {
-			log.Log(log.Info, "skipping options restoration")
+		if restore.OutputOptions.NoOptionsRestore {
+			log.Log(log.Info, "not restoring collection options")
+			logMessageSuffix = "with no collection options"
+			options = nil
 		}
 	}
-	
+	if !collectionExists {
+		log.Logf(log.Info, "creating collection %v %s", intent.Namespace(), logMessageSuffix)
+		log.Logf(log.DebugHigh, "using collection options: %#v", options)
+		err = restore.CreateCollection(intent, options)
+		if err != nil {
+			return fmt.Errorf("error creating collection %v: %v", intent.Namespace(), err)
+		}
+	} else {
+		log.Logf(log.Info, "collection %v already exists - skipping collection create", intent.Namespace())
+	}
+
 	var documentCount int64
 	if intent.BSONFile != nil {
 		err = intent.BSONFile.Open()
@@ -190,13 +190,11 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 	return nil
 }
 
-
 // RestoreCollectionToDB pipes the given BSON data into the database.
 // Returns the number of documents restored and any errors that occured.
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	bsonSource *db.DecodedBSONSource, file PosReader, fileSize int64) (int64, error) {
 
-	
 	var termErr error
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {

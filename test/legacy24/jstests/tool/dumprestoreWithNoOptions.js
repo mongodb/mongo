@@ -36,11 +36,18 @@ db.dropDatabase();
 assert.eq( 0, db.capped.count(), "capped not dropped");
 assert.eq( 0, db.system.indexes.count(), "indexes not dropped" );
 
-t.runTool( "restore" , "--dir" , t.ext , "--noOptionsRestore");
+t.runTool( "restore" , "--dir" , t.ext , "--noOptionsRestore", "-vvv");
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
-assert(undefined === db.capped.exists().options, "restore options not ignored");
+
+// Note: The 2.4 server seems to have a bug where part of the "create" command
+// itself ends up being set in the collection options object. So as a workaround,
+// we will just delete that key and make sure there are no other keys set in
+// the options object.
+opts = db.capped.exists().options;
+delete opts.create;
+assert.eq(Object.keys(opts).length, 0, "restore options not ignored");
 
 // Dump/restore single DB
 
@@ -69,7 +76,10 @@ db = db.getSiblingDB(dbname2);
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
-assert(undefined === db.capped.exists().options, "restore options not ignored");
+
+opts = db.capped.exists().options;
+delete opts.create;
+assert.eq(Object.keys(opts).length, 0, "restore options not ignored");
 
 // Dump/restore single collection
 
@@ -100,6 +110,8 @@ db = db.getSiblingDB(dbname);
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert( true !== db.capped.stats().capped, "restore options were not ignored" );
-assert( undefined === db.capped.exists().options );
+opts = db.capped.exists().options;
+delete opts.create;
+assert.eq(Object.keys(opts).length, 0, "restore options not ignored");
 
 t.stop();
