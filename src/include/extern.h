@@ -253,8 +253,6 @@ extern int __wt_conn_dhandle_find( WT_SESSION_IMPL *session, const char *uri, co
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force);
 extern int __wt_conn_btree_open( WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags);
 extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session, bool apply_checkpoints, const char *uri, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
-extern int __wt_conn_btree_apply_single_ckpt(WT_SESSION_IMPL *session, const char *uri, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
-extern int __wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri, const char *checkpoint, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
 extern int __wt_conn_dhandle_close_all( WT_SESSION_IMPL *session, const char *uri, bool force);
 extern int __wt_conn_dhandle_discard_single( WT_SESSION_IMPL *session, bool final, bool force);
 extern int __wt_conn_dhandle_discard(WT_SESSION_IMPL *session);

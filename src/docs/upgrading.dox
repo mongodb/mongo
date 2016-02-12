@@ -4,25 +4,24 @@
 <dl>
 <dt>Column-store bulk-load cursors</dt>
 <dd>
-Historically, bulk-load of a column-store object ignored any key set in
-the cursor and automatically assigned each inserted row the next
-sequential record number for its key. In the 2.7.1 release, column-store
-objects match row-store behavior and require the cursor key be set
-before an insert. (This also allows allows sparse tables to be created
-in column-store objects, any skipped records are created as
-already-deleted rows.) To match the previous behavior, specify the
-\c append configuration string when opening the column-store bulk-load
-cursor; this causes the cursor's key to be ignored and each inserted row
-will be assigned the next record number.
+Historically, bulk-load of a column-store object ignored any key set in the
+cursor and automatically assigned each inserted row the next sequential
+record number for its key. In the 2.7.1 release, column-store objects match
+row-store behavior and require the cursor key be set before an insert.
+(This allows sparse tables to be created in column-store objects, any
+skipped records are created as already-deleted rows.) To match the previous
+behavior, specify the \c append configuration string when opening the
+column-store bulk-load cursor; this causes the cursor's key to be ignored
+and each inserted row will be assigned the next record number.
 </dd>
 
 <dt>Change to WT_SESSION::truncate with URI</dt>
 <dd>
 If using the WT_SESSION::truncate API with a file: URI for a full table
-truncate, underlying algorithmic changes result in some visible differences.
-This call can now return WT_ROLLBACK.  Applications should be prepared to
-handle this error.  This method no longer requires exclusive access to the
-table.  Also the underlying disk space may not be immediately
+truncate, underlying algorithmic changes result in some visible
+differences.  This call can now return WT_ROLLBACK.  Applications should be
+prepared to handle this error.  This method no longer requires exclusive
+access to the table.  Also the underlying disk space may not be immediately
 reclaimed when the call returns.  The performance of this API may differ
 from earlier releases.
 </dd>
@@ -32,6 +31,14 @@ from earlier releases.
 Support for the bzip2 compression/decompression engine has been removed
 from the WiredTiger release; remaining compression engines include LZ4,
 snappy and zlib.
+</dd>
+
+<dt>Change to named checkpoints with bulk loads</dt>
+<dd>
+Previous versions of WiredTiger created empty named checkpoints in files
+being bulk-loaded.  In this release, checkpoint skips files being
+bulk-loaded, so they do not get named checkpoints that complete during the
+bulk load.
 </dd>
 
 </dl><hr>

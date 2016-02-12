@@ -56,6 +56,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_rwlock_alloc(session,
 	    &conn->hot_backup_lock, "hot backup"));
 	WT_RET(__wt_spin_init(session, &conn->las_lock, "lookaside table"));
+	WT_RET(__wt_spin_init(session, &conn->metadata_lock, "metadata"));
 	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
 	WT_RET(__wt_spin_init(session, &conn->schema_lock, "schema"));
 	WT_RET(__wt_spin_init(session, &conn->table_lock, "table creation"));
@@ -143,6 +144,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->fh_lock);
 	WT_TRET(__wt_rwlock_destroy(session, &conn->hot_backup_lock));
 	__wt_spin_destroy(session, &conn->las_lock);
+	__wt_spin_destroy(session, &conn->metadata_lock);
 	__wt_spin_destroy(session, &conn->reconfig_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_spin_destroy(session, &conn->table_lock);
