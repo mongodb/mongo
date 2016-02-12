@@ -305,7 +305,7 @@ functions:
           git clone git@github.com:10gen/jstestfuzz.git
 
           if [ "Windows_NT" != "$OS" ]; then
-            curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.7-linux-x64.tar.gz --output node.tar.gz
+            curl --verbose --max-time 600 --retry 10 --retry-max-time 900 http://boxes.10gen.com/build/node-v0.12.7-linux-x64.tar.gz --output node.tar.gz
             ${decompress} node.tar.gz > /dev/null
           fi
 
