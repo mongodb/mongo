@@ -132,14 +132,6 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
         self.create = True
 
-        # If we changed the directory to readonly, change it back so that
-        # the cleanup functions can remove it and set up for the next test.
-        if self.dirchmod:
-            for f in os.listdir(self.home):
-                if os.path.isfile(f):
-                    os.chmod(f, 0666)
-            os.chmod(self.home, 0777)
-
     def test_readonly(self):
         if self.dirchmod:
             with self.expectedStderrPattern('Permission'):
