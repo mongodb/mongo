@@ -352,12 +352,23 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 static int
 dump_json_table_config(WT_SESSION *session, const char *uri)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
+	size_t len;
 	int tret;
-	char *value;
+	const char *name, *value;
+	char *p;
 
-	/* Dump the config. */
+	p = NULL;
+
+	/* Get the table name. */
+	if ((name = strchr(uri, ':')) == NULL) {
+		fprintf(stderr, "%s: %s: corrupted uri\n", progname, uri);
+		return (1);
+	}
+	++name;
+
 	/* Open a metadata cursor. */
 	if ((ret = session->open_cursor(
 	    session, "metadata:create", NULL, NULL, &cursor)) != 0) {
@@ -368,12 +379,41 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 	}
 
 	/*
-	 * Search for the object itself, to make sure it
-	 * exists, and get its config string. This where we
-	 * find out a table object doesn't exist, use a simple
-	 * error message.
+	 * Search for the object itself, just to make sure it exists, we don't
+	 * want to output a header if the user entered the wrong name. This is
+	 * where we find out a table doesn't exist, use a simple error message.
+	 *
+	 * Workaround for WiredTiger "simple" table handling. Simple tables
+	 * have column-group entries, but they aren't listed in the metadata's
+	 * table entry. Figure out if it's a simple table and in that case,
+	 * retrieve the column-group entry and use the value from its "source"
+	 * file.
 	 */
-	cursor->set_key(cursor, uri);
+	if (WT_PREFIX_MATCH(uri, "table:")) {
+		len = strlen(uri) + strlen("colgroup:");
+		if ((p = malloc(len)) == NULL)
+			return (util_err(session, errno, NULL));
+		(void)snprintf(p, len, "colgroup:%s", name);
+		cursor->set_key(cursor, p);
+		if ((ret = cursor->search(cursor)) == 0) {
+			if ((ret = cursor->get_value(cursor, &value)) != 0)
+				return (util_cerr(cursor, "get_value", ret));
+			if ((ret = __wt_config_getones(
+			    (WT_SESSION_IMPL *)session,
+			    value, "source", &cval)) != 0)
+				return (util_err(
+				    session, ret, "%s: source entry", p));
+			free(p);
+			len = cval.len + 10;
+			if ((p = malloc(len)) == NULL)
+				return (util_err(session, errno, NULL));
+			(void)snprintf(p, len, "%.*s", (int)cval.len, cval.str);
+			cursor->set_key(cursor, p);
+		} else
+			cursor->set_key(cursor, uri);
+	} else
+		cursor->set_key(cursor, uri);
+
 	if ((ret = cursor->search(cursor)) == 0) {
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			ret = util_cerr(cursor, "get_value", ret);
@@ -381,8 +421,7 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 		    session, cursor, uri, value) != 0)
 			ret = 1;
 	} else if (ret == WT_NOTFOUND)
-		ret = util_err(
-		    session, 0, "%s: No such object exists", uri);
+		ret = util_err(session, 0, "%s: No such object exists", uri);
 	else
 		ret = util_err(session, ret, "%s", uri);
 
@@ -392,6 +431,7 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 			ret = tret;
 	}
 
+	free(p);
 	return (ret);
 }
 
@@ -414,10 +454,15 @@ dump_json_table_end(WT_SESSION *session)
 static int
 dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CURSOR *srch;
 	WT_DECL_RET;
+	size_t len;
 	int tret;
-	const char *key, *name, *value;
+	const char *name, *value;
+	char *p;
+
+	p = NULL;
 
 	/* Get the table name. */
 	if ((name = strchr(uri, ':')) == NULL) {
@@ -427,17 +472,44 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 	++name;
 
 	/*
-	 * Dump out the config information: first, dump the uri entry itself
-	 * (requires a lookup).
+	 * Dump out the config information: first, dump the uri entry itself.
+	 *
+	 * Workaround for WiredTiger "simple" table handling. Simple tables
+	 * have column-group entries, but they aren't listed in the metadata's
+	 * table entry. Figure out if it's a simple table and in that case,
+	 * retrieve the column-group entry and use the value from its "source"
+	 * file.
 	 */
-	cursor->set_key(cursor, uri);
+	if (WT_PREFIX_MATCH(uri, "table:")) {
+		len = strlen(uri) + strlen("colgroup:");
+		if ((p = malloc(len)) == NULL)
+			return (util_err(session, errno, NULL));
+		(void)snprintf(p, len, "colgroup:%s", name);
+		cursor->set_key(cursor, p);
+		if ((ret = cursor->search(cursor)) == 0) {
+			if ((ret = cursor->get_value(cursor, &value)) != 0)
+				return (util_cerr(cursor, "get_value", ret));
+			if ((ret =__wt_config_getones(
+			    (WT_SESSION_IMPL *)session,
+			    value, "source", &cval)) != 0)
+				return (util_err(
+				    session, ret, "%s: source entry", p));
+			free(p);
+			len = cval.len + 10;
+			if ((p = malloc(len)) == NULL)
+				return (util_err(session, errno, NULL));
+			(void)snprintf(p, len, "%.*s", (int)cval.len, cval.str);
+			cursor->set_key(cursor, p);
+		} else
+			cursor->set_key(cursor, uri);
+	} else
+		cursor->set_key(cursor, uri);
+
 	if ((ret = cursor->search(cursor)) != 0)
 		return (util_cerr(cursor, "search", ret));
-	if ((ret = cursor->get_key(cursor, &key)) != 0)
-		return (util_cerr(cursor, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
 		return (util_cerr(cursor, "get_value", ret));
-	if (print_config(session, key, value, NULL) != 0)
+	if (print_config(session, uri, value, NULL) != 0)
 		return (1);
 
 	/*
@@ -459,6 +531,7 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 			ret = tret;
 	}
 
+	free(p);
 	return (ret);
 }
 
@@ -473,6 +546,7 @@ dump_table_config_type(WT_SESSION *session,
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	const char *key, *skip, *value, *value_source;
+	size_t len;
 	int exact;
 	char *p;
 
@@ -514,10 +588,10 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 			    util_err(session, ret, "%s: source entry", key));
 
 		/* Nul-terminate the source entry. */
-		if ((p = malloc(cval.len + 10)) == NULL)
+		len = cval.len + 10;
+		if ((p = malloc(len)) == NULL)
 			return (util_err(session, errno, NULL));
-		(void)strncpy(p, cval.str, cval.len);
-		p[cval.len] = '\0';
+		(void)snprintf(p, len, "%.*s", (int)cval.len, cval.str);
 		srch->set_key(srch, p);
 		if ((ret = srch->search(srch)) != 0)
 			ret = util_err(session, ret, "%s: %s", key, p);
