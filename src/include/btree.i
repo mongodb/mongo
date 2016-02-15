@@ -1446,14 +1446,18 @@ __wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 }
 
 /*
- * __wt_split_intl_race --
+ * __wt_split_descent_race --
  *	Return if we raced with an internal page split when descending the tree.
  */
 static inline bool
-__wt_split_intl_race(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE_INDEX *saved_pindex)
+__wt_split_descent_race(
+    WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX *saved_pindex)
 {
 	WT_PAGE_INDEX *pindex;
+
+	/* No test when starting the descent (there's no home to check). */
+	if (__wt_ref_is_root(ref))
+		return (false);
 
 	/*
 	 * A place to hang this comment...
@@ -1509,6 +1513,6 @@ __wt_split_intl_race(
 	 * content the split page retains after the split, and we ignore this
 	 * race.
 	 */
-	WT_INTL_INDEX_GET(session, parent, pindex);
+	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	return (pindex != saved_pindex);
 }

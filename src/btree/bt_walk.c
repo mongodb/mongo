@@ -163,12 +163,12 @@ __page_ascend(WT_SESSION_IMPL *session,
 }
 
 /*
- * __page_descend --
- *	Descend the tree one level.
+ * __page_descend_prev --
+ *	Descend the tree one level, during a previous-cursor walk.
  */
 static void
-__page_descend(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_PAGE_INDEX **pindexp, uint32_t *slotp, bool prev)
+__page_descend_prev(WT_SESSION_IMPL *session,
+    WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
 	WT_PAGE_INDEX *pindex;
 
@@ -177,9 +177,6 @@ __page_descend(WT_SESSION_IMPL *session,
 	 * we have a hazard pointer.
 	 */
 	for (;; __wt_yield()) {
-		WT_INTL_INDEX_GET(session, page, pindex);
-		*slotp = prev ? pindex->entries - 1 : 0;
-
 		/*
 		 * There's a split race when a cursor moving backwards through
 		 * the tree descends the tree. If we're splitting an internal
@@ -233,18 +230,38 @@ __page_descend(WT_SESSION_IMPL *session,
 		 * being split and part of its namespace moved. We have the
 		 * correct page and we don't have to move, all we have to do is
 		 * wait until the split page's page index is updated.
-		 *
-		 * No test is necessary for a next-cursor movement because we
-		 * do right-hand splits on internal pages and the initial part
-		 * of the page's namespace won't change as part of a split.
-		 * Instead of testing the direction boolean, do the test the
-		 * previous cursor movement requires in all cases, even though
-		 * it will always succeed for a next-cursor movement.
 		 */
-		if (pindex->index[*slotp]->home == page)
+		WT_INTL_INDEX_GET(session, ref->page, pindex);
+		*slotp = pindex->entries - 1;
+		if (pindex->index[*slotp]->home == ref->page)
 			break;
 	}
 	*pindexp = pindex;
+}
+
+/*
+ * __page_initial_descent_prev --
+ *	Descend the tree one level, when setting up the initial cursor position
+ * for a previous-cursor walk.
+ */
+static bool
+__page_initial_descent_prev(WT_SESSION_IMPL *session,
+    WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
+{
+	WT_PAGE_INDEX *parent_pindex, *pindex;
+
+	/*
+	 * We're passed a child page into which we're descending, and on which
+	 * we have a hazard pointer.
+	 */
+	parent_pindex = *pindexp;
+	WT_INTL_INDEX_GET(session, ref->page, pindex);
+	*slotp = pindex->entries - 1;
+	if (__wt_split_descent_race(session, ref, parent_pindex))
+		return (false);
+
+	*pindexp = pindex;
+	return (true);
 }
 
 /*
@@ -259,11 +276,12 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
-	bool empty_internal, prev, skip;
+	bool empty_internal, initial_descent, prev, skip;
 	uint32_t slot;
 
 	btree = S2BT(session);
-	empty_internal = false;
+	pindex = NULL;
+	empty_internal = initial_descent = false;
 
 	/*
 	 * Tree walks are special: they look inside page structures that splits
@@ -325,9 +343,14 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 
 	/* If no page is active, begin a walk from the start of the tree. */
 	if (ref == NULL) {
-		ref = &btree->root;
+restart:	if (couple != &btree->root)
+			WT_ERR(__wt_page_release(session, couple, flags));
+
+		couple = couple_orig = ref = &btree->root;
 		if (ref->page == NULL)
 			goto done;
+
+		initial_descent = true;
 		goto descend;
 	}
 
@@ -336,7 +359,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	 * Release any hazard-pointer we're holding.
 	 */
 	if (__wt_ref_is_root(ref)) {
-		WT_ERR(__wt_page_release(session, couple, flags));
+		WT_ERR(__wt_page_release(session, ref, flags));
 		goto done;
 	}
 
@@ -525,12 +548,8 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 				 * root to a new saved position in the tree,
 				 * restart the walk.
 				 */
-				if (couple == &btree->root) {
-					ref = &btree->root;
-					if (ref->page == NULL)
-						goto done;
-					goto descend;
-				}
+				if (couple == &btree->root)
+					goto restart;
 
 				/*
 				 * If restarting from some original position,
@@ -561,9 +580,52 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 descend:			couple = ref;
 				empty_internal = true;
 
-				__page_descend(
-				    session, ref->page, &pindex, &slot, prev);
+				/*
+				 * There's a split race when a cursor is setting
+				 * up at the end of the tree or moving backwards
+				 * through the tree and descending a level. When
+				 * splitting an internal page into its parent,
+				 * we move the WT_REF structures and update the
+				 * parent's page index before updating the split
+				 * page's page index, and it's not an atomic
+				 * update. A thread can read the parent page's
+				 * replacement page index, then read the split
+				 * page's original index.
+				 *
+				 * This isn't a problem for a cursor setting up
+				 * at the start of the tree or moving forwards
+				 * through the tree because we do right-hand
+				 * splits on internal pages and the initial part
+				 * of the split page's namespace won't change as
+				 * part of a split. A thread reading the parent
+				 * page's and split page's indexes will move to
+				 * the same slot no matter what combination of
+				 * indexes are read.
+				 *
+				 * Handle a cursor setting up at the end of the
+				 * tree or moving backwards through the tree.
+				 */
+				if (!prev) {
+					WT_INTL_INDEX_GET(
+					    session, ref->page, pindex);
+					slot = 0;
+				} else if (initial_descent) {
+					if (!__page_initial_descent_prev(
+					    session, ref, &pindex, &slot))
+						goto restart;
+				} else
+					__page_descend_prev(
+					    session, ref, &pindex, &slot);
 			} else {
+				/*
+				 * At the lowest tree level (considering a leaf
+				 * page), turn off the initial-descent test.
+				 * The descent race tests are different when
+				 * moving through the tree vs. doing the initial
+				 * descent.
+				 */
+				initial_descent = false;
+
 				/*
 				 * Optionally skip leaf pages, the second half.
 				 * We didn't have an on-page cell to figure out
