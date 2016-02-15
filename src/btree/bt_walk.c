@@ -361,7 +361,7 @@ restart:	/*
 	/*
 	 * If the active page was the root, we've reached the walk's end; we
 	 * only get here if we've returned the root to our caller, so we're
-	 * holding no hazard references.
+	 * holding no hazard pointers.
 	 */
 	if (__wt_ref_is_root(ref))
 		goto done;
@@ -670,7 +670,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 /*
  * __wt_tree_walk_count --
  *	Move to the next/previous page in the tree, tracking how many
- *	references were visited to get there.
+ * references were visited to get there.
  */
 int
 __wt_tree_walk_count(WT_SESSION_IMPL *session,
