@@ -341,10 +341,14 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	couple = couple_orig = ref = *refp;
 	*refp = NULL;
 
-	/* If no page is active, begin a walk from the start of the tree. */
+	/* If no page is active, begin a walk from the start/end of the tree. */
 	if (ref == NULL) {
-restart:	if (couple != &btree->root)
-			WT_ERR(__wt_page_release(session, couple, flags));
+restart:	/*
+		 * We can reach here with a NULL or root reference; the release
+		 * function handles them internally, don't complicate this code
+		 * by calling them out.
+		 */
+		WT_ERR(__wt_page_release(session, couple, flags));
 
 		couple = couple_orig = ref = &btree->root;
 		if (ref->page == NULL)
@@ -355,13 +359,12 @@ restart:	if (couple != &btree->root)
 	}
 
 	/*
-	 * If the active page was the root, we've reached the walk's end.
-	 * Release any hazard-pointer we're holding.
+	 * If the active page was the root, we've reached the walk's end; we
+	 * only get here if we've returned the root to our caller, so we're
+	 * holding no hazard references.
 	 */
-	if (__wt_ref_is_root(ref)) {
-		WT_ERR(__wt_page_release(session, ref, flags));
+	if (__wt_ref_is_root(ref))
 		goto done;
-	}
 
 	/* Figure out the current slot in the WT_REF array. */
 	__ref_index_slot(session, ref, &pindex, &slot);
@@ -590,7 +593,8 @@ descend:			couple = ref;
 				 * page's page index, and it's not an atomic
 				 * update. A thread can read the parent page's
 				 * replacement page index, then read the split
-				 * page's original index.
+				 * page's original index, or the parent page's
+				 * original and the split page's replacement.
 				 *
 				 * This isn't a problem for a cursor setting up
 				 * at the start of the tree or moving forwards
@@ -599,8 +603,8 @@ descend:			couple = ref;
 				 * of the split page's namespace won't change as
 				 * part of a split. A thread reading the parent
 				 * page's and split page's indexes will move to
-				 * the same slot no matter what combination of
-				 * indexes are read.
+				 * the same slot no matter what order of indexes
+				 * are read.
 				 *
 				 * Handle a cursor setting up at the end of the
 				 * tree or moving backwards through the tree.
@@ -619,10 +623,9 @@ descend:			couple = ref;
 			} else {
 				/*
 				 * At the lowest tree level (considering a leaf
-				 * page), turn off the initial-descent test.
-				 * The descent race tests are different when
-				 * moving through the tree vs. doing the initial
-				 * descent.
+				 * page), turn off the initial-descent state.
+				 * Descent race tests are different when moving
+				 * through the tree vs. the initial descent.
 				 */
 				initial_descent = false;
 
