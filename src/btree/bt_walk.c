@@ -89,11 +89,11 @@ __ref_is_leaf(WT_REF *ref)
 }
 
 /*
- * __page_ascend --
+ * __ref_ascend --
  *	Ascend the tree one level.
  */
-static void
-__page_ascend(WT_SESSION_IMPL *session,
+static inline void
+__ref_ascend(WT_SESSION_IMPL *session,
     WT_REF **refp, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
 	WT_REF *parent_ref, *ref;
@@ -163,11 +163,11 @@ __page_ascend(WT_SESSION_IMPL *session,
 }
 
 /*
- * __page_descend_prev --
+ * __ref_descend_prev --
  *	Descend the tree one level, during a previous-cursor walk.
  */
-static void
-__page_descend_prev(
+static inline void
+__ref_descend_prev(
     WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp)
 {
 	WT_PAGE_INDEX *pindex;
@@ -239,12 +239,12 @@ __page_descend_prev(
 }
 
 /*
- * __page_initial_descent_prev --
+ * __ref_initial_descent_prev --
  *	Descend the tree one level, when setting up the initial cursor position
  * for a previous-cursor walk.
  */
-static bool
-__page_initial_descent_prev(
+static inline bool
+__ref_initial_descent_prev(
     WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp)
 {
 	WT_PAGE_INDEX *pindex;
@@ -378,7 +378,7 @@ restart:	/*
 		while ((prev && slot == 0) ||
 		    (!prev && slot == pindex->entries - 1)) {
 			/* Ascend to the parent. */
-			__page_ascend(session, &ref, &pindex, &slot);
+			__ref_ascend(session, &ref, &pindex, &slot);
 
 			/*
 			 * If we got all the way through an internal page and
@@ -623,12 +623,12 @@ descend:			couple = ref;
 					    session, ref->page, pindex);
 					slot = 0;
 				} else if (initial_descent) {
-					if (!__page_initial_descent_prev(
+					if (!__ref_initial_descent_prev(
 					    session, ref, &pindex))
 						goto restart;
 					slot = pindex->entries - 1;
 				} else {
-					__page_descend_prev(
+					__ref_descend_prev(
 					    session, ref, &pindex);
 					slot = pindex->entries - 1;
 				}
