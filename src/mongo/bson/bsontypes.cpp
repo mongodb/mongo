@@ -29,6 +29,7 @@
 
 #include "mongo/bson/bsontypes.h"
 
+#include "mongo/config.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
