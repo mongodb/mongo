@@ -52,6 +52,6 @@ TEST(ProcessInfo, NonZeroPageSize) {
 TEST(ProcessInfo, GetNumCoresReturnsNonZeroNumberOfProcessors) {
     ProcessInfo processInfo;
     ProcessInfo::initializeSystemInfo();
-    ASSERT_GREATER_THAN((int)processInfo.getNumCores(), 0);
+    ASSERT_GREATER_THAN(processInfo.getNumCores(), 0u);
 }
 }
