@@ -197,36 +197,22 @@ bool checkShardVersion(OperationContext* txn,
     const NamespaceString& nss = request.getTargetingNSS();
     dassert(txn->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IX));
 
-    if (!request.hasShardVersion()) {
-        // Request is unsharded;
+    if (!OperationShardVersion::get(txn).hasShardVersion()) {
         return true;
     }
 
-    // If sharding metadata was specified by the caller, the sharding state must have been
-    // initialized already. Otherwise we must fail the request so the query is not silently
-    // treated as unsharded.
+    ChunkVersion operationShardVersion = OperationShardVersion::get(txn).getShardVersion(nss);
+    if (ChunkVersion::isIgnoredVersion(operationShardVersion)) {
+        return true;
+    }
+
     ShardingState* shardingState = ShardingState::get(txn);
-    if (!shardingState->enabled()) {
-        // Being in this state is really a bug on the caller side (most likely mongos), unless
-        // this is a test or someone manually constructing commands with sharding fields using the
-        // shell.
-        result->setError(toWriteError({ErrorCodes::NotYetInitialized,
-                                       "Request contains sharding metadata, but the server has not "
-                                       "been made sharding aware."}));
-        return false;
-    }
-
-    ChunkVersion requestShardVersion = request.getShardVersion();
-    if (ChunkVersion::isIgnoredVersion(requestShardVersion)) {
-        return true;
-    }
-
     CollectionMetadataPtr metadata = shardingState->getCollectionMetadata(nss.ns());
     ChunkVersion shardVersion = metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
-    if (!requestShardVersion.isWriteCompatibleWith(shardVersion)) {
+    if (!operationShardVersion.isWriteCompatibleWith(shardVersion)) {
         result->setError(new WriteErrorDetail);
-        buildStaleError(requestShardVersion, shardVersion, result->getError());
+        buildStaleError(operationShardVersion, shardVersion, result->getError());
         return false;
     }
 
@@ -306,15 +292,6 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
     OwnedPointerVector<BatchedUpsertDetail> upsertedOwned;
     vector<BatchedUpsertDetail*>& upserted = upsertedOwned.mutableVector();
 
-    // If the request has a shard version, but the operation doesn't have a shard version, this
-    // means it came from an old mongos instance (pre 3.2) that set the version in the "metadata"
-    // field instead of at the top level. Set the value in order to ensure the
-    // dependent code works.
-    // TODO(spencer): Remove this after 3.2 ships.
-    OperationShardVersion& operationShardVersion = OperationShardVersion::get(_txn);
-    if (request.hasShardVersion() && !operationShardVersion.hasShardVersion()) {
-        operationShardVersion.setShardVersion(request.getTargetingNSS(), request.getShardVersion());
-    }
 
     //
     // Apply each batch item, possibly bulking some items together in the write lock.
@@ -353,6 +330,7 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
 
     if (staleBatch) {
         ShardingState* shardingState = ShardingState::get(_txn);
+        const OperationShardVersion& operationShardVersion = OperationShardVersion::get(_txn);
         const ChunkVersion& requestShardVersion =
             operationShardVersion.getShardVersion(request.getTargetingNSS());
 
@@ -1125,12 +1103,6 @@ static void multiUpdate(OperationContext* txn,
     // Updates from the write commands path can yield.
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-    boost::optional<OperationShardVersion::IgnoreVersioningBlock> maybeIgnoreVersion;
-    if (isMulti) {
-        // Multi-updates are unversioned.
-        maybeIgnoreVersion.emplace(txn, nsString);
-    }
-
     auto client = txn->getClient();
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
     ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
@@ -1310,12 +1282,6 @@ static void multiRemove(OperationContext* txn,
 
     // Deletes running through the write commands path can yield.
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
-
-    boost::optional<OperationShardVersion::IgnoreVersioningBlock> maybeIgnoreVersion;
-    if (request.isMulti()) {
-        // Multi-removes are unversioned.
-        maybeIgnoreVersion.emplace(txn, nss);
-    }
 
     auto client = txn->getClient();
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
