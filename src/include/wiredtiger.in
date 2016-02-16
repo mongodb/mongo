@@ -3004,6 +3004,10 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  */
 #define	WT_CACHE_FULL	-31807
 /*! @endcond */
+/*! @cond internal */
+/*! Permission denied (internal). */
+#define	WT_PERM_DENIED	-31808
+/*! @endcond */
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

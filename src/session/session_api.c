@@ -13,12 +13,11 @@ static int __session_snapshot(WT_SESSION *, const char *);
 static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*
- * __wt_session_notsup_cfg --
+ * __wt_session_notsup_config --
  *	Unsupported session actions that have a signature of a config string.
  */
 int
-__wt_session_notsup_cfg(
-    WT_SESSION *wt_session, const char *config)
+__wt_session_notsup_config(WT_SESSION *wt_session, const char *config)
 {
 	WT_SESSION_IMPL *session;
 
@@ -1471,9 +1470,9 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	 */
 	if (F_ISSET(conn, WT_CONN_READONLY)) {
 		wt_session = &session_ret->iface;
-		wt_session->checkpoint = __wt_session_notsup_cfg;
-		wt_session->log_flush = __wt_session_notsup_cfg;
-		wt_session->transaction_sync = __wt_session_notsup_cfg;
+		wt_session->checkpoint = __wt_session_notsup_config;
+		wt_session->log_flush = __wt_session_notsup_config;
+		wt_session->transaction_sync = __wt_session_notsup_config;
 
 		wt_session->compact = __wt_session_notsup_uri;
 		wt_session->create = __wt_session_notsup_uri;

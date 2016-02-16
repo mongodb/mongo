@@ -622,6 +622,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 
 	manager = &S2C(session)->lsm_manager;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	/*
 	 * Don't add merges or bloom filter creates if merges
 	 * or bloom filters are disabled in the tree.
