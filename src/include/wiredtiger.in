@@ -1854,8 +1854,9 @@ struct __wt_connection {
 	 * integer between 3 and 20; default \c 4.}
 	 * @config{ ),,}
 	 * @config{readonly, open connection in read-only mode.  The database
-	 * must exist.  All methods that may modify a database are disabled., a
-	 * boolean flag; default \c false.}
+	 * must exist.  All methods that may modify a database are disabled.
+	 * See @ref readonly for more information., a boolean flag; default \c
+	 * false.}
 	 * @config{shared_cache = (, shared cache configuration options.  A
 	 * database should configure either a cache_size or a shared_cache not
 	 * both.  Enabling a shared cache uses a session from the configured
@@ -2330,8 +2331,8 @@ struct __wt_connection {
  * processes). <b>Not yet supported in WiredTiger</b>., a boolean flag; default
  * \c false.}
  * @config{readonly, open connection in read-only mode.  The database must
- * exist.  All methods that may modify a database are disabled., a boolean flag;
- * default \c false.}
+ * exist.  All methods that may modify a database are disabled.  See @ref
+ * readonly for more information., a boolean flag; default \c false.}
  * @config{session_max, maximum expected number of sessions (including server
  * threads)., an integer greater than or equal to 1; default \c 100.}
  * @config{shared_cache = (, shared cache configuration options.  A database

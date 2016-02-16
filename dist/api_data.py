@@ -480,7 +480,8 @@ connection_runtime_config = [
             ]),
     Config('readonly', 'false', r'''
         open connection in read-only mode.  The database must exist.  All
-        methods that may modify a database are disabled.''',
+        methods that may modify a database are disabled.  See @ref readonly
+        for more information''',
         type='boolean'),
     Config('shared_cache', '', r'''
         shared cache configuration options. A database should configure
