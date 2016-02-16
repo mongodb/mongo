@@ -53,10 +53,11 @@ options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
 // another insert to set minvalid ahead
 assert.writeOK(b_conn.getDB(name).foo.insert({x: 123}));
 var oplog_entry = b_conn.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
-oplog_entry["ts"] = Timestamp(oplog_entry["ts"].t, oplog_entry["ts"].i + 1);
-oplog_entry["op"] = "c";
-oplog_entry["cmd"] = "fake_command_name.exe";
+oplog_entry.ts = Timestamp(oplog_entry.ts.t, oplog_entry.ts.i + 1);
+oplog_entry.op = "c";
+oplog_entry.o = {fake_command_name: 1};
 assert.writeOK(b_conn.getDB("local").oplog.rs.insert(oplog_entry));
+jsTestLog('inserted oplog entry with invalid command: ' + tojson(oplog_entry));
 
 // shut down B and bring back the original master
 replTest.stop(BID);
@@ -71,7 +72,7 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 // restart B, which should rollback and log a message about not rolling back the nonexistent cmd
 clearRawMongoProgramOutput();
 replTest.restart(BID);
-var msg = RegExp("rollback no such command ");
+var msg = RegExp("rollback no such command fake_command_name");
 assert.soon(function() {
     return rawMongoProgramOutput().match(msg);
 }, "Did not see a log entry about skipping the nonexistent command during rollback");
