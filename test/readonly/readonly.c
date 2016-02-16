@@ -182,6 +182,7 @@ main(int argc, char *argv[])
 
 	working_dir = "WT_RD";
 	child = false;
+	op = OP_READ;
 	while ((ch = __wt_getopt(progname, argc, argv, "Rh:W")) != EOF)
 		switch (ch) {
 		case 'R':
