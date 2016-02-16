@@ -1384,16 +1384,9 @@ TEST(TypeMatchExpression, ElementNumberToBSONIsFormattedCorrectly) {
               BSON("a" << BSON("$type" << TypeMatchExpression::kMatchesAllNumbersAlias)));
 }
 
-TEST(TypeMatchExpression, InvalidTypeMatchExpressionerand) {
-    // If the provided type number is not a valid BSONType, it is not a parse error.  The
-    // operator will simply not match anything.
-    BSONObj notMatch1 = BSON("a" << BSONNULL);
-    BSONObj notMatch2 = BSON("a"
-                             << "abc");
+TEST(TypeMatchExpression, InvalidTypeMatchExpressionTypeCode) {
     TypeMatchExpression type;
-    ASSERT(type.initWithBSONType("", BSONType(JSTypeMax + 1)).isOK());
-    ASSERT(!type.matchesSingleElement(notMatch1["a"]));
-    ASSERT(!type.matchesSingleElement(notMatch2["a"]));
+    ASSERT_NOT_OK(type.initWithBSONType("", JSTypeMax + 1));
 }
 
 TEST(TypeMatchExpression, MatchesScalar) {

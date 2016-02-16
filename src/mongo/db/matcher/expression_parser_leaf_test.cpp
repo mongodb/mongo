@@ -687,10 +687,7 @@ TEST(MatchExpressionParserLeafTest, TypeBadType) {
     BSONObj query = BSON("x" << b.obj());
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5.3)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, TypeBad) {
@@ -852,9 +849,9 @@ TEST(MatchExpressionParserLeafTest, InvalidTypeCodeUnusedBetweenMinAndMaxFailsTo
 
 TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
     std::vector<BSONType> validTypes{
-        MinKey,     EOO,       NumberDouble,  String,     Object,        Array, BinData, Undefined,
-        jstOID,     Bool,      Date,          jstNULL,    RegEx,         DBRef, Code,    Symbol,
-        CodeWScope, NumberInt, bsonTimestamp, NumberLong, NumberDecimal, MaxKey};
+        MinKey,    EOO,    NumberDouble, String,    Object,        Array,      BinData,
+        Undefined, jstOID, Bool,         Date,      jstNULL,       RegEx,      DBRef,
+        Code,      Symbol, CodeWScope,   NumberInt, bsonTimestamp, NumberLong, MaxKey};
 
     for (auto type : validTypes) {
         BSONObj predicate = BSON("a" << BSON("$type" << type));
