@@ -167,8 +167,8 @@ __page_ascend(WT_SESSION_IMPL *session,
  *	Descend the tree one level, during a previous-cursor walk.
  */
 static void
-__page_descend_prev(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
+__page_descend_prev(
+    WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp)
 {
 	WT_PAGE_INDEX *pindex;
 
@@ -232,8 +232,7 @@ __page_descend_prev(WT_SESSION_IMPL *session,
 		 * wait until the split page's page index is updated.
 		 */
 		WT_INTL_INDEX_GET(session, ref->page, pindex);
-		*slotp = pindex->entries - 1;
-		if (pindex->index[*slotp]->home == ref->page)
+		if (pindex->index[pindex->entries - 1]->home == ref->page)
 			break;
 	}
 	*pindexp = pindex;
@@ -245,19 +244,20 @@ __page_descend_prev(WT_SESSION_IMPL *session,
  * for a previous-cursor walk.
  */
 static bool
-__page_initial_descent_prev(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
+__page_initial_descent_prev(
+    WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp)
 {
-	WT_PAGE_INDEX *parent_pindex, *pindex;
+	WT_PAGE_INDEX *pindex;
 
 	/*
 	 * We're passed a child page into which we're descending, and on which
 	 * we have a hazard pointer.
+	 *
+	 * Acquire a page index for the child page and then confirm we haven't
+	 * raced with a parent split.
 	 */
-	parent_pindex = *pindexp;
 	WT_INTL_INDEX_GET(session, ref->page, pindex);
-	*slotp = pindex->entries - 1;
-	if (__wt_split_descent_race(session, ref, parent_pindex))
+	if (__wt_split_descent_race(session, ref, *pindexp))
 		return (false);
 
 	*pindexp = pindex;
@@ -547,6 +547,15 @@ restart:	/*
 				ret = 0;
 
 				/*
+				 * If a cursor is setting up at the end of the
+				 * tree, we can't use our parent page's index,
+				 * because it may have already split; restart
+				 * the walk.
+				 */
+				if (prev && initial_descent)
+					goto restart;
+
+				/*
 				 * If a new walk that never coupled from the
 				 * root to a new saved position in the tree,
 				 * restart the walk.
@@ -615,11 +624,14 @@ descend:			couple = ref;
 					slot = 0;
 				} else if (initial_descent) {
 					if (!__page_initial_descent_prev(
-					    session, ref, &pindex, &slot))
+					    session, ref, &pindex))
 						goto restart;
-				} else
+					slot = pindex->entries - 1;
+				} else {
 					__page_descend_prev(
-					    session, ref, &pindex, &slot);
+					    session, ref, &pindex);
+					slot = pindex->entries - 1;
+				}
 			} else {
 				/*
 				 * At the lowest tree level (considering a leaf
