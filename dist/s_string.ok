@@ -245,6 +245,7 @@ Preload
 Prepend
 Qsort
 RCS
+RDNOLOCK
 RECNO
 REF's
 REFs
@@ -331,6 +332,7 @@ VxWorks
 WAL
 WIREDTIGER
 WRLSN
+WRNOLOCK
 WakeAllConditionVariable
 Wconditional
 WeakHashLen
@@ -799,6 +801,7 @@ nhex
 nlpo
 nocase
 nocrypto
+nolock
 nonliteral
 noop
 nop
