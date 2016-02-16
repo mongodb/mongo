@@ -298,9 +298,9 @@ main(int argc, char *argv[])
 	 *     read-only also.
 	 * 2.  Parent has read-only handle to all databases.  Child opens
 	 *     read-write.
-	 * 3.  Parent has read-write handle to writable databases and 
+	 * 3.  Parent has read-write handle to writable databases and
 	 *     read-only to read-only databases.  Child opens read-only.
-	 * 4.  Parent has read-write handle to writable databases and 
+	 * 4.  Parent has read-write handle to writable databases and
 	 *     read-only to read-only databases.  Child opens read-write.
 	 */
 	/*
@@ -373,7 +373,6 @@ main(int argc, char *argv[])
 		testutil_die(status, "system");
 	if (WEXITSTATUS(status) != 0)
 		testutil_die(WEXITSTATUS(status), "system");
-
 
 	/*
 	 * Clean-up.
