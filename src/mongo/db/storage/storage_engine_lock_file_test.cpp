@@ -37,6 +37,12 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
+#ifndef _WIN32
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
+
 namespace {
 
 using std::string;
@@ -167,6 +173,99 @@ TEST(StorageEngineLockFileTest, ClearPidAndUnlock) {
     lockFile.clearPidAndUnlock();
     ASSERT_TRUE(boost::filesystem::exists(lockFile.getFilespec()));
     ASSERT_EQUALS(0U, boost::filesystem::file_size(lockFile.getFilespec()));
+}
+
+class ScopedReadOnlyDirectory {
+public:
+    ScopedReadOnlyDirectory(const std::string& path) : _path(std::move(path)) {
+        _applyToPathRecursive(_path, makePathReadOnly);
+    }
+
+    ~ScopedReadOnlyDirectory() {
+        _applyToPathRecursive(_path, makePathWritable);
+    }
+
+private:
+    const std::string& _path;
+
+    static void makePathReadOnly(const boost::filesystem::path& path) {
+#ifdef _WIN32
+        ::SetFileAttributes(path.c_str(), FILE_ATTRIBUTE_READONLY);
+#else
+        ::chmod(path.c_str(), 0544);
+#endif
+    }
+
+    static void makePathWritable(const boost::filesystem::path& path) {
+#ifdef _WIN32
+        ::SetFileAttributes(path.c_str(), FILE_ATTRIBUTE_NORMAL);
+#else
+        ::chmod(path.c_str(), 0777);
+#endif
+    }
+
+    template <typename Func>
+    static void _applyToPathRecursive(const boost::filesystem::path& path, Func func) {
+        func(path);
+
+        using rdi = boost::filesystem::recursive_directory_iterator;
+        for (auto iter = rdi{path}; iter != rdi(); ++iter) {
+            func(*iter);
+        }
+    }
+};
+
+#ifndef _WIN32
+
+// Windows has no concept of read only directories - only read only files.
+TEST(StorageEngineLockFileTest, ReadOnlyDirectory) {
+    // If we are running as root, do not run this test as read only permissions will not be
+    // respected.
+    if (::getuid() == 0) {
+        return;
+    }
+
+    TempDir tempDir("StorageEngineLockFileTest_ReadOnlyDirectory");
+
+    // Make tempDir read-only.
+    ScopedReadOnlyDirectory srod(tempDir.path());
+
+    StorageEngineLockFile lockFile(tempDir.path());
+
+    auto openStatus = lockFile.open();
+
+    ASSERT_NOT_OK(openStatus);
+    ASSERT_EQ(openStatus, ErrorCodes::IllegalOperation);
+}
+
+#endif
+
+TEST(StorageEngineLockFileTest, ReadOnlyDirectoryWithLockFile) {
+#ifndef _WIN32
+    // If we are running as root, do not run this test as read only permissions will not be
+    // respected.
+    if (::getuid() == 0) {
+        return;
+    }
+#endif
+
+    TempDir tempDir("StorageEngineLockFileTest_ReadOnlyDirectoryWithLockFile");
+
+
+    StorageEngineLockFile lockFile(tempDir.path());
+    ASSERT_OK(lockFile.open());
+    ASSERT_OK(lockFile.writePid());
+
+    // Make tempDir read-only.
+    ScopedReadOnlyDirectory srod(tempDir.path());
+
+    // Try to create a new lock file.
+    StorageEngineLockFile lockFile2(tempDir.path());
+
+    auto openStatus = lockFile2.open();
+
+    ASSERT_NOT_OK(openStatus);
+    ASSERT_EQ(openStatus, ErrorCodes::IllegalOperation);
 }
 
 }  // namespace
