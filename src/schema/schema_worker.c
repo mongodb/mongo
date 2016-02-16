@@ -55,18 +55,11 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 				WT_ERR(ret);
 			}
 
-			if ((ret = __wt_session_get_btree_ckpt(
-			    session, uri, cfg, open_flags)) == 0) {
-				WT_SAVE_DHANDLE(session,
-				    ret = file_func(session, cfg));
-				WT_TRET(__wt_session_release_btree(session));
-			} else if (ret == EBUSY) {
-				WT_ASSERT(session, !FLD_ISSET(
-				    open_flags, WT_DHANDLE_EXCLUSIVE));
-				WT_WITH_HANDLE_LIST_LOCK(session,
-				    ret = __wt_conn_btree_apply_single_ckpt(
-				    session, uri, file_func, cfg));
-			}
+			WT_ERR(__wt_session_get_btree_ckpt(
+			    session, uri, cfg, open_flags));
+			WT_SAVE_DHANDLE(session,
+			    ret = file_func(session, cfg));
+			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {

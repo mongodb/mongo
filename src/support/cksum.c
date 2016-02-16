@@ -1260,6 +1260,23 @@ __wt_cksum_hw(const void *chunk, size_t len)
 }
 #endif
 
+#if defined(__powerpc64__)
+
+unsigned int crc32_vpmsum(unsigned int crc, const unsigned char *p,
+    unsigned long len);
+
+/*
+ * __wt_cksum_hw --
+ *	Return a checksum for a chunk of memory, computed in hardware
+ *	using 8 byte steps.
+ */
+static uint32_t
+__wt_cksum_hw(const void *chunk, size_t len)
+{
+	return crc32_vpmsum(0, chunk, len);
+}
+#endif
+
 /*
  * __wt_cksum --
  *	Return a checksum for a chunk of memory using the fastest method
@@ -1302,6 +1319,8 @@ __wt_cksum_init(void)
 		__wt_cksum_func = __wt_cksum_hw;
 	else
 		__wt_cksum_func = __wt_cksum_sw;
+#elif defined(__powerpc64__)
+	__wt_cksum_func = __wt_cksum_hw;
 #else
 	__wt_cksum_func = __wt_cksum_sw;
 #endif

@@ -127,10 +127,7 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
 
 					/* Checkpoint support */
-	struct {
-		WT_DATA_HANDLE *dhandle;
-		const char *name;
-	} *ckpt_handle;			/* Handle list */
+	WT_DATA_HANDLE **ckpt_handle;	/* Handle list */
 	u_int   ckpt_handle_next;	/* Next empty slot */
 	size_t  ckpt_handle_allocated;	/* Bytes allocated */
 
