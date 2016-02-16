@@ -2027,6 +2027,7 @@ def doConfigure(myenv):
         using_lsan = 'leak' in sanitizer_list
         using_asan = 'address' in sanitizer_list or using_lsan
         using_tsan = 'thread' in sanitizer_list
+        using_ubsan = 'undefined' in sanitizer_list
 
         # If the user asked for leak sanitizer, turn on the detect_leaks
         # ASAN_OPTION. If they asked for address sanitizer as well, drop
@@ -2084,6 +2085,10 @@ def doConfigure(myenv):
         if using_tsan:
             tsan_options += "suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
             myenv['ENV']['TSAN_OPTIONS'] = tsan_options
+
+        # By default, undefined behavior sanitizer doesn't stop on the first error. Make it so.
+        if using_ubsan:
+            AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover")
 
     if myenv.ToolchainIs('msvc') and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx

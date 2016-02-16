@@ -1,16 +1,28 @@
 # Don't UBSAN most of third_party, but do ubsan WT
 src:src/third_party/IntelRDFPMathLib20U1/*
-src:src/third_party/asio-asio-1-11-0/*
-src:src/third_party/boost-1.56.0/*
-src:src/third_party/gperftools-2.2/*
+src:src/third_party/asio-asio-*/*
+src:src/third_party/boost-*/*
+src:src/third_party/gperftools-*/*
 src:src/third_party/libstemmer_c/*
-src:src/third_party/mozjs-38/*
+src:src/third_party/mozjs-*/*
 src:src/third_party/murmurhash3/*
-src:src/third_party/pcre-8.36/*
-src:src/third_party/pcre-8.37/*
+src:src/third_party/pcre-*/*
 src:src/third_party/s2/*
-src:src/third_party/snappy-1.1.2/*
+src:src/third_party/snappy-*/*
 src:src/third_party/tz/*
-src:src/third_party/unicode-8.0.0/*
-src:src/third_party/yaml-cpp-0.5.1/*
-src:src/third_party/zlib-1.2.8/*
+src:src/third_party/unicode-*/*
+src:src/third_party/yaml-cpp-*/*
+src:src/third_party/zlib-*/*
+
+# See https://jira.mongodb.org/browse/WT-2402
+src:src/third_party/wiredtiger/*
+
+# Blacklisting these functions due to a bug in libstdc++:
+# http://stackoverflow.com/questions/30122500/is-this-code-really-undefined-as-clang-seems-to-indicate
+fun:_ZStaNRSt13_Ios_FmtflagsS_
+fun:_ZStanSt13_Ios_FmtflagsS_
+
+# Blacklisting these functions due to a bug in libstdc++:
+# Maybe https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60734 or similar
+fun:_ZNSt8_Rb_tree*_M_get_insert_hint_unique_posESt23*
+fun:_ZNSt8_Rb_tree*_M_insert_I*
