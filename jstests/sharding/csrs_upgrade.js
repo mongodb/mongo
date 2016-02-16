@@ -88,7 +88,7 @@ var st;
         assert.commandFailed(runNextSplit(snode));
     };
 
-    jsTest.log("Setting up SCCC sharded cluster")
+    jsTest.log("Setting up SCCC sharded cluster");
     st = new ShardingTest({
         name: "csrsUpgrade",
         mongos: 2,
@@ -179,7 +179,7 @@ var st;
 
     assertCannotSplit(st.s0, "with two SCCC nodes down");
 
-    csrsConfig.members.forEach(function (member) { member.votes = 1; member.priority = 1});
+    csrsConfig.members.forEach(function (member) { member.votes = 1; member.priority = 1;});
     csrsConfig.version = 3;
     jsTest.log("Allowing all csrs members to vote: " + tojson(csrsConfig));
     assert.commandWorked(csrs[0].adminCommand({replSetReconfig: csrsConfig}));

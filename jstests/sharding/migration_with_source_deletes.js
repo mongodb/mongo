@@ -68,7 +68,7 @@ assert.eq(20, donorColl.count());
  */
 
 jsTest.log('setting failpoint failMigrationReceivedOutOfRangeDelete');
-assert.commandWorked(recipient.getDB('admin').runCommand( {configureFailPoint: 'failMigrationReceivedOutOfRangeDelete', mode: 'alwaysOn'} ))
+assert.commandWorked(recipient.getDB('admin').runCommand( {configureFailPoint: 'failMigrationReceivedOutOfRangeDelete', mode: 'alwaysOn'} ));
 
 jsTest.log('setting recipient failpoint cloned');
 pauseMigrateAtStep(recipient, migrateStepNames.cloned);
@@ -120,4 +120,4 @@ assert.eq(10, coll.count());
 jsTest.log('DONE!');
 st.stop();
 
-})()
+})();

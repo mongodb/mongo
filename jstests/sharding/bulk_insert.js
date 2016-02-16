@@ -52,7 +52,7 @@ var resetColls = function() {
 var isDupKeyError = function(err)
 {
     return /dup key/.test(err + "");
-}
+};
 
 jsTest.log("Collections created.");
 st.printShardingStatus();
@@ -255,7 +255,7 @@ var inserts = [{ukey : 0},
                {ukey : -3},
                {hello : "world"},
                {ukey : 4},
-               {ukey : 4}]
+               {ukey : 4}];
 
 // Last error here is mongos error
 res = assert.writeError(collSh.insert(inserts, 1));
@@ -318,7 +318,7 @@ var inserts = [{ukey : 1,
                {ukey : -1,
                 data : data10MB},
                {ukey : -2,
-                data : data10MB}]
+                data : data10MB}];
 
 staleCollSh = staleMongos.getCollection(collSh + "");
 

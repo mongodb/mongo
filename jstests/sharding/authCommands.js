@@ -52,7 +52,7 @@ st.ensurePrimaryShard('test', 'test-rs0');
 st.adminCommand( { shardcollection : "test.foo" , key : { i : 1, j : 1 } } );
 
 // Stop the balancer, so no moveChunks will interfere with the splits we're testing
-st.stopBalancer()
+st.stopBalancer();
 
 var str = 'a';
 while ( str.length < 8000 ) {

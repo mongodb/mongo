@@ -17,7 +17,7 @@ assert.eq(1, s1.getDB('test').existing.count({_id:1}));
 assert.eq(1, s2.getDB('test').existing.count({_id:1}));
 
 // We need to turn off the balancer before doing manual moves, otherwise they can interfere
-s1.stopBalancer()
+s1.stopBalancer();
 
 s2.adminCommand( { shardcollection : "test.existing" , key : { _id : 1 } } );
 assert.commandWorked(s2.adminCommand({ split: "test.existing", middle: { _id: 5 }}));

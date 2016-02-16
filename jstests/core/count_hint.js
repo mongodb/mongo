@@ -27,5 +27,5 @@ assert.throws( function() { t.find( { i: 1 } ).hint( { bad: 1, hint: 1 } ).count
 
 // SERVER-14792: bad hints should cause the count to fail, even if there is no query predicate.
 assert.eq( 2, t.find().hint( { i: 1 } ).count(), "H" );
-assert.throws( function() { t.find().hint( { bad: 1, hint: 1 } ).count() } );
-assert.throws( function() { t.find().hint( "BAD HINT" ).count() } );
+assert.throws( function() { t.find().hint( { bad: 1, hint: 1 } ).count(); } );
+assert.throws( function() { t.find().hint( "BAD HINT" ).count(); } );

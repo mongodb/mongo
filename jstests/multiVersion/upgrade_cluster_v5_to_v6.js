@@ -27,7 +27,7 @@ var options = {
 
     sync: true, // Old clusters can't use replsets for config servers
     rs : isRSCluster
-}
+};
 
 // This function attempts to connect to mongos for 5 seconds and if it can NOT
 // connect then it returns true. This is needed to ensure that mongos can not start.
@@ -48,7 +48,7 @@ var cantStartMongos = function(options) {
     MongoRunner.stopMongos(mongos);
     return true;
 
-}
+};
 
 var st = new ShardingTest({ shards : 2, mongos : 2, other : options });
 
@@ -94,7 +94,7 @@ st.upgradeCluster(MongoRunner.versionIterator(["2.6","3.0"]));
 // Restart of mongos here is unfortunately necessary, connection pooling otherwise causes problems
 st.restartMongoses();
 
-jsTest.log("Upgraded to 2.6/3.0 cluster")
+jsTest.log("Upgraded to 2.6/3.0 cluster");
 //
 // Upgrade 2.6/3.0 cluster to only 3.0
 //
@@ -104,7 +104,7 @@ jsTest.log("Upgrading 2.6/3.0 cluster to 3.0 cluster...");
 st.upgradeCluster("3.0");
 st.restartMongoses();
 
-jsTest.log("Upgraded to 3.0 cluster")
+jsTest.log("Upgraded to 3.0 cluster");
 //
 // Upgrade 3.0 cluster to only 3.2
 //
@@ -117,12 +117,12 @@ jsTest.log("Upgrading 3.0 cluster to 3.2 cluster...");
 st.upgradeCluster("3.2", { upgradeMongos: false });
 st.restartMongoses();
 
-jsTest.log("Upgraded shards and configs to 3.2 cluster")
+jsTest.log("Upgraded shards and configs to 3.2 cluster");
 
 st.upgradeCluster("3.2", { upgradeConfigs: false, upgradeShards: false });
 st.restartMongoses();
 
-jsTest.log("Upgraded to 3.2 cluster")
+jsTest.log("Upgraded to 3.2 cluster");
 //
 // Verify cluster version is correct
 //
@@ -149,7 +149,7 @@ mongos = MongoRunner.runMongos({ binVersion : "3.2", configdb : configConnStr })
 assert.neq(null, mongos);
 MongoRunner.stopMongos(mongos);
 
-jsTest.log("DONE!")
+jsTest.log("DONE!");
 
 st.stop();
 
