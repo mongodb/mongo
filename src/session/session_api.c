@@ -597,9 +597,10 @@ __session_rename(WT_SESSION *wt_session,
 	WT_ERR(__wt_str_name_check(session, uri));
 	WT_ERR(__wt_str_name_check(session, newuri));
 
-	WT_WITH_SCHEMA_LOCK(session, ret,
-	    WT_WITH_TABLE_LOCK(session, ret,
-		ret = __wt_schema_rename(session, uri, newuri, cfg)));
+	WT_WITH_CHECKPOINT_LOCK(session, ret,
+	    WT_WITH_SCHEMA_LOCK(session, ret,
+		WT_WITH_TABLE_LOCK(session, ret,
+		    ret = __wt_schema_rename(session, uri, newuri, cfg))));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -646,9 +647,10 @@ __wt_session_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	if (!lock_wait)
 		F_SET(session, WT_SESSION_LOCK_NO_WAIT);
 
-	WT_WITH_SCHEMA_LOCK(session, ret,
-	    WT_WITH_TABLE_LOCK(session, ret,
-		ret = __wt_schema_drop(session, uri, cfg)));
+	WT_WITH_CHECKPOINT_LOCK(session, ret,
+	    WT_WITH_SCHEMA_LOCK(session, ret,
+		WT_WITH_TABLE_LOCK(session, ret,
+		    ret = __wt_schema_drop(session, uri, cfg))));
 
 	if (!lock_wait)
 		F_CLR(session, WT_SESSION_LOCK_NO_WAIT);
