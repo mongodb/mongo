@@ -791,12 +791,17 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
 void ShardRegistry::updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter,
                                          const HostAndPort& remoteHost,
                                          const Status& remoteCommandStatus) {
+    if (remoteCommandStatus.isOK())
+        return;
+
     if (ErrorCodes::isNotMasterError(remoteCommandStatus.code()) ||
         (remoteCommandStatus == ErrorCodes::InterruptedDueToReplStateChange)) {
         targeter->markHostNotMaster(remoteHost);
     } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
         targeter->markHostUnreachable(remoteHost);
     } else if (remoteCommandStatus == ErrorCodes::NotMasterOrSecondary) {
+        targeter->markHostUnreachable(remoteHost);
+    } else if (remoteCommandStatus == ErrorCodes::ExceededTimeLimit) {
         targeter->markHostUnreachable(remoteHost);
     }
 }
