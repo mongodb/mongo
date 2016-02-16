@@ -12,11 +12,11 @@ function chk(longNum) {
     assert.eq(longNum, t.find({}, { _id: 0, x: 1 }).hint({ x: 1 }).next().x);
 }
 
-chk(NumberLong("1123539983311657217"));
+chk( NumberLong("1123539983311657217") );
 chk(NumberLong("-1123539983311657217"));
-chk(NumberLong("4503599627370495"));
-chk(NumberLong("4503599627370496"));
-chk(NumberLong("4503599627370497"));
+ chk(NumberLong("4503599627370495"));
+ chk(NumberLong("4503599627370496"));
+ chk(NumberLong("4503599627370497"));
 
 t.remove({});
 

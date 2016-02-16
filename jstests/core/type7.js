@@ -20,19 +20,12 @@
     }
 
     {
-        // Make sure that floatApprox, top and bottom cannot be set
+        // Make sure that making top and bottom invalid sets us to zero
 
-        assert.throws(function() {
-            number.floatApprox = "a";
-        }, [], "floatApprox should not be setable.");
+        number.top = "a";
+        number.bottom = "b";
 
-        assert.throws(function() {
-            number.top = "a";
-        }, [], "top should not be setable.");
-
-        assert.throws(function() {
-            number.bottom = "a";
-        }, [], "bottom should not be setable.");
+        assert.eq(number.valueOf(), 0);
     }
 
     {
@@ -40,6 +33,32 @@
 
         delete number.top;
         delete number.bottom;
+
+        assert.eq(number.valueOf(), 18014398509481984);
+    }
+
+    {
+        // Try breaking floatApprox
+
+        number.floatApprox = "c";
+
+        assert.eq(number.valueOf(), 0);
+    }
+
+    {
+        // Try setting floatApprox to a non-JS number
+
+        number.floatApprox = NumberLong("10");
+
+        assert.eq(number.valueOf(), 10);
+    }
+
+    {
+        // Try putting it all back together, with non-JS top/bottom
+
+        number.floatApprox = 18014398509481984;
+        number.top = NumberInt("4194304");
+        number.bottom = NumberInt("0");
 
         assert.eq(number.valueOf(), 18014398509481984);
     }
