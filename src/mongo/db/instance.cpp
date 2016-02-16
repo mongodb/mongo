@@ -1023,6 +1023,12 @@ NOINLINE_DECL void insertMulti(OperationContext* txn,
     int64_t chunkCount = 0;
     int64_t chunkSize = 0;
 
+    auto client = txn->getClient();
+    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                                                txn);
+
     for (vector<BSONObj>::iterator it = docs.begin(); it != docs.end(); it++) {
         StatusWith<BSONObj> fixed = fixDocumentForInsert(*it);
         uassertStatusOK(fixed.getStatus());
@@ -1047,6 +1053,13 @@ NOINLINE_DECL void insertMulti(OperationContext* txn,
     }
     if (chunkBegin != docs.end())
         insertMultiVector(txn, ctx, keepGoing, ns, op, chunkBegin, docs.end());
+
+    if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
+        // If this operation has already generated a new lastOp, don't bother setting it
+        // here. No-op inserts will not generate a new lastOp, so we still need the
+        // guard to fire in that case.
+        lastOpSetterGuard.Dismiss();
+    }
 }
 
 static void convertSystemIndexInsertsToCommands(DbMessage& d, BSONArrayBuilder* allCmdsBuilder) {

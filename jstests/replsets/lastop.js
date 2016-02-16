@@ -106,18 +106,31 @@
 
     assert.eq(noOp, twelfthOp);
 
+    // No-op insert
+    assert.writeOK(m1.getCollection("test.foo").insert({ _id : 5, x : 5 }));
+    var thirteenthOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    assert.writeOK(m2.getCollection("test.foo").insert({ m2 : 991 }));
+    var fourteenthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    // Hits DuplicateKey error and fails insert -- no-op
+    assert.writeError(m1.getCollection("test.foo").insert({ _id : 5, x : 5 }));
+    noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    assert.eq(noOp, fourteenthOp);
+
     // Test update and delete failures in legacy write mode.
     m2.forceWriteMode('legacy');
     m1.forceWriteMode('legacy');
     m2.getCollection("test.foo").insert({ m2 : 995 });
-    var thirteenthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+    var fifthteenthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
     m1.getCollection("test.foo").remove({ m1 : 1 });
     noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
-    assert.eq(noOp, thirteenthOp);
+    assert.eq(noOp, fifthteenthOp);
 
     m1.getCollection("test.foo").update({ m1 : 1 }, {$set: {m1: 4}});
     noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
-    assert.eq(noOp, thirteenthOp);
+    assert.eq(noOp, fifthteenthOp);
 
 })();

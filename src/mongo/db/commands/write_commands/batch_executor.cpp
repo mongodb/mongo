@@ -818,6 +818,12 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
         currentOp->debug().ninserted = 0;
     }
 
+    auto client = _txn->getClient();
+    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                                                _txn);
+
     int64_t chunkCount = 0;
     int64_t chunkBytes = 0;
     const int64_t chunkMaxCount = internalQueryExecYieldIterations / 2;
@@ -852,6 +858,13 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
             if (stop)
                 break;
         }
+    }
+
+    if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
+        // If this operation has already generated a new lastOp, don't bother setting it
+        // here. No-op updates will not generate a new lastOp, so we still need the guard to
+        // fire in that case.
+        lastOpSetterGuard.Dismiss();
     }
 
     // TODO: Move Top and CurOp metrics management into an RAII object.
