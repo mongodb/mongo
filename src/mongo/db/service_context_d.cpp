@@ -96,7 +96,7 @@ void ServiceContextMongoD::createLockFile() {
         if (storageGlobalParams.readOnly) {
             severe() << "Attempted to open dbpath in readOnly mode, but the server was "
                         "previously not shut down cleanly.";
-            fassertFailedNoTrace(34414);
+            fassertFailedNoTrace(34416);
         }
         warning() << "Detected unclean shutdown - " << _lockFile->getFilespec() << " is not empty.";
     }
