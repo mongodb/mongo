@@ -331,11 +331,6 @@ functions:
             export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin"
           fi
 
-          # Run jstestfuzz self-tests; redirect to /dev/null to avoid polluting the logs.
-          echo "jstestfuzz self-tests are starting"
-          npm test > /dev/null
-          echo "jstestfuzz self-tests finished"
-
           npm start -- --jsTestsDir ../jstests
     - command: archive.targz_pack
       params:
