@@ -26,23 +26,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/types.h>
-#include <sys/time.h>
-
-#include <errno.h>
-#include <inttypes.h>
-#include <pthread.h>
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 #include "test_util.i"
 
 #define	FNAME		"file:cursor_order.%03d"	/* File name */
 
 typedef enum { FIX, ROW, VAR } __ftype;		/* File type */
+
 typedef struct {
 	uint64_t append_inserters;		/* Number of append threads */
 	WT_CONNECTION *conn;			/* WiredTiger connection */

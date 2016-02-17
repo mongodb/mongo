@@ -28,9 +28,9 @@
 
 #include "cursor_order.h"
 
+static void *append_insert(void *);
 static void  print_stats(SHARED_CONFIG *);
 static void *reverse_scan(void *);
-static void *append_insert(void *);
 
 typedef struct {
 	char *name;				/* object name */
@@ -224,9 +224,9 @@ reverse_scan(void *arg)
 	SHARED_CONFIG *cfg;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	uint64_t i;
 	int id, ret;
 	char tid[128];
+	uint64_t i;
 
 	id = (int)(uintptr_t)arg;
 	s = &run_info[id];

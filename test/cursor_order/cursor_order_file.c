@@ -100,6 +100,7 @@ load(SHARED_CONFIG *cfg, const char *name)
 		if ((ret = cursor->insert(cursor)) != 0)
 			testutil_die(ret, "cursor.insert");
 	}
+
 	/* Setup the starting key range for the workload phase. */
 	cfg->key_range = cfg->nkeys;
 	cursor->close(cursor);
