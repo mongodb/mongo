@@ -196,6 +196,7 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     // How many "units of work" did the plan perform. Each call to work(...)
     // counts as one unit.
     size_t workUnits = stats->common.works;
+    invariant(workUnits != 0);
 
     // How much did a plan produce?
     // Range: [0, 1]
