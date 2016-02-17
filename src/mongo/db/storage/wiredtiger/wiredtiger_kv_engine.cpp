@@ -178,9 +178,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     : _eventHandler(WiredTigerUtil::defaultEventHandlers()),
       _canonicalName(canonicalName),
       _path(path),
+      _sizeStorerSyncTracker(100000, 60 * 1000),
       _durable(durable),
-      _ephemeral(ephemeral),
-      _sizeStorerSyncTracker(100000, 60 * 1000) {
+      _ephemeral(ephemeral) {
     boost::filesystem::path journalPath = path;
     journalPath /= "journal";
     if (_durable) {
@@ -300,9 +300,9 @@ void WiredTigerKVEngine::cleanShutdown() {
     syncSizeInfo(true);
     if (_conn) {
         // these must be the last things we do before _conn->close();
-        _sizeStorer.reset(NULL);
         if (_journalFlusher)
             _journalFlusher->shutdown();
+        _sizeStorer.reset();
         _sessionCache->shuttingDown();
 
 // We want WiredTiger to leak memory for faster shutdown except when we are running tools to

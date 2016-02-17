@@ -164,19 +164,19 @@ private:
     std::string _canonicalName;
     std::string _path;
 
+    std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
+    std::string _sizeStorerUri;
+    mutable ElapsedTracker _sizeStorerSyncTracker;
+
     bool _durable;
     bool _ephemeral;
-    std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;
+    std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;  // Depends on _sizeStorer
 
     std::string _rsOptions;
     std::string _indexOptions;
 
-    std::set<std::string> _identToDrop;
     mutable stdx::mutex _identToDropMutex;
-
-    std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
-    std::string _sizeStorerUri;
-    mutable ElapsedTracker _sizeStorerSyncTracker;
+    std::set<std::string> _identToDrop;
 
     mutable Date_t _previousCheckedDropsQueued;
 
