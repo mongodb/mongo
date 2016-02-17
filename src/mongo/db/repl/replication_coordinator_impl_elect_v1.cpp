@@ -199,7 +199,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
-    fassert(28769, cbStatus.getStatus());
+    fassert(34421, cbStatus.getStatus());
     lossGuard.dismiss();
 }
 

@@ -314,7 +314,7 @@ void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
     Collection* oplogCollection = autoDb.getDb()->getCollection(oplogNss);
     if (!oplogCollection) {
         fassertFailedWithStatusNoTrace(
-            28820,
+            34418,
             Status(ErrorCodes::NamespaceNotFound, str::stream() << "Can't find " << rsOplogName));
     }
 

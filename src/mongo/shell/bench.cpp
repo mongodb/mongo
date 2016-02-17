@@ -198,7 +198,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
             myOp.useCheck = true;
             myOp.check = arg;
             uassert(
-                34403,
+                34420,
                 str::stream()
                     << "Check field requires type CodeWScoe, Code, or String, instead its type is: "
                     << typeName(myOp.check.type()),

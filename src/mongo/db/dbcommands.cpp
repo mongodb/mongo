@@ -1310,7 +1310,7 @@ void Command::execCommand(OperationContext* txn,
                 shardingState->updateConfigServerOpTimeFromMetadata(txn);
             } else {
                 massert(
-                    28807,
+                    34422,
                     str::stream()
                         << "Received a command with sharding chunk version information but this "
                            "node is not sharding aware: " << request.getCommandArgs().jsonString(),

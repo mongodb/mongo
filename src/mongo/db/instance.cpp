@@ -883,7 +883,7 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
     const char* ns = d.getns();
     int ntoreturn = d.pullInt();
     uassert(
-        34368, str::stream() << "Invalid ntoreturn for OP_GET_MORE: " << ntoreturn, ntoreturn >= 0);
+        34419, str::stream() << "Invalid ntoreturn for OP_GET_MORE: " << ntoreturn, ntoreturn >= 0);
     long long cursorid = d.pullInt64();
 
     curop.debug().ntoreturn = ntoreturn;
