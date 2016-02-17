@@ -768,7 +768,9 @@ MongoRunner.stopMongod = function( port, signal, opts ){
 
     if (!Array.contains(allowedExitCodes, returnCode)) {
         throw new MongoRunner.StopError(
+            // clang-format off
             `MongoDB process on port ${port} exited with error code ${returnCode}`,
+            // clang-format on
             returnCode
         );
     }

@@ -13,9 +13,13 @@
 
         if (typeof(jsCode) === "function") {
             // Load the override file and immediately invoke the supplied function.
+            // clang-format off
             newCode = `load("${overridesFile}"); (${jsCode})();`;
+            // clang-format on
         } else {
+            // clang-format off
             newCode = `load("${overridesFile}"); ${jsCode};`;
+            // clang-format on
         }
 
         return originalStartParallelShell(newCode, port, noConnect);
