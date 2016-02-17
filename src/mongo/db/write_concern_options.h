@@ -51,9 +51,6 @@ public:
 
     WriteConcernOptions() {
         reset();
-        // We set syncMode to NONE to avoid having an UNSET syncMode in default WriteConcernOptions
-        // since that can cause invariants to trigger.
-        syncMode = SyncMode::NONE;
     }
 
     WriteConcernOptions(int numNodes, SyncMode sync, int timeout);

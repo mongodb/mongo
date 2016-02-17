@@ -432,7 +432,11 @@ size_t ReplicationCoordinatorMock::getNumUncommittedSnapshots() {
 WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptionsSyncMode(
     WriteConcernOptions wc) {
     if (wc.syncMode == WriteConcernOptions::SyncMode::UNSET) {
-        wc.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
+        if (wc.wMode == WriteConcernOptions::kMajority) {
+            wc.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
+        } else {
+            wc.syncMode = WriteConcernOptions::SyncMode::NONE;
+        }
     }
     return wc;
 }
