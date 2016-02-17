@@ -113,7 +113,8 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
                     lambda: self.session.salvage(self.uri, None), msg)
             elif op == 'truncate':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                    lambda: self.session.truncate(self.uri, None, None, None), msg)
+                    lambda: self.session.truncate(self.uri, None, None, None),
+                    msg)
             elif op == 'upgrade':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.upgrade(self.uri, None), msg)
