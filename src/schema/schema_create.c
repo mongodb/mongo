@@ -275,15 +275,11 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
-	if (exists) {
-		if (strcmp(cgconf, origconf) != 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "%s: does not match existing configuration", name);
-		goto err;
-	}
-	WT_ERR(__wt_metadata_insert(session, name, cgconf));
 
-	WT_ERR(__wt_schema_open_colgroups(session, table));
+	if (!exists) {
+		WT_ERR(__wt_metadata_insert(session, name, cgconf));
+		WT_ERR(__wt_schema_open_colgroups(session, table));
+	}
 
 err:	__wt_free(session, cgconf);
 	__wt_free(session, sourceconf);
@@ -539,20 +535,17 @@ __create_index(WT_SESSION_IMPL *session,
 	cfg[1] = sourceconf;
 	cfg[2] = confbuf.data;
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
-	if (exists) {
-		if (strcmp(idxconf, origconf) != 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "%s: does not match existing configuration", name);
-		goto err;
+
+	if (!exists) {
+		WT_ERR(__wt_metadata_insert(session, name, idxconf));
+
+		/* Make sure that the configuration is valid. */
+		WT_ERR(__wt_schema_open_index(
+		    session, table, idxname, strlen(idxname), &idx));
+
+		/* If there is data in the table, fill the index. */
+		WT_ERR(__fill_index(session, table, idx));
 	}
-	WT_ERR(__wt_metadata_insert(session, name, idxconf));
-
-	/* Make sure that the configuration is valid. */
-	WT_ERR(__wt_schema_open_index(
-	    session, table, idxname, strlen(idxname), &idx));
-
-	/* If there is data in the table, fill the index. */
-	WT_ERR(__fill_index(session, table, idx));
 
 err:	__wt_free(session, idxconf);
 	__wt_free(session, origconf);
@@ -612,23 +605,21 @@ __create_table(WT_SESSION_IMPL *session,
 	WT_ERR_NOTFOUND_OK(ret);
 
 	WT_ERR(__wt_config_collapse(session, cfg, &tableconf));
-	if (exists) {
-		if (strcmp(tableconf, table->config) != 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "%s: does not match existing configuration", name);
-		goto err;
-	}
-	WT_ERR(__wt_metadata_insert(session, name, tableconf));
 
-	/* Attempt to open the table now to catch any errors. */
-	WT_ERR(__wt_schema_get_table(
-	    session, tablename, strlen(tablename), true, &table));
+	if (!exists) {
+		WT_ERR(__wt_metadata_insert(session, name, tableconf));
 
-	if (ncolgroups == 0) {
-		cgsize = strlen("colgroup:") + strlen(tablename) + 1;
-		WT_ERR(__wt_calloc_def(session, cgsize, &cgname));
-		snprintf(cgname, cgsize, "colgroup:%s", tablename);
-		WT_ERR(__create_colgroup(session, cgname, exclusive, config));
+		/* Attempt to open the table now to catch any errors. */
+		WT_ERR(__wt_schema_get_table(
+		    session, tablename, strlen(tablename), true, &table));
+
+		if (ncolgroups == 0) {
+			cgsize = strlen("colgroup:") + strlen(tablename) + 1;
+			WT_ERR(__wt_calloc_def(session, cgsize, &cgname));
+			snprintf(cgname, cgsize, "colgroup:%s", tablename);
+			WT_ERR(__create_colgroup(
+			    session, cgname, exclusive, config));
+		}
 	}
 
 	if (0) {
