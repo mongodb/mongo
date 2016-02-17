@@ -327,7 +327,7 @@ const SpecificStats* CachedPlanStage::getSpecificStats() const {
 void CachedPlanStage::updatePlanCache() {
     std::unique_ptr<PlanCacheEntryFeedback> feedback = stdx::make_unique<PlanCacheEntryFeedback>();
     feedback->stats = getStats();
-    feedback->score = PlanRanker::scoreTree(feedback->stats.get());
+    feedback->score = PlanRanker::scoreTree(feedback->stats->children[0].get());
 
     PlanCache* cache = _collection->infoCache()->getPlanCache();
     Status fbs = cache->feedback(*_canonicalQuery, feedback.release());
