@@ -17,13 +17,22 @@
     }
 
     function makeRegExMatchFn(pattern) {
-        return function (text) {
+        return function (text, logFileName) {
             if (!pattern.test(text)) {
+                print("LOGFILENAME = " + logFileName);
                 print("--- LOG CONTENTS ---");
                 print(text);
                 print("--- END LOG CONTENTS ---");
+
+                sleep(3000);
+
+                print("--- LOG CONTENTS AFTER SLEEPING ---");
+                print(cat(logFileName));
+                print("--- END LOG CONTENTS AFTER SLEEPING ---");
+
                 doassert("Log contents did not match " + pattern);
             }
+            print("GOT EXPECTED LOG CONTENTS IN " + logFileName);
         };
     }
 
@@ -38,7 +47,7 @@
             launcher.stop(conn, undefined, { allowedExitCodes: [ expectedExitCode ] });
         }
         var logContents = cat(logFileName);
-        matchFn(logContents);
+        matchFn(logContents, logFileName);
     }
 
     function runAllTests(launcher) {
