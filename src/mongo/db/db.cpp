@@ -510,7 +510,8 @@ static void _initAndListen(int listenPort) {
     }
 
     if (!getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager()) {
-        if (moe::startupOptionsParsed.count("replication.enableMajorityReadConcern")) {
+        if (moe::startupOptionsParsed.count("replication.enableMajorityReadConcern") &&
+            moe::startupOptionsParsed["replication.enableMajorityReadConcern"].as<bool>()) {
             // Note: we are intentionally only erroring if the user explicitly requested that we
             // enable majority read concern. We do not error if the they are implicitly enabled for
             // CSRS because a required step in the upgrade procedure can involve an mmapv1 node in
