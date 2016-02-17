@@ -47,7 +47,9 @@
 namespace mongo {
 void breakpoint() {
 #ifdef _WIN32
-    DEV DebugBreak();
+    if (IsDebuggerPresent()) {
+        DebugBreak();
+    };
 #endif
 #ifndef _WIN32
     // code to raise a breakpoint in GDB
