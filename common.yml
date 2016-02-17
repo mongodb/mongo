@@ -1172,7 +1172,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_url: "${mongo30_url}"
+        mongo_url: "${mongo32_url}"
     - func: "fetch tool"
       vars:
         tool: mongodump
