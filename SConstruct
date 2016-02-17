@@ -2334,7 +2334,6 @@ def doConfigure(myenv):
             # permit more than four parameters.
             "BOOST_THREAD_DONT_PROVIDE_VARIADIC_THREAD",
             "BOOST_SYSTEM_NO_DEPRECATED",
-            "BOOST_ENABLE_ASSERT_DEBUG_HANDLER",
         ]
     )
 
