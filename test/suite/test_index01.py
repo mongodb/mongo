@@ -226,10 +226,6 @@ class test_index01(wttest.WiredTigerTestCase):
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.create(self.index[0],
             'columns=(dept),exclusive'))
-        # non-exclusive create with differing configuration
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.create(self.index[0],
-            'columns=(salary)'), '/does not match existing configuration/')
         self.drop_table()
 
 if __name__ == '__main__':
