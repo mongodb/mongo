@@ -418,9 +418,8 @@ restart_page:	page = current->page;
 		 * page), check for an internal page split race.
 		 */
 		if (pindex->entries == base) {
-append:			if (parent_pindex != NULL &&
-			    __wt_split_intl_race(
-			    session, current->home, parent_pindex)) {
+append:			if (__wt_split_descent_race(
+			    session, current, parent_pindex)) {
 				if ((ret = __wt_page_release(
 				    session, current, 0)) != 0)
 					return (ret);
