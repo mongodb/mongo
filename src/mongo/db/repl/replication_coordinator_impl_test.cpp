@@ -2784,6 +2784,7 @@ TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
     writeConcern.wNumNodes = 3;
+    writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;
 
     ReplicationAwaiter awaiter(getReplCoord(), &txn);
     awaiter.setOpTime(time);
@@ -2932,6 +2933,7 @@ TEST_F(ReplCoordTest,
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
     writeConcern.wMode = WriteConcernOptions::kMajority;
+    writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;
 
     ReplicationAwaiter awaiter(getReplCoord(), &txn);
     awaiter.setOpTime(time);
@@ -2942,6 +2944,8 @@ TEST_F(ReplCoordTest,
     WriteConcernOptions writeConcern2;
     writeConcern2.wTimeout = WriteConcernOptions::kNoWaiting;
     writeConcern2.wMode = WriteConcernOptions::kMajority;
+    writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;
+
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                   getReplCoord()->awaitReplication(&txn, time, writeConcern2).status);
 
