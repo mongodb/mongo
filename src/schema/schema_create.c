@@ -275,15 +275,11 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
-	if (exists) {
-		if (strcmp(cgconf, origconf) != 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "%s: does not match existing configuration", name);
-		goto err;
-	}
-	WT_ERR(__wt_metadata_insert(session, name, cgconf));
 
-	WT_ERR(__wt_schema_open_colgroups(session, table));
+	if (!exists) {
+		WT_ERR(__wt_metadata_insert(session, name, cgconf));
+		WT_ERR(__wt_schema_open_colgroups(session, table));
+	}
 
 err:	__wt_free(session, cgconf);
 	__wt_free(session, sourceconf);
