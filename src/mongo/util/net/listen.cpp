@@ -325,14 +325,6 @@ void Listener::initAndListen() {
                 }
                 continue;
             }
-            if (from.getType() != AF_UNIX)
-                disableNagle(s);
-
-#ifdef SO_NOSIGPIPE
-            // ignore SIGPIPE signals on osx, to avoid process exit
-            const int one = 1;
-            setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
-#endif
 
             long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
@@ -342,6 +334,15 @@ void Listener::initAndListen() {
                 log() << "connection accepted from " << from.toString() << " #"
                       << myConnectionNumber << " (" << conns << word << " now open)" << endl;
             }
+
+            if (from.getType() != AF_UNIX)
+                disableNagle(s);
+
+#ifdef SO_NOSIGPIPE
+            // ignore SIGPIPE signals on osx, to avoid process exit
+            const int one = 1;
+            setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
+#endif
 
             std::shared_ptr<Socket> pnewSock(new Socket(s, from));
 #ifdef MONGO_CONFIG_SSL
@@ -546,8 +547,6 @@ void Listener::initAndListen() {
             }
             continue;
         }
-        if (from.getType() != AF_UNIX)
-            disableNagle(s);
 
         long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
@@ -557,6 +556,9 @@ void Listener::initAndListen() {
             log() << "connection accepted from " << from.toString() << " #" << myConnectionNumber
                   << " (" << conns << word << " now open)" << endl;
         }
+
+        if (from.getType() != AF_UNIX)
+            disableNagle(s);
 
         std::shared_ptr<Socket> pnewSock(new Socket(s, from));
 #ifdef MONGO_CONFIG_SSL
