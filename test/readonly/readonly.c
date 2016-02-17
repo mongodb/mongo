@@ -92,7 +92,8 @@ run_child(const char *homedir, int op, int expect)
 		testutil_die(ret, "wiredtiger_open success err");
 	if (expect == EXPECT_ERR) {
 		if (ret == 0)
-			testutil_die(ret, "wiredtiger_open expected err succeeded");
+			testutil_die(
+			    ret, "wiredtiger_open expected err succeeded");
 		/*
 		 * If we expect an error and got one, we're done.
 		 */
