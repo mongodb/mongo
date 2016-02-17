@@ -1146,7 +1146,8 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     }
 
     if (params.count("replication.enableMajorityReadConcern")) {
-        replSettings.setMajorityReadConcernEnabled(true);
+        replSettings.setMajorityReadConcernEnabled(
+            params["replication.enableMajorityReadConcern"].as<bool>());
     }
 
     if (params.count("storage.indexBuildRetry")) {
