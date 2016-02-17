@@ -139,7 +139,7 @@ void checkForUncleanShutdown(MMAPV1Engine* storageEngine,
     }
 }
 #else
-void checkForUncleanShutDown(MMAPV1Engine* storageEngine,
+void checkForUncleanShutdown(MMAPV1Engine* storageEngine,
                              bool doingRepair,
                              const StorageEngineLockFile& lockFile) {
     // TODO - this is very bad that the code above not running here.
