@@ -6,10 +6,11 @@ Parses .cpp files for assertions and verifies assertion codes are distinct.
 Optionally replaces zero codes in source code with new distinct values.
 """
 
+import bisect
 import os
 import re
-import utils
 import sys
+import utils
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
 
@@ -50,9 +51,10 @@ def parseSourceFiles( callback ):
     quick = [ "assert" , "Exception"]
 
     patterns = [
-        re.compile( r"[umsg]asser(?:t|ted)(?:NoTrace)? *\( *(\d+)" ) ,
-        re.compile( r"(?:User|Msg|MsgAssertion)Exception *\( *(\d+)" ),
-        re.compile( r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)? *\( *(\d+)" ),
+        re.compile( r"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE ) ,
+        re.compile( r"(?:User|Msg|MsgAssertion)Exception\s*\(\s*(\d+)", re.MULTILINE ),
+        re.compile( r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
+                    re.MULTILINE ),
     ]
 
     bad = [ re.compile( r"^\s*assert *\(" ) ]
@@ -63,42 +65,40 @@ def parseSourceFiles( callback ):
             continue
 
         with open(sourceFile) as f:
-            line_iterator = enumerate(f, 1)
-            for (lineNum, line) in line_iterator:
+            text = f.read()
 
-                # See if we can skip regexes
-                if not any([zz in line for zz in quick]):
-                    continue
+            if not any([zz in text for zz in quick]):
+                continue
 
-                for b in bad:
-                    if b.search(line):
-                        msg = "Bare assert prohibited. Replace with [umwdf]assert"
-                        print( "%s:%s: %s\n%s" % (sourceFile, lineNum, msg, line) )
-                        raise Exception(msg)
+            # TODO: move check for bad assert type to the linter.
+            for b in bad:
+                if b.search(text):
+                    msg = "Bare assert prohibited. Replace with [umwdf]assert"
+                    print( "%s: %s" % (sourceFile, msg) )
+                    raise Exception(msg)
 
-                # no more than one pattern should ever match
-                matches = [x for x in [p.search(line) for p in patterns]
-                           if x]
-                assert len(matches) <= 1, matches
-                if matches:
-                    match = matches[0]
+            splitlines = text.splitlines(True)
+
+            line_offsets = [0]
+            for line in splitlines:
+                line_offsets.append(line_offsets[-1] + len(line))
+
+            matchiters = [p.finditer(text) for p in patterns]
+            for matchiter in matchiters:
+                for match in matchiter:
                     code = match.group(1)
                     span = match.span()
 
-                    # Advance to statement terminator iff not on this line
-                    lines = [line.strip()]
+                    thisLoc = AssertLocation(sourceFile,
+                                             getLineForPosition(line_offsets, span[1]),
+                                             text[span[0]:span[1]],
+                                             code)
 
-                    if not isTerminated(lines):
-                        for (_lineNum, line) in line_iterator:
-                            lines.append(line.strip())
-                            if isTerminated(lines):
-                                break
-
-                    thisLoc = AssertLocation(sourceFile, lineNum, lines, code)
                     callback( thisLoc )
 
-        # end for sourceFile loop
-
+# Converts an absolute position in a file into a line number.
+def getLineForPosition(line_offsets, position):
+    return bisect.bisect(line_offsets, position)
 
 def isTerminated( lines ):
     """Given .cpp/.h source lines as text, determine if assert is terminated."""
@@ -159,12 +159,12 @@ def readErrorCodes():
         bad = seen[code]
         errors.append( bad )
         print( "ZERO_CODE:" )
-        print( "  %s:%d:%s" % (bad.sourceFile, bad.lineNum, bad.lines[0]) )
+        print( "  %s:%d:%s" % (bad.sourceFile, bad.lineNum, bad.lines) )
 
     for code, locations in dups.items():
         print( "DUPLICATE IDS: %s" % code )
         for loc in locations:
-            print( "  %s:%d:%s" % (loc.sourceFile, loc.lineNum, loc.lines[0]) )
+            print( "  %s:%d:%s" % (loc.sourceFile, loc.lineNum, loc.lines) )
 
     return (codes, errors)
 
