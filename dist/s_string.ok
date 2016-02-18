@@ -107,6 +107,7 @@ FALLTHROUGH
 FH
 FLD
 FLSv
+FLv
 FNV
 FORALL
 FOREACH
@@ -677,6 +678,7 @@ inline
 inmem
 insertK
 insertV
+inserters
 instantiation
 intl
 intnum
@@ -1066,6 +1068,7 @@ vsize
 vsnprintf
 vtype
 vunpack
+vw
 walk's
 warmup
 wb
