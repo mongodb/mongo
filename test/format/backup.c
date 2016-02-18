@@ -96,8 +96,7 @@ backup(void *arg)
 		return (NULL);
 
 	/* Open a session. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	check(conn->open_session(conn, NULL, NULL, &session));
 
 	/*
 	 * Perform a backup at somewhere under 10 seconds (so we get at
@@ -113,8 +112,7 @@ backup(void *arg)
 			break;
 
 		/* Lock out named checkpoints */
-		if ((ret = pthread_rwlock_wrlock(&g.backup_lock)) != 0)
-			die(ret, "pthread_rwlock_wrlock: backup lock");
+		check(pthread_rwlock_wrlock(&g.backup_lock));
 
 		/* Re-create the backup directory. */
 		if ((ret = system(g.home_backup_init)) != 0)
@@ -137,17 +135,13 @@ backup(void *arg)
 			copy_file(key);
 		}
 
-		if ((ret = backup_cursor->close(backup_cursor)) != 0)
-			die(ret, "cursor.close");
-
-		if ((ret = pthread_rwlock_unlock(&g.backup_lock)) != 0)
-			die(ret, "pthread_rwlock_unlock: backup lock");
+		check(backup_cursor->close(backup_cursor));
+		check(pthread_rwlock_unlock(&g.backup_lock));
 
 		check_copy();
 	}
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	check(session->close(session, NULL));
 
 	return (NULL);
 }

@@ -341,6 +341,16 @@ __attribute__((__noreturn__))
 ;
 
 /*
+ * check --
+ *	Complain and quit if a function call fails.
+ */
+#define	check(call) do {						\
+	int __r;							\
+	if ((__r = (call)) != 0)					\
+		die(__r, "%s/%d: %s", __func__, __LINE__, #call);	\
+} while (0)
+
+/*
  * mmrand --
  *	Return a random value between a min/max pair.
  */

@@ -51,8 +51,7 @@ wts_rebalance(void)
 	/* Rebalance, then verify the object. */
 	wts_reopen();
 	conn = g.wts_conn;
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	check(conn->open_session(conn, NULL, NULL, &session));
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== rebalance start ===============");
@@ -63,8 +62,7 @@ wts_rebalance(void)
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== rebalance stop ===============");
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	check(session->close(session, NULL));
 
 	wts_verify("post-rebalance verify");
 	wts_close();

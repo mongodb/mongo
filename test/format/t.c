@@ -40,7 +40,7 @@ int
 main(int argc, char *argv[])
 {
 	time_t start;
-	int ch, i, onerun, reps, ret;
+	int ch, i, onerun, reps;
 	const char *config, *home;
 
 	config = NULL;
@@ -176,12 +176,9 @@ main(int argc, char *argv[])
 	 * Initialize locks to single-thread named checkpoints and backups, last
 	 * last-record updates, and failures.
 	 */
-	if ((ret = pthread_rwlock_init(&g.append_lock, NULL)) != 0)
-		die(ret, "pthread_rwlock_init: append lock");
-	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
-		die(ret, "pthread_rwlock_init: backup lock");
-	if ((ret = pthread_rwlock_init(&g.death_lock, NULL)) != 0)
-		die(ret, "pthread_rwlock_init: death lock");
+	check(pthread_rwlock_init(&g.append_lock, NULL));
+	check(pthread_rwlock_init(&g.backup_lock, NULL));
+	check(pthread_rwlock_init(&g.death_lock, NULL));
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
@@ -273,10 +270,8 @@ main(int argc, char *argv[])
 
 	config_print(0);
 
-	if ((ret = pthread_rwlock_destroy(&g.append_lock)) != 0)
-		die(ret, "pthread_rwlock_destroy: append lock");
-	if ((ret = pthread_rwlock_destroy(&g.backup_lock)) != 0)
-		die(ret, "pthread_rwlock_destroy: backup lock");
+	check(pthread_rwlock_destroy(&g.append_lock));
+	check(pthread_rwlock_destroy(&g.backup_lock));
 
 	config_clear();
 

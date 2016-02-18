@@ -436,27 +436,23 @@ wts_create(void)
 	/*
 	 * Create the underlying store.
 	 */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	check(conn->open_session(conn, NULL, NULL, &session));
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	check(session->close(session, NULL));
 }
 
 void
 wts_close(void)
 {
 	WT_CONNECTION *conn;
-	int ret;
 	const char *config;
 
 	conn = g.wts_conn;
 
 	config = g.c_leak_memory ? "leak_memory" : NULL;
 
-	if ((ret = conn->close(conn, config)) != 0)
-		die(ret, "connection.close");
+	check(conn->close(conn, config));
 	g.wts_conn = NULL;
 	g.wt_api = NULL;
 }
@@ -513,8 +509,7 @@ wts_verify(const char *tag)
 	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	check(conn->open_session(conn, NULL, NULL, &session));
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify start ===============");
@@ -527,8 +522,7 @@ wts_verify(const char *tag)
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify stop ===============");
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	check(session->close(session, NULL));
 }
 
 /*
@@ -558,17 +552,15 @@ wts_stats(void)
 	conn = g.wts_conn;
 	track("stat", 0ULL, NULL);
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	check(conn->open_session(conn, NULL, NULL, &session));
 
 	if ((fp = fopen(g.home_stats, "w")) == NULL)
 		die(errno, "fopen: %s", g.home_stats);
 
 	/* Connection statistics. */
 	fprintf(fp, "====== Connection statistics:\n");
-	if ((ret = session->open_cursor(session,
-	    "statistics:", NULL, NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+	check(session->open_cursor(
+	    session, "statistics:", NULL, NULL, &cursor));
 
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
@@ -577,16 +569,13 @@ wts_stats(void)
 
 	if (ret != WT_NOTFOUND)
 		die(ret, "cursor.next");
-	if ((ret = cursor->close(cursor)) != 0)
-		die(ret, "cursor.close");
+	check(cursor->close(cursor));
 
 	/* Data source statistics. */
 	fprintf(fp, "\n\n====== Data source statistics:\n");
 	stat_name = dmalloc(strlen("statistics:") + strlen(g.uri) + 1);
 	sprintf(stat_name, "statistics:%s", g.uri);
-	if ((ret = session->open_cursor(
-	    session, stat_name, NULL, NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+	check(session->open_cursor(session, stat_name, NULL, NULL, &cursor));
 	free(stat_name);
 
 	while ((ret = cursor->next(cursor)) == 0 &&
@@ -596,11 +585,9 @@ wts_stats(void)
 
 	if (ret != WT_NOTFOUND)
 		die(ret, "cursor.next");
-	if ((ret = cursor->close(cursor)) != 0)
-		die(ret, "cursor.close");
+	check(cursor->close(cursor));
 
 	fclose_and_clear(&fp);
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	check(session->close(session, NULL));
 }

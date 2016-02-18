@@ -56,7 +56,7 @@ wts_ops(int lastrun)
 	pthread_t backup_tid, compact_tid, lrt_tid;
 	int64_t fourths, thread_ops;
 	uint32_t i;
-	int ret, running;
+	int running;
 
 	conn = g.wts_conn;
 
@@ -97,8 +97,7 @@ wts_ops(int lastrun)
 
 	/* Open a session. */
 	if (g.logging != 0) {
-		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-			die(ret, "connection.open_session");
+		check(conn->open_session(conn, NULL, NULL, &session));
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== thread ops start ===============");
 	}
@@ -109,24 +108,19 @@ wts_ops(int lastrun)
 	for (i = 0; i < g.c_threads; ++i) {
 		tinfo[i].id = (int)i + 1;
 		tinfo[i].state = TINFO_RUNNING;
-		if ((ret =
-		    pthread_create(&tinfo[i].tid, NULL, ops, &tinfo[i])) != 0)
-			die(ret, "pthread_create");
+		check(pthread_create(&tinfo[i].tid, NULL, ops, &tinfo[i]));
 	}
 
 	/*
 	 * If a multi-threaded run, start optional backup, compaction and
 	 * long-running reader threads.
 	 */
-	if (g.c_backups &&
-	    (ret = pthread_create(&backup_tid, NULL, backup, NULL)) != 0)
-		die(ret, "pthread_create: backup");
-	if (g.c_compact &&
-	    (ret = pthread_create(&compact_tid, NULL, compact, NULL)) != 0)
-		die(ret, "pthread_create: compaction");
-	if (!SINGLETHREADED && g.c_long_running_txn &&
-	    (ret = pthread_create(&lrt_tid, NULL, lrt, NULL)) != 0)
-		die(ret, "pthread_create: long-running reader");
+	if (g.c_backups)
+		check(pthread_create(&backup_tid, NULL, backup, NULL));
+	if (g.c_compact)
+		check(pthread_create(&compact_tid, NULL, compact, NULL));
+	if (!SINGLETHREADED && g.c_long_running_txn)
+		check(pthread_create(&lrt_tid, NULL, lrt, NULL));
 
 	/* Spin on the threads, calculating the totals. */
 	for (;;) {
@@ -192,8 +186,7 @@ wts_ops(int lastrun)
 	if (g.logging != 0) {
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== thread ops stop ===============");
-		if ((ret = session->close(session, NULL)) != 0)
-			die(ret, "session.close");
+		check(session->close(session, NULL));
 	}
 }
 
@@ -269,9 +262,7 @@ ops(void *arg)
 		 */
 		if (intxn &&
 		    (tinfo->ops == ckpt_op || tinfo->ops == session_op)) {
-			if ((ret = session->commit_transaction(
-			    session, NULL)) != 0)
-				die(ret, "session.commit_transaction");
+			check(session->commit_transaction(session, NULL));
 			++tinfo->commit;
 			intxn = 0;
 		}
@@ -279,13 +270,11 @@ ops(void *arg)
 		/* Open up a new session and cursors. */
 		if (tinfo->ops == session_op ||
 		    session == NULL || cursor == NULL) {
-			if (session != NULL &&
-			    (ret = session->close(session, NULL)) != 0)
-				die(ret, "session.close");
+			if (session != NULL)
+				check(session->close(session, NULL));
 
-			if ((ret = conn->open_session(conn, NULL,
-			    ops_session_config(&tinfo->rnd), &session)) != 0)
-				die(ret, "connection.open_session");
+			check(conn->open_session(conn, NULL,
+			    ops_session_config(&tinfo->rnd), &session));
 
 			/*
 			 * 10% of the time, perform some read-only operations
@@ -300,9 +289,8 @@ ops(void *arg)
 			 */
 			if (!SINGLETHREADED && !DATASOURCE("lsm") &&
 			    ckpt_available && mmrand(&tinfo->rnd, 1, 10) == 1) {
-				if ((ret = session->open_cursor(session,
-				    g.uri, NULL, ckpt_name, &cursor)) != 0)
-					die(ret, "session.open_cursor");
+				check(session->open_cursor(session,
+				    g.uri, NULL, ckpt_name, &cursor));
 
 				/* Pick the next session/cursor close/open. */
 				session_op += 250;
@@ -323,13 +311,12 @@ ops(void *arg)
 				 * want to have to specify the record number,
 				 * which requires an append configuration.
 				 */
-				if ((ret = session->open_cursor(session, g.uri,
-				    NULL, "overwrite", &cursor)) != 0)
-					die(ret, "session.open_cursor");
-				if ((g.type == FIX || g.type == VAR) &&
-				    (ret = session->open_cursor(session, g.uri,
-				    NULL, "append", &cursor_insert)) != 0)
-					die(ret, "session.open_cursor");
+				check(session->open_cursor(session,
+				    g.uri, NULL, "overwrite", &cursor));
+				if (g.type == FIX || g.type == VAR)
+					check(session->open_cursor(
+					    session, g.uri,
+					    NULL, "append", &cursor_insert));
 
 				/* Pick the next session/cursor close/open. */
 				session_op += mmrand(&tinfo->rnd, 100, 5000);
@@ -358,10 +345,8 @@ ops(void *arg)
 			}
 
 			/* Named checkpoints lock out backups */
-			if (ckpt_config != NULL &&
-			    (ret = pthread_rwlock_wrlock(&g.backup_lock)) != 0)
-				die(ret,
-				    "pthread_rwlock_wrlock: backup lock");
+			if (ckpt_config != NULL)
+				check(pthread_rwlock_wrlock(&g.backup_lock));
 
 			if ((ret =
 			    session->checkpoint(session, ckpt_config)) != 0)
@@ -369,10 +354,8 @@ ops(void *arg)
 				    ckpt_config == NULL ? "" : ": ",
 				    ckpt_config == NULL ? "" : ckpt_config);
 
-			if (ckpt_config != NULL &&
-			    (ret = pthread_rwlock_unlock(&g.backup_lock)) != 0)
-				die(ret,
-				    "pthread_rwlock_wrlock: backup lock");
+			if (ckpt_config != NULL)
+				check(pthread_rwlock_unlock(&g.backup_lock));
 
 			/* Rephrase the checkpoint name for cursor open. */
 			if (ckpt_config == NULL)
@@ -393,8 +376,7 @@ ops(void *arg)
 		 * have to do the reset outside of a transaction.
 		 */
 		if (tinfo->ops > reset_op && !intxn) {
-			if ((ret = session->reset(session)) != 0)
-				die(ret, "session.reset");
+			check(session->reset(session));
 
 			/* Pick the next reset operation. */
 			reset_op += mmrand(&tinfo->rnd, 20000, 50000);
@@ -406,9 +388,7 @@ ops(void *arg)
 		 */
 		if (!SINGLETHREADED &&
 		    !intxn && mmrand(&tinfo->rnd, 1, 10) >= 8) {
-			if ((ret =
-			    session->begin_transaction(session, NULL)) != 0)
-				die(ret, "session.begin_transaction");
+			check(session->begin_transaction(session, NULL));
 			intxn = 1;
 		}
 
@@ -466,9 +446,7 @@ ops(void *arg)
 				if (col_insert(tinfo,
 				    cursor_insert, &key, &value, &keyno))
 					goto deadlock;
-				if ((ret =
-				    cursor_insert->reset(cursor_insert)) != 0)
-					die(ret, "cursor.reset");
+				check(cursor_insert->reset(cursor_insert));
 
 				insert = 1;
 				break;
@@ -518,8 +496,7 @@ skip_insert:			if (col_update(tinfo,
 			goto deadlock;
 
 		/* Reset the cursor: there is no reason to keep pages pinned. */
-		if ((ret = cursor->reset(cursor)) != 0)
-			die(ret, "cursor.reset");
+		check(cursor->reset(cursor));
 
 		/*
 		 * If we're in the transaction, commit 40% of the time and
@@ -528,9 +505,8 @@ skip_insert:			if (col_update(tinfo,
 		if (intxn)
 			switch (mmrand(&tinfo->rnd, 1, 10)) {
 			case 1: case 2: case 3: case 4:		/* 40% */
-				if ((ret = session->commit_transaction(
-				    session, NULL)) != 0)
-					die(ret, "session.commit_transaction");
+				check(session->commit_transaction(
+				    session, NULL));
 				++tinfo->commit;
 				intxn = 0;
 				break;
@@ -538,10 +514,8 @@ skip_insert:			if (col_update(tinfo,
 				if (0) {
 deadlock:				++tinfo->deadlock;
 				}
-				if ((ret = session->rollback_transaction(
-				    session, NULL)) != 0)
-					die(ret,
-					    "session.rollback_transaction");
+				check(session->rollback_transaction(
+				    session, NULL));
 				++tinfo->rollback;
 				intxn = 0;
 				break;
@@ -550,8 +524,8 @@ deadlock:				++tinfo->deadlock;
 			}
 	}
 
-	if (session != NULL && (ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	if (session != NULL)
+		check(session->close(session, NULL));
 
 	free(keybuf);
 	free(valbuf);
@@ -581,12 +555,10 @@ wts_read_scan(void)
 	key_gen_setup(&keybuf);
 
 	/* Open a session and cursor pair. */
-	if ((ret = conn->open_session(
-	    conn, NULL, ops_session_config(NULL), &session)) != 0)
-		die(ret, "connection.open_session");
-	if ((ret = session->open_cursor(
-	    session, g.uri, NULL, NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+	check(conn->open_session(
+	    conn, NULL, ops_session_config(NULL), &session));
+	check(session->open_cursor(
+	    session, g.uri, NULL, NULL, &cursor));
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
@@ -603,8 +575,7 @@ wts_read_scan(void)
 			die(ret, "read_scan");
 	}
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	check(session->close(session, NULL));
 
 	free(keybuf);
 }
@@ -948,7 +919,7 @@ static void
 table_append(uint64_t keyno)
 {
 	uint64_t *p, *ep;
-	int done, ret;
+	int done;
 
 	ep = g.append + g.append_max;
 
@@ -979,8 +950,7 @@ table_append(uint64_t keyno)
 	 * and we find a slot.
 	 */
 	for (done = 0;;) {
-		if ((ret = pthread_rwlock_wrlock(&g.append_lock)) != 0)
-			die(ret, "pthread_rwlock_wrlock: append_lock");
+		check(pthread_rwlock_wrlock(&g.append_lock));
 
 		/*
 		 * If this is the thread we've been waiting for, and its record
@@ -1017,8 +987,7 @@ table_append(uint64_t keyno)
 					break;
 				}
 
-		if ((ret = pthread_rwlock_unlock(&g.append_lock)) != 0)
-			die(ret, "pthread_rwlock_unlock: append_lock");
+		check(pthread_rwlock_unlock(&g.append_lock));
 
 		if (done)
 			break;
