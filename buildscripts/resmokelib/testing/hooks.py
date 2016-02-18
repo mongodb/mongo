@@ -234,6 +234,12 @@ class CheckReplDBHash(CustomBehavior):
         if "config" in db_names:
             config_db = primary_conn["config"]
             for coll_name in config_db.collection_names():
+                # We cannot use the "include_system_collections" parameter with collection_names()
+                # because it will filter out all system collections, which prevents us from
+                # invalidating the cache entries for user-writable collections like system.js.
+                if (coll_name.startswith("system.") and
+                    coll_name not in ["system.js", "system.users"]):
+                    continue
                 coll = config_db.get_collection(coll_name)
                 coll.insert_one({"invalidate": "cache"})
 
