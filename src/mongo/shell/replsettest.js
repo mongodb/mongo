@@ -254,6 +254,29 @@ var ReplSetTest = function(opts) {
     }
 
     /**
+     * Surrounds a function call by a try...catch to convert any exception to a print statement
+     * and return false.
+     */
+    function _convertExceptionToReturnStatus(func, msg) {
+        try {
+            return func();
+        } catch (e) {
+             if (msg) {
+                print(msg);
+             }
+             print("ReplSetTest caught exception " + e);
+             return false;
+        }
+    }
+
+    /**
+     * Wraps assert.soon to try...catch any function passed in.
+     */
+    function _assertSoonNoExcept(func, msg, timeout) {
+        assert.soon((() => _convertExceptionToReturnStatus(func)), msg, timeout);
+    }
+
+    /**
      * Returns the optime for the specified host by issuing replSetGetStatus.
      */
     function _getLastOpTime(conn) {
@@ -278,33 +301,42 @@ var ReplSetTest = function(opts) {
 
     /**
      * Returns the last committed OpTime for the replicaset as known by the host.
+     * This function may return an OpTime with Timestamp(0,0) and Term(0) if there is no
+     * last committed OpTime.
      */
     function _getLastCommittedOpTime(conn) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({ replSetGetStatus: 1 }));
-        return replSetStatus.OpTimes.lastCommittedOpTime;
+        return replSetStatus.OpTimes.lastCommittedOpTime ||
+            { ts: Timestamp(0, 0), t: NumberLong(0) };
     }
 
     /**
      * Returns the {readConcern: majority} OpTime for the host.
      * This is the OpTime of the host's "majority committed" snapshot.
+     * This function may return an OpTime with Timestamp(0,0) and Term(0) if read concern majority
+     * is not enabled, or if there has not been a committed snapshot yet.
      */
-    function getReadConcernMajorityOpTime(conn) {
+    function _getReadConcernMajorityOpTime(conn) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({ replSetGetStatus: 1 }));
-        return replSetStatus.OpTimes.readConcernMajorityOpTime;
+        return replSetStatus.OpTimes.readConcernMajorityOpTime ||
+            { ts: Timestamp(0, 0), t: NumberLong(0) };
     }
 
     function _isEarlierOpTime(ot1, ot2) {
-        ot1 = ot1.t ? ot1 : { ts: ot1, t: -1 };
-        ot2 = ot2.t ? ot2 : { ts: ot2, t: -1 };
+        // Make sure both optimes have a timestamp and a term.
+        ot1 = ot1.t ? ot1 : { ts: ot1, t: NumberLong(-1) };
+        ot2 = ot2.t ? ot2 : { ts: ot2, t: NumberLong(-1) };
 
-        // If one has a lower term, choose that one.
-        if (!friendlyEqual(ot1.t, ot2.t)) {
-            return ot1.t < ot2.t;
+        // If both optimes have a term that's not -1 and one has a lower term, return that optime.
+        if (!friendlyEqual(ot1.t, NumberLong(-1)) && !friendlyEqual(ot2.t, NumberLong(-1))) {
+            if (!friendlyEqual(ot1.t, ot2.t)) {
+                return ot1.t < ot2.t;
+            }
         }
 
-        // Otherwise choose the one with the lower timestamp.
+        // Otherwise, choose the optime with the lower timestamp.
         return ot1.ts < ot2.ts;
     }
 
@@ -435,7 +467,7 @@ var ReplSetTest = function(opts) {
     this.awaitSecondaryNodes = function(timeout) {
         timeout = timeout || 60000;
 
-        assert.soon(function() {
+        _assertSoonNoExcept(function() {
             // Reload who the current slaves are
             self.getPrimary(timeout);
 
@@ -461,7 +493,7 @@ var ReplSetTest = function(opts) {
         timeout = timeout || 60000;
         var primary = null;
 
-        assert.soon(function() {
+        _assertSoonNoExcept(function() {
             primary = _callIsMaster();
             return primary;
         }, "Finding primary", timeout);
@@ -473,7 +505,7 @@ var ReplSetTest = function(opts) {
         msg = msg || "Timed out waiting for there to be no primary in replset: " + this.name;
         timeout = timeout || 30000;
 
-        assert.soon(function() {
+        _assertSoonNoExcept(function() {
             return _callIsMaster() == false;
         }, msg, timeout);
     };
@@ -598,7 +630,7 @@ var ReplSetTest = function(opts) {
         print("Waiting for op with OpTime " + tojson(masterOpTime) +
             " to be committed on all secondaries");
 
-        assert.soon(function() {
+        _assertSoonNoExcept(function() {
             for (var i = 0; i < rst.nodes.length; i++) {
                 var node = rst.nodes[i];
 
@@ -607,8 +639,11 @@ var ReplSetTest = function(opts) {
                 if (res.myState == ReplSetTest.State.ARBITER) {
                     continue;
                 }
-
-                if (_isEarlierOpTime(getReadConcernMajorityOpTime(node), masterOpTime)) {
+                var rcmOpTime = _getReadConcernMajorityOpTime(node);
+                if (friendlyEqual(rcmOpTime, { ts: Timestamp(0, 0), t: NumberLong(0) })) {
+                    return false;
+                }
+                if (_isEarlierOpTime(rcmOpTime, masterOpTime)) {
                     return false;
                 }
             }
@@ -627,7 +662,7 @@ var ReplSetTest = function(opts) {
         // Blocking call, which will wait for the last optime written on the master to be available
         var awaitLastOpTimeWrittenFn = function() {
             var master = self.getPrimary();
-            assert.soon(function() {
+            _assertSoonNoExcept(function() {
                 try {
                     masterLatestOpTime = _getLastOpTimeTimestamp(master);
                 }
@@ -665,7 +700,7 @@ var ReplSetTest = function(opts) {
                 ", is " + tojson(masterLatestOpTime) +
                 ", last oplog entry is " + tojsononeline(masterOpTime));
 
-        assert.soon(function() {
+        _assertSoonNoExcept(function() {
              try {
                 print("ReplSetTest awaitReplication: checking secondaries against timestamp " +
                       tojson(masterLatestOpTime));
@@ -1077,7 +1112,7 @@ var ReplSetTest = function(opts) {
      */
     this.waitForMaster = function(timeout) {
         var master;
-        assert.soon(function() {
+        _assertSoonNoExcept(function() {
             return (master = self.getPrimary());
         }, "waiting for master", timeout);
 
