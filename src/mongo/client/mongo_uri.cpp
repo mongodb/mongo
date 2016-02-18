@@ -114,28 +114,27 @@ StatusWith<MongoURI> MongoURI::parse(const std::string& url) {
                 std::string(optionsTokens[i + 1].begin(), optionsTokens[i + 1].end());
     }
 
-    std::map<std::string, std::string>::const_iterator optIter;
+    OptionsMap::const_iterator optIter;
 
     // If a replica set option was specified, store it in the 'setName' field.
     bool haveSetName;
     std::string setName;
-    if ((haveSetName = ((optIter = options.find("replicaSet")) != options.end())))
+    if ((haveSetName = ((optIter = options.find("replicaSet")) != options.end()))) {
         setName = optIter->second;
+    }
 
-    // Add all remaining options into the bson object
-    BSONObjBuilder optionsBob;
-    for (optIter = options.begin(); optIter != options.end(); ++optIter)
-        optionsBob.append(optIter->first, optIter->second);
-
-    std::string servers_str = matches[3].str();
     std::vector<HostAndPort> servers;
-    std::vector<std::string> servers_split;
-    boost::algorithm::split(servers_split, servers_str, boost::is_any_of(","));
-    for (auto&& s : servers_split) {
-        try {
-            servers.push_back(HostAndPort(s));
-        } catch (std::exception e) {
-            return Status(ErrorCodes::FailedToParse, e.what());
+
+    {
+        std::vector<std::string> servers_split;
+        boost::algorithm::split(servers_split, matches[3].str(), boost::is_any_of(","));
+        for (auto&& s : servers_split) {
+            auto statusHostAndPort = HostAndPort::parse(s);
+            if (!statusHostAndPort.isOK()) {
+                return statusHostAndPort.getStatus();
+            }
+
+            servers.push_back(statusHostAndPort.getValue());
         }
     }
 
@@ -148,7 +147,8 @@ StatusWith<MongoURI> MongoURI::parse(const std::string& url) {
 
     ConnectionString cs(
         direct ? ConnectionString::MASTER : ConnectionString::SET, servers, setName);
-    return MongoURI(cs, matches[1].str(), matches[2].str(), matches[4].str(), optionsBob.obj());
+    return MongoURI(
+        std::move(cs), matches[1].str(), matches[2].str(), matches[4].str(), std::move(options));
 }
 
 }  // namespace mongo

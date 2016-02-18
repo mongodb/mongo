@@ -292,10 +292,7 @@ TEST(MongoURI, GoodTrickyURIs) {
         ASSERT_EQ(testCase.type, result.type());
         ASSERT_EQ(testCase.setname, result.getSetName());
         ASSERT_EQ(testCase.numservers, result.getServers().size());
-        auto options = result.getOptions();
-        std::set<std::string> fieldNames;
-        options.getFieldNames(fieldNames);
-        ASSERT_EQ(testCase.numOptions, fieldNames.size());
+        ASSERT_EQ(testCase.numOptions, result.getOptions().size());
         ASSERT_EQ(testCase.database, result.getDatabase());
     }
 }
