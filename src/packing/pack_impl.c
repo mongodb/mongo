@@ -157,24 +157,24 @@ __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt,
 	p = inbuf->data;
 	end = p + inbuf->size;
 
-	WT_ERR(__pack_init(session, &packout, outfmt));
-	WT_ERR(__pack_init(session, &packin, infmt));
+	WT_RET(__pack_init(session, &packout, outfmt));
+	WT_RET(__pack_init(session, &packin, infmt));
 
 	/* Outfmt should complete before infmt */
 	while ((ret = __pack_next(&packout, &pvout)) == 0) {
 		if (p >= end)
-			WT_ERR(EINVAL);
+			WT_RET(EINVAL);
 		if (pvout.type == 'x' && pvout.size == 0 && pvout.havesize)
 			continue;
-		WT_ERR(__pack_next(&packin, &pvin));
+		WT_RET(__pack_next(&packin, &pvin));
 		before = p;
-		WT_ERR(__unpack_read(session, &pvin, &p, (size_t)(end - p)));
+		WT_RET(__unpack_read(session, &pvin, &p, (size_t)(end - p)));
 		if (pvout.type != pvin.type)
-			WT_ERR(ENOTSUP);
+			WT_RET(ENOTSUP);
 		if (start == NULL)
 			start = before;
 	}
-	WT_ERR_NOTFOUND_OK(ret);
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
@@ -182,5 +182,5 @@ __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt,
 	outbuf->data = start;
 	outbuf->size = WT_PTRDIFF(p, start);
 
-err:	return (ret);
+	return (0);
 }

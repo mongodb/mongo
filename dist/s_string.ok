@@ -687,6 +687,7 @@ jnr
 jrx
 json
 kb
+kbits
 keycmp
 keyid
 keyv
@@ -839,6 +840,7 @@ pos
 posint
 posix
 postsize
+powerpc
 pragmas
 pre
 prealloc
