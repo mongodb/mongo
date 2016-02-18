@@ -354,6 +354,8 @@ Status runApplyOpsCmd(OperationContext* txn,
     }
 
     BSONArray preCond = buildOpPrecond(firstChunk.getNS(), firstChunk.getShard(), currShardVersion);
-    return grid.catalogManager(txn)->applyChunkOpsDeprecated(txn, updatesB.arr(), preCond);
+
+    return grid.catalogManager(txn)->applyChunkOpsDeprecated(
+        txn, updatesB.arr(), preCond, firstChunk.getNS(), newMergedVersion);
 }
 }

@@ -1497,7 +1497,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateDatabaseExceededTimeLimit) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecated) {
+TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedSuccessful) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArray updateOps = BSON_ARRAY(BSON("update1"
@@ -1508,23 +1508,23 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecated) {
                                              << "first precondition")
                                         << BSON("precondition2"
                                                 << "second precondition"));
+    std::string nss = "config.chunks";
+    ChunkVersion lastChunkVersion(0, 0, OID());
 
-    auto future = launchAsync([this, updateOps, preCondition] {
-        auto status =
-            catalogManager()->applyChunkOpsDeprecated(operationContext(), updateOps, preCondition);
+    auto future = launchAsync([this, updateOps, preCondition, nss, lastChunkVersion] {
+        auto status = catalogManager()->applyChunkOpsDeprecated(
+            operationContext(), updateOps, preCondition, nss, lastChunkVersion);
         ASSERT_OK(status);
     });
 
     onCommand(
-        [updateOps, preCondition](const RemoteCommandRequest& request) {
+        [updateOps, preCondition, nss](const RemoteCommandRequest& request) {
             ASSERT_EQUALS("config", request.dbname);
             ASSERT_EQUALS(BSON("w"
                                << "majority"
                                << "wtimeout" << 15000),
                           request.cmdObj["writeConcern"].Obj());
-
             ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
-
             ASSERT_EQUALS(updateOps, request.cmdObj["applyOps"].Obj());
             ASSERT_EQUALS(preCondition, request.cmdObj["preCondition"].Obj());
 
@@ -1535,7 +1535,7 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecated) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedCommandFailed) {
+TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONArray updateOps = BSON_ARRAY(BSON("update1"
@@ -1546,30 +1546,66 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedCommandFailed) {
                                              << "first precondition")
                                         << BSON("precondition2"
                                                 << "second precondition"));
+    std::string nss = "config.chunks";
+    ChunkVersion lastChunkVersion(0, 0, OID());
 
-    auto future = launchAsync([this, updateOps, preCondition] {
-        auto status =
-            catalogManager()->applyChunkOpsDeprecated(operationContext(), updateOps, preCondition);
-        ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    auto future = launchAsync([this, updateOps, preCondition, nss, lastChunkVersion] {
+        auto status = catalogManager()->applyChunkOpsDeprecated(
+            operationContext(), updateOps, preCondition, nss, lastChunkVersion);
+        ASSERT_OK(status);
     });
 
-    onCommand(
-        [updateOps, preCondition](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS("config", request.dbname);
-            ASSERT_EQUALS(BSON("w"
-                               << "majority"
-                               << "wtimeout" << 15000),
-                          request.cmdObj["writeConcern"].Obj());
-            ASSERT_EQUALS(updateOps, request.cmdObj["applyOps"].Obj());
-            ASSERT_EQUALS(preCondition, request.cmdObj["preCondition"].Obj());
+    onCommand([&](const RemoteCommandRequest& request) {
+        BSONObjBuilder responseBuilder;
+        Command::appendCommandStatus(responseBuilder,
+                                     Status(ErrorCodes::DuplicateKey, "precondition failed"));
+        return responseBuilder.obj();
+    });
 
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+    onFindCommand([this](const RemoteCommandRequest& request) {
+        OID oid = OID::gen();
+        ChunkType chunk;
+        chunk.setName("chunk0000");
+        chunk.setNS("TestDB.TestColl");
+        chunk.setMin(BSON("a" << 1));
+        chunk.setMax(BSON("a" << 100));
+        chunk.setVersion({1, 2, oid});
+        chunk.setShard("shard0000");
+        return vector<BSONObj>{chunk.toBSON()};
+    });
 
-            BSONObjBuilder responseBuilder;
-            Command::appendCommandStatus(responseBuilder,
-                                         Status(ErrorCodes::BadValue, "precondition failed"));
-            return responseBuilder.obj();
-        });
+    // Now wait for the applyChunkOpsDeprecated call to return
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    BSONArray updateOps = BSON_ARRAY(BSON("update1"
+                                          << "first update")
+                                     << BSON("update2"
+                                             << "second update"));
+    BSONArray preCondition = BSON_ARRAY(BSON("precondition1"
+                                             << "first precondition")
+                                        << BSON("precondition2"
+                                                << "second precondition"));
+    std::string nss = "config.chunks";
+    ChunkVersion lastChunkVersion(0, 0, OID());
+
+    auto future = launchAsync([this, updateOps, preCondition, nss, lastChunkVersion] {
+        auto status = catalogManager()->applyChunkOpsDeprecated(
+            operationContext(), updateOps, preCondition, nss, lastChunkVersion);
+        ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, status);
+    });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        BSONObjBuilder responseBuilder;
+        Command::appendCommandStatus(responseBuilder,
+                                     Status(ErrorCodes::NoMatchingDocument, "some error"));
+        return responseBuilder.obj();
+    });
+
+    onFindCommand([this](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
     // Now wait for the applyChunkOpsDeprecated call to return
     future.timed_get(kFutureTimeout);

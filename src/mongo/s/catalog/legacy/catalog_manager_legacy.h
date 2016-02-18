@@ -121,7 +121,9 @@ public:
 
     Status applyChunkOpsDeprecated(OperationContext* txn,
                                    const BSONArray& updateOps,
-                                   const BSONArray& preCondition) override;
+                                   const BSONArray& preCondition,
+                                   const std::string& nss,
+                                   const ChunkVersion& lastChunkVersion) override;
 
     StatusWith<SettingsType> getGlobalSettings(OperationContext* txn,
                                                const std::string& key) override;

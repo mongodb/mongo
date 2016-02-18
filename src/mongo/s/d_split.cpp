@@ -829,8 +829,9 @@ public:
         //
         // 4. apply the batch of updates to remote and local metadata
         //
-        Status applyOpsStatus =
-            grid.catalogManager(txn)->applyChunkOpsDeprecated(txn, updates.arr(), preCond.arr());
+
+        Status applyOpsStatus = grid.catalogManager(txn)->applyChunkOpsDeprecated(
+            txn, updates.arr(), preCond.arr(), nss.ns(), nextChunkVersion);
         if (!applyOpsStatus.isOK()) {
             return appendCommandStatus(result, applyOpsStatus);
         }

@@ -39,8 +39,11 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/optime_pair.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+MONGO_FP_FORWARD_DECLARE(failApplyChunkOps);
 
 /**
  * Common implementation shared by concrete catalog manager classes.

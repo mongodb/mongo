@@ -60,6 +60,8 @@
 
 namespace mongo {
 
+MONGO_FP_DECLARE(failApplyChunkOps);
+
 using std::string;
 using std::unique_ptr;
 using std::vector;

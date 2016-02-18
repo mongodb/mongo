@@ -71,7 +71,6 @@ BSONObj createRecvChunkCommitRequest(const MigrationSessionId& sessionId) {
 MONGO_FP_DECLARE(failMigrationCommit);
 MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
 MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
-MONGO_FP_DECLARE(failMigrationApplyOps);
 
 }  // namespace
 
@@ -396,13 +395,9 @@ Status ChunkMoveOperationState::commitMigration(const MigrationSessionId& sessio
                               ErrorCodes::PrepareConfigsFailed);
         }
 
-        applyOpsStatus =
-            grid.catalogManager(_txn)->applyChunkOpsDeprecated(_txn, updates.arr(), preCond.arr());
+        applyOpsStatus = grid.catalogManager(_txn)->applyChunkOpsDeprecated(
+            _txn, updates.arr(), preCond.arr(), _nss.ns(), nextVersion);
 
-        if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
-            throw SocketException(SocketException::RECV_ERROR,
-                                  shardingState->getConfigServer(_txn).toString());
-        }
     } catch (const DBException& ex) {
         applyOpsStatus = ex.toStatus();
     }
@@ -431,53 +426,7 @@ Status ChunkMoveOperationState::commitMigration(const MigrationSessionId& sessio
                                     << causedBy(applyOpsStatus);
         return Status(applyOpsStatus.code(), msg);
     } else if (!applyOpsStatus.isOK()) {
-        // This could be a blip in the connectivity. Wait out a few seconds and check if the
-        // commit request made it.
-        //
-        // If the commit made it to the config, we'll see the chunk in the new shard and
-        // there's no further action to be done.
-        //
-        // If the commit did not make it, currently the only way to fix this state is to
-        // bounce the mongod so that the old state (before migrating) is brought in.
-
-        warning() << "moveChunk commit failed and metadata will be revalidated"
-                  << causedBy(applyOpsStatus) << migrateLog;
-        sleepsecs(10);
-
-        // Look for the chunk in this shard whose version got bumped. We assume that if that
-        // mod made it to the config server, then applyOps was successful.
-        try {
-            std::vector<ChunkType> newestChunk;
-            Status status =
-                grid.catalogManager(_txn)->getChunks(_txn,
-                                                     BSON(ChunkType::ns(_nss.ns())),
-                                                     BSON(ChunkType::DEPRECATED_lastmod() << -1),
-                                                     1,
-                                                     &newestChunk,
-                                                     nullptr);
-            uassertStatusOK(status);
-
-            ChunkVersion checkVersion;
-            if (!newestChunk.empty()) {
-                invariant(newestChunk.size() == 1);
-                checkVersion = newestChunk[0].getVersion();
-            }
-
-            if (checkVersion.equals(nextVersion)) {
-                log() << "moveChunk commit confirmed" << migrateLog;
-            } else {
-                error() << "moveChunk commit failed: version is at " << checkVersion
-                        << " instead of " << nextVersion << migrateLog;
-                error() << "TERMINATING" << migrateLog;
-
-                dbexit(EXIT_SHARDING_ERROR);
-            }
-        } catch (...) {
-            error() << "moveChunk failed to get confirmation of commit" << migrateLog;
-            error() << "TERMINATING" << migrateLog;
-
-            dbexit(EXIT_SHARDING_ERROR);
-        }
+        fassertStatusOK(34431, applyOpsStatus);
     }
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);

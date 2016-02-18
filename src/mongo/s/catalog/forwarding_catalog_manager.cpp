@@ -532,9 +532,14 @@ bool ForwardingCatalogManager::runUserManagementReadCommand(OperationContext* tx
 
 Status ForwardingCatalogManager::applyChunkOpsDeprecated(OperationContext* txn,
                                                          const BSONArray& updateOps,
-                                                         const BSONArray& preCondition) {
+                                                         const BSONArray& preCondition,
+                                                         const std::string& nss,
+                                                         const ChunkVersion& lastChunkVersion) {
     return retry(txn,
-                 [&] { return _actual->applyChunkOpsDeprecated(txn, updateOps, preCondition); });
+                 [&] {
+                     return _actual->applyChunkOpsDeprecated(
+                         txn, updateOps, preCondition, nss, lastChunkVersion);
+                 });
 }
 
 Status ForwardingCatalogManager::logAction(OperationContext* txn,
