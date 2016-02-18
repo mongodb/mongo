@@ -129,9 +129,9 @@ class CleanEveryN(CustomBehavior):
 
 class CheckReplDBHash(CustomBehavior):
     """
-    Waits for replication after each test, then checks that the dbhahses
-    of all databases other than "local" match on the primary and all of
-    the secondaries. If any dbhashes do not match, logs information
+    Waits for replication after each test, then checks that the dbhashes
+    of all databases other than "local" and "config" match on the primary
+    and all of the secondaries. If any dbhashes do not match, logs information
     about what was different (e.g. Different numbers of collections,
     missing documents in a collection, mismatching documents, etc).
 
@@ -162,8 +162,6 @@ class CheckReplDBHash(CustomBehavior):
 
             primary = self.fixture.get_primary()
             primary_conn = utils.new_mongo_client(port=primary.port)
-
-            CheckReplDBHash._invalidate_dbhash_cache(primary_conn)
 
             # Wait until all operations have replicated.
             self.fixture.await_repl()
@@ -224,31 +222,11 @@ class CheckReplDBHash(CustomBehavior):
         self.started = False
 
     @staticmethod
-    def _invalidate_dbhash_cache(primary_conn):
-        """
-        dbHash values for collections in the "config" database are cached and may be stale due to
-        SERVER-22156. We insert a document into each of these collections to invalidate
-        the potentially stale cache entries.
-        """
-        db_names = primary_conn.database_names()
-        if "config" in db_names:
-            config_db = primary_conn["config"]
-            for coll_name in config_db.collection_names():
-                # We cannot use the "include_system_collections" parameter with collection_names()
-                # because it will filter out all system collections, which prevents us from
-                # invalidating the cache entries for user-writable collections like system.js.
-                if (coll_name.startswith("system.") and
-                    coll_name not in ["system.js", "system.users"]):
-                    continue
-                coll = config_db.get_collection(coll_name)
-                coll.insert_one({"invalidate": "cache"})
-
-    @staticmethod
     def _check_all_db_hashes(primary_conn, secondary_conn, sb):
         """
-        Returns true if for each non-local database, the dbhash command
-        returns the same MD5 hash on the primary as it does on the
-        secondary. Returns false otherwise.
+        Returns true if for each database, except "local" and
+        "config", the dbhash command returns the same MD5 hash on the
+        primary as it does on the secondary. Returns false otherwise.
 
         Logs a message describing the differences if any database's
         dbhash did not match.
@@ -260,8 +238,8 @@ class CheckReplDBHash(CustomBehavior):
         #     - If not, log which databases are missing where, and dump the contents of any that are
         #       missing.
         #
-        # - Check whether each database besides "local" gives the same md5 field as the result of
-        #   running the dbhash command.
+        # - Check whether each database besides "local" and "config" gives the same md5 field as
+        #   the result of running the dbhash command.
         #     - If not, check whether they have the same collections.
         #         - If not, log which collections are missing where, and dump the contents of any
         #           that are missing.
@@ -274,8 +252,8 @@ class CheckReplDBHash(CustomBehavior):
             return False
 
         for db_name in primary_conn.database_names():
-            if db_name == "local":
-                continue  # We don't expect this to match across different nodes.
+            if db_name in ["config", "local"]:
+                continue  # We don't expect these dbs to match across different nodes.
 
             matched = CheckReplDBHash._check_db_hash(primary_conn, secondary_conn, db_name, sb)
             success = matched and success
