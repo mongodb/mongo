@@ -118,8 +118,20 @@ void signalShutdown() {
     shutdownInProgress.fetchAndAdd(1);
 }
 
+// shutdownLock
+//
+// Protects:
+//  Ensures shutdown is single threaded.
+// Lock Ordering:
+//  No restrictions
+stdx::mutex shutdownLock;
+
 void exitCleanly(ExitCode code) {
     signalShutdown();
+
+    // Grab the shutdown lock to prevent concurrent callers
+    stdx::lock_guard<stdx::mutex> lockguard(shutdownLock);
+
     {
         Client& client = cc();
         ServiceContext::UniqueOperationContext uniqueTxn;
