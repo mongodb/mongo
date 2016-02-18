@@ -114,13 +114,18 @@ StatusWith<MongoURI> MongoURI::parse(const std::string& url) {
                 std::string(optionsTokens[i + 1].begin(), optionsTokens[i + 1].end());
     }
 
-    OptionsMap::const_iterator optIter;
+    std::map<std::string, std::string>::const_iterator optIter;
 
     // If a replica set option was specified, store it in the 'setName' field.
     bool haveSetName;
     std::string setName;
     if ((haveSetName = ((optIter = options.find("replicaSet")) != options.end())))
         setName = optIter->second;
+
+    // Add all remaining options into the bson object
+    BSONObjBuilder optionsBob;
+    for (optIter = options.begin(); optIter != options.end(); ++optIter)
+        optionsBob.append(optIter->first, optIter->second);
 
     std::string servers_str = matches[3].str();
     std::vector<HostAndPort> servers;
@@ -143,8 +148,7 @@ StatusWith<MongoURI> MongoURI::parse(const std::string& url) {
 
     ConnectionString cs(
         direct ? ConnectionString::MASTER : ConnectionString::SET, servers, setName);
-    return MongoURI(
-        std::move(cs), matches[1].str(), matches[2].str(), matches[4].str(), std::move(options));
+    return MongoURI(cs, matches[1].str(), matches[2].str(), matches[4].str(), optionsBob.obj());
 }
 
 }  // namespace mongo

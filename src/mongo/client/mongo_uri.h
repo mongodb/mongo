@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <map>
 #include <string>
 #include <vector>
 
@@ -68,11 +67,9 @@ namespace mongo {
  */
 class MongoURI {
 public:
-    using OptionsMap = std::map<std::string, std::string>;
-
     static StatusWith<MongoURI> parse(const std::string& url);
 
-    DBClientBase* connect(std::string& errmsg) const;
+    DBClientBase* connect(std::string& errmsg, double socketTimeout = 0) const;
 
     const std::string& getUser() const {
         return _user;
@@ -82,7 +79,7 @@ public:
         return _password;
     }
 
-    const OptionsMap& getOptions() const {
+    const BSONObj& getOptions() const {
         return _options;
     }
 
@@ -111,19 +108,19 @@ public:
     }
 
 private:
-    explicit MongoURI(const ConnectionString connectString)
-        : _connectString(std::move(connectString)){};
+    explicit MongoURI(const ConnectionString cs)
+        : _connectString(std::move(cs)), _user(), _password(), _database(), _options(){};
 
-    MongoURI(ConnectionString connectString,
+    MongoURI(ConnectionString _connectString,
              const std::string& user,
              const std::string& password,
              const std::string& database,
-             OptionsMap options)
-        : _connectString(std::move(connectString)),
+             const BSONObj& options)
+        : _connectString(std::move(_connectString)),
           _user(user),
           _password(password),
           _database(database),
-          _options(std::move(options)){};
+          _options(options){};
 
     BSONObj _makeAuthObjFromOptions(int maxWireVersion) const;
 
@@ -131,7 +128,6 @@ private:
     std::string _user;
     std::string _password;
     std::string _database;
-    OptionsMap _options;
+    BSONObj _options;
 };
-
 }  // namespace mongo

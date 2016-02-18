@@ -26,8 +26,6 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/shell/shell_options.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -365,13 +363,13 @@ Status storeMongoShellOptions(const moe::Environment& params,
         } else if (!shellGlobalParams.password.empty() && !cs.getPassword().empty()) {
             sb << "password";
         } else if (!shellGlobalParams.authenticationMechanism.empty() &&
-                   uriOptions.count("authMechanism")) {
+                   uriOptions.hasField("authMechanism")) {
             sb << "the authentication mechanism";
         } else if (!shellGlobalParams.authenticationDatabase.empty() &&
-                   uriOptions.count("authSource")) {
+                   uriOptions.hasField("authSource")) {
             sb << "the authentication database";
         } else if (shellGlobalParams.gssapiServiceName != saslDefaultServiceName &&
-                   uriOptions.count("gssapiServiceName")) {
+                   uriOptions.hasField("gssapiServiceName")) {
             sb << "the GSSAPI service name";
         } else {
             return Status::OK();

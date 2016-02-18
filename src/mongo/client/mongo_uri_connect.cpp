@@ -111,36 +111,34 @@ BSONObj MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
     if (!_password.empty())
         bob.append(saslCommandPasswordFieldName, _password);
 
-    OptionsMap::const_iterator it;
-
-    it = _options.find("authSource");
-    if (it != _options.end()) {
-        bob.append(saslCommandUserDBFieldName, it->second);
+    BSONElement elt = _options.getField("authSource");
+    if (!elt.eoo()) {
+        bob.appendAs(elt, saslCommandUserDBFieldName);
     } else if (!_database.empty()) {
         bob.append(saslCommandUserDBFieldName, _database);
     } else {
         bob.append(saslCommandUserDBFieldName, "admin");
     }
 
-    it = _options.find("authMechanism");
-    if (it != _options.end()) {
-        bob.append(saslCommandMechanismFieldName, it->second);
+    elt = _options.getField("authMechanism");
+    if (!elt.eoo()) {
+        bob.appendAs(elt, saslCommandMechanismFieldName);
     } else if (maxWireVersion >= 3) {
         bob.append(saslCommandMechanismFieldName, kAuthMechScramSha1);
     } else {
         bob.append(saslCommandMechanismFieldName, kAuthMechMongoCR);
     }
 
-    it = _options.find("authMechanismProperties");
-    if (it != _options.end()) {
-        BSONObj parsed(parseAuthMechanismProperties(it->second));
+    elt = _options.getField("authMechanismProperties");
+    if (!elt.eoo()) {
+        BSONObj parsed(parseAuthMechanismProperties(elt.String()));
 
         bool hasNameProp = parsed.hasField(kAuthServiceName);
         bool hasRealmProp = parsed.hasField(kAuthServiceRealm);
 
         uassert(ErrorCodes::FailedToParse,
                 "Cannot specify both gssapiServiceName and SERVICE_NAME",
-                !(hasNameProp && _options.count("gssapiServiceName")));
+                !(hasNameProp && _options.hasField("gssapiServiceName")));
         // we append the parsed object so that mechanisms that don't accept it can assert.
         bob.append(kAuthMechanismPropertiesKey, parsed);
         // we still append using the old way the SASL code expects it
@@ -154,29 +152,16 @@ BSONObj MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
         }
     }
 
-    it = _options.find("gssapiServiceName");
-    if (it != _options.end()) {
-        bob.append(saslCommandServiceNameFieldName, it->second);
-    }
+    elt = _options.getField("gssapiServiceName");
+    if (!elt.eoo())
+        bob.appendAs(elt, saslCommandServiceNameFieldName);
 
     bob.append("user", username);
 
     return bob.obj();
 }
 
-DBClientBase* MongoURI::connect(std::string& errmsg) const {
-    double socketTimeout = 0.0;
-
-    OptionsMap::const_iterator it = _options.find("socketTimeoutMS");
-    if (it != _options.end()) {
-        try {
-            socketTimeout = std::stod(it->second);
-        } catch (const std::exception& e) {
-            uasserted(ErrorCodes::BadValue,
-                      str::stream() << "Unable to parse socketTimeoutMS value" << causedBy(e));
-        }
-    }
-
+DBClientBase* MongoURI::connect(std::string& errmsg, double socketTimeout) const {
     auto ret = _connectString.connect(errmsg, socketTimeout);
     if (!_user.empty()) {
         ret->auth(_makeAuthObjFromOptions(ret->getMaxWireVersion()));
