@@ -35,7 +35,7 @@
         assert.soon(() => {
             var logContents = rawMongoProgramOutput();
             return matchFn(logContents);
-        });
+        }, "Log contents should match", 120000);
     }
 
     function runAllTests(launcher) {
