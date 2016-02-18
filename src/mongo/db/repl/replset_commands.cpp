@@ -355,9 +355,15 @@ public:
         std::string replSetString =
             ReplicationCoordinator::get(txn)->getSettings().getReplSetString();
         if (replSetString.empty()) {
-            return appendCommandStatus(
-                result,
-                ReplicationCoordinator::get(txn)->processReplSetInitiate(txn, configObj, &result));
+            if (serverGlobalParams.configsvr) {
+                return appendCommandStatus(result,
+                                           ReplicationCoordinator::get(txn)
+                                               ->processReplSetInitiate(txn, configObj, &result));
+            }
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::NoReplicationEnabled,
+                                              "This node was not started with the replSet "
+                                              "option"));
         }
 
         if (configObj.isEmpty()) {
