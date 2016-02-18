@@ -127,7 +127,8 @@ StatusWith<MongoURI> MongoURI::parse(const std::string& url) {
 
     {
         std::vector<std::string> servers_split;
-        boost::algorithm::split(servers_split, matches[3].str(), boost::is_any_of(","));
+        const std::string serversStr = matches[3].str();
+        boost::algorithm::split(servers_split, serversStr, boost::is_any_of(","));
         for (auto&& s : servers_split) {
             auto statusHostAndPort = HostAndPort::parse(s);
             if (!statusHostAndPort.isOK()) {
