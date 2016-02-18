@@ -113,8 +113,9 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	uint32_t allocsize;
 	bool exist;
-	const char *filecfg[] = { WT_CONFIG_BASE(session, file_meta), NULL };
-	const char *key;
+	const char *filecfg[] = {
+	    WT_CONFIG_BASE(session, file_meta), NULL, NULL };
+	const char *key, *value;
 
 	/*
 	 * If a file was being bulk-loaded during the hot backup, it will appear
@@ -135,6 +136,8 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 		 * If the file doesn't exist, assume it's a bulk-loaded file;
 		 * retrieve the allocation size and re-create the file.
 		 */
+		WT_ERR(cursor->get_value(cursor, &value));
+		filecfg[1] = value;
 		WT_ERR(__wt_direct_io_size_check(
 		    session, filecfg, "allocation_size", &allocsize));
 		WT_ERR(__wt_block_manager_create(session, key, allocsize));
