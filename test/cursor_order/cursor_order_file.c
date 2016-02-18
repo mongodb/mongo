@@ -86,7 +86,7 @@ load(SHARED_CONFIG *cfg, const char *name)
 	for (keyno = 1; keyno <= (int64_t)cfg->nkeys; ++keyno) {
 		if (cfg->ftype == ROW) {
 			snprintf(keybuf, sizeof(keybuf), "%016u", (u_int)keyno);
-			cursor->set_key(cursor, &keybuf);
+			cursor->set_key(cursor, keybuf);
 		} else
 			cursor->set_key(cursor, (uint32_t)keyno);
 		value->data = valuebuf;
@@ -103,8 +103,10 @@ load(SHARED_CONFIG *cfg, const char *name)
 
 	/* Setup the starting key range for the workload phase. */
 	cfg->key_range = cfg->nkeys;
-	cursor->close(cursor);
-	session->checkpoint(session, NULL);
+	if ((ret = cursor->close(cursor)) != 0)
+		testutil_die(ret, "cursor.close");
+	if ((ret = session->checkpoint(session, NULL)) != 0)
+		testutil_die(ret, "session.checkpoint");
 
 	if ((ret = session->close(session, NULL)) != 0)
 		testutil_die(ret, "session.close");
