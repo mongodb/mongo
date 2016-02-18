@@ -88,7 +88,7 @@ main(int argc, char *argv[])
 			working_dir = __wt_optarg;
 			break;
 		case 'k':			/* rows */
-			cfg->nkeys = (u_int64_t)atol(__wt_optarg);
+			cfg->nkeys = (uint64_t)atol(__wt_optarg);
 			break;
 		case 'l':			/* log */
 			if ((logfp = fopen(__wt_optarg, "w")) == NULL) {
@@ -98,10 +98,10 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'n':			/* operations */
-			cfg->max_nops = (u_int64_t)atol(__wt_optarg);
+			cfg->max_nops = (uint64_t)atol(__wt_optarg);
 			break;
 		case 'R':
-			cfg->reverse_scanners = (u_int64_t)atol(__wt_optarg);
+			cfg->reverse_scanners = (uint64_t)atol(__wt_optarg);
 			break;
 		case 'r':			/* runs */
 			runs = atoi(__wt_optarg);
@@ -125,10 +125,10 @@ main(int argc, char *argv[])
 			cfg->vary_nops = true;
 			break;
 		case 'w':
-			cfg->reverse_scan_ops = (u_int64_t)atol(__wt_optarg);
+			cfg->reverse_scan_ops = (uint64_t)atol(__wt_optarg);
 			break;
 		case 'W':
-			cfg->append_inserters = (u_int64_t)atol(__wt_optarg);
+			cfg->append_inserters = (uint64_t)atol(__wt_optarg);
 			break;
 		default:
 			return (usage());

@@ -180,6 +180,9 @@ reverse_scan_op(
 	WT_UNUSED(session);
 	WT_UNUSED(s);
 
+	/* Make GCC 4.1 happy */
+	prev_key = this_key = 0;
+
 	/* Reset the cursor */
 	cursor->reset(cursor);
 
@@ -269,7 +272,7 @@ append_insert_op(
     SHARED_CONFIG *cfg, WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
 	WT_ITEM *value, _value;
-	int64_t keyno;
+	uint64_t keyno;
 	int ret;
 	char keybuf[64], valuebuf[64];
 
