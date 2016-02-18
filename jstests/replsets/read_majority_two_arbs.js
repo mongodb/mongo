@@ -33,19 +33,27 @@ var primary = replTest.getPrimary();
 var db = primary.getDB(name);
 var t = db[name];
 
+function doRead(readConcern) {
+    var res = assert.commandWorked(t.runCommand('find', readConcern));
+    var docs = (new DBCommandCursor(db.getMongo(), res)).toArray();
+    assert.gt(docs.length, 0, "no docs returned!");
+    return docs[0].state;
+}
+
 function doDirtyRead() {
-    var res = t.runCommand('find', {"readConcern": {"level": "local"}});
-    assert.commandWorked(res);
-    return new DBCommandCursor(db.getMongo(), res).toArray()[0].state;
+    return doRead({"readConcern": {"level": "local"}});
 }
 
 function doCommittedRead() {
-    var res = t.runCommand('find', {"readConcern": {"level": "majority"}});
-    assert.commandWorked(res);
-    return new DBCommandCursor(db.getMongo(), res).toArray()[0].state;
+    return doRead({"readConcern": {"level": "majority"}});
 }
 
+jsTest.log("doing write");
 assert.writeOK(t.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeout: 10*1000}}));
+jsTest.log("doing read");
 assert.eq(doDirtyRead(), 0);
+jsTest.log("doing committed read");
 assert.eq(doCommittedRead(), 0);
+jsTest.log("stopping replTest; test completed successfully");
+replTest.stopSet();
 }());
