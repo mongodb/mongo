@@ -267,17 +267,16 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             }
 
             if (scope->getProto<CodeInfo>().getJSClass() == jsclass) {
-                if (o.hasOwnField(InternedString::scope)    // CodeWScope
-                    && o.type(InternedString::scope) == mongo::Object) {
-
+                if (o.hasOwnField(InternedString::scope)  // CodeWScope
+                    &&
+                    o.type(InternedString::scope) == mongo::Object) {
                     if (o.type(InternedString::code) != mongo::String) {
                         uasserted(ErrorCodes::BadValue, "code must be a string");
                     }
 
-                    b->appendCodeWScope(sd, o.getString(InternedString::code),
-                                            o.getObject(InternedString::scope));
-                }
-                else {                                      // Code
+                    b->appendCodeWScope(
+                        sd, o.getString(InternedString::code), o.getObject(InternedString::scope));
+                } else {  // Code
                     if (o.type(InternedString::code) != mongo::String) {
                         uasserted(ErrorCodes::BadValue, "code must be a string");
                     }

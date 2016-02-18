@@ -265,8 +265,7 @@ public:
     }
 
     template <typename T>
-    typename std::enable_if<std::is_same<T, CodeInfo>::value, WrapType<T>&>::type
-    getProto() {
+    typename std::enable_if<std::is_same<T, CodeInfo>::value, WrapType<T>&>::type getProto() {
         return _codeProto;
     }
 
