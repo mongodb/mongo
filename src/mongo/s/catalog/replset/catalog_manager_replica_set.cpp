@@ -875,9 +875,12 @@ bool CatalogManagerReplicaSet::runUserManagementReadCommand(OperationContext* tx
 
 Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
                                                          const BSONArray& updateOps,
-                                                         const BSONArray& preCondition) {
+                                                         const BSONArray& preCondition,
+                                                         const std::string& nss,
+                                                         const ChunkVersion& lastChunkVersion) {
     BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition
                                   << kWriteConcernField << kMajorityWriteConcern.toBSON());
+
     auto response = grid.shardRegistry()->runCommandOnConfigWithRetries(
         txn, "config", cmd, ShardRegistry::kAllRetriableErrors);
 
@@ -886,12 +889,52 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
     }
 
     Status status = Command::getStatusFromCommandResult(response.getValue());
-    if (!status.isOK()) {
-        string errMsg(str::stream() << "Unable to save chunk ops. Command: " << cmd
-                                    << ". Result: " << response.getValue());
 
+    if (MONGO_FAIL_POINT(failApplyChunkOps)) {
+        status = Status(ErrorCodes::InternalError, "Failpoint 'failApplyChunkOps' generated error");
+    }
+
+    if (!status.isOK()) {
+        string errMsg;
+
+        // This could be a blip in the network connectivity. Check if the commit request made it.
+        //
+        // If all the updates were successfully written to the chunks collection, the last
+        // document in the list of updates should be returned from a query to the chunks
+        // collection. The last chunk can be identified by namespace and version number.
+
+        warning() << "chunk operation commit failed and metadata will be revalidated"
+                  << causedBy(status);
+
+        // Look for the chunk in this shard whose version got bumped. We assume that if that
+        // mod made it to the config server, then applyOps was successful.
+        std::vector<ChunkType> newestChunk;
+        BSONObjBuilder query;
+        lastChunkVersion.addToBSON(query, ChunkType::DEPRECATED_lastmod());
+        query.append(ChunkType::ns(), nss);
+        Status chunkStatus = getChunks(txn, query.obj(), BSONObj(), 1, &newestChunk, nullptr);
+
+        if (!chunkStatus.isOK()) {
+            warning() << "getChunks function failed, unable to validate chunk operation metadata"
+                      << causedBy(chunkStatus);
+            errMsg = str::stream() << "getChunks function failed, unable to validate chunk "
+                                   << "operation metadata: " << causedBy(chunkStatus)
+                                   << ". applyChunkOpsDeprecated failed to get confirmation "
+                                   << "of commit. Unable to save chunk ops. Command: " << cmd
+                                   << ". Result: " << response.getValue();
+        } else if (!newestChunk.empty()) {
+            invariant(newestChunk.size() == 1);
+            log() << "chunk operation commit confirmed";
+            return Status::OK();
+        } else {
+            errMsg = str::stream() << "chunk operation commit failed: version "
+                                   << lastChunkVersion.toString() << " doesn't exist in namespace"
+                                   << nss << ". Unable to save chunk ops. Command: " << cmd
+                                   << ". Result: " << response.getValue();
+        }
         return Status(status.code(), errMsg);
     }
+
     return Status::OK();
 }
 

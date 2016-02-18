@@ -162,7 +162,9 @@ bool CatalogManagerMock::runUserManagementReadCommand(OperationContext* txn,
 
 Status CatalogManagerMock::applyChunkOpsDeprecated(OperationContext* txn,
                                                    const BSONArray& updateOps,
-                                                   const BSONArray& preCondition) {
+                                                   const BSONArray& preCondition,
+                                                   const std::string& nss,
+                                                   const ChunkVersion& lastChunkVersion) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

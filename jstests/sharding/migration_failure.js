@@ -59,7 +59,7 @@ assert.commandWorked(
 
 assert.commandWorked(
     st.shard0.getDB("admin").runCommand({
-        configureFailPoint : 'failMigrationApplyOps', mode : 'alwaysOn' }));
+        configureFailPoint : 'failApplyChunkOps', mode : 'alwaysOn' }));
 
 version = st.shard0.getDB("admin").runCommand({ getShardVersion : coll.toString() });
 
@@ -73,7 +73,7 @@ assert.neq(version.global, failVersion.global);
 
 assert.commandWorked(
     st.shard0.getDB("admin").runCommand({
-        configureFailPoint : 'failMigrationApplyOps', mode : 'off' }));
+        configureFailPoint : 'failApplyChunkOps', mode : 'off' }));
 
 jsTest.log( "DONE!" );
 

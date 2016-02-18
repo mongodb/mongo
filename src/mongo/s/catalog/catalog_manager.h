@@ -47,6 +47,7 @@ class BSONArrayBuilder;
 class BSONObj;
 class BSONObjBuilder;
 class ChunkType;
+struct ChunkVersion;
 class CollectionType;
 class ConnectionString;
 class DatabaseType;
@@ -317,12 +318,23 @@ public:
      * Applies oplog entries to the config servers.
      * Used by mergeChunk, splitChunk, and moveChunk commands.
      *
-     * @param updateOps: oplog entries to apply
-     * @param preCondition: preconditions for applying oplog entries
+     * @param updateOps: documents to write to the chunks collection.
+     * @param preCondition: preconditions for applying documents.
+     * @param nss: namespace string for the chunks collection.
+     * @param lastChunkVersion: version of the last document being written to the chunks
+     * collection.
+     *
+     * 'nss' and 'lastChunkVersion' uniquely identify the last document being written, which is
+     * expected to appear in the chunks collection on success. This is important for the
+     * case where network problems cause a retry of a successful write, which then returns
+     * failure because the precondition no longer matches. If a query of the chunks collection
+     * returns a document matching both 'nss' and 'lastChunkVersion,' the write succeeded.
      */
     virtual Status applyChunkOpsDeprecated(OperationContext* txn,
                                            const BSONArray& updateOps,
-                                           const BSONArray& preCondition) = 0;
+                                           const BSONArray& preCondition,
+                                           const std::string& nss,
+                                           const ChunkVersion& lastChunkVersion) = 0;
 
     /**
      * Writes a diagnostic event to the action log.
