@@ -1,5 +1,21 @@
 'use_strict';
 
+function makeDirectoryReadOnly(dir) {
+    if (_isWindows()) {
+        run("attrib", "+r", dir, "/s");
+    } else {
+        run("chmod", "-R", "a-w", dir);
+    }
+}
+
+function makeDirectoryWritable(dir) {
+    if (_isWindows()) {
+        run("attrib", "-r", dir, "/s");
+    } else {
+        run("chmod", "-R", "a+w", dir);
+    }
+}
+
 function runReadOnlyTest(test) {
 
     printjson(test);
@@ -22,18 +38,26 @@ function runReadOnlyTest(test) {
 
     MongoRunner.stopMongod(writableMongod);
 
-    // TODO: change directory to read-only permissions when RO is implemented in MMAPv1.
-    var readOnlyOptions = Object.extend(options,
-                                        {readOnly: '',
-                                         dbpath: dbpath,
-                                         noCleanData: true});
+    makeDirectoryReadOnly(dbpath);
 
-    var readOnlyMongod = MongoRunner.runMongod(readOnlyOptions);
+    try {
+        var readOnlyOptions = Object.extend(options,
+                                            {readOnly: '',
+                                             dbpath: dbpath,
+                                             noCleanData: true});
 
-    jsTest.log('starting execution phase for test: ' + test.name);
-    test.exec(readOnlyMongod.getDB('test')[test.name]);
+        var readOnlyMongod = MongoRunner.runMongod(readOnlyOptions);
 
-    MongoRunner.stopMongod(readOnlyMongod);
+        jsTest.log('starting execution phase for test: ' + test.name);
+        test.exec(readOnlyMongod.getDB('test')[test.name]);
+
+        // We need to make the directory writable so that MongoRunner can clean the dbpath.
+        makeDirectoryWritable(dbpath);
+        MongoRunner.stopMongod(readOnlyMongod);
+    } finally {
+        // One last time, just in case.
+        makeDirectoryWritable(dbpath);
+    }
 }
 
 function* cycleN(arr, N) {

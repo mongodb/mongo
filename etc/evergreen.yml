@@ -3289,6 +3289,7 @@ buildvariants:
     distros:
     - windows-64-vs2013-compile
   - name: read_concern_majority_passthrough_WT
+  - name: read_only
   - name: replicasets
   - name: replicasets_WT
   - name: replication
