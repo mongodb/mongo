@@ -106,9 +106,7 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
     }
 
     WorkingSetID id = _workingSet->allocate();
-    WorkingSetMember* member = _workingSet->get(id);
-    member->obj = Snapshotted<BSONObj>(SnapshotId(), BSONObj().getOwned());
-    member->transitionToOwnedObj();
+    _workingSet->transitionToRecordIdAndObj(id);
     *out = id;
     return PlanStage::ADVANCED;
 }
