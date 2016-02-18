@@ -19,10 +19,11 @@ static const int windows_error_offset = -29000;
 static DWORD
 __wt_map_error_to_windows_error(int error)
 {
-	/* Ensure we do not exceed the error range
-	   Also validate he do not get any COM errors
-	   (which are negative integers)
-	*/
+	/*
+	 * Ensure we do not exceed the error range
+	 * Also validate we do not get any COM errors
+	 * (which are negative integers)
+	 */
 	WT_ASSERT(NULL, error < 0);
 
 	return (error + -(windows_error_offset));
