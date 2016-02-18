@@ -17,37 +17,25 @@
     }
 
     function makeRegExMatchFn(pattern) {
-        return function (text, logFileName) {
-            if (!pattern.test(text)) {
-                print("LOGFILENAME = " + logFileName);
-                print("--- LOG CONTENTS ---");
-                print(text);
-                print("--- END LOG CONTENTS ---");
-
-                sleep(3000);
-
-                print("--- LOG CONTENTS AFTER SLEEPING ---");
-                print(cat(logFileName));
-                print("--- END LOG CONTENTS AFTER SLEEPING ---");
-
-                doassert("Log contents did not match " + pattern);
-            }
-            print("GOT EXPECTED LOG CONTENTS IN " + logFileName);
+        return function (text) {
+            return pattern.test(text);
         };
     }
 
     function testShutdownLogging(launcher, crashFn, matchFn, expectedExitCode) {
-        var logFileName = MongoRunner.dataPath + "mongod.log";
-        var opts = { logpath: logFileName };
-        var conn = launcher.start(opts);
+        clearRawMongoProgramOutput();
+        var conn = launcher.start({});
         try {
             crashFn(conn);
         }
         finally {
             launcher.stop(conn, undefined, { allowedExitCodes: [ expectedExitCode ] });
         }
-        var logContents = cat(logFileName);
-        matchFn(logContents, logFileName);
+
+        assert.soon(() => {
+            var logContents = rawMongoProgramOutput();
+            return matchFn(logContents);
+        });
     }
 
     function runAllTests(launcher) {
