@@ -40,7 +40,6 @@
 
         assert.gt(coll.count(), 0);
         assert.eq(coll.findOne({}, {_id:0}), docs[0]);
-        assert.gt(res.insert, 0, tojson(res));
     }
 
     function testFind(readCmd) {
