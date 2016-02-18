@@ -47,7 +47,7 @@ static char home_rd[HOME_SIZE];		/* Read-only dir */
 static char home_rd2[HOME_SIZE];	/* Read-only dir no lock file */
 static const char *progname;		/* Program name */
 static const char *saved_argv0;		/* Program command */
-static const char *uri = "table:main";
+static const char * const uri = "table:main";
 
 #define	ENV_CONFIG						\
     "create,log=(file_max=10M,archive=false,enabled),"		\
@@ -221,14 +221,13 @@ main(int argc, char *argv[])
 		testutil_make_work_dir(home_wr);
 		testutil_make_work_dir(home_rd);
 		testutil_make_work_dir(home_rd2);
-	} else {
+	} else
 		/*
 		 * We are a child process, we just want to call
 		 * the open_dbs with the directories we have.
 		 * The child function will exit.
 		 */
 		open_dbs(op, home, home_wr, home_rd, home_rd2);
-	}
 
 	/*
 	 * Parent creates a database and table.  Then cleanly shuts down.

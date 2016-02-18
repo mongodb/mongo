@@ -1443,28 +1443,28 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		wt_session = &session_ret->iface;
 		wt_session->checkpoint =
 		    (int (*)(WT_SESSION *, const char *))__wt_session_notsup;
-		wt_session->compact =
-		    (int (*)(WT_SESSION *, const char *, const char *))__wt_session_notsup;
-		wt_session->create =
-		    (int (*)(WT_SESSION *, const char *, const char *))__wt_session_notsup;
-		wt_session->drop =
-		    (int (*)(WT_SESSION *, const char *, const char *))__wt_session_notsup;
+		wt_session->compact = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->create = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->drop = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
 		wt_session->log_flush =
 		    (int (*)(WT_SESSION *, const char *))__wt_session_notsup;
-		wt_session->log_printf =
-		    (int (*)(WT_SESSION *, const char *, ...))__wt_session_notsup;
-		wt_session->rebalance =
-		    (int (*)(WT_SESSION *, const char *, const char *))__wt_session_notsup;
-		wt_session->rename = (int (*)(WT_SESSION *,
-		    const char *, const char *, const char *))__wt_session_notsup;
-		wt_session->salvage =
-		    (int (*)(WT_SESSION *, const char *, const char *))__wt_session_notsup;
+		wt_session->log_printf = (int (*)(
+		    WT_SESSION *, const char *, ...))__wt_session_notsup;
+		wt_session->rebalance = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->rename = (int (*)(WT_SESSION *, const char *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->salvage = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
 		wt_session->transaction_sync =
 		    (int (*)(WT_SESSION *, const char *))__wt_session_notsup;
-		wt_session->truncate = (int (*)(WT_SESSION *,
-		    const char *, WT_CURSOR *, WT_CURSOR *, const char *))__wt_session_notsup;
-		wt_session->upgrade =
-		    (int (*)(WT_SESSION *, const char *, const char *))__wt_session_notsup;
+		wt_session->truncate = (int (*)(WT_SESSION *, const char *,
+		    WT_CURSOR *, WT_CURSOR *, const char *))__wt_session_notsup;
+		wt_session->upgrade = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
 	}
 
 	WT_ERR(__wt_cond_alloc(session, "session", false, &session_ret->cond));
