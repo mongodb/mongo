@@ -25,7 +25,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
 
 #include "mongo/platform/basic.h"
@@ -66,8 +65,8 @@ using ResponseStatus = TaskExecutor::ResponseStatus;
 
 // A type conforms to the NetworkHandler concept if it is a callable type that takes a
 // std::error_code and std::size_t and returns void. The std::error_code parameter is used
-// to inform the handler if the asynchronous operation it was waiting on succeeded, and the size_t
-// parameter conveys how many bytes were read or written.
+// to inform the handler if the asynchronous operation it was waiting on succeeded, and the
+// size_t parameter conveys how many bytes were read or written.
 template <typename FunctionLike>
 using IsNetworkHandler =
     std::is_convertible<FunctionLike, stdx::function<void(std::error_code, std::size_t)>>;
@@ -233,7 +232,6 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
     // return to the connection pool's get() callback with _inSetup == false,
     // so we can proceed with user operations after they return to this
     // codepath.
-
     if (op->_inSetup) {
         log() << "Successfully connected to " << op->request().target.toString();
         op->_inSetup = false;
@@ -280,14 +278,17 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
 
     if (op->_inSetup) {
         // If we are in setup we should only be here if we failed to connect.
-        invariant(!resp.isOK());
-        // If we fail during connection, we won't be able to access any of our members after calling
-        // op->finish().
+        MONGO_ASIO_INVARIANT(!resp.isOK(), "Failed to connect in setup", op);
+        // If we fail during connection, we won't be able to access any of op's members after
+        // calling finish(), so we return here.
         LOG(1) << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
+        op->finish(resp);
+        return;
     }
 
     if (!resp.isOK()) {
-        // In the case that resp is not OK, but _inSetup is false, we are using a connection that
+        // In the case that resp is not OK, but _inSetup is false, we are using a connection
+        // that
         // we got from the pool to execute a command, but it failed for some reason.
         LOG(2) << "Failed to execute command: " << op->request().toString()
                << " reason: " << resp.getStatus();
@@ -302,24 +303,22 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
 
         auto iter = _inProgress.find(op);
 
-        // This can happen if we fail during setup.
-        if (iter == _inProgress.end()) {
-            return;
-        }
+        MONGO_ASIO_INVARIANT_INLOCK(
+            iter != _inProgress.end(), "Could not find AsyncOp in _inProgress", op);
 
         ownedOp = std::move(iter->second);
         _inProgress.erase(iter);
     }
 
-    invariant(ownedOp);
+    MONGO_ASIO_INVARIANT(static_cast<bool>(ownedOp), "Invalid AsyncOp", op);
 
     auto conn = std::move(op->_connectionPoolHandle);
     auto asioConn = static_cast<connection_pool_asio::ASIOConnection*>(conn.get());
 
-    // Prevent any other threads or callbacks from accessing this op so we may safely complete and
-    // destroy it. It is key that we do this after we remove the op from the _inProgress map or
-    // someone else in cancelCommand could read the bumped generation and cancel the next command
-    // that uses this op. See SERVER-20556.
+    // Prevent any other threads or callbacks from accessing this op so we may safely complete
+    // and destroy it. It is key that we do this after we remove the op from the _inProgress map
+    // or someone else in cancelCommand could read the bumped generation and cancel the next
+    // command that uses this op. See SERVER-20556.
     {
         stdx::lock_guard<stdx::mutex> lk(op->_access->mutex);
         ++(op->_access->id);
@@ -358,8 +357,8 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncOp* op, NetworkOpHandler handle
     // Step 3
     auto recvHeaderCallback = [this, cmd, handler, recvMessageCallback, op](std::error_code ec,
                                                                             size_t bytes) {
-        // The operation could have been canceled after starting the command, but before receiving
-        // the header
+        // The operation could have been canceled after starting the command, but before
+        // receiving the header
         _validateAndRun(op,
                         ec,
                         [this, op, recvMessageCallback, ec, bytes, cmd, handler] {

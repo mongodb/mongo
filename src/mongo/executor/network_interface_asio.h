@@ -69,6 +69,23 @@ class ASIOImpl;
 
 class AsyncStreamInterface;
 
+#define MONGO_ASIO_INVARIANT(_Expression, ...)              \
+    do {                                                    \
+        if (MONGO_unlikely(!(_Expression))) {               \
+            _failWithInfo(__FILE__, __LINE__, __VA_ARGS__); \
+        }                                                   \
+    } while (false)
+
+#define MONGO_ASIO_INVARIANT_INLOCK(_Expression, ...)              \
+    do {                                                           \
+        if (MONGO_unlikely(!(_Expression))) {                      \
+            _failWithInfo_inlock(__FILE__, __LINE__, __VA_ARGS__); \
+        }                                                          \
+    } while (false)
+
+// An AsyncOp can transition through at most 5 states.
+const int kMaxStateTransitions = 5;
+
 /**
  * Implementation of the replication system's network interface using Christopher
  * Kohlhoff's ASIO library instead of existing MongoDB networking primitives.
@@ -125,6 +142,7 @@ private:
     using ResponseStatus = TaskExecutor::ResponseStatus;
     using NetworkInterface::RemoteCommandCompletionFn;
     using NetworkOpHandler = stdx::function<void(std::error_code, size_t)>;
+    using TableRow = std::vector<std::string>;
 
     enum class State { kReady, kRunning, kShutdown };
 
@@ -228,6 +246,30 @@ private:
         friend class NetworkInterfaceASIO;
 
     public:
+        /**
+          * Describe the various states through which an AsyncOp transitions.
+          */
+        enum class State : unsigned char {
+            // A non-state placeholder.
+            kNoState,
+            // A new or zeroed-out AsyncOp.
+            kUninitialized,
+            // An AsyncOp begins its progress when startProgress() is called.
+            kInProgress,
+            // An AsyncOp transitions to kTimedOut when timeOut() is called.
+            // Note that the AsyncOp can be in a kCanceled state and still be
+            // in-flight in NetworkInterfaceASIO.
+            kTimedOut,
+            // An AsyncOp transitions to kCanceled when cancel() is called.
+            // Note that the AsyncOp can be in a kCanceled state and still be
+            // in-flight in NetworkInterfaceASIO.
+            kCanceled,
+            // An AsyncOp is finished once its finish() method is called. Note
+            // that the AsyncOp can be in a kFinished state and still be in the
+            // NetworkInterface's set of in-progress operations.
+            kFinished,
+        };
+
         AsyncOp(NetworkInterfaceASIO* net,
                 const TaskExecutor::CallbackHandle& cbHandle,
                 const RemoteCommandRequest& request,
@@ -249,6 +291,7 @@ private:
 
         void cancel();
         bool canceled() const;
+        void timeOut_inlock();
         bool timedOut() const;
 
         const TaskExecutor::CallbackHandle& cbHandle() const;
@@ -275,6 +318,8 @@ private:
 
         const RemoteCommandRequest& request() const;
 
+        void startProgress(Date_t startTime);
+
         Date_t start() const;
 
         rpc::Protocol operationProtocol() const;
@@ -283,7 +328,13 @@ private:
 
         void reset();
 
+        void clearStateTransitions();
+
         void setOnFinish(RemoteCommandCompletionFn&& onFinish);
+
+        // Returns diagnostic strings for logging.
+        TableRow getStringFields() const;
+        std::string toString() const;
 
         asio::io_service::strand& strand() {
             return _strand;
@@ -293,7 +344,28 @@ private:
             return _resolver;
         }
 
+        bool operator==(const AsyncOp& other) const;
+
     private:
+        // Type to represent the internal id of this request.
+        using AsyncOpId = uint64_t;
+
+        // Return string representation of a given state.
+        std::string _stateToString(State state) const;
+
+        // Return a string representation of this op's state transitions.
+        std::string _stateString() const;
+
+        bool _hasSeenState(State state) const;
+
+        // Track and validate AsyncOp state transitions.
+        // Use the _inlock variant if already holding the access control lock.
+        void _transitionToState(State newState);
+        void _transitionToState_inlock(State newState);
+
+        // Helper for debugging.
+        void _failWithInfo(const char* file, int line, std::string error) const;
+
         NetworkInterfaceASIO* const _owner;
         // Information describing a task enqueued on the NetworkInterface
         // via a call to startCommand().
@@ -322,8 +394,7 @@ private:
 
         asio::ip::tcp::resolver _resolver;
 
-        bool _canceled = false;
-        bool _timedOut = false;
+        const AsyncOpId _id;
 
         /**
          * We maintain a shared_ptr to an access control object. This ensures that tangent
@@ -348,6 +419,12 @@ private:
          * will make those fields illegal to touch from callbacks.
          */
         asio::io_service::strand _strand;
+
+        /**
+         * We hold an array of states to show the path this AsyncOp has taken.
+         * Must be holding the access control's lock to edit.
+         */
+        State _states[kMaxStateTransitions];
     };
 
     void _startCommand(AsyncOp* op);
@@ -393,6 +470,12 @@ private:
     void _signalWorkAvailable_inlock();
 
     void _asyncRunCommand(AsyncOp* op, NetworkOpHandler handler);
+
+    std::string _getDiagnosticString_inlock(AsyncOp* currentOp);
+
+    // Helpers for debugging crashes
+    void _failWithInfo(const char* file, int line, std::string error, AsyncOp* op = nullptr);
+    void _failWithInfo_inlock(const char* file, int line, std::string error, AsyncOp* op = nullptr);
 
     Options _options;
 
