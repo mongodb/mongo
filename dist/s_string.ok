@@ -436,6 +436,7 @@ cfg
 cfkos
 change's
 changelog
+chdir
 checkpointed
 checkpointer
 checkpointing
@@ -1069,6 +1070,7 @@ vsnprintf
 vtype
 vunpack
 vw
+waitpid
 walk's
 warmup
 wb
