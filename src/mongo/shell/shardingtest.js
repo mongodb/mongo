@@ -624,6 +624,23 @@ var ShardingTest = function(params) {
         return false;
     };
 
+    /*
+     * Converts a CSRS connection string to a SCCC connection string.
+     * TODO: handle numbers of config servers other than 1 or 3
+     *
+     * E.g.: "test-configRS/Foo:20002,Foo:20003,Foo:20004" (CSRS)
+     *       converts to "Foo:20002,Foo:20003,Foo:20004" (SCCC)
+     */
+    this.generateSCCCFromCSRSConnectionString = function(csrsString) {
+        var numConfigConnections = csrsString.split(",").length;
+        if ((numConfigConnections === 3) || (numConfigConnections === 1)) {
+            return csrsString.substring(csrsString.indexOf("/") + 1);
+        } else {
+            throw new Error("generateSCCCFromCSRSConnectionString() expects " +
+                            "1 or 3-node config servers, got " + tojson(csrsString));
+        }
+    };
+
     /**
      * Kills the mongos with index n.
      */

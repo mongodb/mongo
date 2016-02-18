@@ -1171,6 +1171,11 @@ const std::size_t kHelpField = 1;
 const std::size_t kShardVersionField = 2;
 const std::size_t kQueryOptionMaxTimeMSField = 3;
 
+// When this node's sharding state is not enabled, allow commands that initialize sharding state
+// to run even if they contain chunk information.
+const std::set<std::string> shardingStateEnablingCommands = {
+    "moveChunk", "splitChunk", "mergeChunks", "_recvChunkStart"};
+
 // We make an array of the fields we need so we can call getFields once. This saves repeated
 // scans over the command object.
 const std::array<StringData, 4> neededFieldNames{LiteParsedQuery::cmdOptionMaxTimeMS,
@@ -1305,7 +1310,8 @@ void Command::execCommand(OperationContext* txn,
                            "node is not sharding aware: " << request.getCommandArgs().jsonString(),
                     !operationShardVersion.hasShardVersion() ||
                         ChunkVersion::isIgnoredVersion(
-                            operationShardVersion.getShardVersion(commandNS)));
+                            operationShardVersion.getShardVersion(commandNS)) ||
+                        shardingStateEnablingCommands.count(request.getCommandName().rawData()));
             }
         }
 

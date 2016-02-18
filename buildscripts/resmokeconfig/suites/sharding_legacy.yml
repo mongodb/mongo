@@ -4,6 +4,8 @@ selector:
     - jstests/sharding/*.js
     - jstests/sharding/sync_cluster_config/*.js
     exclude_files:
+    # Tests shard upgrade to CSRS mode, nonsensical if using SCCC config servers
+    - jstests/sharding/csrs_upgrade_mongod_using_movechunk.js
 
 executor:
   js_test:
