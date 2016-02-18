@@ -150,16 +150,21 @@ MAdvise::~MAdvise() {
 }
 #endif
 
-void* MemoryMappedFile::map(const char* filename, unsigned long long& length, int options) {
+void* MemoryMappedFile::map(const char* filename,
+                            unsigned long long& length,
+                            int mongoFileOptions) {
     // length may be updated by callee.
     setFilename(filename);
     FileAllocator::get()->allocateAsap(filename, length);
     len = length;
 
+    const bool readOnly = mongoFileOptions & MongoFile::Options::READONLY;
+
     massert(
         10446, str::stream() << "mmap: can't map area of size 0 file: " << filename, length > 0);
 
-    fd = open(filename, O_RDWR | O_NOATIME);
+    const int posixOpenOpts = O_NOATIME | (readOnly ? O_RDONLY : O_RDWR);
+    fd = ::open(filename, posixOpenOpts);
     if (fd <= 0) {
         log() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
         fd = 0;  // our sentinel for not opened
@@ -173,7 +178,8 @@ void* MemoryMappedFile::map(const char* filename, unsigned long long& length, in
             filelen == length);
     lseek(fd, 0, SEEK_SET);
 
-    void* view = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    const int mmapProtectionOpts = readOnly ? PROT_READ : (PROT_READ | PROT_WRITE);
+    void* view = mmap(NULL, length, mmapProtectionOpts, MAP_SHARED, fd, 0);
     if (view == MAP_FAILED) {
         error() << "  mmap() failed for " << filename << " len:" << length << " "
                 << errnoWithDescription() << endl;
@@ -191,7 +197,7 @@ void* MemoryMappedFile::map(const char* filename, unsigned long long& length, in
 #if defined(__sun)
 #warning madvise not supported on solaris yet
 #else
-    if (options & SEQUENTIAL) {
+    if (mongoFileOptions & MongoFile::Options::SEQUENTIAL) {
         if (madvise(view, length, MADV_SEQUENTIAL)) {
             warning() << "map: madvise failed for " << filename << ' ' << errnoWithDescription()
                       << endl;
@@ -202,21 +208,6 @@ void* MemoryMappedFile::map(const char* filename, unsigned long long& length, in
     views.push_back(view);
 
     return view;
-}
-
-void* MemoryMappedFile::createReadOnlyMap() {
-    void* x = mmap(/*start*/ 0, len, PROT_READ, MAP_SHARED, fd, 0);
-    if (x == MAP_FAILED) {
-        if (errno == ENOMEM) {
-            if (sizeof(void*) == 4)
-                error() << "mmap ro failed with out of memory. You are using a 32-bit build and "
-                           "probably need to upgrade to 64" << endl;
-            else
-                error() << "mmap ro failed with out of memory. (64 bit build)" << endl;
-        }
-        return 0;
-    }
-    return x;
 }
 
 void* MemoryMappedFile::createPrivateMap() {

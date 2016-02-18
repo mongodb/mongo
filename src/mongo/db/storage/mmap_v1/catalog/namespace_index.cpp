@@ -171,6 +171,10 @@ void NamespaceIndex::init(OperationContext* txn) {
             p = _f.getView();
         }
     } else {
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot create a database in read-only mode.",
+                !storageGlobalParams.readOnly);
+
         // use mmapv1GlobalOptions.lenForNewNsFiles, we are making a new database
         massert(10343,
                 "bad mmapv1GlobalOptions.lenForNewNsFiles",

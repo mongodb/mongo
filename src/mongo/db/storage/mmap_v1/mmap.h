@@ -219,7 +219,7 @@ public:
        passed length.
        @param options MongoFile::Options bits
     */
-    void* map(const char* filename, unsigned long long& length, int options = 0);
+    void* map(const char* filename, unsigned long long& length, int mongoFileOptions = 0);
 
     /* Create. Must not exist.
        @param zero fill file with zeros when true
@@ -241,7 +241,6 @@ public:
     /** create a new view with the specified properties.
         automatically cleaned up upon close/destruction of the MemoryMappedFile object.
         */
-    void* createReadOnlyMap();
     void* createPrivateMap();
 
     virtual uint64_t getUniqueId() const {

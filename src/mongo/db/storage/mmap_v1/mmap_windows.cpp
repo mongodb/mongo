@@ -183,51 +183,9 @@ void MemoryMappedFile::close() {
 
 unsigned long long mapped = 0;
 
-void* MemoryMappedFile::createReadOnlyMap() {
-    verify(maphandle);
-
-    stdx::lock_guard<stdx::mutex> lk(mapViewMutex);
-
-    void* readOnlyMapAddress = NULL;
-    int current_retry = 0;
-
-    while (true) {
-        LPVOID thisAddress = getNextMemoryMappedFileLocation(len);
-
-        readOnlyMapAddress = MapViewOfFileEx(maphandle,      // file mapping handle
-                                             FILE_MAP_READ,  // access
-                                             0,
-                                             0,             // file offset, high and low
-                                             0,             // bytes to map, 0 == all
-                                             thisAddress);  // address to place file
-
-        if (0 == readOnlyMapAddress) {
-            DWORD dosError = GetLastError();
-
-            ++current_retry;
-
-            // If we failed to allocate a memory mapped file, try again in case we picked
-            // an address that Windows is also trying to use for some other VM allocations
-            if (dosError == ERROR_INVALID_ADDRESS && current_retry < 5) {
-                continue;
-            }
-
-            log() << "MapViewOfFileEx for " << filename() << " at address " << thisAddress
-                  << " failed with error " << errnoWithDescription(dosError) << " (file size is "
-                  << len << ")"
-                  << " in MemoryMappedFile::createReadOnlyMap" << endl;
-
-            fassertFailed(16165);
-        }
-
-        break;
-    }
-
-    views.push_back(readOnlyMapAddress);
-    return readOnlyMapAddress;
-}
-
-void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length, int options) {
+void* MemoryMappedFile::map(const char* filenameIn,
+                            unsigned long long& length,
+                            int mongoFileOptions) {
     verify(fd == 0 && len == 0);  // can't open more than once
     setFilename(filenameIn);
     FileAllocator::get()->allocateAsap(filenameIn, length);
@@ -249,18 +207,23 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length, 
 
     updateLength(filename, length);
 
+    const bool readOnly = mongoFileOptions & MongoFile::Options::READONLY;
+
     {
         DWORD createOptions = FILE_ATTRIBUTE_NORMAL;
-        if (options & SEQUENTIAL)
+        if (mongoFileOptions & SEQUENTIAL)
             createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
-        DWORD rw = GENERIC_READ | GENERIC_WRITE;
+
+        DWORD desiredAccess = readOnly ? GENERIC_READ : (GENERIC_READ | GENERIC_WRITE);
+        DWORD shareMode = readOnly ? FILE_SHARE_READ : (FILE_SHARE_WRITE | FILE_SHARE_READ);
+
         fd = CreateFileW(toWideString(filename).c_str(),
-                         rw,                                  // desired access
-                         FILE_SHARE_WRITE | FILE_SHARE_READ,  // share mode
-                         NULL,                                // security
-                         OPEN_ALWAYS,                         // create disposition
-                         createOptions,                       // flags
-                         NULL);                               // hTempl
+                         desiredAccess,  // desired access
+                         shareMode,      // share mode
+                         NULL,           // security
+                         OPEN_ALWAYS,    // create disposition
+                         createOptions,  // flags
+                         NULL);          // hTempl
         if (fd == INVALID_HANDLE_VALUE) {
             DWORD dosError = GetLastError();
             log() << "CreateFileW for " << filename << " failed with "
@@ -273,7 +236,7 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length, 
     mapped += length;
 
     {
-        DWORD flProtect = PAGE_READWRITE;  //(options & READONLY)?PAGE_READONLY:PAGE_READWRITE;
+        DWORD flProtect = readOnly ? PAGE_READONLY : PAGE_READWRITE;
         maphandle = CreateFileMappingW(fd,
                                        NULL,
                                        flProtect,
@@ -293,7 +256,7 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length, 
     void* view = 0;
     {
         stdx::lock_guard<stdx::mutex> lk(mapViewMutex);
-        DWORD access = (options & READONLY) ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
+        DWORD access = readOnly ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
 
         int current_retry = 0;
         while (true) {

@@ -246,7 +246,15 @@ bool DurableMappedFile::open(const std::string& fname, bool sequentialHint) {
     invariant(!_view_write);
 
     setPath(fname);
-    _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
+    int options = 0;
+    if (sequentialHint) {
+        options |= MongoFile::Options::SEQUENTIAL;
+    }
+    if (storageGlobalParams.readOnly) {
+        options |= MongoFile::Options::READONLY;
+    }
+
+    _view_write = mapWithOptions(fname.c_str(), options);
     return finishOpening();
 }
 
