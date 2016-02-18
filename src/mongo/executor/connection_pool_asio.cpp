@@ -52,12 +52,14 @@ ASIOTimer::~ASIOTimer() {
     ++_callbackSharedState->id;
 }
 
+const auto kMaxTimerDuration = duration_cast<Milliseconds>(ASIOTimer::clock_type::duration::max());
+
 void ASIOTimer::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
     _strand->dispatch([this, timeout, cb] {
         _cb = std::move(cb);
 
         cancelTimeout();
-        _impl.expires_after(timeout);
+        _impl.expires_after(std::min(kMaxTimerDuration, timeout));
 
         decltype(_callbackSharedState->id) id;
         decltype(_callbackSharedState) sharedState;

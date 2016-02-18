@@ -44,6 +44,8 @@ namespace connection_pool_asio {
  */
 class ASIOTimer final : public ConnectionPool::TimerInterface {
 public:
+    using clock_type = asio::steady_timer::clock_type;
+
     ASIOTimer(asio::io_service::strand* strand);
     ~ASIOTimer();
 
