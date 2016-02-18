@@ -1853,10 +1853,6 @@ struct __wt_connection {
 	 * thread uses a session handle from the configured session_max., an
 	 * integer between 3 and 20; default \c 4.}
 	 * @config{ ),,}
-	 * @config{readonly, open connection in read-only mode.  The database
-	 * must exist.  All methods that may modify a database are disabled.
-	 * See @ref readonly for more information., a boolean flag; default \c
-	 * false.}
 	 * @config{shared_cache = (, shared cache configuration options.  A
 	 * database should configure either a cache_size or a shared_cache not
 	 * both.  Enabling a shared cache uses a session from the configured

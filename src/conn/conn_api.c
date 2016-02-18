@@ -1119,7 +1119,8 @@ __conn_config_readonly(const char *cfg[])
 	const char *readonly;
 
 	/*
-	 * Override certain settings.  Other settings at odds will return
+	 * Override certain settings.  In general we override the options
+	 * whose default conflicts.  Other settings at odds will return
 	 * an error and will be checked when those settings are processed.
 	 */
 	readonly="checkpoint=(wait=0),"

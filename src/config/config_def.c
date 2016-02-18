@@ -138,7 +138,6 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_lsm_manager_subconfigs, 2 },
 	{ "lsm_merge", "boolean", NULL, NULL, NULL, 0 },
-	{ "readonly", "boolean", NULL, NULL, NULL, 0 },
 	{ "shared_cache", "category",
 	    NULL, NULL,
 	    confchk_wiredtiger_open_shared_cache_subconfigs, 5 },
@@ -856,12 +855,12 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  ",file_manager=(close_handle_minimum=250,close_idle_time=30,"
 	  "close_scan_interval=10),log=(archive=,compressor=,enabled=0,"
 	  "file_max=100MB,path=,prealloc=,recover=on,zero_fill=0),"
-	  "lsm_manager=(merge=,worker_thread_max=4),lsm_merge=,readonly=0,"
+	  "lsm_manager=(merge=,worker_thread_max=4),lsm_merge=,"
 	  "shared_cache=(chunk=10MB,name=,quota=0,reserve=0,size=500MB),"
 	  "statistics=none,statistics_log=(on_close=0,"
 	  "path=\"WiredTigerStat.%d.%H\",sources=,"
 	  "timestamp=\"%b %d %H:%M:%S\",wait=0),verbose=",
-	  confchk_WT_CONNECTION_reconfigure, 19
+	  confchk_WT_CONNECTION_reconfigure, 18
 	},
 	{ "WT_CURSOR.close",
 	  "",
