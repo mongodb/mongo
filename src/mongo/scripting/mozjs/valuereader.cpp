@@ -61,8 +61,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
                 JS::RootedObject obj(_context);
                 scope->getProto<CodeInfo>().newInstance(args, _value);
-            }
-            else {
+            } else {
                 scope->newFunction(elem.valueStringData(), _value);
             }
             return;
@@ -71,12 +70,10 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
                 JS::AutoValueArray<2> args(_context);
 
                 ValueReader(_context, args[0]).fromStringData(elem.valueStringData());
-                ValueReader(_context, args[1]).fromBSON(elem.codeWScopeObject(),
-                                                        nullptr, readOnly);
+                ValueReader(_context, args[1]).fromBSON(elem.codeWScopeObject(), nullptr, readOnly);
 
                 scope->getProto<CodeInfo>().newInstance(args, _value);
-            }
-            else {
+            } else {
                 if (!elem.codeWScopeObject().isEmpty())
                     warning() << "CodeWScope doesn't transfer to db.eval";
                 scope->newFunction(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1),

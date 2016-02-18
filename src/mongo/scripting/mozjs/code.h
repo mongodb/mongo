@@ -51,5 +51,5 @@ struct CodeInfo : public BaseInfo {
     static const char* const className;
 };
 
-} // namespace mozjs
-} // namespace mongo
+}  // namespace mozjs
+}  // namespace mongo
