@@ -180,6 +180,9 @@ reverse_scan_op(
 	WT_UNUSED(session);
 	WT_UNUSED(s);
 
+	/* Make GCC 4.1 happy */
+	prev_key = this_key = 0;
+
 	/* Reset the cursor */
 	cursor->reset(cursor);
 
