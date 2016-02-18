@@ -47,23 +47,6 @@ AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
     [test "$wt_cv_with_builtin_extension_zlib" = "yes"])
 AC_MSG_RESULT($with_builtins)
 
-AC_MSG_CHECKING(if --enable-bzip2 option specified)
-AC_ARG_ENABLE(bzip2,
-	[AS_HELP_STRING([--enable-bzip2],
-	    [Build the bzip2 compressor extension.])], r=$enableval, r=no)
-case "$r" in
-no)	wt_cv_enable_bzip2=no;;
-*)	wt_cv_enable_bzip2=yes;;
-esac
-AC_MSG_RESULT($wt_cv_enable_bzip2)
-if test "$wt_cv_enable_bzip2" = "yes"; then
-	AC_CHECK_HEADER(bzlib.h,,
-	    [AC_MSG_ERROR([--enable-bzip2 requires bzlib.h])])
-	AC_CHECK_LIB(bz2, BZ2_bzCompress,,
-	    [AC_MSG_ERROR([--enable-bzip2 requires bz2 library])])
-fi
-AM_CONDITIONAL([BZIP2], [test "$wt_cv_enable_bzip2" = "yes"])
-
 AH_TEMPLATE(HAVE_DIAGNOSTIC, [Define to 1 for diagnostic tests.])
 AC_MSG_CHECKING(if --enable-diagnostic option specified)
 AC_ARG_ENABLE(diagnostic,
@@ -165,10 +148,8 @@ no)	if test "$wt_cv_with_builtin_extension_snappy" = "yes"; then
 esac
 AC_MSG_RESULT($wt_cv_enable_snappy)
 if test "$wt_cv_enable_snappy" = "yes"; then
-	AC_LANG_PUSH([C++])
-	AC_CHECK_HEADER(snappy.h,,
+	AC_CHECK_HEADER(snappy-c.h,,
 	    [AC_MSG_ERROR([--enable-snappy requires snappy.h])])
-	AC_LANG_POP([C++])
 	AC_CHECK_LIB(snappy, snappy_compress,,
 	    [AC_MSG_ERROR([--enable-snappy requires snappy library])])
 fi
@@ -193,10 +174,8 @@ no)	if test "$wt_cv_with_builtin_extension_lz4" = "yes"; then
 esac
 AC_MSG_RESULT($wt_cv_enable_lz4)
 if test "$wt_cv_enable_lz4" = "yes"; then
-	AC_LANG_PUSH([C++])
 	AC_CHECK_HEADER(lz4.h,,
 	    [AC_MSG_ERROR([--enable-lz4 requires lz4.h])])
-	AC_LANG_POP([C++])
 	AC_CHECK_LIB(lz4, LZ4_compress_destSize,,
 	    [AC_MSG_ERROR([--enable-lz4 requires lz4 library with LZ4_compress_destSize support])])
 fi
@@ -212,10 +191,8 @@ no)	wt_cv_enable_tcmalloc=no;;
 esac
 AC_MSG_RESULT($wt_cv_enable_tcmalloc)
 if test "$wt_cv_enable_tcmalloc" = "yes"; then
-	AC_LANG_PUSH([C++])
 	AC_CHECK_HEADER(gperftools/tcmalloc.h,,
 	    [AC_MSG_ERROR([--enable-tcmalloc requires gperftools/tcmalloc.h])])
-	AC_LANG_POP([C++])
 	AC_CHECK_LIB(tcmalloc, tc_calloc,,
 	    [AC_MSG_ERROR([--enable-tcmalloc requires tcmalloc library])])
 fi

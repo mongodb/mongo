@@ -136,8 +136,8 @@ file_config = format_meta + [
         configure a compressor for file blocks.  Permitted values are \c "none"
         or custom compression engine name created with
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for
-        \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression, these names
-        are also available.  See @ref compression for more information'''),
+        \c "snappy", \c "lz4" or \c "zlib" compression, these names are also
+        available.  See @ref compression for more information'''),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages from cache. Not compatible with
         LSM tables; see @ref tuning_cache_resident for more information''',
@@ -422,9 +422,8 @@ connection_runtime_config = [
             configure a compressor for log records.  Permitted values are
             \c "none" or custom compression engine name created with
             WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-            for \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression,
-            these names are also available. See @ref compression for more
-            information'''),
+            for \c "snappy", \c "lz4" or \c "zlib" compression, these names
+            are also available. See @ref compression for more information'''),
         Config('enabled', 'false', r'''
             enable logging subsystem''',
             type='boolean'),

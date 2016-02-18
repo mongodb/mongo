@@ -26,9 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <assert.h>
-
 #include "wt_internal.h"			/* For __wt_XXX */
+
+#include <assert.h>
 
 void test_value(int64_t);
 void test_spread(int64_t, int64_t, int64_t);

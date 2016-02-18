@@ -38,10 +38,6 @@ compressor(uint32_t compress_flag)
 	switch (compress_flag) {
 	case COMPRESS_NONE:
 		return ("none");
-	case COMPRESS_BZIP:
-		return ("bzip2");
-	case COMPRESS_BZIP_RAW:
-		return ("bzip2-raw-test");
 	case COMPRESS_LZ4:
 		return ("lz4");
 	case COMPRESS_LZ4_NO_RAW:
@@ -143,11 +139,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "create,checkpoint_sync=false,cache_size=%" PRIu32 "MB",
 	    g.c_cache);
 
-#ifdef _WIN32
-	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"t_format.exe\"");
-#else
 	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"%s\"", g.progname);
-#endif
 
 	/* In-memory configuration. */
 	if (g.c_in_memory != 0)
@@ -178,7 +170,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		    ",encryption=(name=%s)", encryptor(g.c_encryption_flag));
 
 	/* Miscellaneous. */
-#ifndef _WIN32
+#ifdef HAVE_POSIX_MEMALIGN
 	p += snprintf(p, REMAIN(p, end), ",buffer_alignment=512");
 #endif
 
@@ -210,9 +202,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	/* Extensions. */
 	p += snprintf(p, REMAIN(p, end),
 	    ",extensions=["
-	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
 	    g.c_reverse ? REVERSE_PATH : "",
-	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
 	    access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
