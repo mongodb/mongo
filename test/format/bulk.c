@@ -41,7 +41,7 @@ wts_load(void)
 	conn = g.wts_conn;
 	keybuf = valbuf = NULL;
 
-	check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
@@ -59,7 +59,7 @@ wts_load(void)
 	if (g.c_reverse)
 		is_bulk = false;
 
-	check(session->open_cursor(session, g.uri, NULL,
+	testutil_check(session->open_cursor(session, g.uri, NULL,
 	    is_bulk ? "bulk,append" : NULL, &cursor));
 
 	/* Set up the key/value buffers. */
@@ -117,7 +117,7 @@ wts_load(void)
 			break;
 		}
 
-		check(cursor->insert(cursor));
+		testutil_check(cursor->insert(cursor));
 
 #ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
@@ -125,13 +125,13 @@ wts_load(void)
 #endif
 	}
 
-	check(cursor->close(cursor));
+	testutil_check(cursor->close(cursor));
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== bulk load stop ===============");
 
-	check(session->close(session, NULL));
+	testutil_check(session->close(session, NULL));
 
 	free(keybuf);
 	free(valbuf);

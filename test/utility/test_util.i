@@ -76,6 +76,16 @@ testutil_die(int e, const char *fmt, ...)
 }
 
 /*
+ * check --
+ *	Complain and quit if a function call fails.
+ */
+#define	testutil_check(call) do {					\
+	int __r;							\
+	if ((__r = (call)) != 0)					\
+		testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call);\
+} while (0)
+
+/*
  * testutil_work_dir_from_path --
  *	Takes a buffer, its size and the intended work directory.
  *	Creates the full intended work directory in buffer.

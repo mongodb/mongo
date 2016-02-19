@@ -178,9 +178,9 @@ main(int argc, char *argv[])
 	 * Initialize locks to single-thread named checkpoints and backups, last
 	 * last-record updates, and failures.
 	 */
-	check(pthread_rwlock_init(&g.append_lock, NULL));
-	check(pthread_rwlock_init(&g.backup_lock, NULL));
-	check(pthread_rwlock_init(&g.death_lock, NULL));
+	testutil_check(pthread_rwlock_init(&g.append_lock, NULL));
+	testutil_check(pthread_rwlock_init(&g.backup_lock, NULL));
+	testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
@@ -272,8 +272,8 @@ main(int argc, char *argv[])
 
 	config_print(0);
 
-	check(pthread_rwlock_destroy(&g.append_lock));
-	check(pthread_rwlock_destroy(&g.backup_lock));
+	testutil_check(pthread_rwlock_destroy(&g.append_lock));
+	testutil_check(pthread_rwlock_destroy(&g.backup_lock));
 
 	config_clear();
 

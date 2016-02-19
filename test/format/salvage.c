@@ -42,10 +42,10 @@ salvage(void)
 	conn = g.wts_conn;
 	track("salvage", 0ULL, NULL);
 
-	check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	if ((ret = session->salvage(session, g.uri, "force=true")) != 0)
 		testutil_die(ret, "session.salvage: %s", g.uri);
-	check(session->close(session, NULL));
+	testutil_check(session->close(session, NULL));
 }
 
 /*

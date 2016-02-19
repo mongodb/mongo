@@ -48,7 +48,7 @@ compact(void *arg)
 
 	/* Open a session. */
 	conn = g.wts_conn;
-	check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/*
 	 * Perform compaction at somewhere under 15 seconds (so we get at
@@ -68,7 +68,7 @@ compact(void *arg)
 			testutil_die(ret, "session.compact");
 	}
 
-	check(session->close(session, NULL));
+	testutil_check(session->close(session, NULL));
 
 	return (NULL);
 }

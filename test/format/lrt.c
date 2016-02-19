@@ -60,8 +60,9 @@ lrt(void *arg)
 
 	/* Open a session and cursor. */
 	conn = g.wts_conn;
-	check(conn->open_session(conn, NULL, NULL, &session));
-	check(session->open_cursor(session, g.uri, NULL, NULL, &cursor));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->open_cursor(
+	    session, g.uri, NULL, NULL, &cursor));
 
 	for (pinned = 0;;) {
 		if (pinned) {
@@ -89,10 +90,11 @@ lrt(void *arg)
 				testutil_die(0, "mismatched start/stop values");
 
 			/* End the transaction. */
-			check(session->commit_transaction(session, NULL));
+			testutil_check(
+			    session->commit_transaction(session, NULL));
 
 			/* Reset the cursor, releasing our pin. */
-			check(cursor->reset(cursor));
+			testutil_check(cursor->reset(cursor));
 			pinned = 0;
 		} else {
 			/*
@@ -101,7 +103,7 @@ lrt(void *arg)
 			 * positioned. As soon as the cursor loses its position
 			 * a new snapshot will be allocated.
 			 */
-			check(session->begin_transaction(
+			testutil_check(session->begin_transaction(
 			    session, "isolation=snapshot"));
 
 			/* Read a record at the end of the table. */
@@ -161,7 +163,7 @@ lrt(void *arg)
 			break;
 	}
 
-	check(session->close(session, NULL));
+	testutil_check(session->close(session, NULL));
 
 	free(keybuf);
 	free(buf);

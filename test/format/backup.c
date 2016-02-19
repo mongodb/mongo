@@ -97,7 +97,7 @@ backup(void *arg)
 		return (NULL);
 
 	/* Open a session. */
-	check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	/*
 	 * Perform a backup at somewhere under 10 seconds (so we get at
@@ -113,7 +113,7 @@ backup(void *arg)
 			break;
 
 		/* Lock out named checkpoints */
-		check(pthread_rwlock_wrlock(&g.backup_lock));
+		testutil_check(pthread_rwlock_wrlock(&g.backup_lock));
 
 		/* Re-create the backup directory. */
 		if ((ret = system(g.home_backup_init)) != 0)
@@ -136,13 +136,13 @@ backup(void *arg)
 			copy_file(key);
 		}
 
-		check(backup_cursor->close(backup_cursor));
-		check(pthread_rwlock_unlock(&g.backup_lock));
+		testutil_check(backup_cursor->close(backup_cursor));
+		testutil_check(pthread_rwlock_unlock(&g.backup_lock));
 
 		check_copy();
 	}
 
-	check(session->close(session, NULL));
+	testutil_check(session->close(session, NULL));
 
 	return (NULL);
 }
