@@ -51,6 +51,7 @@
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -434,8 +435,14 @@ public:
 
                 BSONObj moveResult;
                 WriteConcernOptions noThrottle;
-                if (!chunk->moveAndCommit(
-                        txn, to->getId(), Chunk::MaxChunkSize, &noThrottle, true, 0, moveResult)) {
+                if (!chunk->moveAndCommit(txn,
+                                          to->getId(),
+                                          Chunk::MaxChunkSize,
+                                          MigrationSecondaryThrottleOptions::create(
+                                              MigrationSecondaryThrottleOptions::kOff),
+                                          true,
+                                          0,
+                                          moveResult)) {
                     warning() << "couldn't move chunk " << chunk->toString() << " to shard " << *to
                               << " while sharding collection " << ns << "."
                               << " Reason: " << moveResult;

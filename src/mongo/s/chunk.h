@@ -35,8 +35,8 @@
 namespace mongo {
 
 class ChunkManager;
+class MigrationSecondaryThrottleOptions;
 class OperationContext;
-struct WriteConcernOptions;
 
 /**
    config.chunks
@@ -188,7 +188,7 @@ public:
     bool moveAndCommit(OperationContext* txn,
                        const ShardId& to,
                        long long chunkSize,
-                       const WriteConcernOptions* writeConcern,
+                       const MigrationSecondaryThrottleOptions& secondaryThrottle,
                        bool waitForDelete,
                        int maxTimeMS,
                        BSONObj& res) const;

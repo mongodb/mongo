@@ -38,7 +38,6 @@
 
 namespace mongo {
 
-struct WriteConcernOptions;
 class BSONObj;
 template <typename T>
 class StatusWith;
@@ -107,12 +106,6 @@ public:
     std::string toString() const;
 
     /**
-     * Returns the write concern to use for balancing.
-     * Uses *deprecated* secondary throttle if migration write concern is not set.
-     */
-    std::unique_ptr<WriteConcernOptions> getWriteConcern() const;
-
-    /**
      * Returns true if either 'now' is in the balancing window or
      * if no balancing window exists.
      */
@@ -149,22 +142,6 @@ public:
         return _balancerActiveWindow.get();
     }
     void setBalancerActiveWindow(const BSONObj& balancerActiveWindow);
-
-    bool isSecondaryThrottleSet() const {
-        return _secondaryThrottle.is_initialized();
-    }
-    bool getSecondaryThrottle() const {
-        return _secondaryThrottle.get();
-    }
-    void setSecondaryThrottle(const bool secondaryThrottle);
-
-    bool isMigrationWriteConcernSet() const {
-        return _migrationWriteConcern.is_initialized();
-    }
-    const WriteConcernOptions& getMigrationWriteConcern() const {
-        return _migrationWriteConcern.get();
-    }
-    void setMigrationWriteConcern(const BSONObj& migrationWriteConcern);
 
     bool isWaitForDeleteSet() const {
         return _waitForDelete.is_initialized();

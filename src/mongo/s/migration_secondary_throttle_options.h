@@ -74,9 +74,9 @@ public:
      * Extracts the write concern settings from a BSON with the following format:
      *
      * {
-     *     secondaryThrottle: <bool>,   // optional
-     *     _secondaryThrottle: <bool>,  // optional
-     *     writeConcern: <BSONObj>      // optional
+     *     secondaryThrottle: <bool>,                           // optional
+     *     _secondaryThrottle: <bool>,                          // optional
+     *     writeConcern: <WriteConcern formatted as BSONObj>    // optional
      * }
      *
      * Note: secondaryThrottle takes precedence over _secondaryThrottle. If either of the two are
@@ -85,6 +85,19 @@ public:
      * Returns OK if the parse was successful.
      */
     static StatusWith<MigrationSecondaryThrottleOptions> createFromCommand(const BSONObj& obj);
+
+    /**
+     * Extracts the secondary throttle settings from a balancer configuration document, which can
+     * have the following format:
+     *
+     * {
+     *     _secondaryThrottle: <bool> | <WriteConcern formatted as BSONObj> // optional
+     * }
+     *
+     * If secondary throttle is not specified, uses kDefault.
+     */
+    static StatusWith<MigrationSecondaryThrottleOptions> createFromBalancerConfig(
+        const BSONObj& obj);
 
     /**
      * Returns the selected secondary throttle option.
@@ -107,7 +120,7 @@ public:
     WriteConcernOptions getWriteConcern() const;
 
     /**
-     * Returns a BSON representation of the current secondary throttle settongs.
+     * Returns a BSON representation of the current secondary throttle settings.
      */
     void append(BSONObjBuilder* builder) const;
     BSONObj toBSON() const;

@@ -228,16 +228,11 @@ public:
         const auto secondaryThrottle =
             uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
 
-        const unique_ptr<WriteConcernOptions> writeConcern(
-            secondaryThrottle.isWriteConcernSpecified()
-                ? new WriteConcernOptions(secondaryThrottle.getWriteConcern())
-                : nullptr);
-
         BSONObj res;
         if (!chunk->moveAndCommit(txn,
                                   to->getId(),
                                   maxChunkSizeBytes,
-                                  writeConcern.get(),
+                                  secondaryThrottle,
                                   cmdObj["_waitForDelete"].trueValue(),
                                   maxTimeMS.getValue(),
                                   res)) {

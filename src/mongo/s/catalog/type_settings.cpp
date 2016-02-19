@@ -171,12 +171,13 @@ BSONObj SettingsType::toBSON() const {
         builder.append(chunkSizeMB(), getChunkSizeMB());
     if (_balancerStopped)
         builder.append(balancerStopped(), getBalancerStopped());
-    if (_secondaryThrottle) {
-        builder.append(deprecated_secondaryThrottle(), getSecondaryThrottle());
-    }
-    if (_migrationWriteConcern) {
-        builder.append(migrationWriteConcern(), getMigrationWriteConcern().toBSON());
-    }
+
+    // These two are mutually exclusive
+    if (_secondaryThrottle)
+        builder.append(deprecated_secondaryThrottle(), *_secondaryThrottle);
+    if (_migrationWriteConcern)
+        builder.append(migrationWriteConcern(), _migrationWriteConcern->toBSON());
+
     if (_waitForDelete)
         builder.append(waitForDelete(), getWaitForDelete());
 
@@ -185,20 +186,6 @@ BSONObj SettingsType::toBSON() const {
 
 std::string SettingsType::toString() const {
     return toBSON().toString();
-}
-
-std::unique_ptr<WriteConcernOptions> SettingsType::getWriteConcern() const {
-    dassert(_key.is_initialized());
-    dassert(_key == BalancerDocKey);
-
-    if (isSecondaryThrottleSet() && !getSecondaryThrottle()) {
-        return stdx::make_unique<WriteConcernOptions>(1, WriteConcernOptions::SyncMode::NONE, 0);
-    } else if (!isMigrationWriteConcernSet()) {
-        // Default setting.
-        return nullptr;
-    } else {
-        return stdx::make_unique<WriteConcernOptions>(getMigrationWriteConcern());
-    }
 }
 
 StatusWith<BoostTimePair> SettingsType::_parseBalancingWindow(const BSONObj& balancingWindowObj) {
@@ -272,18 +259,6 @@ void SettingsType::setBalancerActiveWindow(const BSONObj& balancerActiveWindow) 
     StatusWith<BoostTimePair> timePairResult = _parseBalancingWindow(balancerActiveWindow);
     invariant(timePairResult.isOK());
     _balancerActiveWindow = timePairResult.getValue();
-}
-
-void SettingsType::setSecondaryThrottle(const bool secondaryThrottle) {
-    invariant(_key == BalancerDocKey);
-    _secondaryThrottle = secondaryThrottle;
-}
-
-void SettingsType::setMigrationWriteConcern(const BSONObj& migrationWCBSONObj) {
-    invariant(_key == BalancerDocKey);
-    invariant(!migrationWCBSONObj.isEmpty());
-    Status status = _migrationWriteConcern->parse(migrationWCBSONObj);
-    invariant(status.isOK());
 }
 
 void SettingsType::setWaitForDelete(const bool waitForDelete) {

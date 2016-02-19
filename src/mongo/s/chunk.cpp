@@ -49,6 +49,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 
@@ -135,13 +136,14 @@ bool tryMoveToOtherShard(OperationContext* txn,
 
     BSONObj res;
     WriteConcernOptions noThrottle;
-    if (!toMove->moveAndCommit(txn,
-                               newShard->getId(),
-                               Chunk::MaxChunkSize,
-                               &noThrottle, /* secondaryThrottle */
-                               false,       /* waitForDelete - small chunk, no need */
-                               0,           /* maxTimeMS - don't time out */
-                               res)) {
+    if (!toMove->moveAndCommit(
+            txn,
+            newShard->getId(),
+            Chunk::MaxChunkSize,
+            MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
+            false, /* waitForDelete - small chunk, no need */
+            0,     /* maxTimeMS - don't time out */
+            res)) {
         msgassertedNoTrace(10412, str::stream() << "moveAndCommit failed: " << res);
     }
 
@@ -473,7 +475,7 @@ Status Chunk::multiSplit(OperationContext* txn, const vector<BSONObj>& m, BSONOb
 bool Chunk::moveAndCommit(OperationContext* txn,
                           const ShardId& toShardId,
                           long long chunkSize /* bytes */,
-                          const WriteConcernOptions* writeConcern,
+                          const MigrationSecondaryThrottleOptions& secondaryThrottle,
                           bool waitForDelete,
                           int maxTimeMS,
                           BSONObj& res) const {
@@ -497,18 +499,7 @@ bool Chunk::moveAndCommit(OperationContext* txn,
     builder.append("max", _max);
     builder.append("maxChunkSizeBytes", chunkSize);
     builder.append("configdb", grid.shardRegistry()->getConfigServerConnectionString().toString());
-
-    // For legacy secondary throttle setting.
-    bool secondaryThrottle = true;
-    if (writeConcern && writeConcern->wNumNodes <= 1 && writeConcern->wMode.empty()) {
-        secondaryThrottle = false;
-    }
-
-    builder.append("secondaryThrottle", secondaryThrottle);
-
-    if (secondaryThrottle && writeConcern) {
-        builder.append("writeConcern", writeConcern->toBSON());
-    }
+    secondaryThrottle.append(&builder);
 
     builder.append("waitForDelete", waitForDelete);
     builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);

@@ -55,6 +55,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -133,7 +134,7 @@ Balancer::~Balancer() = default;
 
 int Balancer::_moveChunks(OperationContext* txn,
                           const vector<shared_ptr<MigrateInfo>>& candidateChunks,
-                          const WriteConcernOptions* writeConcern,
+                          const MigrationSecondaryThrottleOptions& secondaryThrottle,
                           bool waitForDelete) {
     int movedCount = 0;
 
@@ -208,7 +209,7 @@ int Balancer::_moveChunks(OperationContext* txn,
             if (c->moveAndCommit(txn,
                                  migrateInfo->to,
                                  Chunk::MaxChunkSize,
-                                 writeConcern,
+                                 secondaryThrottle,
                                  waitForDelete,
                                  0, /* maxTimeMS */
                                  res)) {
@@ -619,14 +620,18 @@ void Balancer::run() {
                     (balancerConfig.isWaitForDeleteSet() ? balancerConfig.getWaitForDelete()
                                                          : false);
 
-                std::unique_ptr<WriteConcernOptions> writeConcern;
-                if (balancerConfig.isKeySet()) {  // if balancer doc exists.
-                    writeConcern = balancerConfig.getWriteConcern();
+                MigrationSecondaryThrottleOptions secondaryThrottle(
+                    MigrationSecondaryThrottleOptions::create(
+                        MigrationSecondaryThrottleOptions::kDefault));
+                if (balancerConfig.isKeySet()) {
+                    secondaryThrottle =
+                        uassertStatusOK(MigrationSecondaryThrottleOptions::createFromBalancerConfig(
+                            balancerConfig.toBSON()));
                 }
 
                 LOG(1) << "*** start balancing round. "
-                       << "waitForDelete: " << waitForDelete << ", secondaryThrottle: "
-                       << (writeConcern.get() ? writeConcern->toBSON().toString() : "default");
+                       << "waitForDelete: " << waitForDelete
+                       << ", secondaryThrottle: " << secondaryThrottle.toBSON();
 
                 vector<shared_ptr<MigrateInfo>> candidateChunks;
                 _doBalanceRound(txn.get(), &scopedDistLock.getValue(), &candidateChunks);
@@ -636,7 +641,7 @@ void Balancer::run() {
                     _balancedLastTime = 0;
                 } else {
                     _balancedLastTime =
-                        _moveChunks(txn.get(), candidateChunks, writeConcern.get(), waitForDelete);
+                        _moveChunks(txn.get(), candidateChunks, secondaryThrottle, waitForDelete);
                 }
 
                 roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),

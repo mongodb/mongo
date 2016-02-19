@@ -37,8 +37,8 @@ namespace mongo {
 
 class BalancerPolicy;
 struct MigrateInfo;
+class MigrationSecondaryThrottleOptions;
 class OperationContext;
-struct WriteConcernOptions;
 
 /**
  * The balancer is a background task that tries to keep the number of chunks across all
@@ -107,7 +107,7 @@ private:
      */
     int _moveChunks(OperationContext* txn,
                     const std::vector<std::shared_ptr<MigrateInfo>>& candidateChunks,
-                    const WriteConcernOptions* writeConcern,
+                    const MigrationSecondaryThrottleOptions& secondaryThrottle,
                     bool waitForDelete);
 
     /**

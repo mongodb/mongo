@@ -101,8 +101,7 @@ TEST(SettingsType, ValidValues) {
                                << SettingsType::balancerActiveWindow(BSON("start"
                                                                           << "23:00"
                                                                           << "stop"
-                                                                          << "6:00"))
-                               << SettingsType::migrationWriteConcern(BSON("w" << 2)));
+                                                                          << "6:00")));
     result = SettingsType::fromBSON(objBalancer);
     settings = result.getValue();
     ASSERT(result.isOK());
@@ -110,28 +109,6 @@ TEST(SettingsType, ValidValues) {
     ASSERT(validationStatus.isOK());
     ASSERT_EQUALS(settings.getKey(), SettingsType::BalancerDocKey);
     ASSERT_EQUALS(settings.getBalancerStopped(), true);
-
-    WriteConcernOptions wc;
-    wc.parse(BSON("w" << 2));
-    ASSERT_EQUALS(settings.getMigrationWriteConcern().toBSON(), wc.toBSON());
-}
-
-TEST(SettingsType, ValidWithDeprecatedThrottle) {
-    BSONObj objChunkSize =
-        BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) << SettingsType::chunkSizeMB(1));
-    StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSize);
-    ASSERT(result.isOK());
-    SettingsType settings = result.getValue();
-    ASSERT_EQUALS(settings.getKey(), SettingsType::ChunkSizeDocKey);
-    ASSERT_EQUALS(settings.getChunkSizeMB(), 1);
-
-    BSONObj objBalancer = BSON(SettingsType::key(SettingsType::BalancerDocKey)
-                               << SettingsType::deprecated_secondaryThrottle(true));
-    result = SettingsType::fromBSON(objBalancer);
-    ASSERT_EQUALS(result.getStatus(), Status::OK());
-    settings = result.getValue();
-    ASSERT_EQUALS(settings.getKey(), SettingsType::BalancerDocKey);
-    ASSERT(settings.getSecondaryThrottle());
 }
 
 TEST(SettingsType, BadType) {

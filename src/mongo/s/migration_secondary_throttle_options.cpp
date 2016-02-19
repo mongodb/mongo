@@ -116,6 +116,34 @@ StatusWith<MigrationSecondaryThrottleOptions> MigrationSecondaryThrottleOptions:
     return MigrationSecondaryThrottleOptions(secondaryThrottle, std::move(writeConcernBSON));
 }
 
+StatusWith<MigrationSecondaryThrottleOptions>
+MigrationSecondaryThrottleOptions::createFromBalancerConfig(const BSONObj& obj) {
+    {
+        bool isSecondaryThrottle;
+        Status status =
+            bsonExtractBooleanField(obj, kSecondaryThrottleMongos, &isSecondaryThrottle);
+        if (status.isOK()) {
+            return MigrationSecondaryThrottleOptions::create(isSecondaryThrottle ? kOn : kOff);
+        } else if (status == ErrorCodes::NoSuchKey) {
+            return MigrationSecondaryThrottleOptions::create(kDefault);
+        } else if (status != ErrorCodes::TypeMismatch) {
+            return status;
+        }
+    }
+
+    // Try to load it as a BSON document
+    BSONElement elem;
+    Status status = bsonExtractTypedField(obj, kSecondaryThrottleMongos, BSONType::Object, &elem);
+
+    WriteConcernOptions writeConcern;
+    Status writeConcernParseStatus = writeConcern.parse(elem.Obj());
+    if (!writeConcernParseStatus.isOK()) {
+        return writeConcernParseStatus;
+    }
+
+    return MigrationSecondaryThrottleOptions::createWithWriteConcern(writeConcern);
+}
+
 WriteConcernOptions MigrationSecondaryThrottleOptions::getWriteConcern() const {
     invariant(_secondaryThrottle != kOff);
     invariant(_writeConcernBSON);
