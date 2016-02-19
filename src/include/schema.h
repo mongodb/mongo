@@ -174,6 +174,8 @@ struct __wt_table {
  */
 #define	WT_WITHOUT_LOCKS(session, op) do {				\
 	WT_CONNECTION_IMPL *__conn = S2C(session);			\
+	bool __checkpoint_locked =					\
+	    F_ISSET(session, WT_SESSION_LOCKED_CHECKPOINT);		\
 	bool __handle_locked =						\
 	    F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST);		\
 	bool __table_locked =						\
@@ -192,7 +194,15 @@ struct __wt_table {
 		F_CLR(session, WT_SESSION_LOCKED_SCHEMA);		\
 		__wt_spin_unlock(session, &__conn->schema_lock);	\
 	}								\
+	if (__checkpoint_locked) {					\
+		F_CLR(session, WT_SESSION_LOCKED_CHECKPOINT);		\
+		__wt_spin_unlock(session, &__conn->checkpoint_lock);	\
+	}								\
 	op;								\
+	if (__checkpoint_locked) {					\
+		__wt_spin_lock(session, &__conn->checkpoint_lock);	\
+		F_SET(session, WT_SESSION_LOCKED_CHECKPOINT);		\
+	}								\
 	if (__schema_locked) {						\
 		__wt_spin_lock(session, &__conn->schema_lock);		\
 		F_SET(session, WT_SESSION_LOCKED_SCHEMA);		\
