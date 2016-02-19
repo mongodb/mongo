@@ -283,15 +283,14 @@ checkRemoveShard( false );
 assert( adminDB.auth( rwUser, password ) );
 assert( testDB.dropDatabase().ok );
 checkRemoveShard( true );
-adminDB.printShardingStatus();
+st.printShardingStatus();
 
 jsTestLog("Check adding a shard");
 assert( adminDB.logout().ok );
 checkAddShard( false );
 assert( adminDB.auth( rwUser, password ) );
 checkAddShard( true );
-adminDB.printShardingStatus();
-
+st.printShardingStatus();
 
 st.stop();
 };

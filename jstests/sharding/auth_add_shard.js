@@ -73,7 +73,7 @@ assert.commandWorked(admin.runCommand({ moveChunk: "foo.bar", find: { _id: 1 }, 
 admin.runCommand({ flushRouterConfig: 1 });
 
 var config = mongos.getDB("config");
-config.printShardingStatus(true);
+st.printShardingStatus(true);
 
 // start balancer before removing the shard
 st.startBalancer();

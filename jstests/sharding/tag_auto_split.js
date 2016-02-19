@@ -20,11 +20,10 @@ sh.addTagRange( "test.foo" , { _id : 5 } , { _id : 10 } , "a" );
 sh.addTagRange( "test.foo" , { _id : 10 } , { _id : 15 } , "b" );
 
 assert.soon( function() {
-    //printjson( sh.status() );
     return s.config.chunks.count() == 3;
 }, "things didn't get split", 1000 * 60 * 10, 1000 );
 
-printjson( sh.status() );
+s.printShardingStatus();
 
 s.stop();
 
@@ -48,7 +47,6 @@ sh.addTagRange( "test.foo" , { _id : 5 } , { _id : 10 } , "a" );
 sh.addTagRange( "test.foo" , { _id : 10 } , { _id : 15 } , "b" );
 
 assert.soon( function() {
-    //printjson( sh.status() );
     return s.config.chunks.count() == 3;
 }, "things didn't get split", 1000 * 60 * 10, 1000 );
 

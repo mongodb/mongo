@@ -122,7 +122,7 @@ assert.soon( function() {
 
 assert.eq( 300, coll.find().itcount() );
 
-st.admin.printShardingStatus();
+st.printShardingStatus();
 
 // Remove shard and add it back in, without shutting it down.
 jsTestLog( "Attempting to remove shard and add it back in" );

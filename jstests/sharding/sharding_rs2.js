@@ -137,7 +137,7 @@ s.stopBalancer();
 assert.eq(100, t.count(), "C2");
 assert.commandWorked(s.s0.adminCommand({ split: "test.foo", middle: { x: 50 } }));
 
-db.printShardingStatus();
+s.printShardingStatus();
 
 var other = s.config.shards.findOne({ _id: { $ne: serverName } });
 assert.commandWorked(s.getDB('admin').runCommand({ moveChunk: "test.foo",
@@ -175,7 +175,7 @@ assert.lte(before.query + 10, after.query, "D3");
 m = new Mongo(s.s.name);
 m.forceWriteMode("commands");
 
-db.printShardingStatus();
+s.printShardingStatus();
 
 ts = m.getDB("test").foo;
 

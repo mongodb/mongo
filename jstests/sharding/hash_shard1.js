@@ -18,7 +18,7 @@ t.drop();
 var res = db.adminCommand( { shardcollection : ns , key : { a : "hashed" } } );
 assert.gt( s.config.chunks.count({ns:ns}), 3);
 assert.eq( res.ok , 1 , "shardcollection didn't work" );
-db.printShardingStatus();
+s.printShardingStatus();
 
 // insert stuff
 var numitems = 1000;

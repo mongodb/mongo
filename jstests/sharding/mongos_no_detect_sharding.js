@@ -34,7 +34,7 @@ for( var i = 0; i < 100; i++ ){
 }
 assert.writeOK(bulk.execute());
 
-config.printShardingStatus( true );
+st.printShardingStatus( true );
 
 assert.eq( coll.getShardVersion().ok, 1 );
 assert.eq( 101, coll.find().itcount() );

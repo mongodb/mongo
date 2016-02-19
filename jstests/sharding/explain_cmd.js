@@ -34,7 +34,7 @@ for (var i = 0; i < 3; i++) {
     collSharded.insert({_id: i, a: i, b: 1});
 }
 
-printjson(sh.status());
+st.printShardingStatus();
 
 // Test a scatter-gather count command.
 assert.eq(3, collSharded.count({b: 1}));

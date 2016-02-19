@@ -22,13 +22,13 @@ for ( x=0; x<100; x++ ) {
 }
 assert.writeOK(bulk.execute());
 
-db.printShardingStatus();
+s.printShardingStatus();
 
 s.adminCommand( { split : "test.foo" , middle : { x : 30 } } );
 s.adminCommand( { split : "test.foo" , middle : { x : 66 } } );
 s.adminCommand( { movechunk : "test.foo" , find : { x : 90 } , to : s.getOther( s.getServer( "test" ) ).name } );
 
-db.printShardingStatus();
+s.printShardingStatus();
 
 print( "YO : "  + s.getServer( "test" ).host );
 direct = new Mongo( s.getServer( "test" ).host );
@@ -40,7 +40,7 @@ for ( done=0; done<2*1024*1024; done+=big.length ){
     assert.writeOK(directDB.foo.insert( { x : 50 + Math.random() , big : big } ));
 }
 
-db.printShardingStatus();
+s.printShardingStatus();
 
 assert.throws( function(){  s.adminCommand( { movechunk : "test.foo" , find : { x : 50 } , to : s.getOther( s.getServer( "test" ) ).name } ); } , [] , "move should fail" );
 
@@ -55,7 +55,7 @@ for ( i=0; i<20; i+= 2 ) {
     }
 }
 
-db.printShardingStatus();
+s.printShardingStatus();
 
 s.config.settings.update( { _id: "balancer" }, { $set : { stopped: false } } , true );
 

@@ -189,7 +189,7 @@ for( i=0; i < 3; i++ ){
     // and check total
     assert.eq( 25 , coll2.find().itcount() , "bad total number of docs after move" );
 
-    db.printShardingStatus();
+    s.printShardingStatus();
 }
 
 s.stop();

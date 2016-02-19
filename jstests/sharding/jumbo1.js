@@ -28,13 +28,13 @@ for ( ; x < 2000; x++ )
 
 assert.writeOK( bulk.execute() );
 
-sh.status(true);
+s.printShardingStatus(true);
 
 res = sh.moveChunk( "test.foo" , { x : 0 } , "shard0001" );
 if ( ! res.ok )
     res = sh.moveChunk( "test.foo" , { x : 0 } , "shard0000" );
 
-sh.status(true);
+s.printShardingStatus(true);
 
 sh.setBalancerState( true );
 
@@ -47,7 +47,7 @@ function diff1(){
 assert.soon( function(){
     var d = diff1();
     print( "diff: " + d );
-    sh.status(true);
+    s.printShardingStatus(true);
     return d < 5;
 } , "balance didn't happen" , 1000 * 60 * 5 , 5000 );
 

@@ -25,7 +25,7 @@ for ( i=0; i<N; i++ ){
 assert.writeOK(bulk.execute());
 assert.writeOK(bulk2.execute());
 
-db.printShardingStatus();
+s.printShardingStatus();
 
 function mytest( coll , i , loopNumber ){
     x = coll.find( { _id : i } ).explain();
@@ -42,7 +42,7 @@ while ( 1 ){
         if ( i % 1000 == 0 )
             print( i );
     }
-    db.printShardingStatus();
+    s.printShardingStatus();
     loopNumber++;
 
     if ( loopNumber == 1 ){

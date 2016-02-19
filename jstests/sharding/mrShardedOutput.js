@@ -67,7 +67,7 @@ assert.gt(newNumChunks, 1,
 var objSize = Object.bsonsize(testDB.mrShardedOut.findOne());
 var docsPerChunk = 1024 * 1024 / objSize * 1.1; // 1MB chunk size + allowance
 
-printShardingStatus(config, true);
+st.printShardingStatus(true);
 
 config.chunks.find({ ns: testDB.mrShardedOut.getFullName() }).forEach(function(chunkDoc) {
     var count = testDB.mrShardedOut.find({ _id: { $gte: chunkDoc.min._id,
@@ -123,7 +123,7 @@ newNumChunks = config.chunks.count({ns: testDB.mrShardedOut._fullName});
 assert.gt(newNumChunks, 1,
           "Sharding FAILURE: " + testDB.mrShardedOut._fullName + " has only 1 chunk");
 
-printShardingStatus(config, true);
+st.printShardingStatus(true);
 
 // TODO: fix SERVER-12581
 /*

@@ -19,7 +19,7 @@ var res = s.stopBalancer();
 // shard a fresh collection using a hashed shard key
 coll.drop();
 assert.commandWorked(db.adminCommand( { shardcollection : ns , key : { a : "hashed" } } ));
-db.printShardingStatus();
+s.printShardingStatus();
 
 // Create unique index
 assert.commandWorked(coll.ensureIndex({ a: 1, b: 1 }, { unique: true }));
@@ -38,7 +38,7 @@ assert.commandWorked(coll.ensureIndex({ a: 1, b: 1 }, { unique: true }));
 assert.commandWorked(db.adminCommand( { shardcollection : ns , key : { a : "hashed" } } ),
                      "shardcollection didn't worked 2");
 
-db.printShardingStatus();
+s.printShardingStatus();
 jsTest.log("------ indexes 2-------");
 jsTest.log(tojson(coll.getIndexes()));
 

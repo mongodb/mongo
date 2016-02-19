@@ -26,7 +26,7 @@ for (i = 0; i < 20; i++) {
 
 sh.startBalancer();
 
-sh.status(true);
+s.printShardingStatus(true);
 
 // Wait for the initial balance to happen
 assert.soon(function() {
@@ -48,7 +48,7 @@ assert.eq([ "a" ] , s.config.shards.findOne({ _id : "shard0000" }).tags);
 sh.addTagRange("test.foo", { _id : MinKey }, { _id : MaxKey }, "a");
 
 // Wait for things to move to that one shard
-sh.status(true);
+s.printShardingStatus(true);
 
 assert.soon(function() {
                 var counts = s.chunkCounts("foo");
@@ -60,6 +60,6 @@ assert.soon(function() {
             1000 * 60 * 10,
             1000);
 
-printjson(sh.status());
+s.printShardingStatus(true);
 
 s.stop();

@@ -16,7 +16,7 @@ assert.commandWorked(db.adminCommand({ shardcollection: dbname + "." + coll,
                                        key: { a: "hashed" },
                                        numInitialChunks: 500 }));
 
-db.printShardingStatus();
+s.printShardingStatus();
 
 var numChunks = s.config.chunks.count();
 assert.eq(numChunks, 500 , "should be exactly 500 chunks");

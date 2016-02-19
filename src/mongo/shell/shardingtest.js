@@ -361,8 +361,8 @@ var ShardingTest = function(params) {
         print("ShardingTest " + this.getChunksString(ns));
     };
 
-    this.printShardingStatus = function() {
-        printShardingStatus(this.config);
+    this.printShardingStatus = function(verbose) {
+        printShardingStatus(this.config, verbose);
     };
 
     this.printCollectionInfo = function(ns, msg) {
