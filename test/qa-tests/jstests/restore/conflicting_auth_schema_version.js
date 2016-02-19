@@ -1,3 +1,5 @@
+// This test requires mongo 2.6.x releases
+// @tags: [requires_mongo_26]
 (function() {
 
     load("jstests/configs/standard_dump_targets.config.js");

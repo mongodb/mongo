@@ -38,6 +38,13 @@ mongo_tools_variables:
       mongo30_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-3.0.7.tgz"
       mongo26_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-2.6.5.tgz"
       mongo24_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-subscription-ubuntu1204-2.4.12.tgz"
+    linux_ppc64le_bit_enterprise: &mongo_url_ubuntu1504_ppc64le_enterprise
+      mongo_os: "ubuntu1504"
+      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-ppc64le-enterprise-ubuntu1504-3.3.1.tgz"
+      mongo32_url: "http://downloads.10gen.com/linux/mongodb-linux-ppc64le-enterprise-ubuntu1504-3.3.1.tgz"
+      mongo30_url: "http://downloads.10gen.com/linux/mongodb-linux-ppc64le-enterprise-ubuntu1504-3.3.1.tgz"
+      mongo26_url: "http://downloads.10gen.com/linux/mongodb-linux-ppc64le-enterprise-ubuntu1504-3.3.1.tgz"
+      mongo24_url: "http://downloads.10gen.com/linux/mongodb-linux-ppc64le-enterprise-ubuntu1504-3.3.1.tgz"
     windows_32_bit: &mongo_url_windows32
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-latest.zip"
       mongo32_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-3.2.0.zip"
@@ -206,6 +213,26 @@ mongo_tools_variables:
         distros:
         - windows-64-vs2013-test
       - name: unit
+    ubuntu1504_enterprise_task_list: &ubuntu1504_enterprise_tasks
+      - name: bsonutil
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: json
+      #- name: kerberos
+      - name: lint
+      - name: log
+      - name: progress
+      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-gzip
+      - name: qa-tests
+      - name: qa-tests-unstable
+      - name: qa-tests-wt
+      - name: text
+      - name: unit
+      - name: util
+      - name: vet
 
 
 ## Common mongodb arguments
@@ -1064,7 +1091,7 @@ tasks:
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
           chmod 400 jstests/libs/key*
 
-          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=core${resmoke_use_ssl}  --continueOnFailure --log=buildlogger --reportFile=report.json
+          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=core${resmoke_use_ssl} --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args}
 
 
 - name: qa-tests
@@ -1126,7 +1153,7 @@ tasks:
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
           chmod 400 jstests/libs/key*
 
-          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=core${resmoke_use_ssl}  --continueOnFailure --log=buildlogger --reportFile=report.json
+          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=core${resmoke_use_ssl}  --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args}
 
 - name: qa-dump-restore-archiving
   depends_on:
@@ -1165,7 +1192,7 @@ tasks:
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
           chmod 400 jstests/libs/key*
 
-          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=restore_archive --continueOnFailure --log=buildlogger --reportFile=report.json
+          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=restore_archive --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args}
 
 - name: qa-dump-restore-gzip
   depends_on:
@@ -1204,7 +1231,7 @@ tasks:
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
           chmod 400 jstests/libs/key*
 
-          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=restore_gzip --continueOnFailure --log=buildlogger --reportFile=report.json
+          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=restore_gzip --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args}
 
 - name: qa-tests-wt
   depends_on:
@@ -1264,7 +1291,7 @@ tasks:
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
           chmod 400 jstests/libs/key*
 
-          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=core --continueOnFailure --log=buildlogger --reportFile=report.json --storageEngine=wiredTiger
+          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=core --continueOnFailure --log=buildlogger --reportFile=report.json --storageEngine=wiredTiger ${resmoke_args}
 
 - name: text
   commands:
@@ -1448,6 +1475,24 @@ buildvariants:
     run_kinit: true
     integration_test_args: integration
   tasks: *ubuntu1204_enterprise_tasks
+
+- name: ubuntu-ppc64le-enterprise
+  display_name: Linux PPC64LE Enterprise
+  run_on:
+  - ubuntu-1504-power8-build
+  expansions:
+    <<: *mongo_url_ubuntu1504_ppc64le_enterprise
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    # Ubuntu 1504 does not include gcc 5.3 yet so SSL is disabled
+    #build_tags: -tags "ssl sasl"
+    #resmoke_use_ssl: _ssl
+    resmoke_args: --excludeWithAnyTags=requires_mongo_24,requires_mongo_26,requires_mongo_30
+    arch: "linux/ppc64le"
+    edition: enterprise
+    run_kinit: true
+    integration_test_args: integration
+  tasks: *ubuntu1504_enterprise_tasks
 
 #######################################
 #         Solaris Buildvariant        #

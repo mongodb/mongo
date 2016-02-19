@@ -1,3 +1,5 @@
+// This test requires mongo 2.6.x releases
+// @tags: [requires_mongo_26]
 (function() {
 
     // Tests running mongorestore with  --restoreDbUsersAndRoles against 
