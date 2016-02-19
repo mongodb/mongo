@@ -634,6 +634,9 @@ config_opt_str(CONFIG *cfg, const char *name, const char *value)
 int
 config_sanity(CONFIG *cfg)
 {
+	WORKLOAD *workp;
+	u_int i;
+
 	/* Various intervals should be less than the run-time. */
 	if (cfg->run_time > 0 &&
 	    ((cfg->checkpoint_threads != 0 &&
@@ -660,6 +663,17 @@ config_sanity(CONFIG *cfg)
 		    "Invalid pareto distribution - should be a percentage\n");
 		return (EINVAL);
 	}
+
+	if (cfg->readonly && cfg->workload != NULL)
+		for (i = 0, workp = cfg->workload;
+		    i < cfg->workload_cnt; ++i, ++workp)
+			if (workp->insert != 0 || workp->update != 0 ||
+			    workp->truncate != 0) {
+				fprintf(stderr,
+				    "Invalid workload: insert, update or "
+				    "truncate specified with readonly\n");
+				return (EINVAL);
+			}
 	return (0);
 }
 

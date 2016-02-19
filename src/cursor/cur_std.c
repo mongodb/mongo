@@ -15,9 +15,10 @@
 int
 __wt_cursor_notsup(WT_CURSOR *cursor)
 {
-	WT_UNUSED(cursor);
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)cursor->session;
+	WT_RET_MSG(session, ENOTSUP, "Unsupported cursor operation");
 }
 
 /*
@@ -628,7 +629,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	} else {
 		WT_RET(
 		    __wt_config_gets_def(session, cfg, "readonly", 0, &cval));
-		if (cval.val != 0) {
+		if (cval.val != 0 || F_ISSET(S2C(session), WT_CONN_READONLY)) {
 			cursor->insert = __wt_cursor_notsup;
 			cursor->update = __wt_cursor_notsup;
 			cursor->remove = __wt_cursor_notsup;

@@ -56,6 +56,8 @@ errors = [
         This error is generated when wiredtiger_open is configured
         to run in-memory, and an insert or update operation requires more
         than the configured cache size to complete.''', undoc=True),
+    Error('WT_PERM_DENIED', -31808,
+        'permission denied (internal)', undoc=True),
 ]
 
 # Update the #defines in the wiredtiger.in file.

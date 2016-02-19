@@ -488,6 +488,7 @@ extern int __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp
 extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, bool fail, void *sym_ret);
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
 extern int __wt_errno(void);
+extern int __wt_map_error_rdonly(int error);
 extern const char *__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen);
 extern int __wt_exist(WT_SESSION_IMPL *session, const char *filename, bool *existp);
 extern void __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh);
@@ -610,6 +611,7 @@ extern WT_DATA_SOURCE *__wt_schema_get_source(WT_SESSION_IMPL *session, const ch
 extern int __wt_str_name_check(WT_SESSION_IMPL *session, const char *str);
 extern int __wt_name_check(WT_SESSION_IMPL *session, const char *str, size_t len);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri, int (*file_func)(WT_SESSION_IMPL *, const char *[]), int (*name_func)(WT_SESSION_IMPL *, const char *, bool *), const char *cfg[], uint32_t open_flags);
+extern int __wt_session_notsup(WT_SESSION *wt_session);
 extern int __wt_session_reset_cursors(WT_SESSION_IMPL *session, bool free_buffers);
 extern int __wt_session_copy_values(WT_SESSION_IMPL *session);
 extern int __wt_session_release_resources(WT_SESSION_IMPL *session);
