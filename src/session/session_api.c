@@ -1572,7 +1572,6 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_transaction_sync_readonly
 	};
 	WT_DECL_RET;
-	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t i;
 
