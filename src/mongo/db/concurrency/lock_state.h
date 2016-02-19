@@ -181,7 +181,7 @@ private:
 
     /**
      * The main functionality of the unlock method, except accepts iterator in order to avoid
-     * additional lookups during unlockGlobal. Frees locks immediately, so must not be called from 
+     * additional lookups during unlockGlobal. Frees locks immediately, so must not be called from
      * inside a WUOW.
      */
     bool _unlockImpl(LockRequestsMap::Iterator* it);

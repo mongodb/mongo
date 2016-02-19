@@ -40,10 +40,6 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-namespace {
-const int NUM_PERF_ITERS = 1000 * 1000;  // numeber of iterations to use for lock perf
-}
-
 
 TEST(LockerImpl, LockNoConflict) {
     const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
@@ -300,66 +296,4 @@ TEST(LockerImpl, CanceledDeadlockUnblocks) {
     ASSERT(locker2.unlockGlobal());
     ASSERT(locker3.unlockGlobal());
 }
-
-
-// These two tests exercise single-threaded performance of uncontended lock acquisition. It
-// is not practical to run them on debug builds.
-#ifndef MONGO_CONFIG_DEBUG_BUILD
-
-TEST(Locker, PerformanceBoostSharedMutex) {
-    for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
-        stdx::mutex mtx;
-
-        // Do some warm-up loops
-        for (int i = 0; i < 1000; i++) {
-            mtx.lock();
-            mtx.unlock();
-        }
-
-        // Measure the number of loops
-        //
-        Timer t;
-
-        for (int i = 0; i < NUM_PERF_ITERS; i++) {
-            mtx.lock();
-            mtx.unlock();
-        }
-
-        log() << numLockers << " locks took: "
-              << static_cast<double>(t.micros()) * 1000.0 / static_cast<double>(NUM_PERF_ITERS)
-              << " ns";
-    }
-}
-
-TEST(Locker, PerformanceLocker) {
-    for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
-        std::vector<std::shared_ptr<LockerForTests>> lockers(numLockers);
-        for (int i = 0; i < numLockers; i++) {
-            lockers[i].reset(new LockerForTests(MODE_S));
-        }
-
-        DefaultLockerImpl locker;
-
-        // Do some warm-up loops
-        for (int i = 0; i < 1000; i++) {
-            locker.lockGlobal(MODE_IS);
-            locker.unlockGlobal();
-        }
-
-        // Measure the number of loops
-        Timer t;
-
-        for (int i = 0; i < NUM_PERF_ITERS; i++) {
-            locker.lockGlobal(MODE_IS);
-            locker.unlockGlobal();
-        }
-
-        log() << numLockers << " locks took: "
-              << static_cast<double>(t.micros()) * 1000.0 / static_cast<double>(NUM_PERF_ITERS)
-              << " ns";
-    }
-}
-
-#endif  // MONGO_CONFIG_DEBUG_BUILD
-
 }  // namespace mongo
