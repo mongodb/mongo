@@ -2025,6 +2025,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		 */
 		__conn_config_readonly(cfg);
 		WT_ERR(__wt_config_merge(session, cfg, NULL, &conn->cfg));
+		__wt_free(session, merge_cfg);
 	} else
 		conn->cfg = merge_cfg;
 
