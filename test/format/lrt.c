@@ -70,7 +70,8 @@ lrt(void *arg)
 			    &key, saved_keyno, 1)) == WT_ROLLBACK)
 				;
 			if (ret != 0)
-				die(ret, "read_row %" PRIu64, saved_keyno);
+				testutil_die(ret,
+				    "read_row %" PRIu64, saved_keyno);
 
 			/* Compare the previous value with the current one. */
 			if (g.type == FIX) {
@@ -80,12 +81,12 @@ lrt(void *arg)
 			} else
 				ret = cursor->get_value(cursor, &value);
 			if (ret != 0)
-				die(ret,
+				testutil_die(ret,
 				    "cursor.get_value: %" PRIu64, saved_keyno);
 
 			if (buf_size != value.size ||
 			    memcmp(buf, value.data, value.size) != 0)
-				die(0, "mismatched start/stop values");
+				testutil_die(0, "mismatched start/stop values");
 
 			/* End the transaction. */
 			check(session->commit_transaction(session, NULL));
@@ -113,7 +114,8 @@ lrt(void *arg)
 					;
 			} while (ret == WT_NOTFOUND);
 			if (ret != 0)
-				die(ret, "read_row %" PRIu64, saved_keyno);
+				testutil_die(ret,
+				    "read_row %" PRIu64, saved_keyno);
 
 			/* Copy the cursor's value. */
 			if (g.type == FIX) {
@@ -123,11 +125,11 @@ lrt(void *arg)
 			} else
 				ret = cursor->get_value(cursor, &value);
 			if (ret != 0)
-				die(ret,
+				testutil_die(ret,
 				    "cursor.get_value: %" PRIu64, saved_keyno);
 			if (buf_len < value.size &&
 			    (buf = realloc(buf, buf_len = value.size)) == NULL)
-				die(errno, "malloc");
+				testutil_die(errno, "malloc");
 			memcpy(buf, value.data, buf_size = value.size);
 
 			/*
@@ -142,7 +144,7 @@ lrt(void *arg)
 					;
 			} while (ret == WT_NOTFOUND);
 			if (ret != 0)
-				die(ret, "read_row %" PRIu64, keyno);
+				testutil_die(ret, "read_row %" PRIu64, keyno);
 
 			pinned = 1;
 		}

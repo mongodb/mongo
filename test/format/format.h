@@ -334,11 +334,7 @@ void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
 
-void	 die(int, const char *, ...)
-#if defined(__GNUC__)
-__attribute__((__noreturn__))
-#endif
-;
+void	 format_die(void);
 
 /*
  * check --
@@ -347,7 +343,7 @@ __attribute__((__noreturn__))
 #define	check(call) do {						\
 	int __r;							\
 	if ((__r = (call)) != 0)					\
-		die(__r, "%s/%d: %s", __func__, __LINE__, #call);	\
+		testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call);\
 } while (0)
 
 /*

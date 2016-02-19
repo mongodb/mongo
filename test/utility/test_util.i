@@ -42,14 +42,28 @@
 #define	DEFAULT_DIR "WT_TEST"
 #define	MKDIR_COMMAND "mkdir "
 
+/* Setup a function pointer so tests can override the content of die. */
+typedef void (*die_func)(void);
+die_func custom_die;
+
+static void	 testutil_die(int, const char *, ...)
+#if defined(__GNUC__)
+__attribute__((__noreturn__))
+#endif
+;
+
 /*
  * die --
  *	Report an error and quit.
  */
-static inline void
+static void
 testutil_die(int e, const char *fmt, ...)
 {
 	va_list ap;
+
+	/* Allow test programs to cleanup on fatal error. */
+	if (custom_die != NULL)
+		(*custom_die)();
 
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
@@ -57,6 +71,7 @@ testutil_die(int e, const char *fmt, ...)
 	if (e != 0)
 		fprintf(stderr, ": %s", wiredtiger_strerror(e));
 	fprintf(stderr, "\n");
+
 	exit(EXIT_FAILURE);
 }
 

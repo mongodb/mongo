@@ -53,7 +53,7 @@ compressor(uint32_t compress_flag)
 	default:
 		break;
 	}
-	die(EINVAL, "illegal compression flag: 0x%x", compress_flag);
+	testutil_die(EINVAL, "illegal compression flag: 0x%x", compress_flag);
 }
 
 /*
@@ -71,7 +71,7 @@ encryptor(uint32_t encrypt_flag)
 	default:
 		break;
 	}
-	die(EINVAL, "illegal encryption flag: 0x%x", encrypt_flag);
+	testutil_die(EINVAL, "illegal encryption flag: 0x%x", encrypt_flag);
 }
 
 static int
@@ -222,7 +222,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		p += snprintf(p, REMAIN(p, end), ",%s", g.config_open);
 
 	if (REMAIN(p, end) == 0)
-		die(ENOMEM, "wiredtiger_open configuration buffer too small");
+		testutil_die(ENOMEM,
+		    "wiredtiger_open configuration buffer too small");
 
 	/*
 	 * Direct I/O may not work with backups, doing copies through the buffer
@@ -234,7 +235,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		g.c_backups = 0;
 
 	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
-		die(ret, "wiredtiger_open: %s", home);
+		testutil_die(ret, "wiredtiger_open: %s", home);
 
 	if (set_api)
 		g.wt_api = conn->get_extension_api(conn);
@@ -247,7 +248,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	 */
 	if (DATASOURCE("helium")) {
 		if (g.helium_mount == NULL)
-			die(EINVAL, "no Helium mount point specified");
+			testutil_die(EINVAL, "no Helium mount point specified");
 		(void)snprintf(helium_config, sizeof(helium_config),
 		    "entry=wiredtiger_extension_init,config=["
 		    "helium_verbose=0,"
@@ -256,7 +257,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		    g.helium_mount);
 		if ((ret = conn->load_extension(
 		    conn, HELIUM_PATH, helium_config)) != 0)
-			die(ret,
+			testutil_die(ret,
 			   "WT_CONNECTION.load_extension: %s:%s",
 			   HELIUM_PATH, helium_config);
 	}
@@ -274,7 +275,7 @@ wts_reopen(void)
 
 	if ((ret = wiredtiger_open(g.home,
 	    &event_handler, g.wiredtiger_open_config, &g.wts_conn)) != 0)
-		die(ret, "wiredtiger_open: %s", g.home);
+		testutil_die(ret, "wiredtiger_open: %s", g.home);
 }
 
 /*
@@ -431,14 +432,15 @@ wts_create(void)
 	}
 
 	if (REMAIN(p, end) == 0)
-		die(ENOMEM, "WT_SESSION.create configuration buffer too small");
+		testutil_die(ENOMEM,
+		    "WT_SESSION.create configuration buffer too small");
 
 	/*
 	 * Create the underlying store.
 	 */
 	check(conn->open_session(conn, NULL, NULL, &session));
 	if ((ret = session->create(session, g.uri, config)) != 0)
-		die(ret, "session.create: %s", g.uri);
+		testutil_die(ret, "session.create: %s", g.uri);
 	check(session->close(session, NULL));
 }
 
@@ -488,7 +490,7 @@ wts_dump(const char *tag, int dump_bdb)
 	    g.uri == NULL ? "" : g.uri);
 
 	if ((ret = system(cmd)) != 0)
-		die(ret, "%s: dump comparison failed", tag);
+		testutil_die(ret, "%s: dump comparison failed", tag);
 	free(cmd);
 #else
 	(void)tag;				/* [-Wunused-variable] */
@@ -517,7 +519,7 @@ wts_verify(const char *tag)
 	/* Session operations for LSM can return EBUSY. */
 	ret = session->verify(session, g.uri, "strict");
 	if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
-		die(ret, "session.verify: %s: %s", g.uri, tag);
+		testutil_die(ret, "session.verify: %s: %s", g.uri, tag);
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
@@ -555,7 +557,7 @@ wts_stats(void)
 	check(conn->open_session(conn, NULL, NULL, &session));
 
 	if ((fp = fopen(g.home_stats, "w")) == NULL)
-		die(errno, "fopen: %s", g.home_stats);
+		testutil_die(errno, "fopen: %s", g.home_stats);
 
 	/* Connection statistics. */
 	fprintf(fp, "====== Connection statistics:\n");
@@ -565,10 +567,10 @@ wts_stats(void)
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
-			die(errno, "fprintf");
+			testutil_die(errno, "fprintf");
 
 	if (ret != WT_NOTFOUND)
-		die(ret, "cursor.next");
+		testutil_die(ret, "cursor.next");
 	check(cursor->close(cursor));
 
 	/* Data source statistics. */
@@ -581,10 +583,10 @@ wts_stats(void)
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
-			die(errno, "fprintf");
+			testutil_die(errno, "fprintf");
 
 	if (ret != WT_NOTFOUND)
-		die(ret, "cursor.next");
+		testutil_die(ret, "cursor.next");
 	check(cursor->close(cursor));
 
 	fclose_and_clear(&fp);

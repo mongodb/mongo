@@ -42,7 +42,7 @@ dmalloc(size_t len)
 	void *p;
 
 	if ((p = malloc(len)) == NULL)
-		die(errno, "malloc");
+		testutil_die(errno, "malloc");
 	return (p);
 }
 
@@ -56,7 +56,7 @@ dstrdup(const char *str)
 	char *p;
 
 	if ((p = strdup(str)) == NULL)
-		die(errno, "strdup");
+		testutil_die(errno, "strdup");
 	return (p);
 }
 
@@ -268,9 +268,9 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 	lastlen = len;
 
 	if (printf("%s\r", msg) < 0)
-		die(EIO, "printf");
+		testutil_die(EIO, "printf");
 	if (fflush(stdout) == EOF)
-		die(errno, "fflush");
+		testutil_die(errno, "fflush");
 }
 
 /*
@@ -407,7 +407,7 @@ rng(WT_RAND_STATE *rnd)
 				    "\n" "end of random number log reached\n");
 				exit(EXIT_SUCCESS);
 			}
-			die(errno, "random number log");
+			testutil_die(errno, "random number log");
 		}
 
 		return ((uint32_t)strtoul(buf, NULL, 10));
@@ -435,6 +435,6 @@ fclose_and_clear(FILE **fpp)
 		return;
 	*fpp = NULL;
 	if (fclose(fp) != 0)
-		die(errno, "fclose");
+		testutil_die(errno, "fclose");
 	return;
 }

@@ -65,7 +65,7 @@ compact(void *arg)
 
 		if ((ret = session->compact(
 		    session, g.uri, NULL)) != 0 && ret != WT_ROLLBACK)
-			die(ret, "session.compact");
+			testutil_die(ret, "session.compact");
 	}
 
 	check(session->close(session, NULL));

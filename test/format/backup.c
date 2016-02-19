@@ -43,14 +43,15 @@ check_copy(void)
 
 	if ((ret = conn->open_session(
 	    conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session: %s", g.home_backup);
+		testutil_die(ret, "connection.open_session: %s", g.home_backup);
 
 	ret = session->verify(session, g.uri, NULL);
 	if (ret != 0)
-		die(ret, "session.verify: %s: %s", g.home_backup, g.uri);
+		testutil_die(ret,
+		    "session.verify: %s: %s", g.home_backup, g.uri);
 
 	if ((ret = conn->close(conn, NULL)) != 0)
-		die(ret, "connection.close: %s", g.home_backup);
+		testutil_die(ret, "connection.close: %s", g.home_backup);
 }
 
 /*
@@ -69,7 +70,7 @@ copy_file(const char *name)
 	(void)snprintf(cmd, len,
 	    "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
 	if ((ret = system(cmd)) != 0)
-		die(ret, "backup copy: %s", cmd);
+		testutil_die(ret, "backup copy: %s", cmd);
 	free(cmd);
 }
 
@@ -116,7 +117,7 @@ backup(void *arg)
 
 		/* Re-create the backup directory. */
 		if ((ret = system(g.home_backup_init)) != 0)
-			die(ret, "backup directory creation failed");
+			testutil_die(ret, "backup directory creation failed");
 
 		/*
 		 * open_cursor can return EBUSY if a metadata operation is
@@ -126,12 +127,12 @@ backup(void *arg)
 		    "backup:", NULL, NULL, &backup_cursor)) == EBUSY)
 			sleep(1);
 		if (ret != 0)
-			die(ret, "session.open_cursor: backup");
+			testutil_die(ret, "session.open_cursor: backup");
 
 		while ((ret = backup_cursor->next(backup_cursor)) == 0) {
 			if ((ret =
 			    backup_cursor->get_key(backup_cursor, &key)) != 0)
-				die(ret, "cursor.get_key");
+				testutil_die(ret, "cursor.get_key");
 			copy_file(key);
 		}
 

@@ -46,7 +46,7 @@ wts_rebalance(void)
 	    "../../wt -h %s dump -f %s/rebalance.orig %s",
 	    g.home, g.home, g.uri);
 	if ((ret = system(cmd)) != 0)
-		die(ret, "command failed: %s", cmd);
+		testutil_die(ret, "command failed: %s", cmd);
 
 	/* Rebalance, then verify the object. */
 	wts_reopen();
@@ -57,7 +57,7 @@ wts_rebalance(void)
 		    "=============== rebalance start ===============");
 
 	if ((ret = session->rebalance(session, g.uri, NULL)) != 0)
-		die(ret, "session.rebalance: %s: %s", g.uri);
+		testutil_die(ret, "session.rebalance: %s: %s", g.uri);
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
@@ -71,12 +71,12 @@ wts_rebalance(void)
 	    "../../wt -h %s dump -f %s/rebalance.new %s",
 	    g.home, g.home, g.uri);
 	if ((ret = system(cmd)) != 0)
-		die(ret, "command failed: %s", cmd);
+		testutil_die(ret, "command failed: %s", cmd);
 
 	/* Compare the old/new versions of the object. */
 	(void)snprintf(cmd, sizeof(cmd),
 	    "cmp %s/rebalance.orig %s/rebalance.new > /dev/null",
 	    g.home, g.home);
 	if ((ret = system(cmd)) != 0)
-		die(ret, "command failed: %s", cmd);
+		testutil_die(ret, "command failed: %s", cmd);
 }

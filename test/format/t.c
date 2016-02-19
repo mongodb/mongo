@@ -45,6 +45,8 @@ main(int argc, char *argv[])
 
 	config = NULL;
 
+	/* Register a fatal cleanup handler */
+	custom_die = format_die;
 #ifdef _WIN32
 	g.progname = "t_format.exe";
 #else
@@ -125,9 +127,9 @@ main(int argc, char *argv[])
 	/* If it's a replay, use the home directory's CONFIG file. */
 	if (g.replay) {
 		if (config != NULL)
-			die(EINVAL, "-c incompatible with -r");
+			testutil_die(EINVAL, "-c incompatible with -r");
 		if (access(g.home_config, R_OK) != 0)
-			die(ENOENT, "%s", g.home_config);
+			testutil_die(ENOENT, "%s", g.home_config);
 		config = g.home_config;
 	}
 
@@ -293,41 +295,33 @@ startup(void)
 
 	/* Create or initialize the home and data-source directories. */
 	if ((ret = system(g.home_init)) != 0)
-		die(ret, "home directory initialization failed");
+		testutil_die(ret, "home directory initialization failed");
 
 	/* Open/truncate the logging file. */
 	if (g.logging != 0 && (g.logfp = fopen(g.home_log, "w")) == NULL)
-		die(errno, "fopen: %s", g.home_log);
+		testutil_die(errno, "fopen: %s", g.home_log);
 
 	/* Open/truncate the random number logging file. */
 	if ((g.randfp = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
-		die(errno, "%s", g.home_rand);
+		testutil_die(errno, "%s", g.home_rand);
 }
 
 /*
  * die --
- *	Report an error and quit, dumping the configuration.
+ *	Report an error, dumping the configuration.
  */
 void
-die(int e, const char *fmt, ...)
+format_die(void)
 {
-	va_list ap;
-
-	/* Single-thread error handling. */
+	/*
+	 * Single-thread error handling, our caller exits after calling
+	 * us - don't release the lock.
+	 */
 	(void)pthread_rwlock_wrlock(&g.death_lock);
 
 	/* Try and turn off tracking so it doesn't obscure the error message. */
 	if (!g.c_quiet) {
 		g.c_quiet = 1;
-		fprintf(stderr, "\n");
-	}
-	if (fmt != NULL) {				/* Death message. */
-		fprintf(stderr, "%s: ", g.progname);
-		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
-		va_end(ap);
-		if (e != 0)
-			fprintf(stderr, ": %s", wiredtiger_strerror(e));
 		fprintf(stderr, "\n");
 	}
 
@@ -338,8 +332,6 @@ die(int e, const char *fmt, ...)
 	/* Display the configuration that failed. */
 	if (g.run_cnt)
 		config_print(1);
-
-	exit(EXIT_FAILURE);
 }
 
 /*
