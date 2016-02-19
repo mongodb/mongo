@@ -26,6 +26,7 @@
  * it in the license file.
  */
 
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/expression.h"
@@ -996,6 +997,9 @@ void ExpressionDateToString::validateFormat(const std::string& format) {
             case 'j':
             case 'w':
             case 'U':
+            case 'G':
+            case 'V':
+            case 'u':
                 break;
             default:
                 uasserted(18536,
@@ -1058,6 +1062,15 @@ string ExpressionDateToString::formatDate(const string& format,
                 break;
             case 'U':  // Week
                 insertPadded(formatted, ExpressionWeek::extract(tm), 2);
+                break;
+            case 'G': // Iso year of week
+                insertPadded(formatted, ExpressionIsoWeekYear::extract(tm), 4);
+                break;
+            case 'V': // Iso week
+                insertPadded(formatted, ExpressionIsoWeek::extract(tm), 2);
+                break;
+            case 'u': // Iso day of week
+                insertPadded(formatted, ExpressionIsoDayOfWeek::extract(tm), 1);
                 break;
             default:
                 // Should never happen as format is pre-validated
@@ -3070,6 +3083,104 @@ int ExpressionWeek::extract(const tm& tm) {
 REGISTER_EXPRESSION(week, ExpressionWeek::parse);
 const char* ExpressionWeek::getOpName() const {
     return "$week";
+}
+
+/* ------------------------- ExpressionIsoDayOfWeek --------------------- */
+
+Value ExpressionIsoDayOfWeek::evaluateInternal(Variables* vars) const {
+    Value pDate(vpOperand[0]->evaluateInternal(vars));
+    return Value(extract(pDate.coerceToTm()));
+}
+
+int ExpressionIsoDayOfWeek::extract(const tm& tm) {
+    return (tm.tm_wday - 7) % 7 + 7;
+}
+
+REGISTER_EXPRESSION(isoDayOfWeek, ExpressionIsoDayOfWeek::parse);
+const char* ExpressionIsoDayOfWeek::getOpName() const {
+    return "$isoDayOfWeek";
+}
+
+/* ------------------------- ExpressionIsoWeekYear ---------------------- */
+
+Value ExpressionIsoWeekYear::evaluateInternal(Variables* vars) const {
+    Value pDate(vpOperand[0]->evaluateInternal(vars));
+    return Value(extract(pDate.coerceToTm()));
+}
+
+int ExpressionIsoWeekYear::extract(const tm& tm) {
+    if (tm.tm_mon > 0 && tm.tm_mon < 11) {
+        return tm.tm_year + 1900;
+    } else if (tm.tm_mon == 0) {
+        int isoWeek = ExpressionIsoWeek::extract(tm);
+        if (isoWeek > 51) return tm.tm_year + 1900 - 1;
+        else return tm.tm_year + 1900;
+    } else {
+        int isoWeek = ExpressionIsoWeek::extract(tm);
+        if (isoWeek == 1) return tm.tm_year + 1900 + 1;
+        else return tm.tm_year + 1900;
+    }
+}
+
+REGISTER_EXPRESSION(isoWeekYear, ExpressionIsoWeekYear::parse);
+const char* ExpressionIsoWeekYear::getOpName() const {
+    return "$isoWeekYear";
+}
+
+/* ------------------------- ExpressionIsoWeek -------------------------- */
+
+Value ExpressionIsoWeek::evaluateInternal(Variables* vars) const {
+    Value pDate(vpOperand[0]->evaluateInternal(vars));
+    return Value(extract(pDate.coerceToTm()));
+}
+
+int ExpressionIsoWeek::lastWeek(int year) {
+    struct tm tm;
+    tm.tm_year = year - 1900;
+    tm.tm_mon = 11;
+    tm.tm_mday = 31;
+    tm.tm_hour = 23;
+    tm.tm_min = 59;
+    tm.tm_sec = 59;
+    mktime(&tm);
+    if (tm.tm_wday > 0 && tm.tm_wday < 4) {
+        return 1;
+    } else if (tm.tm_wday == 4) {
+        return 53;
+    } else if (tm.tm_wday == 5) {
+        if (year % 400 == 0) { // leap year
+            return 53;
+        } else if (year % 100 == 0) { // non leap year
+            return 52;
+        } else if (year % 4 == 0) { // leap year
+            return 53;
+        } else { // non leap year
+            return 52;
+        }
+    } else {
+        return 52;
+    }
+}
+
+int ExpressionIsoWeek::extract(const tm& tm) {
+    //int isoDayOfWeek = ExpressionIsoDayOfWeek::extract(tm);
+    int isoDayOfWeek = (tm.tm_wday - 7) % 7 + 7;
+    int isoDayOfYear = tm.tm_yday + 1;
+
+    int isoWeek = (isoDayOfYear - isoDayOfWeek + 10) / 7;
+
+    if (isoWeek < 1) {
+        return lastWeek(tm.tm_year + 1900 - 1);
+    } else if (isoWeek == 53 && isoWeek > lastWeek(tm.tm_year + 1900)) {
+        return 1;
+    } else {
+        return isoWeek;
+    }
+}
+
+REGISTER_EXPRESSION(isoWeek, ExpressionIsoWeek::parse);
+const char* ExpressionIsoWeek::getOpName() const {
+   return "$isoWeek";
 }
 
 /* ------------------------- ExpressionYear ----------------------------- */
