@@ -234,8 +234,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (strstr(config, "direct_io") != NULL)
 		g.c_backups = 0;
 
-	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
-		testutil_die(ret, "wiredtiger_open: %s", home);
+	testutil_checkfmt(
+	    wiredtiger_open(home, &event_handler, config, &conn), "%s", home);
 
 	if (set_api)
 		g.wt_api = conn->get_extension_api(conn);
@@ -271,11 +271,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 void
 wts_reopen(void)
 {
-	int ret;
-
-	if ((ret = wiredtiger_open(g.home,
-	    &event_handler, g.wiredtiger_open_config, &g.wts_conn)) != 0)
-		testutil_die(ret, "wiredtiger_open: %s", g.home);
+	testutil_checkfmt(wiredtiger_open(g.home, &event_handler,
+	    g.wiredtiger_open_config, &g.wts_conn), "%s", g.home);
 }
 
 /*
@@ -288,7 +285,6 @@ wts_create(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlkey, maxleafpage, maxleafkey, maxleafvalue;
-	int ret;
 	char config[4096], *end, *p;
 
 	conn = g.wts_conn;
@@ -439,8 +435,7 @@ wts_create(void)
 	 * Create the underlying store.
 	 */
 	testutil_check(conn->open_session(conn, NULL, NULL, &session));
-	if ((ret = session->create(session, g.uri, config)) != 0)
-		testutil_die(ret, "session.create: %s", g.uri);
+	testutil_checkfmt(session->create(session, g.uri, config), "%s", g.uri);
 	testutil_check(session->close(session, NULL));
 }
 
@@ -464,7 +459,6 @@ wts_dump(const char *tag, int dump_bdb)
 {
 #ifdef HAVE_BERKELEY_DB
 	size_t len;
-	int ret;
 	char *cmd;
 
 	/*
@@ -489,8 +483,7 @@ wts_dump(const char *tag, int dump_bdb)
 	    g.uri == NULL ? "" : "-n",
 	    g.uri == NULL ? "" : g.uri);
 
-	if ((ret = system(cmd)) != 0)
-		testutil_die(ret, "%s: dump comparison failed", tag);
+	testutil_checkfmt(system(cmd), "%s: dump comparison failed", tag);
 	free(cmd);
 #else
 	(void)tag;				/* [-Wunused-variable] */

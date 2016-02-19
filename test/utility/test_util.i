@@ -76,13 +76,24 @@ testutil_die(int e, const char *fmt, ...)
 }
 
 /*
- * check --
+ * testutil_check --
  *	Complain and quit if a function call fails.
  */
 #define	testutil_check(call) do {					\
 	int __r;							\
 	if ((__r = (call)) != 0)					\
 		testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call);\
+} while (0)
+
+/*
+ * testutil_checkfmt --
+ *	Complain and quit if a function call fails, with additional arguments.
+ */
+#define	testutil_checkfmt(call, fmt, ...) do {				\
+	int __r;							\
+	if ((__r = (call)) != 0)					\
+		testutil_die(__r, "%s/%d: %s: " fmt,			\
+		    __func__, __LINE__, #call, __VA_ARGS__);		\
 } while (0)
 
 /*
