@@ -302,8 +302,15 @@ extern int __wt_curmetadata_open(WT_SESSION_IMPL *session, const char *uri, WT_C
 extern void __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst);
 extern int __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *curjoin, const char *cfg[], WT_CURSOR_STAT *cst);
 extern int __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, const char *cfg[], WT_CURSOR **cursorp);
-extern int __wt_cursor_notsup(WT_CURSOR *cursor);
 extern int __wt_cursor_noop(WT_CURSOR *cursor);
+extern int __wt_cursor_notsup(WT_CURSOR *cursor);
+extern int __wt_cursor_get_value_notsup(WT_CURSOR *cursor, ...);
+extern void __wt_cursor_set_key_notsup(WT_CURSOR *cursor, ...);
+extern void __wt_cursor_set_value_notsup(WT_CURSOR *cursor, ...);
+extern int __wt_cursor_compare_notsup(WT_CURSOR *a, WT_CURSOR *b, int *cmpp);
+extern int __wt_cursor_equals_notsup(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp);
+extern int __wt_cursor_search_near_notsup(WT_CURSOR *cursor, int *exact);
+extern int __wt_cursor_reconfigure_notsup(WT_CURSOR *cursor, const char *config);
 extern void __wt_cursor_set_notsup(WT_CURSOR *cursor);
 extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, bool key);
 extern int __wt_cursor_get_key(WT_CURSOR *cursor, ...);
