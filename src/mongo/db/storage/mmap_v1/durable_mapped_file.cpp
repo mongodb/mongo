@@ -241,31 +241,21 @@ void DurableMappedFile::setPath(const std::string& f) {
     _p = RelativePath::fromFullPath(storageGlobalParams.dbpath, prefix);
 }
 
-bool DurableMappedFile::open(const std::string& fname, bool sequentialHint) {
+bool DurableMappedFile::open(const std::string& fname) {
     LOG(3) << "mmf open " << fname;
     invariant(!_view_write);
 
     setPath(fname);
-    int options = 0;
-    if (sequentialHint) {
-        options |= MongoFile::Options::SEQUENTIAL;
-    }
-    if (storageGlobalParams.readOnly) {
-        options |= MongoFile::Options::READONLY;
-    }
-
-    _view_write = mapWithOptions(fname.c_str(), options);
+    _view_write = map(fname.c_str());
     return finishOpening();
 }
 
-bool DurableMappedFile::create(const std::string& fname,
-                               unsigned long long& len,
-                               bool sequentialHint) {
+bool DurableMappedFile::create(const std::string& fname, unsigned long long& len) {
     LOG(3) << "mmf create " << fname;
     invariant(!_view_write);
 
     setPath(fname);
-    _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
+    _view_write = map(fname.c_str(), len);
     return finishOpening();
 }
 
@@ -294,7 +284,8 @@ bool DurableMappedFile::finishOpening() {
     return false;
 }
 
-DurableMappedFile::DurableMappedFile() : _willNeedRemap(false) {
+DurableMappedFile::DurableMappedFile(OptionSet options)
+    : MemoryMappedFile(options), _willNeedRemap(false) {
     _view_write = _view_private = 0;
 }
 

@@ -441,10 +441,10 @@ void processMessage(Connection& c, Message& m) {
 
 void processDiagLog(const char* file) {
     Connection c;
-    MemoryMappedFile f;
+    MemoryMappedFile f(MemoryMappedFile::SEQUENTIAL);
     long length;
     unsigned long long L = 0;
-    char* root = (char*)f.map(file, L, MemoryMappedFile::SEQUENTIAL);
+    char* root = (char*)f.map(file, L);
     verify(L < 0x80000000);
     length = (long)L;
     verify(root);

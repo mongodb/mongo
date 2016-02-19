@@ -49,11 +49,11 @@ protected:
     }
 
 public:
-    DurableMappedFile();
+    DurableMappedFile(OptionSet options = NONE);
     virtual ~DurableMappedFile();
 
     /** @return true if opened ok. */
-    bool open(const std::string& fname, bool sequentialHint /*typically we open with this false*/);
+    bool open(const std::string& fname);
 
     /** @return file length */
     unsigned long long length() const {
@@ -70,10 +70,9 @@ public:
 
     /* Creates with length if DNE, otherwise uses existing file length,
        passed length.
-       @param sequentialHint if true will be sequentially accessed
        @return true for ok
     */
-    bool create(const std::string& fname, unsigned long long& len, bool sequentialHint);
+    bool create(const std::string& fname, unsigned long long& len);
 
     /* Get the "standard" view (which is the private one).
        @return the private view.

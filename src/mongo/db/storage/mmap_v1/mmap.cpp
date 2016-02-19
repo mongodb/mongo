@@ -36,6 +36,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
@@ -63,7 +64,13 @@ void minOSPageSizeBytesTest(size_t minOSPageSizeBytes) {
 namespace {
 set<MongoFile*> mmfiles;
 map<string, MongoFile*> pathToFile;
+mongo::AtomicUInt64 mmfNextId(0);
 }  // namespace
+
+MemoryMappedFile::MemoryMappedFile(OptionSet options)
+    : MongoFile(options), _uniqueId(mmfNextId.fetchAndAdd(1)) {
+    created();
+}
 
 /* Create. Must not exist.
 @param zero fill file with zeros when true
@@ -100,21 +107,14 @@ void* MemoryMappedFile::map(const char* filename) {
     }
     return map(filename, l);
 }
-void* MemoryMappedFile::mapWithOptions(const char* filename, int options) {
-    unsigned long long l;
-    try {
-        l = boost::filesystem::file_size(filename);
-    } catch (boost::filesystem::filesystem_error& e) {
-        uasserted(15923,
-                  mongoutils::str::stream() << "couldn't get file length when opening mapping "
-                                            << filename << ' ' << e.what());
-    }
-    return map(filename, l, options);
-}
 
 /* --- MongoFile -------------------------------------------------
    this is the administrative stuff
 */
+
+MongoFile::MongoFile(OptionSet options)
+    : _options(storageGlobalParams.readOnly ? (options | READONLY) : options) {}
+
 
 RWLockRecursiveNongreedy LockMongoFilesShared::mmmutex("mmmutex", 10 * 60 * 1000 /* 10 minutes */);
 unsigned LockMongoFilesShared::era = 99;  // note this rolls over
@@ -180,6 +180,7 @@ void MongoFile::closeAllFiles(stringstream& message) {
             if (!mmf)
                 continue;
 
+            invariant(!mmf->isOptionSet(READONLY));
             mmf->flush(sync);
         }
         return num;
@@ -209,8 +210,11 @@ void MongoFile::closeAllFiles(stringstream& message) {
 }
 
 void MongoFile::created() {
-    LockMongoFilesExclusive lk;
-    mmfiles.insert(this);
+    // If we're a READONLY mapping, we don't want to ever flush.
+    if (!isOptionSet(READONLY)) {
+        LockMongoFilesExclusive lk;
+        mmfiles.insert(this);
+    }
 }
 
 void MongoFile::setFilename(const std::string& fn) {

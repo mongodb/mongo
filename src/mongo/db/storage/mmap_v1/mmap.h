@@ -108,14 +108,17 @@ public:
         virtual void flush() = 0;
     };
 
-    MongoFile() {}
-    virtual ~MongoFile() {}
-
     enum Options {
-        SEQUENTIAL = 1,  // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
-        READONLY =
-            2  // not contractually guaranteed, but if specified the impl has option to fault writes
+        NONE = 0,
+        SEQUENTIAL = 1 << 0,  // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows.
+        READONLY = 1 << 1     // if true, writing to the mapped file will crash the process.
     };
+
+    // Integral type used as a BitSet of Options.
+    using OptionSet = std::underlying_type<Options>::type;
+
+    MongoFile(OptionSet options);
+    virtual ~MongoFile() = default;
 
     /** @param fun is called for each MongoFile.
         called from within a mutex that MongoFile uses. so be careful not to deadlock.
@@ -147,6 +150,8 @@ public:
 private:
     std::string _filename;
     static int _flushAll(bool sync);  // returns n flushed
+    const OptionSet _options;
+
 protected:
     virtual void close() = 0;
     virtual void flush(bool sync) = 0;
@@ -166,6 +171,10 @@ protected:
     void destroyed();
 
     virtual unsigned long long length() const = 0;
+
+    bool isOptionSet(Options option) const {
+        return _options & option;
+    }
 };
 
 /** look up a MMF by filename. scoped mutex locking convention.
@@ -199,7 +208,7 @@ protected:
     }
 
 public:
-    MemoryMappedFile();
+    MemoryMappedFile(OptionSet options = NONE);
 
     virtual ~MemoryMappedFile() {
         LockMongoFilesExclusive lk;
@@ -211,15 +220,10 @@ public:
     // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
     void* map(const char* filename);
 
-    /** @param options see MongoFile::Options
-    */
-    void* mapWithOptions(const char* filename, int options);
-
     /* Creates with length if DNE, otherwise uses existing file length,
        passed length.
-       @param options MongoFile::Options bits
     */
-    void* map(const char* filename, unsigned long long& length, int mongoFileOptions = 0);
+    void* map(const char* filename, unsigned long long& length);
 
     /* Create. Must not exist.
        @param zero fill file with zeros when true
@@ -250,10 +254,10 @@ public:
 private:
     static void updateLength(const char* filename, unsigned long long& length);
 
-    HANDLE fd;
-    HANDLE maphandle;
+    HANDLE fd = 0;
+    HANDLE maphandle = 0;
     std::vector<void*> views;
-    unsigned long long len;
+    unsigned long long len = 0u;
     const uint64_t _uniqueId;
 #ifdef _WIN32
     // flush Mutex

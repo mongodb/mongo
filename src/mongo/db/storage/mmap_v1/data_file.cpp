@@ -113,7 +113,7 @@ Status DataFile::openExisting(const char* filename) {
         return Status(ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist");
     }
 
-    if (!mmf.open(filename, false)) {
+    if (!mmf.open(filename)) {
         return Status(ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed");
     }
 
@@ -172,7 +172,7 @@ void DataFile::open(OperationContext* txn,
     {
         invariant(_mb == 0);
         unsigned long long sz = size;
-        if (mmf.create(filename, sz, false)) {
+        if (mmf.create(filename, sz)) {
             _mb = mmf.getView();
         }
 

@@ -52,9 +52,6 @@ using std::vector;
 
 using namespace mongoutils;
 
-namespace {
-mongo::AtomicUInt64 mmfNextId(0);
-}
 
 namespace mongo {
 static size_t fetchMinOSPageSizeBytes() {
@@ -64,13 +61,6 @@ static size_t fetchMinOSPageSizeBytes() {
 }
 const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
 
-
-MemoryMappedFile::MemoryMappedFile() : _uniqueId(mmfNextId.fetchAndAdd(1)) {
-    fd = 0;
-    maphandle = 0;
-    len = 0;
-    created();
-}
 
 void MemoryMappedFile::close() {
     LockMongoFilesShared::assertExclusivelyLocked();
@@ -150,15 +140,13 @@ MAdvise::~MAdvise() {
 }
 #endif
 
-void* MemoryMappedFile::map(const char* filename,
-                            unsigned long long& length,
-                            int mongoFileOptions) {
+void* MemoryMappedFile::map(const char* filename, unsigned long long& length) {
     // length may be updated by callee.
     setFilename(filename);
     FileAllocator::get()->allocateAsap(filename, length);
     len = length;
 
-    const bool readOnly = mongoFileOptions & MongoFile::Options::READONLY;
+    const bool readOnly = isOptionSet(READONLY);
 
     massert(
         10446, str::stream() << "mmap: can't map area of size 0 file: " << filename, length > 0);
@@ -197,7 +185,7 @@ void* MemoryMappedFile::map(const char* filename,
 #if defined(__sun)
 #warning madvise not supported on solaris yet
 #else
-    if (mongoFileOptions & MongoFile::Options::SEQUENTIAL) {
+    if (isOptionSet(SEQUENTIAL)) {
         if (madvise(view, length, MADV_SEQUENTIAL)) {
             warning() << "map: madvise failed for " << filename << ' ' << errnoWithDescription()
                       << endl;

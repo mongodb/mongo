@@ -79,7 +79,7 @@ public:
         {
             DurableMappedFile f;
             unsigned long long len = 256 * 1024 * 1024;
-            verify(f.create(fn, len, /*sequential*/ false));
+            verify(f.create(fn, len));
             {
                 char* p = (char*)f.getView();
                 verify(p);
@@ -110,8 +110,10 @@ public:
         // we make a lot here -- if we were leaking, presumably it would fail doing this many.
         Timer t;
         for (int i = 0; i < N; i++) {
-            DurableMappedFile f;
-            verify(f.open(fn, i % 4 == 1));
+            // Every 4 iterations we pass the sequential hint.
+            DurableMappedFile f{i % 4 == 1 ? MongoFile::Options::SEQUENTIAL
+                                           : MongoFile::Options::NONE};
+            verify(f.open(fn));
             {
                 char* p = (char*)f.getView();
                 verify(p);

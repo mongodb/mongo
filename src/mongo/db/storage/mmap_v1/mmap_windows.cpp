@@ -47,10 +47,6 @@ using std::endl;
 using std::string;
 using std::vector;
 
-namespace {
-mongo::AtomicUInt64 mmfNextId(0);
-}
-
 static size_t fetchMinOSPageSizeBytes() {
     SYSTEM_INFO si;
     GetSystemInfo(&si);
@@ -152,11 +148,6 @@ static void* getNextMemoryMappedFileLocation(unsigned long long mmfSize) {
     return reinterpret_cast<void*>(static_cast<uintptr_t>(thisMemoryMappedFileLocation));
 }
 
-MemoryMappedFile::MemoryMappedFile()
-    : _uniqueId(mmfNextId.fetchAndAdd(1)), fd(0), maphandle(0), len(0) {
-    created();
-}
-
 void MemoryMappedFile::close() {
     LockMongoFilesShared::assertExclusivelyLocked();
 
@@ -183,9 +174,7 @@ void MemoryMappedFile::close() {
 
 unsigned long long mapped = 0;
 
-void* MemoryMappedFile::map(const char* filenameIn,
-                            unsigned long long& length,
-                            int mongoFileOptions) {
+void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) {
     verify(fd == 0 && len == 0);  // can't open more than once
     setFilename(filenameIn);
     FileAllocator::get()->allocateAsap(filenameIn, length);
@@ -207,11 +196,11 @@ void* MemoryMappedFile::map(const char* filenameIn,
 
     updateLength(filename, length);
 
-    const bool readOnly = mongoFileOptions & MongoFile::Options::READONLY;
+    const bool readOnly = isOptionSet(READONLY);
 
     {
         DWORD createOptions = FILE_ATTRIBUTE_NORMAL;
-        if (mongoFileOptions & SEQUENTIAL)
+        if (isOptionSet(SEQUENTIAL))
             createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
 
         DWORD desiredAccess = readOnly ? GENERIC_READ : (GENERIC_READ | GENERIC_WRITE);
@@ -468,6 +457,7 @@ public:
 };
 
 void MemoryMappedFile::flush(bool sync) {
+    invariant(!(isOptionSet(Options::READONLY)));
     uassert(13056, "Async flushing not supported on windows", sync);
     if (!views.empty()) {
         WindowsFlushable f(this, viewForFlushing(), fd, _uniqueId, filename(), _flushMutex);
