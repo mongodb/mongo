@@ -18,7 +18,9 @@ if [ $# -ne 1 ]; then
 
 	find bench examples ext src test \
 	    -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
-	sed -e '/Makefile.in/d' -e '/build_win\/wiredtiger_config.h/d' |
+	sed -e '/Makefile.in/d' \
+	    -e '/build_win\/wiredtiger_config.h/d' \
+	    -e '/support\/power8/d' |
 	xargs $xp -n 1 -I{} sh ./dist/s_style {}
 else
 	# General style correction and cleanup for a single file

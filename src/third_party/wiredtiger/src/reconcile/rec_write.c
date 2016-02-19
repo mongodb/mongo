@@ -363,6 +363,17 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, __wt_page_is_modified(page));
 
 	/*
+	 * Reconciliation locks the page for three reasons:
+	 *    Reconciliation reads the lists of page updates, obsolete updates
+	 * cannot be discarded while reconciliation is in progress;
+	 *    The compaction process reads page modification information, which
+	 * reconciliation modifies;
+	 *    In-memory splits: reconciliation of an internal page cannot handle
+	 * a child page splitting during the reconciliation.
+	 */
+	WT_RET(__wt_fair_lock(session, &page->page_lock));
+
+	/*
 	 * Check that transaction time always moves forward for a given page.
 	 * If this check fails, reconciliation can free something that a future
 	 * reconciliation will need.
@@ -375,17 +386,6 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_RET(__rec_write_init(
 	    session, ref, flags, salvage, &session->reconcile));
 	r = session->reconcile;
-
-	/*
-	 * Reconciliation locks the page for three reasons:
-	 *    Reconciliation reads the lists of page updates, obsolete updates
-	 * cannot be discarded while reconciliation is in progress;
-	 *    The compaction process reads page modification information, which
-	 * reconciliation modifies;
-	 *    In-memory splits: reconciliation of an internal page cannot handle
-	 * a child page splitting during the reconciliation.
-	 */
-	WT_RET(__wt_fair_lock(session, &page->page_lock));
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -1313,7 +1313,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 } while (0)
 
 typedef enum {
-    WT_CHILD_IGNORE,				/* Deleted child: ignore */
+    WT_CHILD_IGNORE,				/* Ignored child */
     WT_CHILD_MODIFIED,				/* Modified child */
     WT_CHILD_ORIGINAL,				/* Original child */
     WT_CHILD_PROXY				/* Deleted child: proxy */
@@ -1450,16 +1450,15 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 
 	/*
 	 * This function is called when walking an internal page to decide how
-	 * to handle child pages referenced by the internal page, specifically
-	 * if the child page is to be merged into its parent.
+	 * to handle child pages referenced by the internal page.
 	 *
 	 * Internal pages are reconciled for two reasons: first, when evicting
 	 * an internal page, second by the checkpoint code when writing internal
-	 * pages.  During eviction, the subtree is locked down so all pages
-	 * should be in the WT_REF_DISK or WT_REF_LOCKED state. During
-	 * checkpoint, any eviction that might affect our review of an internal
-	 * page is prohibited, however, as the subtree is not reserved for our
-	 * exclusive use, there are other page states that must be considered.
+	 * pages.  During eviction, all pages should be in the WT_REF_DISK or
+	 * WT_REF_DELETED state. During checkpoint, eviction that might affect
+	 * review of an internal page is prohibited, however, as the subtree is
+	 * not reserved for our exclusive use, there are other page states that
+	 * must be considered.
 	 */
 	for (;; __wt_yield())
 		switch (r->tested_ref_state = ref->state) {
@@ -1488,15 +1487,14 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * Locked.
 			 *
-			 * If evicting, the evicted page's subtree, including
-			 * this child, was selected for eviction by us and the
-			 * state is stable until we reset it, it's an in-memory
-			 * state.  This is the expected state for a child being
-			 * merged into a page (where the page was selected by
-			 * the eviction server for eviction).
+			 * We should never be here during eviction, active child
+			 * pages in an evicted page's subtree fails the eviction
+			 * attempt.
 			 */
-			if (F_ISSET(r, WT_EVICTING))
-				goto in_memory;
+			if (F_ISSET(r, WT_EVICTING)) {
+				WT_ASSERT(session, !F_ISSET(r, WT_EVICTING));
+				return (EBUSY);
+			}
 
 			/*
 			 * If called during checkpoint, the child is being
@@ -1514,24 +1512,21 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * In memory.
 			 *
-			 * If evicting, the evicted page's subtree, including
-			 * this child, was selected for eviction by us and the
-			 * state is stable until we reset it, it's an in-memory
-			 * state.  This is the expected state for a child being
-			 * merged into a page (where the page belongs to a file
-			 * being discarded from the cache during close).
+			 * We should never be here during eviction, active child
+			 * pages in an evicted page's subtree fails the eviction
+			 * attempt.
 			 */
-			if (F_ISSET(r, WT_EVICTING))
-				goto in_memory;
+			if (F_ISSET(r, WT_EVICTING)) {
+				WT_ASSERT(session, !F_ISSET(r, WT_EVICTING));
+				return (EBUSY);
+			}
 
 			/*
 			 * If called during checkpoint, acquire a hazard pointer
 			 * so the child isn't evicted, it's an in-memory case.
 			 *
-			 * This call cannot return split/restart, eviction of
-			 * pages that split into their parent is shutout during
-			 * checkpoint, all splits in process will have completed
-			 * before we walk any pages for checkpoint.
+			 * This call cannot return split/restart, we have a lock
+			 * on the parent which prevents a child page split.
 			 */
 			ret = __wt_page_in(session, ref,
 			    WT_READ_CACHE | WT_READ_NO_EVICT |
@@ -1548,29 +1543,31 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * Being read, not modified by definition.
 			 *
-			 * We should never be here during eviction, a child page
-			 * in this state within an evicted page's subtree would
-			 * have caused normally eviction to fail, and exclusive
-			 * eviction shouldn't ever see pages being read.
+			 * We should never be here during eviction, active child
+			 * pages in an evicted page's subtree fails the eviction
+			 * attempt.
 			 */
-			WT_ASSERT(session, !F_ISSET(r, WT_EVICTING));
+			if (F_ISSET(r, WT_EVICTING)) {
+				WT_ASSERT(session, !F_ISSET(r, WT_EVICTING));
+				return (EBUSY);
+			}
 			goto done;
 
 		case WT_REF_SPLIT:
 			/*
 			 * The page was split out from under us.
 			 *
-			 * We should never be here during eviction, a child page
-			 * in this state within an evicted page's subtree would
-			 * have caused eviction to fail.
+			 * We should never be here during eviction, active child
+			 * pages in an evicted page's subtree fails the eviction
+			 * attempt.
 			 *
 			 * We should never be here during checkpoint, dirty page
 			 * eviction is shutout during checkpoint, all splits in
 			 * process will have completed before we walk any pages
 			 * for checkpoint.
 			 */
-			WT_ASSERT(session, ref->state != WT_REF_SPLIT);
-			/* FALLTHROUGH */
+			WT_ASSERT(session, WT_REF_SPLIT != WT_REF_SPLIT);
+			return (EBUSY);
 
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -1581,11 +1578,21 @@ in_memory:
 	 * modify structure has been instantiated. If the modify structure
 	 * exists and the page has actually been modified, set that state.
 	 * If that's not the case, we would normally use the original cell's
-	 * disk address as our reference, but, if we're forced to instantiate
-	 * a deleted child page and it's never modified, we end up here with
-	 * a page that has a modify structure, no modifications, and no disk
-	 * address.  Ignore those pages, they're not modified and there is no
-	 * reason to write the cell.
+	 * disk address as our reference, however there are two special cases,
+	 * both flagged by a missing block address.
+	 *
+	 * First, if forced to instantiate a deleted child page and it's never
+	 * modified, we end up here with a page that has a modify structure, no
+	 * modifications, and no disk address. Ignore those pages, they're not
+	 * modified and there is no reason to write the cell.
+	 *
+	 * Second, insert splits are permitted during checkpoint. When doing the
+	 * final checkpoint pass, we first walk the internal page's page-index
+	 * and write out any dirty pages we find, then we write out the internal
+	 * page in post-order traversal. If we found the split page in the first
+	 * step, it will have an address; if we didn't find the split page in
+	 * the first step, it won't have an address and we ignore it, it's not
+	 * part of the checkpoint.
 	 */
 	mod = ref->page->modify;
 	if (mod != NULL && mod->rec_result != 0)
@@ -3808,7 +3815,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		switch (state) {
 		case WT_CHILD_IGNORE:
-			/* Deleted child we don't have to write. */
+			/* Ignored child. */
 			WT_CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
 
@@ -3977,7 +3984,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * record 100 moves to another page. When we reconcile
 			 * the original page, we write record 98, then we don't
 			 * see record 99 for whatever reason. If we've moved
-			 * record 1000, we don't know to write a deleted record
+			 * record 100, we don't know to write a deleted record
 			 * 99 on the page.)
 			 *
 			 * The record number recorded during the split is the
@@ -3999,8 +4006,6 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		} else {
 			WT_RET(
 			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
-			if (upd == NULL)
-				continue;
 			recno = WT_INSERT_RECNO(ins);
 		}
 		for (;;) {
@@ -4536,8 +4541,11 @@ compare:		/*
 			 * record 100 moves to another page. When we reconcile
 			 * the original page, we write record 98, then we don't
 			 * see record 99 for whatever reason. If we've moved
-			 * record 1000, we don't know to write a deleted record
+			 * record 100, we don't know to write a deleted record
 			 * 99 on the page.)
+			 *
+			 * Assert the recorded record number is past the end of
+			 * the page.
 			 *
 			 * The record number recorded during the split is the
 			 * first key on the split page, that is, one larger than
@@ -4545,13 +4553,13 @@ compare:		/*
 			 */
 			if ((n = page->modify->mod_split_recno) == WT_RECNO_OOB)
 				break;
+			WT_ASSERT(session, n >= src_recno);
 			n -= 1;
+
 			upd = NULL;
 		} else {
 			WT_ERR(
 			    __rec_txn_read(session, r, ins, NULL, NULL, &upd));
-			if (upd == NULL)
-				continue;
 			n = WT_INSERT_RECNO(ins);
 		}
 		while (src_recno <= n) {
@@ -4734,10 +4742,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		switch (state) {
 		case WT_CHILD_IGNORE:
 			/*
-			 * Deleted child we don't have to write.
+			 * Ignored child.
 			 *
-			 * Overflow keys referencing discarded pages are no
-			 * longer useful, schedule them for discard.  Don't
+			 * Overflow keys referencing pages we're not writing are
+			 * no longer useful, schedule them for discard.  Don't
 			 * worry about instantiation, internal page keys are
 			 * always instantiated.  Don't worry about reuse,
 			 * reusing this key in this reconciliation is unlikely.

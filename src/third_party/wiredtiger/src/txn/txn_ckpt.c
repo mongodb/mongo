@@ -179,14 +179,8 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 
 	/* If we have already locked the handles, apply the operation. */
 	for (i = 0; i < session->ckpt_handle_next; ++i) {
-		if (session->ckpt_handle[i].dhandle != NULL)
-			WT_WITH_DHANDLE(session,
-			    session->ckpt_handle[i].dhandle,
-			    ret = (*op)(session, cfg));
-		else
-			WT_WITH_HANDLE_LIST_LOCK(session,
-			    ret = __wt_conn_btree_apply_single(session,
-			    session->ckpt_handle[i].name, NULL, op, cfg));
+		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
+		    ret = (*op)(session, cfg));
 		WT_RET(ret);
 	}
 
@@ -257,15 +251,11 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 	name = session->dhandle->name;
 	session->dhandle = NULL;
 
-	/* Record busy file names, we'll deal with them in the checkpoint. */
-	if ((ret = __wt_session_get_btree(session, name, NULL, NULL, 0)) == 0)
-		session->ckpt_handle[session->ckpt_handle_next++].dhandle =
-		    session->dhandle;
-	else if (ret == EBUSY)
-		ret = __wt_strdup(session, name,
-		    &session->ckpt_handle[session->ckpt_handle_next++].name);
+	if ((ret = __wt_session_get_btree(session, name, NULL, NULL, 0)) != 0)
+		return (ret == EBUSY ? 0 : ret);
 
-	return (ret);
+	session->ckpt_handle[session->ckpt_handle_next++] = session->dhandle;
+	return (0);
 }
 
 /*
@@ -421,10 +411,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
 		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
-	/* Acquire the schema lock. */
-	F_SET(session, WT_SESSION_LOCKED_SCHEMA);
-	__wt_spin_lock(session, &conn->schema_lock);
-
+	/* Start the checkpoint for real. */
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = true;
 
@@ -543,16 +530,25 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Recovery relies on the checkpoint LSN in the metadata only being
 	 * updated by full checkpoints so only checkpoint the metadata for
 	 * full or non-logged checkpoints.
+	 *
+	 * This is very similar to __wt_meta_track_off, ideally they would be
+	 * merged.
 	 */
 	if (full || !logging) {
 		session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
 		/* Disable metadata tracking during the metadata checkpoint. */
 		saved_meta_next = session->meta_track_next;
 		session->meta_track_next = NULL;
+		WT_WITH_METADATA_LOCK(session, ret,
+		    WT_WITH_DHANDLE(session,
+			WT_SESSION_META_DHANDLE(session),
+			ret = __wt_checkpoint(session, cfg)));
+		session->meta_track_next = saved_meta_next;
+		WT_ERR(ret);
+
 		WT_WITH_DHANDLE(session,
 		    WT_SESSION_META_DHANDLE(session),
-		    ret = __wt_checkpoint(session, cfg));
-		session->meta_track_next = saved_meta_next;
+		    ret = __wt_checkpoint_sync(session, NULL));
 		WT_ERR(ret);
 
 		WT_ERR(__checkpoint_verbose_track(session,
@@ -610,22 +606,12 @@ err:	/*
 		    WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_CLEANUP, NULL));
 	}
 
-	for (i = 0; i < session->ckpt_handle_next; ++i) {
-		if (session->ckpt_handle[i].dhandle == NULL) {
-			__wt_free(session, session->ckpt_handle[i].name);
-			continue;
-		}
-		WT_WITH_DHANDLE(session, session->ckpt_handle[i].dhandle,
+	for (i = 0; i < session->ckpt_handle_next; ++i)
+		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
 		    WT_TRET(__wt_session_release_btree(session)));
-	}
 
 	__wt_free(session, session->ckpt_handle);
 	session->ckpt_handle_allocated = session->ckpt_handle_next = 0;
-
-	if (F_ISSET(session, WT_SESSION_LOCKED_SCHEMA)) {
-		F_CLR(session, WT_SESSION_LOCKED_SCHEMA);
-		__wt_spin_unlock(session, &conn->schema_lock);
-	}
 
 	session->isolation = txn->isolation = saved_isolation;
 	return (ret);
@@ -1189,7 +1175,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
 	/* Should be holding the schema lock. */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
+	WT_ASSERT(session, !WT_IS_METADATA(session, session->dhandle) ||
+	    F_ISSET(session, WT_SESSION_LOCKED_METADATA));
 
 	return (__checkpoint_worker(session, cfg, true, true));
 }
@@ -1253,17 +1240,9 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	}
 
 	/*
-	 * We should already have the schema lock unless we're finishing a bulk
-	 * load -- the only other paths to closing files (sweep and LSM) have
-	 * already checked for read-only trees.
-	 */
-	WT_ASSERT(session,
-	    final || bulk || F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
-
-	/*
 	 * Turn on metadata tracking if:
 	 * - The session is not already doing metadata tracking.
-	 * - The file was bulk loaded.
+	 * - The file was not bulk loaded.
 	 * - The close is not during connection close.
 	 */
 	need_tracking = !WT_META_TRACKING(session) && !bulk && !final;

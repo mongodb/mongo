@@ -189,6 +189,7 @@ MALLOC
 MEM
 MEMALIGN
 MERCHANTABILITY
+METADATA
 MONGODB
 MSVC
 MULTIBLOCK
@@ -686,6 +687,7 @@ jnr
 jrx
 json
 kb
+kbits
 keycmp
 keyid
 keyv
@@ -838,6 +840,7 @@ pos
 posint
 posix
 postsize
+powerpc
 pragmas
 pre
 prealloc
