@@ -371,6 +371,20 @@ void NetworkInterfaceASIO::AsyncOp::_transitionToState_inlock(AsyncOp::State new
         return;
     }
 
+    // We can transition to cancelled multiple times if cancel() is called
+    // multiple times.  Ignore that transition if we're already cancelled.
+    if (newState == State::kCanceled) {
+        // Find the current state
+        auto iter = std::find_if_not(_states.rbegin(),
+                                     _states.rend(),
+                                     [](const State& state) { return state == State::kNoState; });
+
+        // If its cancelled, just return
+        if (iter != _states.rend() && *iter == State::kCanceled) {
+            return;
+        }
+    }
+
     for (int i = 0; i < kMaxStateTransitions; i++) {
         // We can't transition to the same state twice.
         MONGO_ASYNC_OP_INVARIANT(_states[i] != newState,

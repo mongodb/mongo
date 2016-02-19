@@ -30,6 +30,7 @@
 
 #include <asio.hpp>
 
+#include <array>
 #include <boost/optional.hpp>
 #include <memory>
 #include <string>
@@ -424,7 +425,7 @@ private:
          * We hold an array of states to show the path this AsyncOp has taken.
          * Must be holding the access control's lock to edit.
          */
-        State _states[kMaxStateTransitions];
+        std::array<State, kMaxStateTransitions> _states;
     };
 
     void _startCommand(AsyncOp* op);
