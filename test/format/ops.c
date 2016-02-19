@@ -229,7 +229,7 @@ ops(void *arg)
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
-	int ckpt_available, dir, insert, intxn, notfound, readonly, ret;
+	int ckpt_available, dir, insert, intxn, notfound, readonly;
 	char *ckpt_config, ckpt_name[64];
 
 	tinfo = arg;
@@ -352,11 +352,9 @@ ops(void *arg)
 				testutil_check(
 				    pthread_rwlock_wrlock(&g.backup_lock));
 
-			if ((ret =
-			    session->checkpoint(session, ckpt_config)) != 0)
-				testutil_die(ret, "session.checkpoint%s%s",
-				    ckpt_config == NULL ? "" : ": ",
-				    ckpt_config == NULL ? "" : ckpt_config);
+			testutil_checkfmt(
+			    session->checkpoint(session, ckpt_config),
+			    "%s", ckpt_config == NULL ? "" : ckpt_config);
 
 			if (ckpt_config != NULL)
 				testutil_check(
@@ -554,7 +552,6 @@ wts_read_scan(void)
 	WT_SESSION *session;
 	uint64_t cnt, last_cnt;
 	uint8_t *keybuf;
-	int ret;
 
 	conn = g.wts_conn;
 
@@ -578,8 +575,8 @@ wts_read_scan(void)
 		}
 
 		key.data = keybuf;
-		if ((ret = read_row(cursor, &key, cnt, 0)) != 0)
-			testutil_die(ret, "read_scan");
+		testutil_checkfmt(
+		    read_row(cursor, &key, cnt, 0), "%s", "read_scan");
 	}
 
 	testutil_check(session->close(session, NULL));
@@ -1074,8 +1071,7 @@ col_insert(TINFO *tinfo,
 			return (WT_ROLLBACK);
 		testutil_die(ret, "cursor.insert");
 	}
-	if ((ret = cursor->get_key(cursor, &keyno)) != 0)
-		testutil_die(ret, "cursor.get_key");
+	testutil_check(cursor->get_key(cursor, &keyno));
 	*keynop = (uint32_t)keyno;
 
 	table_append(keyno);			/* Extend the object. */
