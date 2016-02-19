@@ -2326,6 +2326,9 @@ struct __wt_connection {
  * start an RPC server for primary processes and use RPC for secondary
  * processes). <b>Not yet supported in WiredTiger</b>., a boolean flag; default
  * \c false.}
+ * @config{readonly, open connection in read-only mode.  The database must
+ * exist.  All methods that may modify a database are disabled.  See @ref
+ * readonly for more information., a boolean flag; default \c false.}
  * @config{session_max, maximum expected number of sessions (including server
  * threads)., an integer greater than or equal to 1; default \c 100.}
  * @config{shared_cache = (, shared cache configuration options.  A database
@@ -2997,6 +3000,10 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * size to complete.
  */
 #define	WT_CACHE_FULL	-31807
+/*! @endcond */
+/*! @cond internal */
+/*! Permission denied (internal). */
+#define	WT_PERM_DENIED	-31808
 /*! @endcond */
 /*
  * Error return section: END

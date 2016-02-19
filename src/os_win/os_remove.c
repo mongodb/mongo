@@ -21,6 +21,7 @@ __remove_file_check(WT_SESSION_IMPL *session, const char *name)
 	uint64_t bucket;
 
 	conn = S2C(session);
+	WT_ASSERT(session, !F_ISSET(conn, WT_CONN_READONLY));
 	fh = NULL;
 	bucket = __wt_hash_city64(name, strlen(name)) % WT_HASH_ARRAY_SIZE;
 

@@ -17,11 +17,13 @@ static const int windows_error_offset = -29000;
  * Windows errors are from 0 - 15999 according to the documentation
  */
 static DWORD
-__wt_map_error_to_windows_error(int error) {
-	/* Ensure we do not exceed the error range
-	   Also validate he do not get any COM errors
-	   (which are negative integers)
-	*/
+__wt_map_error_to_windows_error(int error)
+{
+	/*
+	 * Ensure we do not exceed the error range
+	 * Also validate we do not get any COM errors
+	 * (which are negative integers)
+	 */
 	WT_ASSERT(NULL, error < 0);
 
 	return (error + -(windows_error_offset));
@@ -32,8 +34,25 @@ __wt_map_error_to_windows_error(int error) {
  *	Return a positive integer, a decoded Windows error
  */
 static int
-__wt_map_windows_error_to_error(DWORD winerr) {
+__wt_map_windows_error_to_error(DWORD winerr)
+{
 	return (winerr + windows_error_offset);
+}
+
+/*
+ * __wt_map_error_rdonly --
+ *	Map an error into a  WiredTiger error code specific for
+ *	read-only operation which intercepts based on certain types
+ *	of failures.
+ */
+int
+__wt_map_error_rdonly(int winerr)
+{
+	if (winerr == ERROR_FILE_NOT_FOUND)
+		return (WT_NOTFOUND);
+	else if (winerr == ERROR_ACCESS_DENIED)
+		return (WT_PERM_DENIED);
+	return (winerr);
 }
 
 /*

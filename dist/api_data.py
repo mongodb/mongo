@@ -655,6 +655,11 @@ wiredtiger_open_common = connection_runtime_config + [
         RPC server for primary processes and use RPC for secondary
         processes). <b>Not yet supported in WiredTiger</b>''',
         type='boolean'),
+    Config('readonly', 'false', r'''
+        open connection in read-only mode.  The database must exist.  All
+        methods that may modify a database are disabled.  See @ref readonly
+        for more information''',
+        type='boolean'),
     Config('session_max', '100', r'''
         maximum expected number of sessions (including server
         threads)''',

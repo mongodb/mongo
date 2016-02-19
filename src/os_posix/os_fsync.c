@@ -60,6 +60,7 @@ __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
 #ifdef __linux__
 	WT_DECL_RET;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	if ((ret = __wt_handle_sync(fh->fd)) == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "%s: fsync", fh->name);
@@ -108,6 +109,7 @@ __wt_directory_sync(WT_SESSION_IMPL *session, const char *path)
 	if (ret != 0)
 		WT_RET_MSG(session, ret, "%s: open", path);
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	if ((ret = __wt_handle_sync(fd)) != 0)
 		WT_ERR_MSG(session, ret, "%s: fsync", path);
 
@@ -134,6 +136,9 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: fsync", fh->name));
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY) ||
+	    WT_STRING_MATCH(fh->name, WT_SINGLETHREAD,
+	    strlen(WT_SINGLETHREAD)));
 	if ((ret = __wt_handle_sync(fh->fd)) == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "%s fsync error", fh->name);
@@ -149,6 +154,7 @@ __wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh)
 #ifdef	HAVE_SYNC_FILE_RANGE
 	WT_DECL_RET;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_FILEOPS, "%s: sync_file_range", fh->name));
 

@@ -13,6 +13,20 @@ static int __session_snapshot(WT_SESSION *, const char *);
 static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*
+ * __wt_session_notsup --
+ *	Unsupported session method.
+ */
+int
+__wt_session_notsup(WT_SESSION *wt_session)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	WT_RET_MSG(session, ENOTSUP, "Unsupported session method");
+}
+
+/*
  * __wt_session_reset_cursors --
  *	Reset all open cursors.
  */
@@ -566,9 +580,6 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, rebalance, config, cfg);
-
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR(ENOTSUP);
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session, ret,
@@ -1384,6 +1395,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_transaction_sync
 	};
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t i;
 
@@ -1423,6 +1435,37 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	session_ret->id = i;
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
+	/*
+	 * Disable some methods if this is a read-only connection.  Group
+	 * them by call signature.
+	 */
+	if (F_ISSET(conn, WT_CONN_READONLY)) {
+		wt_session = &session_ret->iface;
+		wt_session->checkpoint =
+		    (int (*)(WT_SESSION *, const char *))__wt_session_notsup;
+		wt_session->compact = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->create = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->drop = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->log_flush =
+		    (int (*)(WT_SESSION *, const char *))__wt_session_notsup;
+		wt_session->log_printf = (int (*)(
+		    WT_SESSION *, const char *, ...))__wt_session_notsup;
+		wt_session->rebalance = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->rename = (int (*)(WT_SESSION *, const char *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->salvage = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
+		wt_session->transaction_sync =
+		    (int (*)(WT_SESSION *, const char *))__wt_session_notsup;
+		wt_session->truncate = (int (*)(WT_SESSION *, const char *,
+		    WT_CURSOR *, WT_CURSOR *, const char *))__wt_session_notsup;
+		wt_session->upgrade = (int (*)(WT_SESSION *,
+		    const char *, const char *))__wt_session_notsup;
+	}
 
 	WT_ERR(__wt_cond_alloc(session, "session", false, &session_ret->cond));
 
