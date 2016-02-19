@@ -1887,7 +1887,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
-	bool config_base_set;
+	bool config_base_set, free_merge_cfg;
 	const char *enc_cfg[] = { NULL, NULL }, *merge_cfg;
 	char version[64];
 
@@ -1899,6 +1899,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	conn = NULL;
 	session = NULL;
+	free_merge_cfg = false;
 
 	WT_RET(__wt_library_init());
 
@@ -2024,18 +2025,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		 * read-only are tested in their individual locations later.
 		 */
 		__conn_config_readonly(cfg);
-		ret = __wt_config_merge(session, cfg, NULL, &conn->cfg);
-		__wt_free(session, merge_cfg);
-		WT_ERR(ret);
+		free_merge_cfg = true;
+		WT_ERR(__wt_config_merge(session, cfg, NULL, &conn->cfg));
 	} else
 		conn->cfg = merge_cfg;
-
-	/*
-	 * At this point we've merged the configuration stack and the final
-	 * stack resides in conn->cfg.  Set up the cfg array to use that now.
-	 */
-	cfg[0] = conn->cfg;
-	cfg[1] = NULL;
 
 	/*
 	 * Configuration ...
@@ -2208,6 +2201,8 @@ err:	/* Discard the scratch buffers. */
 	__wt_scr_free(session, &i2);
 	__wt_scr_free(session, &i3);
 
+	if (free_merge_cfg)
+		__wt_free(session, merge_cfg);
 	/*
 	 * We may have allocated scratch memory when using the dummy session or
 	 * the subsequently created real session, and we don't want to tie down
