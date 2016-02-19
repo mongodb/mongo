@@ -136,9 +136,9 @@ config_free(CONFIG *cfg)
 	cleanup_truncate_config(cfg);
 	free(cfg->base_uri);
 	free(cfg->ckptthreads);
-	free((char *)cfg->partial_config);
+	free(cfg->partial_config);
 	free(cfg->popthreads);
-	free((char *)cfg->reopen_config);
+	free(cfg->reopen_config);
 	free(cfg->workers);
 	free(cfg->workload);
 }
