@@ -127,22 +127,20 @@ assert.neq = function(a, b, msg){
 
 assert.contains = function(o, arr, msg){
     var wasIn = false;
-
-    if(! arr.length){
-        for(var i in arr){
-            wasIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o));
-                return;
-            if(wasIn) break;
-        }
+    if (!Array.isArray(arr)) {
+        throw new Error("The second argument to assert.contains must be an array.");
     }
-    else {
-        for(var i = 0; i < arr.length; i++){
-            wasIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o));
-            if(wasIn) break;
+
+    for(var i = 0; i < arr.length; i++){
+        wasIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o));
+        if(wasIn) {
+            break;
         }
     }
 
-    if(! wasIn) doassert(tojson(o) + " was not in " + tojson(arr) + " : " + msg);
+    if(!wasIn) {
+        doassert(tojson(o) + " was not in " + tojson(arr) + " : " + msg);
+    }
 };
 
 assert.soon = function(f, msg, timeout /*ms*/, interval) {
