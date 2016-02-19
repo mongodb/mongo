@@ -1409,7 +1409,7 @@ struct __wt_session {
 	 * if <code>NULL</code>, the truncate continues to the end of the
 	 * object
 	 * @configempty{WT_SESSION.truncate, see dist/api_data.py}
-	 * @ebusy_errors
+	 * @errors
 	 */
 	int __F(truncate)(WT_SESSION *session,
 	    const char *name,
