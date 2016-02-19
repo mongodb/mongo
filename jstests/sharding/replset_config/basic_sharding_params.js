@@ -30,12 +30,12 @@ function shardingTestUsingObjects() {
     var rs1_d0 = rs1.nodes[0];
     var rs1_a1 = rs1.nodes[1];
 
-    assert.contains( "-vvvvvv", s0.commandLine );
-    assert.contains( "-vvvvv", s1.commandLine );
-    assert.contains( "-vvvv", c0.commandLine );
-    assert.contains( "-vvv", d0.commandLine );
-    assert.contains( "-vv", rs1_d0.commandLine );
-    assert.contains( "-v", rs1_a1.commandLine );
+    assert(s0.commandLine.hasOwnProperty("vvvvvv"));
+    assert(s1.commandLine.hasOwnProperty("vvvvv"));
+    assert(c0.commandLine.hasOwnProperty("vvvv"));
+    assert(d0.commandLine.hasOwnProperty("vvv"));
+    assert(rs1_d0.commandLine.hasOwnProperty("vv"));
+    assert(rs1_a1.commandLine.hasOwnProperty("v"));
 
     st.stop();
 }
@@ -62,11 +62,11 @@ function shardingTestUsingArrays() {
     var d1 = st.d1;
     assert.eq( d1, st._connections[1] );
 
-    assert.contains( "-vvvvv", s0.commandLine );
-    assert.contains( "-vvvv", s1.commandLine );
-    assert.contains( "-vvv", c0.commandLine );
-    assert.contains( "-vv", d0.commandLine );
-    assert.contains( "-v", d1.commandLine );
+    assert(s0.commandLine.hasOwnProperty("vvvvv"));
+    assert(s1.commandLine.hasOwnProperty("vvvv"));
+    assert(c0.commandLine.hasOwnProperty("vvv"));
+    assert(d0.commandLine.hasOwnProperty("vv"));
+    assert(d1.commandLine.hasOwnProperty("v"));
 
     st.stop();
 }
