@@ -60,7 +60,8 @@ var $config = (function() {
         transitions: transitions,
         setup: setup,
         data: {
-            ttlSeconds: 5
+            ttlSeconds: 5,
+            ttlIndexExists: true
         },
         teardown: teardown
     };

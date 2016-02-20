@@ -14,7 +14,8 @@ var $config = (function() {
 
     var data = {
         numDocs: 1000,
-        maxTTL: 5000 // max time to live
+        maxTTL: 5000, // max time to live
+        ttlIndexExists: true
     };
 
     var states = (function() {

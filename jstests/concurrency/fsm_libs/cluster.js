@@ -109,7 +109,6 @@ var Cluster = function(options) {
         mongod: []
     };
     var nextConn = 0;
-    var primaries = [];
     var replSets = [];
 
     // TODO: Define size of replica set from options
@@ -179,7 +178,6 @@ var Cluster = function(options) {
                 i = 0;
                 while (rsTest) {
                     this._addReplicaSetConns(rsTest);
-                    primaries.push(rsTest.getPrimary());
                     replSets.push(rsTest);
                     ++i;
                     rsTest = st['rs' + i];
@@ -210,7 +208,6 @@ var Cluster = function(options) {
             rst.awaitSecondaryNodes();
 
             conn = rst.getPrimary();
-            primaries = [conn];
             replSets = [rst];
 
             this.teardown = function teardown() {
@@ -417,88 +414,142 @@ var Cluster = function(options) {
         return this.isSharded() && options.enableBalancer;
     };
 
-    this.awaitReplication = function awaitReplication(message) {
+    this.checkDBHashes = function checkDBHashes(rst, dbBlacklist, phase) {
         assert(initialized, 'cluster must be initialized first');
-        if (this.isReplication()) {
-            var wc = {
-                writeConcern: {
-                    w: replSetNodes, // all nodes in replica set
-                    wtimeout: 300000 // wait up to 5 minutes
+        assert(this.isReplication(), 'cluster is not a replica set');
+
+        // Use liveNodes.master instead of getPrimary() to avoid the detection of a new primary.
+        var primary = rst.liveNodes.master;
+
+        var res = primary.adminCommand({ listDatabases: 1 });
+        assert.commandWorked(res);
+
+        res.databases.forEach(dbInfo => {
+            var dbName = dbInfo.name;
+            if (Array.contains(dbBlacklist, dbName)) {
+                return;
+            }
+
+            var dbHashes = rst.getHashes(dbName);
+            var primaryDBHash = dbHashes.master;
+            assert.commandWorked(primaryDBHash);
+
+            dbHashes.slaves.forEach(secondaryDBHash => {
+                assert.commandWorked(secondaryDBHash);
+
+                var primaryNumCollections = Object.keys(primaryDBHash.collections).length;
+                var secondaryNumCollections = Object.keys(secondaryDBHash.collections).length;
+
+                assert.eq(primaryNumCollections, secondaryNumCollections,
+                          phase + ', the primary and secondary have a different number of' +
+                          ' collections: ' + tojson(dbHashes));
+
+                // Only compare the dbhashes of non-capped collections because capped collections
+                // are not necessarily truncated at the same points across replica set members.
+                var collNames = Object.keys(primaryDBHash.collections).filter(collName =>
+                    !primary.getDB(dbName)[collName].isCapped());
+
+                collNames.forEach(collName => {
+                    assert.eq(primaryDBHash.collections[collName],
+                              secondaryDBHash.collections[collName],
+                              phase + ', the primary and secondary have a different hash for the' +
+                              ' collection ' + dbName + '.' + collName + ': ' + tojson(dbHashes));
+                });
+
+                if (collNames.length === primaryNumCollections) {
+                    // If the primary and secondary have the same hashes for all the collections on
+                    // the database and there aren't any capped collections, then the hashes for the
+                    // whole database should match.
+                    assert.eq(primaryDBHash.md5,
+                              secondaryDBHash.md5,
+                              phase + ', the primary and secondary have a different hash for the ' +
+                              dbName + ' database: ' + tojson(dbHashes));
                 }
-            };
-            primaries.forEach(function(primary) {
-                var startTime = Date.now();
-                jsTest.log(primary.host + ': awaitReplication started ' + message);
-
-                // Insert a document with a writeConcern for all nodes in the replica set to
-                // ensure that all previous workload operations have completed on secondaries
-                var result = primary.getDB('test').fsm_teardown.insert({ a: 1 }, wc);
-                assert.writeOK(result, 'teardown insert failed: ' + tojson(result));
-
-                var totalTime = Date.now() - startTime;
-                jsTest.log(primary.host + ': awaitReplication ' + message + ' completed in ' +
-                           totalTime + ' ms');
             });
-        }
+        });
     };
 
-    // Returns true if the specified DB contains a capped collection.
-    var containsCappedCollection = function containsCappedCollection(db) {
-        return db.getCollectionNames().some(coll => db[coll].isCapped());
-    };
+    this.checkReplicationConsistency = function checkReplicationConsistency(dbBlacklist,
+                                                                            phase,
+                                                                            ttlIndexExists) {
+        assert(initialized, 'cluster must be initialized first');
 
-    // Checks dbHashes for databases that are not on the blacklist.
-    // All replica set nodes are checked.
-    this.checkDbHashes = function checkDbHashes(dbBlacklist, message) {
-        if (!this.isReplication() || this.isBalancerEnabled()) {
+        if (!this.isReplication()) {
             return;
         }
 
-        var res = this.getDB('admin').runCommand('listDatabases');
-        assert.commandWorked(res);
+        var shouldCheckDBHashes = !this.isBalancerEnabled();
 
-        res.databases.forEach(function(dbInfo) {
-            if (Array.contains(dbBlacklist, dbInfo.name)) {
-                return;
+        replSets.forEach(rst => {
+            var startTime = Date.now();
+            var res;
+
+            // Use liveNodes.master instead of getPrimary() to avoid the detection of a new primary.
+            var primary = rst.liveNodes.master;
+            jsTest.log('Starting consistency checks for replica set with ' + primary.host +
+                       ' assumed to still be primary, ' + phase);
+
+            if (shouldCheckDBHashes && ttlIndexExists) {
+                // Lock the primary to prevent the TTL monitor from deleting expired documents in
+                // the background while we are getting the dbhashes of the replica set members.
+                assert.commandWorked(primary.adminCommand({ fsync: 1, lock: 1 }),
+                                     phase + ', failed to lock the primary');
             }
-            var hasCappedColl = containsCappedCollection(this.getDB(dbInfo.name));
 
-            replSets.forEach(function(replSet) {
-                var hashes = replSet.getHashes(dbInfo.name);
-                var masterHashes = hashes.master;
-                assert.commandWorked(masterHashes);
-                var dbHash = masterHashes.md5;
+            var activeException = false;
+            var msg;
 
-                hashes.slaves.forEach(function(slaveHashes) {
-                    assert.commandWorked(slaveHashes);
-                    assert.eq(Object.keys(masterHashes.collections).length,
-                              Object.keys(slaveHashes.collections).length,
-                              message + ' dbHash number of collections in db ' +
-                                dbInfo.name + ' ' + tojson(hashes));
+            try {
+                // Get the latest optime from the primary.
+                var replSetStatus = primary.adminCommand({ replSetGetStatus: 1 });
+                assert.commandWorked(replSetStatus,
+                                     phase + ', error getting replication status');
 
-                    if (!hasCappedColl) {
-                        // dbHash on a DB not containing a capped collection should match.
-                        assert.eq(dbHash,
-                                  slaveHashes.md5,
-                                  message + ' dbHash inconsistency for db ' +
-                                    dbInfo.name + ' ' + tojson(hashes));
-                    } else {
-                        // dbHash on a DB containing a capped collection will not return
-                        // consistent results between the replica set, so we only
-                        // check non-capped collections in the DB.
-                        var collNames = Object.keys(masterHashes.collections).filter(
-                                                    coll =>
-                                                    !this.getDB(dbInfo.name)[coll].isCapped());
-                        collNames.forEach(function(coll) {
-                            assert.eq(masterHashes.collections[coll],
-                                      slaveHashes.collections[coll],
-                                      message + ' dbHash inconsistency for collection ' + coll +
-                                        ' in db ' + dbInfo.name + ' ' + tojson(hashes));
-                        }, this);
+                var primaryInfo = replSetStatus.members.find(memberInfo => memberInfo.self);
+                assert(primaryInfo !== undefined,
+                       phase + ', failed to find self in replication status: ' +
+                       tojson(replSetStatus));
+
+                // Wait for all previous workload operations to complete. We use the "getLastError"
+                // command rather than a replicated write because the primary is currently
+                // fsyncLock()ed to prevent the TTL monitor from running.
+                res = primary.getDB('test').runCommand({
+                    getLastError: 1,
+                    w: replSetNodes,
+                    wtimeout: 5 * 60 * 1000,
+                    wOpTime: primaryInfo.optime
+                });
+                assert.commandWorked(res, phase + ', error awaiting replication');
+
+                if (shouldCheckDBHashes) {
+                    // Compare the dbhashes of the primary and secondaries.
+                    this.checkDBHashes(rst, dbBlacklist);
+                }
+            } catch (e) {
+                activeException = true;
+                throw e;
+            } finally {
+                if (shouldCheckDBHashes && ttlIndexExists) {
+                    // Allow writes on the primary.
+                    res = primary.adminCommand({ fsyncUnlock: 1 });
+
+                    // Returning early would suppress the exception rethrown in the catch block.
+                    if (!res.ok) {
+                        msg = phase + ', failed to unlock the primary, which may cause this' +
+                              ' test to hang: ' + tojson(res);
+                        if (activeException) {
+                            jsTest.log(msg);
+                        } else {
+                            throw new Error(msg);
+                        }
                     }
-                }, this);
-            }, this);
-        }, this);
+                }
+            }
+
+            var totalTime = Date.now() - startTime;
+            jsTest.log('Finished consistency checks of replica set with ' + primary.host +
+                       ' as primary in ' + totalTime +  ' ms, ' + phase);
+        });
     };
 
     this.recordConfigServerData = function recordConfigServerData(configServer) {
