@@ -1533,8 +1533,8 @@ close_reopen(CONFIG *cfg)
 		lprintf(cfg, ret, 0, "Closing the connection failed");
 		return (ret);
 	}
-	if ((ret = wiredtiger_open(cfg->home,
-	    NULL, (const char *)cfg->reopen_config, &cfg->conn)) != 0) {
+	if ((ret = wiredtiger_open(
+	    cfg->home, NULL, cfg->reopen_config, &cfg->conn)) != 0) {
 		lprintf(cfg, ret, 0, "Re-opening the connection failed");
 		return (ret);
 	}
@@ -1810,8 +1810,8 @@ create_tables(CONFIG *cfg)
 
 	for (i = 0; i < cfg->table_count; i++) {
 		if (cfg->log_partial && i > 0) {
-			if (((ret = session->create(session, cfg->uris[i],
-			    (const char *)cfg->partial_config)) != 0)) {
+			if (((ret = session->create(session,
+			    cfg->uris[i], cfg->partial_config)) != 0)) {
 				lprintf(cfg, ret, 0,
 				    "Error creating table %s", cfg->uris[i]);
 				return (ret);
