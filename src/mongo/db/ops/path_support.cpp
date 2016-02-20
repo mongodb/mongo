@@ -287,9 +287,9 @@ Status setElementAtPath(const FieldRef& path,
     }
 }
 
-const BSONElement& findParentEqualityElement(const EqualityMatches& equalities,
-                                             const FieldRef& path,
-                                             int* parentPathParts) {
+BSONElement findParentEqualityElement(const EqualityMatches& equalities,
+                                      const FieldRef& path,
+                                      int* parentPathParts) {
     // We may have an equality match to an object at a higher point in the pattern path, check
     // all path prefixes for equality matches
     // ex: path: 'a.b', query : { 'a' : { b : <value> } }
@@ -309,8 +309,7 @@ const BSONElement& findParentEqualityElement(const EqualityMatches& equalities,
     }
 
     *parentPathParts = -1;
-    static const BSONElement eooElement;
-    return eooElement;
+    return BSONElement();
 }
 
 /**
@@ -318,7 +317,7 @@ const BSONElement& findParentEqualityElement(const EqualityMatches& equalities,
  */
 static Status checkEqualityConflicts(const EqualityMatches& equalities, const FieldRef& path) {
     int parentPathPart = -1;
-    const BSONElement& parentEl = findParentEqualityElement(equalities, path, &parentPathPart);
+    const BSONElement parentEl = findParentEqualityElement(equalities, path, &parentPathPart);
 
     if (parentEl.eoo())
         return Status::OK();
