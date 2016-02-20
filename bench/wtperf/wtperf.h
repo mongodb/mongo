@@ -146,8 +146,8 @@ typedef struct {
 struct __config {			/* Configuration structure */
 	const char *home;		/* WiredTiger home */
 	const char *monitor_dir;	/* Monitor output dir */
-	const char *partial_config;	/* Config string for partial logging */
-	const char *reopen_config;	/* Config string for conn reopen */
+	char *partial_config;		/* Config string for partial logging */
+	char *reopen_config;		/* Config string for conn reopen */
 	char *base_uri;			/* Object URI */
 	char **uris;			/* URIs if multiple tables */
 	const char *helium_mount;	/* Optional Helium mount point */

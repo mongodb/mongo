@@ -2298,8 +2298,8 @@ main(int argc, char *argv[])
 		req_len = strlen(cfg->table_config) +
 		    strlen(LOG_PARTIAL_CONFIG) + 1;
 		cfg->partial_config = dcalloc(req_len, 1);
-		snprintf((char *)cfg->partial_config, req_len, "%s%s",
-		    (char *)cfg->table_config, LOG_PARTIAL_CONFIG);
+		snprintf(cfg->partial_config, req_len, "%s%s",
+		    cfg->table_config, LOG_PARTIAL_CONFIG);
 	}
 	/*
 	 * Set the config for reopen.  If readonly add in that string.
@@ -2312,11 +2312,11 @@ main(int argc, char *argv[])
 		req_len = strlen(cfg->conn_config) + 1;
 	cfg->reopen_config = dcalloc(req_len, 1);
 	if (cfg->readonly)
-		snprintf((char *)cfg->reopen_config, req_len, "%s%s",
-		    (char *)cfg->conn_config, READONLY_CONFIG);
+		snprintf(cfg->reopen_config, req_len, "%s%s",
+		    cfg->conn_config, READONLY_CONFIG);
 	else
-		snprintf((char *)cfg->reopen_config, req_len, "%s",
-		    (char *)cfg->conn_config);
+		snprintf(cfg->reopen_config, req_len, "%s",
+		    cfg->conn_config);
 
 	/* Sanity-check the configuration. */
 	if ((ret = config_sanity(cfg)) != 0)
