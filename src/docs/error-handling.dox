@@ -55,10 +55,17 @@ This error is generated when wiredtiger_open is configured to return an error if
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 
-The ::wiredtiger_strerror function returns the standard message
-associated with any WiredTiger, ISO C99, or POSIX 1003.1-2001 function:
+@section error_translation Translating errors
+
+The WT_SESSION::strerror and ::wiredtiger_strerror functions return the
+standard text message associated with any WiredTiger, ISO C, or POSIX
+standard API.
+
+@snippet ex_all.c Display an error thread safe
 
 @snippet ex_all.c Display an error
+
+Note that ::wiredtiger_strerror is not thread-safe.
 
 @m_if{c}
 @section error_handling_event Error handling using the WT_EVENT_HANDLER

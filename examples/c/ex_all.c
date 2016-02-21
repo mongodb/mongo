@@ -347,8 +347,7 @@ cursor_ops(WT_SESSION *session)
 	cursor->set_key(cursor, key);
 	if ((ret = cursor->remove(cursor)) != 0) {
 		fprintf(stderr,
-		    "cursor.remove: %s\n",
-		    cursor->session->strerror(cursor->session, ret));
+		    "cursor.remove: %s\n", wiredtiger_strerror(ret));
 		return (ret);
 	}
 	/*! [Display an error] */
@@ -360,7 +359,8 @@ cursor_ops(WT_SESSION *session)
 	cursor->set_key(cursor, key);
 	if ((ret = cursor->remove(cursor)) != 0) {
 		fprintf(stderr,
-		    "cursor.remove: %s\n", session->strerror(session, ret));
+		    "cursor.remove: %s\n",
+		    cursor->session->strerror(cursor->session, ret));
 		return (ret);
 	}
 	/*! [Display an error thread safe] */

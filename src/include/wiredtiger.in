@@ -828,7 +828,8 @@ struct __wt_session {
 	 * @snippet ex_all.c Display an error thread safe
 	 *
 	 * @param session the session handle
-	 * @param error a return value from a WiredTiger function
+	 * @param error a return value from a WiredTiger, ISO C, or POSIX
+	 * standard API
 	 * @returns a string representation of the error
 	 */
 	const char *__F(strerror)(WT_SESSION *session, int error);
@@ -2434,11 +2435,12 @@ int wiredtiger_open(const char *home,
     WT_CONNECTION **connectionp);
 
 /*!
- * Return information about a WiredTiger error as a string, not thread-safe.
+ * Return information about a WiredTiger error as a string (see
+ * WT_SESSION::strerror for a thread-safe API).
  *
  * @snippet ex_all.c Display an error
  *
- * @param error a return value from a WiredTiger call
+ * @param error a return value from a WiredTiger, ISO C, or POSIX standard API
  * @returns a string representation of the error
  */
 const char *wiredtiger_strerror(int error);
@@ -2491,8 +2493,9 @@ struct __wt_event_handler {
 	 * @param session the WiredTiger session handle in use when the error
 	 * was generated. The handle may have been created by the application
 	 * or automatically by WiredTiger.
-	 * @param error a WiredTiger, C99 or POSIX error code, which can
-	 * be converted to a string using ::wiredtiger_strerror
+	 * @param error a return value from a WiredTiger, ISO C, or
+	 * POSIX standard API, which can be converted to a string using
+	 * WT_SESSION::strerror
 	 * @param message an error string
 	 */
 	int (*handle_error)(WT_EVENT_HANDLER *handler,
