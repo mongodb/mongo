@@ -12,10 +12,7 @@ Darwin)
 *)
 	# We require GNU nm, which may not be installed.
 	type nm > /dev/null 2>&1 &&
-	    (nm --version | grep 'GNU nm') > /dev/null 2>&1 || {
-		echo 'skipped: GNU nm not found'
-		exit 0
-	}
+	    (nm --version | grep 'GNU nm') > /dev/null 2>&1 || exit 0
 	NM='nm --extern-only --defined-only --print-file-name $f'
 	;;
 esac
