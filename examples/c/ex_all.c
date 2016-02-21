@@ -1060,7 +1060,6 @@ application_logging(int which, const char *message)
 	return (0);
 }
 
-
 /*! [Function event_handler] */
 
 /*
