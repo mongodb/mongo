@@ -2477,7 +2477,7 @@ struct __wt_async_callback {
 struct __wt_event_handler {
 	/*!
 	 * Callback to handle error messages; by default, error messages are
-	 * written to the stderr stream.
+	 * written to the stderr stream. See @ref error_handling.
 	 *
 	 * Errors that require the application to exit and restart will have
 	 * their \c error value set to \c WT_PANIC. The application can exit
@@ -2500,7 +2500,7 @@ struct __wt_event_handler {
 
 	/*!
 	 * Callback to handle informational messages; by default, informational
-	 * messages are written to the stdout stream.
+	 * messages are written to the stdout stream. See @ref error_handling.
 	 *
 	 * Message handler returns are not ignored: if the handler returns
 	 * non-zero, the error may cause the WiredTiger function posting the
@@ -2516,7 +2516,7 @@ struct __wt_event_handler {
 
 	/*!
 	 * Callback to handle progress messages; by default, no progress
-	 * messages are written.
+	 * messages are written. See @ref error_handling.
 	 *
 	 * Progress handler returns are not ignored: if the handler returns
 	 * non-zero, the error may cause the WiredTiger function posting the
