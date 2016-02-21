@@ -1,6 +1,4 @@
 # List of OK external symbols.
-lz4_extension_init
-snappy_extension_init
 wiredtiger_config_parser_open
 wiredtiger_config_validate
 wiredtiger_open
@@ -20,4 +18,3 @@ wiredtiger_unpack_start
 wiredtiger_unpack_str
 wiredtiger_unpack_uint
 wiredtiger_version
-zlib_extension_init
