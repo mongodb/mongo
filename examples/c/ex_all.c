@@ -1062,18 +1062,19 @@ application_logging(int which, const char *message)
  *	WiredTiger error handler.
  */
 int
-wiredtiger_handle_error(
-    WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *error)
+wiredtiger_handle_error(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, int error, const char *message)
 {
 	int ret;
 
 	(void)(handler);			/* Unused variables */
+	(void)(error);
 
 	/* Timestamp and log the error message. */
-	ret = application_logging(APPLICATION_ERROR, error);
+	ret = application_logging(APPLICATION_ERROR, message);
 
 	/* Copy and flush the message to stderr. */
-	if (fprintf(stderr, "%p: %s\n", session, error) < 0 && ret == 0)
+	if (fprintf(stderr, "%p: %s\n", session, message) < 0 && ret == 0)
 		ret = EIO;
 	if (fflush(stderr) != 0 && ret == 0)
 		ret = errno;
