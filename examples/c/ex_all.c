@@ -1047,13 +1047,19 @@ backup(WT_SESSION *session)
 
 #define	APPLICATION_ERROR	1
 #define	APPLICATION_INFO	2
-static int
+int application_logging(int, const char *);
+int wiredtiger_handle_error(
+    WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
+int wiredtiger_handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
+
+int
 application_logging(int which, const char *message)
 {
 	(void)which;
 	(void)message;
 	return (0);
 }
+
 
 /*! [Function event_handler] */
 
