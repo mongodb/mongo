@@ -59,6 +59,7 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/hasher.h"
@@ -552,9 +553,11 @@ public:
         // we want the number of records to better report, in that case
         bool isLargeChunk = false;
         unsigned long long recCount = 0;
-        ;
+
+        BSONObj obj;
         RecordId dl;
-        while (PlanExecutor::ADVANCED == exec->getNext(NULL, &dl)) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, &dl))) {
             if (!isLargeChunk) {
                 scoped_lock lk(_cloneLocsMutex);
                 _cloneLocs.insert(dl);
@@ -566,6 +569,13 @@ public:
                 // just to get the correct value for recCount.
             }
         }
+
+        if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
+            errmsg = "Executor error while scanning for documents belonging to chunk: " +
+                WorkingSetCommon::toStatusString(obj);
+            return false;
+        }
+
         exec.reset();
 
         if (isLargeChunk) {
