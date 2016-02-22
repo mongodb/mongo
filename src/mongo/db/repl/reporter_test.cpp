@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -44,31 +45,43 @@ using executor::RemoteCommandResponse;
 
 class MockProgressManager {
 public:
-    void updateMap(int memberId, const Timestamp& ts) {
-        progressMap[memberId] = ts;
+    void updateMap(int memberId, const OpTime& lastDurableOpTime, const OpTime& lastAppliedOpTime) {
+        progressMap[memberId] = ProgressInfo(lastDurableOpTime, lastAppliedOpTime);
     }
 
     void setResult(bool newResult) {
         _result = newResult;
     }
 
-    bool prepareOldReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
+    bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
         if (!_result) {
             return _result;
         }
         cmdBuilder->append("replSetUpdatePosition", 1);
         BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
-        for (auto itr = progressMap.begin(); itr != progressMap.end(); ++itr) {
+        for (auto&& itr : progressMap) {
             BSONObjBuilder entry(arrayBuilder.subobjStart());
-            entry.append("optime", itr->second);
-            entry.append("memberId", itr->first);
+            itr.second.lastDurableOpTime.append(&entry, "durableOpTime");
+            itr.second.lastAppliedOpTime.append(&entry, "appliedOpTime");
+            entry.append("memberId", itr.first);
             entry.append("cfgver", 1);
         }
         return true;
     }
 
 private:
-    std::map<int, Timestamp> progressMap;
+    struct ProgressInfo {
+        ProgressInfo() = default;
+        ProgressInfo(const OpTime& lastDurableOpTime, const OpTime& lastAppliedOpTime)
+            : lastDurableOpTime(lastDurableOpTime), lastAppliedOpTime(lastAppliedOpTime) {}
+
+        // Our last known OpTime that this slave has applied and journaled to.
+        OpTime lastDurableOpTime;
+        // Our last known OpTime that this slave has applied, whether journaled or unjournaled.
+        OpTime lastAppliedOpTime;
+    };
+
+    std::map<int, ProgressInfo> progressMap;
     bool _result = true;
 };
 
@@ -84,7 +97,7 @@ protected:
 
     std::unique_ptr<Reporter> reporter;
     std::unique_ptr<MockProgressManager> posUpdater;
-    Reporter::PrepareReplSetUpdatePositionCommandFn prepareOldReplSetUpdatePositionCommandFn;
+    Reporter::PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn;
 };
 
 ReporterTest::ReporterTest() {}
@@ -92,16 +105,16 @@ ReporterTest::ReporterTest() {}
 void ReporterTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     posUpdater.reset(new MockProgressManager());
-    prepareOldReplSetUpdatePositionCommandFn = [this]() -> StatusWith<BSONObj> {
+    prepareReplSetUpdatePositionCommandFn = [this]() -> StatusWith<BSONObj> {
         BSONObjBuilder bob;
-        if (posUpdater->prepareOldReplSetUpdatePositionCommand(&bob)) {
+        if (posUpdater->prepareReplSetUpdatePositionCommand(&bob)) {
             return bob.obj();
         }
         return Status(ErrorCodes::OperationFailed,
                       "unable to prepare replSetUpdatePosition command object");
     };
     reporter.reset(new Reporter(&getExecutor(),
-                                [this]() { return prepareOldReplSetUpdatePositionCommandFn(); },
+                                [this]() { return prepareReplSetUpdatePositionCommandFn(); },
                                 HostAndPort("h1")));
     launchExecutorThread();
 }
@@ -137,11 +150,11 @@ TEST_F(ReporterTest, InvalidConstruction) {
                   UserException);
 
     // null TaskExecutor
-    ASSERT_THROWS(Reporter(nullptr, prepareOldReplSetUpdatePositionCommandFn, HostAndPort("h1")),
+    ASSERT_THROWS(Reporter(nullptr, prepareReplSetUpdatePositionCommandFn, HostAndPort("h1")),
                   UserException);
 
     // empty HostAndPort
-    ASSERT_THROWS(Reporter(&getExecutor(), prepareOldReplSetUpdatePositionCommandFn, HostAndPort()),
+    ASSERT_THROWS(Reporter(&getExecutor(), prepareReplSetUpdatePositionCommandFn, HostAndPort()),
                   UserException);
 }
 
@@ -165,7 +178,7 @@ TEST_F(ReporterTest, ShutdownBeforeSchedule) {
 
 // If an error is returned, it should be recorded in the Reporter and be returned when triggered
 TEST_F(ReporterTest, ErrorsAreStoredInTheReporter) {
-    posUpdater->updateMap(0, Timestamp(3, 0));
+    posUpdater->updateMap(0, OpTime({3, 0}, 1), OpTime({3, 0}, 1));
     ASSERT_OK(reporter->trigger());
     ASSERT_TRUE(reporter->isActive());
 
@@ -183,7 +196,7 @@ TEST_F(ReporterTest, ErrorsAreStoredInTheReporter) {
 
 // If an error is returned, it should be recorded in the Reporter and not run again.
 TEST_F(ReporterTest, ErrorsStopTheReporter) {
-    posUpdater->updateMap(0, Timestamp(3, 0));
+    posUpdater->updateMap(0, OpTime({3, 0}, 1), OpTime({3, 0}, 1));
     ASSERT_OK(reporter->trigger());
     ASSERT_TRUE(reporter->isActive());
     ASSERT_FALSE(reporter->willRunAgain());
@@ -206,7 +219,7 @@ TEST_F(ReporterTest, ErrorsStopTheReporter) {
 // Schedule while we are already scheduled, it should set willRunAgain, then automatically
 // schedule itself after finishing.
 TEST_F(ReporterTest, DoubleScheduleShouldCauseRescheduleImmediatelyAfterRespondedTo) {
-    posUpdater->updateMap(0, Timestamp(3, 0));
+    posUpdater->updateMap(0, OpTime({3, 0}, 1), OpTime({3, 0}, 1));
     ASSERT_OK(reporter->trigger());
     ASSERT_TRUE(reporter->isActive());
     ASSERT_FALSE(reporter->willRunAgain());
@@ -238,7 +251,7 @@ TEST_F(ReporterTest, DoubleScheduleShouldCauseRescheduleImmediatelyAfterResponde
 // then automatically schedule itself after finishing, but not a third time since the latter
 // two will contain the same batch of updates.
 TEST_F(ReporterTest, TripleScheduleShouldCauseRescheduleImmediatelyAfterRespondedToOnlyOnce) {
-    posUpdater->updateMap(0, Timestamp(3, 0));
+    posUpdater->updateMap(0, OpTime({3, 0}, 1), OpTime({3, 0}, 1));
     ASSERT_OK(reporter->trigger());
     ASSERT_TRUE(reporter->isActive());
     ASSERT_FALSE(reporter->willRunAgain());
@@ -270,7 +283,7 @@ TEST_F(ReporterTest, TripleScheduleShouldCauseRescheduleImmediatelyAfterResponde
 }
 
 TEST_F(ReporterTest, CancelWhileScheduled) {
-    posUpdater->updateMap(0, Timestamp(3, 0));
+    posUpdater->updateMap(0, OpTime({3, 0}, 1), OpTime({3, 0}, 1));
     ASSERT_OK(reporter->trigger());
     ASSERT_TRUE(reporter->isActive());
     ASSERT_FALSE(reporter->willRunAgain());
@@ -294,7 +307,7 @@ TEST_F(ReporterTest, CancelWhileScheduled) {
 }
 
 TEST_F(ReporterTest, CancelAfterFirstReturns) {
-    posUpdater->updateMap(0, Timestamp(3, 0));
+    posUpdater->updateMap(0, OpTime({3, 0}, 1), OpTime({3, 0}, 1));
     ASSERT_OK(reporter->trigger());
     ASSERT_TRUE(reporter->isActive());
     ASSERT_FALSE(reporter->willRunAgain());

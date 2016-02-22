@@ -127,7 +127,7 @@ struct DataReplicatorOptions {
 
     Applier::ApplyOperationFn applierFn;
     RollbackFn rollbackFn;
-    Reporter::PrepareReplSetUpdatePositionCommandFn prepareOldReplSetUpdatePositionCommandFn;
+    Reporter::PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn;
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
     SetFollowerModeFn setFollowerMode;

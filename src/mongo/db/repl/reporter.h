@@ -50,7 +50,7 @@ public:
     using PrepareReplSetUpdatePositionCommandFn = stdx::function<StatusWith<BSONObj>()>;
 
     Reporter(executor::TaskExecutor* executor,
-             PrepareReplSetUpdatePositionCommandFn prepareOldReplSetUpdatePositionCommandFn,
+             PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn,
              const HostAndPort& target);
     virtual ~Reporter();
 
@@ -105,7 +105,7 @@ private:
     executor::TaskExecutor* _executor;
 
     // Prepares update command object.
-    PrepareReplSetUpdatePositionCommandFn _prepareOldReplSetUpdatePositionCommandFn;
+    PrepareReplSetUpdatePositionCommandFn _prepareReplSetUpdatePositionCommandFn;
 
     // Host to whom the Reporter sends updates.
     HostAndPort _target;

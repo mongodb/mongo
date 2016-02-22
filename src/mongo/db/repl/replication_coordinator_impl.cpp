@@ -163,9 +163,9 @@ DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCo
     options.applierFn = [](OperationContext*, const BSONObj&) -> Status { return Status::OK(); };
     options.rollbackFn =
         [](OperationContext*, const OpTime&, const HostAndPort&) { return Status::OK(); };
-    options.prepareOldReplSetUpdatePositionCommandFn = [replCoord]() -> StatusWith<BSONObj> {
+    options.prepareReplSetUpdatePositionCommandFn = [replCoord]() -> StatusWith<BSONObj> {
         BSONObjBuilder bob;
-        if (replCoord->prepareOldReplSetUpdatePositionCommand(&bob)) {
+        if (replCoord->prepareReplSetUpdatePositionCommand(&bob)) {
             return bob.obj();
         }
         return Status(ErrorCodes::OperationFailed,

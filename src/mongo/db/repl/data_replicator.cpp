@@ -525,7 +525,7 @@ DataReplicator::DataReplicator(DataReplicatorOptions opts, ReplicationExecutor* 
     uassert(ErrorCodes::BadValue, "invalid rollback function", _opts.rollbackFn);
     uassert(ErrorCodes::BadValue,
             "invalid replSetUpdatePosition command object creation function",
-            _opts.prepareOldReplSetUpdatePositionCommandFn);
+            _opts.prepareReplSetUpdatePositionCommandFn);
     uassert(ErrorCodes::BadValue, "invalid getMyLastOptime function", _opts.getMyLastOptime);
     uassert(ErrorCodes::BadValue, "invalid setMyLastOptime function", _opts.setMyLastOptime);
     uassert(ErrorCodes::BadValue, "invalid setFollowerMode function", _opts.setFollowerMode);
@@ -1018,9 +1018,8 @@ void DataReplicator::_doNextActions_Steady_inlock() {
     }
 
     if (!_reporterPaused && (!_reporter || !_reporter->getStatus().isOK())) {
-        // TODO get reporter in good shape
         _reporter.reset(
-            new Reporter(_exec, _opts.prepareOldReplSetUpdatePositionCommandFn, _syncSource));
+            new Reporter(_exec, _opts.prepareReplSetUpdatePositionCommandFn, _syncSource));
     }
 }
 
