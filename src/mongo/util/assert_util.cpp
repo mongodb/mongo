@@ -159,10 +159,9 @@ NOINLINE_DECL void invariantOKFailed(const char* expr,
                                      unsigned line) {
     log() << "Invariant failure: " << expr << " resulted in status " << status << " at " << file
           << ' ' << dec << line;
-    logContext();
     breakpoint();
     log() << "\n\n***aborting after invariant() failure\n\n" << endl;
-    quickExit(EXIT_ABRUPT);
+    std::abort();
 }
 
 NOINLINE_DECL void fassertFailed(int msgid) {
@@ -181,10 +180,9 @@ NOINLINE_DECL void fassertFailedNoTrace(int msgid) {
 
 MONGO_COMPILER_NORETURN void fassertFailedWithStatus(int msgid, const Status& status) {
     log() << "Fatal assertion " << msgid << " " << status;
-    logContext();
     breakpoint();
     log() << "\n\n***aborting after fassert() failure\n\n" << endl;
-    quickExit(EXIT_ABRUPT);
+    std::abort();
 }
 
 MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTrace(int msgid, const Status& status) {
