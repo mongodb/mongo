@@ -46,7 +46,7 @@ typedef int u_int;
 
 /* MSVC Doesn't provide __func__, it has __FUNCTION__ */
 #ifdef _MSC_VER
-#define __func__ __FUNCTION__
+#define	__func__ __FUNCTION__
 #endif
 
 /* snprintf does not exist on <= VS 2013 */
