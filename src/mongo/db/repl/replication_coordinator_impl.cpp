@@ -116,6 +116,26 @@ BSONObj incrementConfigVersionByRandom(BSONObj config) {
 
 }  // namespace
 
+BSONObj ReplicationCoordinatorImpl::SlaveInfo::toBSON() const {
+    BSONObjBuilder bo;
+    bo.append("id", memberId);
+    bo.append("rid", rid);
+    bo.append("host", hostAndPort.toString());
+    bo.append("lastDurableOpTime", lastDurableOpTime.toBSON());
+    bo.append("lastAppliedOpTime", lastAppliedOpTime.toBSON());
+    if (self)
+        bo.append("self", true);
+    if (down)
+        bo.append("down", true);
+    bo.append("lastUpdated", lastUpdate);
+    return bo.obj();
+}
+
+std::string ReplicationCoordinatorImpl::SlaveInfo::toString() const {
+    return toBSON().toString();
+}
+
+
 struct ReplicationCoordinatorImpl::WaiterInfo {
     /**
      * Constructor takes the list of waiters and enqueues itself on the list, removing itself
@@ -418,7 +438,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(cbData, localConfig, myIndex.getValue());
     _setMyLastAppliedOpTime_inlock(lastOpTime, false);
-    _setMyLastDurableOpTimeAndReport_inlock(&lk, lastOpTime, false);
+    _setMyLastDurableOpTime_inlock(lastOpTime, false);
+    _reportUpstream_inlock(&lk);
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
     // Step down is impossible, so we don't need to wait for the returned event.
     _updateTerm_incallback(term);
@@ -770,8 +791,9 @@ void ReplicationCoordinatorImpl::_updateSlaveInfoDurableOpTime_inlock(SlaveInfo*
                                                                       const OpTime& opTime) {
     // lastAppliedOpTime cannot be behind lastDurableOpTime.
     if (slaveInfo->lastAppliedOpTime < opTime) {
-        log() << "Durable progress is ahead of the applied progress. This is likely due to a "
-                 "rollback.";
+        log() << "Durable progress (" << opTime << ") is ahead of the applied progress ("
+              << slaveInfo->lastAppliedOpTime << ". This is likely due to a "
+                                                 "rollback. slaveInfo: " << slaveInfo->toString();
         return;
     }
     slaveInfo->lastDurableOpTime = opTime;
@@ -875,56 +897,48 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
 void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (opTime > _getMyLastAppliedOpTime_inlock()) {
-        _setMyLastAppliedOpTimeAndReport_inlock(&lock, opTime, false);
+        const bool allowRollback = false;
+        _setMyLastAppliedOpTime_inlock(opTime, allowRollback);
+
+        // If the storage engine isn't durable then we need to update the durableOpTime.
+        if (!_isDurableStorageEngine()) {
+            _setMyLastDurableOpTime_inlock(opTime, allowRollback);
+        }
+
+        _reportUpstream_inlock(&lock);
     }
 }
 
 void ReplicationCoordinatorImpl::setMyLastDurableOpTimeForward(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (opTime > _getMyLastDurableOpTime_inlock()) {
-        _setMyLastDurableOpTimeAndReport_inlock(&lock, opTime, false);
+        _setMyLastDurableOpTime_inlock(opTime, false);
+        _reportUpstream_inlock(&lock);
     }
 }
 
 void ReplicationCoordinatorImpl::setMyLastAppliedOpTime(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _setMyLastAppliedOpTimeAndReport_inlock(&lock, opTime, false);
+    _setMyLastAppliedOpTime_inlock(opTime, false);
+    _reportUpstream_inlock(&lock);
 }
 
 void ReplicationCoordinatorImpl::setMyLastDurableOpTime(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _setMyLastDurableOpTimeAndReport_inlock(&lock, opTime, false);
+    _setMyLastDurableOpTime_inlock(opTime, false);
+    _reportUpstream_inlock(&lock);
 }
 
 void ReplicationCoordinatorImpl::resetMyLastOpTimes() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     // Reset to uninitialized OpTime
     _setMyLastAppliedOpTime_inlock(OpTime(), true);
-    _setMyLastDurableOpTimeAndReport_inlock(&lock, OpTime(), true);
+    _setMyLastDurableOpTime_inlock(OpTime(), true);
+    _reportUpstream_inlock(&lock);
 }
 
-void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndReport_inlock(
-    stdx::unique_lock<stdx::mutex>* lock, const OpTime& opTime, bool isRollbackAllowed) {
+void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::mutex>* lock) {
     invariant(lock->owns_lock());
-    _setMyLastAppliedOpTime_inlock(opTime, isRollbackAllowed);
-
-    if (getReplicationMode() != modeReplSet) {
-        return;
-    }
-
-    if (_getMemberState_inlock().primary()) {
-        return;
-    }
-
-    lock->unlock();
-
-    _externalState->forwardSlaveProgress();  // Must do this outside _mutex
-}
-
-void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndReport_inlock(
-    stdx::unique_lock<stdx::mutex>* lock, const OpTime& opTime, bool isRollbackAllowed) {
-    invariant(lock->owns_lock());
-    _setMyLastDurableOpTime_inlock(opTime, isRollbackAllowed);
 
     if (getReplicationMode() != modeReplSet) {
         return;
@@ -958,8 +972,10 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTime_inlock(const OpTime& op
     invariant(isRollbackAllowed || mySlaveInfo->lastDurableOpTime <= opTime);
     // lastAppliedOpTime cannot be behind lastDurableOpTime.
     if (mySlaveInfo->lastAppliedOpTime < opTime) {
-        log() << "Durable progress is ahead of the applied progress. This is likely due to a "
-                 "rollback.";
+        log() << "My durable progress (" << opTime << ") is ahead of my applied progress ("
+              << mySlaveInfo->lastAppliedOpTime
+              << ". This is likely due to a "
+                 "rollback. slaveInfo: " << mySlaveInfo->toString();
         return;
     }
     _updateSlaveInfoDurableOpTime_inlock(mySlaveInfo, opTime);
@@ -3029,7 +3045,8 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* txn
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _setMyLastAppliedOpTime_inlock(lastOpTime, true);
-    _setMyLastDurableOpTimeAndReport_inlock(&lk, lastOpTime, true);
+    _setMyLastDurableOpTime_inlock(lastOpTime, true);
+    _reportUpstream_inlock(&lk);
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
 }
 

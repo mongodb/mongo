@@ -3937,7 +3937,7 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAppliedOpTimeChanges) {
 }
 
 TEST_F(ReplCoordTest,
-       NodeChangesMyLastOpTimeWhenAndOnlyWhensetMyLastDurableOpTimeReceivesANewerOpTime) {
+       NodeChangesMyLastOpTimeWhenAndOnlyWhensetMyLastDurableOpTimeReceivesANewerOpTime4DurableSE) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
@@ -3957,6 +3957,32 @@ TEST_F(ReplCoordTest,
     getReplCoord()->setMyLastAppliedOpTimeForward(time2);
     getReplCoord()->setMyLastDurableOpTimeForward(time2);
     ASSERT_EQUALS(time3, getReplCoord()->getMyLastAppliedOpTime());
+}
+
+TEST_F(ReplCoordTest,
+       NodeChangesMyLastOpTimeWhenSetMyLastDurableOpTimeReceivesANewerOpTimeWithoutJournaling) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+
+
+    setStorageEngineDurable(false);
+
+    OpTime time1(Timestamp(100, 1), 1);
+    OpTime time2(Timestamp(100, 2), 1);
+    OpTime time3(Timestamp(100, 3), 1);
+
+    getReplCoord()->setMyLastAppliedOpTime(time1);
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
+    getReplCoord()->setMyLastAppliedOpTimeForward(time3);
+    ASSERT_EQUALS(time3, getReplCoord()->getMyLastAppliedOpTime());
+    ASSERT_EQUALS(time3, getReplCoord()->getMyLastDurableOpTime());
+    getReplCoord()->setMyLastAppliedOpTimeForward(time2);
+    ASSERT_EQUALS(time3, getReplCoord()->getMyLastAppliedOpTime());
+    ASSERT_EQUALS(time3, getReplCoord()->getMyLastDurableOpTime());
 }
 
 TEST_F(ReplCoordTest, OnlyForwardSyncProgressForOtherNodesWhenTheNodesAreBelievedToBeUp) {

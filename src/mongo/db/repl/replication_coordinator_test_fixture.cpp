@@ -113,7 +113,7 @@ void ReplCoordTest::init() {
 
     TopologyCoordinatorImpl::Options settings;
     _topo = new TopologyCoordinatorImpl(settings);
-    stdx::function<bool()> _durablityLambda = []() -> bool { return true; };
+    stdx::function<bool()> _durablityLambda = [this]() -> bool { return _isStorageEngineDurable; };
     _net = new NetworkInterfaceMock;
     _storage = new StorageInterfaceMock;
     _replExec.reset(new ReplicationExecutor(_net, _storage, seed));
