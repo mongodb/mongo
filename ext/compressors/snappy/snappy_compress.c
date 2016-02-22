@@ -44,11 +44,11 @@ typedef struct {
 
 #ifdef WORDS_BIGENDIAN
 /*
- * wt_bswap64 --
+ * snappy_bswap64 --
  *	64-bit unsigned little-endian to/from big-endian value.
  */
 static inline uint64_t
-wt_bswap64(uint64_t v)
+snappy_bswap64(uint64_t v)
 {
 	return (
 	    ((v << 56) & 0xff00000000000000UL) |
@@ -132,7 +132,7 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 			 * Store the value in little-endian format.
 			 */
 #ifdef WORDS_BIGENDIAN
-			snaplen = wt_bswap64(snaplen);
+			snaplen = snappy_bswap64(snaplen);
 #endif
 			*(size_t *)dst = snaplen;
 		} else
@@ -165,7 +165,7 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 */
 	snaplen = *(size_t *)src;
 #ifdef WORDS_BIGENDIAN
-	snaplen = wt_bswap64(snaplen);
+	snaplen = snappy_bswap64(snaplen);
 #endif
 	if (snaplen + sizeof(size_t) > src_len) {
 		(void)wt_api->err_printf(wt_api,
