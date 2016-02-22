@@ -1515,16 +1515,21 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecated) {
         ASSERT_OK(status);
     });
 
-    onCommand([updateOps, preCondition](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS("config", request.dbname);
+    onCommand(
+        [updateOps, preCondition](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS("config", request.dbname);
+            ASSERT_EQUALS(BSON("w"
+                               << "majority"
+                               << "wtimeout" << 15000),
+                          request.cmdObj["writeConcern"].Obj());
 
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
-        ASSERT_EQUALS(updateOps, request.cmdObj["applyOps"].Obj());
-        ASSERT_EQUALS(preCondition, request.cmdObj["preCondition"].Obj());
+            ASSERT_EQUALS(updateOps, request.cmdObj["applyOps"].Obj());
+            ASSERT_EQUALS(preCondition, request.cmdObj["preCondition"].Obj());
 
-        return BSON("ok" << 1);
-    });
+            return BSON("ok" << 1);
+        });
 
     // Now wait for the applyChunkOpsDeprecated call to return
     future.timed_get(kFutureTimeout);
@@ -1548,18 +1553,23 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedCommandFailed) {
         ASSERT_EQUALS(ErrorCodes::BadValue, status);
     });
 
-    onCommand([updateOps, preCondition](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS("config", request.dbname);
-        ASSERT_EQUALS(updateOps, request.cmdObj["applyOps"].Obj());
-        ASSERT_EQUALS(preCondition, request.cmdObj["preCondition"].Obj());
+    onCommand(
+        [updateOps, preCondition](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS("config", request.dbname);
+            ASSERT_EQUALS(BSON("w"
+                               << "majority"
+                               << "wtimeout" << 15000),
+                          request.cmdObj["writeConcern"].Obj());
+            ASSERT_EQUALS(updateOps, request.cmdObj["applyOps"].Obj());
+            ASSERT_EQUALS(preCondition, request.cmdObj["preCondition"].Obj());
 
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
-        BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder,
-                                     Status(ErrorCodes::BadValue, "precondition failed"));
-        return responseBuilder.obj();
-    });
+            BSONObjBuilder responseBuilder;
+            Command::appendCommandStatus(responseBuilder,
+                                         Status(ErrorCodes::BadValue, "precondition failed"));
+            return responseBuilder.obj();
+        });
 
     // Now wait for the applyChunkOpsDeprecated call to return
     future.timed_get(kFutureTimeout);

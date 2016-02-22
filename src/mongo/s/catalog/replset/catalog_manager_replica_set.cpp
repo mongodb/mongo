@@ -89,6 +89,8 @@ using str::stream;
 
 namespace {
 
+const char kWriteConcernField[] = "writeConcern";
+
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
@@ -874,7 +876,8 @@ bool CatalogManagerReplicaSet::runUserManagementReadCommand(OperationContext* tx
 Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
                                                          const BSONArray& updateOps,
                                                          const BSONArray& preCondition) {
-    BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition);
+    BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition
+                                  << kWriteConcernField << kMajorityWriteConcern.toBSON());
     auto response = grid.shardRegistry()->runCommandOnConfigWithRetries(
         txn, "config", cmd, ShardRegistry::kAllRetriableErrors);
 
