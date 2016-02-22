@@ -42,9 +42,8 @@
 #define	DEFAULT_DIR "WT_TEST"
 #define	MKDIR_COMMAND "mkdir "
 
-/* Setup a function pointer so tests can override the content of die. */
-typedef void (*die_func)(void);
-die_func custom_die;
+/* Allow tests to add their own death handling. */
+extern void (*custom_die)(void);
 
 static void	 testutil_die(int, const char *, ...)
 #if defined(__GNUC__)
