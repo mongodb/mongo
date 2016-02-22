@@ -448,22 +448,22 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_cursor_get_key,	/* get-key */
-	    __wt_cursor_get_value,	/* get-value */
-	    __wt_cursor_set_key,	/* set-key */
-	    __wt_cursor_set_value,	/* set-value */
-	    __curmetadata_compare,	/* compare */
-	    __wt_cursor_equals,		/* equals */
-	    __curmetadata_next,		/* next */
-	    __curmetadata_prev,		/* prev */
-	    __curmetadata_reset,	/* reset */
-	    __curmetadata_search,	/* search */
-	    __curmetadata_search_near,	/* search-near */
-	    __curmetadata_insert,	/* insert */
-	    __curmetadata_update,	/* update */
-	    __curmetadata_remove,	/* remove */
-	    __wt_cursor_notsup,		/* reconfigure */
-	    __curmetadata_close);	/* close */
+	    __wt_cursor_get_key,		/* get-key */
+	    __wt_cursor_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __wt_cursor_set_value,		/* set-value */
+	    __curmetadata_compare,		/* compare */
+	    __wt_cursor_equals,			/* equals */
+	    __curmetadata_next,			/* next */
+	    __curmetadata_prev,			/* prev */
+	    __curmetadata_reset,		/* reset */
+	    __curmetadata_search,		/* search */
+	    __curmetadata_search_near,		/* search-near */
+	    __curmetadata_insert,		/* insert */
+	    __curmetadata_update,		/* update */
+	    __curmetadata_remove,		/* remove */
+	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __curmetadata_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;

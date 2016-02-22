@@ -9,6 +9,18 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_cursor_noop --
+ *	Cursor noop.
+ */
+int
+__wt_cursor_noop(WT_CURSOR *cursor)
+{
+	WT_UNUSED(cursor);
+
+	return (0);
+}
+
+/*
  * __wt_cursor_notsup --
  *	Unsupported cursor actions.
  */
@@ -22,15 +34,83 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 }
 
 /*
- * __wt_cursor_noop --
- *	Cursor noop.
+ * __wt_cursor_get_value_notsup --
+ *	WT_CURSOR.get_value not-supported.
  */
 int
-__wt_cursor_noop(WT_CURSOR *cursor)
+__wt_cursor_get_value_notsup(WT_CURSOR *cursor, ...)
 {
-	WT_UNUSED(cursor);
+	return (__wt_cursor_notsup(cursor));
+}
 
-	return (0);
+/*
+ * __wt_cursor_set_key_notsup --
+ *	WT_CURSOR.set_key not-supported.
+ */
+void
+__wt_cursor_set_key_notsup(WT_CURSOR *cursor, ...)
+{
+	(void)__wt_cursor_notsup(cursor);
+}
+
+/*
+ * __wt_cursor_set_value_notsup --
+ *	WT_CURSOR.set_value not-supported.
+ */
+void
+__wt_cursor_set_value_notsup(WT_CURSOR *cursor, ...)
+{
+	(void)__wt_cursor_notsup(cursor);
+}
+
+/*
+ * __wt_cursor_compare_notsup --
+ *	Unsupported cursor comparison.
+ */
+int
+__wt_cursor_compare_notsup(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
+{
+	WT_UNUSED(b);
+	WT_UNUSED(cmpp);
+
+	return (__wt_cursor_notsup(a));
+}
+
+/*
+ * __wt_cursor_equals_notsup --
+ *	Unsupported cursor equality.
+ */
+int
+__wt_cursor_equals_notsup(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
+{
+	WT_UNUSED(other);
+	WT_UNUSED(equalp);
+
+	return (__wt_cursor_notsup(cursor));
+}
+
+/*
+ * __wt_cursor_search_near_notsup --
+ *	Unsupported cursor search-near.
+ */
+int
+__wt_cursor_search_near_notsup(WT_CURSOR *cursor, int *exact)
+{
+	WT_UNUSED(exact);
+
+	return (__wt_cursor_notsup(cursor));
+}
+
+/*
+ * __wt_cursor_reconfigure_notsup --
+ *	Unsupported cursor reconfiguration.
+ */
+int
+__wt_cursor_reconfigure_notsup(WT_CURSOR *cursor, const char *config)
+{
+	WT_UNUSED(config);
+
+	return (__wt_cursor_notsup(cursor));
 }
 
 /*
@@ -47,13 +127,12 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	 * cursors in a session. Reconfigure is left open in case it's possible
 	 * in the future to change these configurations.
 	 */
-	cursor->compare =
-	    (int (*)(WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
+	cursor->compare = __wt_cursor_compare_notsup;
 	cursor->next = __wt_cursor_notsup;
 	cursor->prev = __wt_cursor_notsup;
 	cursor->reset = __wt_cursor_noop;
 	cursor->search = __wt_cursor_notsup;
-	cursor->search_near = (int (*)(WT_CURSOR *, int *))__wt_cursor_notsup;
+	cursor->search_near = __wt_cursor_search_near_notsup;
 	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
 	cursor->remove = __wt_cursor_notsup;
