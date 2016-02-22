@@ -165,8 +165,9 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
     doMinidumpWithException(excPointers);
 
     // Don't go through normal shutdown procedure. It may make things worse.
+    // Do not go through _exit or ExitProcess(), terminate immediately
     log() << "*** immediate exit due to unhandled exception" << std::endl;
-    quickExit(EXIT_ABRUPT);
+    TerminateProcess(GetCurrentProcess(), EXIT_ABRUPT);
 
     // We won't reach here
     return EXCEPTION_EXECUTE_HANDLER;
