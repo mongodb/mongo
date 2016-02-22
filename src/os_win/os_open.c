@@ -64,7 +64,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	 */
 	if (F_ISSET(conn, WT_CONN_READONLY) &&
 	    !WT_STRING_MATCH(name, WT_SINGLETHREAD,
-	    strlen(WT_SINGLETHREAD)));
+	    strlen(WT_SINGLETHREAD)))
 		share_mode = FILE_SHARE_READ;
 	else
 		share_mode = FILE_SHARE_READ | FILE_SHARE_WRITE;
