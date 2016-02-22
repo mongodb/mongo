@@ -347,22 +347,22 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_cursor_get_key,	/* get-key */
-	    __wt_cursor_get_value,	/* get-value */
-	    __wt_cursor_set_key,	/* set-key */
-	    __wt_cursor_set_value,	/* set-value */
-	    __curlog_compare,		/* compare */
-	    __wt_cursor_equals,		/* equals */
-	    __curlog_next,		/* next */
-	    __wt_cursor_notsup,		/* prev */
-	    __curlog_reset,		/* reset */
-	    __curlog_search,		/* search */
-	    __wt_cursor_notsup,		/* search-near */
-	    __wt_cursor_notsup,		/* insert */
-	    __wt_cursor_notsup,		/* update */
-	    __wt_cursor_notsup,		/* remove */
-	    __wt_cursor_notsup,		/* reconfigure */
-	    __curlog_close);		/* close */
+	    __wt_cursor_get_key,		/* get-key */
+	    __wt_cursor_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __wt_cursor_set_value,		/* set-value */
+	    __curlog_compare,			/* compare */
+	    __wt_cursor_equals,			/* equals */
+	    __curlog_next,			/* next */
+	    __wt_cursor_notsup,			/* prev */
+	    __curlog_reset,			/* reset */
+	    __curlog_search,			/* search */
+	    __wt_cursor_search_near_notsup,	/* search-near */
+	    __wt_cursor_notsup,			/* insert */
+	    __wt_cursor_notsup,			/* update */
+	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __curlog_close);			/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;

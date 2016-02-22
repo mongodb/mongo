@@ -335,6 +335,14 @@ class WiredTigerTestCase(unittest.TestCase):
             # always get back to original directory
             os.chdir(self.origcwd)
 
+        # Make sure no read-only files or directories were left behind
+        os.chmod(self.testdir, 0777)
+        for root, dirs, files in os.walk(self.testdir):
+            for d in dirs:
+                os.chmod(os.path.join(root, d), 0777)
+            for f in files:
+                os.chmod(os.path.join(root, f), 0666)
+
         # Clean up unless there's a failure
         if (passed or skipped) and not WiredTigerTestCase._preserveFiles:
             shutil.rmtree(self.testdir, ignore_errors=True)

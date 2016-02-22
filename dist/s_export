@@ -12,10 +12,7 @@ Darwin)
 *)
 	# We require GNU nm, which may not be installed.
 	type nm > /dev/null 2>&1 &&
-	    (nm --version | grep 'GNU nm') > /dev/null 2>&1 || {
-		echo 'skipped: GNU nm not found'
-		exit 0
-	}
+	    (nm --version | grep 'GNU nm') > /dev/null 2>&1 || exit 0
 	NM='nm --extern-only --defined-only --print-file-name $f'
 	;;
 esac
@@ -28,7 +25,9 @@ check()
 	sed 's/.* //' |
 	egrep -v '^__wt') |
 	sort |
-	uniq -u > $t
+	uniq -u |
+	egrep -v \
+	    'zlib_extension_init|lz4_extension_init|snappy_extension_init' > $t
 
 	test -s $t && {
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="

@@ -18,6 +18,7 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 	WT_DECL_RET;
 	LARGE_INTEGER largeint;
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	largeint.QuadPart = len;
 
 	if ((ret = SetFilePointerEx(

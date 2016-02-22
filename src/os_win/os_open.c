@@ -58,7 +58,17 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_filename(session, name, &path));
 
-	share_mode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+	/*
+	 * If this is a read-only connection, open all files read-only
+	 * except the lock file.
+	 */
+	if (F_ISSET(conn, WT_CONN_READONLY) &&
+	    !WT_STRING_MATCH(name, WT_SINGLETHREAD,
+	    strlen(WT_SINGLETHREAD)))
+		share_mode = FILE_SHARE_READ;
+	else
+		share_mode = FILE_SHARE_READ | FILE_SHARE_WRITE;
+
 	/*
 	 * Security:
 	 * The application may spawn a new process, and we don't want another
@@ -72,6 +82,9 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	dwCreationDisposition = 0;
 	if (ok_create) {
+		WT_ASSERT(session, !F_ISSET(conn, WT_CONN_READONLY) ||
+		    WT_STRING_MATCH(name, WT_SINGLETHREAD,
+		    strlen(WT_SINGLETHREAD)));
 		dwCreationDisposition = CREATE_NEW;
 		if (exclusive)
 			dwCreationDisposition = CREATE_ALWAYS;

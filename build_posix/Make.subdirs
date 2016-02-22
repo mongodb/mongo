@@ -26,10 +26,12 @@ lang/python PYTHON
 # Make the tests
 test/bloom
 test/checkpoint
+test/cursor_order
 test/fops
 test/format
 test/huge
 test/packing
+test/readonly
 test/recovery
 test/salvage
 test/thread

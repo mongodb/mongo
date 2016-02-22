@@ -193,6 +193,7 @@ err:	session->compact_state = WT_COMPACT_NONE;
 
 /*
  * __wt_session_compact --
+ *	WT_SESSION.compact method.
  */
 int
 __wt_session_compact(
@@ -259,4 +260,18 @@ err:	session->compact = NULL;
 	WT_TRET(__wt_session_release_resources(session));
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __wt_session_compact_readonly --
+ *	WT_SESSION.compact method; readonly version.
+ */
+int
+__wt_session_compact_readonly(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
 }

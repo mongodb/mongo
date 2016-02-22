@@ -26,12 +26,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <wt_internal.h>
-
 #include <snappy-c.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <wiredtiger_config.h>
+#include <wiredtiger.h>
+#include <wiredtiger_ext.h>
 
 /* Local compressor structure. */
 typedef struct {
@@ -39,6 +41,27 @@ typedef struct {
 
 	WT_EXTENSION_API *wt_api;		/* Extension API */
 } SNAPPY_COMPRESSOR;
+
+#ifdef WORDS_BIGENDIAN
+/*
+ * snappy_bswap64 --
+ *	64-bit unsigned little-endian to/from big-endian value.
+ */
+static inline uint64_t
+snappy_bswap64(uint64_t v)
+{
+	return (
+	    ((v << 56) & 0xff00000000000000UL) |
+	    ((v << 40) & 0x00ff000000000000UL) |
+	    ((v << 24) & 0x0000ff0000000000UL) |
+	    ((v <<  8) & 0x000000ff00000000UL) |
+	    ((v >>  8) & 0x00000000ff000000UL) |
+	    ((v >> 24) & 0x0000000000ff0000UL) |
+	    ((v >> 40) & 0x000000000000ff00UL) |
+	    ((v >> 56) & 0x00000000000000ffUL)
+	);
+}
+#endif
 
 /*
  * wt_snappy_error --
@@ -109,7 +132,7 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 			 * Store the value in little-endian format.
 			 */
 #ifdef WORDS_BIGENDIAN
-			snaplen = __wt_bswap64(snaplen);
+			snaplen = snappy_bswap64(snaplen);
 #endif
 			*(size_t *)dst = snaplen;
 		} else
@@ -142,7 +165,7 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 */
 	snaplen = *(size_t *)src;
 #ifdef WORDS_BIGENDIAN
-	snaplen = __wt_bswap64(snaplen);
+	snaplen = snappy_bswap64(snaplen);
 #endif
 	if (snaplen + sizeof(size_t) > src_len) {
 		(void)wt_api->err_printf(wt_api,

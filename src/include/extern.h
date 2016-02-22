@@ -302,8 +302,15 @@ extern int __wt_curmetadata_open(WT_SESSION_IMPL *session, const char *uri, WT_C
 extern void __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst);
 extern int __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *curjoin, const char *cfg[], WT_CURSOR_STAT *cst);
 extern int __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, const char *cfg[], WT_CURSOR **cursorp);
-extern int __wt_cursor_notsup(WT_CURSOR *cursor);
 extern int __wt_cursor_noop(WT_CURSOR *cursor);
+extern int __wt_cursor_notsup(WT_CURSOR *cursor);
+extern int __wt_cursor_get_value_notsup(WT_CURSOR *cursor, ...);
+extern void __wt_cursor_set_key_notsup(WT_CURSOR *cursor, ...);
+extern void __wt_cursor_set_value_notsup(WT_CURSOR *cursor, ...);
+extern int __wt_cursor_compare_notsup(WT_CURSOR *a, WT_CURSOR *b, int *cmpp);
+extern int __wt_cursor_equals_notsup(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp);
+extern int __wt_cursor_search_near_notsup(WT_CURSOR *cursor, int *exact);
+extern int __wt_cursor_reconfigure_notsup(WT_CURSOR *cursor, const char *config);
 extern void __wt_cursor_set_notsup(WT_CURSOR *cursor);
 extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, bool key);
 extern int __wt_cursor_get_key(WT_CURSOR *cursor, ...);
@@ -488,6 +495,7 @@ extern int __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp
 extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, bool fail, void *sym_ret);
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
 extern int __wt_errno(void);
+extern int __wt_map_error_rdonly(int error);
 extern const char *__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen);
 extern int __wt_exist(WT_SESSION_IMPL *session, const char *filename, bool *existp);
 extern void __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh);
@@ -550,7 +558,6 @@ extern int __wt_struct_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v);
 extern int __wt_struct_size(WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, ...);
 extern int __wt_struct_pack(WT_SESSION_IMPL *session, void *buffer, size_t size, const char *fmt, ...);
 extern int __wt_struct_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt, ...);
-extern int __wt_struct_unpack_size(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt, size_t *resultp);
 extern int __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt, const char *outfmt, const WT_ITEM *inbuf, WT_ITEM *outbuf);
 extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell);
 extern void __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page);
@@ -610,6 +617,7 @@ extern WT_DATA_SOURCE *__wt_schema_get_source(WT_SESSION_IMPL *session, const ch
 extern int __wt_str_name_check(WT_SESSION_IMPL *session, const char *str);
 extern int __wt_name_check(WT_SESSION_IMPL *session, const char *str, size_t len);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri, int (*file_func)(WT_SESSION_IMPL *, const char *[]), int (*name_func)(WT_SESSION_IMPL *, const char *, bool *), const char *cfg[], uint32_t open_flags);
+extern int __wt_session_notsup(WT_SESSION *wt_session);
 extern int __wt_session_reset_cursors(WT_SESSION_IMPL *session, bool free_buffers);
 extern int __wt_session_copy_values(WT_SESSION_IMPL *session);
 extern int __wt_session_release_resources(WT_SESSION_IMPL *session);
@@ -621,6 +629,7 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_h
 extern int __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name, bool open_metadata, uint32_t session_flags, WT_SESSION_IMPL **sessionp);
 extern int __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, bool *skipp);
 extern int __wt_session_compact( WT_SESSION *wt_session, const char *uri, const char *config);
+extern int __wt_session_compact_readonly( WT_SESSION *wt_session, const char *uri, const char *config);
 extern int __wt_session_lock_dhandle( WT_SESSION_IMPL *session, uint32_t flags, bool *is_deadp);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], uint32_t flags);
