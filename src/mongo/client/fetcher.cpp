@@ -164,7 +164,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
       _first(true),
       _remoteCommandCallbackHandle(),
       _timeout(timeout) {
-    uassert(ErrorCodes::BadValue, "null replication executor", executor);
+    uassert(ErrorCodes::BadValue, "null task executor", executor);
     uassert(ErrorCodes::BadValue, "database name cannot be empty", !dbname.empty());
     uassert(ErrorCodes::BadValue, "command object cannot be empty", !findCmdObj.isEmpty());
     uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
