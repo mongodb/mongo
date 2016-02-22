@@ -3112,13 +3112,11 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	uint32_t bnd_slot, i, j;
 	int cmp;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
-	bool compact;
 
 	btree = S2BT(session);
 	dsk = buf->mem;
 	page = r->page;
 	mod = page->modify;
-	compact = false;
 
 	WT_RET(__wt_scr_alloc(session, 0, &key));
 
@@ -3283,22 +3281,19 @@ supd_check_complete:
 		 * do this check after calculating the checksums, hopefully the
 		 * next write can be skipped.
 		 */
-		if (session->compact_state == WT_COMPACT_NONE) {
-			if (mod->rec_result == WT_PM_REC_MULTIBLOCK &&
-			    mod->mod_multi_entries > bnd_slot) {
-				multi = &mod->mod_multi[bnd_slot];
-				if (multi->size == bnd->size &&
-				    multi->cksum == bnd->cksum) {
-					multi->addr.reuse = 1;
-					bnd->addr = multi->addr;
+		if (session->compact_state == WT_COMPACT_NONE &&
+		    mod->rec_result == WT_PM_REC_MULTIBLOCK &&
+		    mod->mod_multi_entries > bnd_slot) {
+			multi = &mod->mod_multi[bnd_slot];
+			if (multi->size == bnd->size &&
+			    multi->cksum == bnd->cksum) {
+				multi->addr.reuse = 1;
+				bnd->addr = multi->addr;
 
-					WT_STAT_FAST_DATA_INCR(
-					    session, rec_page_match);
-					goto done;
-				}
+				WT_STAT_FAST_DATA_INCR(session, rec_page_match);
+				goto done;
 			}
-		} else
-			compact = true;
+		}
 	}
 
 	bnd->entries = r->entries;
@@ -3312,19 +3307,8 @@ supd_check_complete:
 		    F_ISSET(r, WT_EVICTING) ? "evict" : "checkpoint",
 		    r->bnd_state));
 
-	/*
-	 * We should use first-fit if we are doing a compact to avoid writing
-	 * to the  end of the file
-	 */
-	if (compact)
-		__wt_block_configure_first_fit(btree->bm->block, true);
-
 	WT_ERR(__wt_bt_write(session,
 	    buf, addr, &addr_size, false, bnd->already_compressed));
-
-	if (compact)
-		__wt_block_configure_first_fit(btree->bm->block, false);
-
 	WT_ERR(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
 	bnd->addr.size = (uint8_t)addr_size;
 
