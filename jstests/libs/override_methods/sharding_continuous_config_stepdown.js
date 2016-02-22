@@ -41,8 +41,31 @@ ReplSetTest = function ReplSetTestWithContinuousPrimaryStepdown() {
 
         print('*** Continuous stepdown thread running with seed node ' + seedNode);
 
+        // The config primary may unexpectedly step down during startup if under heavy load and
+        // too slowly processing heartbeats. When it steps down, it closes all of its connections.
+        // This can happen during the call to new ReplSetTest, so in order to account for this and
+        // make the tests stable, retry discovery of the replica set's configuration once
+        // (SERVER-22794).
+        var replSet;
+        var networkErrorRetries = 1;
+        while (networkErrorRetries >= 0) {
+            try {
+                replSet = new ReplSetTest(seedNode);
+                break;
+            } catch (e) {
+                if ( ((networkErrorRetries--) > 0) &&
+                     (e.toString().indexOf("network error") > -1) ) {
+                    print("Error: " + e.toString() + "\nStacktrace: " + e.stack);
+                    print("Stepdown thread's config server connection was closed, retrying.");
+                } else {
+                    print('*** Continuous stepdown thread failed to connect to the ' +
+                          'config server: ' + tojson(e));
+                    return { ok: 0, error: e.toString(), stack: e.stack };
+                }
+            }
+        }
+
         try {
-            var replSet = new ReplSetTest(seedNode);
             var primary = replSet.getPrimary();
 
             while (stopCounter.getCount() > 0) {
