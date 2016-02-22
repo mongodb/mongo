@@ -303,43 +303,37 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
             return Status(ErrorCodes::BadValue, "cannot use $position in $pushAll");
         }
 
-        if (!positionElem.isNumber()) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "The value for $position must "
-                                           "be a non-negative numeric value, not of type: "
-                                        << typeName(positionElem.type()));
+        // Check that $position can be represented by a 32-bit integer.
+        switch (positionElem.type()) {
+            case NumberInt:
+                break;
+            case NumberLong:
+                if (positionElem.numberInt() != positionElem.numberLong()) {
+                    return Status(
+                        ErrorCodes::BadValue,
+                        "The $position value in $push must be representable as a 32-bit integer.");
+                }
+                break;
+            case NumberDouble:
+                if (positionElem.numberInt() != positionElem.numberDouble()) {
+                    return Status(
+                        ErrorCodes::BadValue,
+                        "The $position value in $push must be representable as a 32-bit integer.");
+                }
+                break;
+            default:
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The value for $position must "
+                                               "be a non-negative numeric value, not of type: "
+                                            << typeName(positionElem.type()));
         }
 
-        // TODO: Cleanup and unify numbers wrt getting int32/64 bson values (from doubles)
-
-        // If the value of position is not fraction, even if it's a double, we allow it. The
-        // reason here is that the shell will use doubles by default unless told otherwise.
-        const double doubleVal = positionElem.numberDouble();
-        if (std::isnan(doubleVal)) {
-            return Status(ErrorCodes::BadValue, "The $position value in $push cannot be NaN.");
+        if (positionElem.numberInt() < 0) {
+            return {
+                Status(ErrorCodes::BadValue, "The $position value in $push must be non-negative.")};
         }
 
-        if (doubleVal - static_cast<int64_t>(doubleVal) != 0) {
-            return Status(ErrorCodes::BadValue,
-                          "The $position value in $push cannot be fractional.");
-        }
-
-        if (static_cast<double>(numeric_limits<int64_t>::max()) < doubleVal) {
-            return Status(ErrorCodes::BadValue,
-                          "The $position value in $push is too large a number.");
-        }
-
-        if (static_cast<double>(numeric_limits<int64_t>::min()) > doubleVal) {
-            return Status(ErrorCodes::BadValue,
-                          "The $position value in $push is too small a number.");
-        }
-
-        const int64_t tempVal = positionElem.numberLong();
-        if (tempVal < 0)
-            return Status(ErrorCodes::BadValue,
-                          "The $position value in $push must be non-negative.");
-
-        _startPosition = size_t(tempVal);
+        _startPosition = size_t(positionElem.numberInt());
     }
 
     // Is sort present and correct?

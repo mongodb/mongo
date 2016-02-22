@@ -1279,8 +1279,8 @@ TEST(ToPosition, BadInputs) {
         "{$push: {a: { $each: [1], $position:3.000000000001}}}",
         "{$push: {a: { $each: [1], $position:1.2}}}",
         "{$push: {a: { $each: [1], $position:-1.2}}}",
-        "{$push: {a: { $each: [1], $position:9.0e19}}}",
-        "{$push: {a: { $each: [1], $position:-9.0e19}}}",
+        "{$push: {a: { $each: [1], $position:2147483648}}}",
+        "{$push: {a: { $each: [1], $position:-2147483649}}}",
         "{$push: {a: { $each: [1], $position:NaN}}}",
         NULL,
     };
