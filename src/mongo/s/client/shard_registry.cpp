@@ -181,7 +181,8 @@ void ShardRegistry::reload(OperationContext* txn) {
 
     int numShards = shards.size();
 
-    LOG(1) << "found " << numShards << " shards listed on config server(s)";
+    LOG(1) << "found " << numShards << " shards listed on config server(s) with lastVisibleOpTime: "
+           << reloadOpTime.toBSON();
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     // Only actually update the registry if the config.shards query came back at an OpTime newer
