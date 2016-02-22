@@ -958,3 +958,16 @@ TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
     ASSERT_EQUALS(ns.step, NextStep::DONE);
     ASSERT(ns.host.empty());
 }
+
+TEST(ReplicaSetMonitor, NoPrimaryUpCheck) {
+    SetStatePtr state(new SetState("name", basicSeedsSet));
+    ReplicaSetMonitor rsm(state);
+    ASSERT_FALSE(rsm.isKnownToHaveGoodPrimary());
+}
+
+TEST(ReplicaSetMonitor, PrimaryIsUpCheck) {
+    SetStatePtr state(new SetState("name", basicSeedsSet));
+    state->nodes.front().isMaster = true;
+    ReplicaSetMonitor rsm(state);
+    ASSERT_TRUE(rsm.isKnownToHaveGoodPrimary());
+}

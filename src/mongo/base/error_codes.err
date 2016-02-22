@@ -117,6 +117,7 @@ error_code("InitialSyncOplogSourceMissing", 114)
 error_code("CommandNotSupported", 115)
 error_code("DocTooLargeForCapped", 116)
 error_code("ConflictingOperationInProgress", 117)
+error_code("FailedToSatisfyReadPreference", 133)
 
 # backported
 error_code("OplogStartMissing", 120)
