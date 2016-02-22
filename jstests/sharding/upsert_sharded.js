@@ -2,11 +2,10 @@
 // Upsert behavior tests for sharding
 // NOTE: Generic upsert behavior tests belong in the core suite
 //
+(function() {
+'use strict';
 
-var options = { shardOptions : { verbose : 2 } };
-
-var st = new ShardingTest({ shards : 2, mongos : 1, other : options });
-st.stopBalancer();
+var st = new ShardingTest({ shards : 2, mongos : 1 });
 
 var mongos = st.s0;
 var admin = mongos.getDB( "admin" );
@@ -18,8 +17,7 @@ st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 
 var upsertedResult = function(query, expr) {
     coll.remove({});
-    result = coll.update(query, expr, { upsert : true });
-    return result;
+    return coll.update(query, expr, { upsert : true });
 };
 
 var upsertedField = function(query, expr, fieldName) {
@@ -35,13 +33,13 @@ var upsertedXVal = function(query, expr) {
     return upsertedField(query, expr, "x");
 };
 
-printjson( admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._id }) );
-assert( admin.runCommand({ shardCollection : coll + "", key : { x : 1 } }).ok );
-assert( admin.runCommand({ split : coll + "", middle : { x : 0 } }).ok );
-assert( admin.runCommand({ moveChunk : coll + "",
-                           find : { x : 0 },
-                           to : shards[1]._id,
-                           _waitForDelete : true }).ok );
+st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
+assert.commandWorked(admin.runCommand({ shardCollection : coll + "", key : { x : 1 } }));
+assert.commandWorked(admin.runCommand({ split : coll + "", middle : { x : 0 } }));
+assert.commandWorked(admin.runCommand({ moveChunk : coll + "",
+                                        find : { x : 0 },
+                                        to : shards[1]._id,
+                                        _waitForDelete : true }));
 
 st.printShardingStatus();
 
@@ -74,13 +72,13 @@ assert.writeError(upsertedResult({ "x.x" : { $eq : 1 } }, { $set : { a : 1 } }))
 
 coll.drop();
 
-printjson( admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._id }) );
-assert( admin.runCommand({ shardCollection : coll + "", key : { 'x.x' : 1 } }).ok );
-assert( admin.runCommand({ split : coll + "", middle : { 'x.x' : 0 } }).ok );
-assert( admin.runCommand({ moveChunk : coll + "",
-                           find : { 'x.x' : 0 },
-                           to : shards[1]._id,
-                           _waitForDelete : true }).ok );
+st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
+assert.commandWorked(admin.runCommand({ shardCollection : coll + "", key : { 'x.x' : 1 } }));
+assert.commandWorked( admin.runCommand({ split : coll + "", middle : { 'x.x' : 0 } }));
+assert.commandWorked( admin.runCommand({ moveChunk : coll + "",
+                                         find : { 'x.x' : 0 },
+                                         to : shards[1]._id,
+                                         _waitForDelete : true }));
 
 st.printShardingStatus();
 
@@ -104,6 +102,6 @@ assert.writeError(upsertedResult({ x : [{ x : 1 }] }, { $set : { a : 1 } }));
 // Can't set sub-fields of nested key
 assert.writeError(upsertedResult({ "x.x.x" : { $eq : 1 } }, { $set : { a : 1 } }));
 
-jsTest.log("DONE!");
 st.stop();
 
+})();

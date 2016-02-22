@@ -6,6 +6,7 @@
 // @tags: [requires_persistence]
 
 (function() {
+'use strict';
 
 var st = new ShardingTest({ shards: 2,
                             mongos: 1,
@@ -23,7 +24,7 @@ var coll = mongos.getCollection("foo.bar");
 var collSharded = mongos.getCollection("foo.barSharded");
 
 assert.commandWorked(admin.runCommand({ enableSharding : coll.getDB() + "" }));
-printjson(admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._id }));
+st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
 assert.commandWorked(admin.runCommand({ shardCollection : collSharded.toString(),
                                         key : { _id : 1 } }));
 assert.commandWorked(admin.runCommand({ moveChunk : collSharded.toString(),
@@ -156,8 +157,6 @@ assert.neq({},
 assert.neq({},
            st.rs1.getPrimary().adminCommand(
                 { getShardVersion : collSharded.toString(), fullMetadata : true }).metadata);
-
-jsTest.log( "DONE!" );
 
 st.stop();
 

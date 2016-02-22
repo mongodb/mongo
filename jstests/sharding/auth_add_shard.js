@@ -48,7 +48,7 @@ MongoRunner.stopMongod(conn);
 //start mongod again, this time with keyfile 
 var conn = MongoRunner.runMongod({keyFile: "jstests/libs/key1"});
 //try adding the new shard
-printjson(assert.commandWorked(admin.runCommand({ addShard: conn.host })));
+assert.commandWorked(admin.runCommand({ addShard: conn.host }));
 
 //Add some data
 var db = mongos.getDB("foo");
@@ -80,7 +80,7 @@ st.startBalancer();
 
 //--------------- Test 3 --------------------
 // now drain the shard
-printjson(assert.commandWorked(admin.runCommand({removeShard: conn.host})));
+assert.commandWorked(admin.runCommand({removeShard: conn.host}));
 
 // give it some time to drain
 assert.soon(function() {

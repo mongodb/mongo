@@ -1,17 +1,17 @@
 // Tests that updates can't change immutable fields (used in sharded system)
-var st = new ShardingTest({shards : 2,
-                           mongos : 1,
-                           verbose : 0});
-st.stopBalancer();
+(function() {
+'use strict';
+
+var st = new ShardingTest({ shards : 2, mongos : 1 });
 
 var mongos = st.s;
 var config = mongos.getDB("config");
 var coll = mongos.getCollection(jsTestName() + ".coll1");
 var shard0 = st.shard0;
 
-printjson(config.adminCommand({enableSharding : coll.getDB() + ""}));
+assert.commandWorked(config.adminCommand({enableSharding : coll.getDB() + ""}));
 st.ensurePrimaryShard(coll.getDB().getName(), 'shard0000');
-printjson(config.adminCommand({shardCollection : "" + coll, key : {a : 1}}));
+assert.commandWorked(config.adminCommand({shardCollection : "" + coll, key : {a : 1}}));
 
 var getDirectShardedConn = function( st, collName ) {
 
@@ -29,8 +29,7 @@ var getDirectShardedConn = function( st, collName ) {
                        shard: 'shard0000',
                        versionEpoch : maxChunk.lastmodEpoch };
 
-    printjson( ssvInitCmd );
-
+    printjson(ssvInitCmd);
     assert.commandWorked( shardConnWithVersion.getDB( "admin" ).runCommand( ssvInitCmd ) );
 
     return shardConnWithVersion;
@@ -73,5 +72,6 @@ assert.writeOK(shard0Coll.save({ _id: 2, a: { c: 1, b: 1 }}));
 assert.writeError(shard0Coll.update({}, { $unset: { "a.c": 1 }}));
 assert.writeError(shard0Coll.update({}, { $unset: { "a.b": 1, "a.c": 1 }}));
 
-jsTest.log("DONE!"); // distinguishes shutdown failures
 st.stop();
+
+})();

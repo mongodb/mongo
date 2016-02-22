@@ -41,7 +41,8 @@ jsTest.log("Moving a bunch of chunks to stack cleanup...");
 
 // Move a bunch of chunks, but don't close the cursor so they stack.
 for (var i = 0; i < numChunks; i++) {
-    printjson(mongos.adminCommand({ moveChunk : coll + "", find : { _id : i }, to : shards[1]._id }));
+    assert.commandWorked(
+        mongos.adminCommand({ moveChunk : coll + "", find : { _id : i }, to : shards[1]._id }));
 }
 
 jsTest.log("Dropping and re-creating collection...");
