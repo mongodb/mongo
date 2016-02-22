@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	KERBEROS_DIAL_TIMEOUT             = time.Second * 3
 	KERBEROS_AUTHENTICATION_MECHANISM = "GSSAPI"
 )
 
@@ -30,7 +29,7 @@ func (self *KerberosDBConnector) Configure(opts options.ToolOptions) error {
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:          connectionAddrs,
-		Timeout:        KERBEROS_DIAL_TIMEOUT,
+		Timeout:        time.Duration(opts.HiddenOptions.DialTimeoutSeconds) * time.Second,
 		Direct:         opts.Direct,
 		ReplicaSetName: opts.ReplicaSetName,
 

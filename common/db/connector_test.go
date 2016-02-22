@@ -26,12 +26,15 @@ func TestVanillaDBConnector(t *testing.T) {
 					Host: "host1,host2",
 					Port: "20000",
 				},
+				HiddenOptions: &options.HiddenOptions{
+					DialTimeoutSeconds: options.DefaultDialTimeoutSeconds,
+				},
 				Auth: &options.Auth{},
 			}
 			So(connector.Configure(opts), ShouldBeNil)
 			So(connector.dialInfo.Addrs, ShouldResemble,
 				[]string{"host1:20000", "host2:20000"})
-			So(connector.dialInfo.Timeout, ShouldResemble, DefaultDialTimeout)
+			So(connector.dialInfo.Timeout, ShouldResemble, options.DefaultDialTimeoutSeconds)
 
 		})
 
@@ -44,6 +47,9 @@ func TestVanillaDBConnector(t *testing.T) {
 				Connection: &options.Connection{
 					Host: "localhost",
 					Port: DefaultTestPort,
+				},
+				HiddenOptions: &options.HiddenOptions{
+					DialTimeoutSeconds: options.DefaultDialTimeoutSeconds,
 				},
 				Auth: &options.Auth{},
 			}
@@ -89,6 +95,9 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 					Host: "localhost",
 					Port: DefaultTestPort,
 				},
+				HiddenOptions: &options.HiddenOptions{
+					DialTimeoutSeconds: options.DefaultDialTimeoutSeconds,
+				},
 				Auth: &options.Auth{},
 			}
 			So(connector.Configure(opts), ShouldBeNil)
@@ -111,6 +120,9 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 				Connection: &options.Connection{
 					Host: "localhost",
 					Port: DefaultTestPort,
+				},
+				HiddenOptions: &options.HiddenOptions{
+					DialTimeoutSeconds: options.DefaultDialTimeoutSeconds,
 				},
 				Auth: &options.Auth{
 					Username: "cAdmin",
