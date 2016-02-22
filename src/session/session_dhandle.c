@@ -360,10 +360,32 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
  */
 static int
 __session_find_shared_dhandle(WT_SESSION_IMPL *session,
-    const char *uri, const char *checkpoint, uint32_t flags)
+    WT_DATA_HANDLE_CACHE **dhandle_cachep, const char *uri,
+    const char *checkpoint, uint32_t flags)
 {
 	WT_RET(__wt_conn_dhandle_find(session, uri, checkpoint, flags));
-	(void)__wt_atomic_add32(&session->dhandle->session_ref, 1);
+	WT_RET(__session_add_dhandle(session, dhandle_cachep));
+	return (0);
+}
+
+/*
+ * __session_get_shared_dhandle --
+ *	Open a data handle and add it to the connection cache. Bump the
+ *	reference
+ *	cache.  Since the data handle isn't locked, this must be called holding
+ *	the handle list lock, and we must increment the handle's reference
+ *	count before releasing it.
+ */
+static int
+__session_get_shared_dhandle(WT_SESSION_IMPL *session,
+    WT_DATA_HANDLE_CACHE **dhandle_cachep, const char *uri,
+    const char *checkpoint, const char *cfg[], uint32_t flags)
+{
+
+	WT_RET(__wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
+	/* Bump the reference count when opening the file for the first time */
+	if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
+		WT_RET(__session_add_dhandle(session, dhandle_cachep));
 	return (0);
 }
 
@@ -394,7 +416,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 */
 		WT_WITH_HANDLE_LIST_LOCK(session, ret =
 		    __session_find_shared_dhandle(
-		    session, uri, checkpoint, flags));
+		    session, &dhandle_cache, uri, checkpoint, flags));
 		dhandle = (ret == 0) ? session->dhandle : NULL;
 		WT_RET_NOTFOUND_OK(ret);
 	}
@@ -419,6 +441,12 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		    F_ISSET(session,
 		    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_TABLE)))
 			return (ret);
+
+		/*
+		 * If we retrieved a dhandle it needs to have been added to
+		 * our session cache already.
+		 */
+		WT_ASSERT(session, dhandle_cache != NULL);
 
 		/* If we found the handle and it isn't dead, reopen it. */
 		if (is_dead) {
@@ -445,7 +473,8 @@ retry:	is_dead = 0;
 	    WT_WITH_HANDLE_LIST_LOCK(session, ret =
 		(is_dead = (dhandle != NULL &&
 		    F_ISSET(dhandle, WT_DHANDLE_DEAD))) ?
-		0 : __wt_conn_btree_get(session, uri, checkpoint, cfg, flags)));
+		0 : __session_get_shared_dhandle(
+		session, &dhandle_cache, uri, checkpoint, cfg, flags)));
 
 	if (is_dead) {
 		if (dhandle_cache != NULL)
@@ -456,9 +485,6 @@ retry:	is_dead = 0;
 		goto retry;
 	}
 	WT_RET(ret);
-
-	if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
-		WT_RET(__session_add_dhandle(session, NULL));
 
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 	    (F_ISSET(session->dhandle, WT_DHANDLE_OPEN) &&
