@@ -33,14 +33,12 @@
 #include "mongo/db/repl/reporter.h"
 #include "mongo/util/log.h"
 
-#include "mongo/db/repl/replication_executor.h"
-
 namespace mongo {
 namespace repl {
 
 using executor::RemoteCommandRequest;
 
-Reporter::Reporter(ReplicationExecutor* executor,
+Reporter::Reporter(executor::TaskExecutor* executor,
                    PrepareReplSetUpdatePositionCommandFn prepareOldReplSetUpdatePositionCommandFn,
                    const HostAndPort& target)
     : _executor(executor),
@@ -49,7 +47,7 @@ Reporter::Reporter(ReplicationExecutor* executor,
       _status(Status::OK()),
       _willRunAgain(false),
       _active(false) {
-    uassert(ErrorCodes::BadValue, "null replication executor", executor);
+    uassert(ErrorCodes::BadValue, "null task executor", executor);
     uassert(ErrorCodes::BadValue,
             "null function to create replSetUpdatePosition command object",
             prepareOldReplSetUpdatePositionCommandFn);
@@ -74,7 +72,7 @@ void Reporter::cancel() {
 }
 
 void Reporter::wait() {
-    ReplicationExecutor::CallbackHandle handle;
+    executor::TaskExecutor::CallbackHandle handle;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (!_active) {
@@ -114,7 +112,7 @@ Status Reporter::_schedule_inlock() {
                       "Reporter failed to create replSetUpdatePositionCommand command.");
     }
     auto cmdObj = prepareResult.getValue();
-    StatusWith<ReplicationExecutor::CallbackHandle> scheduleResult =
+    StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
             RemoteCommandRequest(_target, "admin", cmdObj),
             stdx::bind(&Reporter::_callback, this, stdx::placeholders::_1));
@@ -132,7 +130,7 @@ Status Reporter::_schedule_inlock() {
     return Status::OK();
 }
 
-void Reporter::_callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd) {
+void Reporter::_callback(const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     _status = rcbd.response.getStatus();

@@ -31,7 +31,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -49,7 +49,7 @@ public:
      */
     using PrepareReplSetUpdatePositionCommandFn = stdx::function<StatusWith<BSONObj>()>;
 
-    Reporter(ReplicationExecutor* executor,
+    Reporter(executor::TaskExecutor* executor,
              PrepareReplSetUpdatePositionCommandFn prepareOldReplSetUpdatePositionCommandFn,
              const HostAndPort& target);
     virtual ~Reporter();
@@ -99,10 +99,10 @@ private:
     /**
      * Callback for remote command.
      */
-    void _callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd);
+    void _callback(const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd);
 
     // Not owned by us.
-    ReplicationExecutor* _executor;
+    executor::TaskExecutor* _executor;
 
     // Prepares update command object.
     PrepareReplSetUpdatePositionCommandFn _prepareOldReplSetUpdatePositionCommandFn;
@@ -113,7 +113,7 @@ private:
     // Protects member data of this Reporter.
     mutable stdx::mutex _mutex;
 
-    // Stores the most recent Status returned from the ReplicationExecutor.
+    // Stores the most recent Status returned from the executor.
     Status _status;
 
     // _willRunAgain is true when Reporter is scheduled to be run by the executor and subsequent
@@ -123,7 +123,7 @@ private:
     bool _active;
 
     // Callback handle to the scheduled remote command.
-    ReplicationExecutor::CallbackHandle _remoteCommandCallbackHandle;
+    executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
 };
 
 }  // namespace repl

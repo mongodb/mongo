@@ -528,7 +528,7 @@ env.CppUnitTest(
     source='reporter_test.cpp',
     LIBDEPS=[
         'reporter',
-        'replication_executor_test_fixture',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],
 )
 
