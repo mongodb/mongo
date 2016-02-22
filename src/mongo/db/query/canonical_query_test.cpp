@@ -28,6 +28,7 @@
 
 #include "mongo/db/query/canonical_query.h"
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -162,6 +163,27 @@ TEST(CanonicalQueryTest, IsValidText) {
         "    ]}"
         "]}",
         *lpq));
+}
+
+TEST(CanonicalQueryTest, IsValidTextTailable) {
+    // Passes in default values for LiteParsedQuery.
+    // Filter inside LiteParsedQuery is not used.
+    int options = QueryOption_CursorTailable;
+    unique_ptr<LiteParsedQuery> lpq(assertGet(LiteParsedQuery::makeAsOpQuery(nss,
+                                                                             0,
+                                                                             0,
+                                                                             options,
+                                                                             BSONObj(),
+                                                                             BSONObj(),
+                                                                             BSONObj(),
+                                                                             BSONObj(),
+                                                                             BSONObj(),
+                                                                             BSONObj(),
+                                                                             false,
+                                                                             false)));
+
+    // Invalid: TEXT and tailable.
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
 }
 
 TEST(CanonicalQueryTest, IsValidGeo) {
