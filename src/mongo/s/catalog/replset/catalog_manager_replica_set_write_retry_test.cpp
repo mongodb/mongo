@@ -37,6 +37,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -159,11 +160,11 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMatch) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[1]);
-        configTargeter()->setFindHostReturnValue({kTestHosts[2]});
         return Status(ErrorCodes::DuplicateKey, "Duplicate key");
     });
 
     onFindCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kTestHosts[1]);
         auto query =
             assertGet(LiteParsedQuery::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
         ASSERT_EQ(BSON("_id" << 1), query->getFilter());
@@ -194,11 +195,11 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorNotFound) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[1]);
-        configTargeter()->setFindHostReturnValue({kTestHosts[2]});
         return Status(ErrorCodes::DuplicateKey, "Duplicate key");
     });
 
     onFindCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kTestHosts[1]);
         auto query =
             assertGet(LiteParsedQuery::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
         ASSERT_EQ(BSON("_id" << 1), query->getFilter());
@@ -229,17 +230,72 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, kTestHosts[1]);
-        configTargeter()->setFindHostReturnValue({kTestHosts[2]});
         return Status(ErrorCodes::DuplicateKey, "Duplicate key");
     });
 
     onFindCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kTestHosts[1]);
         auto query =
             assertGet(LiteParsedQuery::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
         ASSERT_EQ(BSON("_id" << 1), query->getFilter());
 
         return vector<BSONObj>{BSON("_id" << 1 << "Value"
                                           << "TestValue has changed")};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
+    configTargeter()->setFindHostReturnValue({kTestHosts[0]});
+
+    BSONObj objToInsert = BSON("_id" << 1 << "Value"
+                                     << "TestValue");
+
+    auto future = launchAsync([&] {
+        Status status = catalogManager()->insertConfigDocument(
+            operationContext(), kTestNamespace.ns(), objToInsert);
+        ASSERT_OK(status);
+    });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        BatchedInsertRequest actualBatchedInsert;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedInsert.getNS().ns());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setN(1);
+
+        auto wcError = std::make_unique<WCErrorDetail>();
+
+        WriteConcernResult wcRes;
+        wcRes.err = "timeout";
+        wcRes.wTimedOut = true;
+
+        Status wcStatus(ErrorCodes::NetworkTimeout, "Failed to wait for write concern");
+        wcError->setErrCode(wcStatus.code());
+        wcError->setErrMessage(wcStatus.reason());
+        wcError->setErrInfo(BSON("wtimeout" << true));
+
+        response.setWriteConcernError(wcError.release());
+
+        return response.toBSON();
+    });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kTestHosts[0]);
+        return Status(ErrorCodes::DuplicateKey, "Duplicate key");
+    });
+
+    onFindCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kTestHosts[0]);
+        auto query =
+            assertGet(LiteParsedQuery::makeFromFindCommand(kTestNamespace, request.cmdObj, false));
+        ASSERT_EQ(BSON("_id" << 1), query->getFilter());
+
+        return vector<BSONObj>{objToInsert};
     });
 
     future.timed_get(kFutureTimeout);
@@ -266,8 +322,6 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
         ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
 
         BatchedCommandResponse response;
-        response.setOk(true);
-        response.setNModified(0);
 
         auto writeErrDetail = stdx::make_unique<WriteErrorDetail>();
         writeErrDetail->setIndex(0);
@@ -287,6 +341,62 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
         BatchedCommandResponse response;
         response.setOk(true);
         response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(UpdateRetryTest, WriteConcernFailure) {
+    configTargeter()->setFindHostReturnValue({kTestHosts[0]});
+
+    BSONObj objToUpdate = BSON("_id" << 1 << "Value"
+                                     << "TestValue");
+    BSONObj updateExpr = BSON("$set" << BSON("Value"
+                                             << "NewTestValue"));
+
+    auto future = launchAsync([&] {
+        auto status = catalogManager()->updateConfigDocument(
+            operationContext(), kTestNamespace.ns(), objToUpdate, updateExpr, false);
+        ASSERT_OK(status);
+    });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        BatchedUpdateRequest actualBatchedUpdate;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setNModified(1);
+
+        auto wcError = std::make_unique<WCErrorDetail>();
+
+        WriteConcernResult wcRes;
+        wcRes.err = "timeout";
+        wcRes.wTimedOut = true;
+
+        Status wcStatus(ErrorCodes::NetworkTimeout, "Failed to wait for write concern");
+        wcError->setErrCode(wcStatus.code());
+        wcError->setErrMessage(wcStatus.reason());
+        wcError->setErrInfo(BSON("wtimeout" << true));
+
+        response.setWriteConcernError(wcError.release());
+
+        return response.toBSON();
+    });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        BatchedUpdateRequest actualBatchedUpdate;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(kTestNamespace.ns(), actualBatchedUpdate.getNS().ns());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setNModified(0);
 
         return response.toBSON();
     });
