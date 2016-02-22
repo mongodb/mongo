@@ -55,6 +55,8 @@ class test_compact02(wttest.WiredTigerTestCase):
     fileConfig = [
         ('default', dict(fileConfig='')),
         ('8KB', dict(fileConfig='leaf_page_max=8kb')),
+        ('64KB', dict(fileConfig='leaf_page_max=64KB')),
+        ('128KB', dict(fileConfig='leaf_page_max=128KB')),
     ]
     scenarios = \
         number_scenarios(multiply_scenarios('.', types, cacheSize, fileConfig))
