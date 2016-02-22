@@ -30,11 +30,14 @@
 
 GLOBAL g;
 
+static void format_die(void);
 static void startup(void);
 static void usage(void);
 
 extern int __wt_optind;
 extern char *__wt_optarg;
+
+void (*custom_die)(void) = format_die;		/* Local death handler. */
 
 int
 main(int argc, char *argv[])
@@ -45,8 +48,6 @@ main(int argc, char *argv[])
 
 	config = NULL;
 
-	/* Register a fatal cleanup handler */
-	custom_die = format_die;
 #ifdef _WIN32
 	g.progname = "t_format.exe";
 #else
@@ -310,7 +311,7 @@ startup(void)
  * die --
  *	Report an error, dumping the configuration.
  */
-void
+static void
 format_die(void)
 {
 	/*

@@ -55,6 +55,8 @@ void usage(void);
 extern char *__wt_optarg;
 extern int __wt_optind;
 
+void (*custom_die)(void) = NULL;
+
 int
 main(int argc, char *argv[])
 {
