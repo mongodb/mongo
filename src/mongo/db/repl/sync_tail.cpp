@@ -170,14 +170,35 @@ namespace {
 
 class ApplyBatchFinalizer {
 public:
-    ApplyBatchFinalizer(ReplicationCoordinator* replCoord);
-    ~ApplyBatchFinalizer();
+    ApplyBatchFinalizer(ReplicationCoordinator* replCoord) : _replCoord(replCoord) {}
+    virtual ~ApplyBatchFinalizer(){};
 
-    /**
-     * In PV0, calls ReplicationCoordinator::setMyLastOptime with "newOp".
-     * In PV1, sets _latestOpTime to be "newOp" and signals the _waiterThread.
-     */
-    void record(OpTime newOp);
+    virtual void record(const OpTime& newOpTime) {
+        _recordApplied(newOpTime);
+    };
+
+protected:
+    void _recordApplied(const OpTime& newOpTime) {
+        _replCoord->setMyLastAppliedOpTimeForward(newOpTime);
+    }
+
+    void _recordDurable(const OpTime& newOpTime) {
+        _replCoord->setMyLastDurableOpTimeForward(newOpTime);
+    }
+
+private:
+    // Used to update the replication system's progress.
+    ReplicationCoordinator* _replCoord;
+};
+
+class ApplyBatchFinalizerForJournal : public ApplyBatchFinalizer {
+public:
+    ApplyBatchFinalizerForJournal(ReplicationCoordinator* replCoord)
+        : ApplyBatchFinalizer(replCoord),
+          _waiterThread{&ApplyBatchFinalizerForJournal::_run, this} {};
+    ~ApplyBatchFinalizerForJournal();
+
+    void record(const OpTime& newOpTime) override;
 
 private:
     /**
@@ -187,8 +208,6 @@ private:
      */
     void _run();
 
-    // Used to update the replication system's progress.
-    ReplicationCoordinator* _replCoord;
     // Protects _cond, _shutdownSignaled, and _latestOpTime.
     stdx::mutex _mutex;
     // Used to alert our thread of a new OpTime.
@@ -196,17 +215,12 @@ private:
     // The next OpTime to set as the ReplicationCoordinator's lastOpTime after flushing.
     OpTime _latestOpTime;
     // Once this is set to true the _run method will terminate.
-    bool _shutdownSignaled;
+    bool _shutdownSignaled = false;
     // Thread that will _run(). Must be initialized last as it depends on the other variables.
     stdx::thread _waiterThread;
 };
 
-ApplyBatchFinalizer::ApplyBatchFinalizer(ReplicationCoordinator* replCoord)
-    : _replCoord(replCoord),
-      _shutdownSignaled(false),
-      _waiterThread(&ApplyBatchFinalizer::_run, this) {}
-
-ApplyBatchFinalizer::~ApplyBatchFinalizer() {
+ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _shutdownSignaled = true;
     _cond.notify_all();
@@ -215,18 +229,18 @@ ApplyBatchFinalizer::~ApplyBatchFinalizer() {
     _waiterThread.join();
 }
 
-void ApplyBatchFinalizer::record(OpTime newOp) {
+void ApplyBatchFinalizerForJournal::record(const OpTime& newOpTime) {
     // We have to use setMyLastAppliedOpTimeForward since this thread races with
     // logTransitionToPrimaryToOplog.
-    _replCoord->setMyLastAppliedOpTimeForward(newOp);
+    _recordApplied(newOpTime);
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _latestOpTime = newOp;
+    _latestOpTime = newOpTime;
     _cond.notify_all();
 }
 
-void ApplyBatchFinalizer::_run() {
-    Client::initThread("ApplyBatchFinalizer");
+void ApplyBatchFinalizerForJournal::_run() {
+    Client::initThread("ApplyBatchFinalizerForJournal");
 
     while (true) {
         OpTime latestOpTime;
@@ -250,7 +264,7 @@ void ApplyBatchFinalizer::_run() {
         txn->recoveryUnit()->waitUntilDurable();
         // We have to use setMyLastDurableOpTimeForward since this thread races with
         // logTransitionToPrimaryToOplog.
-        _replCoord->setMyLastDurableOpTimeForward(latestOpTime);
+        _recordDurable(latestOpTime);
     }
 }
 }  // anonymous namespace containing ApplyBatchFinalizer definitions.
@@ -708,7 +722,10 @@ void SyncTail::oplogApplication() {
 
     OperationContextImpl txn;
     auto replCoord = ReplicationCoordinator::get(&txn);
-    ApplyBatchFinalizer finalizer(replCoord);
+    std::unique_ptr<ApplyBatchFinalizer> finalizer{
+        getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()
+            ? new ApplyBatchFinalizerForJournal(replCoord)
+            : new ApplyBatchFinalizer(replCoord)};
 
     auto minValidBoundaries = getMinValid(&txn);
     OpTime originalEndOpTime(minValidBoundaries.end);
@@ -803,7 +820,7 @@ void SyncTail::oplogApplication() {
         setMinValid(&txn, end, DurableRequirement::None);
         minValidBoundaries.start = {};
         minValidBoundaries.end = end;
-        finalizer.record(lastWriteOpTime);
+        finalizer->record(lastWriteOpTime);
     }
 }
 

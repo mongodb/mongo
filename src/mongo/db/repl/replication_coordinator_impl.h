@@ -513,6 +513,9 @@ private:
         Date_t lastUpdate =
             Date_t::max();  // The last time we heard from this node; used for liveness detection
         bool down = false;  // Indicator set when lastUpdate time exceeds the election timeout.
+
+        BSONObj toBSON() const;
+        std::string toString() const;
     };
 
     typedef std::vector<SlaveInfo> SlaveInfoVector;
@@ -767,33 +770,18 @@ private:
                                  long long* configVersion);
 
     /**
-     * Helper method for setMyLastAppliedOptime that takes in a unique lock on
-     * _mutex.  The passed in lock must already be locked.  It is unspecified what state the
-     * lock will be in after this method finishes.
+     * This function will report our position externally (like upstream) if necessary.
      *
-     * This function has the same rules for "opTime" as setMyLastAppliedOptime(), unless
-     * "isRollbackAllowed" is true.
+     * Takes in a unique lock, that must already be locked, on _mutex.
      *
-     * This function will also report our position externally (like upstream) if necessary.
+     * NOTE: It is unspecified what state the lock will be in after this method finishes.
      */
-    void _setMyLastAppliedOpTimeAndReport_inlock(stdx::unique_lock<stdx::mutex>* lock,
-                                                 const OpTime& opTime,
-                                                 bool isRollbackAllowed);
-    void _setMyLastAppliedOpTime_inlock(const OpTime& opTime, bool isRollbackAllowed);
+    void _reportUpstream_inlock(stdx::unique_lock<stdx::mutex>* lock);
 
     /**
-     * Helper method for setMyLastDurableOptime that takes in a unique lock on
-     * _mutex.  The passed in lock must already be locked.  It is unspecified what state the
-     * lock will be in after this method finishes.
-     *
-     * This function has the same rules for "opTime" as setMyLastDurableOptime(), unless
-     * "isRollbackAllowed" is true.
-     *
-     * This function will also report our position externally (like upstream) if necessary.
+     * Helpers to set the last applied and durable OpTime.
      */
-    void _setMyLastDurableOpTimeAndReport_inlock(stdx::unique_lock<stdx::mutex>* lock,
-                                                 const OpTime& opTime,
-                                                 bool isRollbackAllowed);
+    void _setMyLastAppliedOpTime_inlock(const OpTime& opTime, bool isRollbackAllowed);
     void _setMyLastDurableOpTime_inlock(const OpTime& opTime, bool isRollbackAllowed);
 
     /**
