@@ -130,6 +130,11 @@ class MasterSlaveFixture(interface.ReplFixture):
 
         client = utils.new_mongo_client(self.port)
 
+        self.logger.info("Starting fsync on master on port %d to flush all pending writes",
+                         self.port)
+        client.fsync()
+        self.logger.info("fsync on master completed")
+
         # We verify that each database has replicated to the slave because in the case of an initial
         # sync, the slave may acknowledge writes to one database before it has finished syncing
         # others.

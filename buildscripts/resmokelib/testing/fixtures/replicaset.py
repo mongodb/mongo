@@ -152,10 +152,16 @@ class ReplicaSetFixture(interface.ReplFixture):
         return self.nodes[1:]
 
     def await_repl(self):
+        client = utils.new_mongo_client(port=self.port)
+
+        self.logger.info("Starting fsync on primary on port %d to flush all pending writes",
+                         self.port)
+        client.fsync()
+        self.logger.info("fsync on primary completed")
+
         self.logger.info("Awaiting replication of insert (w=%d, wtimeout=%d min) to primary on port"
                          " %d", self.num_nodes, interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS,
                          self.port)
-        client = utils.new_mongo_client(port=self.port)
 
         # Keep retrying this until it times out waiting for replication.
         def insert_fn(remaining_secs):
