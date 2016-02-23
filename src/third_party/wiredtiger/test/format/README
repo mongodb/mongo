@@ -1,0 +1,11 @@
+The test/format program randomly generates WiredTiger databases with
+different configurations and different size objects and then does
+operations on those files.  The goal is to test the WiredTiger file
+formats.
+
+test/format should be linked with a version of Berkeley DB (which it
+uses to verify format's results).  Use the configuration option
+--with-berkeleydb=DIR to specify the top-level of an installed Berkeley
+DB distribution directory, for example:
+
+	--with-berkeleydb=/usr/local/BerkeleyDB.5.3

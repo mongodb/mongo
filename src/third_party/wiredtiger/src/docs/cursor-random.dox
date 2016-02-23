@@ -1,0 +1,16 @@
+/*! @m_page{{c,java},cursor_random,Cursor random}
+
+The \c next_random configuration to the WT_SESSION::open_cursor method
+configures the cursor to return a pseudo-random record from a row-store
+object.
+
+The ability to return a random record was added to support a particular
+application, and as a result has somewhat unusual semantics.  First, the
+returned record may not be random at all in the case of objects with only a few
+rows (especially when the object has never been written to the backing store).
+In such objects, the WT_CURSOR::next method for cursors configured with \c
+next_random may return the same row on each call.  Additionally, even in larger
+objects, the WT_CURSOR::next method usually returns the first record from a
+random page in the underlying file, not a random record from a random page.
+
+ */

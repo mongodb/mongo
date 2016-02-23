@@ -1,0 +1,55 @@
+/*! @page custom_collators Custom Collators
+
+@section custom_collators_intro Introduction to Custom Collators
+
+WiredTiger tables order records based on their keys.  Cursors traverse
+records in key order using WT_CURSOR::next, or in reverse order using
+WT_CURSOR::prev.  By default, WiredTiger uses lexicographic ordering, by
+comparing the raw bytes of each key to determine their order.
+
+The built-in encoding of types (including integers and strings) is designed
+to make lexicographic ordering match the natural ordering, including when
+the key consists of multiple columns, each of which can be a different
+type.
+
+Applications that need custom ordering of keys can either change the
+serialized representation so that the lexicographic order matches the
+required order, or implement the WT_COLLATOR interface to change the
+comparison routine that WiredTiger uses.
+
+Applications must register their WT_COLLATOR implementations using
+WT_CONNECTION::add_collator.  They are then configured by passing
+\c "collator=..." to WT_SESSION::create when creating a table or index.
+
+See @ex_ref{ex_extending.c} for more details about how to implement custom
+collators.
+
+@section custom_collators_recovery Custom Collators and Recovery
+
+If logging is enabled, WiredTiger will run recovery as required in
+::wiredtiger_open.  Any custom collators in use must be registered before
+recovery runs.  This is described in more detail in
+@ref extensions_recovery.
+
+@section custom_collators_indices Custom Collators for Indices
+
+Custom collators can be used with indices, but they must take into account
+how WiredTiger indices are implemented.  The primary key columns are
+implicitly appended to the logical index key columns in order to create the
+key that is stored in the index.  This is done so that the key stored in
+the index is unique even when multiple records have the same values for the
+index key columns.
+
+A collator must give an unambiguous ordering to records in the index, so it
+must use the primary key columns as well as the index columns when
+comparing two index records.
+
+What this means in practice is that if the table has \c key_format=r and
+the index is on a string column, then the index cursor will have
+\c key_format=S, but the actual keys stored in the index will have
+\c key_format=Sr (with the primary key appended).
+
+Collators usually call ::wiredtiger_struct_unpack with the appropriate
+format to split the index key into fields that are used for the comparison.
+
+*/

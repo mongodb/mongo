@@ -1,0 +1,114 @@
+/*! @page architecture WiredTiger Architecture
+
+The WiredTiger data engine is a high performance, scalable, transactional,
+production quality, open source, NoSQL data engine, created to maximize the
+value of each computer you buy:
+
+- WiredTiger offers both low latency and high throughput (in-cache reads
+require no latching, writes typically require a single latch),
+
+- WiredTiger handles data sets much larger than RAM without performance
+or resource degradation,
+
+- WiredTiger has predictable behavior under heavy access and large
+volumes of data,
+
+- WiredTiger offers transactional semantics without blocking,
+
+- WiredTiger stores are not corrupted by torn writes, reverting to the
+last checkpoint after system failure,
+
+- WiredTiger supports petabyte tables, records up to 4GB, and record
+numbers up to 64-bits.
+
+WiredTiger's design is focused on a few core principles:
+
+@section multi_core Multi-core scaling
+
+WiredTiger scales on modern, multi-CPU architectures.  Using a variety of
+programming techniques such as hazard pointers, lock-free algorithms, fast
+latching and message passing, WiredTiger performs more work per CPU core than
+alternative engines.
+
+WiredTiger's transactions use optimistic concurrency control algorithms that
+avoid the bottleneck of a centralized lock manager.  Transactional operations
+in one thread do not block operations in other threads, but strong isolation is
+provided and update conflicts are detected to preserve data consistency.
+
+@section cache Hot caches
+
+WiredTiger supports both row-oriented storage (where all columns of a
+row are stored together), and column-oriented storage (where groups of
+columns are stored in separate files), resulting in more efficient
+memory use.  When reading and writing column-stores, only the columns
+required for any particular query are maintained in memory.
+Column-store keys are derived from the value's location in the table
+rather than being physically stored in the table, further minimizing
+memory requirements.  Finally, row-and column-stores can be
+mixed-and-matched at the table level: for example, a row-store index can
+be created on a column-store table.
+
+WiredTiger supports @ref lsm, where updates are buffered in small files
+that fit in cache for fast random updates, then automatically merged into
+larger files in the background so that read latency approaches that of
+traditional Btree files.  LSM trees automatically create Bloom filters to
+avoid unnecessary reads from files that cannot containing matching keys.
+
+WiredTiger supports different-sized Btree internal and leaf pages in the
+same file.  Applications can maximize the amount of data transferred in
+each I/O by configuring large leaf pages, and still minimize CPU cache
+misses when searching the tree.
+
+WiredTiger supports key prefix compression and value dictionaries,
+reducing the amount of memory keys and values require.
+
+WiredTiger supports static encoding with a configurable Huffman engine,
+which typically reduces the amount of information maintained in memory
+by 20-50%.
+
+@section io Making I/O more valuable
+
+WiredTiger uses compact file formats to minimize on-disk overhead.
+WiredTiger does not store page content indexing information on disk,
+instead, WiredTiger instantiates content indexing information either
+when pages are read from disk or on demand.  This simplifies the on-disk
+file format and in the case of small key/value pairs, typically reduces
+the amount of information written to disk by 20-50%.
+
+WiredTiger supports variable-length pages, meaning there is less wasted
+space for large objects, and no need for compaction as pages grow and
+shrink naturally when key/value pairs are inserted or deleted.
+
+WiredTiger supports block compression on table pages.  Because
+WiredTiger supports variable-length pages, pages do not have to shrink
+by a fixed amount in order to benefit from block compression.  Block
+compression is selectable on a per-table basis, allowing applications
+to choose the compression algorithm most appropriate for their data.
+Block compression typically reduces the amount of information written
+to disk by 30-80%.
+
+WiredTiger supports leaf pages of up to 512MB in size.  Disk seeks are
+less likely when reading large amounts of data from disk, significantly
+improving table scan performance.
+
+Also, as noted in the @ref cache section, WiredTiger supports
+column-store formats, prefix compression and static encoding.  While
+each of these features makes WiredTiger's use of memory more efficient,
+they also maximize the amount of useful data transferred per disk I/O.
+
+@section quality Production quality
+
+WiredTiger is production quality, supported software, engineered for the
+most demanding application environments.  For example, as a no-overwrite
+data engine, torn writes can never corrupt a WiredTiger data store.
+
+WiredTiger includes verification support so you can verify data sets,
+and salvage support as a last-ditch protection: data can be retrieved
+even if it somehow becomes corrupted.
+
+@section nosql NoSQL and Open Source
+
+WiredTiger is an Open Source, NoSQL data engine.  See the @ref license
+for details.
+
+*/

@@ -1,0 +1,28 @@
+/*! @page processes Sharing Between Processes
+
+@notyet{inter-process sharing}
+
+WiredTiger includes a server that provides remote access to databases.  The primary process to open a database can optionally start a server that handles requests from other processes.
+
+The remote interface is the way languages other than C/C++ are supported, and the interface for client processes in multiprocess C/C++ applications.
+
+The server can be embedded in an application or run from the command line.  To embed the RPC server in your application, pass <code>"multiprocess"</code> in the configuration string to ::wiredtiger_open.  Note that in this case, when your application exits, all client connections are forcibly closed.
+
+For details on running a standalone RPC server, see @ref utility.
+
+@section processes_sharing Opening connections from multiple processes
+
+When ::wiredtiger_open is called for a database, one of the following occurs:
+
+# no process has the database open, it was closed cleanly.  In this case, the opening process becomes the primary process and the database is opened without recovery.
+# no process has the database open, but it was not closed cleanly.  In this case, the process becomes the primary and recovery is run before the database is opened.  See @ref transaction_recovery for details.
+# another process has the database open and is running the RPC server, in which case the opening process becomes a client.
+# another process has the database open but is not running the RPC server, in which case the open fails.
+
+@section processes_example Code samples
+
+The code below is taken from the complete example program @ex_ref{ex_process.c}.
+
+@snippet ex_process.c processes
+
+ */

@@ -1,0 +1,493 @@
+---------------------
+subunit release notes
+---------------------
+
+NEXT (In development)
+---------------------
+
+0.0.16
+------
+
+BUG FIXES
+~~~~~~~~~
+
+* Perl files should now honour perl system config.
+  (Benedikt Morbach, #1233198)
+
+* Python 3.1 and 3.2 have an inconsistent memoryview implementation which
+  required a workaround for NUL byte detection. (Robert Collins, #1216246)
+
+* The test suite was failing 6 tests due to testtools changing it's output
+  formatting of exceptions. (Robert Collins)
+
+* V2 parser errors now set appropriate mime types for the encapsulated packet
+  data and the error message. (Robert Collins)
+
+* When tests fail to import ``python subunit.run -l ...`` will now write a 
+  subunit file attachment listing the failed imports and exit 2, rather than
+  listing the stub objects from the importer and exiting 0.
+  (Robert Collins, #1245672)
+
+IMPROVEMENTS
+~~~~~~~~~~~~
+
+* Most filters will now accept a file path argument instead of only reading
+  from stdin. (Robert Collins, #409206)
+
+0.0.15
+------
+
+BUG FIXES
+~~~~~~~~~
+
+* Clients of subunit did not expect memoryview objects in StreamResult events.
+  (Robert Collins)
+
+* Memoryview and struct were mutually incompatible in 2.7.3 and 3.2.
+  (Robert Collins, #1216163)
+
+0.0.14
+------
+
+BUG FIXES
+~~~~~~~~~
+
+* Memoryview detection was broken and thus it's use was never really tested.
+  (Robert Collins, 1216101)
+
+* TestProtocol2's tag tests were set sort order dependent.
+  (Robert Collins, #1025392)
+
+* TestTestProtocols' test_tags_both was set sort order dependent.
+  (Robert Collins, #1025392)
+
+* TestTestProtocols' test_*_details were dictionary sort order dependent.
+  (Robert Collins, #1025392)
+
+* TestSubUnitTags's test_add_tag was also se sort order dependent.
+  (Robert Collins, #1025392)
+
+0.0.13
+------
+
+IMPROVEMENTS
+~~~~~~~~~~~~
+
+* subunit should now build with automake 1.11 again. (Robert Collins)
+
+* `subunit-stats` no longer outputs encapsulated stdout as subunit.
+  (Robert Collins, #1171987)
+
+* The logic for `subunit.run` is now importable via python -
+  `subunit.run.main`. (Robert Collins, #606770)
+
+BUG FIXES
+~~~~~~~~~
+
+* Removed GPL files that were (C) non Subunit Developers - they are
+  incompatible for binary distribution, which affects redistributors.
+  (Robert Collins, #1185591)
+
+0.0.12
+------
+
+BUG FIXES
+~~~~~~~~~
+
+* Subunit v2 packets with both file content and route code were not being
+  parsed correctly - they would incorrectly emit a parser error, due to trying
+  to parse the route code length from the first byes of the file content.
+  (Robert Collins, 1172815)
+
+0.0.11
+------
+
+v2 protocol draft included in this release. The v2 protocol trades off human
+readability for a massive improvement in robustness, the ability to represent
+concurrent tests in a single stream, cheaper parsing, and that provides
+significantly better in-line debugging support and structured forwarding
+of non-test data (such as stdout or stdin data).
+
+This change includes two new filters (subunit-1to2 and subunit-2to1). Use
+these filters to convert old streams to v2 and convert v2 streams to v1.
+
+All the other filters now only parse and emit v2 streams. V2 is still in
+draft format, so if you want to delay and wait for v2 to be finalised, you
+should use subunit-2to1 before any serialisation steps take place.
+With the ability to encapsulate multiple non-test streams, another significant
+cange is that filters which emit subunit now encapsulate any non-subunit they
+encounter, labelling it 'stdout'. This permits multiplexing such streams and
+detangling the stdout streams from each input.
+
+The subunit libraries (Python etc) have not changed their behaviour: they
+still emit v1 from their existing API calls. New API's are being added
+and applications should migrate once their language has those API's available.
+
+IMPROVEMENTS
+~~~~~~~~~~~~
+
+* ``subunit.run`` now replaces sys.stdout to ensure that stdout is unbuffered
+  - without this pdb output is not reliably visible when stdout is a pipe
+  as it usually is. (Robert Collins)
+
+* v2 protocol draft included in this release. (Python implementation only so
+  far). (Robert Collins)
+
+* Two new Python classes -- ``StreamResultToBytes`` and
+  ``ByteStreamToStreamResult`` handle v2 generation and parsing.
+  (Robert Collins)
+
+0.0.10
+------
+
+BUG FIXES
+~~~~~~~~~
+
+* make_stream_binary is now public for reuse. (Robert Collins)
+
+* NAME was not defined in the protocol BNF. (Robert Collins)
+
+* UnsupportedOperation is available in the Python2.6 io library, so ask
+  forgiveness rather than permission for obtaining it. (Robert Collins)
+
+* Streams with no fileno() attribute are now supported, but they are not
+  checked for being in binary mode: be sure to take care of that if using
+  the library yourself. (Robert Collins)
+
+0.0.9
+-----
+
+BUG FIXES
+~~~~~~~~~
+
+* All the source files are now included in the distribution tarball.
+  (Arfrever Frehtes Taifersar Arahesis, Robert Collins, #996275)
+
+* ``python/subunit/tests/test_run.py`` and ``python/subunit/filters.py`` were
+  not included in the 0.0.8 tarball. (Robert Collins)
+
+* Test ids which include non-ascii unicode characters are now supported.
+  (Robert Collins, #1029866)
+
+* The ``failfast`` option to ``subunit.run`` will now work. The dependency on
+  testtools has been raised to 0.9.23 to permit this.
+  (Robert Collins, #1090582)
+
+0.0.8
+-----
+
+IMPROVEMENTS
+~~~~~~~~~~~~
+
+* Perl module now correctly outputs "failure" instead of "fail".  (Stewart Smith)
+
+* Shell functions now output timestamps. (Stewart Smith, Robert Collins)
+
+* 'subunit2csv' script that converts subunit output to CSV format.
+  (Jonathan Lange)
+
+* ``TagCollapsingDecorator`` now correctly distinguishes between local and
+  global tags.  (Jonathan Lange)
+
+* ``TestResultFilter`` always forwards ``time:`` events.
+  (Benji York, Brad Crittenden)
+
+BUG FIXES
+~~~~~~~~~
+
+* Add 'subunit --no-xfail', which will omit expected failures from the subunit
+  stream. (John Arbash Meinel, #623642)
+
+* Add 'subunit -F/--only-genuine-failures' which sets all of '--no-skips',
+  '--no-xfail', '--no-passthrough, '--no-success', and gives you just the
+  failure stream. (John Arbash Meinel)
+
+* Python2.6 support was broken by the fixup feature.
+  (Arfrever Frehtes Taifersar Arahesis, #987490)
+
+* Python3 support regressed in trunk.
+  (Arfrever Frehtes Taifersar Arahesis, #987514)
+
+* Python3 support was insufficiently robust in detecting unicode streams.
+  (Robert Collins, Arfrever Frehtes Taifersar Arahesis)
+
+* Tag support has been implemented for TestProtocolClient.
+  (Robert Collins, #518016)
+
+* Tags can now be filtered. (Jonathan Lange, #664171)
+
+* Test suite works with latest testtools (but not older ones - formatting
+  changes only). (Robert Collins)
+
+0.0.7
+-----
+
+The Subunit Python test runner ``python -m subunit.run`` can now report the
+test ids and also filter via a test id list file thanks to improvements in
+``testtools.run``. See the testtools manual, or testrepository - a major
+user of such functionality.
+
+Additionally the protocol now has a keyword uxsuccess for Unexpected Success
+reporting. Older parsers will report tests with this status code as 'lost
+connection'.
+
+IMPROVEMENTS
+~~~~~~~~~~~~
+
+* Add ``TimeCollapsingDecorator`` which collapses multiple sequential time()
+  calls into just the first and last. (Jonathan Lange)
+
+* Add ``TagCollapsingDecorator`` which collapses many tags() calls into one
+  where possible. (Jonathan Lange, Robert Collins)
+
+* Force flush of writes to stdout in c/tests/test_child.
+  (Jelmer Vernooij, #687611)
+
+* Provisional Python 3.x support.
+  (Robert Collins, Tres Seaver, Martin[gz], #666819)
+
+* ``subunit.chunked.Decoder`` Python class takes a new ``strict`` option,
+  which defaults to ``True``. When ``False``, the ``Decoder`` will accept
+  incorrect input that is still unambiguous. i.e. subunit will not barf if
+  a \r is missing from the input. (Martin Pool)
+
+* ``subunit-filter`` preserves the relative ordering of ``time:`` statements,
+  so you can now use filtered streams to gather data about how long it takes
+  to run a test. (Jonathan Lange, #716554)
+
+* ``subunit-ls`` now handles a stream with time: instructions that start
+  partway through the stream (which may lead to strange times) more gracefully.
+  (Robert Collins, #785954)
+
+* ``subunit-ls`` should handle the new test outcomes in Python2.7 better.
+  (Robert Collins, #785953)
+
+* ``TestResultFilter`` now collapses sequential calls to time().
+  (Jonathan Lange, #567150)
+
+* ``TestResultDecorator.tags()`` now actually works, and is no longer a buggy
+  copy/paste of ``TestResultDecorator.time()``. (Jonathan Lange, #681828)
+
+* ``TestResultFilter`` now supports a ``fixup_expected_failures``
+  argument. (Jelmer Vernooij, #755241)
+
+* The ``subunit.run`` Python module supports ``-l`` and ``--load-list`` as
+  per ``testtools.run``. This required a dependency bump due to a small
+  API change in ``testtools``. (Robert Collins)
+
+* The help for subunit-filter was confusing about the behaviour of ``-f`` /
+  ``--no-failure``. (Robert Collins, #703392)
+
+* The Python2.7 / testtools addUnexpectedSuccess API is now supported. This
+  required adding a new status code to the protocol. (Robert Collins, #654474)
+
+CHANGES
+~~~~~~~
+
+* testtools 0.9.11 or newer is new needed (due to the Python 3 support).
+  (Robert Collins)
+
+0.0.6
+-----
+
+This release of subunit fixes a number of unicode related bugs. This depends on
+testtools 0.9.4 and will not function without it. Thanks to Tres Seaver there
+is also an optional native setup.py file for use with easy_install and the
+like.
+
+BUG FIXES
+~~~~~~~~~
+
+* Be consistent about delivering unicode content to testtools StringException
+  class which has become (appropriately) conservative. (Robert Collins)
+
+* Fix incorrect reference to subunit_test_failf in c/README.
+  (Brad Hards, #524341)
+
+* Fix incorrect ordering of tags method parameters in TestResultDecorator. This
+  is purely cosmetic as the parameters are passed down with no interpretation.
+  (Robert Collins, #537611)
+
+* Old style tracebacks with no encoding info are now treated as UTF8 rather
+  than some-random-codec-like-ascii. (Robert Collins)
+
+* On windows, ProtocolTestCase and TestProtocolClient will set their streams to
+  binary mode by calling into msvcrt; this avoids having their input or output
+  mangled by the default line ending translation on that platform.
+  (Robert Collins, Martin [gz], #579296)
+
+IMPROVEMENTS
+~~~~~~~~~~~~
+
+* Subunit now has a setup.py for python deployments that are not using
+  distribution packages. (Tres Seaver, #538181)
+
+* Subunit now supports test discovery by building on the testtools support for
+  it. You can take advantage of it with "python -m subunit.run discover [path]"
+  and see "python -m subunit.run discover --help" for more options.
+
+* Subunit now uses the improved unicode support in testtools when outputting
+  non-details based test information; this should consistently UTF8 encode such
+  strings.
+
+* The Python TestProtocolClient now flushes output on startTest and stopTest.
+  (Martin [gz]).
+
+
+0.0.5
+-----
+
+BUG FIXES
+~~~~~~~~~
+
+* make check was failing if subunit wasn't installed due to a missing include
+  path for the test program test_child.
+
+* make distcheck was failing due to a missing $(top_srcdir) rune.
+
+IMPROVEMENTS
+~~~~~~~~~~~~
+
+* New filter `subunit-notify` that will show a notification window with test 
+  statistics when the test run finishes.
+
+* subunit.run will now pipe its output to the command in the 
+  SUBUNIT_FORMATTER environment variable, if set.
+
+0.0.4
+-----
+
+BUG FIXES
+~~~~~~~~~
+
+* subunit2junitxml -f required a value, this is now fixed and -f acts as a
+  boolean switch with no parameter.
+
+* Building with autoconf 2.65 is now supported.
+
+
+0.0.3
+-----
+
+  CHANGES:
+  
+    * License change, by unanimous agreement of contributors to BSD/Apache
+      License Version 2.0. This makes Subunit compatible with more testing
+      frameworks.
+
+  IMPROVEMENTS:
+
+    * CPPUnit is now directly supported: subunit builds a cppunit listener
+      ``libcppunit-subunit``. 
+
+    * In the python API ``addExpectedFailure`` and ``addUnexpectedSuccess``
+      from python 2.7/3.1 are now supported. ``addExpectedFailure`` is
+      serialised as ``xfail``, and ``addUnexpectedSuccess`` as ``success``.
+      The ``ProtocolTestCase`` parser now calls outcomes using an extended
+      API that permits attaching arbitrary MIME resources such as text files
+      log entries and so on. This extended API is being developed with the
+      Python testing community, and is in flux. ``TestResult`` objects that
+      do not support the API will be detected and transparently downgraded
+      back to the regular Python unittest API.
+
+    * INSTALLDIRS can be set to control the perl MakeMaker 'INSTALLDIRS'
+      viarable when installing.
+
+    * Multipart test outcomes are tentatively supported; the exact protocol
+      for them, both serialiser and object is not yet finalised. Testers and
+      early adopters are sought. As part of this and also in an attempt to
+      provider a more precise focus on the wire protocol and toolchain, 
+      Subunit now depends on testtools (http://launchpad.net/testtools)
+      release 0.9.0 or newer.
+
+    * subunit2junitxml supports a new option, --forward which causes it
+      to forward the raw subunit stream in a similar manner to tee. This
+      is used with the -o option to both write a xml report and get some
+      other subunit filter to process the stream.
+
+    * The C library now has ``subunit_test_skip``.
+
+  BUG FIXES:
+
+    * Install progress_model.py correctly.
+
+    * Non-gcc builds will no longer try to use gcc specific flags.
+      (Thanks trondn-norbye)
+
+  API CHANGES:
+
+  INTERNALS:
+
+0.0.2
+-----
+
+  CHANGES:
+
+  IMPROVEMENTS:
+
+    * A number of filters now support ``--no-passthrough`` to cause all
+      non-subunit content to be discarded. This is useful when precise control
+      over what is output is required - such as with subunit2junitxml.
+
+    * A small perl parser is now included, and a new ``subunit-diff`` tool
+      using that is included. (Jelmer Vernooij)
+
+    * Subunit streams can now include optional, incremental lookahead
+      information about progress. This allows reporters to make estimates
+      about completion, when such information is available. See the README
+      under ``progress`` for more details.
+
+    * ``subunit-filter`` now supports regex filtering via ``--with`` and
+      ``without`` options. (Martin Pool)
+
+    * ``subunit2gtk`` has been added, a filter that shows a GTK summary of a
+      test stream.
+
+    * ``subunit2pyunit`` has a --progress flag which will cause the bzrlib
+      test reporter to be used, which has a textual progress bar. This requires
+      a recent bzrlib as a minor bugfix was required in bzrlib to support this.
+
+    * ``subunit2junitxml`` has been added. This filter converts a subunit
+      stream to a single JUnit style XML stream using the pyjunitxml
+      python library.
+
+    * The shell functions support skipping via ``subunit_skip_test`` now.
+
+  BUG FIXES:
+
+    * ``xfail`` outcomes are now passed to python TestResult's via
+      addExpectedFailure if it is present on the TestResult. Python 2.6 and
+      earlier which do not have this function will have ``xfail`` outcomes
+      passed through as success outcomes as earlier versions of subunit did.
+
+  API CHANGES:
+
+    * tags are no longer passed around in python via the ``TestCase.tags``
+      attribute. Instead ``TestResult.tags(new_tags, gone_tags)`` is called,
+      and like in the protocol, if called while a test is active only applies
+      to that test. (Robert Collins)
+
+    * ``TestResultFilter`` takes a new optional constructor parameter 
+      ``filter_predicate``.  (Martin Pool)
+
+    * When a progress: directive is encountered in a subunit stream, the
+      python bindings now call the ``progress(offset, whence)`` method on
+      ``TestResult``.
+
+    * When a time: directive is encountered in a subunit stream, the python
+      bindings now call the ``time(seconds)`` method on ``TestResult``.
+
+  INTERNALS:
+
+    * (python) Added ``subunit.test_results.AutoTimingTestResultDecorator``. Most
+      users of subunit will want to wrap their ``TestProtocolClient`` objects
+      in this decorator to get test timing data for performance analysis.
+
+    * (python) ExecTestCase supports passing arguments to test scripts.
+
+    * (python) New helper ``subunit.test_results.HookedTestResultDecorator``
+      which can be used to call some code on every event, without having to
+      implement all the event methods.
+
+    * (python) ``TestProtocolClient.time(a_datetime)`` has been added which
+      causes a timestamp to be output to the stream.

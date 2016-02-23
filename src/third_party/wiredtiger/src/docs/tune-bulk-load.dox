@@ -1,0 +1,35 @@
+/*! @page tune_bulk_load Bulk-load
+
+When loading a large amount of data into a new object, using a cursor
+with the \c bulk configuration string enabled and loading the data in
+sorted order will be much faster than doing out-of-order inserts.
+
+WiredTiger cursors can be configured for bulk-load using the \c bulk
+configuration keyword to WT_SESSION::open_cursor.  Bulk-load is a "fast
+path" for quickly loading a large number of rows.  Bulk-load may only
+be used on newly created objects, and an object being bulk-loaded is not
+accessible from other cursors.
+
+Cursors configured for bulk-load only support the WT_CURSOR::insert and
+WT_CURSOR::close methods.  Bulk load inserts are non-transactional: they
+cannot be rolled back and ignore the transactional state of the WT_SESSION
+in which they are opened.
+
+When bulk-loading row-store objects, keys must be loaded in sorted
+order.
+
+When using the \c sort utility on a Linux or other POSIX-like system to
+pre-sort keys, the locale specified by the environment affects the sort
+order and may not match the default sort order used by WiredTiger.  Set
+\c LC_ALL=C in the process' environment to configure the traditional sort
+order that uses native byte values.
+
+When bulk-loading fixed-length column store objects, the \c bulk
+configuration string value \c bitmap allows chunks of a memory resident
+bitmap to be loaded directly into an object by passing a WT_ITEM to
+WT_CURSOR::set_value, where the size field indicates the number of
+records in the bitmap (as specified by the object's \c value_format
+configuration). Bulk-loaded bitmap values must end on a byte boundary
+relative to the bit count (except for the last set of values loaded).
+
+ */

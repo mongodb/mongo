@@ -1,0 +1,164 @@
+/*! @m_page{{c,java},statistics,Statistics}
+
+WiredTiger can be configured to maintain a variety of run-time and
+data-source statistics.  As maintaining statistics may involve updating
+shared-memory data structures and traversing disk-based data structures,
+configuring statistics may decrease application performance.
+
+The ::wiredtiger_open \c statistics configuration must be set in order
+for statistics to be maintained.  When configured to \c none (the
+default), no statistics are maintained and attempting to read the
+statistics will result in an error.   Alternatively, the \c fast
+configuration maintains a subset of the statistics which are relatively
+inexpensive, and the \c all configuration maintains all statistics
+regardless of cost.
+
+The following example configures WiredTiger to maintain all statistics,
+regardless of cost:
+
+@snippet ex_all.c Statistics configuration
+
+Statistics are gathered and returned to the application using a statistics
+cursor, which returns key/value pairs to the application.  See
+@ref data_statistics for information about accessing the gathered statistics.
+
+When the WT_SESSION::open_cursor method is called to open a statistics
+cursor, the statistics configuration specifies the statistics to be
+gathered, similarly to the ::wiredtiger_open function.   The \c fast
+configuration gathers the subset of the statistics that are relatively
+inexpensive, and the \c all configuration gathers all statistics,
+regardless of cost.  If no configuration is specified, the current
+database statistics configuration is assumed.
+
+The configuration of the WT_SESSION::open_cursor method must agree with the
+database configuration: if the database is configured to maintain \c fast
+statistics, attempts to open a statistics cursor in \c all mode will fail.
+If the database has been configured to maintain \c all statistics, the
+statistics cursor can be configured in either \c fast or \c all modes.
+For example, an application might configure the database to maintain all
+available statistics, but the application might gather expensive statistics
+less frequently than inexpensive ones.
+
+The following example opens a statistics cursor on the database:
+
+@snippet ex_all.c Statistics cursor database
+
+The following example opens a statistics cursor on a table:
+
+@snippet ex_all.c Statistics cursor table
+
+The following example opens a statistics cursor on a table, but gathering
+only the relatively inexpensive statistics:
+
+@snippet ex_all.c Statistics cursor table fast
+
+The WT_SESSION::open_cursor method and the ::wiredtiger_open function
+also support the statistics configuration value \c clear.
+
+When \c clear is specified to the WT_SESSION::open_cursor method, gathered
+statistics will be reset, where appropriate, after they are gathered.  For
+example, a cache size statistic is not cleared because it's not expected to
+change rapidly over time, while the count of cursor insert operations will
+be cleared.  This allows applications to easily monitor changes in the
+system over time.
+
+The following example gathers all statistics for a table, regardless of
+cost, and then clears them:
+
+@snippet ex_all.c Statistics cursor clear configuration
+
+When \c clear is specified to the ::wiredtiger_open function, gathered
+statistics will be reset, where appropriate, after they are gathered.
+This applies to all statistics cursors (as if \c clear was configured
+when the cursor was opened), as well as statistics logging, when it is
+configured.
+
+The following example configures WiredTiger to maintain only relatively
+inexpensive statistics, and to clears statistics after they are gathered
+or logged:
+
+@snippet ex_all.c Statistics clear configuration
+
+@section statistics_log Statistics logging
+
+WiredTiger will optionally log database statistics into a file when the
+the ::wiredtiger_open \c statistics_log configuration is set.
+
+The resulting statistics can be displayed using the \c wtstats visualization
+tool.  For more information, see @ref_single wtstats.
+
+The following example logs statistics every 30 seconds:
+
+@snippet ex_all.c Statistics logging
+
+Each record is formatted as a space-separated timestamp, unsigned 64-bit
+value and a variable length string which describes the statistic.
+
+The timestamp format may be changed with the \c statistics_log.timestamp
+configuration string.  The \c timestamp value may contain ISO C90 standard
+strftime conversion specifications.
+
+The statistics the database is configured to maintain are logged, that
+is, configuring the database to maintain \c fast or \c all statistics
+will modify the statistics that will be logged.
+
+Statistics for specific underlying data sources may be included by adding
+a list of data source URIs to the \c statistics_log configuration string:
+
+@snippet ex_all.c Statistics logging with a table
+
+Statistics for all underlying data sources of a particular type may be
+included by adding a partial data source URI to the \c statistics_log
+configuration string:
+
+@snippet ex_all.c Statistics logging with all tables
+
+When database statistics are logged, the database home will be the first
+space-separated entry for each record in the log file.  For example:
+
+@code
+Mar 08 11:38:23 463 /database/home pthread mutex condition wait calls
+Mar 08 11:38:23 0 /database/home files currently open
+Mar 08 11:38:23 1855437 /database/home total heap memory allocations
+Mar 08 11:38:23 1856622 /database/home total heap memory frees
+Mar 08 11:38:23 1 /database/home total heap memory re-allocations
+Mar 08 11:38:23 472 /database/home total read I/Os
+@endcode
+
+When data source statistics are logged, the data source's URI will be
+the first space-separated entry for each record in the log file.  For
+example:
+
+@code
+Mar 20 10:42:36 21 table:mytable compressed pages written
+Mar 20 10:42:36 0 table:mytable page written failed to compress
+Mar 20 10:42:36 5 table:mytable page written was too small to compress
+Mar 20 10:42:36 586 table:mytable cursor insert calls
+Mar 20 10:42:36 0 table:mytable bulk-loaded cursor-insert calls
+@endcode
+
+No statistics are logged for any data source for which a handle is not
+currently open in the database, nor will any statistics requiring the
+traversal of a tree (as if the \c statistics_fast configuration string
+were set).
+
+The location of the log files may be changed with the \c statistics_log.path
+configuration string.  The \c path value value may contain ISO C90 standard
+strftime conversion specifications.  WiredTiger will not create non-existent
+directories in the path, they must exist before ::wiredtiger_open is called.
+
+The following example logs statistics into files named with the month,
+day and year:
+
+@snippet ex_all.c Statistics logging with path
+
+A Python script that parses the default logging output and uses the
+<a href="http://www.gnuplot.info/">gnuplot</a>, utility to generate
+Portable Network Graphics (PNG) format graphs is included in the
+WiredTiger distribution in the file \c tools/statlog.py.
+
+@m_if{c}
+To interactively examine statistics results, see @ref wtstats.
+@m_endif
+
+*/

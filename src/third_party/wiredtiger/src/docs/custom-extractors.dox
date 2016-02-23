@@ -1,0 +1,73 @@
+/*! @page custom_extractors Custom Extractors
+
+@section custom_extractors_intro Introduction to Custom Extractors
+
+A WiredTiger table can have zero or more associated indices.  An index
+uses a different key to locate records than the table, and usually only
+stores a short key for each record, with the (larger) value in the
+table.
+
+WiredTiger tables must be created with column names in order to create
+an index.  This is required so that index cursors can support
+projections, and because WiredTiger optimizes some cases of "simple"
+tables without column names.
+
+When the full schema of your records can be described in WiredTiger's
+packing format, you can create an index by specifying which columns from
+the record should appear in the index.  However, for more complex
+records, or to associate multiple index keys to each record,
+applications can instead specify a custom extractor by implementing the
+WT_EXTRACTOR interface.
+
+The main method in the interface is WT_EXTRACTOR::extract.  This is
+called by WiredTiger each time a record is updated in a table.  The
+\c extract method should determine the index key(s) and call
+WT_CURSOR::set_key followed by WT_CURSOR::insert on the supplied
+\c result_cursor for each index key.
+
+If any operation fails, WT_EXTRACTOR::extract must return the failure
+to WiredTiger, or the index could become out of sync with the table.
+
+Note that the extract callback is called for all operations that update
+the table, not just inserts.  The callback sets the key and uses the
+WT_CURSOR::insert method to return the index key(s).  WiredTiger will
+perform the required operation to keep the index in sync with the table.
+
+Applications must register their WT_EXTRACTOR implementations using
+WT_CONNECTION::add_extractor.  This is often done by creating a
+@ref extensions "WiredTiger extension". They are then configured by
+passing \c "extractor=..." to WT_SESSION::create when creating an index.
+
+See @ex_ref{ex_extractor.c} for an example of how to implement custom
+extractors.
+
+@section custom_extractors_notes Implementation notes
+
+A WiredTiger index is a row store where the key columns contain all of
+the secondary and primary key columns, but only the secondary key
+columns are visible to applications. The value is empty, and
+WiredTiger's on-disk format optimizes for this case (empty values take
+up no space on disk).
+
+Custom extractors only need to calculate the public index key columns.
+The \c result_cursor will be configured with a \c key_format
+corresponding to what was supplied to WT_SESSION::create when the index
+was created.  WiredTiger will append the (hidden) primary key when
+populating the index.
+
+If column names are specified for an index with a custom extractor, it
+is not permitted to use any column names from the table key.  Custom
+index keys can include columns from the table value, but the extracted
+value must be equal to the value from that column of the record or the
+results of using a projection cursor on the index will be undefined.
+
+@section custom_extractors_raw Custom Collators in raw mode
+
+If a custom extractor needs to operate in raw mode on the
+\c result_cursor, it must take into account an implementation detail.
+To avoid rewriting the extracted key, WiredTiger appends a padding byte
+to the raw key using a \c 'x' format. See @ref schema_format_types for
+more information.  If the callback operates in raw mode, it must also
+append this padding byte.
+
+*/
