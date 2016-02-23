@@ -1369,10 +1369,12 @@ __evict_get_ref(
     WT_SESSION_IMPL *session, bool is_server, WT_BTREE **btreep, WT_REF **refp)
 {
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	WT_EVICT_ENTRY *evict;
 	uint32_t candidates;
 
-	cache = S2C(session)->cache;
+	conn = S2C(session);
+	cache = conn->cache;
 	*btreep = NULL;
 	*refp = NULL;
 
@@ -1392,11 +1394,14 @@ __evict_get_ref(
 	}
 
 	/*
-	 * The eviction server only tries to evict half of the pages before
-	 * looking for more.
+	 * The eviction server normally only tries to evict half of the pages
+	 * before looking for more, unless there isn't anybody else to do the
+	 * work, we're stuck, or there's only a single candidate (that happens
+	 * in very small environments).
 	 */
 	candidates = cache->evict_candidates;
-	if (is_server && candidates > 1)
+	if (is_server && conn->evict_workers_max != 0 &&
+	    !F_ISSET(cache, WT_CACHE_STUCK) && candidates > 1)
 		candidates /= 2;
 
 	/* Get the next page queued for eviction. */
