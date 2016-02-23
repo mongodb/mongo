@@ -36,6 +36,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
 
@@ -58,6 +59,8 @@ protected:
     void addIndex(BSONObj keyPattern, BSONObj infoObj);
 
     void addIndex(BSONObj keyPattern, MatchExpression* filterExpr);
+
+    void addIndex(BSONObj keyPattern, IndexEntry::MultikeyPaths multikeyPaths);
 
     //
     // Execute planner.
