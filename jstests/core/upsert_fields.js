@@ -12,8 +12,10 @@ var upsertedResult = function(query, expr) {
 };
 
 var upsertedField = function(query, expr, fieldName) {
-    assert.writeOK(upsertedResult(query, expr));
-    return coll.findOne()[fieldName];
+    var res = assert.writeOK(upsertedResult(query, expr));
+    var doc = coll.findOne();
+    assert.neq(doc, null, "findOne query returned no results! UpdateRes: " + tojson(res));
+    return doc[fieldName];
 };
 
 var upsertedId = function(query, expr) {
