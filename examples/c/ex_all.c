@@ -1045,63 +1045,6 @@ backup(WT_SESSION *session)
 	return (ret);
 }
 
-#define	APPLICATION_ERROR	1
-#define	APPLICATION_INFO	2
-int application_logging(int, const char *);
-int wiredtiger_handle_error(
-    WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
-int wiredtiger_handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
-
-int
-application_logging(int which, const char *message)
-{
-	(void)which;
-	(void)message;
-	return (0);
-}
-
-/*! [Function event_handler] */
-
-/*
- * handle_error --
- *	WiredTiger error handler.
- */
-int
-wiredtiger_handle_error(WT_EVENT_HANDLER *handler,
-    WT_SESSION *session, int error, const char *message)
-{
-	int ret;
-
-	(void)(handler);			/* Unused variables */
-	(void)(error);
-
-	/* Timestamp and log the error message. */
-	ret = application_logging(APPLICATION_ERROR, message);
-
-	/* Copy and flush the message to stderr. */
-	if (fprintf(stderr, "%p: %s\n", session, message) < 0 && ret == 0)
-		ret = EIO;
-	if (fflush(stderr) != 0 && ret == 0)
-		ret = errno;
-	return (ret);
-}
-
-/*
- * handle_message --
- *	WiredTiger message handler.
- */
-int
-wiredtiger_handle_message(
-    WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
-{
-	(void)(handler);			/* Unused variables */
-	(void)(session);			/* Unused variables */
-
-	/* Timestamp and log the informational message. */
-	return (application_logging(APPLICATION_INFO, message));
-}
-/*! [Function event_handler] */
-
 int
 main(void)
 {
@@ -1171,20 +1114,6 @@ main(void)
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 #endif
-	{
-	/*! [Configure event_handler] */
-	WT_EVENT_HANDLER event_handler;
-
-	event_handler.handle_error = wiredtiger_handle_error;
-	event_handler.handle_message = wiredtiger_handle_message;
-	event_handler.handle_progress = NULL;
-	event_handler.handle_close = NULL;
-
-	ret = wiredtiger_open(home, &event_handler, "create", &conn);
-	/*! [Configure event_handler] */
-	if (ret == 0)
-		(void)conn->close(conn, NULL);
-	}
 
 	/*! [Configure file_extend] */
 	ret = wiredtiger_open(

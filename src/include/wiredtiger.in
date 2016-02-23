@@ -1983,7 +1983,8 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param errhandler An error handler.  If <code>NULL</code>, the
-	 * connection's error handler is used
+	 * connection's error handler is used. See @ref error_handling_event
+	 * for more information.
 	 * @configstart{WT_CONNECTION.open_session, see dist/api_data.py}
 	 * @config{isolation, the default isolation level for operations in this
 	 * session., a string\, chosen from the following options: \c
@@ -2144,7 +2145,8 @@ struct __wt_connection {
  * @param home The path to the database home directory.  See @ref home
  * for more information.
  * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
- * handler is installed that writes error messages to stderr
+ * handler is installed that writes error messages to stderr. See
+ * @ref error_handling_event for more information.
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{async = (, asynchronous operations configuration options., a set of
  * related configuration options defined below.}
