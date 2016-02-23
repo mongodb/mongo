@@ -36,6 +36,7 @@
 #include "mongo/config.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/platform/bits.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/processinfo.h"
