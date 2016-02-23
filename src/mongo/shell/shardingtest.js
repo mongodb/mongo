@@ -584,6 +584,7 @@ var ShardingTest = function(params) {
 
         var oldDB = db;
         db = this.config;
+        timeout = timeout || 60000;
 
         try {
             sh.setBalancerState(false);
@@ -601,6 +602,7 @@ var ShardingTest = function(params) {
 
         var oldDB = db;
         db = this.config;
+        timeout = timeout || 60000;
 
         try {
             sh.setBalancerState(true);
