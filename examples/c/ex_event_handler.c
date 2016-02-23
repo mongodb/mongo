@@ -42,9 +42,8 @@ int handle_wiredtiger_error(
 int handle_wiredtiger_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 
 /*! [Function event_handler] */
-
 /*
- * Setup our own event handler structure to allow us to pass context through
+ * Create our own event handler structure to allow us to pass context through
  * to event handler callbacks. For this to work the WiredTiger event handler
  * must appear first in our custom event handler structure.
  */
@@ -82,8 +81,9 @@ int
 handle_wiredtiger_message(
     WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
 {
+	/* Cast the handler back to our custom handler. */
 	printf("app id %s, thread context %p, message %s\n",
-	    ((CUSTOM_EVENT_HANDLER*)handler)->app_id, session, message);
+	    ((CUSTOM_EVENT_HANDLER *)handler)->app_id, session, message);
 
 	return (0);
 }
@@ -101,13 +101,13 @@ main(void)
 
 	event_handler.h.handle_error = handle_wiredtiger_error;
 	event_handler.h.handle_message = handle_wiredtiger_message;
-	/* Setup a NULL to use the default handler. */
+	/* Set handlers to NULL to use the default handler. */
 	event_handler.h.handle_progress = NULL;
 	event_handler.h.handle_close = NULL;
 	event_handler.app_id = "example_event_handler";
 
 	ret = wiredtiger_open(home,
-	    (WT_EVENT_HANDLER*)&event_handler, "create", &conn);
+	    (WT_EVENT_HANDLER *)&event_handler, "create", &conn);
 	/*! [Configure event_handler] */
 
 	/* Make an invalid API call, to ensure the event handler works. */
