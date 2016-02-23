@@ -89,24 +89,13 @@ handle_wiredtiger_message(
 }
 /*! [Function event_handler] */
 
-int
-main(void)
+static int
+config_event_handler()
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
 
-	/*
-	 * Create a clean test directory for this run of the test program if the
-	 * environment variable isn't already set (as is done by make check).
-	 */
-	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WT_HOME";
-		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
-	} else
-		home = NULL;
-
-	{
 	/*! [Configure event_handler] */
 	CUSTOM_EVENT_HANDLER event_handler;
 
@@ -120,13 +109,28 @@ main(void)
 	ret = wiredtiger_open(home,
 	    (WT_EVENT_HANDLER *)&event_handler, "create", &conn);
 	/*! [Configure event_handler] */
-	}
 
 	/* Make an invalid API call, to ensure the event handler works. */
 	(void)conn->open_session(conn, NULL, "isolation=invalid", &session);
 
 	if (ret == 0)
-		(void)conn->close(conn, NULL);
+		ret = conn->close(conn, NULL);
 
 	return (ret);
+}
+
+int
+main(void)
+{
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		(void)system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
+
+	return (config_event_handler());
 }
