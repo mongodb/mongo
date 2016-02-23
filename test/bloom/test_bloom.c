@@ -189,12 +189,16 @@ run(void)
 	 */
 	item.size = g.c_key_max + 10;
 	item.data = calloc(item.size, 1);
+	if (item.data == NULL)
+		testutil_die(ENOMEM, "value buffer malloc");
 	memset((void *)item.data, 'a', item.size);
 	for (i = 0, fp = 0; i < g.c_ops; i++) {
 		((uint8_t *)item.data)[i % item.size] =
 		    'a' + ((uint8_t)rand() % 26);
 		if ((ret = __wt_bloom_get(bloomp, &item)) == 0)
 			++fp;
+		if (ret != 0 && ret != WT_NOTFOUND)
+			testutil_die(ret, "__wt_bloom_get");
 	}
 	free((void *)item.data);
 	printf("Out of %d ops, got %d false positives, %.4f%%\n",
