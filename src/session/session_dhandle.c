@@ -11,31 +11,6 @@
 static int __session_dhandle_sweep(WT_SESSION_IMPL *);
 
 /*
- * __session_add_dhandle --
- *	Add a handle to the session's cache.
- */
-static int
-__session_add_dhandle(
-    WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE **dhandle_cachep)
-{
-	WT_DATA_HANDLE_CACHE *dhandle_cache;
-	uint64_t bucket;
-
-	WT_RET(__wt_calloc_one(session, &dhandle_cache));
-	dhandle_cache->dhandle = session->dhandle;
-
-	bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_INSERT_HEAD(&session->dhandles, dhandle_cache, q);
-	TAILQ_INSERT_HEAD(&session->dhhash[bucket], dhandle_cache, hashq);
-
-	if (dhandle_cachep != NULL)
-		*dhandle_cachep = dhandle_cache;
-
-	/* Sweep the handle list to remove any dead handles. */
-	return (__session_dhandle_sweep(session));
-}
-
-/*
  * __session_discard_dhandle --
  *	Remove a data handle from the session cache.
  */
@@ -52,6 +27,44 @@ __session_discard_dhandle(
 	(void)__wt_atomic_sub32(&dhandle_cache->dhandle->session_ref, 1);
 
 	__wt_overwrite_and_free(session, dhandle_cache);
+}
+
+/*
+ * __session_add_dhandle --
+ *	Add a handle to the session's cache.
+ */
+static int
+__session_add_dhandle(
+    WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE **dhandle_cachep)
+{
+	WT_DATA_HANDLE_CACHE *dhandle_cache;
+	WT_DECL_RET;
+	uint64_t bucket;
+
+	/*
+	 * Allocate a handle cache entry, fixup the reference count on failure
+	 * since we are part way through adding a handle and have already
+	 * increased the reference count while holding a lock.
+	 */
+	if ((ret = __wt_calloc_one(session, &dhandle_cache)) != 0) {
+		(void)__wt_atomic_sub32(&session->dhandle->session_ref, 1);
+		return (ret);
+	}
+
+	dhandle_cache->dhandle = session->dhandle;
+
+	bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
+	TAILQ_INSERT_HEAD(&session->dhandles, dhandle_cache, q);
+	TAILQ_INSERT_HEAD(&session->dhhash[bucket], dhandle_cache, hashq);
+
+	/* Sweep the handle list to remove any dead handles. */
+	if ((ret = __session_dhandle_sweep(session)) != 0)
+		__session_discard_dhandle(session, dhandle_cache);
+
+	if (ret == 0 && dhandle_cachep != NULL)
+		*dhandle_cachep = dhandle_cache;
+
+	return (ret);
 }
 
 /*
