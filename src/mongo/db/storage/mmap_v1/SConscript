@@ -105,6 +105,7 @@ env.Library(
         'file_allocator',
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/progress_meter',
+        '$BUILD_DIR/mongo/db/storage/storage_options'
     ],
 )
 
