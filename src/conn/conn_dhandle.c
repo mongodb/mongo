@@ -355,7 +355,7 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 /*
  * __conn_btree_apply_internal --
- *	Apply a function an open data handle.
+ *	Apply a function to an open data handle.
  */
 static int
 __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
