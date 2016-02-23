@@ -122,17 +122,9 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 * We need to ensure we don't race with page reconciliation as it's
 	 * writing the page modify information.
 	 *
-	 * There are three ways we call reconciliation: checkpoints, threads
-	 * writing leaf pages (usually in preparation for a checkpoint or if
-	 * closing a file), and eviction.
-	 *
-	 * We're holding the schema lock which serializes with checkpoints.
-	 */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
-
-	/*
-	 * Get the tree handle's flush lock which blocks threads writing leaf
-	 * pages.
+	 * There are two ways we call reconciliation: checkpoints and eviction.
+	 * Get the tree's flush lock which blocks threads writing pages for
+	 * checkpoints.
 	 */
 	__wt_spin_lock(session, &btree->flush_lock);
 
