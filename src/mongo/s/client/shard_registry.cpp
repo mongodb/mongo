@@ -35,6 +35,7 @@
 #include <set>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/query_fetcher.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -53,6 +54,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
@@ -73,6 +75,8 @@ using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
 using repl::OpTime;
 
 namespace {
+
+const char kCmdResponseWriteConcernField[] = "writeConcernError";
 
 const Seconds kConfigCommandTimeout{30};
 const int kOnErrorNumRetries = 3;
@@ -117,6 +121,28 @@ BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
     updatedCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
                              durationCount<Milliseconds>(maxTime));
     return updatedCmdBuilder.obj();
+}
+
+Status checkForWriteConcernError(const BSONObj& obj) {
+    BSONElement wcErrorElem;
+    Status status = bsonExtractTypedField(obj, kCmdResponseWriteConcernField, Object, &wcErrorElem);
+    if (status.isOK()) {
+        BSONObj wcErrObj(wcErrorElem.Obj());
+
+        WCErrorDetail wcError;
+        string wcErrorParseMsg;
+        if (!wcError.parseBSON(wcErrObj, &wcErrorParseMsg)) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          str::stream() << "Failed to parse write concern section due to "
+                                        << wcErrorParseMsg);
+        } else {
+            return Status(ErrorCodes::WriteConcernFailed, wcError.toString());
+        }
+    } else if (status == ErrorCodes::NoSuchKey) {
+        return Status::OK();
+    }
+
+    return status;
 }
 
 }  // unnamed namespace
@@ -782,9 +808,8 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     // Block until the command is carried out
     executor->wait(callStatus.getValue());
 
-    updateReplSetMonitor(targeter, host.getValue(), responseStatus.getStatus());
-
     if (!responseStatus.isOK()) {
+        updateReplSetMonitor(targeter, host.getValue(), responseStatus.getStatus());
         return responseStatus.getStatus();
     }
 
@@ -795,6 +820,11 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
 
     if (errorsToCheck.count(commandSpecificStatus.code())) {
         return commandSpecificStatus;
+    }
+
+    Status writeConcernStatus = checkForWriteConcernError(response.data);
+    if (!writeConcernStatus.isOK()) {
+        return writeConcernStatus;
     }
 
     CommandResponse cmdResponse;

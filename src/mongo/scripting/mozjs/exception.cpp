@@ -116,7 +116,7 @@ Status JSErrorReportToStatus(JSContext* cx,
         if (report->errorNumber < JSErr_Limit) {
             error = ErrorCodes::JSInterpreterFailure;
         } else {
-            error = static_cast<ErrorCodes::Error>(report->errorNumber - JSErr_Limit);
+            error = ErrorCodes::fromInt(report->errorNumber - JSErr_Limit);
         }
     }
 

@@ -308,9 +308,13 @@ public:
     using ErrorCodesSet = unordered_set<ErrorCodes::Error, ErrorCodesHash>;
 
     /**
-     * Runs commands against the config shard's primary. Retries if executing the command fails with
-     * one of the given error codes, or if executing the command succeeds but the server returned
-     * one of the codes. If executing the command fails with a different code we return that code.
+     * Runs a command against the config shard's primary and includes a set of errors on which to
+     * retry. Converts responses, which contain writeConcernError into WriteConcernFailed status.
+     *
+     * Retries if executing the command fails with one of the specified error codes, or if executing
+     * the command succeeds but the server returned one of the codes. If executing the command fails
+     * with a different code we return that code.
+     *
      * If executing the command succeeds and the command itself succeeds or fails with a code not in
      * the set, then we return the command response object. Thus the caller is responsible for
      * checking the command response object for any kind of command-specific failures other than

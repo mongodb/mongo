@@ -371,10 +371,6 @@ void BatchedCommandResponse::setErrMessage(StringData errMessage) {
     _isErrMessageSet = true;
 }
 
-void BatchedCommandResponse::unsetErrMessage() {
-    _isErrMessageSet = false;
-}
-
 bool BatchedCommandResponse::isErrMessageSet() const {
     return _isErrMessageSet;
 }
@@ -579,21 +575,19 @@ const WCErrorDetail* BatchedCommandResponse::getWriteConcernError() const {
 
 Status BatchedCommandResponse::toStatus() const {
     if (!getOk()) {
-        return Status(static_cast<ErrorCodes::Error>(getErrCode()), getErrMessage());
+        return Status(ErrorCodes::fromInt(getErrCode()), getErrMessage());
     }
 
     if (isErrDetailsSet()) {
         const WriteErrorDetail* errDetail = getErrDetails().front();
 
-        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
-                      errDetail->getErrMessage());
+        return Status(ErrorCodes::fromInt(errDetail->getErrCode()), errDetail->getErrMessage());
     }
 
     if (isWriteConcernErrorSet()) {
         const WCErrorDetail* errDetail = getWriteConcernError();
 
-        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
-                      errDetail->getErrMessage());
+        return Status(ErrorCodes::fromInt(errDetail->getErrCode()), errDetail->getErrMessage());
     }
 
     return Status::OK();

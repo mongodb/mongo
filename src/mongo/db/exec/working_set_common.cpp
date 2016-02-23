@@ -175,8 +175,7 @@ void WorkingSetCommon::getStatusMemberObject(const WorkingSet& ws,
 // static
 Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
     invariant(WorkingSetCommon::isValidStatusMemberObject(memberObj));
-    return Status(static_cast<ErrorCodes::Error>(memberObj["code"].numberInt()),
-                  memberObj["errmsg"]);
+    return Status(ErrorCodes::fromInt(memberObj["code"].numberInt()), memberObj["errmsg"]);
 }
 
 // static

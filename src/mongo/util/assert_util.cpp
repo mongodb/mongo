@@ -90,9 +90,10 @@ void DBException::traceIfNeeded(const DBException& e) {
 }
 
 ErrorCodes::Error DBException::convertExceptionCode(int exCode) {
-    if (exCode == 0)
+    if (exCode == 0) {
         return ErrorCodes::UnknownError;
-    return static_cast<ErrorCodes::Error>(exCode);
+    }
+    return ErrorCodes::fromInt(exCode);
 }
 
 void ExceptionInfo::append(BSONObjBuilder& b, const char* m, const char* c) const {

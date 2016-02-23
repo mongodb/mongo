@@ -29,11 +29,10 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/bson_serializable.h"
 
 namespace mongo {
 
@@ -41,24 +40,11 @@ namespace mongo {
  * This class represents the layout and content of the error that occurs while trying
  * to satisfy the write concern after executing the insert/update/delete runCommand.
  */
-class WCErrorDetail : public BSONSerializable {
+class WCErrorDetail {
     MONGO_DISALLOW_COPYING(WCErrorDetail);
 
 public:
-    //
-    // schema declarations
-    //
-
-    static const BSONField<int> errCode;
-    static const BSONField<BSONObj> errInfo;
-    static const BSONField<std::string> errMessage;
-
-    //
-    // construction / destruction
-    //
-
     WCErrorDetail();
-    virtual ~WCErrorDetail();
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(WCErrorDetail* other) const;
@@ -67,28 +53,24 @@ public:
     // bson serializable interface implementation
     //
 
-    virtual bool isValid(std::string* errMsg) const;
-    virtual BSONObj toBSON() const;
-    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-    virtual void clear();
-    virtual std::string toString() const;
+    bool isValid(std::string* errMsg) const;
+    BSONObj toBSON() const;
+    bool parseBSON(const BSONObj& source, std::string* errMsg);
+    void clear();
+    std::string toString() const;
 
     //
     // individual field accessors
     //
 
-    void setErrCode(int errCode);
-    void unsetErrCode();
-    bool isErrCodeSet() const;
-    int getErrCode() const;
+    void setErrCode(ErrorCodes::Error code);
+    ErrorCodes::Error getErrCode() const;
 
     void setErrInfo(const BSONObj& errInfo);
-    void unsetErrInfo();
     bool isErrInfoSet() const;
     const BSONObj& getErrInfo() const;
 
     void setErrMessage(StringData errMessage);
-    void unsetErrMessage();
     bool isErrMessageSet() const;
     const std::string& getErrMessage() const;
 
@@ -96,7 +78,7 @@ private:
     // Convention: (M)andatory, (O)ptional
 
     // (M)  error code for the write concern error.
-    int _errCode;
+    ErrorCodes::Error _errCode;
     bool _isErrCodeSet;
 
     // (O)  further details about the write concern error.

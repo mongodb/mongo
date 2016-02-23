@@ -119,13 +119,15 @@ private:
     std::unique_ptr<WriteErrorDetail> _error;
 };
 
-WCErrorDetail* toWriteConcernError(const Status& wcStatus, const WriteConcernResult& wcResult) {
-    WCErrorDetail* wcError = new WCErrorDetail;
+unique_ptr<WCErrorDetail> toWriteConcernError(const Status& wcStatus,
+                                              const WriteConcernResult& wcResult) {
+    auto wcError = stdx::make_unique<WCErrorDetail>();
 
     wcError->setErrCode(wcStatus.code());
     wcError->setErrMessage(wcStatus.reason());
-    if (wcResult.wTimedOut)
+    if (wcResult.wTimedOut) {
         wcError->setErrInfo(BSON("wtimeout" << true));
+    }
 
     return wcError;
 }
@@ -326,21 +328,20 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
     // If something failed, we have already set the lastOp to be the last op to have succeeded
     // and written to the oplog.
 
-    unique_ptr<WCErrorDetail> wcError;
     {
         stdx::lock_guard<Client> lk(*_txn->getClient());
         CurOp::get(_txn)->setMessage_inlock("waiting for write concern");
     }
 
+    unique_ptr<WCErrorDetail> wcError;
     WriteConcernResult res;
     Status status =
         waitForWriteConcern(_txn,
                             repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp(),
                             _txn->getWriteConcern(),
                             &res);
-
     if (!status.isOK()) {
-        wcError.reset(toWriteConcernError(status, res));
+        wcError = std::move(toWriteConcernError(status, res));
     }
 
     //
