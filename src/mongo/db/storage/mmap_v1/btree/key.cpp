@@ -32,6 +32,8 @@
 
 #include <cmath>
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
@@ -315,7 +317,7 @@ KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
             }
             case Date:
                 b.appendUChar(cdate | bits);
-                b.appendStruct(e.date());
+                b.appendNum(e.date().toMillisSinceEpoch());
                 break;
             case String: {
                 b.appendUChar(cstring | bits);
@@ -428,19 +430,28 @@ BSONObj KeyV1::toBson() const {
                 break;
             }
             case cdate:
-                b.appendDate("", (Date_t&)*p);
+                b.appendDate(
+                    "",
+                    Date_t::fromMillisSinceEpoch(ConstDataView(reinterpret_cast<const char*>(p))
+                                                     .read<LittleEndian<long long>>()));
                 p += 8;
                 break;
             case cdouble:
-                b.append("", (double&)*p);
+                b.append(
+                    "",
+                    ConstDataView(reinterpret_cast<const char*>(p)).read<LittleEndian<double>>());
                 p += sizeof(double);
                 break;
             case cint:
-                b.append("", static_cast<int>((reinterpret_cast<const PackedDouble&>(*p)).d));
+                b.append("",
+                         static_cast<int>(ConstDataView(reinterpret_cast<const char*>(p))
+                                              .read<LittleEndian<double>>()));
                 p += sizeof(double);
                 break;
             case clong:
-                b.append("", static_cast<long long>((reinterpret_cast<const PackedDouble&>(*p)).d));
+                b.append("",
+                         static_cast<long long>(ConstDataView(reinterpret_cast<const char*>(p))
+                                                    .read<LittleEndian<double>>()));
                 p += sizeof(double);
                 break;
             default:
@@ -466,8 +477,8 @@ static int compare(const unsigned char*& l, const unsigned char*& r) {
     // same type
     switch (lt) {
         case cdouble: {
-            double L = (reinterpret_cast<const PackedDouble*>(l))->d;
-            double R = (reinterpret_cast<const PackedDouble*>(r))->d;
+            double L = ConstDataView(reinterpret_cast<const char*>(l)).read<LittleEndian<double>>();
+            double R = ConstDataView(reinterpret_cast<const char*>(r)).read<LittleEndian<double>>();
             if (L < R)
                 return -1;
             if (L != R)
@@ -518,8 +529,10 @@ static int compare(const unsigned char*& l, const unsigned char*& r) {
             break;
         }
         case cdate: {
-            long long L = *((long long*)l);
-            long long R = *((long long*)r);
+            long long L =
+                ConstDataView(reinterpret_cast<const char*>(l)).read<LittleEndian<long long>>();
+            long long R =
+                ConstDataView(reinterpret_cast<const char*>(r)).read<LittleEndian<long long>>();
             if (L < R)
                 return -1;
             if (L > R)
@@ -648,19 +661,24 @@ bool KeyV1::woEqual(const KeyV1& right) const {
         r++;
         switch (lval & cCANONTYPEMASK) {
             case coid:
-                if (*((unsigned*)l) != *((unsigned*)r))
+                if (ConstDataView(reinterpret_cast<const char*>(l))
+                        .read<LittleEndian<uint32_t>>() !=
+                    ConstDataView(reinterpret_cast<const char*>(r)).read<LittleEndian<uint32_t>>())
                     return false;
                 l += 4;
                 r += 4;
             case cdate:
-                if (*((unsigned long long*)l) != *((unsigned long long*)r))
+                if (ConstDataView(reinterpret_cast<const char*>(l))
+                        .read<LittleEndian<unsigned long long>>() !=
+                    ConstDataView(reinterpret_cast<const char*>(r))
+                        .read<LittleEndian<unsigned long long>>())
                     return false;
                 l += 8;
                 r += 8;
                 break;
             case cdouble:
-                if ((reinterpret_cast<const PackedDouble*>(l))->d !=
-                    (reinterpret_cast<const PackedDouble*>(r))->d)
+                if (ConstDataView(reinterpret_cast<const char*>(l)).read<LittleEndian<double>>() !=
+                    ConstDataView(reinterpret_cast<const char*>(r)).read<LittleEndian<double>>())
                     return false;
                 l += 8;
                 r += 8;
