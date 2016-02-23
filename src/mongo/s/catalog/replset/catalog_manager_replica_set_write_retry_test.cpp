@@ -57,6 +57,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -268,7 +269,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
         response.setOk(true);
         response.setN(1);
 
-        auto wcError = std::make_unique<WCErrorDetail>();
+        auto wcError = stdx::make_unique<WCErrorDetail>();
 
         WriteConcernResult wcRes;
         wcRes.err = "timeout";
@@ -372,7 +373,7 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
         response.setOk(true);
         response.setNModified(1);
 
-        auto wcError = std::make_unique<WCErrorDetail>();
+        auto wcError = stdx::make_unique<WCErrorDetail>();
 
         WriteConcernResult wcRes;
         wcRes.err = "timeout";
