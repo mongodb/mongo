@@ -199,64 +199,6 @@ void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bo
     }
 }
 
-namespace {
-void _debugHelp(stringstream& ss, const set<string>& s, const string& sep) {
-    bool first = true;
-    for (set<string>::const_iterator i = s.begin(); i != s.end(); ++i) {
-        if (first)
-            first = false;
-        else
-            ss << sep;
-        ss << *i;
-    }
-}
-
-void _debugHelp(stringstream& ss, const vector<string>& v, const string& sep) {
-    set<string> s(v.begin(), v.end());
-    _debugHelp(ss, s, sep);
-}
-}
-
-string FTSQueryImpl::toString() const {
-    stringstream ss;
-    ss << "FTSQueryImpl\n";
-
-    ss << "  terms: ";
-    _debugHelp(ss, getPositiveTerms(), ", ");
-    ss << "\n";
-
-    ss << "  negated terms: ";
-    _debugHelp(ss, getNegatedTerms(), ", ");
-    ss << "\n";
-
-    ss << "  phrases: ";
-    _debugHelp(ss, getPositivePhr(), ", ");
-    ss << "\n";
-
-    ss << "  negated phrases: ";
-    _debugHelp(ss, getNegatedPhr(), ", ");
-    ss << "\n";
-
-    return ss.str();
-}
-
-string FTSQueryImpl::debugString() const {
-    stringstream ss;
-
-    _debugHelp(ss, getPositiveTerms(), "|");
-    ss << "||";
-
-    _debugHelp(ss, getNegatedTerms(), "|");
-    ss << "||";
-
-    _debugHelp(ss, getPositivePhr(), "|");
-    ss << "||";
-
-    _debugHelp(ss, getNegatedPhr(), "|");
-
-    return ss.str();
-}
-
 BSONObj FTSQueryImpl::toBSON() const {
     BSONObjBuilder bob;
     bob.append("terms", getPositiveTerms());

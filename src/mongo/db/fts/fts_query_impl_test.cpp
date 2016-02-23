@@ -29,6 +29,7 @@
 */
 
 
+#include "mongo/bson/json.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/unittest/unittest.h"
 
@@ -156,14 +157,11 @@ TEST(FTSQueryImpl, Phrase1) {
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
 
-    ASSERT_EQUALS(3U, q.getPositiveTerms().size());
-    ASSERT_EQUALS(0U, q.getNegatedTerms().size());
-    ASSERT_EQUALS(1U, q.getPositivePhr().size());
-    ASSERT_EQUALS(0U, q.getNegatedPhr().size());
+    ASSERT_EQUALS(q.toBSON(),
+                  fromjson(
+                      "{terms: ['fun', 'phrase', 'test'], negatedTerms: [], phrases: ['phrase "
+                      "test'], negatedPhrases: []}"));
     ASSERT_TRUE(q.getTermsForBounds() == q.getPositiveTerms());
-
-    ASSERT_EQUALS("phrase test", q.getPositivePhr()[0]);
-    ASSERT_EQUALS("fun|phrase|test||||phrase test||", q.debugString());
 }
 
 TEST(FTSQueryImpl, Phrase2) {
@@ -184,7 +182,10 @@ TEST(FTSQueryImpl, HyphenDirectlyBeforePhraseShouldNegateEntirePhrase) {
     q.setCaseSensitive(false);
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
-    ASSERT_EQUALS("fun||||||phrase test", q.debugString());
+    ASSERT_EQUALS(
+        q.toBSON(),
+        fromjson(
+            "{terms: ['fun'], negatedTerms: [], phrases: [], negatedPhrases: ['phrase test']}"));
 }
 
 TEST(FTSQueryImpl, HyphenSurroundedByWhitespaceBeforePhraseShouldNotNegateEntirePhrase) {
@@ -194,7 +195,10 @@ TEST(FTSQueryImpl, HyphenSurroundedByWhitespaceBeforePhraseShouldNotNegateEntire
     q.setCaseSensitive(false);
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
-    ASSERT_EQUALS("fun|phrase|test||||phrase test||", q.debugString());
+    ASSERT_EQUALS(q.toBSON(),
+                  fromjson(
+                      "{terms: ['fun', 'phrase', 'test'], negatedTerms: [], phrases: ['phrase "
+                      "test'], negatedPhrases: []}"));
 }
 
 TEST(FTSQueryImpl, HyphenBetweenTermAndPhraseShouldBeTreatedAsDelimiter) {
@@ -204,7 +208,10 @@ TEST(FTSQueryImpl, HyphenBetweenTermAndPhraseShouldBeTreatedAsDelimiter) {
     q.setCaseSensitive(false);
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
-    ASSERT_EQUALS("fun|phrase|test||||phrase test||", q.debugString());
+    ASSERT_EQUALS(q.toBSON(),
+                  fromjson(
+                      "{terms: ['fun', 'phrase', 'test'], negatedTerms: [], phrases: ['phrase "
+                      "test'], negatedPhrases: []}"));
 }
 
 TEST(FTSQueryImpl, HyphenShouldNegateAllSucceedingPhrasesSeparatedByHyphens) {
@@ -214,7 +221,10 @@ TEST(FTSQueryImpl, HyphenShouldNegateAllSucceedingPhrasesSeparatedByHyphens) {
     q.setCaseSensitive(false);
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
-    ASSERT_EQUALS("anoth|phrase||||another phrase||really fun|stuff here", q.debugString());
+    ASSERT_EQUALS(q.toBSON(),
+                  fromjson(
+                      "{terms: ['anoth', 'phrase'], negatedTerms: [], phrases: ['another "
+                      "phrase'], negatedPhrases: ['really fun', 'stuff here']}"));
 }
 
 TEST(FTSQueryImpl, CaseSensitiveOption) {
@@ -297,7 +307,10 @@ TEST(FTSQueryImpl, Mix1) {
     q.setCaseSensitive(false);
     q.setDiacriticSensitive(false);
     ASSERT(q.parse(TEXT_INDEX_VERSION_3).isOK());
-    ASSERT_EQUALS("industri||melbourn|physic||industry||", q.debugString());
+    ASSERT_EQUALS(q.toBSON(),
+                  fromjson(
+                      "{terms: ['industri'], negatedTerms: ['melbourn', 'physic'], phrases: "
+                      "['industry'], negatedPhrases: []}"));
 }
 
 TEST(FTSQueryImpl, NegPhrase2) {
