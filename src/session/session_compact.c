@@ -287,7 +287,7 @@ __wt_session_compact(
 	WT_ERR(__wt_config_gets(session, cfg, "timeout", &cval));
 	session->compact->max_time = (uint64_t)cval.val;
 
-	/* Find the types of data sources are being compacted. */
+	/* Find the types of data sources being compacted. */
 	WT_WITH_SCHEMA_LOCK(session, ret,
 	    ret = __wt_schema_worker(session, uri,
 	    __compact_handle_append, __compact_uri_analyze, cfg, 0));
