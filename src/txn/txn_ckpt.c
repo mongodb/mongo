@@ -155,8 +155,8 @@ __checkpoint_apply_all(WT_SESSION_IMPL *session, const char *cfg[],
 			ckpt_closed = cval.len != 0;
 		}
 		WT_ERR(ckpt_closed ?
-		    __wt_meta_btree_apply(session, op, cfg) :
-		    __wt_conn_btree_apply(session, false, NULL, op, cfg));
+		    __wt_meta_apply_all(session, op, NULL, cfg) :
+		    __wt_conn_btree_apply(session, NULL, op, NULL, cfg));
 	}
 
 	if (fullp != NULL)
