@@ -189,6 +189,8 @@ class CheckReplDBHash(CustomBehavior):
                 success = all_matched and success
 
             if not success:
+                CheckReplDBHash._dump_oplog(primary_conn, secondary_conn, sb)
+
                 # Adding failures to a TestReport requires traceback information, so we raise
                 # a 'self.test_case.failureException' that we will catch ourselves.
                 self.test_case.logger.info("\n    ".join(sb))
@@ -220,6 +222,20 @@ class CheckReplDBHash(CustomBehavior):
             test_report.stopTest(self.test_case)
 
         self.started = False
+
+    @staticmethod
+    def _dump_oplog(primary_conn, secondary_conn, sb):
+
+        def dump_latest_docs(coll, limit=0):
+            docs = (doc for doc in coll.find().sort("$natural", pymongo.DESCENDING).limit(limit))
+            for doc in docs:
+                sb.append("    %s" % (doc))
+
+        LIMIT = 100
+        sb.append("Dumping the latest %d documents from the primary's oplog" % (LIMIT))
+        dump_latest_docs(primary_conn.local.oplog.rs, LIMIT)
+        sb.append("Dumping the latest %d documents from the secondary's oplog" % (LIMIT))
+        dump_latest_docs(secondary_conn.local.oplog.rs, LIMIT)
 
     @staticmethod
     def _check_all_db_hashes(primary_conn, secondary_conn, sb):
