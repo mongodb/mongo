@@ -446,7 +446,7 @@ void Document::serializeForSorter(BufBuilder& buf) const {
 }
 
 Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-    const int numElems = buf.read<int>();
+    const int numElems = buf.read<LittleEndian<int>>();
     MutableDocument doc(numElems);
     for (int i = 0; i < numElems; i++) {
         StringData name = buf.readCStr();
@@ -455,9 +455,9 @@ Document Document::deserializeForSorter(BufReader& buf, const SorterDeserializeS
 
     while (char marker = buf.read<char>()) {
         if (marker == char(DocumentStorage::MetaType::TEXT_SCORE) + 1) {
-            doc.setTextScore(buf.read<double>());
+            doc.setTextScore(buf.read<LittleEndian<double>>());
         } else if (marker == char(DocumentStorage::MetaType::RAND_VAL) + 1) {
-            doc.setRandMetaField(buf.read<double>());
+            doc.setRandMetaField(buf.read<LittleEndian<double>>());
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }

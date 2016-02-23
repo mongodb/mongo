@@ -582,7 +582,7 @@ public:
         buf.appendBuf(objdata(), objsize());
     }
     static BSONObj deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-        const int size = buf.peek<int>();
+        const int size = buf.peek<LittleEndian<int>>();
         const void* ptr = buf.skip(size);
         return BSONObj(static_cast<const char*>(ptr));
     }

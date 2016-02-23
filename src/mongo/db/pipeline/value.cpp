@@ -35,6 +35,7 @@
 #include <boost/functional/hash.hpp>
 
 #include "mongo/base/compare_numbers.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/platform/decimal128.h"
@@ -1215,17 +1216,17 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
         case jstOID:
             return Value(OID::from(buf.skip(OID::kOIDSize)));
         case NumberInt:
-            return Value(buf.read<int>());
+            return Value(buf.read<LittleEndian<int>>().value);
         case NumberLong:
-            return Value(buf.read<long long>());
+            return Value(buf.read<LittleEndian<long long>>().value);
         case NumberDouble:
-            return Value(buf.read<double>());
+            return Value(buf.read<LittleEndian<double>>().value);
         case NumberDecimal:
-            return Value(buf.read<Decimal128>());
+            return Value(Decimal128(buf.read<LittleEndian<Decimal128::Value>>().value));
         case Bool:
             return Value(bool(buf.read<char>()));
         case Date:
-            return Value(Date_t::fromMillisSinceEpoch(buf.read<long long>()));
+            return Value(Date_t::fromMillisSinceEpoch(buf.read<LittleEndian<long long>>().value));
         case bsonTimestamp:
             return Value(buf.read<Timestamp>());
 
@@ -1233,14 +1234,14 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
         case String:
         case Symbol:
         case Code: {
-            int size = buf.read<int>();
+            int size = buf.read<LittleEndian<int>>();
             const char* str = static_cast<const char*>(buf.skip(size));
             return Value(ValueStorage(type, StringData(str, size)));
         }
 
         case BinData: {
             BinDataType bdt = BinDataType(buf.read<char>());
-            int size = buf.read<int>();
+            int size = buf.read<LittleEndian<int>>();
             const void* data = buf.skip(size);
             return Value(BSONBinData(data, size, bdt));
         }
@@ -1262,14 +1263,14 @@ Value Value::deserializeForSorter(BufReader& buf, const SorterDeserializeSetting
         }
 
         case CodeWScope: {
-            int size = buf.read<int>();
+            int size = buf.read<LittleEndian<int>>();
             const char* str = static_cast<const char*>(buf.skip(size));
             BSONObj bson = BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings());
             return Value(BSONCodeWScope(StringData(str, size), bson));
         }
 
         case Array: {
-            const int numElems = buf.read<int>();
+            const int numElems = buf.read<LittleEndian<int>>();
             vector<Value> array;
             array.reserve(numElems);
             for (int i = 0; i < numElems; i++)

@@ -33,6 +33,7 @@
 #include <boost/filesystem.hpp>
 
 #include "mongo/config.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
@@ -79,7 +80,7 @@ public:
         buf.appendNum(_i);
     }
     static IntWrapper deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-        return buf.read<int>();
+        return buf.read<LittleEndian<int>>().value;
     }
     int memUsageForSorter() const {
         return sizeof(IntWrapper);

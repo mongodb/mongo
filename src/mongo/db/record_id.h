@@ -108,10 +108,10 @@ public:
     /// members for Sorter
     struct SorterDeserializeSettings {};  // unused
     void serializeForSorter(BufBuilder& buf) const {
-        buf.appendStruct(_repr);
+        buf.appendNum(static_cast<long long>(_repr));
     }
     static RecordId deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-        return RecordId(buf.read<int64_t>());
+        return RecordId(buf.read<LittleEndian<int64_t>>());
     }
     int memUsageForSorter() const {
         return sizeof(RecordId);
