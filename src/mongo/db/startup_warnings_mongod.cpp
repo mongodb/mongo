@@ -369,8 +369,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 #if MONGO_ENTERPRISE_VERSION
     if (storageParams.engine == "inMemory") {
         log() << startupWarningsLog;
-        log() << "** NOTE: The inMemory storage engine is in beta. "
-              << startupWarningsLog;
+        log() << "** NOTE: The inMemory storage engine is in beta. " << startupWarningsLog;
         log() << "**       Do not use in production." << startupWarningsLog;
         warned = true;
     }
