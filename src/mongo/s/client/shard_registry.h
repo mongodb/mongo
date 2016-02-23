@@ -41,6 +41,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -136,9 +137,13 @@ public:
 
     /**
      * Reloads the ShardRegistry based on the contents of the config server's config.shards
-     * collection.
+     * collection. Returns true if this call perfomed a reload and false if this call only waited
+     * for another thread to perform the reload and did not actually reload. Because of this, it is
+     * possible that calling reload once may not result in the most up to date view. If strict
+     * reloading is required, the caller should call this method one more time if the first call
+     * returned false.
      */
-    void reload(OperationContext* txn);
+    bool reload(OperationContext* txn);
 
     /**
      * Throws out and reconstructs the config shard.  This has the effect that if replica set
@@ -412,17 +417,25 @@ private:
     // added as shards.  Does not have any connection hook set on it.
     const std::unique_ptr<executor::TaskExecutor> _executorForAddShard;
 
-    // Protects the config server connections string, _configOpTime, and the lookup maps below
+    // Protects the _reloadState, config server connections string, _configOpTime,
+    // and the lookup maps below.
     mutable stdx::mutex _mutex;
+
+    stdx::condition_variable _inReloadCV;
+
+    enum class ReloadState {
+        Idle,       // no other thread is loading data from config server in reload().
+        Reloading,  // another thread is loading data from the config server in reload().
+        Failed,     // last call to reload() caused an error when contacting the config server.
+    };
+
+    ReloadState _reloadState{ReloadState::Idle};
 
     // Config server connection string
     ConnectionString _configServerCS;
 
     // Last known highest opTime from the config server that should be used when doing reads.
     repl::OpTime _configOpTime;
-
-    // Config server OpTime of the query run during the last successful ShardRegistry::reload() call
-    repl::OpTime _lastReloadOpTime;
 
     // Map of both shardName -> Shard and hostName -> Shard
     ShardMap _lookup;

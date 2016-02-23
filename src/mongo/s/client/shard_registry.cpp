@@ -169,31 +169,48 @@ void ShardRegistry::shutdown() {
     _executorPool->shutdownAndJoin();
 }
 
-void ShardRegistry::reload(OperationContext* txn) {
+bool ShardRegistry::reload(OperationContext* txn) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    if (_reloadState == ReloadState::Reloading) {
+        // Another thread is already in the process of reloading so no need to do duplicate work.
+        // There is also an issue if multiple threads are allowed to call getAllShards()
+        // simultaneously because there is no good way to determine which of the threads has the
+        // more recent version of the data.
+        do {
+            _inReloadCV.wait(lk);
+        } while (_reloadState == ReloadState::Reloading);
+
+        if (_reloadState == ReloadState::Idle) {
+            return false;
+        }
+        // else proceed to reload since an error occured on the last reload attempt.
+        invariant(_reloadState == ReloadState::Failed);
+    }
+
+    _reloadState = ReloadState::Reloading;
+    lk.unlock();
+
     auto shardsStatus = grid.catalogManager(txn)->getAllShards(txn);
+
+    lk.lock();
+
+    _reloadState = ReloadState::Idle;
+    _inReloadCV.notify_all();
+
     if (!shardsStatus.isOK()) {
+        _reloadState = ReloadState::Failed;
         uasserted(shardsStatus.getStatus().code(),
                   str::stream() << "could not get updated shard list from config server due to "
                                 << shardsStatus.getStatus().toString());
     }
-    vector<ShardType> shards = std::move(shardsStatus.getValue().value);
-    OpTime reloadOpTime = std::move(shardsStatus.getValue().opTime);
 
-    int numShards = shards.size();
+    auto shards = std::move(shardsStatus.getValue().value);
+    auto reloadOpTime = std::move(shardsStatus.getValue().opTime);
 
-    LOG(1) << "found " << numShards << " shards listed on config server(s) with lastVisibleOpTime: "
+    LOG(1) << "found " << shards.size()
+           << " shards listed on config server(s) with lastVisibleOpTime: "
            << reloadOpTime.toBSON();
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    // Only actually update the registry if the config.shards query came back at an OpTime newer
-    // than _lastReloadOpTime.
-    if (reloadOpTime < _lastReloadOpTime) {
-        LOG(1) << "Not updating ShardRegistry from the results of query at config server OpTime "
-               << reloadOpTime
-               << ", which is older than the OpTime of the last reload: " << _lastReloadOpTime;
-        return;
-    }
-    _lastReloadOpTime = reloadOpTime;
 
     _lookup.clear();
     _rsLookup.clear();
@@ -210,6 +227,8 @@ void ShardRegistry::reload(OperationContext* txn) {
 
         _addShard_inlock(shardType, false);
     }
+
+    return true;
 }
 
 void ShardRegistry::rebuildConfigShard() {
@@ -224,8 +243,15 @@ shared_ptr<Shard> ShardRegistry::getShard(OperationContext* txn, const ShardId& 
     }
 
     // If we can't find the shard, we might just need to reload the cache
-    reload(txn);
+    bool didReload = reload(txn);
 
+    shard = _findUsingLookUp(shardId);
+
+    if (shard || didReload) {
+        return shard;
+    }
+
+    reload(txn);
     return _findUsingLookUp(shardId);
 }
 
