@@ -30,11 +30,11 @@
  *
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 
-static const char * const progname = "ex_event_handler";
 static const char *home;
 
 int handle_wiredtiger_error(
@@ -96,6 +96,17 @@ main(void)
 	WT_SESSION *session;
 	int ret;
 
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
+
+	{
 	/*! [Configure event_handler] */
 	CUSTOM_EVENT_HANDLER event_handler;
 
@@ -109,6 +120,7 @@ main(void)
 	ret = wiredtiger_open(home,
 	    (WT_EVENT_HANDLER *)&event_handler, "create", &conn);
 	/*! [Configure event_handler] */
+	}
 
 	/* Make an invalid API call, to ensure the event handler works. */
 	(void)conn->open_session(conn, NULL, "isolation=invalid", &session);
