@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/wc_error_detail.h"
 
 #include "mongo/db/field_parser.h"
@@ -35,26 +37,27 @@ namespace mongo {
 
 using std::string;
 
-using mongoutils::str::stream;
-const BSONField<int> WCErrorDetail::errCode("code");
-const BSONField<BSONObj> WCErrorDetail::errInfo("errInfo");
-const BSONField<std::string> WCErrorDetail::errMessage("errmsg");
+namespace {
+
+const BSONField<int> errCode("code");
+const BSONField<BSONObj> errInfo("errInfo");
+const BSONField<string> errMessage("errmsg");
+
+}  // namespace
 
 WCErrorDetail::WCErrorDetail() {
     clear();
 }
 
-WCErrorDetail::~WCErrorDetail() {}
-
-bool WCErrorDetail::isValid(std::string* errMsg) const {
-    std::string dummy;
+bool WCErrorDetail::isValid(string* errMsg) const {
+    string dummy;
     if (errMsg == NULL) {
         errMsg = &dummy;
     }
 
     // All the mandatory fields must be present.
     if (!_isErrCodeSet) {
-        *errMsg = stream() << "missing " << errCode.name() << " field";
+        *errMsg = str::stream() << "missing " << errCode.name() << " field";
         return false;
     }
 
@@ -79,15 +82,19 @@ BSONObj WCErrorDetail::toBSON() const {
 bool WCErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
     clear();
 
-    std::string dummy;
+    string dummy;
     if (!errMsg)
         errMsg = &dummy;
 
     FieldParser::FieldState fieldState;
-    fieldState = FieldParser::extract(source, errCode, &_errCode, errMsg);
+    int errCodeValue;
+    fieldState = FieldParser::extract(source, errCode, &errCodeValue, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
         return false;
     _isErrCodeSet = fieldState == FieldParser::FIELD_SET;
+    if (_isErrCodeSet) {
+        _errCode = ErrorCodes::fromInt(errCodeValue);
+    }
 
     fieldState = FieldParser::extract(source, errInfo, &_errInfo, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
@@ -103,7 +110,7 @@ bool WCErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
 }
 
 void WCErrorDetail::clear() {
-    _errCode = 0;
+    _errCode = ErrorCodes::OK;
     _isErrCodeSet = false;
 
     _errInfo = BSONObj();
@@ -126,24 +133,18 @@ void WCErrorDetail::cloneTo(WCErrorDetail* other) const {
     other->_isErrMessageSet = _isErrMessageSet;
 }
 
-std::string WCErrorDetail::toString() const {
-    return "implement me";
+string WCErrorDetail::toString() const {
+    return str::stream() << (_isErrCodeSet ? ErrorCodes::errorString(_errCode) : "<no code>")
+                         << ": " << (_isErrMessageSet ? _errMessage : "")
+                         << ". Error details: " << (_isErrInfoSet ? _errInfo.toString() : "<none>");
 }
 
-void WCErrorDetail::setErrCode(int errCode) {
-    _errCode = errCode;
+void WCErrorDetail::setErrCode(ErrorCodes::Error code) {
+    _errCode = code;
     _isErrCodeSet = true;
 }
 
-void WCErrorDetail::unsetErrCode() {
-    _isErrCodeSet = false;
-}
-
-bool WCErrorDetail::isErrCodeSet() const {
-    return _isErrCodeSet;
-}
-
-int WCErrorDetail::getErrCode() const {
+ErrorCodes::Error WCErrorDetail::getErrCode() const {
     dassert(_isErrCodeSet);
     return _errCode;
 }
@@ -151,10 +152,6 @@ int WCErrorDetail::getErrCode() const {
 void WCErrorDetail::setErrInfo(const BSONObj& errInfo) {
     _errInfo = errInfo.getOwned();
     _isErrInfoSet = true;
-}
-
-void WCErrorDetail::unsetErrInfo() {
-    _isErrInfoSet = false;
 }
 
 bool WCErrorDetail::isErrInfoSet() const {
@@ -171,15 +168,11 @@ void WCErrorDetail::setErrMessage(StringData errMessage) {
     _isErrMessageSet = true;
 }
 
-void WCErrorDetail::unsetErrMessage() {
-    _isErrMessageSet = false;
-}
-
 bool WCErrorDetail::isErrMessageSet() const {
     return _isErrMessageSet;
 }
 
-const std::string& WCErrorDetail::getErrMessage() const {
+const string& WCErrorDetail::getErrMessage() const {
     dassert(_isErrMessageSet);
     return _errMessage;
 }

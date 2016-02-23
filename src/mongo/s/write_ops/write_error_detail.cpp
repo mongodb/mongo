@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/write_error_detail.h"
 
 #include "mongo/db/field_parser.h"
@@ -35,7 +37,6 @@ namespace mongo {
 
 using std::string;
 
-using mongoutils::str::stream;
 const BSONField<int> WriteErrorDetail::index("index");
 const BSONField<int> WriteErrorDetail::errCode("code");
 const BSONField<BSONObj> WriteErrorDetail::errInfo("errInfo");
@@ -45,8 +46,6 @@ WriteErrorDetail::WriteErrorDetail() {
     clear();
 }
 
-WriteErrorDetail::~WriteErrorDetail() {}
-
 bool WriteErrorDetail::isValid(std::string* errMsg) const {
     std::string dummy;
     if (errMsg == NULL) {
@@ -55,12 +54,12 @@ bool WriteErrorDetail::isValid(std::string* errMsg) const {
 
     // All the mandatory fields must be present.
     if (!_isIndexSet) {
-        *errMsg = stream() << "missing " << index.name() << " field";
+        *errMsg = str::stream() << "missing " << index.name() << " field";
         return false;
     }
 
     if (!_isErrCodeSet) {
-        *errMsg = stream() << "missing " << errCode.name() << " field";
+        *errMsg = str::stream() << "missing " << errCode.name() << " field";
         return false;
     }
 
@@ -207,10 +206,6 @@ const BSONObj& WriteErrorDetail::getErrInfo() const {
 void WriteErrorDetail::setErrMessage(StringData errMessage) {
     _errMessage = errMessage.toString();
     _isErrMessageSet = true;
-}
-
-void WriteErrorDetail::unsetErrMessage() {
-    _isErrMessageSet = false;
 }
 
 bool WriteErrorDetail::isErrMessageSet() const {

@@ -96,7 +96,6 @@ public:
     int getErrCode() const;
 
     void setErrMessage(StringData errMessage);
-    void unsetErrMessage();
     bool isErrMessageSet() const;
     const std::string& getErrMessage() const;
 

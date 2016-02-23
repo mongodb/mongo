@@ -993,8 +993,7 @@ TEST_F(DistLockCatalogFixture, UnlockWriteConcernError) {
         ASSERT_FALSE(status.reason().empty());
     });
 
-    onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return fromjson(R"({
+    BSONObj writeConcernFailedResponse = fromjson(R"({
                 ok: 1,
                 value: null,
                 writeConcernError: {
@@ -1002,7 +1001,17 @@ TEST_F(DistLockCatalogFixture, UnlockWriteConcernError) {
                     errmsg: "waiting for replication timed out"
                 }
             })");
-    });
+
+    // The dist lock catalog calls into the ShardRegistry, which will retry 3 times for
+    // WriteConcernFailed errors
+    onCommand([&](const RemoteCommandRequest& request)
+                  -> StatusWith<BSONObj> { return writeConcernFailedResponse; });
+
+    onCommand([&](const RemoteCommandRequest& request)
+                  -> StatusWith<BSONObj> { return writeConcernFailedResponse; });
+
+    onCommand([&](const RemoteCommandRequest& request)
+                  -> StatusWith<BSONObj> { return writeConcernFailedResponse; });
 
     future.timed_get(kFutureTimeout);
 }
