@@ -30,6 +30,7 @@
  * This file contains tests for mongo/db/geo/hash.cpp.
  */
 
+#include <bitset>
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -44,6 +45,8 @@
 
 using mongo::GeoHash;
 using mongo::GeoHashConverter;
+using std::cout;
+using std::endl;
 using std::string;
 using std::stringstream;
 
@@ -64,6 +67,39 @@ static string makeRandomBitString(int length) {
         }
     }
     return ss.str();
+}
+
+// splitBinStr("0000111100001111") -> "0000 1111 0000 1111"
+string splitBinStr(string bin) {
+    string split = "";
+    for (unsigned i = 0; i < bin.length(); i += 4) {
+        split += bin.substr(i, 4) + ' ';
+    }
+    return split.substr(0, split.size() - 1);
+}
+
+bool unhash_fast_and_slow_match(string hash) {
+    GeoHash geoHash = GeoHash(hash);
+    unsigned fastX, fastY, slowX, slowY, x, y;
+
+    geoHash.unhash_fast(&x, &y);
+    fastX = x;
+    fastY = y;
+
+    geoHash.unhash_slow(&x, &y);
+    slowX = x;
+    slowY = y;
+
+    bool match = (fastX == slowX && fastY == slowY);
+    if (!match) {
+        std::bitset<32> fastXBits(fastX), fastYBits(fastY), slowXBits(slowX), slowYBits(slowY);
+        cout << "unhash_fast's x: " << splitBinStr(fastXBits.to_string()) << endl;
+        cout << "unhash_slow's x: " << splitBinStr(slowXBits.to_string()) << endl;
+        cout << "unhash_fast's y: " << splitBinStr(fastYBits.to_string()) << endl;
+        cout << "unhash_slow's y: " << splitBinStr(slowYBits.to_string()) << endl;
+    }
+
+    return match;
 }
 
 TEST(GeoHash, MakeRandomValidHashes) {
@@ -89,6 +125,24 @@ TEST(GeoHash, MakeTooLongHash) {
 TEST(GeoHash, MakeOddHash) {
     string a = makeRandomBitString(13);
     ASSERT_THROWS(makeHash(a), mongo::UserException);
+}
+
+TEST(GeoHash, UnhashFastMatchesUnhashSlow) {
+    string hashes[12] = {"0000000000000000000000000000000000000000000000000000000000000000",
+                         "0101010110100011011100110101000000000101001101000011001011111001",
+                         "1010000000110010100110000111001111010011010100001000011110101100",
+                         "0101010110100011011101011010001111000110111011111011001010110100",
+                         "1010000000110010100111101000000000010000100010110000011111100001",
+                         "0101010100100100001011111110011110010001111100011011011110110111",
+                         "1010000010110101110001001100010001000111100101010000001011100010",
+                         "0101010100100100001010010001010001010010001010100011011111111010",
+                         "1010000010110101110000100011011110000100010011101000001010101111",
+                         "0101010110100011011100110101000000000000100111110001101101001011",
+                         "1010000000110010100110000111001111010110111110111010111000011110",
+                         "1111111111111111111111111111111111111111111111111111111111111111"};
+    for (int i = 0; i < 12; i++) {
+        ASSERT_TRUE(unhash_fast_and_slow_match(hashes[i]));
+    }
 }
 
 TEST(GeoHashConvertor, EdgeLength) {
