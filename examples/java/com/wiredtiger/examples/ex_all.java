@@ -333,7 +333,7 @@ public static int cursor_ops(Session session)
         cursor.putKeyString(key);
         if ((ret = cursor.remove()) != 0) {
             System.err.println(
-                "cursor.remove: " + cursor.session.strerror(ret));
+                "cursor.remove: " + wiredtiger.wiredtiger_strerror(ret));
             return (ret);
         }
     } catch (WiredTigerException wte) {  /* Catch severe errors. */
