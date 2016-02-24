@@ -47,82 +47,146 @@ namespace unicode {
 
 using linenoise_utf8::copyString32to8;
 
+namespace {
+// Added to the end of strings to ensure the real content is tested with the vectored
+// implementation.
+const std::string filler(32, 'x');
+
+/**
+ * Converts return from prepForSubstrMatch to a StringData that is only useful in the current
+ * expression.
+ */
+StringData toStringData(std::pair<std::unique_ptr<char[]>, char*> result) {
+    return {result.first.get(), size_t(result.second - result.first.get())};
+}
+
+auto kDiacriticSensitive = String::kDiacriticSensitive;
+auto kCaseSensitive = String::kCaseSensitive;
+
+auto kTurkish = CaseFoldMode::kTurkish;
+auto kNormal = CaseFoldMode::kNormal;
+}
+
+
+// Macro to preserve line numbers and arguments in error messages.
+#define TEST_PREP_FOR_SUBSTR_MATCH(expected, input, options, caseFoldMode)                       \
+    ASSERT_EQ(expected, toStringData(String::prepForSubstrMatch(input, options, caseFoldMode))); \
+    ASSERT_EQ(expected + filler,                                                                 \
+              toStringData(String::prepForSubstrMatch(input + filler, options, caseFoldMode)))
+
 TEST(UnicodeString, RemoveDiacritics) {
+    // Test all ascii chars.
+    for (unsigned char ch = 0; ch <= 0x7F; ch++) {
+        const auto input = std::string(1, ch);
+        const auto output = codepointIsDiacritic(ch) ? std::string() : std::string(1, ch);
+        if (ch) {  // String's constructor doesn't handle embedded NUL bytes.
+            ASSERT_EQUALS(output, String(input).removeDiacritics().toString());
+        }
+        TEST_PREP_FOR_SUBSTR_MATCH(output, input, kCaseSensitive, kNormal);
+    }
+
     // NFC Normalized Text.
-    String test1 = String(UTF8("¿CUÁNTOS AÑOS TIENES TÚ?"));
+    const char test1[] = UTF8("¿CUÁNTOS AÑOS TIENES TÚ?");
 
     // NFD Normalized Text ("Café").
     const char test2[] = {'C', 'a', 'f', 'e', static_cast<char>(0xcc), static_cast<char>(0x81), 0};
 
-    ASSERT_EQUALS(UTF8("¿CUANTOS ANOS TIENES TU?"), test1.removeDiacritics().toString());
+    ASSERT_EQUALS(UTF8("¿CUANTOS ANOS TIENES TU?"), String(test1).removeDiacritics().toString());
     ASSERT_EQUALS(UTF8("Cafe"), String(test2).removeDiacritics().toString());
+
+    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("¿CUANTOS ANOS TIENES TU?"), test1, kCaseSensitive, kNormal);
+    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("Cafe"), test2, kCaseSensitive, kNormal);
 }
 
 TEST(UnicodeString, CaseFolding) {
-    String test1 = String(UTF8("СКОЛЬКО ТЕБЕ ЛЕТ?"));
-    String test2 = String(UTF8("¿CUÁNTOS AÑOS TIENES TÚ?"));
+    // Test all ascii chars.
+    for (unsigned char ch = 0; ch <= 0x7F; ch++) {
+        const auto upper = std::string(1, ch);
+        const auto lower = std::string(1, std::tolower(ch));
+        if (ch) {  // String's constructor doesn't handle embedded NUL bytes.
+            ASSERT_EQUALS(lower, String(upper).toLower().toString());
+        }
+        TEST_PREP_FOR_SUBSTR_MATCH(lower, upper, kDiacriticSensitive, kNormal);
+    }
 
-    ASSERT_EQUALS(UTF8("сколько тебе лет?"), test1.toLower().toString());
-    ASSERT_EQUALS(UTF8("¿cuántos años tienes tú?"), test2.toLower().toString());
+    const char test1[] = UTF8("СКОЛЬКО ТЕБЕ ЛЕТ?");
+    const char test2[] = UTF8("¿CUÁNTOS AÑOS TIENES TÚ?");
+
+    ASSERT_EQUALS(UTF8("сколько тебе лет?"), String(test1).toLower().toString());
+    ASSERT_EQUALS(UTF8("¿cuántos años tienes tú?"), String(test2).toLower().toString());
+
+    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("сколько тебе лет?"), test1, kDiacriticSensitive, kNormal);
+    TEST_PREP_FOR_SUBSTR_MATCH(
+        UTF8("¿cuántos años tienes tú?"), test2, kDiacriticSensitive, kNormal);
 }
 
 TEST(UnicodeString, CaseFoldingTurkish) {
-    String test1 = String(UTF8("KAC YASINDASINIZ"));
-    String test2 = String(UTF8("KAC YASİNDASİNİZ"));
+    const char test1[] = UTF8("KAC YASINDASINIZ");
+    const char test2[] = UTF8("KAC YASİNDASİNİZ");
 
-    ASSERT_EQUALS(UTF8("kac yasındasınız"), test1.toLower(CaseFoldMode::kTurkish).toString());
-    ASSERT_EQUALS(UTF8("kac yasindasiniz"), test2.toLower(CaseFoldMode::kTurkish).toString());
+    ASSERT_EQUALS(UTF8("kac yasındasınız"),
+                  String(test1).toLower(CaseFoldMode::kTurkish).toString());
+    ASSERT_EQUALS(UTF8("kac yasindasiniz"),
+                  String(test2).toLower(CaseFoldMode::kTurkish).toString());
+
+    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("kac yasındasınız"), test1, kDiacriticSensitive, kTurkish);
+    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("kac yasindasiniz"), test2, kDiacriticSensitive, kTurkish);
 }
 
 TEST(UnicodeString, CaseFoldingAndRemoveDiacritics) {
     // NFC Normalized Text.
-    String test1 = String(UTF8("Πόσο χρονών είσαι?"));
-    String test2 = String(UTF8("¿CUÁNTOS AÑOS TIENES TÚ?"));
+    const char test1[] = UTF8("Πόσο χρονών είσαι?");
+    const char test2[] = UTF8("¿CUÁNTOS AÑOS TIENES TÚ?");
 
     // NFD Normalized Text ("CAFÉ").
     const char test3[] = {'C', 'A', 'F', 'E', static_cast<char>(0xcc), static_cast<char>(0x81), 0};
 
-    ASSERT_EQUALS(UTF8("ποσο χρονων εισαι?"), test1.toLower().removeDiacritics().toString());
-    ASSERT_EQUALS(UTF8("¿cuantos anos tienes tu?"), test2.toLower().removeDiacritics().toString());
+    ASSERT_EQUALS(UTF8("ποσο χρονων εισαι?"),
+                  String(test1).toLower().removeDiacritics().toString());
+    ASSERT_EQUALS(UTF8("¿cuantos anos tienes tu?"),
+                  String(test2).toLower().removeDiacritics().toString());
     ASSERT_EQUALS(UTF8("cafe"), String(test3).toLower().removeDiacritics().toString());
+
+    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("ποσο χρονων εισαι?"), test1, 0, kNormal);
+    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("¿cuantos anos tienes tu?"), test2, 0, kNormal);
+    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("cafe"), test3, 0, kNormal);
 }
 
 TEST(UnicodeString, SubstringMatch) {
-    String str = String(UTF8("Одумайся! Престол свой сохрани; И ярость укроти."));
+    std::string str = UTF8("Одумайся! Престол свой сохрани; И ярость укроти.");
 
     // Case insensitive & diacritic insensitive.
-    ASSERT(String::substrMatch(str, String(UTF8("ПРЁСТОЛ СВОИ")), String::kNone));
-    ASSERT_FALSE(String::substrMatch(str, String(UTF8("Престол сохрани")), String::kNone));
+    ASSERT(String::substrMatch(str, UTF8("ПРЁСТОЛ СВОИ"), String::kNone));
+    ASSERT_FALSE(String::substrMatch(str, UTF8("Престол сохрани"), String::kNone));
 
     // Case sensitive & diacritic insensitive.
-    ASSERT(String::substrMatch(str, String(UTF8("Одумаися!")), String::kCaseSensitive));
-    ASSERT_FALSE(String::substrMatch(str, String(UTF8("одумайся!")), String::kCaseSensitive));
+    ASSERT(String::substrMatch(str, UTF8("Одумаися!"), String::kCaseSensitive));
+    ASSERT_FALSE(String::substrMatch(str, UTF8("одумайся!"), String::kCaseSensitive));
 
     // Case insensitive & diacritic sensitive.
-    ASSERT(String::substrMatch(str, String(UTF8("одумайся!")), String::kDiacriticSensitive));
-    ASSERT_FALSE(String::substrMatch(str, String(UTF8("Одумаися!")), String::kDiacriticSensitive));
+    ASSERT(String::substrMatch(str, UTF8("одумайся!"), String::kDiacriticSensitive));
+    ASSERT_FALSE(String::substrMatch(str, UTF8("Одумаися!"), String::kDiacriticSensitive));
 
     // Case sensitive & diacritic sensitive.
     ASSERT(String::substrMatch(
-        str, String(UTF8("Одумайся!")), String::kDiacriticSensitive | String::kCaseSensitive));
+        str, UTF8("Одумайся!"), String::kDiacriticSensitive | String::kCaseSensitive));
     ASSERT_FALSE(String::substrMatch(
-        str, String(UTF8("Одумаися!")), String::kDiacriticSensitive | String::kCaseSensitive));
+        str, UTF8("Одумаися!"), String::kDiacriticSensitive | String::kCaseSensitive));
 }
 
 TEST(UnicodeString, SubstringMatchTurkish) {
-    String str = String(UTF8("KAÇ YAŞINDASINIZ?"));
+    std::string str = UTF8("KAÇ YAŞINDASINIZ?");
 
     // Case insensitive & diacritic insensitive.
-    ASSERT(String::substrMatch(
-        str, String(UTF8("yasındasınız")), String::kNone, CaseFoldMode::kTurkish));
-    ASSERT_FALSE(String::substrMatch(
-        str, String(UTF8("yasindasiniz")), String::kNone, CaseFoldMode::kTurkish));
+    ASSERT(String::substrMatch(str, UTF8("yasındasınız"), String::kNone, CaseFoldMode::kTurkish));
+    ASSERT_FALSE(
+        String::substrMatch(str, UTF8("yasindasiniz"), String::kNone, CaseFoldMode::kTurkish));
 
     // Case insensitive & diacritic sensitive.
     ASSERT(String::substrMatch(
-        str, String(UTF8("yaşındasınız")), String::kDiacriticSensitive, CaseFoldMode::kTurkish));
+        str, UTF8("yaşındasınız"), String::kDiacriticSensitive, CaseFoldMode::kTurkish));
     ASSERT_FALSE(String::substrMatch(
-        str, String(UTF8("yaşindasiniz")), String::kDiacriticSensitive, CaseFoldMode::kTurkish));
+        str, UTF8("yaşindasiniz"), String::kDiacriticSensitive, CaseFoldMode::kTurkish));
 }
 
 TEST(UnicodeString, BadUTF8) {
@@ -153,6 +217,14 @@ TEST(UnicodeString, BadUTF8) {
     ASSERT_THROWS(String test2(invalid2), AssertionException);
     ASSERT_THROWS(String test3(invalid3), AssertionException);
     ASSERT_THROWS(String test4(invalid4), AssertionException);
+
+    // preForSubstrMatch doesn't make any guarantees about behavior when fed invalid utf8.
+    // These calls are to ensure that they don't trigger any faults in sanitizing builds.
+    String::prepForSubstrMatch(invalid1, 0, kNormal);
+    String::prepForSubstrMatch(invalid2, 0, kNormal);
+    String::prepForSubstrMatch(invalid3, 0, kNormal);
+
+    ASSERT_THROWS(String::prepForSubstrMatch(invalid4, 0, kNormal), AssertionException);
 }
 
 TEST(UnicodeString, UTF32ToUTF8) {

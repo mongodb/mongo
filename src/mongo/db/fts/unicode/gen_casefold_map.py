@@ -7,11 +7,11 @@ from gen_helper import getCopyrightNotice, openNamespaces, closeNamespaces, \
     include
 
 def generate(unicode_casefold_file, target):
-    """Generates a C++ source file that contains a Unicode case folding 
+    """Generates a C++ source file that contains a Unicode case folding
        function.
 
     The case folding function contains a switch statement with cases for every
-    Unicode codepoint that has a case folding mapping. 
+    Unicode codepoint that has a case folding mapping.
     """
     out = open(target, "w")
 
@@ -43,29 +43,46 @@ def generate(unicode_casefold_file, target):
             codepoint_mapping  = int(values[2], 16)
             case_mappings[original_codepoint] = codepoint_mapping
 
-    out.write("""char32_t codepointToLower(char32_t codepoint, CaseFoldMode \
-mode) { 
-    if (mode == CaseFoldMode::kTurkish) {
-        if (codepoint == 0x049) {  // I -> ı
-            return 0x131;
-        } else if (codepoint == 0x130) {  // İ -> i
-            return 0x069;
-        }
+    turkishMapping = {
+        0x49: 0x131,  # I -> ı
+        0x130: 0x069,   # İ -> i
     }
 
-    switch (codepoint) {\n""")
+    out.write(
+        """char32_t codepointToLower(char32_t codepoint, CaseFoldMode mode) {
+               if (codepoint <= 0x7f) {
+                    if (codepoint >= 'A' && codepoint <= 'Z') {
+                       return (mode == CaseFoldMode::kTurkish && codepoint == 'I')
+                              ? 0x131
+                              : (codepoint | 0x20); // Set the ascii lowercase bit on the character.
+                   }
+                   return codepoint;
+               }
+
+               switch (codepoint) {\n""")
 
     mappings_list = []
 
     for mapping in case_mappings:
         mappings_list.append((mapping, case_mappings[mapping]))
 
+    # Make sure we include each mapping in turkishMapping in the cases below. This ensures we handle
+    # them even if we'd skip the letter in non-turkish mode.
+    for mapping in turkishMapping:
+        if mapping not in case_mappings:
+            mappings_list.append((mapping, mapping))
+
     sorted_mappings = sorted(mappings_list, key=lambda mapping: mapping[0])
 
     for mapping in sorted_mappings:
-        out.write("\
-    case " + str(hex(mapping[0])) + ": return " + \
-        str(hex(mapping[1])) +";\n")
+        if mapping[0] <= 0x7f:
+            continue # ascii is special cased above.
+
+        if mapping[0] in turkishMapping:
+            out.write("case 0x%x: return mode == CaseFoldMode::kTurkish ? 0x%x : 0x%x;\n"
+                      % (mapping[0], turkishMapping[mapping[0]], mapping[1]))
+        else:
+            out.write("case 0x%x: return 0x%x;\n"%mapping)
 
     out.write("\
     default: return codepoint;\n    }\n}")

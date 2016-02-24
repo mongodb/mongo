@@ -29,7 +29,9 @@
 #include "mongo/db/fts/unicode/string.h"
 
 #include <algorithm>
+#include <boost/algorithm/searching/boyer_moore.hpp>
 
+#include "mongo/platform/bits.h"
 #include "mongo/shell/linenoise_utf8.h"
 #include "mongo/util/assert_util.h"
 
@@ -42,10 +44,6 @@ using linenoise_utf8::copyString8to32;
 using std::u32string;
 
 String::String(const StringData utf8_src) {
-    // Reserve space for underlying buffers to prevent excessive reallocations.
-    _outputBuf.reserve(utf8_src.size() * 4);
-    _data.reserve(utf8_src.size() * 4);
-
     // Convert UTF-8 input to UTF-32 data.
     setData(utf8_src);
 }
@@ -79,12 +77,6 @@ void String::setData(const StringData utf8_src) {
     _needsOutputConversion = true;
 }
 
-String::String(u32string&& src) : _data(std::move(src)), _needsOutputConversion(true) {
-    // Reserve space for underlying buffers to prevent excessive reallocations.
-    _outputBuf.reserve(src.size() * 4);
-    _data.reserve(src.size() * 4);
-}
-
 std::string String::toString() {
     // _outputBuf is the target, resize it so that it's guaranteed to fit all of the input
     // characters, plus a null character if there isn't one.
@@ -98,14 +90,6 @@ std::string String::toString() {
         _needsOutputConversion = false;
     }
     return _outputBuf;
-}
-
-size_t String::size() const {
-    return _data.size();
-}
-
-const char32_t& String::operator[](int i) const {
-    return _data[i];
 }
 
 String String::substr(size_t pos, size_t len) const {
@@ -147,63 +131,133 @@ void String::substrToBuf(size_t pos, size_t len, String& buffer) const {
 
 void String::toLowerToBuf(CaseFoldMode mode, String& buffer) const {
     buffer._data.resize(_data.size());
-    auto index = 0;
+    auto outIt = buffer._data.begin();
     for (auto codepoint : _data) {
-        buffer._data[index++] = codepointToLower(codepoint, mode);
+        *outIt++ = codepointToLower(codepoint, mode);
     }
     buffer._needsOutputConversion = true;
 }
 
 void String::removeDiacriticsToBuf(String& buffer) const {
     buffer._data.resize(_data.size());
-    auto index = 0;
+    auto outIt = buffer._data.begin();
     for (auto codepoint : _data) {
-        if (!codepointIsDiacritic(codepoint)) {
-            buffer._data[index++] = codepointRemoveDiacritics(codepoint);
+        if (codepoint <= 0x7f) {
+            // ASCII only has two diacritics so they are hard-coded here.
+            if (codepoint != '^' && codepoint != '`') {
+                *outIt++ = codepoint;
+            }
+        } else if (auto clean = codepointRemoveDiacritics(codepoint)) {
+            *outIt++ = clean;
+        } else {
+            // codepoint was a pure diacritic mark, so skip it.
         }
     }
-    buffer._data.resize(index);
+    buffer._data.resize(outIt - buffer._data.begin());
     buffer._needsOutputConversion = true;
 }
 
-bool String::substrMatch(const String& str,
-                         const String& find,
-                         SubstrMatchOptions options,
-                         CaseFoldMode cfMode) {
-    // In Turkish, lowercasing needs to be applied first because the letter İ has a different case
-    // folding mapping than the letter I, but removing diacritics removes the dot from İ.
-    if (cfMode == CaseFoldMode::kTurkish) {
-        String cleanStr = str.toLower(cfMode);
-        String cleanFind = find.toLower(cfMode);
-        return substrMatch(cleanStr, cleanFind, options | kCaseSensitive, CaseFoldMode::kNormal);
-    }
+std::pair<std::unique_ptr<char[]>, char*> String::prepForSubstrMatch(StringData utf8,
+                                                                     SubstrMatchOptions options,
+                                                                     CaseFoldMode mode) {
+    // This function should only be called when casefolding or stripping diacritics.
+    dassert(!(options & kCaseSensitive) || !(options & kDiacriticSensitive));
 
-    if (options & kDiacriticSensitive) {
-        if (options & kCaseSensitive) {
-            // Case sensitive and diacritic sensitive.
-            return std::search(str._data.cbegin(),
-                               str._data.cend(),
-                               find._data.cbegin(),
-                               find._data.cend(),
-                               [&](char32_t c1, char32_t c2) { return (c1 == c2); }) !=
-                str._data.cend();
+    // Allocate space for up to 2x growth which is the worst possible case for stripping diacritics
+    // and casefolding. Proof: the only case where 1 byte goes to >1 is 'I' in Turkish going to 2
+    // bytes. The biggest codepoint is 4 bytes which is also 2x 2 bytes. This holds as long as we
+    // don't map a single code point to more than one.
+    std::unique_ptr<char[]> buffer(new char[utf8.size() * 2]);
+    auto outputIt = buffer.get();
+
+    for (auto inputIt = utf8.begin(), endIt = utf8.end(); inputIt != endIt;) {
+        const uint8_t firstByte = *inputIt++;
+        char32_t codepoint = 0;
+        if (firstByte <= 0x7f) {
+            // ASCII special case. Can use faster operations.
+            if ((!(options & kCaseSensitive)) && (firstByte >= 'A' && firstByte <= 'Z')) {
+                codepoint = (mode == CaseFoldMode::kTurkish && firstByte == 'I')
+                    ? 0x131                // In Turkish, I -> ı (i with no dot).
+                    : (firstByte | 0x20);  // Set the ascii lowercase bit on the character.
+            } else {
+                // ASCII has two pure diacritics that should be skipped and no characters that
+                // change when removing diacritics.
+                if ((options & kDiacriticSensitive) || !(firstByte == '^' || firstByte == '`')) {
+                    *outputIt++ = (firstByte);
+                }
+                continue;
+            }
+        } else {
+            // firstByte indicates that it is not an ASCII char.
+            int leadingOnes = countLeadingZeros64(~(uint64_t(firstByte) << (64 - 8)));
+
+            // Only checking enough to ensure that this code doesn't crash in the face of malformed
+            // utf-8. We make no guarantees about what results will be returned in this case.
+            uassert(ErrorCodes::BadValue,
+                    "text contains invalid UTF-8",
+                    leadingOnes > 1 && leadingOnes <= 4 && inputIt + leadingOnes - 1 <= endIt);
+
+            codepoint = firstByte & (0xff >> leadingOnes);  // mask off the size indicator.
+            for (int subByteIx = 1; subByteIx < leadingOnes; subByteIx++) {
+                const uint8_t subByte = *inputIt++;
+                codepoint <<= 6;
+                codepoint |= subByte & 0x3f;  // mask off continuation bits.
+            }
+
+            if (!(options & kCaseSensitive)) {
+                codepoint = codepointToLower(codepoint, mode);
+            }
+
+            if (!(options & kDiacriticSensitive)) {
+                codepoint = codepointRemoveDiacritics(codepoint);
+                if (!codepoint)
+                    continue;  // codepoint is a pure diacritic.
+            }
         }
 
-        // Case insensitive and diacritic sensitive.
-        return std::search(str._data.cbegin(),
-                           str._data.cend(),
-                           find._data.cbegin(),
-                           find._data.cend(),
-                           [&](char32_t c1, char32_t c2) {
-                               return (codepointToLower(c1, cfMode) ==
-                                       codepointToLower(c2, cfMode));
-                           }) != str._data.cend();
+        // Back to utf-8.
+        if (codepoint <= 0x7f /* max 1-byte codepoint */) {
+            *outputIt++ = (codepoint);
+        } else if (codepoint <= 0x7ff /* max 2-byte codepoint*/) {
+            *outputIt++ = ((codepoint >> (6 * 1)) | 0xc0);  // 2 leading 1s.
+            *outputIt++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
+        } else if (codepoint <= 0xffff /* max 3-byte codepoint*/) {
+            *outputIt++ = ((codepoint >> (6 * 2)) | 0xe0);  // 3 leading 1s.
+            *outputIt++ = (((codepoint >> (6 * 1)) & 0x3f) | 0x80);
+            *outputIt++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
+        } else {
+            *outputIt++ = ((codepoint >> (6 * 3)) | 0xf0);  // 4 leading 1s.
+            *outputIt++ = (((codepoint >> (6 * 2)) & 0x3f) | 0x80);
+            *outputIt++ = (((codepoint >> (6 * 1)) & 0x3f) | 0x80);
+            *outputIt++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
+        }
     }
 
-    String cleanStr = str.removeDiacritics();
-    String cleanFind = find.removeDiacritics();
+    return {std::move(buffer), outputIt};
+}
 
-    return substrMatch(cleanStr, cleanFind, options | kDiacriticSensitive, cfMode);
+bool String::substrMatch(const std::string& str,
+                         const std::string& find,
+                         SubstrMatchOptions options,
+                         CaseFoldMode cfMode) {
+    if (cfMode == CaseFoldMode::kTurkish) {
+        // Turkish comparisons are always case insensitive due to their handling of I/i.
+        options &= ~kCaseSensitive;
+    }
+
+    if ((options & kCaseSensitive) && (options & kDiacriticSensitive)) {
+        // No transformation needed. Just do the search on the input strings.
+        return boost::algorithm::boyer_moore_search(
+                   str.cbegin(), str.cend(), find.cbegin(), find.cend()) != str.cend();
+    }
+
+    auto haystack = prepForSubstrMatch(str, options, cfMode);
+    auto needle = prepForSubstrMatch(find, options, cfMode);
+
+    // Case sensitive and diacritic sensitive.
+    return boost::algorithm::boyer_moore_search(
+               haystack.first.get(), haystack.second, needle.first.get(), needle.second) !=
+        haystack.second;
 }
 
 }  // namespace unicode

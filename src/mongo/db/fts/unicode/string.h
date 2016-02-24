@@ -29,6 +29,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -110,12 +111,16 @@ public:
     /**
      * Returns the number Unicode codepoints in the String.
      */
-    size_t size() const;
+    size_t size() const {
+        return _data.size();
+    }
 
     /**
      * Returns the Unicode codepoint at index i of the String.
      */
-    const char32_t& operator[](int i) const;
+    const char32_t& operator[](int i) const {
+        return _data[i];
+    }
 
     /**
      * Options for the substrMatch method.
@@ -143,18 +148,22 @@ public:
      * the search is case insensitive, non-Turkish case folding is used unless the
      * CaseFoldMode::Turkish is passed to mode.
      */
-    static bool substrMatch(const String& str,
-                            const String& find,
+    static bool substrMatch(const std::string& str,
+                            const std::string& find,
                             SubstrMatchOptions options,
                             CaseFoldMode mode = CaseFoldMode::kNormal);
 
-private:
     /**
-     * Private constructor used by substr, toLower, and removeDiacritics to build a String from
-     * UTF-32 data.
+     * Strips diacritics and case-folds the utf8 input string, as needed to support options.
+     *
+     * Returns an owned buffer containing the output utf8 string and an end iterator for the string
+     * (points at the first byte after the string).
      */
-    String(std::u32string&& src);
+    static std::pair<std::unique_ptr<char[]>, char*> prepForSubstrMatch(StringData utf8,
+                                                                        SubstrMatchOptions options,
+                                                                        CaseFoldMode mode);
 
+private:
     /**
      * Helper method for converting a UTF-8 string to a UTF-32 string.
      */
