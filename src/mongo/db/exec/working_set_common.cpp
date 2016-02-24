@@ -63,7 +63,13 @@ bool WorkingSetCommon::fetchAndInvalidateRecordId(OperationContext* txn,
 }
 
 void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
-    dassert(supportsDocLocking());
+    if (!supportsDocLocking()) {
+        // Non doc-locking storage engines use invalidations, so we don't need to examine the
+        // buffered working set ids. But we do need to clear the set of ids in order to keep our
+        // memory utilization in check.
+        workingSet->getAndClearYieldSensitiveIds();
+        return;
+    }
 
     for (auto id : workingSet->getAndClearYieldSensitiveIds()) {
         if (workingSet->isFree(id)) {

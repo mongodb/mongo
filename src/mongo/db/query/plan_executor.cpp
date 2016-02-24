@@ -258,13 +258,10 @@ OperationContext* PlanExecutor::getOpCtx() const {
 void PlanExecutor::saveState() {
     invariant(_currentState == kUsable || _currentState == kSaved);
 
-    // Doc-locking storage engines drop their transactional context after saving state.
     // The query stages inside this stage tree might buffer record ids (e.g. text, geoNear,
     // mergeSort, sort) which are no longer protected by the storage engine's transactional
     // boundaries.
-    if (supportsDocLocking()) {
-        WorkingSetCommon::prepareForSnapshotChange(_workingSet.get());
-    }
+    WorkingSetCommon::prepareForSnapshotChange(_workingSet.get());
 
     if (!killed()) {
         _root->saveState();

@@ -872,11 +872,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
 
             // Save state before making changes
             try {
-                if (supportsDocLocking()) {
-                    // Doc-locking engines require this before saveState() since they don't use
-                    // invalidations.
-                    WorkingSetCommon::prepareForSnapshotChange(_ws);
-                }
+                WorkingSetCommon::prepareForSnapshotChange(_ws);
                 child()->saveState();
             } catch (const WriteConflictException& wce) {
                 std::terminate();
