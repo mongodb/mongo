@@ -51,6 +51,7 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/move_chunk_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 
@@ -483,32 +484,26 @@ bool Chunk::moveAndCommit(OperationContext* txn,
                           BSONObj& res) const {
     uassert(10167, "can't move shard to its current location!", getShardId() != toShardId);
 
-    log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") "
-          << getShardId() << " -> " << toShardId;
-
     BSONObjBuilder builder;
-    builder.append("moveChunk", _manager->getns());
-    builder.append("from", _getShardConnectionString(txn).toString());
-    {
-        const auto toShard = grid.shardRegistry()->getShard(txn, toShardId);
-        builder.append("to", toShard->getConnString().toString());
-    }
-    // NEEDED FOR 2.0 COMPATIBILITY
-    builder.append("fromShard", getShardId());
-    builder.append("toShard", toShardId);
-    ///////////////////////////////
-    builder.append("min", _min);
-    builder.append("max", _max);
-    builder.append("maxChunkSizeBytes", chunkSize);
-    builder.append("configdb", grid.shardRegistry()->getConfigServerConnectionString().toString());
-    secondaryThrottle.append(&builder);
-
-    builder.append("waitForDelete", waitForDelete);
+    MoveChunkRequest::appendAsCommand(&builder,
+                                      NamespaceString(_manager->getns()),
+                                      _manager->getVersion(),
+                                      grid.shardRegistry()->getConfigServerConnectionString(),
+                                      _shardId,
+                                      toShardId,
+                                      _min,
+                                      _max,
+                                      chunkSize,
+                                      secondaryThrottle,
+                                      waitForDelete);
     builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
-    _manager->getVersion().appendForCommands(&builder);
+
+    BSONObj cmdObj = builder.obj();
+
+    log() << "Moving chunk with the following arguments: " << cmdObj;
 
     ShardConnection fromconn(_getShardConnectionString(txn), "");
-    bool worked = fromconn->runCommand("admin", builder.done(), res);
+    bool worked = fromconn->runCommand("admin", cmdObj, res);
     fromconn.done();
 
     LOG(worked ? 1 : 0) << "moveChunk result: " << res;

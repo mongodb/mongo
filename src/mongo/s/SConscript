@@ -39,6 +39,7 @@ env.Library(
         'chunk_diff.cpp',
         'chunk_version.cpp',
         'migration_secondary_throttle_options.cpp',
+        'move_chunk_request.cpp',
         'set_shard_version_request.cpp',
     ],
     LIBDEPS=[
@@ -102,6 +103,7 @@ env.CppUnitTest(
     source=[
         'chunk_version_test.cpp',
         'migration_secondary_throttle_options_test.cpp',
+        'move_chunk_request_test.cpp',
         'set_shard_version_request_test.cpp',
     ],
     LIBDEPS=[

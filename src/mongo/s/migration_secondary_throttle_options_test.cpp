@@ -26,15 +26,12 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
