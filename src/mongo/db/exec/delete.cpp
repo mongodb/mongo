@@ -197,11 +197,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
         // saving/restoring state repeatedly?
 
         try {
-            if (supportsDocLocking()) {
-                // Doc-locking engines require this before saveState() since they don't use
-                // invalidations.
-                WorkingSetCommon::prepareForSnapshotChange(_ws);
-            }
+            WorkingSetCommon::prepareForSnapshotChange(_ws);
             child()->saveState();
         } catch (const WriteConflictException& wce) {
             std::terminate();
