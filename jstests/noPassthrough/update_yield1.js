@@ -69,8 +69,8 @@ while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
 
 join();
 
-x = db.currentOp();
+var curOp = db.currentOp();
 // currentOp itself shows up as an active operation
-assert.eq( 1 , x.inprog.length , "weird 2" );
+assert.eq( 1 , curOp.inprog.length , tojson(curOp) );
 
 testServer.stop();
