@@ -29,6 +29,8 @@
 #ifndef	HAVE_WTPERF_H
 #define	HAVE_WTPERF_H
 
+#include <wt_internal.h>
+
 #ifndef _WIN32
 #include <sys/time.h>
 #endif
@@ -56,8 +58,6 @@
 #include <unistd.h>
 #endif
 
-#include <wt_internal.h>
-
 #ifdef _WIN32
 #include "windows_shim.h"
 #endif
@@ -73,9 +73,6 @@ typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 #define	EXTPATH "../../ext/compressors/"		/* Extensions path */
 #define	BLKCMP_PFX	",block_compressor="
 
-#define	BZIP_BLK BLKCMP_PFX "bzip2"
-#define	BZIP_EXT							\
-	EXT_PFX EXTPATH "bzip2/.libs/libwiredtiger_bzip2.so" EXT_SFX
 #define	LZ4_BLK BLKCMP_PFX "lz4"
 #define	LZ4_EXT							\
 	EXT_PFX EXTPATH "lz4/.libs/libwiredtiger_lz4.so" EXT_SFX
@@ -91,7 +88,7 @@ typedef struct {
 	int64_t insert;			/* Insert ratio */
 	int64_t read;			/* Read ratio */
 	int64_t update;			/* Update ratio */
-	uint64_t throttle;              /* Maximum operations/second */
+	uint64_t throttle;		/* Maximum operations/second */
 		/* Number of operations per transaction. Zero for autocommit */
 	int64_t ops_per_txn;
 	int64_t truncate;		/* Truncate ratio */
@@ -406,16 +403,18 @@ dstrdup(const char *str)
 
 /*
  * dstrndup --
- *      Call strndup, dying on failure.
+ *      Call emulating strndup, dying on failure. Don't use actual strndup here
+ *	as it is not supported within MSVC.
  */
 static inline char *
 dstrndup(const char *str, const size_t len)
 {
 	char *p;
+	p = dcalloc(len + 1, 1);
 
-	if ((p = strndup(str, len)) == NULL)
-		die(errno, "strndup");
+	strncpy(p, str, len);
+	if (p == NULL)
+		die(errno, "dstrndup");
 	return (p);
 }
-
 #endif

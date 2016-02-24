@@ -42,7 +42,6 @@ class test_compress01(wttest.WiredTigerTestCase):
         ('table', dict(uri='table:test_compress01')),
     ]
     compress = [
-        ('bzip2', dict(compress='bzip2')),
         ('nop', dict(compress='nop')),
         ('snappy', dict(compress='snappy')),
         ('none', dict(compress=None)),

@@ -139,6 +139,7 @@ __wt_block_read_off_blind(
 	WT_RET(__wt_read(
 	    session, block->fh, offset, (size_t)block->allocsize, buf->mem));
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
+	__wt_block_header_byteswap(blk);
 
 	/*
 	 * Copy out the size and checksum (we're about to re-use the buffer),
@@ -163,7 +164,7 @@ int
 __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_ITEM *buf, wt_off_t offset, uint32_t size, uint32_t cksum)
 {
-	WT_BLOCK_HEADER *blk;
+	WT_BLOCK_HEADER *blk, swap;
 	size_t bufsize;
 	uint32_t page_cksum;
 
@@ -193,14 +194,26 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
 	buf->size = size;
 
+	/*
+	 * We incrementally read through the structure before doing a checksum,
+	 * do little- to big-endian handling early on, and then select from the
+	 * original or swapped structure as needed.
+	 */
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
-	if (blk->cksum == cksum) {
+	__wt_block_header_byteswap_copy(blk, &swap);
+	if (swap.cksum == cksum) {
 		blk->cksum = 0;
 		page_cksum = __wt_cksum(buf->mem,
-		    F_ISSET(blk, WT_BLOCK_DATA_CKSUM) ?
+		    F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ?
 		    size : WT_BLOCK_COMPRESS_SKIP);
-		if (page_cksum == cksum)
+		if (page_cksum == cksum) {
+			/*
+			 * Swap the page-header as needed; this doesn't belong
+			 * here, but it's the best place to catch all callers.
+			 */
+			__wt_page_header_byteswap(buf->mem);
 			return (0);
+		}
 
 		if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
 			__wt_errx(session,
@@ -216,7 +229,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			    "offset %" PRIuMAX ": block header checksum "
 			    "of %" PRIu32 " doesn't match expected checksum "
 			    "of %" PRIu32,
-			    size, (uintmax_t)offset, blk->cksum, cksum);
+			    size, (uintmax_t)offset, swap.cksum, cksum);
 
 	/* Panic if a checksum fails during an ordinary read. */
 	return (block->verify ||

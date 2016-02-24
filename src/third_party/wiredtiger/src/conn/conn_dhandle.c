@@ -421,7 +421,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 			    (apply_checkpoints ||
 			    dhandle->checkpoint == NULL) &&
 			    WT_PREFIX_MATCH(dhandle->name, "file:") &&
-			    !WT_IS_METADATA(dhandle))
+			    !WT_IS_METADATA(session, dhandle))
 				WT_RET(__conn_btree_apply_internal(
 				    session, dhandle, func, cfg));
 	}
@@ -644,7 +644,7 @@ __wt_conn_dhandle_discard_single(
 		F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
 
 	/* Try to remove the handle, protected by the data handle lock. */
-	WT_WITH_HANDLE_LIST_LOCK(session, tret,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    tret = __conn_dhandle_remove(session, final));
 	WT_TRET(tret);
 
@@ -686,7 +686,7 @@ __wt_conn_dhandle_discard(WT_SESSION_IMPL *session)
 	 */
 restart:
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
-		if (WT_IS_METADATA(dhandle))
+		if (WT_IS_METADATA(session, dhandle))
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,
