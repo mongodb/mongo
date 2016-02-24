@@ -159,13 +159,19 @@ config_compress(CONFIG *cfg)
 		cfg->compress_ext = NULL;
 		cfg->compress_table = NULL;
 	} else if (strcmp(s, "lz4") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_LZ4
 		cfg->compress_ext = LZ4_EXT;
+#endif
 		cfg->compress_table = LZ4_BLK;
 	} else if (strcmp(s, "snappy") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_SNAPPY
 		cfg->compress_ext = SNAPPY_EXT;
+#endif
 		cfg->compress_table = SNAPPY_BLK;
 	} else if (strcmp(s, "zlib") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_ZLIB
 		cfg->compress_ext = ZLIB_EXT;
+#endif
 		cfg->compress_table = ZLIB_BLK;
 	} else {
 		fprintf(stderr,
