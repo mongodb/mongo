@@ -120,6 +120,10 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
         }
 
         if (str::equals(pFieldName, "allowDiskUse")) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "The 'allowDiskUse' option is not permitted in read-only mode.",
+                    !storageGlobalParams.readOnly);
+
             uassert(16949,
                     str::stream() << "allowDiskUse must be a bool, not a "
                                   << typeName(cmdElement.type()),
