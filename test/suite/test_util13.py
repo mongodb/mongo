@@ -95,9 +95,9 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
         match = all(item in da.items() for item in dx.items())
         if match == False:
             print "MISMATCH:"
-            print "Original dict: " 
+            print "Original dict: "
             print da
-            print "Expected config: " 
+            print "Expected config: "
             print dx
         return match
 
