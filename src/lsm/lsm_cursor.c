@@ -1501,22 +1501,22 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_cursor_get_key,	/* get-key */
-	    __wt_cursor_get_value,	/* get-value */
-	    __wt_cursor_set_key,	/* set-key */
-	    __wt_cursor_set_value,	/* set-value */
-	    __clsm_compare,		/* compare */
-	    __wt_cursor_equals,		/* equals */
-	    __clsm_next,		/* next */
-	    __clsm_prev,		/* prev */
-	    __clsm_reset,		/* reset */
-	    __clsm_search,		/* search */
-	    __clsm_search_near,		/* search-near */
-	    __clsm_insert,		/* insert */
-	    __clsm_update,		/* update */
-	    __clsm_remove,		/* remove */
-	    __wt_cursor_reconfigure,	/* reconfigure */
-	    __wt_clsm_close);		/* close */
+	    __wt_cursor_get_key,		/* get-key */
+	    __wt_cursor_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __wt_cursor_set_value,		/* set-value */
+	    __clsm_compare,			/* compare */
+	    __wt_cursor_equals,			/* equals */
+	    __clsm_next,			/* next */
+	    __clsm_prev,			/* prev */
+	    __clsm_reset,			/* reset */
+	    __clsm_search,			/* search */
+	    __clsm_search_near,			/* search-near */
+	    __clsm_insert,			/* insert */
+	    __clsm_update,			/* update */
+	    __clsm_remove,			/* remove */
+	    __wt_cursor_reconfigure,		/* reconfigure */
+	    __wt_clsm_close);			/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;

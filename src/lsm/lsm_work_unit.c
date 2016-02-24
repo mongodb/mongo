@@ -341,20 +341,13 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * time, and our checkpoint operation should be very quick.
 	 */
 	WT_ERR(__wt_meta_track_on(session));
-	F_SET(session, WT_SESSION_LOCK_NO_WAIT);
 	WT_WITH_CHECKPOINT_LOCK(session, ret,
 	    WT_WITH_SCHEMA_LOCK(session, ret,
 		ret = __wt_schema_worker(
 		session, chunk->uri, __wt_checkpoint, NULL, NULL, 0)));
 	WT_TRET(__wt_meta_track_off(session, false, ret != 0));
-	F_CLR(session, WT_SESSION_LOCK_NO_WAIT);
-	if (ret != 0) {
-		if (ret == EBUSY) {
-			ret = 0;
-			goto err;
-		}
+	if (ret != 0)
 		WT_ERR_MSG(session, ret, "LSM checkpoint");
-	}
 
 	/* Now the file is written, get the chunk size. */
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));

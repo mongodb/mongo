@@ -326,6 +326,22 @@ public static int cursor_ops(Session session)
     /*! [Display an error] */
     }
 
+    {
+    /*! [Display an error thread safe] */
+    try {
+        String key = "non-existent key";
+        cursor.putKeyString(key);
+        if ((ret = cursor.remove()) != 0) {
+            System.err.println(
+                "cursor.remove: " + wiredtiger.wiredtiger_strerror(ret));
+            return (ret);
+        }
+    } catch (WiredTigerException wte) {  /* Catch severe errors. */
+        System.err.println("cursor.remove exception: " + wte);
+    }
+    /*! [Display an error thread safe] */
+    }
+
     /*! [Close the cursor] */
     ret = cursor.close();
     /*! [Close the cursor] */

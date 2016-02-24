@@ -60,11 +60,9 @@ lrt(void *arg)
 
 	/* Open a session and cursor. */
 	conn = g.wts_conn;
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
-	if ((ret = session->open_cursor(
-	    session, g.uri, NULL, NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_check(session->open_cursor(
+	    session, g.uri, NULL, NULL, &cursor));
 
 	for (pinned = 0;;) {
 		if (pinned) {
@@ -73,7 +71,8 @@ lrt(void *arg)
 			    &key, saved_keyno, 1)) == WT_ROLLBACK)
 				;
 			if (ret != 0)
-				die(ret, "read_row %" PRIu64, saved_keyno);
+				testutil_die(ret,
+				    "read_row %" PRIu64, saved_keyno);
 
 			/* Compare the previous value with the current one. */
 			if (g.type == FIX) {
@@ -83,21 +82,19 @@ lrt(void *arg)
 			} else
 				ret = cursor->get_value(cursor, &value);
 			if (ret != 0)
-				die(ret,
+				testutil_die(ret,
 				    "cursor.get_value: %" PRIu64, saved_keyno);
 
 			if (buf_size != value.size ||
 			    memcmp(buf, value.data, value.size) != 0)
-				die(0, "mismatched start/stop values");
+				testutil_die(0, "mismatched start/stop values");
 
 			/* End the transaction. */
-			if ((ret =
-			    session->commit_transaction(session, NULL)) != 0)
-				die(ret, "session.commit_transaction");
+			testutil_check(
+			    session->commit_transaction(session, NULL));
 
 			/* Reset the cursor, releasing our pin. */
-			if ((ret = cursor->reset(cursor)) != 0)
-				die(ret, "cursor.reset");
+			testutil_check(cursor->reset(cursor));
 			pinned = 0;
 		} else {
 			/*
@@ -106,9 +103,8 @@ lrt(void *arg)
 			 * positioned. As soon as the cursor loses its position
 			 * a new snapshot will be allocated.
 			 */
-			if ((ret = session->begin_transaction(
-			    session, "isolation=snapshot")) != 0)
-				die(ret, "session.begin_transaction");
+			testutil_check(session->begin_transaction(
+			    session, "isolation=snapshot"));
 
 			/* Read a record at the end of the table. */
 			do {
@@ -120,7 +116,8 @@ lrt(void *arg)
 					;
 			} while (ret == WT_NOTFOUND);
 			if (ret != 0)
-				die(ret, "read_row %" PRIu64, saved_keyno);
+				testutil_die(ret,
+				    "read_row %" PRIu64, saved_keyno);
 
 			/* Copy the cursor's value. */
 			if (g.type == FIX) {
@@ -130,11 +127,11 @@ lrt(void *arg)
 			} else
 				ret = cursor->get_value(cursor, &value);
 			if (ret != 0)
-				die(ret,
+				testutil_die(ret,
 				    "cursor.get_value: %" PRIu64, saved_keyno);
 			if (buf_len < value.size &&
 			    (buf = realloc(buf, buf_len = value.size)) == NULL)
-				die(errno, "malloc");
+				testutil_die(errno, "malloc");
 			memcpy(buf, value.data, buf_size = value.size);
 
 			/*
@@ -149,7 +146,7 @@ lrt(void *arg)
 					;
 			} while (ret == WT_NOTFOUND);
 			if (ret != 0)
-				die(ret, "read_row %" PRIu64, keyno);
+				testutil_die(ret, "read_row %" PRIu64, keyno);
 
 			pinned = 1;
 		}
@@ -166,8 +163,7 @@ lrt(void *arg)
 			break;
 	}
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 
 	free(keybuf);
 	free(buf);

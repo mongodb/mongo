@@ -65,6 +65,9 @@ __wt_write(WT_SESSION_IMPL *session,
 	    "%s: write %" WT_SIZET_FMT " bytes at offset %" PRIuMAX,
 	    fh->name, len, (uintmax_t)offset));
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY) ||
+	    WT_STRING_MATCH(fh->name, WT_SINGLETHREAD,
+	    strlen(WT_SINGLETHREAD)));
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
 	WT_ASSERT(session,
 	    !fh->direct_io ||

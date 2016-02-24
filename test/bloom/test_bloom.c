@@ -55,6 +55,8 @@ void usage(void);
 extern char *__wt_optarg;
 extern int __wt_optind;
 
+void (*custom_die)(void) = NULL;
+
 int
 main(int argc, char *argv[])
 {
@@ -129,11 +131,9 @@ setup(void)
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s",
 	    g.progname, g.c_cache, g.config_open == NULL ? "" : g.config_open);
 
-	if ((ret = wiredtiger_open(NULL, NULL, config, &conn)) != 0)
-		testutil_die(ret, "wiredtiger_open");
+	testutil_check(wiredtiger_open(NULL, NULL, config, &conn));
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "connection.open_session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	g.wt_conn = conn;
 	g.wt_session = session;
@@ -153,9 +153,8 @@ run(void)
 	/* Use the internal session handle to access private APIs. */
 	sess = (WT_SESSION_IMPL *)g.wt_session;
 
-	if ((ret = __wt_bloom_create(
-	    sess, uri, NULL, g.c_ops, g.c_factor, g.c_k, &bloomp)) != 0)
-		testutil_die(ret, "__wt_bloom_create");
+	testutil_check(__wt_bloom_create(
+	    sess, uri, NULL, g.c_ops, g.c_factor, g.c_k, &bloomp));
 
 	item.size = g.c_key_max;
 	for (i = 0; i < g.c_ops; i++) {
@@ -164,8 +163,7 @@ run(void)
 			testutil_die(ret, "__wt_bloom_insert: %d", i);
 	}
 
-	if ((ret = __wt_bloom_finalize(bloomp)) != 0)
-		testutil_die(ret, "__wt_bloom_finalize");
+	testutil_check(__wt_bloom_finalize(bloomp));
 
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
@@ -174,18 +172,15 @@ run(void)
 			testutil_die(ret, "__wt_bloom_get");
 		}
 	}
-	if ((ret = __wt_bloom_close(bloomp)) != 0)
-		testutil_die(ret, "__wt_bloom_close");
+	testutil_check(__wt_bloom_close(bloomp));
 
-	if ((ret = g.wt_session->checkpoint(g.wt_session, NULL)) != 0)
-		testutil_die(ret, "WT_SESSION.checkpoint");
-	if ((ret = __wt_bloom_open(
-	    sess, uri, g.c_factor, g.c_k, NULL, &bloomp)) != 0)
-		testutil_die(ret, "__wt_bloom_open");
+	testutil_check(g.wt_session->checkpoint(g.wt_session, NULL));
+	testutil_check(__wt_bloom_open(
+	    sess, uri, g.c_factor, g.c_k, NULL, &bloomp));
+
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
-		if ((ret = __wt_bloom_get(bloomp, &item)) != 0)
-			testutil_die(ret, "__wt_bloom_get");
+		testutil_check(__wt_bloom_get(bloomp, &item));
 	}
 
 	/*
@@ -194,33 +189,33 @@ run(void)
 	 */
 	item.size = g.c_key_max + 10;
 	item.data = calloc(item.size, 1);
+	if (item.data == NULL)
+		testutil_die(ENOMEM, "value buffer malloc");
 	memset((void *)item.data, 'a', item.size);
 	for (i = 0, fp = 0; i < g.c_ops; i++) {
 		((uint8_t *)item.data)[i % item.size] =
 		    'a' + ((uint8_t)rand() % 26);
 		if ((ret = __wt_bloom_get(bloomp, &item)) == 0)
 			++fp;
+		if (ret != 0 && ret != WT_NOTFOUND)
+			testutil_die(ret, "__wt_bloom_get");
 	}
 	free((void *)item.data);
 	printf("Out of %d ops, got %d false positives, %.4f%%\n",
 	    g.c_ops, fp, 100.0 * fp/g.c_ops);
-	if ((ret = __wt_bloom_drop(bloomp, NULL)) != 0)
-		testutil_die(ret, "__wt_bloom_drop");
+	testutil_check(__wt_bloom_drop(bloomp, NULL));
 }
 
 void
 cleanup(void)
 {
 	uint32_t i;
-	int ret;
 
 	for (i = 0; i < g.c_ops; i++)
 		free(g.entries[i]);
 	free(g.entries);
-	if ((ret = g.wt_session->close(g.wt_session, NULL)) != 0)
-		testutil_die(ret, "WT_SESSION.close");
-	if ((g.wt_conn->close(g.wt_conn, NULL)) != 0)
-		testutil_die(ret, "WT_CONNECTION.close");
+	testutil_check(g.wt_session->close(g.wt_session, NULL));
+	testutil_check(g.wt_conn->close(g.wt_conn, NULL));
 }
 
 /*

@@ -33,6 +33,7 @@ static const CONFIG default_cfg = {
 	"WT_TEST",			/* home */
 	"WT_TEST",			/* monitor dir */
 	NULL,				/* partial logging */
+	NULL,				/* reopen config */
 	NULL,				/* base_uri */
 	NULL,				/* uris */
 	NULL,				/* helium_mount */
@@ -1517,7 +1518,7 @@ close_reopen(CONFIG *cfg)
 {
 	int ret;
 
-	if (!cfg->reopen_connection)
+	if (!cfg->readonly && !cfg->reopen_connection)
 		return (0);
 	/*
 	 * Reopen the connection.  We do this so that the workload phase always
@@ -1533,7 +1534,7 @@ close_reopen(CONFIG *cfg)
 		return (ret);
 	}
 	if ((ret = wiredtiger_open(
-	    cfg->home, NULL, cfg->conn_config, &cfg->conn)) != 0) {
+	    cfg->home, NULL, cfg->reopen_config, &cfg->conn)) != 0) {
 		lprintf(cfg, ret, 0, "Re-opening the connection failed");
 		return (ret);
 	}
@@ -2297,9 +2298,25 @@ main(int argc, char *argv[])
 		req_len = strlen(cfg->table_config) +
 		    strlen(LOG_PARTIAL_CONFIG) + 1;
 		cfg->partial_config = dcalloc(req_len, 1);
-		snprintf((char *)cfg->partial_config, req_len, "%s%s",
-		    (char *)cfg->table_config, LOG_PARTIAL_CONFIG);
+		snprintf(cfg->partial_config, req_len, "%s%s",
+		    cfg->table_config, LOG_PARTIAL_CONFIG);
 	}
+	/*
+	 * Set the config for reopen.  If readonly add in that string.
+	 * If not readonly then just copy the original conn_config.
+	 */
+	if (cfg->readonly)
+		req_len = strlen(cfg->conn_config) +
+		    strlen(READONLY_CONFIG) + 1;
+	else
+		req_len = strlen(cfg->conn_config) + 1;
+	cfg->reopen_config = dcalloc(req_len, 1);
+	if (cfg->readonly)
+		snprintf(cfg->reopen_config, req_len, "%s%s",
+		    cfg->conn_config, READONLY_CONFIG);
+	else
+		snprintf(cfg->reopen_config, req_len, "%s",
+		    cfg->conn_config);
 
 	/* Sanity-check the configuration. */
 	if ((ret = config_sanity(cfg)) != 0)

@@ -471,8 +471,7 @@ __evict_review(
 			LF_SET(WT_EVICT_IN_MEMORY | WT_EVICT_UPDATE_RESTORE);
 		else if (page->read_gen == WT_READGEN_OLDEST)
 			LF_SET(WT_EVICT_UPDATE_RESTORE);
-		else if (F_ISSET(session, WT_SESSION_INTERNAL) &&
-		    F_ISSET(S2C(session)->cache, WT_CACHE_STUCK))
+		else if (F_ISSET(S2C(session)->cache, WT_CACHE_STUCK))
 			LF_SET(WT_EVICT_LOOKASIDE);
 	}
 

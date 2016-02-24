@@ -13,7 +13,6 @@ Christoph
 Collet's
 Coverity
 Coverity's
-crc
 DB's
 DBTs
 Datastore
@@ -81,7 +80,6 @@ Seward's
 SiH
 TXT
 URIs
-vpmsum
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
@@ -155,6 +153,7 @@ control's
 copydoc
 cpp
 crashless
+crc
 cursortype
 customerABC
 cv
@@ -381,6 +380,7 @@ rVv
 rdbms
 rdlock
 readlock
+readonly
 realclean
 realloc
 realloc'd
@@ -423,6 +423,7 @@ src
 ssd
 startsync
 statlog
+stderr
 str
 strerror
 strftime
@@ -479,6 +480,7 @@ valuefmt
 vec
 versa
 vm
+vpmsum
 warmup
 whitespace
 wiredtiger

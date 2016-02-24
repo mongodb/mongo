@@ -266,6 +266,8 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	F_SET(txn, WT_TXN_RUNNING);
+	if (F_ISSET(S2C(session), WT_CONN_READONLY))
+		F_SET(txn, WT_TXN_READONLY);
 	return (false);
 }
 

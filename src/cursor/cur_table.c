@@ -79,22 +79,22 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx,
     WT_CURSOR *cur, WT_CURSOR_TABLE *ctable, int (*f)(WT_CURSOR *))
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_cursor_get_key,	/* get-key */
-	    __wt_cursor_get_value,	/* get-value */
-	    __wt_cursor_set_key,	/* set-key */
-	    __wt_cursor_set_value,	/* set-value */
-	    __wt_cursor_notsup,		/* compare */
-	    __wt_cursor_notsup,		/* equals */
-	    __wt_cursor_notsup,		/* next */
-	    __wt_cursor_notsup,		/* prev */
-	    __wt_cursor_notsup,		/* reset */
-	    __wt_cursor_notsup,		/* search */
-	    __wt_cursor_notsup,		/* search-near */
-	    __curextract_insert,	/* insert */
-	    __wt_cursor_notsup,		/* update */
-	    __wt_cursor_notsup,		/* reconfigure */
-	    __wt_cursor_notsup,		/* remove */
-	    __wt_cursor_notsup);	/* close */
+	    __wt_cursor_get_key,		/* get-key */
+	    __wt_cursor_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __wt_cursor_set_value,		/* set-value */
+	    __wt_cursor_compare_notsup,		/* compare */
+	    __wt_cursor_equals_notsup,		/* equals */
+	    __wt_cursor_notsup,			/* next */
+	    __wt_cursor_notsup,			/* prev */
+	    __wt_cursor_notsup,			/* reset */
+	    __wt_cursor_notsup,			/* search */
+	    __wt_cursor_search_near_notsup,	/* search-near */
+	    __curextract_insert,		/* insert */
+	    __wt_cursor_notsup,			/* update */
+	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __wt_cursor_notsup);		/* close */
 	WT_CURSOR_EXTRACTOR extract_cursor;
 	WT_DECL_RET;
 	WT_ITEM key, value;
@@ -842,22 +842,22 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_curtable_get_key,	/* get-key */
-	    __wt_curtable_get_value,	/* get-value */
-	    __wt_curtable_set_key,	/* set-key */
-	    __wt_curtable_set_value,	/* set-value */
-	    __curtable_compare,		/* compare */
-	    __wt_cursor_equals,		/* equals */
-	    __curtable_next,		/* next */
-	    __curtable_prev,		/* prev */
-	    __curtable_reset,		/* reset */
-	    __curtable_search,		/* search */
-	    __curtable_search_near,	/* search-near */
-	    __curtable_insert,		/* insert */
-	    __curtable_update,		/* update */
-	    __curtable_remove,		/* remove */
-	    __wt_cursor_reconfigure,	/* reconfigure */
-	    __curtable_close);		/* close */
+	    __wt_curtable_get_key,		/* get-key */
+	    __wt_curtable_get_value,		/* get-value */
+	    __wt_curtable_set_key,		/* set-key */
+	    __wt_curtable_set_value,		/* set-value */
+	    __curtable_compare,			/* compare */
+	    __wt_cursor_equals,			/* equals */
+	    __curtable_next,			/* next */
+	    __curtable_prev,			/* prev */
+	    __curtable_reset,			/* reset */
+	    __curtable_search,			/* search */
+	    __curtable_search_near,		/* search-near */
+	    __curtable_insert,			/* insert */
+	    __curtable_update,			/* update */
+	    __curtable_remove,			/* remove */
+	    __wt_cursor_reconfigure,		/* reconfigure */
+	    __curtable_close);			/* close */
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_TABLE *ctable;

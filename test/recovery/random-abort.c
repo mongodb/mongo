@@ -42,7 +42,7 @@
 
 static char home[512];			/* Program working dir */
 static const char *progname;		/* Program name */
-static const char *uri = "table:main";
+static const char * const uri = "table:main";
 
 #define	RECORDS_FILE "records"
 
@@ -88,7 +88,8 @@ fill_db(void)
 	/*
 	 * Run in the home directory so that the records file is in there too.
 	 */
-	chdir(home);
+	if (chdir(home) != 0)
+		testutil_die(errno, "chdir: %s", home);
 	if ((ret = wiredtiger_open(NULL, NULL, ENV_CONFIG, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -109,7 +110,7 @@ fill_db(void)
 	/*
 	 * Set to no buffering.
 	 */
-	setvbuf(fp, NULL, _IONBF, 0);
+	(void)setvbuf(fp, NULL, _IONBF, 0);
 
 	/*
 	 * Write data into the table until we are killed by the parent.
@@ -134,6 +135,8 @@ fill_db(void)
 
 extern int __wt_optind;
 extern char *__wt_optarg;
+
+void (*custom_die)(void) = NULL;
 
 int
 main(int argc, char *argv[])
@@ -201,13 +204,15 @@ main(int argc, char *argv[])
 	printf("Kill child\n");
 	if (kill(pid, SIGKILL) != 0)
 		testutil_die(errno, "kill");
-	waitpid(pid, &status, 0);
+	if (waitpid(pid, &status, 0) == -1)
+		testutil_die(errno, "waitpid");
 
 	/*
 	 * !!! If we wanted to take a copy of the directory before recovery,
 	 * this is the place to do it.
 	 */
-	chdir(home);
+	if (chdir(home) != 0)
+		testutil_die(errno, "chdir: %s", home);
 	printf("Open database, run recovery and verify content\n");
 	if ((ret = wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");
@@ -239,7 +244,8 @@ main(int argc, char *argv[])
 			++absent;
 		}
 	}
-	fclose(fp);
+	if (fclose(fp) != 0)
+		testutil_die(errno, "fclose");
 	if ((ret = conn->close(conn, NULL)) != 0)
 		testutil_die(ret, "WT_CONNECTION:close");
 	if (absent) {

@@ -107,36 +107,6 @@ __wt_struct_unpack(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_struct_unpack_size --
- *	Determine the packed size of a buffer matching the format.
- */
-int
-__wt_struct_unpack_size(WT_SESSION_IMPL *session,
-    const void *buffer, size_t size, const char *fmt, size_t *resultp)
-{
-	WT_DECL_PACK_VALUE(pv);
-	WT_DECL_RET;
-	WT_PACK pack;
-	const uint8_t *p, *end;
-
-	p = buffer;
-	end = p + size;
-
-	WT_RET(__pack_init(session, &pack, fmt));
-	while ((ret = __pack_next(&pack, &pv)) == 0)
-		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));
-
-	/* Be paranoid - __pack_write should never overflow. */
-	WT_ASSERT(session, p <= end);
-
-	if (ret != WT_NOTFOUND)
-		return (ret);
-
-	*resultp = WT_PTRDIFF(p, buffer);
-	return (0);
-}
-
-/*
  * __wt_struct_repack --
  *	Return the subset of the packed buffer that represents part of
  *	the format.  If the result is not contiguous in the existing

@@ -128,7 +128,7 @@ bdb_np(int next,
 	if ((ret =
 	    dbc->get(dbc, &key, &value, next ? DB_NEXT : DB_PREV)) != 0) {
 		if (ret != DB_NOTFOUND)
-			die(ret, "dbc.get: %s: {%.*s}",
+			testutil_die(ret, "dbc.get: %s: {%.*s}",
 			    next ? "DB_NEXT" : "DB_PREV",
 			    (int)key.size, (char *)key.data);
 		*notfoundp = 1;
@@ -154,7 +154,7 @@ bdb_read(uint64_t keyno, void *valuep, size_t *valuesizep, int *notfoundp)
 	*notfoundp = 0;
 	if ((ret = dbc->get(dbc, &key, &value, DB_SET)) != 0) {
 		if (ret != DB_NOTFOUND)
-			die(ret, "dbc.get: DB_SET: {%.*s}",
+			testutil_die(ret, "dbc.get: DB_SET: {%.*s}",
 			    (int)key.size, (char *)key.data);
 		*notfoundp = 1;
 	} else {
@@ -178,7 +178,7 @@ bdb_update(const void *arg_key, size_t arg_key_size,
 	*notfoundp = 0;
 	if ((ret = dbc->put(dbc, &key, &value, DB_KEYFIRST)) != 0) {
 		if (ret != DB_NOTFOUND) {
-			die(ret, "dbc.put: DB_KEYFIRST: {%.*s}{%.*s}",
+			testutil_die(ret, "dbc.put: DB_KEYFIRST: {%.*s}{%.*s}",
 			    (int)key.size, (char *)key.data,
 			    (int)value.size, (char *)value.data);
 		}
@@ -204,7 +204,7 @@ bdb_remove(uint64_t keyno, int *notfoundp)
 
 	if ((ret = dbc->del(dbc, 0)) != 0) {
 		if (ret != DB_NOTFOUND)
-			die(ret, "dbc.del: {%.*s}",
+			testutil_die(ret, "dbc.del: {%.*s}",
 			    (int)key.size, (char *)key.data);
 		*notfoundp = 1;
 	}
