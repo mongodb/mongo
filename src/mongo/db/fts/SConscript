@@ -68,20 +68,12 @@ env.Library(
     ],
 )
 
-env.Library( 'server_common', [
-             ],
-             LIBDEPS=[
-                 '$BUILD_DIR/mongo/base',
-                 '$BUILD_DIR/mongo/db/server_parameters',
-             ],
-)
-
 env.Library('ftsmongod', [
-        ], LIBDEPS=["base","server_common"])
+        ], LIBDEPS=["base","$BUILD_DIR/mongo/base"])
 
 
 env.Library('ftsmongos', [
-        ], LIBDEPS=["server_common"])
+        ], LIBDEPS=["$BUILD_DIR/mongo/base"])
 
 
 env.CppUnitTest( "fts_basic_phrase_matcher_test", "fts_basic_phrase_matcher_test.cpp",
