@@ -397,22 +397,22 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_cursor_get_key,	/* get-key */
-	    __wt_cursor_get_value,	/* get-value */
-	    __wt_cursor_set_key,	/* set-key */
-	    __wt_cursor_set_value,	/* set-value */
-	    __curfile_compare,		/* compare */
-	    __curfile_equals,		/* equals */
-	    __curfile_next,		/* next */
-	    __curfile_prev,		/* prev */
-	    __curfile_reset,		/* reset */
-	    __curfile_search,		/* search */
-	    __curfile_search_near,	/* search-near */
-	    __curfile_insert,		/* insert */
-	    __curfile_update,		/* update */
-	    __curfile_remove,		/* remove */
-	    __wt_cursor_reconfigure,	/* reconfigure */
-	    __curfile_close);		/* close */
+	    __wt_cursor_get_key,		/* get-key */
+	    __wt_cursor_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __wt_cursor_set_value,		/* set-value */
+	    __curfile_compare,			/* compare */
+	    __curfile_equals,			/* equals */
+	    __curfile_next,			/* next */
+	    __curfile_prev,			/* prev */
+	    __curfile_reset,			/* reset */
+	    __curfile_search,			/* search */
+	    __curfile_search_near,		/* search-near */
+	    __curfile_insert,			/* insert */
+	    __curfile_update,			/* update */
+	    __curfile_remove,			/* remove */
+	    __wt_cursor_reconfigure,		/* reconfigure */
+	    __curfile_close);			/* close */
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;

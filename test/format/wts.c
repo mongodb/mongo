@@ -53,7 +53,7 @@ compressor(uint32_t compress_flag)
 	default:
 		break;
 	}
-	die(EINVAL, "illegal compression flag: 0x%x", compress_flag);
+	testutil_die(EINVAL, "illegal compression flag: 0x%x", compress_flag);
 }
 
 /*
@@ -71,7 +71,7 @@ encryptor(uint32_t encrypt_flag)
 	default:
 		break;
 	}
-	die(EINVAL, "illegal encryption flag: 0x%x", encrypt_flag);
+	testutil_die(EINVAL, "illegal encryption flag: 0x%x", encrypt_flag);
 }
 
 static int
@@ -222,7 +222,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		p += snprintf(p, REMAIN(p, end), ",%s", g.config_open);
 
 	if (REMAIN(p, end) == 0)
-		die(ENOMEM, "wiredtiger_open configuration buffer too small");
+		testutil_die(ENOMEM,
+		    "wiredtiger_open configuration buffer too small");
 
 	/*
 	 * Direct I/O may not work with backups, doing copies through the buffer
@@ -233,8 +234,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (strstr(config, "direct_io") != NULL)
 		g.c_backups = 0;
 
-	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
-		die(ret, "wiredtiger_open: %s", home);
+	testutil_checkfmt(
+	    wiredtiger_open(home, &event_handler, config, &conn), "%s", home);
 
 	if (set_api)
 		g.wt_api = conn->get_extension_api(conn);
@@ -247,7 +248,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	 */
 	if (DATASOURCE("helium")) {
 		if (g.helium_mount == NULL)
-			die(EINVAL, "no Helium mount point specified");
+			testutil_die(EINVAL, "no Helium mount point specified");
 		(void)snprintf(helium_config, sizeof(helium_config),
 		    "entry=wiredtiger_extension_init,config=["
 		    "helium_verbose=0,"
@@ -256,7 +257,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		    g.helium_mount);
 		if ((ret = conn->load_extension(
 		    conn, HELIUM_PATH, helium_config)) != 0)
-			die(ret,
+			testutil_die(ret,
 			   "WT_CONNECTION.load_extension: %s:%s",
 			   HELIUM_PATH, helium_config);
 	}
@@ -270,11 +271,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 void
 wts_reopen(void)
 {
-	int ret;
-
-	if ((ret = wiredtiger_open(g.home,
-	    &event_handler, g.wiredtiger_open_config, &g.wts_conn)) != 0)
-		die(ret, "wiredtiger_open: %s", g.home);
+	testutil_checkfmt(wiredtiger_open(g.home, &event_handler,
+	    g.wiredtiger_open_config, &g.wts_conn), "%s", g.home);
 }
 
 /*
@@ -287,7 +285,6 @@ wts_create(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlkey, maxleafpage, maxleafkey, maxleafvalue;
-	int ret;
 	char config[4096], *end, *p;
 
 	conn = g.wts_conn;
@@ -431,32 +428,28 @@ wts_create(void)
 	}
 
 	if (REMAIN(p, end) == 0)
-		die(ENOMEM, "WT_SESSION.create configuration buffer too small");
+		testutil_die(ENOMEM,
+		    "WT_SESSION.create configuration buffer too small");
 
 	/*
 	 * Create the underlying store.
 	 */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
-	if ((ret = session->create(session, g.uri, config)) != 0)
-		die(ret, "session.create: %s", g.uri);
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+	testutil_checkfmt(session->create(session, g.uri, config), "%s", g.uri);
+	testutil_check(session->close(session, NULL));
 }
 
 void
 wts_close(void)
 {
 	WT_CONNECTION *conn;
-	int ret;
 	const char *config;
 
 	conn = g.wts_conn;
 
 	config = g.c_leak_memory ? "leak_memory" : NULL;
 
-	if ((ret = conn->close(conn, config)) != 0)
-		die(ret, "connection.close");
+	testutil_check(conn->close(conn, config));
 	g.wts_conn = NULL;
 	g.wt_api = NULL;
 }
@@ -466,7 +459,6 @@ wts_dump(const char *tag, int dump_bdb)
 {
 #ifdef HAVE_BERKELEY_DB
 	size_t len;
-	int ret;
 	char *cmd;
 
 	/*
@@ -491,8 +483,7 @@ wts_dump(const char *tag, int dump_bdb)
 	    g.uri == NULL ? "" : "-n",
 	    g.uri == NULL ? "" : g.uri);
 
-	if ((ret = system(cmd)) != 0)
-		die(ret, "%s: dump comparison failed", tag);
+	testutil_checkfmt(system(cmd), "%s: dump comparison failed", tag);
 	free(cmd);
 #else
 	(void)tag;				/* [-Wunused-variable] */
@@ -513,8 +504,7 @@ wts_verify(const char *tag)
 	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify start ===============");
@@ -522,13 +512,12 @@ wts_verify(const char *tag)
 	/* Session operations for LSM can return EBUSY. */
 	ret = session->verify(session, g.uri, "strict");
 	if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
-		die(ret, "session.verify: %s: %s", g.uri, tag);
+		testutil_die(ret, "session.verify: %s: %s", g.uri, tag);
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify stop ===============");
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }
 
 /*
@@ -558,49 +547,43 @@ wts_stats(void)
 	conn = g.wts_conn;
 	track("stat", 0ULL, NULL);
 
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
 	if ((fp = fopen(g.home_stats, "w")) == NULL)
-		die(errno, "fopen: %s", g.home_stats);
+		testutil_die(errno, "fopen: %s", g.home_stats);
 
 	/* Connection statistics. */
 	fprintf(fp, "====== Connection statistics:\n");
-	if ((ret = session->open_cursor(session,
-	    "statistics:", NULL, NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+	testutil_check(session->open_cursor(
+	    session, "statistics:", NULL, NULL, &cursor));
 
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
-			die(errno, "fprintf");
+			testutil_die(errno, "fprintf");
 
 	if (ret != WT_NOTFOUND)
-		die(ret, "cursor.next");
-	if ((ret = cursor->close(cursor)) != 0)
-		die(ret, "cursor.close");
+		testutil_die(ret, "cursor.next");
+	testutil_check(cursor->close(cursor));
 
 	/* Data source statistics. */
 	fprintf(fp, "\n\n====== Data source statistics:\n");
 	stat_name = dmalloc(strlen("statistics:") + strlen(g.uri) + 1);
 	sprintf(stat_name, "statistics:%s", g.uri);
-	if ((ret = session->open_cursor(
-	    session, stat_name, NULL, NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+	testutil_check(session->open_cursor(
+	    session, stat_name, NULL, NULL, &cursor));
 	free(stat_name);
 
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
-			die(errno, "fprintf");
+			testutil_die(errno, "fprintf");
 
 	if (ret != WT_NOTFOUND)
-		die(ret, "cursor.next");
-	if ((ret = cursor->close(cursor)) != 0)
-		die(ret, "cursor.close");
+		testutil_die(ret, "cursor.next");
+	testutil_check(cursor->close(cursor));
 
 	fclose_and_clear(&fp);
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 }

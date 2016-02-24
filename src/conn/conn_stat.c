@@ -97,6 +97,14 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	if (!*runp && !FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
 		return (0);
 
+	/*
+	 * If any statistics logging is done, this must not be a read-only
+	 * connection.
+	 */
+	if (F_ISSET(conn, WT_CONN_READONLY))
+		WT_RET_MSG(session, EINVAL,
+		    "Read-only configuration incompatible with statistics "
+		    "logging");
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
 	WT_RET(__wt_config_subinit(session, &objectconf, &cval));
 	for (cnt = 0; (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
@@ -342,7 +350,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	if (conn->stat_sources != NULL) {
 		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __wt_conn_btree_apply(
-		    session, false, NULL, __statlog_apply, NULL));
+		    session, NULL, __statlog_apply, NULL, NULL));
 		WT_RET(ret);
 	}
 

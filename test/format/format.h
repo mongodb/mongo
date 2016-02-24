@@ -334,12 +334,6 @@ void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
 
-void	 die(int, const char *, ...)
-#if defined(__GNUC__)
-__attribute__((__noreturn__))
-#endif
-;
-
 /*
  * mmrand --
  *	Return a random value between a min/max pair.

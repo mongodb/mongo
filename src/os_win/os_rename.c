@@ -22,6 +22,7 @@ __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	WT_RET(__wt_verbose(
 		session, WT_VERB_FILEOPS, "rename %s to %s", from, to));
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 	from_path = to_path = NULL;
 
 	WT_RET(__wt_filename(session, from, &from_path));

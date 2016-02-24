@@ -107,36 +107,6 @@ __wt_struct_unpack(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_struct_unpack_size --
- *	Determine the packed size of a buffer matching the format.
- */
-int
-__wt_struct_unpack_size(WT_SESSION_IMPL *session,
-    const void *buffer, size_t size, const char *fmt, size_t *resultp)
-{
-	WT_DECL_PACK_VALUE(pv);
-	WT_DECL_RET;
-	WT_PACK pack;
-	const uint8_t *p, *end;
-
-	p = buffer;
-	end = p + size;
-
-	WT_RET(__pack_init(session, &pack, fmt));
-	while ((ret = __pack_next(&pack, &pv)) == 0)
-		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));
-
-	/* Be paranoid - __pack_write should never overflow. */
-	WT_ASSERT(session, p <= end);
-
-	if (ret != WT_NOTFOUND)
-		return (ret);
-
-	*resultp = WT_PTRDIFF(p, buffer);
-	return (0);
-}
-
-/*
  * __wt_struct_repack --
  *	Return the subset of the packed buffer that represents part of
  *	the format.  If the result is not contiguous in the existing
@@ -157,24 +127,24 @@ __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt,
 	p = inbuf->data;
 	end = p + inbuf->size;
 
-	WT_ERR(__pack_init(session, &packout, outfmt));
-	WT_ERR(__pack_init(session, &packin, infmt));
+	WT_RET(__pack_init(session, &packout, outfmt));
+	WT_RET(__pack_init(session, &packin, infmt));
 
 	/* Outfmt should complete before infmt */
 	while ((ret = __pack_next(&packout, &pvout)) == 0) {
 		if (p >= end)
-			WT_ERR(EINVAL);
+			WT_RET(EINVAL);
 		if (pvout.type == 'x' && pvout.size == 0 && pvout.havesize)
 			continue;
-		WT_ERR(__pack_next(&packin, &pvin));
+		WT_RET(__pack_next(&packin, &pvin));
 		before = p;
-		WT_ERR(__unpack_read(session, &pvin, &p, (size_t)(end - p)));
+		WT_RET(__unpack_read(session, &pvin, &p, (size_t)(end - p)));
 		if (pvout.type != pvin.type)
-			WT_ERR(ENOTSUP);
+			WT_RET(ENOTSUP);
 		if (start == NULL)
 			start = before;
 	}
-	WT_ERR_NOTFOUND_OK(ret);
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
@@ -182,5 +152,5 @@ __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt,
 	outbuf->data = start;
 	outbuf->size = WT_PTRDIFF(p, start);
 
-err:	return (ret);
+	return (0);
 }

@@ -145,9 +145,8 @@ restart:	/*
 			 * If on the last slot (the key is larger than any key
 			 * on the page), check for an internal page split race.
 			 */
-			if (parent_pindex != NULL &&
-			    __wt_split_intl_race(
-			    session, current->home, parent_pindex))
+			if (__wt_split_descent_race(
+			    session, current, parent_pindex))
 				goto restart;
 
 			goto descend;
