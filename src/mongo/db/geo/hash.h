@@ -149,7 +149,6 @@ private:
     void clearUnusedBits();
     // XXX: what does this do
     void _move(unsigned offset, int d);
-    // XXX: this is nasty and has no example
 
     long long _hash;
     // Bits per field.  Our hash is 64 bits, and we have an X and a Y field,
