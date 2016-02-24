@@ -92,7 +92,7 @@ static bool handleCursorCommand(OperationContext* txn,
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
         // do it when batchSize is 0 since that indicates a desire for a fast return.
         PlanExecutor::ExecState state;
-        if ((state = exec->getNext(&next, NULL)) != PlanExecutor::ADVANCED) {
+        if ((state = exec->getNext(&next, NULL)) == PlanExecutor::IS_EOF) {
             // make it an obvious error to use cursor or executor after this point
             cursor = NULL;
             exec = NULL;
@@ -101,7 +101,7 @@ static bool handleCursorCommand(OperationContext* txn,
 
         uassert(34426,
                 "Plan executor error during aggregation: " + WorkingSetCommon::toStatusString(next),
-                PlanExecutor::ADVANCED == state || PlanExecutor::IS_EOF);
+                PlanExecutor::ADVANCED == state);
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
