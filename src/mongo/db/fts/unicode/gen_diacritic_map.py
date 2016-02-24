@@ -55,6 +55,8 @@ def add_diacritic_mapping(codepoint):
 
     # Only use mappings where the final recomposed form is a single codepoint
     if (a != c and len(c) == 1):
+        assert c != '\0' # This is used to indicate the codepoint is a pure diacritic.
+        assert ord(c) not in diacritics
         diacritic_mappings[codepoint] = ord(c[0])
 
 def add_diacritic_range(start, end):
@@ -77,6 +79,9 @@ def generate(target):
 
     # Map diacritics from 0 to the maximum Unicode codepoint
     add_diacritic_range(0x0000, 0x10FFFF)
+
+    for diacritic in diacritics:
+        diacritic_mappings[diacritic] = 0
 
     out.write("""char32_t codepointRemoveDiacritics(char32_t codepoint) {
     switch (codepoint) {\n""")

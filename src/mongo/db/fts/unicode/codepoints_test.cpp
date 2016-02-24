@@ -32,6 +32,8 @@
 namespace mongo {
 namespace unicode {
 
+const char32_t maxCP = 0x1FFFFF;  // Highest valid codepoint.
+
 /**
  * Above most of the arrays in this class are the UTF-32 character literals that correspond to the
  * codepoints in the array.
@@ -39,14 +41,19 @@ namespace unicode {
 
 TEST(UnicodeCodepoints, Diacritics) {
     // There are no character literals for combining marks.
-    const char32_t marks[] = {0x0301, 0x0339, 0x1AB4, 0x1DC5, 0xA69D};
+    const char32_t marks[] = {'^', '`', 0x0301, 0x0339, 0x1AB4, 0x1DC5, 0xA69D};
 
     // const char32_t not_marks[] = {U'-', U'.', U'\'', U'*', U'm'};
     const char32_t not_marks[] = {0x2D, 0x2E, 0x27, 0x2A, 0x6D};
 
-    for (auto i = 0; i < 5; ++i) {
-        ASSERT(codepointIsDiacritic(marks[i]));
-        ASSERT_FALSE(codepointIsDiacritic(not_marks[i]));
+    for (auto cp : marks) {
+        ASSERT(codepointIsDiacritic(cp));
+        ASSERT_EQ(codepointRemoveDiacritics(cp), char32_t(0));
+    }
+
+    for (auto cp : not_marks) {
+        ASSERT(!codepointIsDiacritic(cp));
+        ASSERT_NE(codepointRemoveDiacritics(cp), char32_t(0));
     }
 }
 
@@ -77,6 +84,10 @@ TEST(UnicodeCodepoints, RemoveDiacritics) {
     for (auto i = 0; i < 5; ++i) {
         ASSERT_EQUALS(clean[i], codepointRemoveDiacritics(originals[i]));
     }
+
+    for (char32_t cp = 0; cp <= maxCP; cp++) {
+        ASSERT_EQ(codepointRemoveDiacritics(cp) == 0, cp == 0 || codepointIsDiacritic(cp));
+    }
 }
 
 TEST(UnicodeCodepoints, ToLower) {
@@ -87,6 +98,19 @@ TEST(UnicodeCodepoints, ToLower) {
 
     for (auto i = 0; i < 5; ++i) {
         ASSERT_EQUALS(lower[i], codepointToLower(upper[i]));
+    }
+}
+
+TEST(UnicodeCodepoints, ToLowerIsFixedPoint) {
+    for (char32_t cp = 0; cp <= maxCP; cp++) {
+        ASSERT_EQ(codepointToLower(cp), codepointToLower(codepointToLower(cp)));
+    }
+}
+
+TEST(UnicodeCodepoints, RemoveDiacriticsIsFixedPoint) {
+    for (char32_t cp = 0; cp <= maxCP; cp++) {
+        ASSERT_EQ(codepointRemoveDiacritics(cp),
+                  codepointRemoveDiacritics(codepointRemoveDiacritics(cp)));
     }
 }
 

@@ -57,8 +57,7 @@ bool UnicodeFTSPhraseMatcher::phraseMatches(const string& phrase,
         matchOptions |= unicode::String::kDiacriticSensitive;
     }
 
-    return unicode::String::substrMatch(
-        unicode::String(haystack), unicode::String(phrase), matchOptions, _caseFoldMode);
+    return unicode::String::substrMatch(haystack, phrase, matchOptions, _caseFoldMode);
 }
 
 }  // namespace fts

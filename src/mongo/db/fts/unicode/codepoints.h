@@ -73,6 +73,10 @@ bool codepointIsDelimiter(char32_t codepoint, DelimiterListLanguage lang);
  * which code blocks are used), decomposing them to the NFD normalization form, removing any
  * combining marks, and renormalizing them to the NFC form. The result is a mapping from original
  * codepoint to a codepoint with no diacritics.
+ *
+ * Returns 0 if codepoint is a pure diacritic mark (ie if codepointIsDiacritic() would return true).
+ * You will need to distinguish this case from the input codepoint being 0 either by explicit
+ * checking or avoiding a call to this function if codepoint is in the ASCII range (<0x80).
  */
 char32_t codepointRemoveDiacritics(char32_t codepoint);
 
