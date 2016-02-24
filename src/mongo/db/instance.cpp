@@ -608,6 +608,8 @@ void assembleResponse(OperationContext* txn,
             LOG(1) << "note: not profiling because recursive read lock";
         } else if (lockedForWriting()) {
             LOG(1) << "note: not profiling because doing fsync+lock";
+        } else if (storageGlobalParams.readOnly) {
+            LOG(1) << "note: not profiling because server is read-only";
         } else {
             profile(txn, op);
         }
