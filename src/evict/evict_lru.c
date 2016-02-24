@@ -1392,8 +1392,9 @@ __evict_get_ref(
 	}
 
 	/*
-	 * The eviction server only tries to evict half of the pages before
-	 * looking for more.
+	 * Only evict half of the pages before looking for more. The remainder
+	 * are left to eviction workers (if configured), or application threads
+	 * if necessary.
 	 */
 	candidates = cache->evict_candidates;
 	if (is_server && candidates > 1)
