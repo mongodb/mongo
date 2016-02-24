@@ -14,7 +14,7 @@ db = s.getDB( "test" );
 primary = s.getServer( "test" ).getDB( "test" );
 secondary = s.getOther( primary ).getDB( "test" );
 
-numObjs = 10;
+var numObjs = 30;
 var bulk = db.foo.initializeUnorderedBulkOp();
 for (i=0; i < numObjs; i++){
     bulk.insert({ _id: i });
@@ -42,23 +42,28 @@ assert.eq( numObjs , cursor1.itcount() , "c1" );
 assert.eq( numObjs , cursor2.itcount() , "c2" );
 assert.eq( numObjs , cursor3.itcount() , "c3" );
 
-// test timeout
+// Test that a cursor with a 1 second timeout eventually times out.
 gc(); gc();
-cur = db.foo.find().batchSize( 2 );
+var cur = db.foo.find().batchSize( 2 );
 assert( cur.next() , "T1" );
 assert( cur.next() , "T2" );
 assert.commandWorked(s.admin.runCommand({
     setParameter: 1,
-    cursorTimeoutMillis: 10000 // 10 seconds.
+    cursorTimeoutMillis: 1000 // 1 second.
 }));
-before = db.serverStatus().metrics.cursor;
-printjson( before );
-sleep( 6000 );
-assert( cur.next() , "T3" );
-assert( cur.next() , "T4" );
-sleep( 24000 );
-assert.throws( function(){ cur.next(); } , null , "T5" );
-after = db.serverStatus().metrics.cursor;
+
+assert.soon(function() {
+    try {
+        cur.next();
+        cur.next();
+        print("cursor still alive");
+        return false;
+    }
+    catch (e) {
+        return true;
+    }
+}, "cursor failed to time out", /*timeout*/30000, /*interval*/5000);
+
 gc(); gc();
 
 s.stop();
