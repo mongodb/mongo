@@ -266,6 +266,11 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
 }
 
 namespace {
+
+// If the request received a connection from the pool but failed in its execution,
+// convert the raw Status in cbData to a StatusWith<RemoteCommandResponse> so that the callback,
+// which expects a StatusWith<RemoteCommandResponse> as part of RemoteCommandCallbackArgs,
+// can be run despite a RemoteCommandResponse never having been created.
 void remoteCommandFinished(const TaskExecutor::CallbackArgs& cbData,
                            const TaskExecutor::RemoteCommandCallbackFn& cb,
                            const RemoteCommandRequest& request,
@@ -280,6 +285,10 @@ void remoteCommandFinished(const TaskExecutor::CallbackArgs& cbData,
     }
 }
 
+// If the request failed to receive a connection from the pool,
+// convert the raw Status in cbData to a StatusWith<RemoteCommandResponse> so that the callback,
+// which expects a StatusWith<RemoteCommandResponse> as part of RemoteCommandCallbackArgs,
+// can be run despite a RemoteCommandResponse never having been created.
 void remoteCommandFailedEarly(const TaskExecutor::CallbackArgs& cbData,
                               const TaskExecutor::RemoteCommandCallbackFn& cb,
                               const RemoteCommandRequest& request) {
@@ -298,6 +307,9 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     } else {
         scheduledRequest.expirationDate = _net->now() + scheduledRequest.timeout;
     }
+
+    // In case the request fails to even get a connection from the pool,
+    // we wrap the callback in a method that prepares its input parameters.
     auto wq = makeSingletonWorkQueue([scheduledRequest, cb](const CallbackArgs& cbData) {
         remoteCommandFailedEarly(cbData, cb, scheduledRequest);
     });

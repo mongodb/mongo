@@ -443,9 +443,12 @@ private:
         if (op->canceled())
             return _completeOperation(op,
                                       Status(ErrorCodes::CallbackCanceled, "Callback canceled"));
-        if (op->timedOut())
-            return _completeOperation(op,
-                                      Status(ErrorCodes::ExceededTimeLimit, "Operation timed out"));
+        if (op->timedOut()) {
+            str::stream msg;
+            msg << "Operation timed out"
+                << ", request was " << op->_request.toString();
+            return _completeOperation(op, Status(ErrorCodes::ExceededTimeLimit, msg));
+        }
         if (ec)
             return _networkErrorCallback(op, ec);
 

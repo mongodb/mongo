@@ -295,10 +295,10 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                     // timeout duration - but make no stronger assumption. It is thus possible that
                     // we have already exceeded the timeout. In this case we timeout the operation
                     // manually.
-                    return _completeOperation(op,
-                                              {ErrorCodes::ExceededTimeLimit,
-                                               "Remote command timed out while waiting to get a "
-                                               "connection from the pool."});
+                    std::stringstream msg;
+                    msg << "Remote command timed out while waiting to get a connection from the "
+                        << "pool, took " << getConnectionDuration;
+                    return _completeOperation(op, {ErrorCodes::ExceededTimeLimit, msg.str()});
                 }
 
                 // The above conditional guarantees that the adjusted timeout will never underflow.
@@ -318,7 +318,7 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                 }
 
                 op->_timeoutAlarm->asyncWait(
-                    [this, op, access, generation, requestId](std::error_code ec) {
+                    [this, op, access, generation, requestId, adjustedTimeout](std::error_code ec) {
                         if (!ec) {
                             // We must pass a check for safe access before using op inside the
                             // callback or we may attempt access on an invalid pointer.
@@ -328,12 +328,14 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                                 return;
                             }
 
-                            LOG(2) << "Operation " << requestId << " timed out.";
+                            LOG(2) << "Operation " << requestId << " timed out"
+                                   << ", adjusted timeout after getting connection from pool was "
+                                   << adjustedTimeout << ", op was " << op->toString();
 
                             op->timeOut_inlock();
                         } else {
-                            LOG(2) << "Failed to time operation " << requestId
-                                   << " out: " << ec.message();
+                            LOG(2) << "Failed to time operation " << requestId << ", op was "
+                                   << op->toString() << ", out: " << ec.message();
                         }
                     });
             }

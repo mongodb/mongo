@@ -590,6 +590,9 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
     updateReplSetMonitor(targeter, host.getValue(), status);
 
     if (!status.isOK()) {
+        if (status.compareCode(ErrorCodes::ExceededTimeLimit)) {
+            LOG(0) << "Operation timed out with status " << status;
+        }
         return status;
     }
 
@@ -810,6 +813,9 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
 
     if (!responseStatus.isOK()) {
         updateReplSetMonitor(targeter, host.getValue(), responseStatus.getStatus());
+        if (responseStatus.getStatus().compareCode(ErrorCodes::ExceededTimeLimit)) {
+            LOG(0) << "Operation timed out with status " << responseStatus.getStatus();
+        }
         return responseStatus.getStatus();
     }
 
