@@ -316,7 +316,7 @@ connection_stats = [
     YieldStat('page_sleep', 'page acquire time sleeping (usecs)'),
 ]
 
-connection_stats = sorted(connection_stats, key=attrgetter('name'))
+connection_stats = sorted(connection_stats, key=attrgetter('desc'))
 
 ##########################################
 # Data source statistics
@@ -458,7 +458,7 @@ dsrc_stats = [
     TxnStat('txn_update_conflict', 'update conflicts'),
 ]
 
-dsrc_stats = sorted(dsrc_stats, key=attrgetter('name'))
+dsrc_stats = sorted(dsrc_stats, key=attrgetter('desc'))
 
 ##########################################
 # Cursor Join statistics
@@ -469,4 +469,4 @@ join_stats = [
     JoinStat('bloom_false_positive', 'bloom filter false positives'),
 ]
 
-join_stats = sorted(join_stats, key=attrgetter('name'))
+join_stats = sorted(join_stats, key=attrgetter('desc'))
