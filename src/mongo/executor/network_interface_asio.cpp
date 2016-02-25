@@ -319,23 +319,25 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
                 op->_timeoutAlarm->asyncWait(
                     [this, op, access, generation, requestId, adjustedTimeout](std::error_code ec) {
-                        if (!ec) {
-                            // We must pass a check for safe access before using op inside the
-                            // callback or we may attempt access on an invalid pointer.
-                            stdx::lock_guard<stdx::mutex> lk(access->mutex);
-                            if (generation != access->id) {
-                                // The operation has been cleaned up, do not access.
-                                return;
-                            }
+                        // We must pass a check for safe access before using op inside the
+                        // callback or we may attempt access on an invalid pointer.
+                        stdx::lock_guard<stdx::mutex> lk(access->mutex);
+                        if (generation != access->id) {
+                            // The operation has been cleaned up, do not access.
+                            LOG(2) << "Could not time out request " << requestId
+                                   << ", operation has already been cleaned up";
+                            return;
+                        }
 
-                            LOG(2) << "Operation " << requestId << " timed out"
+                        if (!ec) {
+                            LOG(2) << "Request " << requestId << " timed out"
                                    << ", adjusted timeout after getting connection from pool was "
                                    << adjustedTimeout << ", op was " << op->toString();
 
                             op->timeOut_inlock();
                         } else {
-                            LOG(2) << "Failed to time operation " << requestId << ", op was "
-                                   << op->toString() << ", out: " << ec.message();
+                            LOG(2) << "Failed to time request " << requestId
+                                   << "out: " << ec.message() << ", op was " << op->toString();
                         }
                     });
             }
