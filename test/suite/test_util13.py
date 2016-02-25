@@ -140,7 +140,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
             if self.pop != simple_populate:
                 expectout.write('key_format=S\n')
                 expectout.write('colgroup:' + self.pfx + ':cgroup1\n')
-            if self.cfg == '': 
+            if self.cfg == '':
                 expectout.write(self.table_config + '\n')
             else:
                 expectout.write(self.cfg + '\n')
