@@ -49,7 +49,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
     #
     types = [
         ('file-simple', dict(uri='file:' + pfx, pop=simple_populate,
-                table_config='prefix_compression_min=3', cfg='')),
+            table_config='prefix_compression_min=3', cfg='')),
         ('lsm-simple', dict(uri='lsm:' + pfx, pop=simple_populate,
             table_config='lsm=(bloom_bit_count=29)',
             cfg='bloom_bit_count=29')),
