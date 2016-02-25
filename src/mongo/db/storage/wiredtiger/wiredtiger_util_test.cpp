@@ -239,6 +239,14 @@ TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionNumber) 
         getOperationContext(), getURI(), 3, 3));
 }
 
+TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
+    createSession("\"");
+    Status result = WiredTigerUtil::checkApplicationMetadataFormatVersion(
+        getOperationContext(), getURI(), 0, 3);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, result.code());
+}
+
 TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
