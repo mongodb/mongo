@@ -200,6 +200,13 @@ Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* o
         return Status(ErrorCodes::UnsupportedFormat,
                       str::stream() << "application metadata for " << uri << " is missing ");
 
+    if (metadata.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream()
+                          << "application metadata must be enclosed in parentheses. Actual value: "
+                          << StringData(metadata.str, metadata.len));
+    }
+
     WiredTigerConfigParser parser(metadata);
 
     int64_t version = 0;
