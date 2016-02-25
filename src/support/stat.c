@@ -537,6 +537,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: tracked bytes belonging to overflow pages in the cache",
 	"cache: bytes read into cache",
 	"cache: bytes written from cache",
+	"cache: eviction currently operating in aggressive mode",
 	"cache: pages evicted by application threads",
 	"cache: checkpoint blocked page eviction",
 	"cache: unmodified pages evicted",
@@ -724,6 +725,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_bytes_read = 0;
 	stats->cache_bytes_write = 0;
 	stats->cache_eviction_checkpoint = 0;
+		/* not clearing cache_eviction_aggressive_set */
 	stats->cache_eviction_queue_empty = 0;
 	stats->cache_eviction_queue_not_empty = 0;
 	stats->cache_eviction_server_evicting = 0;
@@ -901,6 +903,8 @@ __wt_stat_connection_aggregate(
 	to->cache_bytes_write += WT_STAT_READ(from, cache_bytes_write);
 	to->cache_eviction_checkpoint +=
 	    WT_STAT_READ(from, cache_eviction_checkpoint);
+	to->cache_eviction_aggressive_set +=
+	    WT_STAT_READ(from, cache_eviction_aggressive_set);
 	to->cache_eviction_queue_empty +=
 	    WT_STAT_READ(from, cache_eviction_queue_empty);
 	to->cache_eviction_queue_not_empty +=
