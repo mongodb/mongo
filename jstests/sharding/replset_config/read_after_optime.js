@@ -33,8 +33,9 @@
 
     assert.commandWorked(runFindCommand(lastOp.ts));
 
+    var pingIntervalSeconds = 10;
     var timeoutResult = assert.commandFailedWithCode(
-        runFindCommand(new Timestamp(lastOp.ts.getTime() + 2, 0)),
+        runFindCommand(new Timestamp(lastOp.ts.getTime() + pingIntervalSeconds * 5, 0)),
         ErrorCodes.ExceededTimeLimit
     );
     assert.gt(timeoutResult.waitedMS, 500);
