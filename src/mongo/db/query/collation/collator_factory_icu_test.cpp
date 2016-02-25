@@ -660,4 +660,25 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthBackwardsTrue) {
     // u8"\u00E1" is latin small letter a with acute.
     ASSERT_GT(collator.getValue()->compare(u8"a\u00E1", u8"\u00E1a"), 0);
 }
+
+TEST(CollatorInterfaceICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"));
+    ASSERT_OK(collator.getStatus());
+    const auto comparisonKeyAB = collator.getValue()->getComparisonKey("ab");
+    const auto comparisonKeyABB = collator.getValue()->getComparisonKey("abb");
+    const auto comparisonKeyBA = collator.getValue()->getComparisonKey("ba");
+
+    ASSERT_LT(comparisonKeyAB.getKeyData().compare(comparisonKeyBA.getKeyData()), 0);
+    ASSERT_GT(comparisonKeyBA.getKeyData().compare(comparisonKeyAB.getKeyData()), 0);
+    ASSERT_EQ(comparisonKeyAB.getKeyData().compare(comparisonKeyAB.getKeyData()), 0);
+
+    ASSERT_LT(comparisonKeyAB.getKeyData().compare(comparisonKeyABB.getKeyData()), 0);
+    ASSERT_GT(comparisonKeyABB.getKeyData().compare(comparisonKeyAB.getKeyData()), 0);
+
+    ASSERT_GT(comparisonKeyBA.getKeyData().compare(comparisonKeyABB.getKeyData()), 0);
+    ASSERT_LT(comparisonKeyABB.getKeyData().compare(comparisonKeyBA.getKeyData()), 0);
+}
+
 }  // namespace

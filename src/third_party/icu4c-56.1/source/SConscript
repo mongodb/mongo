@@ -6,7 +6,7 @@ env = env.Clone()
 
 env.Append(
     CPPDEFINES=[
-        'U_CHARSET_ISUTF8=1',
+        'U_CHARSET_IS_UTF8=1',
         'U_I18N_IMPLEMENTATION=1',
         'U_STATIC_IMPLEMENTATION=1',
     ],

@@ -45,6 +45,8 @@ public:
 
     int compare(StringData left, StringData right) final;
 
+    ComparisonKey getComparisonKey(StringData stringData) final;
+
 private:
     // The ICU implementation of the collator to which we delegate interesting work. Const methods
     // on the ICU collator are expected to be thread-safe.

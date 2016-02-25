@@ -34,7 +34,7 @@ namespace mongo {
 
 /**
  * A CollationSpec is a parsed representation of a user-provided collation BSONObj. Can be
- * re-serialized to BSON using the CollationSpecSerializer.
+ * re-serialized to BSON using CollationSerializer.
  */
 struct CollationSpec {
     // Controls whether uppercase sorts before lowercase or vice versa.
@@ -109,6 +109,17 @@ struct CollationSpec {
     static const char* kAlternateShifted;
     static const char* kMaxVariablePunct;
     static const char* kMaxVariableSpace;
+
+    /**
+     * Constructs a CollationSpec with no locale, where all other fields have their default values.
+     */
+    CollationSpec() = default;
+
+    /**
+     * Constructs a CollationSpec for the given locale, where all other fields have their default
+     * values.
+     */
+    CollationSpec(std::string locale) : localeID(std::move(locale)) {}
 
     // A string such as "en_US", identifying the language, country, or other attributes of the
     // locale for this collation.

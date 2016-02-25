@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/collation/collation_spec_serializer.h"
+#include "mongo/db/query/collation/collation_serializer.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"
@@ -37,7 +37,7 @@ namespace {
 
 using namespace mongo;
 
-TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesDefaults) {
+TEST(CollationSerializerTest, ToBSONCorrectlySerializesDefaults) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
 
@@ -51,10 +51,10 @@ TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesDefaults) {
                                << "punct"
                                << "normalization" << false << "backwards" << false);
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
-TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesCaseFirstUpper) {
+TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstUpper) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
     collationSpec.caseFirst = CollationSpec::CaseFirstType::kUpper;
@@ -69,10 +69,10 @@ TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesCaseFirstUpper) {
                                << "punct"
                                << "normalization" << false << "backwards" << false);
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
-TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesCaseFirstLower) {
+TEST(CollationSerializerTest, ToBSONCorrectlySerializesCaseFirstLower) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
     collationSpec.caseFirst = CollationSpec::CaseFirstType::kLower;
@@ -87,10 +87,10 @@ TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesCaseFirstLower) {
                                << "punct"
                                << "normalization" << false << "backwards" << false);
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
-TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesPrimaryStrength) {
+TEST(CollationSerializerTest, ToBSONCorrectlySerializesPrimaryStrength) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
     collationSpec.strength = CollationSpec::StrengthType::kPrimary;
@@ -105,10 +105,10 @@ TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesPrimaryStrength) {
                                << "punct"
                                << "normalization" << false << "backwards" << false);
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
-TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesSecondaryStrength) {
+TEST(CollationSerializerTest, ToBSONCorrectlySerializesSecondaryStrength) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
     collationSpec.strength = CollationSpec::StrengthType::kSecondary;
@@ -123,10 +123,10 @@ TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesSecondaryStrength) {
                                << "punct"
                                << "normalization" << false << "backwards" << false);
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
-TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesQuaternaryStrength) {
+TEST(CollationSerializerTest, ToBSONCorrectlySerializesQuaternaryStrength) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
     collationSpec.strength = CollationSpec::StrengthType::kQuaternary;
@@ -141,10 +141,10 @@ TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesQuaternaryStrength) {
                                << "punct"
                                << "normalization" << false << "backwards" << false);
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
-TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesIdenticalStrength) {
+TEST(CollationSerializerTest, ToBSONCorrectlySerializesIdenticalStrength) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
     collationSpec.strength = CollationSpec::StrengthType::kIdentical;
@@ -159,10 +159,10 @@ TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesIdenticalStrength) {
                                << "punct"
                                << "normalization" << false << "backwards" << false);
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
-TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesAlternateShifted) {
+TEST(CollationSerializerTest, ToBSONCorrectlySerializesAlternateShifted) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
     collationSpec.alternate = CollationSpec::AlternateType::kShifted;
@@ -177,10 +177,10 @@ TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesAlternateShifted) {
                                << "punct"
                                << "normalization" << false << "backwards" << false);
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
-TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesMaxVariableSpace) {
+TEST(CollationSerializerTest, ToBSONCorrectlySerializesMaxVariableSpace) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
     collationSpec.maxVariable = CollationSpec::MaxVariableType::kSpace;
@@ -195,7 +195,7 @@ TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesMaxVariableSpace) {
                                << "space"
                                << "normalization" << false << "backwards" << false);
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
 }  // namespace

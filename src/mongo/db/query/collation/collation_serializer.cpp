@@ -28,14 +28,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/collation/collation_spec_serializer.h"
+#include "mongo/db/query/collation/collation_serializer.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/collation/collation_spec.h"
 
 namespace mongo {
 
-BSONObj CollationSpecSerializer::toBSON(const CollationSpec& spec) {
+BSONObj CollationSerializer::specToBSON(const CollationSpec& spec) {
     BSONObjBuilder builder;
     builder.append(CollationSpec::kLocaleField, spec.localeID);
     builder.append(CollationSpec::kCaseLevelField, spec.caseLevel);
@@ -82,6 +84,17 @@ BSONObj CollationSpecSerializer::toBSON(const CollationSpec& spec) {
     builder.append(CollationSpec::kNormalizationField, spec.normalization);
     builder.append(CollationSpec::kBackwardsField, spec.backwards);
     return builder.obj();
+}
+
+// TODO SERVER-22372: Add test coverage for this method once the CollatorInterfaceMock is
+// implemented.
+void CollationSerializer::appendCollationKey(StringData fieldName,
+                                             const CollatorInterface::ComparisonKey& key,
+                                             BSONObjBuilder* bob) {
+    const auto keyData = key.getKeyData();
+    // 'keyData' should not contain a trailing null byte, but the BSONObjBuilder will add one after
+    // appending the string.
+    bob->append(fieldName, keyData);
 }
 
 }  // namespace mongo

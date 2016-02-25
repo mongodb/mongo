@@ -33,9 +33,9 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="collation_spec_serializer",
+    target="collation_serializer",
     source=[
-        "collation_spec_serializer.cpp",
+        "collation_serializer.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -44,12 +44,12 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="collation_spec_serializer_test",
+    target="collation_serializer_test",
     source=[
-        "collation_spec_serializer_test.cpp",
+        "collation_serializer_test.cpp",
     ],
     LIBDEPS=[
-        "collation_spec_serializer",
+        "collation_serializer",
     ],
 )
 
