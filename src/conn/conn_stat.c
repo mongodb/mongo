@@ -150,11 +150,12 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	 * default.
 	 */
 	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_JSON)) {
-		WT_ERR(__wt_config_gets_def(
-		    session, cfg, "statistics_log.timestamp", 0, &cval));
-		if (cval.type == WT_CONFIG_ITEM_NUM)
+		ret = __wt_config_gets(
+		    session, &cfg[1], "statistics_log.timestamp", &cval);
+		if (ret == WT_NOTFOUND)
 			WT_ERR(__wt_strdup(
 			    session, "%FT%T.000Z", &conn->stat_format));
+		WT_ERR_NOTFOUND_OK(ret);
 	}
 	if (conn->stat_format == NULL) {
 		WT_ERR(__wt_config_gets(
