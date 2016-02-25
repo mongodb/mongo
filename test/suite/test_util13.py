@@ -30,7 +30,8 @@ import os, re, string
 from suite_subprocess import suite_subprocess
 import itertools, wiredtiger, wttest
 
-from helper import complex_populate, complex_populate_lsm, simple_populate
+from helper import complex_populate_cgconfig, complex_populate_lsm
+from helper import simple_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
 # test_util13.py
@@ -55,7 +56,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
         ('table-simple', dict(uri='table:' + pfx, pop=simple_populate,
             table_config='split_pct=50', cfg='')),
         ('table-complex',
-            dict(uri='table:' + pfx, pop=complex_populate,
+            dict(uri='table:' + pfx, pop=complex_populate_cgconfig,
             table_config='allocation_size=512B', cfg='')),
         ('table-complex-lsm',
             dict(uri='table:' + pfx, pop=complex_populate_lsm,
@@ -101,20 +102,20 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
             print dx
         return match
 
-    def compare_files(self, filename1, filename2):
+    def compare_files(self, expect_subset, dump_out):
         inheader = isconfig = False
-        for l1, l2 in zip(open(filename1, "rb"), open(filename2, "rb")):
+        for l1, l2 in zip(open(expect_subset, "rb"), open(dump_out, "rb")):
             if isconfig:
                 if not self.compare_config(l1, l2):
                     return False
-            elif l1 != l2:
-                return False
             if inheader:
+                # This works because the expected subset has a format
+                # of URI and config lines alternating.
                 isconfig = not isconfig
             if l1.strip() == 'Header':
                 inheader = True
             if l1.strip() == 'Data':
-                inheader = isconfig = False
+                break
         return True
 
     def test_dump_config(self):
@@ -135,7 +136,11 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
             expectout.write('Format=print\n')
             expectout.write('Header\n')
             expectout.write(self.uri + '\n')
-            if self.cfg == '':
+            # Check the config on the colgroup itself for complex tables.
+            if self.pop != simple_populate:
+                expectout.write('key_format=S\n')
+                expectout.write('colgroup:' + self.pfx + ':cgroup1\n')
+            if self.cfg == '': 
                 expectout.write(self.table_config + '\n')
             else:
                 expectout.write(self.cfg + '\n')
