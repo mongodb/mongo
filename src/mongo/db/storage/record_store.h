@@ -586,6 +586,13 @@ public:
                                         long long numRecords,
                                         long long dataSize) = 0;
 
+    /**
+     * support modify capped collection config
+     * if storage engine cannot support this feature, simple return false
+     */
+    virtual bool setCappedSize(long long cappedSize) { return false; }
+    virtual bool setCappedMaxDocs(long long cappedMaxDocs) { return false; }
+
 protected:
     std::string _ns;
 };

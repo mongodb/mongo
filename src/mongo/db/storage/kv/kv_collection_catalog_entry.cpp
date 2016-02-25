@@ -174,6 +174,18 @@ void KVCollectionCatalogEntry::updateValidator(OperationContext* txn,
     _catalog->putMetaData(txn, ns().toString(), md);
 }
 
+void KVCollectionCatalogEntry::updateCappedSize(OperationContext* txn, long long cappedSize) {
+    MetaData md = _getMetaData(txn);
+    md.options.cappedSize = cappedSize;
+    _catalog->putMetaData(txn, ns().toString(), md);
+}
+
+void KVCollectionCatalogEntry::updateCappedMaxDocs(OperationContext* txn, long long cappedMaxDocs) {
+    MetaData md = _getMetaData(txn);
+    md.options.cappedMaxDocs = cappedMaxDocs;
+    _catalog->putMetaData(txn, ns().toString(), md);
+}
+
 BSONCollectionCatalogEntry::MetaData KVCollectionCatalogEntry::_getMetaData(
     OperationContext* txn) const {
     return _catalog->getMetaData(txn, ns().toString());

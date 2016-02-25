@@ -143,6 +143,53 @@ Status collMod(OperationContext* txn,
             auto status = coll->setValidationAction(txn, e.String());
             if (!status.isOK())
                 errorStatus = std::move(status);
+        } else if (str::equals("cappedSize", e.fieldName()) ||
+                   str::equals("cappedMaxDocs", e.fieldName())) {
+            if (!e.isNumber()) {
+                errorStatus = Status(ErrorCodes::InvalidOptions,
+                                     std::string(e.fieldName()) + " field must be a number");
+                continue;
+            }
+
+            const StringData name = e.fieldNameStringData();
+            const long long newVal = e.numberLong();
+
+            CollectionCatalogEntry* cce = coll->getCatalogEntry();
+
+            const CollectionOptions oldOptions = cce->getCollectionOptions(txn);
+            if (!oldOptions.capped) {
+                errorStatus = Status(ErrorCodes::InvalidOptions,
+                                     "not a capped collection");
+                continue;
+            }
+            if (str::equals("cappedSize", e.fieldName())) {
+                const long long oldCappedSize = oldOptions.cappedSize;
+                const long long newCappedSize = newVal;
+
+                if (coll->getRecordStore()->setCappedSize(newCappedSize)) {
+                    result->appendNumber("cappedSize_old", oldCappedSize);
+                    result->appendNumber("cappedSize_new", newCappedSize);
+                    cce->updateCappedSize(txn, newCappedSize);
+                } else {
+                    errorStatus = Status(ErrorCodes::InvalidOptions,
+                                         "option CappedSize not support");
+                    continue;
+                }
+
+            } else {
+                const long long oldCappedMaxDocs = oldOptions.cappedMaxDocs;
+                const long long newCappedMaxDocs = newVal;
+
+                if (coll->getRecordStore()->setCappedMaxDocs(newCappedMaxDocs)) {
+                    result->appendNumber("cappedMaxDocs_old", oldCappedMaxDocs);
+                    result->appendNumber("cappedMaxDocs_new", newCappedMaxDocs);
+                    cce->updateCappedMaxDocs(txn, newCappedMaxDocs);
+                } else {
+                    errorStatus = Status(ErrorCodes::InvalidOptions,
+                                         "option cappedMaxDocs not support");
+                    continue;
+                }
+            }
         } else {
             // As of SERVER-17312 we only support these two options. When SERVER-17320 is
             // resolved this will need to be enhanced to handle other options.

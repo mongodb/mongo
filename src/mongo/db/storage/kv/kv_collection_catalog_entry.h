@@ -73,6 +73,9 @@ public:
                          StringData validationLevel,
                          StringData validationAction) final;
 
+    void updateCappedSize(OperationContext* txn, long long cappedSize) final;
+    void updateCappedMaxDocs(OperationContext* txn, long long cappedMaxDocs) final;
+
     RecordStore* getRecordStore() {
         return _recordStore.get();
     }
