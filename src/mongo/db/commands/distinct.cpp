@@ -216,9 +216,9 @@ public:
 
         // Return an error if execution fails for any reason.
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-            const std::unique_ptr<PlanStageStats> stats(executor.getValue()->getStats());
             log() << "Plan executor error during distinct command: "
-                  << PlanExecutor::statestr(state) << ", stats: " << Explain::statsToBSON(*stats);
+                  << PlanExecutor::statestr(state)
+                  << ", stats: " << Explain::getWinningPlanStats(executor.getValue().get());
 
             return appendCommandStatus(result,
                                        Status(ErrorCodes::OperationFailed,
