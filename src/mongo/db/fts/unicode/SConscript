@@ -69,3 +69,12 @@ env.CppUnitTest(
         'unicode', 
     ]
 )
+
+env.CppUnitTest(
+    target='byte_vector_test',
+    source=[
+        'byte_vector_test.cpp'
+    ],
+    LIBDEPS=[
+    ]
+)

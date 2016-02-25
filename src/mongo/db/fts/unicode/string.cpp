@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <boost/algorithm/searching/boyer_moore.hpp>
 
+#include "mongo/db/fts/unicode/byte_vector.h"
 #include "mongo/platform/bits.h"
 #include "mongo/shell/linenoise_utf8.h"
 #include "mongo/util/assert_util.h"
@@ -171,6 +172,46 @@ std::pair<std::unique_ptr<char[]>, char*> String::prepForSubstrMatch(StringData 
     auto outputIt = buffer.get();
 
     for (auto inputIt = utf8.begin(), endIt = utf8.end(); inputIt != endIt;) {
+#ifdef MONGO_HAVE_FAST_BYTE_VECTOR
+        if (size_t(endIt - inputIt) >= ByteVector::size) {
+            // Try the fast path for 16 contiguous bytes of ASCII.
+            auto word = ByteVector::load(&*inputIt);
+
+            // Count the bytes of ASCII.
+            uint32_t usableBytes = ByteVector::countInitialZeros(word.maskHigh());
+            if (usableBytes) {
+                if (!(options & kCaseSensitive)) {
+                    if (mode == CaseFoldMode::kTurkish) {
+                        ByteVector::Mask iMask = word.compareEQ('I').maskAny();
+                        if (iMask) {
+                            usableBytes =
+                                std::min(usableBytes, ByteVector::countInitialZeros(iMask));
+                        }
+                    }
+                    // 0xFF for each byte in word that is uppercase, 0x00 for all others.
+                    ByteVector uppercaseMask = word.compareGT('A' - 1) & word.compareLT('Z' + 1);
+                    word |= (uppercaseMask & ByteVector(0x20));  // Set the ascii lowercase bit.
+                }
+
+                if (!(options & kDiacriticSensitive)) {
+                    ByteVector::Mask diacriticMask =
+                        word.compareEQ('^').maskAny() | word.compareEQ('`').maskAny();
+                    if (diacriticMask) {
+                        usableBytes =
+                            std::min(usableBytes, ByteVector::countInitialZeros(diacriticMask));
+                    }
+                }
+
+                word.store(&*outputIt);
+                outputIt += usableBytes;
+                inputIt += usableBytes;
+                if (usableBytes == ByteVector::size)
+                    continue;
+            }
+            // If we get here, inputIt is positioned on a byte that we know needs special handling.
+            // Either it isn't ASCII or it is a diacritic that needs to be stripped.
+        }
+#endif
         const uint8_t firstByte = *inputIt++;
         char32_t codepoint = 0;
         if (firstByte <= 0x7f) {
