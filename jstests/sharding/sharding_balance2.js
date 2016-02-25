@@ -63,16 +63,10 @@ while (getShardSize(shardConn) < maxSizeBytes) {
     assert.commandWorked(shardConn.getDB('admin').runCommand({ fsync: 1 }));
 }
 
-var configDB = s.s.getDB('config');
-var balanceRoundsBefore = configDB.actionlog.find({ what: 'balancer.round' }).count();
-
 s.startBalancer();
 
-// Wait until a balancer finishes at least one round.
-assert.soon(function() {
-    var currentBalanceRound = configDB.actionlog.find({ what: 'balancer.round' }).count();
-    return balanceRoundsBefore < currentBalanceRound;
-});
+// Wait until balancer finishes at least one balancing round.
+assert(s.waitForBalancerRound(), "Balancer is not running: it never pinged config.mongos");
 
 var chunkCounts = s.chunkCounts('foo', 'test');
 assert.eq(0, chunkCounts.shard0001);

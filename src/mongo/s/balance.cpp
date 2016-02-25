@@ -642,13 +642,13 @@ void Balancer::run() {
                 } else {
                     _balancedLastTime =
                         _moveChunks(txn.get(), candidateChunks, secondaryThrottle, waitForDelete);
+
+                    roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
+                                              _balancedLastTime);
+
+                    grid.catalogManager(txn.get())
+                        ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
                 }
-
-                roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
-                                          _balancedLastTime);
-
-                grid.catalogManager(txn.get())
-                    ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
 
                 LOG(1) << "*** End of balancing round";
             }

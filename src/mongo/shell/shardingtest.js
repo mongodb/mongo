@@ -623,6 +623,44 @@ var ShardingTest = function(params) {
         }
     };
 
+    /*
+     * Returns true after the balancer has completed a balancing round.
+     *
+     * Checks that three pings were sent to config.mongos. The balancer writes a ping
+     * at the start and end of a balancing round. If the balancer is in the middle of 
+     * a round, there could be three pings before the first full balancing round 
+     * completes: end ping of a round, and start and end pings of the following round.
+     */
+    this.waitForBalancerRound = function() {
+        if (typeof db == "undefined") {
+            db = undefined;
+        }
+        var oldDB = db;
+        db = this.config;
+
+        var getPings = function(){
+            return sh._getConfigDB().mongos.find().toArray();
+        };
+
+        try {
+            // If sh.waitForPingChange returns a non-empty array, config.mongos
+            // was not successfully updated and no balancer round was reported.
+            for (var i = 0; i < 3; ++i) {
+                if ( sh.waitForPingChange(getPings()).length != 0 ) {
+                    return false;
+                }
+            }
+
+            db = oldDB;
+            return true;
+        }
+        catch (e) {
+            print("Error running waitForPingChange: " + tojson(e));
+            db = oldDB;
+            return false;
+        }
+    }
+
     this.isAnyBalanceInFlight = function() {
         if (this.config.locks.find({ _id : { $ne : "balancer" }, state : 2 }).count() > 0)
             return true;
