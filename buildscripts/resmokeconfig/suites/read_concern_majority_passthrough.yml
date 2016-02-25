@@ -7,10 +7,8 @@ selector:
     # and/or an injected 'majority' writeConcern. Where a function is
     # listed the reason is we don't have a reliable solution to override
     # the write concern for that function.
-    - jstests/core/apply_ops1.js # applyOps() used for writes
     - jstests/core/batch_write_command*.js # these tests use various write concerns
     - jstests/core/bench_test*.js # benchRun() used for writes
-    - jstests/core/bypass_doc_validation.js # applyOps() used for writes
     - jstests/core/capped_update.js # uses godinsert and can't run under replication.
     - jstests/core/crud_api.js # has specific w:0 tests
     - jstests/core/error2.js # db.eval() used
