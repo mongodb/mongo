@@ -132,3 +132,18 @@ func TestMarshal(t *testing.T) {
 		t.Fatal("invalid public key der bytes")
 	}
 }
+
+func TestGenerate(t *testing.T) {
+	key, err := GenerateRSAKey(2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = key.MarshalPKIXPublicKeyPEM()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = key.MarshalPKCS1PrivateKeyPEM()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

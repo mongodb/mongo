@@ -38,7 +38,7 @@ func NewWriterOutput(w io.Writer) *WriterOutput {
 }
 
 func (o *WriterOutput) Output(_ LogLevel, message []byte) {
-	o.w.Write(append(bytes.TrimRight(message, "\r\n"), '\n'))
+	o.w.Write(append(bytes.TrimRight(message, "\r\n"), platformNewline...))
 }
 
 // StdlibOutput is a TextOutput that simply writes to the default Go stdlib
