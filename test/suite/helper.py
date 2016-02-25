@@ -201,6 +201,8 @@ def complex_populate_cgconfig(self, uri, config, rows):
         complex_populate_type(self, uri, config, config, rows, '')
 def complex_populate_lsm(self, uri, config, rows):
         complex_populate_type(self, uri, config, '', rows, 'type=lsm')
+def complex_populate_cgconfig_lsm(self, uri, config, rows):
+        complex_populate_type(self, uri, config, config, rows, 'type=lsm')
 def complex_populate_type(self, uri, config, cgconfig, rows, type):
     self.session.create(uri,
         config + ',value_format=SiSS,' +

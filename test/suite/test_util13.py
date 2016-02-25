@@ -30,7 +30,7 @@ import os, re, string
 from suite_subprocess import suite_subprocess
 import itertools, wiredtiger, wttest
 
-from helper import complex_populate_cgconfig, complex_populate_lsm
+from helper import complex_populate_cgconfig, complex_populate_cgconfig_lsm
 from helper import simple_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
@@ -59,7 +59,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
             dict(uri='table:' + pfx, pop=complex_populate_cgconfig,
             table_config='allocation_size=512B', cfg='')),
         ('table-complex-lsm',
-            dict(uri='table:' + pfx, pop=complex_populate_lsm,
+            dict(uri='table:' + pfx, pop=complex_populate_cgconfig_lsm,
             table_config='lsm=(merge_max=5)',
             cfg='merge_max=5')),
     ]
