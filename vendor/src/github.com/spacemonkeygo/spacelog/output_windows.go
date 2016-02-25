@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Ryan Hileman
+// Copyright (C) 2014 Space Monkey, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,21 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package openssl
+package spacelog
 
-import (
-	"regexp"
-)
-
-var pemSplit *regexp.Regexp = regexp.MustCompile(`(?sm)` +
-	`(^-----[\s-]*?BEGIN.*?-----$` +
-	`.*?` +
-	`^-----[\s-]*?END.*?-----$)`)
-
-func SplitPEM(data []byte) [][]byte {
-	var results [][]byte
-	for _, block := range pemSplit.FindAll(data, -1) {
-		results = append(results, block)
-	}
-	return results
-}
+var platformNewline = []byte("\r\n")

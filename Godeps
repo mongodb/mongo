@@ -4,6 +4,6 @@ github.com/jacobsa/oglematchers         4fc24f97b5b74022c2a3f4ca7eed57ca29083d3e
 github.com/smartystreets/goconvey       75bc4a2dad71e5c5b51c5009b33eba766ec57051
 github.com/jessevdk/go-flags            1679536dcc895411a9f5848d9a0250be7856448c
 github.com/3rf/mongo-lint               3550fdcf1f43b89aaeabaa4559eaae6dc4407e42
-github.com/spacemonkeygo/openssl        c53ffe3be2426bc12a7874412ccc54daa7ce6c18	github.com/10gen/openssl
+github.com/spacemonkeygo/openssl        4c6dbafa5ec35b3ffc6a1b1e1fe29c3eba2053ec        github.com/10gen/openssl
 github.com/howeyc/gopass                2c70fa70727c953c51695f800f25d6b44abb368e
 golang.org/x/crypto                     b7d6bf2c61544745a02f83dec90393985fc3a065
