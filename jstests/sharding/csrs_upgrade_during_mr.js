@@ -51,11 +51,11 @@ load("jstests/libs/csrs_upgrade_util.js");
 
                 var map = function() {
                     emit(this.num, 1);
-                }
+                };
 
                 var reduce = function(key, values) {
                     return Array.sum(values);
-                }
+                };
 
                 var res = db.runCommand({mapReduce: 'sharded',
                                          map: map,
@@ -97,6 +97,6 @@ load("jstests/libs/csrs_upgrade_util.js");
     printjson(outputColl1.find().toArray());
     assert.eq(4, outputColl1.count());
     assert.eq(4, outputColl2.count());
-    outputColl1.find().forEach(function(x) {assert.eq(500, x.value)});
-    outputColl2.find().forEach(function(x) {assert.eq(500, x.value)});
+    outputColl1.find().forEach(function(x) {assert.eq(500, x.value);});
+    outputColl2.find().forEach(function(x) {assert.eq(500, x.value);});
 }());

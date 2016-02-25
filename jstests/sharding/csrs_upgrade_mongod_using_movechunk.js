@@ -15,7 +15,7 @@ var st;
     var testDBName = jsTestName();
     var dataCollectionName = testDBName + ".data";
 
-    jsTest.log("Setting up CSRS sharded cluster")
+    jsTest.log("Setting up CSRS sharded cluster");
     st = new ShardingTest({
         name: "csrs",
         mongos: 2,
@@ -47,7 +47,7 @@ var st;
     var splitCmd = {
         split: dataCollectionName,
         middle: { _id: 0 }
-    }
+    };
     assert.commandWorked(st.s0.adminCommand(splitCmd));
 
     jsTest.log("Stopping and restarting mongod " + st.shard0.name +
@@ -82,7 +82,7 @@ var st;
         maxTimeMS: 0,
         shardVersion: [shardVersion, epoch],
         epoch: epoch
-    }
+    };
     assert.commandWorked(restartedMongod.adminCommand(moveChunkCmd));
 
     jsTest.log("Ensuring restarted mongod is now sharding-aware " +
