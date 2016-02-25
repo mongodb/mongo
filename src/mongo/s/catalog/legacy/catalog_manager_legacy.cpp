@@ -918,7 +918,8 @@ StatusWith<std::vector<BSONObj>> CatalogManagerLegacy::_findOnConfig(const std::
         try {
             ScopedDbConnection conn(_configServerConnectionString, 30.0);
 
-            std::unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query(ns, query, limit)));
+            std::unique_ptr<DBClientCursor> cursor(
+                _safeCursor(conn->query(ns, query, limit, 0, nullptr, QueryOption_SlaveOk)));
             if (!cursor.get()) {
                 conn.done();
                 return Status(ErrorCodes::HostUnreachable,
