@@ -363,7 +363,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
                 JS::RootedValue dateval(_context);
                 o.callMethod("getTime", &dateval);
 
-                auto d = Date_t::fromMillisSinceEpoch(ValueWriter(_context, dateval).toNumber());
+                auto d = Date_t::fromMillisSinceEpoch(ValueWriter(_context, dateval).toInt64());
                 b->appendDate(sd, d);
 
                 return;
