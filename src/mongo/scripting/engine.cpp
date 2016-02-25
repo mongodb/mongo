@@ -101,9 +101,8 @@ void Scope::append(BSONObjBuilder& builder, const char* fieldName, const char* s
             builder.appendNull(fieldName);
             break;
         case Date:
-            builder.appendDate(
-                fieldName,
-                Date_t::fromMillisSinceEpoch(static_cast<long long>(getNumber(scopeName))));
+            builder.appendDate(fieldName,
+                               Date_t::fromMillisSinceEpoch(getNumberLongLong(scopeName)));
             break;
         case Code:
             builder.appendCode(fieldName, getString(scopeName));
@@ -441,6 +440,12 @@ public:
     }
     double getNumber(const char* field) {
         return _real->getNumber(field);
+    }
+    int getNumberInt(const char* field) {
+        return _real->getNumberInt(field);
+    }
+    long long getNumberLongLong(const char* field) {
+        return _real->getNumberLongLong(field);
     }
     Decimal128 getNumberDecimal(const char* field) {
         return _real->getNumberDecimal(field);

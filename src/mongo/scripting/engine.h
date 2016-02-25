@@ -74,12 +74,10 @@ public:
     virtual std::string getString(const char* field) = 0;
     virtual bool getBoolean(const char* field) = 0;
     virtual double getNumber(const char* field) = 0;
-    virtual int getNumberInt(const char* field) {
-        return (int)getNumber(field);
-    }
-    virtual long long getNumberLongLong(const char* field) {
-        return static_cast<long long>(getNumber(field));
-    }
+    virtual int getNumberInt(const char* field) = 0;
+
+    virtual long long getNumberLongLong(const char* field) = 0;
+
     virtual Decimal128 getNumberDecimal(const char* field) = 0;
 
     virtual void setElement(const char* field, const BSONElement& e, const BSONObj& parent) = 0;
