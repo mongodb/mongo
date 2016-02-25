@@ -141,3 +141,14 @@ env.Library(
         'incomplete',
     ],
 )
+
+env.CppUnitTest(
+    target='expression_serialization_test',
+    source=[
+        'expression_serialization_test.cpp',
+    ],
+    LIBDEPS=[
+        'expressions',
+        'expressions_geo',
+    ],
+)

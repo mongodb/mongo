@@ -369,7 +369,7 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int level) const {
     debug << "\n";
 }
 
-void GeoMatchExpression::toBSON(BSONObjBuilder* out) const {
+void GeoMatchExpression::serialize(BSONObjBuilder* out) const {
     out->appendElements(_rawObj);
 }
 
@@ -426,7 +426,7 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int level) const 
     debug << "\n";
 }
 
-void GeoNearMatchExpression::toBSON(BSONObjBuilder* out) const {
+void GeoNearMatchExpression::serialize(BSONObjBuilder* out) const {
     out->appendElements(_rawObj);
 }
 

@@ -462,7 +462,7 @@ public:
         initPath(twoDPath);
     }
 
-    void toBSON(BSONObjBuilder* out) const final {
+    void serialize(BSONObjBuilder* out) const final {
         out->append("TwoDPtInAnnulusExpression", true);
     }
 

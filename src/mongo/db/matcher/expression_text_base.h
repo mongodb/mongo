@@ -79,7 +79,7 @@ public:
 
     void debugString(StringBuilder& debug, int level = 0) const final;
 
-    void toBSON(BSONObjBuilder* out) const final;
+    void serialize(BSONObjBuilder* out) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 };

@@ -804,7 +804,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseAll(const char* name,
     }
 
     if (myAnd->numChildren() == 0) {
-        return {stdx::make_unique<FalseMatchExpression>()};
+        return {stdx::make_unique<FalseMatchExpression>(name)};
     }
 
     return {std::move(myAnd)};

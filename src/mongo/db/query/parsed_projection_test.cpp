@@ -181,7 +181,7 @@ TEST(ParsedProjectionTest, ValidPositionalOperatorProjections) {
 // to achieve the same effect.
 // Projection parser should handle this the same way as an empty path.
 TEST(ParsedProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression) {
-    unique_ptr<MatchExpression> queryMatchExpr(new FalseMatchExpression());
+    unique_ptr<MatchExpression> queryMatchExpr(new FalseMatchExpression(""));
     ASSERT(NULL == queryMatchExpr->path().rawData());
 
     ParsedProjection* out = NULL;

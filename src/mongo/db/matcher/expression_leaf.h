@@ -97,7 +97,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -210,7 +210,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     void shortDebugString(StringBuilder& debug) const;
 
@@ -248,7 +248,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -283,7 +283,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 };
@@ -337,7 +337,7 @@ public:
 
     void debugString(StringBuilder& debug) const;
 
-    void toBSON(BSONArrayBuilder* out) const;
+    void serialize(BSONArrayBuilder* out) const;
 
 private:
     bool _hasNull;  // if _equalities has a jstNULL element in it
@@ -364,7 +364,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -425,7 +425,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -481,7 +481,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int level) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 

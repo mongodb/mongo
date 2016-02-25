@@ -60,6 +60,10 @@ public:
         return _pattern.toString();
     }
 
+    MatchExpression* getMatchExpression() {
+        return _expression.get();
+    }
+
 private:
     BSONObj _pattern;
 

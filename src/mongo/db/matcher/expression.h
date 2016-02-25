@@ -233,12 +233,18 @@ public:
         }
     }
 
+    /**
+     * Serialize the MatchExpression to BSON, appending to 'out'. Output of this method is expected
+     * to be a valid query object, that, when parsed, produces a logically equivalent
+     * MatchExpression.
+     */
+    virtual void serialize(BSONObjBuilder* out) const = 0;
+
     //
     // Debug information
     //
     virtual std::string toString() const;
     virtual void debugString(StringBuilder& debug, int level = 0) const = 0;
-    virtual void toBSON(BSONObjBuilder* out) const = 0;
 
 protected:
     void _debugAddSpace(StringBuilder& debug, int level) const;
@@ -250,7 +256,9 @@ private:
 
 class FalseMatchExpression : public MatchExpression {
 public:
-    FalseMatchExpression() : MatchExpression(ALWAYS_FALSE) {}
+    FalseMatchExpression(StringData path) : MatchExpression(ALWAYS_FALSE) {
+        _path = path;
+    }
 
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const {
         return false;
@@ -261,15 +269,18 @@ public:
     }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        return stdx::make_unique<FalseMatchExpression>();
+        return stdx::make_unique<FalseMatchExpression>(_path);
     }
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
-    virtual void toBSON(BSONObjBuilder* out) const;
+    virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const {
         return other->matchType() == ALWAYS_FALSE;
     }
+
+private:
+    StringData _path;
 };
 }

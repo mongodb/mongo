@@ -247,13 +247,13 @@ TEST_F(ExtensionsCallbackRealTest, WhereExpressionsWithSameScopeHaveSameBSONRepr
     auto expr1 =
         unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query1.firstElement()));
     BSONObjBuilder builder1;
-    expr1->toBSON(&builder1);
+    expr1->serialize(&builder1);
 
     BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
     auto expr2 =
         unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query2.firstElement()));
     BSONObjBuilder builder2;
-    expr2->toBSON(&builder2);
+    expr2->serialize(&builder2);
 
     ASSERT_EQ(builder1.obj(), builder2.obj());
 }
@@ -266,13 +266,13 @@ TEST_F(ExtensionsCallbackRealTest,
     auto expr1 =
         unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query1.firstElement()));
     BSONObjBuilder builder1;
-    expr1->toBSON(&builder1);
+    expr1->serialize(&builder1);
 
     BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << false)));
     auto expr2 =
         unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query2.firstElement()));
     BSONObjBuilder builder2;
-    expr2->toBSON(&builder2);
+    expr2->serialize(&builder2);
 
     ASSERT_NE(builder1.obj(), builder2.obj());
 }

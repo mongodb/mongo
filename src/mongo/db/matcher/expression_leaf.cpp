@@ -185,8 +185,7 @@ void ComparisonMatchExpression::debugString(StringBuilder& debug, int level) con
             debug << "$gte";
             break;
         default:
-            debug << " UNKNOWN - should be impossible";
-            break;
+            invariant(false);
     }
     debug << " " << _rhs.toString(false);
 
@@ -199,7 +198,7 @@ void ComparisonMatchExpression::debugString(StringBuilder& debug, int level) con
     debug << "\n";
 }
 
-void ComparisonMatchExpression::toBSON(BSONObjBuilder* out) const {
+void ComparisonMatchExpression::serialize(BSONObjBuilder* out) const {
     string opString = "";
     switch (matchType()) {
         case LT:
@@ -218,8 +217,7 @@ void ComparisonMatchExpression::toBSON(BSONObjBuilder* out) const {
             opString = "$gte";
             break;
         default:
-            opString = " UNKNOWN - should be impossible";
-            break;
+            invariant(false);
     }
 
     out->append(path(), BSON(opString << _rhs));
@@ -307,7 +305,7 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int level) const {
     debug << "\n";
 }
 
-void RegexMatchExpression::toBSON(BSONObjBuilder* out) const {
+void RegexMatchExpression::serialize(BSONObjBuilder* out) const {
     out->appendRegex(path(), _regex, _flags);
 }
 
@@ -342,7 +340,7 @@ void ModMatchExpression::debugString(StringBuilder& debug, int level) const {
     debug << "\n";
 }
 
-void ModMatchExpression::toBSON(BSONObjBuilder* out) const {
+void ModMatchExpression::serialize(BSONObjBuilder* out) const {
     out->append(path(), BSON("$mod" << BSON_ARRAY(_divisor << _remainder)));
 }
 
@@ -377,7 +375,7 @@ void ExistsMatchExpression::debugString(StringBuilder& debug, int level) const {
     debug << "\n";
 }
 
-void ExistsMatchExpression::toBSON(BSONObjBuilder* out) const {
+void ExistsMatchExpression::serialize(BSONObjBuilder* out) const {
     out->append(path(), BSON("$exists" << true));
 }
 
@@ -494,7 +492,7 @@ void TypeMatchExpression::debugString(StringBuilder& debug, int level) const {
     debug << "\n";
 }
 
-void TypeMatchExpression::toBSON(BSONObjBuilder* out) const {
+void TypeMatchExpression::serialize(BSONObjBuilder* out) const {
     if (matchesAllNumbers()) {
         out->append(path(), BSON("$type" << kMatchesAllNumbersAlias));
     } else {
@@ -591,13 +589,13 @@ void ArrayFilterEntries::debugString(StringBuilder& debug) const {
     debug << "]";
 }
 
-void ArrayFilterEntries::toBSON(BSONArrayBuilder* out) const {
+void ArrayFilterEntries::serialize(BSONArrayBuilder* out) const {
     for (BSONElementSet::const_iterator it = _equalities.begin(); it != _equalities.end(); ++it) {
         out->append(*it);
     }
     for (size_t i = 0; i < _regexes.size(); ++i) {
         BSONObjBuilder regexBob;
-        _regexes[i]->toBSON(&regexBob);
+        _regexes[i]->serialize(&regexBob);
         out->append(regexBob.obj().firstElement());
     }
     out->doneFast();
@@ -654,10 +652,10 @@ void InMatchExpression::debugString(StringBuilder& debug, int level) const {
     debug << "\n";
 }
 
-void InMatchExpression::toBSON(BSONObjBuilder* out) const {
+void InMatchExpression::serialize(BSONObjBuilder* out) const {
     BSONObjBuilder inBob(out->subobjStart(path()));
     BSONArrayBuilder arrBob(inBob.subarrayStart("$in"));
-    _arrayEntries.toBSON(&arrBob);
+    _arrayEntries.serialize(&arrBob);
     inBob.doneFast();
 }
 
@@ -878,7 +876,7 @@ void BitTestMatchExpression::debugString(StringBuilder& debug, int level) const 
     }
 }
 
-void BitTestMatchExpression::toBSON(BSONObjBuilder* out) const {
+void BitTestMatchExpression::serialize(BSONObjBuilder* out) const {
     string opString = "";
 
     switch (matchType()) {

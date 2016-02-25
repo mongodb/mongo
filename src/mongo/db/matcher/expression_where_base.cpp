@@ -46,7 +46,7 @@ void WhereMatchExpressionBase::debugString(StringBuilder& debug, int level) cons
     debug << "scope: " << getScope() << "\n";
 }
 
-void WhereMatchExpressionBase::toBSON(BSONObjBuilder* out) const {
+void WhereMatchExpressionBase::serialize(BSONObjBuilder* out) const {
     out->appendCodeWScope("$where", getCode(), getScope());
 }
 

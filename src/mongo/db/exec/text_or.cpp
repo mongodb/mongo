@@ -115,7 +115,7 @@ std::unique_ptr<PlanStageStats> TextOrStage::getStats() {
 
     if (_filter) {
         BSONObjBuilder bob;
-        _filter->toBSON(&bob);
+        _filter->serialize(&bob);
         _commonStats.filter = bob.obj();
     }
 
