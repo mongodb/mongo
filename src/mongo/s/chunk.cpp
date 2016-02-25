@@ -41,6 +41,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/random.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -457,11 +458,12 @@ Status Chunk::multiSplit(OperationContext* txn, const vector<BSONObj>& m, BSONOb
 
     ShardConnection conn(_getShardConnectionString(txn), "");
     if (!conn->runCommand("admin", cmdObj, *res)) {
-        string msg(str::stream() << "splitChunk failed - cmd: " << cmdObj << " result: " << *res);
-        warning() << msg;
+        Status status = getStatusFromCommandResult(*res);
+        warning() << "splitChunk cmd " << cmdObj << " failed" << causedBy(status);
         conn.done();
 
-        return Status(ErrorCodes::SplitFailed, msg);
+        return Status(ErrorCodes::SplitFailed,
+                      str::stream() << "command failed due to " << status.toString());
     }
 
     conn.done();
