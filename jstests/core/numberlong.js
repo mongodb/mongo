@@ -35,7 +35,7 @@ assert.eq.automsg( "'NumberLong(\"4294967296\")'", "tojson( n )" );
 assert.eq.automsg( "4294967296", "n.floatApprox" );
 assert.eq.automsg( "", "n.top" );
 assert.eq.automsg( "", "n.bottom" );
-a = {}
+a = {};
 a.a = n;
 p = tojson( a );
 assert.eq.automsg( "'{ \"a\" : NumberLong(\"4294967296\") }'", "p" );
@@ -62,7 +62,7 @@ assert.eq.automsg( "'NumberLong(\"-11111111111111111\")'", "tojson( n )" );
 assert.eq.automsg( "-11111111111111112", "n.floatApprox" );
 assert.eq.automsg( "4292380288", "n.top" );
 assert.eq.automsg( "3643379257", "n.bottom" );
-a = {}
+a = {};
 a.a = n;
 p = tojson( a );
 assert.eq.automsg( "'{ \"a\" : NumberLong(\"-11111111111111111\") }'", "p" );

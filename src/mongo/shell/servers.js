@@ -854,9 +854,8 @@ function appendSetParameterArgs(argArray) {
                 }
             }
             if (!hasAuthMechs) {
-                argArray.push.apply(argArray,
-                                    ['--setParameter',
-                                     "authenticationMechanisms=" + jsTest.options().authMechanism]);
+                argArray.push(...['--setParameter',
+                                  "authenticationMechanisms=" + jsTest.options().authMechanism]);
             }
         }
         if (jsTest.options().auth) {

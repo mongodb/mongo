@@ -64,7 +64,7 @@ function* cycleN(arr, N) {
     for (var i = 0; i < N; ++i) {
         yield arr[i % arr.length];
     }
-};
+}
 
 function* zip2(iter1, iter2)  {
     var n1 = iter1.next();
@@ -82,4 +82,4 @@ function* zip2(iter1, iter2)  {
 
         yield res;
     }
-};
+}

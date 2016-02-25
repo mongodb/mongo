@@ -33,8 +33,8 @@ var fsm = (function() {
 
 
             shardNames.forEach(name =>
-                connCache.shards[name] = args.cluster.shards[name].map(connStr =>
-                    new Mongo(connStr)));
+                (connCache.shards[name] = args.cluster.shards[name].map(connStr =>
+                    new Mongo(connStr))));
         }
 
         for (var i = 0; i < args.iterations; ++i) {
