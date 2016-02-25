@@ -73,7 +73,16 @@ __wt_open(WT_SESSION_IMPL *session,
 		goto setupfh;
 	}
 
-	f = O_RDWR;
+	/*
+	 * If this is a read-only connection, open all files read-only
+	 * except the lock file.
+	 */
+	if (F_ISSET(conn, WT_CONN_READONLY) &&
+	    !WT_STRING_MATCH(name, WT_SINGLETHREAD,
+	    strlen(WT_SINGLETHREAD)))
+		f = O_RDONLY;
+	else
+		f = O_RDWR;
 #ifdef O_BINARY
 	/* Windows clones: we always want to treat the file as a binary. */
 	f |= O_BINARY;
@@ -94,6 +103,9 @@ __wt_open(WT_SESSION_IMPL *session,
 #endif
 
 	if (ok_create) {
+		WT_ASSERT(session, !F_ISSET(conn, WT_CONN_READONLY) ||
+		    WT_STRING_MATCH(name, WT_SINGLETHREAD,
+		    strlen(WT_SINGLETHREAD)));
 		f |= O_CREAT;
 		if (exclusive)
 			f |= O_EXCL;

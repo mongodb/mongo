@@ -828,7 +828,8 @@ struct __wt_session {
 	 * @snippet ex_all.c Display an error thread safe
 	 *
 	 * @param session the session handle
-	 * @param error a return value from a WiredTiger function
+	 * @param error a return value from a WiredTiger, ISO C, or POSIX
+	 * standard API
 	 * @returns a string representation of the error
 	 */
 	const char *__F(strerror)(WT_SESSION *session, int error);
@@ -1409,7 +1410,7 @@ struct __wt_session {
 	 * if <code>NULL</code>, the truncate continues to the end of the
 	 * object
 	 * @configempty{WT_SESSION.truncate, see dist/api_data.py}
-	 * @ebusy_errors
+	 * @errors
 	 */
 	int __F(truncate)(WT_SESSION *session,
 	    const char *name,
@@ -1982,7 +1983,8 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param errhandler An error handler.  If <code>NULL</code>, the
-	 * connection's error handler is used
+	 * connection's error handler is used. See @ref error_handling_event
+	 * for more information.
 	 * @configstart{WT_CONNECTION.open_session, see dist/api_data.py}
 	 * @config{isolation, the default isolation level for operations in this
 	 * session., a string\, chosen from the following options: \c
@@ -2143,7 +2145,8 @@ struct __wt_connection {
  * @param home The path to the database home directory.  See @ref home
  * for more information.
  * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
- * handler is installed that writes error messages to stderr
+ * handler is installed that writes error messages to stderr. See
+ * @ref error_handling_event for more information.
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{async = (, asynchronous operations configuration options., a set of
  * related configuration options defined below.}
@@ -2326,6 +2329,9 @@ struct __wt_connection {
  * start an RPC server for primary processes and use RPC for secondary
  * processes). <b>Not yet supported in WiredTiger</b>., a boolean flag; default
  * \c false.}
+ * @config{readonly, open connection in read-only mode.  The database must
+ * exist.  All methods that may modify a database are disabled.  See @ref
+ * readonly for more information., a boolean flag; default \c false.}
  * @config{session_max, maximum expected number of sessions (including server
  * threads)., an integer greater than or equal to 1; default \c 100.}
  * @config{shared_cache = (, shared cache configuration options.  A database
@@ -2431,11 +2437,12 @@ int wiredtiger_open(const char *home,
     WT_CONNECTION **connectionp);
 
 /*!
- * Return information about a WiredTiger error as a string, not thread-safe.
+ * Return information about a WiredTiger error as a string (see
+ * WT_SESSION::strerror for a thread-safe API).
  *
  * @snippet ex_all.c Display an error
  *
- * @param error a return value from a WiredTiger call
+ * @param error a return value from a WiredTiger, ISO C, or POSIX standard API
  * @returns a string representation of the error
  */
 const char *wiredtiger_strerror(int error);
@@ -2474,7 +2481,7 @@ struct __wt_async_callback {
 struct __wt_event_handler {
 	/*!
 	 * Callback to handle error messages; by default, error messages are
-	 * written to the stderr stream.
+	 * written to the stderr stream. See @ref error_handling.
 	 *
 	 * Errors that require the application to exit and restart will have
 	 * their \c error value set to \c WT_PANIC. The application can exit
@@ -2488,8 +2495,9 @@ struct __wt_event_handler {
 	 * @param session the WiredTiger session handle in use when the error
 	 * was generated. The handle may have been created by the application
 	 * or automatically by WiredTiger.
-	 * @param error a WiredTiger, C99 or POSIX error code, which can
-	 * be converted to a string using ::wiredtiger_strerror
+	 * @param error a return value from a WiredTiger, ISO C, or
+	 * POSIX standard API, which can be converted to a string using
+	 * WT_SESSION::strerror
 	 * @param message an error string
 	 */
 	int (*handle_error)(WT_EVENT_HANDLER *handler,
@@ -2497,7 +2505,7 @@ struct __wt_event_handler {
 
 	/*!
 	 * Callback to handle informational messages; by default, informational
-	 * messages are written to the stdout stream.
+	 * messages are written to the stdout stream. See @ref error_handling.
 	 *
 	 * Message handler returns are not ignored: if the handler returns
 	 * non-zero, the error may cause the WiredTiger function posting the
@@ -2513,7 +2521,7 @@ struct __wt_event_handler {
 
 	/*!
 	 * Callback to handle progress messages; by default, no progress
-	 * messages are written.
+	 * messages are written. See @ref error_handling.
 	 *
 	 * Progress handler returns are not ignored: if the handler returns
 	 * non-zero, the error may cause the WiredTiger function posting the
@@ -2997,6 +3005,10 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * size to complete.
  */
 #define	WT_CACHE_FULL	-31807
+/*! @endcond */
+/*! @cond internal */
+/*! Permission denied (internal). */
+#define	WT_PERM_DENIED	-31808
 /*! @endcond */
 /*
  * Error return section: END

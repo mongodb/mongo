@@ -13,6 +13,20 @@ static int __session_snapshot(WT_SESSION *, const char *);
 static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*
+ * __wt_session_notsup --
+ *	Unsupported session method.
+ */
+int
+__wt_session_notsup(WT_SESSION *wt_session)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	WT_RET_MSG(session, ENOTSUP, "Unsupported session method");
+}
+
+/*
  * __wt_session_reset_cursors --
  *	Reset all open cursors.
  */
@@ -495,6 +509,20 @@ err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __session_create_readonly --
+ *	WT_SESSION->create method; readonly version.
+ */
+static int
+__session_create_readonly(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
+}
+
+/*
  * __session_log_flush --
  *	WT_SESSION->log_flush method.
  */
@@ -532,6 +560,18 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_log_flush_readonly --
+ *	WT_SESSION->log_flush method; readonly version.
+ */
+static int
+__session_log_flush_readonly(WT_SESSION *wt_session, const char *config)
+{
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
+}
+
+/*
  * __session_log_printf --
  *	WT_SESSION->log_printf method.
  */
@@ -554,6 +594,19 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_log_printf_readonly --
+ *	WT_SESSION->log_printf method; readonly version.
+ */
+static int
+__session_log_printf_readonly(WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+{
+	WT_UNUSED(fmt);
+
+	return (__wt_session_notsup(wt_session));
+}
+
+/*
  * __session_rebalance --
  *	WT_SESSION->rebalance method.
  */
@@ -567,9 +620,6 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, rebalance, config, cfg);
 
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR(ENOTSUP);
-
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session, ret,
 	    WT_WITH_SCHEMA_LOCK(session, ret,
@@ -577,6 +627,20 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_REBALANCE)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_rebalance_readonly --
+ *	WT_SESSION->rebalance method; readonly version.
+ */
+static int
+__session_rebalance_readonly(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
 }
 
 /*
@@ -597,11 +661,27 @@ __session_rename(WT_SESSION *wt_session,
 	WT_ERR(__wt_str_name_check(session, uri));
 	WT_ERR(__wt_str_name_check(session, newuri));
 
-	WT_WITH_SCHEMA_LOCK(session, ret,
-	    WT_WITH_TABLE_LOCK(session, ret,
-		ret = __wt_schema_rename(session, uri, newuri, cfg)));
+	WT_WITH_CHECKPOINT_LOCK(session, ret,
+	    WT_WITH_SCHEMA_LOCK(session, ret,
+		WT_WITH_TABLE_LOCK(session, ret,
+		    ret = __wt_schema_rename(session, uri, newuri, cfg))));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_rename_readonly --
+ *	WT_SESSION->rename method; readonly version.
+ */
+static int
+__session_rename_readonly(WT_SESSION *wt_session,
+    const char *uri, const char *newuri, const char *config)
+{
+	WT_UNUSED(uri);
+	WT_UNUSED(newuri);
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
 }
 
 /*
@@ -646,9 +726,10 @@ __wt_session_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	if (!lock_wait)
 		F_SET(session, WT_SESSION_LOCK_NO_WAIT);
 
-	WT_WITH_SCHEMA_LOCK(session, ret,
-	    WT_WITH_TABLE_LOCK(session, ret,
-		ret = __wt_schema_drop(session, uri, cfg)));
+	WT_WITH_CHECKPOINT_LOCK(session, ret,
+	    WT_WITH_SCHEMA_LOCK(session, ret,
+		WT_WITH_TABLE_LOCK(session, ret,
+		    ret = __wt_schema_drop(session, uri, cfg))));
 
 	if (!lock_wait)
 		F_CLR(session, WT_SESSION_LOCK_NO_WAIT);
@@ -676,6 +757,20 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
 	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_drop_readonly --
+ *	WT_SESSION->drop method; readonly version.
+ */
+static int
+__session_drop_readonly(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
 }
 
 /*
@@ -820,6 +915,20 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_salvage_readonly --
+ *	WT_SESSION->salvage method; readonly version.
+ */
+static int
+__session_salvage_readonly(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
 }
 
 /*
@@ -1004,6 +1113,22 @@ err:	TXN_API_END_RETRY(session, ret, 0);
 }
 
 /*
+ * __session_truncate_readonly --
+ *	WT_SESSION->truncate method; readonly version.
+ */
+static int
+__session_truncate_readonly(WT_SESSION *wt_session,
+    const char *uri, WT_CURSOR *start, WT_CURSOR *stop, const char *config)
+{
+	WT_UNUSED(uri);
+	WT_UNUSED(start);
+	WT_UNUSED(stop);
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
+}
+
+/*
  * __session_upgrade --
  *	WT_SESSION->upgrade method.
  */
@@ -1023,6 +1148,20 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_upgrade_readonly --
+ *	WT_SESSION->upgrade method; readonly version.
+ */
+static int
+__session_upgrade_readonly(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_UNUSED(uri);
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
 }
 
 /*
@@ -1247,6 +1386,18 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_transaction_sync_readonly --
+ *	WT_SESSION->transaction_sync method; readonly version.
+ */
+static int
+__session_transaction_sync_readonly(WT_SESSION *wt_session, const char *config)
+{
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
+}
+
+/*
  * __session_checkpoint --
  *	WT_SESSION->checkpoint method.
  */
@@ -1292,6 +1443,18 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_TRET(__wt_session_release_resources(session));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_checkpoint_readonly --
+ *	WT_SESSION->checkpoint method; readonly version.
+ */
+static int
+__session_checkpoint_readonly(WT_SESSION *wt_session, const char *config)
+{
+	WT_UNUSED(config);
+
+	return (__wt_session_notsup(wt_session));
 }
 
 /*
@@ -1380,6 +1543,33 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_snapshot,
 		__session_transaction_pinned_range,
 		__session_transaction_sync
+	}, stds_readonly = {
+		NULL,
+		NULL,
+		__session_close,
+		__session_reconfigure,
+		__session_strerror,
+		__session_open_cursor,
+		__session_create_readonly,
+		__wt_session_compact_readonly,
+		__session_drop_readonly,
+		__session_join,
+		__session_log_flush_readonly,
+		__session_log_printf_readonly,
+		__session_rebalance_readonly,
+		__session_rename_readonly,
+		__session_reset,
+		__session_salvage_readonly,
+		__session_truncate_readonly,
+		__session_upgrade_readonly,
+		__session_verify,
+		__session_begin_transaction,
+		__session_commit_transaction,
+		__session_rollback_transaction,
+		__session_checkpoint_readonly,
+		__session_snapshot,
+		__session_transaction_pinned_range,
+		__session_transaction_sync_readonly
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
@@ -1419,7 +1609,8 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		conn->session_cnt = i + 1;
 
 	session_ret->id = i;
-	session_ret->iface = stds;
+	session_ret->iface =
+	    F_ISSET(conn, WT_CONN_READONLY) ? stds_readonly : stds;
 	session_ret->iface.connection = &conn->iface;
 
 	WT_ERR(__wt_cond_alloc(session, "session", false, &session_ret->cond));

@@ -1088,28 +1088,36 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		WT_RET(__wt_open(session, conn->log_path,
 		    false, false, WT_FILE_TYPE_DIRECTORY, &log->log_dir_fh));
 	}
-	/*
-	 * Clean up any old interim pre-allocated files.
-	 * We clean up these files because settings have changed upon reboot
-	 * and we want those settings to take effect right away.
-	 */
-	WT_ERR(__log_get_files(session,
-	    WT_LOG_TMPNAME, &logfiles, &logcount));
-	for (i = 0; i < logcount; i++) {
-		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
-		WT_ERR(__wt_log_remove(session, WT_LOG_TMPNAME, lognum));
+
+	if (!F_ISSET(conn, WT_CONN_READONLY)) {
+		/*
+		 * Clean up any old interim pre-allocated files.  We clean
+		 * up these files because settings have changed upon reboot
+		 * and we want those settings to take effect right away.
+		 */
+		WT_ERR(__log_get_files(session,
+		    WT_LOG_TMPNAME, &logfiles, &logcount));
+		for (i = 0; i < logcount; i++) {
+			WT_ERR(__wt_log_extract_lognum(
+			    session, logfiles[i], &lognum));
+			WT_ERR(__wt_log_remove(
+			    session, WT_LOG_TMPNAME, lognum));
+		}
+		__wt_log_files_free(session, logfiles, logcount);
+		logfiles = NULL;
+		logcount = 0;
+		WT_ERR(__log_get_files(session,
+		    WT_LOG_PREPNAME, &logfiles, &logcount));
+		for (i = 0; i < logcount; i++) {
+			WT_ERR(__wt_log_extract_lognum(
+			    session, logfiles[i], &lognum));
+			WT_ERR(__wt_log_remove(
+			    session, WT_LOG_PREPNAME, lognum));
+		}
+		__wt_log_files_free(session, logfiles, logcount);
+		logfiles = NULL;
 	}
-	__wt_log_files_free(session, logfiles, logcount);
-	logfiles = NULL;
-	logcount = 0;
-	WT_ERR(__log_get_files(session,
-	    WT_LOG_PREPNAME, &logfiles, &logcount));
-	for (i = 0; i < logcount; i++) {
-		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
-		WT_ERR(__wt_log_remove(session, WT_LOG_PREPNAME, lognum));
-	}
-	__wt_log_files_free(session, logfiles, logcount);
-	logfiles = NULL;
+
 	/*
 	 * Now look at the log files and set our LSNs.
 	 */
@@ -1132,9 +1140,11 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * Start logging at the beginning of the next log file, no matter
 	 * where the previous log file ends.
 	 */
-	WT_WITH_SLOT_LOCK(session, log, ret,
-	    ret = __log_newfile(session, true, NULL));
-	WT_ERR(ret);
+	if (!F_ISSET(conn, WT_CONN_READONLY)) {
+		WT_WITH_SLOT_LOCK(session, log, ret,
+		    ret = __log_newfile(session, true, NULL));
+		WT_ERR(ret);
+	}
 
 	/* If we found log files, save the new state. */
 	if (logcount > 0) {
@@ -1163,20 +1173,24 @@ __wt_log_close(WT_SESSION_IMPL *session)
 	if (log->log_close_fh != NULL && log->log_close_fh != log->log_fh) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing old log %s", log->log_close_fh->name));
-		WT_RET(__wt_fsync(session, log->log_close_fh));
+		if (!F_ISSET(conn, WT_CONN_READONLY))
+			WT_RET(__wt_fsync(session, log->log_close_fh));
 		WT_RET(__wt_close(session, &log->log_close_fh));
 	}
 	if (log->log_fh != NULL) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing log %s", log->log_fh->name));
-		WT_RET(__wt_fsync(session, log->log_fh));
+		if (!F_ISSET(conn, WT_CONN_READONLY))
+			WT_RET(__wt_fsync(session, log->log_fh));
 		WT_RET(__wt_close(session, &log->log_fh));
 		log->log_fh = NULL;
 	}
 	if (log->log_dir_fh != NULL) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing log directory %s", log->log_dir_fh->name));
-		WT_RET(__wt_directory_sync_fh(session, log->log_dir_fh));
+		if (!F_ISSET(conn, WT_CONN_READONLY))
+			WT_RET(
+			    __wt_directory_sync_fh(session, log->log_dir_fh));
 		WT_RET(__wt_close(session, &log->log_dir_fh));
 		log->log_dir_fh = NULL;
 	}

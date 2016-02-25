@@ -201,10 +201,6 @@
 	(((const char *)str)[0] == ((const char *)pfx)[0] &&		\
 	    strncmp((str), (pfx), strlen(pfx)) == 0)
 
-/* Check if a non-nul-terminated string matches a prefix. */
-#define	WT_PREFIX_MATCH_LEN(str, len, pfx)				\
-	((len) >= strlen(pfx) && WT_PREFIX_MATCH(str, pfx))
-
 /* Check if a string matches a prefix, and move past it. */
 #define	WT_PREFIX_SKIP(str, pfx)					\
 	(WT_PREFIX_MATCH(str, pfx) ? ((str) += strlen(pfx), 1) : 0)

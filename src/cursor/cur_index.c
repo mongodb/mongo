@@ -386,22 +386,22 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_cursor_get_key,	/* get-key */
-	    __curindex_get_value,	/* get-value */
-	    __wt_cursor_set_key,	/* set-key */
-	    __curindex_set_value,	/* set-value */
-	    __curindex_compare,		/* compare */
-	    __wt_cursor_equals,		/* equals */
-	    __curindex_next,		/* next */
-	    __curindex_prev,		/* prev */
-	    __curindex_reset,		/* reset */
-	    __curindex_search,		/* search */
-	    __curindex_search_near,	/* search-near */
-	    __wt_cursor_notsup,		/* insert */
-	    __wt_cursor_notsup,		/* update */
-	    __wt_cursor_notsup,		/* remove */
-	    __wt_cursor_notsup,		/* reconfigure */
-	    __curindex_close);		/* close */
+	    __wt_cursor_get_key,		/* get-key */
+	    __curindex_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __curindex_set_value,		/* set-value */
+	    __curindex_compare,			/* compare */
+	    __wt_cursor_equals,			/* equals */
+	    __curindex_next,			/* next */
+	    __curindex_prev,			/* prev */
+	    __curindex_reset,			/* reset */
+	    __curindex_search,			/* search */
+	    __curindex_search_near,		/* search-near */
+	    __wt_cursor_notsup,			/* insert */
+	    __wt_cursor_notsup,			/* update */
+	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __curindex_close);			/* close */
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(tmp);
