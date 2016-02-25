@@ -57,7 +57,7 @@ function assertNoStoredWhere() {
  *  ACTUAL TEST
  */
 
-db.system.js.save( { _id : "stored_func" , value : funcToStore } )
+db.system.js.save( { _id : "stored_func" , value : funcToStore } );
 t.insertOne({'_id': 0, 'myFunc': function() { return 'tesval'; } });
 
 assertMongoClientCorrect();
