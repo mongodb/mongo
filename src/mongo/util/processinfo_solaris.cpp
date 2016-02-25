@@ -28,6 +28,8 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
 #include <boost/filesystem.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <fstream>
 #include <iostream>
 #include <malloc.h>
@@ -105,6 +107,14 @@ ProcessInfo::~ProcessInfo() {}
 
 bool ProcessInfo::supported() {
     return true;
+}
+
+// get the number of CPUs available to the scheduler
+boost::optional<unsigned long> ProcessInfo::getNumAvailableCores() {
+    long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+    if (nprocs)
+        return nprocs;
+    return boost::none;
 }
 
 int ProcessInfo::getVirtualMemorySize() {

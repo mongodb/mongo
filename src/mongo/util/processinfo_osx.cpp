@@ -34,6 +34,9 @@
 #include "mongo/util/log.h"
 #include "mongo/db/jsobj.h"
 
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+
 #include <mach/vm_statistics.h>
 #include <mach/task_info.h>
 #include <mach/mach_init.h>
@@ -58,6 +61,14 @@ ProcessInfo::~ProcessInfo() {}
 
 bool ProcessInfo::supported() {
     return true;
+}
+
+// get the number of CPUs available to the scheduler
+boost::optional<unsigned long> ProcessInfo::getNumAvailableCores() {
+    long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+    if (nprocs)
+        return nprocs;
+    return boost::none;
 }
 
 int ProcessInfo::getVirtualMemorySize() {

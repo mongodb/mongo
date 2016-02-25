@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <cstdint>
 #include <string>
 
@@ -87,6 +88,12 @@ public:
     unsigned long long getMemSizeMB() const {
         return sysInfo().memSize / (1024 * 1024);
     }
+
+    /**
+     * Get the number of available CPUs. Depending on the OS, the number can be the
+     * number of available CPUs to the current process or scheduler.
+     */
+    boost::optional<unsigned long> getNumAvailableCores();
 
     /**
      * Get the number of CPUs

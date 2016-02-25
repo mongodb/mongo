@@ -31,6 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <bitset>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <iostream>
 #include <psapi.h>
 
@@ -72,6 +75,18 @@ int _wconvertmtos(SIZE_T s) {
 ProcessInfo::ProcessInfo(ProcessId pid) {}
 
 ProcessInfo::~ProcessInfo() {}
+
+// get the number of CPUs available to the current process
+boost::optional<unsigned long> ProcessInfo::getNumAvailableCores() {
+    DWORD_PTR process_mask, system_mask;
+
+    if (GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask)) {
+        std::bitset<32> mask(process_mask);
+        if (mask.count() > 0)
+            return mask.count();
+    }
+    return boost::none;
+}
 
 bool ProcessInfo::supported() {
     return true;
