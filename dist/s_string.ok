@@ -728,6 +728,7 @@ libwiredtiger
 llll
 llu
 loadtext
+localTime
 localtime
 logf
 logmgr
@@ -1076,6 +1077,7 @@ waitpid
 walk's
 warmup
 wb
+wiredTiger
 wiredtiger
 workFactor
 wrapup

@@ -299,9 +299,10 @@ struct __wt_connection_impl {
 #define	WT_CONN_STAT_ALL	0x01	/* "all" statistics configured */
 #define	WT_CONN_STAT_CLEAR	0x02	/* clear after gathering */
 #define	WT_CONN_STAT_FAST	0x04	/* "fast" statistics configured */
-#define	WT_CONN_STAT_NONE	0x08	/* don't gather statistics */
-#define	WT_CONN_STAT_ON_CLOSE	0x10	/* output statistics on close */
-#define	WT_CONN_STAT_SIZE	0x20	/* "size" statistics configured */
+#define	WT_CONN_STAT_JSON	0x08	/* output JSON format */
+#define	WT_CONN_STAT_NONE	0x10	/* don't gather statistics */
+#define	WT_CONN_STAT_ON_CLOSE	0x20	/* output statistics on close */
+#define	WT_CONN_STAT_SIZE	0x40	/* "size" statistics configured */
 	uint32_t stat_flags;
 
 					/* Connection statistics */
