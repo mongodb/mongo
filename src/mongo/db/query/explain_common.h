@@ -53,8 +53,8 @@ public:
         // execution tree. String alias is "execStats".
         EXEC_STATS = 1,
 
-        // At this second-highest verbosity level, we generate the execution stats for each
-        // rejected plan as well as the winning plan. String alias is "allPlansExecution".
+        // At this verbosity level, we generate the execution stats for each rejected plan as
+        // well as the winning plan. String alias is "allPlansExecution".
         EXEC_ALL_PLANS = 2,
     };
 

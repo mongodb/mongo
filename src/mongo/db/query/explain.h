@@ -100,6 +100,17 @@ public:
                               BSONObjBuilder* out);
 
     /**
+     * Converts the PlanExecutor's winning plan stats tree to BSON and returns to the caller.
+     */
+    static BSONObj getWinningPlanStats(const PlanExecutor* exec);
+
+    /**
+     * Converts the PlanExecutor's winning plan stats tree to BSON and returns the result through
+     * the out-parameter 'bob'.
+     */
+    static void getWinningPlanStats(const PlanExecutor* exec, BSONObjBuilder* bob);
+
+    /**
      * Converts the stats tree 'stats' into a corresponding BSON object containing
      * explain information.
      *

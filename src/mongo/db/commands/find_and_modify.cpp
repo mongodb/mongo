@@ -114,9 +114,8 @@ StatusWith<boost::optional<BSONObj>> advanceExecutor(OperationContext* txn,
     }
 
     if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-        const std::unique_ptr<PlanStageStats> stats(exec->getStats());
         error() << "Plan executor error during findAndModify: " << PlanExecutor::statestr(state)
-                << ", stats: " << Explain::statsToBSON(*stats);
+                << ", stats: " << Explain::getWinningPlanStats(exec);
 
         if (WorkingSetCommon::isValidStatusMemberObject(value)) {
             const Status errorStatus = WorkingSetCommon::getMemberObjectStatus(value);

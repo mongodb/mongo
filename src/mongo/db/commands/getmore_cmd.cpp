@@ -451,9 +451,8 @@ public:
         if (PlanExecutor::FAILURE == *state || PlanExecutor::DEAD == *state) {
             nextBatch->abandon();
 
-            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
             error() << "GetMore command executor error: " << PlanExecutor::statestr(*state)
-                    << ", stats: " << Explain::statsToBSON(*stats);
+                    << ", stats: " << Explain::getWinningPlanStats(exec);
 
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "GetMore command executor error: "

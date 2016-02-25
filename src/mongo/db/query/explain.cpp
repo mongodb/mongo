@@ -501,6 +501,23 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 }
 
 // static
+BSONObj Explain::getWinningPlanStats(const PlanExecutor* exec) {
+    BSONObjBuilder bob;
+    getWinningPlanStats(exec, &bob);
+    return bob.obj();
+}
+
+// static
+void Explain::getWinningPlanStats(const PlanExecutor* exec, BSONObjBuilder* bob) {
+    MultiPlanStage* mps = getMultiPlanStage(exec->getRootStage());
+    unique_ptr<PlanStageStats> winningStats(
+        mps ? std::move(mps->getStats()->children[mps->bestPlanIdx()])
+            : std::move(exec->getRootStage()->getStats()));
+
+    statsToBSON(*winningStats, ExplainCommon::EXEC_STATS, bob, bob);
+}
+
+// static
 void Explain::generatePlannerInfo(PlanExecutor* exec,
                                   PlanStageStats* winnerStats,
                                   const vector<unique_ptr<PlanStageStats>>& rejectedStats,

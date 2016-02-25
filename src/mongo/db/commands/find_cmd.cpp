@@ -318,9 +318,8 @@ public:
         // Throw an assertion if query execution fails for any reason.
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             firstBatch.abandon();
-            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
             error() << "Plan executor error during find command: " << PlanExecutor::statestr(state)
-                    << ", stats: " << Explain::statsToBSON(*stats);
+                    << ", stats: " << Explain::getWinningPlanStats(exec.get());
 
             return appendCommandStatus(result,
                                        Status(ErrorCodes::OperationFailed,
