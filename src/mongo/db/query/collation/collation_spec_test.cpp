@@ -47,6 +47,110 @@ TEST(CollationSpecTest, SpecsWithNonEqualLocaleStringsAreNotEqual) {
     ASSERT_TRUE(collationSpec1 != collationSpec2);
 }
 
+TEST(CollationSpecTest, SpecsWithNonEqualCaseLevelValuesAreNotEqual) {
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "fr";
+    collationSpec1.caseLevel = true;
+
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "fr";
+    collationSpec2.caseLevel = false;
+
+    ASSERT_FALSE(collationSpec1 == collationSpec2);
+    ASSERT_TRUE(collationSpec1 != collationSpec2);
+}
+
+TEST(CollationSpecTest, SpecsWithNonEqualCaseFirstValuesAreNotEqual) {
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "fr";
+    collationSpec1.caseFirst = CollationSpec::CaseFirstType::kUpper;
+
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "fr";
+    collationSpec2.caseFirst = CollationSpec::CaseFirstType::kOff;
+
+    ASSERT_FALSE(collationSpec1 == collationSpec2);
+    ASSERT_TRUE(collationSpec1 != collationSpec2);
+}
+
+TEST(CollationSpecTest, SpecsWithNonEqualStrengthsAreNotEqual) {
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "fr";
+    collationSpec1.strength = CollationSpec::StrengthType::kPrimary;
+
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "fr";
+    collationSpec2.strength = CollationSpec::StrengthType::kSecondary;
+
+    ASSERT_FALSE(collationSpec1 == collationSpec2);
+    ASSERT_TRUE(collationSpec1 != collationSpec2);
+}
+
+TEST(CollationSpecTest, SpecsWithNonEqualNumericOrderingValuesAreNotEqual) {
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "fr";
+    collationSpec1.numericOrdering = false;
+
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "fr";
+    collationSpec2.numericOrdering = true;
+
+    ASSERT_FALSE(collationSpec1 == collationSpec2);
+    ASSERT_TRUE(collationSpec1 != collationSpec2);
+}
+
+TEST(CollationSpecTest, SpecsWithNonEqualAlternateValuesAreNotEqual) {
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "fr";
+    collationSpec1.alternate = CollationSpec::AlternateType::kNonIgnorable;
+
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "fr";
+    collationSpec2.alternate = CollationSpec::AlternateType::kShifted;
+
+    ASSERT_FALSE(collationSpec1 == collationSpec2);
+    ASSERT_TRUE(collationSpec1 != collationSpec2);
+}
+
+TEST(CollationSpecTest, SpecsWithNonEqualMaxVariableValuesAreNotEqual) {
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "fr";
+    collationSpec1.maxVariable = CollationSpec::MaxVariableType::kPunct;
+
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "fr";
+    collationSpec2.maxVariable = CollationSpec::MaxVariableType::kSpace;
+
+    ASSERT_FALSE(collationSpec1 == collationSpec2);
+    ASSERT_TRUE(collationSpec1 != collationSpec2);
+}
+
+TEST(CollationSpecTest, SpecsWithNonEqualNormalizationValuesAreNotEqual) {
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "fr";
+    collationSpec1.normalization = false;
+
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "fr";
+    collationSpec2.normalization = true;
+
+    ASSERT_FALSE(collationSpec1 == collationSpec2);
+    ASSERT_TRUE(collationSpec1 != collationSpec2);
+}
+
+TEST(CollationSpecTest, SpecsWithNonEqualBackwardsValuesAreNotEqual) {
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "fr";
+    collationSpec1.backwards = false;
+
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "fr";
+    collationSpec2.backwards = true;
+
+    ASSERT_FALSE(collationSpec1 == collationSpec2);
+    ASSERT_TRUE(collationSpec1 != collationSpec2);
+}
+
 TEST(CollationSpecTest, EqualSpecs) {
     CollationSpec collationSpec1;
     collationSpec1.localeID = "fr";

@@ -37,12 +37,163 @@ namespace {
 
 using namespace mongo;
 
-TEST(CollationSpecSerializerTest, ToBSONProducesCorrectSerializedObj) {
+TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesDefaults) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
 
     BSONObj expectedObj = BSON("locale"
-                               << "myLocale");
+                               << "myLocale"
+                               << "caseLevel" << false << "caseFirst"
+                               << "off"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "non-ignorable"
+                               << "maxVariable"
+                               << "punct"
+                               << "normalization" << false << "backwards" << false);
+
+    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+}
+
+TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesCaseFirstUpper) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "myLocale";
+    collationSpec.caseFirst = CollationSpec::CaseFirstType::kUpper;
+
+    BSONObj expectedObj = BSON("locale"
+                               << "myLocale"
+                               << "caseLevel" << false << "caseFirst"
+                               << "upper"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "non-ignorable"
+                               << "maxVariable"
+                               << "punct"
+                               << "normalization" << false << "backwards" << false);
+
+    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+}
+
+TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesCaseFirstLower) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "myLocale";
+    collationSpec.caseFirst = CollationSpec::CaseFirstType::kLower;
+
+    BSONObj expectedObj = BSON("locale"
+                               << "myLocale"
+                               << "caseLevel" << false << "caseFirst"
+                               << "lower"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "non-ignorable"
+                               << "maxVariable"
+                               << "punct"
+                               << "normalization" << false << "backwards" << false);
+
+    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+}
+
+TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesPrimaryStrength) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "myLocale";
+    collationSpec.strength = CollationSpec::StrengthType::kPrimary;
+
+    BSONObj expectedObj = BSON("locale"
+                               << "myLocale"
+                               << "caseLevel" << false << "caseFirst"
+                               << "off"
+                               << "strength" << 1 << "numericOrdering" << false << "alternate"
+                               << "non-ignorable"
+                               << "maxVariable"
+                               << "punct"
+                               << "normalization" << false << "backwards" << false);
+
+    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+}
+
+TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesSecondaryStrength) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "myLocale";
+    collationSpec.strength = CollationSpec::StrengthType::kSecondary;
+
+    BSONObj expectedObj = BSON("locale"
+                               << "myLocale"
+                               << "caseLevel" << false << "caseFirst"
+                               << "off"
+                               << "strength" << 2 << "numericOrdering" << false << "alternate"
+                               << "non-ignorable"
+                               << "maxVariable"
+                               << "punct"
+                               << "normalization" << false << "backwards" << false);
+
+    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+}
+
+TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesQuaternaryStrength) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "myLocale";
+    collationSpec.strength = CollationSpec::StrengthType::kQuaternary;
+
+    BSONObj expectedObj = BSON("locale"
+                               << "myLocale"
+                               << "caseLevel" << false << "caseFirst"
+                               << "off"
+                               << "strength" << 4 << "numericOrdering" << false << "alternate"
+                               << "non-ignorable"
+                               << "maxVariable"
+                               << "punct"
+                               << "normalization" << false << "backwards" << false);
+
+    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+}
+
+TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesIdenticalStrength) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "myLocale";
+    collationSpec.strength = CollationSpec::StrengthType::kIdentical;
+
+    BSONObj expectedObj = BSON("locale"
+                               << "myLocale"
+                               << "caseLevel" << false << "caseFirst"
+                               << "off"
+                               << "strength" << 5 << "numericOrdering" << false << "alternate"
+                               << "non-ignorable"
+                               << "maxVariable"
+                               << "punct"
+                               << "normalization" << false << "backwards" << false);
+
+    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+}
+
+TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesAlternateShifted) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "myLocale";
+    collationSpec.alternate = CollationSpec::AlternateType::kShifted;
+
+    BSONObj expectedObj = BSON("locale"
+                               << "myLocale"
+                               << "caseLevel" << false << "caseFirst"
+                               << "off"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "shifted"
+                               << "maxVariable"
+                               << "punct"
+                               << "normalization" << false << "backwards" << false);
+
+    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+}
+
+TEST(CollationSpecSerializerTest, ToBSONCorrectlySerializesMaxVariableSpace) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "myLocale";
+    collationSpec.maxVariable = CollationSpec::MaxVariableType::kSpace;
+
+    BSONObj expectedObj = BSON("locale"
+                               << "myLocale"
+                               << "caseLevel" << false << "caseFirst"
+                               << "off"
+                               << "strength" << 3 << "numericOrdering" << false << "alternate"
+                               << "non-ignorable"
+                               << "maxVariable"
+                               << "space"
+                               << "normalization" << false << "backwards" << false);
 
     ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
 }

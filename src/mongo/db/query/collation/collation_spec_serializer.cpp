@@ -38,6 +38,49 @@ namespace mongo {
 BSONObj CollationSpecSerializer::toBSON(const CollationSpec& spec) {
     BSONObjBuilder builder;
     builder.append(CollationSpec::kLocaleField, spec.localeID);
+    builder.append(CollationSpec::kCaseLevelField, spec.caseLevel);
+
+    switch (spec.caseFirst) {
+        case CollationSpec::CaseFirstType::kUpper:
+            builder.append(CollationSpec::kCaseFirstField, CollationSpec::kCaseFirstUpper);
+            break;
+        case CollationSpec::CaseFirstType::kLower:
+            builder.append(CollationSpec::kCaseFirstField, CollationSpec::kCaseFirstLower);
+            break;
+        case CollationSpec::CaseFirstType::kOff:
+            builder.append(CollationSpec::kCaseFirstField, CollationSpec::kCaseFirstOff);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    builder.append(CollationSpec::kStrengthField, static_cast<int>(spec.strength));
+    builder.append(CollationSpec::kNumericOrderingField, spec.numericOrdering);
+
+    switch (spec.alternate) {
+        case CollationSpec::AlternateType::kNonIgnorable:
+            builder.append(CollationSpec::kAlternateField, CollationSpec::kAlternateNonIgnorable);
+            break;
+        case CollationSpec::AlternateType::kShifted:
+            builder.append(CollationSpec::kAlternateField, CollationSpec::kAlternateShifted);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    switch (spec.maxVariable) {
+        case CollationSpec::MaxVariableType::kPunct:
+            builder.append(CollationSpec::kMaxVariableField, CollationSpec::kMaxVariablePunct);
+            break;
+        case CollationSpec::MaxVariableType::kSpace:
+            builder.append(CollationSpec::kMaxVariableField, CollationSpec::kMaxVariableSpace);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    builder.append(CollationSpec::kNormalizationField, spec.normalization);
+    builder.append(CollationSpec::kBackwardsField, spec.backwards);
     return builder.obj();
 }
 

@@ -35,23 +35,119 @@ namespace mongo {
 /**
  * A CollationSpec is a parsed representation of a user-provided collation BSONObj. Can be
  * re-serialized to BSON using the CollationSpecSerializer.
- *
- * TODO SERVER-22373: extend to support options other than the localeID.
  */
 struct CollationSpec {
+    // Controls whether uppercase sorts before lowercase or vice versa.
+    enum class CaseFirstType {
+        // Sort uppercase before lowercase.
+        kUpper,
+
+        // Sort lowercase before uppercase.
+        kLower,
+
+        // Use default sorting behavior for the strength.
+        kOff
+    };
+
+    // Controls the set of characteristics used to compare strings.
+    enum class StrengthType {
+        // Only consider base character differences.
+        kPrimary = 1,
+
+        // Additionally consider accent differences.
+        kSecondary = 2,
+
+        // Additionally consider case differences.
+        kTertiary = 3,
+
+        // Additionally consider punctuation and space differences. (If alternate=shifted, spaces
+        // and punctuation are not considered base characters, and are only considered at this
+        // strength.)
+        kQuaternary = 4,
+
+        // Equal Unicode point values.
+        // E.g. Hebrew cantillation marks are only distinguished at this level.
+        kIdentical = 5
+    };
+
+    // Controls whether spaces and punctuation are considered base characters.
+    enum class AlternateType {
+        // Spaces and punctuation are considered base characters.
+        kNonIgnorable,
+
+        // Spaces and punctuation are not considered base characters, and are only distinguished at
+        // strength > 3.
+        kShifted
+    };
+
+    // Controls which characters are affected by alternate=shifted.
+    enum class MaxVariableType {
+        // Punctuation and spaces are affected.
+        kPunct,
+
+        // Only spaces are affected
+        kSpace
+    };
+
+
     // Field name constants.
     static const char* kLocaleField;
+    static const char* kCaseLevelField;
+    static const char* kCaseFirstField;
+    static const char* kStrengthField;
+    static const char* kNumericOrderingField;
+    static const char* kAlternateField;
+    static const char* kMaxVariableField;
+    static const char* kNormalizationField;
+    static const char* kBackwardsField;
+
+    // Field value constants.
+    static const char* kCaseFirstUpper;
+    static const char* kCaseFirstLower;
+    static const char* kCaseFirstOff;
+    static const char* kAlternateNonIgnorable;
+    static const char* kAlternateShifted;
+    static const char* kMaxVariablePunct;
+    static const char* kMaxVariableSpace;
 
     // A string such as "en_US", identifying the language, country, or other attributes of the
     // locale for this collation.
+    // Required.
     std::string localeID;
+
+    // Turns case sensitivity on at strength 1 or 2.
+    bool caseLevel = false;
+
+    CaseFirstType caseFirst = CaseFirstType::kOff;
+
+    StrengthType strength = StrengthType::kTertiary;
+
+    // Order numbers based on numerical order and not lexicographic order.
+    bool numericOrdering = false;
+
+    AlternateType alternate = AlternateType::kNonIgnorable;
+
+    MaxVariableType maxVariable = MaxVariableType::kPunct;
+
+    // Any language that uses multiple combining characters such as Arabic, ancient Greek, Hebrew,
+    // Hindi, Thai or Vietnamese either requires Normalization Checking to be on, or the text to go
+    // through a normalization process before collation.
+    bool normalization = false;
+
+    // Causes accent differences to be considered in reverse order, as it is done in the French
+    // language.
+    bool backwards = false;
 };
 
 /**
  * Returns whether 'left' and 'right' are logically equivalent collations.
  */
 inline bool operator==(const CollationSpec& left, const CollationSpec& right) {
-    return left.localeID == right.localeID;
+    return ((left.localeID == right.localeID) && (left.caseLevel == right.caseLevel) &&
+            (left.caseFirst == right.caseFirst) && (left.strength == right.strength) &&
+            (left.numericOrdering == right.numericOrdering) &&
+            (left.alternate == right.alternate) && (left.maxVariable == right.maxVariable) &&
+            (left.normalization == right.normalization) && (left.backwards == right.backwards));
 }
 
 inline bool operator!=(const CollationSpec& left, const CollationSpec& right) {

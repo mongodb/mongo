@@ -62,6 +62,7 @@ if icuEnabled:
         ],
         LIBDEPS=[
             "$BUILD_DIR/mongo/base",
+            "$BUILD_DIR/mongo/bson/util/bson_extract",
             "$BUILD_DIR/third_party/shim_icu",
             "collator_interface",
         ],
