@@ -801,11 +801,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
 
         // Save state before making changes
         _child->saveState();
-        if (supportsDocLocking()) {
-            // Doc-locking engines require this after saveState() since they don't use
-            // invalidations.
-            WorkingSetCommon::forceFetchAllLocs(_txn, _ws, _collection);
-        }
+        WorkingSetCommon::forceFetchAllLocs(_txn, _ws, _collection);
 
         // Do the update and return.
         uint64_t attempt = 1;

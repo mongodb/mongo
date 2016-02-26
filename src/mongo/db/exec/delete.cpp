@@ -130,11 +130,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
         // TODO: Do we want to buffer docs and delete them in a group rather than
         // saving/restoring state repeatedly?
         _child->saveState();
-        if (supportsDocLocking()) {
-            // Doc-locking engines require this after saveState() since they don't use
-            // invalidations.
-            WorkingSetCommon::forceFetchAllLocs(_txn, _ws, _collection);
-        }
+        WorkingSetCommon::forceFetchAllLocs(_txn, _ws, _collection);
 
         {
             WriteUnitOfWork wunit(_txn);

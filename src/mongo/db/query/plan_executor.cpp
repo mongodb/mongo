@@ -247,16 +247,18 @@ void PlanExecutor::saveState() {
         _root->saveState();
     }
 
-    // Doc-locking storage engines drop their transactional context after saving state.
     // The query stages inside this stage tree might buffer record ids (e.g. text, geoNear,
     // mergeSort, sort) which are no longer protected by the storage engine's transactional
     // boundaries. Force-fetch the documents for any such record ids so that we have our
     // own copy in the working set.
     //
-    // This is not necessary for covered plans, as such plans never use buffered record ids
-    // for index or collection lookup.
-    if (supportsDocLocking() && _collection && (!_qs.get() || _qs->root->fetched())) {
+    // This is not necessary for covered plans, as such plans never use buffered record ids for
+    // index or collection lookup.
+    if (_collection && (!_qs.get() || _qs->root->fetched())) {
         WorkingSetCommon::forceFetchAllLocs(_opCtx, _workingSet.get(), _collection);
+    } else {
+        // Clear buffered record ids in order to keep our memory footprint in check.
+        _workingSet->getAndClearIdxIds();
     }
 
     _opCtx = NULL;

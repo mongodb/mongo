@@ -44,9 +44,10 @@ public:
                                       const Collection* collection);
 
     /**
-     * Iterates over 'workingSet' members that have transitioned to the LOC_AND_IDX state since
-     * the last yield. For all members still in the LOC_AND_IDX state, fetches the associated
-     * document and puts the member in "loc with unowned obj" state.
+     * For storage engines with document-level concurrency, iterates over 'workingSet' members that
+     * have transitioned to the LOC_AND_IDX state since the last yield. For all members still in the
+     * LOC_AND_IDX state, fetches the associated document and puts the member in "loc with unowned
+     * obj" state.
      *
      * This "force-fetching" is called on saveState() for storage-engines that support document-
      * level locking. This ensures that all WS members are still valid, even after the
