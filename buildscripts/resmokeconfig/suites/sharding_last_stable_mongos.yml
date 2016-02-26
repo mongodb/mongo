@@ -1,0 +1,17 @@
+selector:
+  js_test:
+    roots:
+    - jstests/sharding/*.js
+    exclude_files:
+    # Error format changes. See SERVER-22184.
+    - jstests/sharding/error_propagation.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            mongosBinVersion: 'last-stable'
+        nodb: ''
+

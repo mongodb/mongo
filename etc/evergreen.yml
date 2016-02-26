@@ -1614,6 +1614,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: sharding_last_stable_mongos
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      path_prefix: PATH=$PATH:/data/multiversion
+      resmoke_args: --suites=sharding_last_stable_mongos
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: snmp
   commands:
   - func: "do setup"
@@ -2278,6 +2289,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_last_stable_mongos
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -2630,6 +2642,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2736,6 +2749,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2919,6 +2933,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -3190,6 +3205,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_last_stable_mongos
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -3976,6 +3992,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_last_stable_mongos
   - name: sharding_op_query_WT
   - name: sharding_csrs_continuous_config_stepdown_WT
   - name: slow1
@@ -4141,6 +4158,7 @@ buildvariants:
   - name: slow2_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_last_stable_mongos
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -4248,6 +4266,7 @@ buildvariants:
   - name: slow2_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_last_stable_mongos
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -4355,6 +4374,7 @@ buildvariants:
   - name: slow2_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_last_stable_mongos
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -4745,6 +4765,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4902,6 +4923,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -5192,6 +5214,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -5303,6 +5326,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -5654,6 +5678,7 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_last_stable_mongos
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
@@ -5780,6 +5805,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
   - name: slow2
