@@ -764,16 +764,10 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
 
 void ConfigServer::replicaSetChangeShardRegistryUpdateHook(const string& setName,
                                                            const string& newConnectionString) {
-    auto shard = grid.shardRegistry()->lookupRSName(setName);
-    if (shard) {
-        // Inform the ShardRegsitry of the new connection string for the shard.
-        auto connString = fassertStatusOK(28805, ConnectionString::parse(newConnectionString));
-        if (shard->isConfig()) {
-            grid.shardRegistry()->updateConfigServerConnectionString(connString);
-        } else {
-            grid.shardRegistry()->updateLookupMapsForShard(std::move(shard), connString);
-        }
-    }
+    // Inform the ShardRegsitry of the new connection string for the shard.
+    auto connString = fassertStatusOK(28805, ConnectionString::parse(newConnectionString));
+    invariant(setName == connString.getSetName());
+    grid.shardRegistry()->updateReplSetHosts(connString);
 }
 
 void ConfigServer::replicaSetChangeConfigServerUpdateHook(const string& setName,
