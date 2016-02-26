@@ -86,20 +86,19 @@ var st;
                 "and has CSRS config string");
 
     var res = st.shard1.adminCommand({ serverStatus : 1 });
-    assert.contains("sharding", res,
-        "Regular shard mongod in CSRS cluster is not sharding aware");
+    assert(res.sharding);
     var expectedConfigString = res.sharding.configsvrConnectionString;
+    assert(expectedConfigString);
+    assert(st.isCSRSConnectionString(expectedConfigString));
 
     var res = restartedMongod.adminCommand({ serverStatus : 1 });
-    assert.contains("sharding", res,
-        "Restarted shard mongod is not sharding aware " +
-        "after receiving a moveChunk command");
+    assert(res.sharding);
     var observedConfigString = res.sharding.configsvrConnectionString;
+    assert(observedConfigString);
 
     assert.eq(expectedConfigString, observedConfigString,
         "Restarted shard mongod's config string " + observedConfigString +
         " differs from expected config string " + expectedConfigString);
-    assert(observedConfigString.indexOf("/") >= 0);
 
     st.stop();
 

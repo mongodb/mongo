@@ -628,21 +628,66 @@ var ShardingTest = function(params) {
     };
 
     /*
-     * Converts a CSRS connection string to a SCCC connection string.
-     * TODO: handle numbers of config servers other than 1 or 3
+     * Converts a CSRS connection string to an SCCC connection string.
+     * TODO: Handle numbers of CSRS config servers other than 3.
      *
-     * E.g.: "test-configRS/Foo:20002,Foo:20003,Foo:20004" (CSRS)
-     *       converts to "Foo:20002,Foo:20003,Foo:20004" (SCCC)
+     * For example:
+     * "test-configRS/host:20002,host:20003,host:20004" -> "host:20002,host:20003,host:20004"
      */
     this.generateSCCCFromCSRSConnectionString = function(csrsString) {
-        var numConfigConnections = csrsString.split(",").length;
-        if ((numConfigConnections === 3) || (numConfigConnections === 1)) {
-            return csrsString.substring(csrsString.indexOf("/") + 1);
-        } else {
+        assert(this.isCSRSConnectionString(csrsString));
+
+        var numNodes = csrsString.split(",").length;
+        if (numNodes !== 3) {
             throw new Error("generateSCCCFromCSRSConnectionString() expects " +
-                            "1 or 3-node config servers, got " + tojson(csrsString));
+                            "3-node config servers, got " + tojson(csrsString));
         }
+
+        var scccString = csrsString.substring(csrsString.indexOf("/") + 1);
+        assert(this.isSCCCConnectionString(scccString));
+        return scccString;
     };
+
+    /*
+     * Checks if connString is in the format of an SCCC connection string.
+     * SCCC config servers must have exactly 3 nodes.
+     *
+     * Valid example:
+     * "host:20002,host:20003,host:20004"
+     */
+    this.isSCCCConnectionString = function(connString) {
+        // Should not contain a replica set name.
+        assert(connString.indexOf('/') < 0);
+
+        var nodes = connString.split(',');
+        assert(nodes.length == 3);
+
+        for (var i = 0; i < nodes.length; i++) {
+            assert(nodes[i].indexOf(':') >= 0);
+        }
+        return true;
+    }
+
+    /*
+     * Checks if connString is in the format of a CSRS connection string.
+     * CSRS connection strings must contain a replica set name.
+     *
+     * Valid examples:
+     * 1 node: "test-configRS/host:20002"
+     * 3 node: "test-configRS/host:20002,host:20003,host:20004"
+     * 4 nodes: "test-configRS/host:20002,host:20003,host:20004,host:20005"
+     */
+    this.isCSRSConnectionString = function(connString) {
+        // Should contain a replica set name.
+        assert(connString.indexOf('/') >= 0);
+
+        var nodes = connString.split(',');
+        assert(nodes.length > 0);
+        for (var i = 0; i < nodes.length; i++) {
+            assert(nodes[i].indexOf(':') >= 0);
+        }
+        return true;
+    }
 
     /**
      * Kills the mongos with index n.
