@@ -69,13 +69,17 @@ runReadOnlyTest(function() {
             // Find titles nominated for the most awards.
             var mostAwardsPipeline = [
                 {$unwind: "$nominations"},
-                {$group: {_id: "$nominations.title", count: {$sum: 1}}},
-                {$sort: {count: -1}},
-                {$limit: 2}
+                {$group: {
+                    _id: "$nominations.title",
+                    count: {$sum: 1}}},
+                {$sort: {count: -1, _id: 1}},
+                {$limit: 2},
             ];
 
-            assert.docEq(readableCollection.aggregate(mostAwardsPipeline).toArray(),
-                         [{_id: "The Revenant", count: 3}, {_id: "Spotlight", count: 3}]);
+            assert.docEq(readableCollection.aggregate(mostAwardsPipeline).toArray(), [
+                {_id: "Spotlight", count: 3},
+                {_id: "The Revenant", count: 3}
+            ]);
 
             // Check that pipelines fail with allowDiskUse true. We use runCommand manually because
             // the helper has conflicting error handling logic.

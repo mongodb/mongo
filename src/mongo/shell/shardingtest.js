@@ -369,6 +369,12 @@ var ShardingTest = function(params) {
               (timeMillis / 1000) + " seconds ***");
     };
 
+    this.getDBPaths = function() {
+        return _alldbpaths.map((path) => {
+            return MongoRunner.dataPath + path;
+        });
+    };
+
     this.adminCommand = function(cmd) {
         var res = this.admin.runCommand(cmd);
         if (res && res.ok == 1)
@@ -820,11 +826,14 @@ var ShardingTest = function(params) {
      * Stops and restarts a shard mongod process.
      *
      * If opts is specified, the new mongod is started using those options. Otherwise, it is started
-     * with its previous parameters.
+     * with its previous parameters. The 'beforeRestartCallback' parameter is an optional function
+     * that will be run after the MongoD is stopped, but before it is restarted. The intended uses
+     * of the callback are modifications to the dbpath of the mongod that must be made while it is
+     * stopped.
      *
      * Warning: Overwrites the old dn/shardn member variables.
      */
-    this.restartMongod = function(n) {
+    this.restartMongod = function(n, opts, beforeRestartCallback) {
         var mongod;
 
         if (otherParams.useBridge) {
@@ -833,26 +842,37 @@ var ShardingTest = function(params) {
             mongod = this["d" + n];
         }
 
+        opts = opts || mongod;
+        opts.port = opts.port || mongod.port;
+
         this.stopMongod(n);
 
         if (otherParams.useBridge) {
-            var bridgeOptions =
-                Object.merge(otherParams.bridgeOptions, mongod.fullOptions.bridgeOptions || {});
-            bridgeOptions = Object.merge(
-                bridgeOptions,
-                {
-                  hostName: otherParams.useHostname ? hostName : "localhost",
-                  port: this._connections[n].port,
-                  // The mongod processes identify themselves to mongobridge as host:port, where the
-                  // host is the actual hostname of the machine and not localhost.
-                  dest: hostName + ":" + mongod.port,
-                });
+            var bridgeOptions = (opts !== mongod) ? opts.bridgeOptions
+                    : mongod.fullOptions.bridgeOptions;
+            bridgeOptions = Object.merge(otherParams.bridgeOptions, bridgeOptions || {});
+            bridgeOptions = Object.merge(bridgeOptions, {
+                hostName: otherParams.useHostname ? hostName : "localhost",
+                port: this._connections[n].port,
+                // The mongod processes identify themselves to mongobridge as host:port, where the
+                // host is the actual hostname of the machine and not localhost.
+                dest: hostName + ":" + opts.port,
+            });
 
             this._connections[n] = new MongoBridge(bridgeOptions);
         }
 
-        mongod.restart = true;
-        var newConn = MongoRunner.runMongod(mongod);
+        if (arguments.length >= 3) {
+            if (typeof(beforeRestartCallback) !== "function") {
+                throw new Error("beforeRestartCallback must be a function but was of type " +
+                                typeof(beforeRestartCallback));
+            }
+            beforeRestartCallback();
+        }
+
+        opts.restart = true;
+
+        var newConn = MongoRunner.runMongod(opts);
         if (!newConn) {
             throw new Error("Failed to restart shard " + n);
         }
