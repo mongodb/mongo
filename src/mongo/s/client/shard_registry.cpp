@@ -530,8 +530,8 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
     Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
     QueryResponse response;
 
-    auto fetcherCallback = [&status, &response](const Fetcher::QueryResponseStatus& dataStatus,
-                                                Fetcher::NextAction* nextAction) {
+    auto fetcherCallback = [this, &status, &response](
+        const Fetcher::QueryResponseStatus& dataStatus, Fetcher::NextAction* nextAction) {
 
         // Throw out any accumulated results on error
         if (!dataStatus.isOK()) {
@@ -552,6 +552,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
             }
 
             response.opTime = replParseStatus.getValue().getLastOpVisible();
+            advanceConfigOpTime(response.opTime);
         }
 
         for (const BSONObj& doc : data.documents) {
@@ -612,8 +613,6 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
     if (!status.isOK()) {
         return status;
     }
-
-    advanceConfigOpTime(response.opTime);
 
     return response;
 }
@@ -716,7 +715,6 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
         return response.getStatus();
     }
 
-    advanceConfigOpTime(response.getValue().visibleOpTime);
     return response.getValue().response;
 }
 
@@ -759,7 +757,6 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithRetries(
         return response.getStatus();
     }
 
-    advanceConfigOpTime(response.getValue().visibleOpTime);
     return response.getValue().response;
 }
 
@@ -838,15 +835,6 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     Status commandSpecificStatus = getStatusFromCommandResult(response.data);
     updateReplSetMonitor(targeter, host.getValue(), commandSpecificStatus);
 
-    if (errorsToCheck.count(commandSpecificStatus.code())) {
-        return commandSpecificStatus;
-    }
-
-    Status writeConcernStatus = checkForWriteConcernError(response.data);
-    if (!writeConcernStatus.isOK()) {
-        return writeConcernStatus;
-    }
-
     CommandResponse cmdResponse;
     cmdResponse.response = response.data.getOwned();
     cmdResponse.metadata = response.metadata.getOwned();
@@ -860,6 +848,19 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
 
         const auto& replMetadata = replParseStatus.getValue();
         cmdResponse.visibleOpTime = replMetadata.getLastOpVisible();
+
+        if (shard->isConfig()) {
+            advanceConfigOpTime(cmdResponse.visibleOpTime);
+        }
+    }
+
+    if (errorsToCheck.count(commandSpecificStatus.code())) {
+        return commandSpecificStatus;
+    }
+
+    Status writeConcernStatus = checkForWriteConcernError(response.data);
+    if (!writeConcernStatus.isOK()) {
+        return writeConcernStatus;
     }
 
     return StatusWith<CommandResponse>(std::move(cmdResponse));
