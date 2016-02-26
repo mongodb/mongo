@@ -3,6 +3,9 @@
  * but uses an SCCC connection string for the config servers even though
  * the config servers are actually in CSRS mode, to force the mongod to
  * perform the in-memory upgrade process from SCCC mode to CSRS mode.
+ *
+ * This test restarts nodes and expects the collection metadata to still be present.
+ * @tags: [requires_persistence]
  */
 
 var st;
