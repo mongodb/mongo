@@ -157,6 +157,7 @@ connection_stats = [
     CacheStat('cache_bytes_overflow', 'tracked bytes belonging to overflow pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_bytes_read', 'bytes read into cache'),
     CacheStat('cache_bytes_write', 'bytes written from cache'),
+    CacheStat('cache_eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
     CacheStat('cache_eviction_app', 'pages evicted by application threads'),
     CacheStat('cache_eviction_checkpoint', 'checkpoint blocked page eviction'),
     CacheStat('cache_eviction_clean', 'unmodified pages evicted'),

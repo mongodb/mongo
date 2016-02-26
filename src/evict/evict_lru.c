@@ -477,6 +477,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
+	WT_STAT_FAST_CONN_SET(session, cache_eviction_aggressive_set, 0);
 	/* Clear previous state. */
 	cache->state = 0;
 
@@ -534,8 +535,11 @@ __evict_update_work(WT_SESSION_IMPL *session)
 
 	return (false);
 
-done:	if (F_ISSET(cache, WT_CACHE_STUCK))
+done:	if (F_ISSET(cache, WT_CACHE_STUCK)) {
+		WT_STAT_FAST_CONN_SET(session,
+		    cache_eviction_aggressive_set, 1);
 		FLD_SET(cache->state, WT_EVICT_PASS_AGGRESSIVE);
+	}
 	return (true);
 }
 
@@ -594,8 +598,11 @@ __evict_pass(WT_SESSION_IMPL *session)
 		if (!__evict_update_work(session))
 			break;
 
-		if (loop > 10)
+		if (loop > 10) {
+			WT_STAT_FAST_CONN_SET(session,
+			    cache_eviction_aggressive_set, 1);
 			FLD_SET(cache->state, WT_EVICT_PASS_AGGRESSIVE);
+		}
 
 		/*
 		 * Start a worker if we have capacity and we haven't reached
