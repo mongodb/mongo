@@ -1,8 +1,28 @@
+//
+// Testing migrations are successful with secondaryThrottle.
+//
+
 (function() {
 "use strict";
 
+// The mongod secondaries are set to priority 0 and votes 0 to prevent the primaries
+// from stepping down during migrations on slow evergreen builders.
 var s = new ShardingTest({ shards: 2,
-                           other: { rs: true , numReplicas: 2 , chunkSize: 1 } });
+                           other: {
+                               chunkSize: 1,
+                               rs0: {
+                                   nodes: [
+                                       {rsConfig: {votes: 1}},
+                                       {rsConfig: {priority: 0, votes: 0}},
+                                   ],
+                               },
+                               rs1: {
+                                   nodes: [
+                                       {rsConfig: {votes: 1}},
+                                       {rsConfig: {priority: 0, votes: 0}},
+                                   ],
+                               }
+                           } });
 
 var db = s.getDB( "test" );
 var bulk = db.foo.initializeUnorderedBulkOp();

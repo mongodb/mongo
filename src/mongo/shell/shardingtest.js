@@ -178,6 +178,9 @@ var ShardingTest = function(params) {
         return this.s.getDB(name);
     };
 
+    /*
+     * Gets the _id of the primary shard of the database 'dbname', e.g., 'test-rs0'
+     */
     this.getServerName = function(dbname) {
         var x = this.config.databases.findOne({ _id : "" + dbname });
         if (x) {

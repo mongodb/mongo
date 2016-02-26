@@ -1,14 +1,35 @@
-// mostly for testing mongos w/replica sets
 //
-// This test involves using fsync to lock the secondaries, so cannot be run on storage engines which
-// do not support the command.
+// Testing mongos with replica sets:
+//  - config server should update when replica set config changes.
+//  - test insert and find commands are routed appropriately to shard primaries
+//    and secondaries.
+//
+// This test involves using fsync to lock the secondaries, so cannot be run on
+// storage engines which do not support the command.
 // @tags: [requires_fsync]
+//
+
 (function() {
 'use strict';
 
-var s = new ShardingTest({ shards: { rs0: { nodes: 2 },
-                                     rs1: { nodes: 2 } },
-                           chunkSize: 1 });
+// The mongod secondaries are set to priority 0 and votes 0 to prevent the primaries
+// from stepping down during migrations on slow evergreen builders.
+var s = new ShardingTest({ shards: 2,
+                           other: {
+                               chunkSize: 1,
+                               rs0: {
+                                   nodes: [
+                                       {rsConfig: {votes: 1}},
+                                       {rsConfig: {priority: 0, votes: 0}},
+                                   ],
+                               },
+                               rs1: {
+                                   nodes: [
+                                       {rsConfig: {votes: 1}},
+                                       {rsConfig: {priority: 0, votes: 0}},
+                                   ],
+                               }
+                           } });
 
 var db = s.getDB("test");
 var t = db.foo;
