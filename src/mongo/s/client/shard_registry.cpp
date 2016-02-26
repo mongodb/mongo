@@ -60,6 +60,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -177,10 +178,14 @@ ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targe
 ShardRegistry::~ShardRegistry() = default;
 
 void ShardRegistry::updateConfigServerConnectionString(ConnectionString configServerCS) {
-    log() << "Updating config server connection string to: " << configServerCS.toString();
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _configServerCS = std::move(configServerCS);
+    _updateConfigServerConnectionString_inlock(std::move(configServerCS));
+}
 
+void ShardRegistry::_updateConfigServerConnectionString_inlock(ConnectionString configServerCS) {
+    log() << "Updating config server connection string to: " << configServerCS.toString();
+
+    _configServerCS = std::move(configServerCS);
     _addConfigShard_inlock();
 }
 
@@ -217,18 +222,21 @@ bool ShardRegistry::reload(OperationContext* txn) {
     _reloadState = ReloadState::Reloading;
     lk.unlock();
 
+    auto nextReloadState = ReloadState::Failed;
+    auto failGuard = MakeGuard([&] {
+        if (!lk.owns_lock()) {
+            lk.lock();
+        }
+        _reloadState = nextReloadState;
+        _inReloadCV.notify_all();
+    });
+
     auto shardsStatus = grid.catalogManager(txn)->getAllShards(txn);
 
-    lk.lock();
-
-    _reloadState = ReloadState::Idle;
-    _inReloadCV.notify_all();
-
     if (!shardsStatus.isOK()) {
-        _reloadState = ReloadState::Failed;
         uasserted(shardsStatus.getStatus().code(),
                   str::stream() << "could not get updated shard list from config server due to "
-                                << shardsStatus.getStatus().toString());
+                                << shardsStatus.getStatus().reason());
     }
 
     auto shards = std::move(shardsStatus.getValue().value);
@@ -238,22 +246,48 @@ bool ShardRegistry::reload(OperationContext* txn) {
            << " shards listed on config server(s) with lastVisibleOpTime: "
            << reloadOpTime.toBSON();
 
+    // Ensure targeter exists for all shards and take shard connection string from the targeter.
+    // Do this before re-taking the mutex to avoid deadlock with the ReplicaSetMonitor updating
+    // hosts for a given shard.
+    std::vector<std::tuple<std::string, ConnectionString, std::unique_ptr<RemoteCommandTargeter>>>
+        shardsInfo;
+    for (const auto& shardType : shards) {
+        // This validation should ideally go inside the ShardType::validate call. However, doing
+        // it there would prevent us from loading previously faulty shard hosts, which might have
+        // been stored (i.e., the entire getAllShards call would fail).
+        auto shardHostStatus = ConnectionString::parse(shardType.getHost());
+        if (!shardHostStatus.isOK()) {
+            warning() << "Unable to parse shard host " << shardHostStatus.getStatus().toString();
+            continue;
+        }
+
+        auto targeter = _targeterFactory->create(shardHostStatus.getValue());
+
+        shardsInfo.push_back(std::make_tuple(
+            shardType.getName(), targeter->connectionString(), std::move(targeter)));
+    }
+
+    lk.lock();
+
     _lookup.clear();
     _rsLookup.clear();
     _hostLookup.clear();
 
     _addConfigShard_inlock();
 
-    for (const ShardType& shardType : shards) {
+    for (auto& shardInfo : shardsInfo) {
         // Skip the config host even if there is one left over from legacy installations. The
         // config host is installed manually from the catalog manager data.
-        if (shardType.getName() == "config") {
+        if (std::get<0>(shardInfo) == "config") {
             continue;
         }
 
-        _addShard_inlock(shardType, false);
+        _addShard_inlock(std::move(std::get<0>(shardInfo)),
+                         std::move(std::get<1>(shardInfo)),
+                         std::move(std::get<2>(shardInfo)));
     }
 
+    nextReloadState = ReloadState::Idle;
     return true;
 }
 
@@ -384,72 +418,54 @@ void ShardRegistry::appendConnectionStats(executor::ConnectionPoolStats* stats) 
 }
 
 void ShardRegistry::_addConfigShard_inlock() {
-    ShardType configServerShard;
-    configServerShard.setName("config");
-    configServerShard.setHost(_configServerCS.toString());
-    _addShard_inlock(configServerShard, true);
+    _addShard_inlock("config",
+                     _configServerCS,
+                     _configServerCS.type() == ConnectionString::SYNC
+                         ? nullptr
+                         : _targeterFactory->create(_configServerCS));
 }
 
-void ShardRegistry::_addShard_inlock(const ShardType& shardType, bool passHostName) {
-    // This validation should ideally go inside the ShardType::validate call. However, doing
-    // it there would prevent us from loading previously faulty shard hosts, which might have
-    // been stored (i.e., the entire getAllShards call would fail).
-    auto shardHostStatus = ConnectionString::parse(shardType.getHost());
-    if (!shardHostStatus.isOK()) {
-        warning() << "Unable to parse shard host " << shardHostStatus.getStatus().toString();
-    }
+void ShardRegistry::updateReplSetHosts(const ConnectionString& newConnString) {
+    invariant(newConnString.type() == ConnectionString::SET ||
+              newConnString.type() == ConnectionString::CUSTOM);  // For dbtests
 
-    const ConnectionString& shardHost(shardHostStatus.getValue());
-
-    shared_ptr<Shard> shard;
-
-    if (shardHost.type() == ConnectionString::SYNC) {
-        // Sync cluster connections (legacy config server) do not go through the normal targeting
-        // mechanism and must only be reachable through CatalogManagerLegacy or legacy-style queries
-        // and inserts. Do not create targeter for these connections. This code should go away after
-        // 3.2 is released.
-        // Config server updates must pass the host name to avoid deadlock
-        shard = std::make_shared<Shard>(shardType.getName(), shardHost, nullptr);
-        _updateLookupMapsForShard_inlock(std::move(shard), shardHost);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    ShardMap::const_iterator i = _rsLookup.find(newConnString.getSetName());
+    if (i == _rsLookup.end())
+        return;
+    auto shard = i->second;
+    if (shard->isConfig()) {
+        _updateConfigServerConnectionString_inlock(newConnString);
     } else {
-        // Non-SYNC shards use targeter factory.
-        shard = std::make_shared<Shard>(
-            shardType.getName(), shardHost, _targeterFactory->create(shardHost));
-        if (passHostName) {
-            _updateLookupMapsForShard_inlock(std::move(shard), shardHost);
-        } else {
-            _updateLookupMapsForShard_inlock(std::move(shard),
-                                             boost::optional<const ConnectionString&>(boost::none));
+        _addShard_inlock(shard->getId(), newConnString, _targeterFactory->create(newConnString));
+    }
+}
+
+void ShardRegistry::_addShard_inlock(const ShardId& shardId,
+                                     const ConnectionString& connString,
+                                     std::unique_ptr<RemoteCommandTargeter> targeter) {
+    auto originalShard = _findUsingLookUp_inlock(shardId);
+    if (originalShard) {
+        auto oldConnString = originalShard->getConnString();
+
+        if (oldConnString.toString() != connString.toString()) {
+            log() << "Updating ShardRegistry connection string for shard " << originalShard->getId()
+                  << " from: " << oldConnString.toString() << " to: " << connString.toString();
+        }
+
+        for (const auto& host : oldConnString.getServers()) {
+            _lookup.erase(host.toString());
+            _hostLookup.erase(host);
         }
     }
-}
 
-void ShardRegistry::updateLookupMapsForShard(
-    shared_ptr<Shard> shard, boost::optional<const ConnectionString&> optConnString) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _updateLookupMapsForShard_inlock(std::move(shard), optConnString);
-}
-
-void ShardRegistry::_updateLookupMapsForShard_inlock(
-    shared_ptr<Shard> shard, boost::optional<const ConnectionString&> optConnString) {
-    auto oldConnString = shard->getConnString();
-    auto newConnString = optConnString ? *optConnString : shard->getTargeter()->connectionString();
-
-    if (oldConnString.toString() != newConnString.toString()) {
-        log() << "Updating ShardRegistry connection string for shard " << shard->getId()
-              << " from: " << oldConnString.toString() << " to: " << newConnString.toString();
-    }
-
-    for (const auto& host : oldConnString.getServers()) {
-        _lookup.erase(host.toString());
-        _hostLookup.erase(host);
-    }
+    shared_ptr<Shard> shard = std::make_shared<Shard>(shardId, connString, std::move(targeter));
 
     _lookup[shard->getId()] = shard;
 
-    if (newConnString.type() == ConnectionString::SET) {
-        _rsLookup[newConnString.getSetName()] = shard;
-    } else if (newConnString.type() == ConnectionString::CUSTOM) {
+    if (connString.type() == ConnectionString::SET) {
+        _rsLookup[connString.getSetName()] = shard;
+    } else if (connString.type() == ConnectionString::CUSTOM) {
         // CUSTOM connection strings (ie "$dummy:10000) become DBDirectClient connections which
         // always return "localhost" as their resposne to getServerAddress().  This is just for
         // making dbtest work.
@@ -461,9 +477,9 @@ void ShardRegistry::_updateLookupMapsForShard_inlock(
     // setShardVersion call, which resolves the shard id from the shard address. This is
     // error-prone and will go away eventually when we switch all communications to go through
     // the remote command runner and all nodes are sharding aware by default.
-    _lookup[newConnString.toString()] = shard;
+    _lookup[connString.toString()] = shard;
 
-    for (const HostAndPort& hostAndPort : newConnString.getServers()) {
+    for (const HostAndPort& hostAndPort : connString.getServers()) {
         _lookup[hostAndPort.toString()] = shard;
         _hostLookup[hostAndPort] = shard;
     }
@@ -471,6 +487,10 @@ void ShardRegistry::_updateLookupMapsForShard_inlock(
 
 shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const ShardId& shardId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _findUsingLookUp_inlock(shardId);
+}
+
+shared_ptr<Shard> ShardRegistry::_findUsingLookUp_inlock(const ShardId& shardId) {
     ShardMap::iterator it = _lookup.find(shardId);
     if (it != _lookup.end()) {
         return it->second;
