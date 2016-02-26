@@ -10,7 +10,7 @@ initDB = function( name ){
     c.save( { a : 3 } );
     assert.eq( 3 , c.count() );
     
-    return s.getServer( name );
+    return s.getPrimaryShard( name );
 };
 
 from = initDB( "test1" );

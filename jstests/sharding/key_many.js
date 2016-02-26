@@ -21,7 +21,7 @@ assert.commandWorked(s.s0.adminCommand({ enableSharding: 'test' }));
 s.ensurePrimaryShard('test', 'shard0001');
 
 var db = s.getDB('test');
-var primary = s.getServer("test").getDB("test");
+var primary = s.getPrimaryShard("test").getDB("test");
 var secondary = s.getOther(primary).getDB("test");
 
 var curT;

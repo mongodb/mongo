@@ -20,7 +20,9 @@ s2.adminCommand( { shardcollection : "test.existing" , key : { _id : 1 } } );
 assert.eq(true, s2.getDB('test').existing.stats().sharded);
 
 
-res = s2.getDB( "admin" ).runCommand( { moveChunk: "test.existing" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
+res = s2.getDB( "admin" ).runCommand( { moveChunk: "test.existing",
+                                        find : { _id : 1 },
+                                        to : s1.getOther( s1.getPrimaryShard( "test" ) ).name } );
 
 assert.eq(1 , res.ok, tojson(res));
 

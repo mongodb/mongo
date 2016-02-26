@@ -42,8 +42,8 @@ assert.eq( 2100, db.foo.find().itcount() );
 var coll = db.foo;
 coll.setSlaveOk();
 
-var serverName = s.getServerName( "test" );
-var other = s.config.shards.findOne( { _id : { $ne : serverName } } );
+var dbPrimaryShardId = s.getPrimaryShardIdForDatabase( "test" );
+var other = s.config.shards.findOne( { _id : { $ne : dbPrimaryShardId } } );
 
 for ( i=0; i<20; i++ ) {
     // Needs to waitForDelete because we'll be performing a slaveOk query,

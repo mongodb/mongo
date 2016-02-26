@@ -26,12 +26,14 @@ s.printShardingStatus();
 
 s.adminCommand( { split : "test.foo" , middle : { x : 30 } } );
 s.adminCommand( { split : "test.foo" , middle : { x : 66 } } );
-s.adminCommand( { movechunk : "test.foo" , find : { x : 90 } , to : s.getOther( s.getServer( "test" ) ).name } );
+s.adminCommand( { movechunk : "test.foo" ,
+                  find : { x : 90 } ,
+                  to : s.getOther( s.getPrimaryShard( "test" ) ).name } );
 
 s.printShardingStatus();
 
-print( "YO : "  + s.getServer( "test" ).host );
-direct = new Mongo( s.getServer( "test" ).host );
+print( "YO : "  + s.getPrimaryShard( "test" ).host );
+direct = new Mongo( s.getPrimaryShard( "test" ).host );
 print( "direct : " + direct );
 
 directDB = direct.getDB( "test" );
@@ -42,7 +44,11 @@ for ( done=0; done<2*1024*1024; done+=big.length ){
 
 s.printShardingStatus();
 
-assert.throws( function(){  s.adminCommand( { movechunk : "test.foo" , find : { x : 50 } , to : s.getOther( s.getServer( "test" ) ).name } ); } , [] , "move should fail" );
+assert.throws( function(){
+    s.adminCommand({ movechunk : "test.foo" ,
+                     find : { x : 50 } ,
+                     to : s.getOther( s.getPrimaryShard( "test" ) ).name });
+}, [], "move should fail" );
 
 for ( i=0; i<20; i+= 2 ) {
     try {
@@ -59,7 +65,11 @@ s.printShardingStatus();
 
 s.config.settings.update( { _id: "balancer" }, { $set : { stopped: false } } , true );
 
-assert.soon( function(){ var x = s.chunkDiff( "foo" , "test" ); print( "chunk diff: " + x ); return x < 2; } , "no balance happened" , 8 * 60 * 1000 , 2000 ); 
+assert.soon( function(){
+    var x = s.chunkDiff( "foo" , "test" );
+    print( "chunk diff: " + x );
+    return x < 2;
+}, "no balance happened" , 8 * 60 * 1000 , 2000 );
 
 assert.soon( function(){ return !s.isAnyBalanceInFlight(); } );
 

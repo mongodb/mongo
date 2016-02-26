@@ -68,8 +68,10 @@ printjson( result2 );
 assert.eq( 1, result2.ok , "splitting didn't succeed");
 
 //test moving
-var result3 = admin.runCommand({ movechunk: coll.getFullName(), find: { num: 20 },
-    to: s.getOther(s.getServer("test")).name, _waitForDelete: true });
+var result3 = admin.runCommand({ movechunk: coll.getFullName(),
+                                 find: { num: 20 },
+                                 to: s.getOther(s.getPrimaryShard("test")).name,
+                                 _waitForDelete: true });
 printjson( result3 );
 assert.eq( 1, result3.ok , "moveChunk didn't succeed");
 
@@ -97,7 +99,7 @@ for (var docs = 0; docs < 1000; docs++) {
 assert.eq(1000, db.user.find().itcount());
 
 var result4 = admin.runCommand({ movechunk: 'test.user', find: { num: 70 },
-    to: s.getOther(s.getServer("test")).name, _waitForDelete: true });
+    to: s.getOther(s.getPrimaryShard("test")).name, _waitForDelete: true });
 assert.commandWorked(result4);
 
 var expectedShardCount = { shard0000: 0, shard0001: 0 };
@@ -137,7 +139,7 @@ for( i=0; i < 3; i++ ){
     // setup new collection on shard0
     var coll2 = db.foo2;
     coll2.drop();
-    if ( s.getServerName( coll2.getDB() ) != shards[0]._id ) {
+    if ( s.getPrimaryShardIdForDatabase( coll2.getDB() ) != shards[0]._id ) {
         var moveRes = admin.runCommand( { movePrimary : coll2.getDB() + "", to : shards[0]._id } );
         assert.eq( moveRes.ok , 1 , "primary not moved correctly" );
     }

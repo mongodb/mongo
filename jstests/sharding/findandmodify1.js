@@ -5,7 +5,7 @@ var s = new ShardingTest({ name: "find_and_modify_sharded", shards: 2 });
 s.adminCommand( { enablesharding : "test" } );
 db = s.getDB( "test" );
 s.ensurePrimaryShard('test', 'shard0001');
-primary = s.getServer( "test" ).getDB( "test" );
+primary = s.getPrimaryShard( "test" ).getDB( "test" );
 secondary = s.getOther( primary ).getDB( "test" );
 
 numObjs = 20;

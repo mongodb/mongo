@@ -41,10 +41,11 @@ db.foo.save( { num : 1 , name : "eliot" } );
 db.foo.save( { num : 2 , name : "sara" } );
 db.foo.save( { num : -1 , name : "joe" } );
 
-assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() , "not right directly to db A" );
+assert.eq( 3 , s.getPrimaryShard( "test" ).getDB( "test" ).foo.find().length(),
+           "not right directly to db A" );
 assert.eq( 3 , db.foo.find().length() , "not right on shard" );
 
-primary = s.getServer( "test" ).getDB( "test" );
+primary = s.getPrimaryShard( "test" ).getDB( "test" );
 secondary = s.getOther( primary ).getDB( "test" );
 
 assert.eq( 3 , primary.foo.find().length() , "primary wrong B" );

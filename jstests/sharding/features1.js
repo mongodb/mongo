@@ -21,7 +21,9 @@ b = s._connections[1].getDB( "test" );
 db.foo.ensureIndex( { y : 1 } );
 
 s.adminCommand( { split : "test.foo" , middle : { num : 10 } } );
-s.adminCommand( { movechunk : "test.foo" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
+s.adminCommand( { movechunk : "test.foo",
+                  find : { num : 20 },
+                  to : s.getOther( s.getPrimaryShard( "test" ) ).name } );
 
 db.foo.save( { num : 5 } );
 db.foo.save( { num : 15 } );
@@ -102,7 +104,7 @@ assert( s.admin.runCommand( { shardcollection : "test.foo4" , key : { num : 1 } 
 s.adminCommand( { split : "test.foo4" , middle : { num : 10 } } );
 
 s.admin.runCommand({ movechunk: "test.foo4", find: { num: 20 },
-                     to: s.getOther( s.getServer( "test" ) ).name });
+                     to: s.getOther( s.getPrimaryShard( "test" ) ).name });
 
 assert.writeOK(db.foo4.save( { num : 5 } ));
 assert.writeOK(db.foo4.save( { num : 15 } ));
@@ -169,7 +171,9 @@ s.adminCommand( { split : "test.foo6" , middle : { a : 2 } } );
 //Remove when SERVER-10232 is fixed
 
 assert.soon( function() {
-    var cmdRes = s.admin.runCommand( { movechunk : "test.foo6" , find : { a : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
+    var cmdRes = s.admin.runCommand( { movechunk : "test.foo6",
+                                       find : { a : 3 },
+                                       to : s.getOther( s.getPrimaryShard( "test" ) ).name } );
     return cmdRes.ok;
 }, 'move chunk test.foo6', 60000, 1000 );
 

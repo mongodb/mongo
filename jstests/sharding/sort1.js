@@ -25,7 +25,7 @@ s.adminCommand( { split : "test.data" , middle : { 'sub.num' : 66 } } );
 
 s.adminCommand({ movechunk : "test.data", 
                  find : { 'sub.num' : 50 }, 
-                 to : s.getOther( s.getServer( "test" ) ).name,
+                 to : s.getOther( s.getPrimaryShard( "test" ) ).name,
                  waitForDelete : true });
 
 assert.lte( 3 , s.config.chunks.find().itcount() , "A1" );
@@ -49,11 +49,13 @@ for ( i=0; i<100; i++ ){
 
 
 db.data.find().sort( { 'sub.num' : 1 } ).toArray();
-s.getServer("test").getDB( "test" ).data.find().sort( { 'sub.num' : 1 } ).toArray();
+s.getPrimaryShard("test").getDB( "test" ).data.find().sort( { 'sub.num' : 1 } ).toArray();
 
 a = Date.timeFunc( function(){ z = db.data.find().sort( { 'sub.num' : 1 } ).toArray(); } , 200 );
 assert.eq( 100 , z.length , "C1" );
-b = 1.5 * Date.timeFunc( function(){ z = s.getServer("test").getDB( "test" ).data.find().sort( { 'sub.num' : 1 } ).toArray(); } , 200 );
+b = 1.5 * Date.timeFunc( function(){
+        z = s.getPrimaryShard("test").getDB("test").data.find().sort({'sub.num' : 1}).toArray();
+    }, 200 );
 assert.eq( 67 , z.length , "C2" );
 
 print( "a: " + a + " b:" + b + " mongos slow down: " + Math.ceil( 100 * ( ( a - b ) / b ) ) + "%" );

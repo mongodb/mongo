@@ -26,7 +26,7 @@ s.adminCommand( { split:"test.data", middle:{ _id:66 } } );
 // Migrate the middle chunk to another shard
 s.adminCommand({ movechunk: "test.data",
                  find: { _id: 50 },
-                 to: s.getOther(s.getServer("test")).name });
+                 to: s.getOther(s.getPrimaryShard("test")).name });
 
 // Check that the results are in order.
 var result = d.data.aggregate({ $sort: { _id: 1 } }).toArray();

@@ -38,7 +38,8 @@ new Mongo(s.s.host).adminCommand("connpoolsync");
 
 print("done inserting data" );
 
-print("datasize: " + tojson( s.getServer("test" ).getDB("admin" ).runCommand( { datasize : "test.foo" } ) ) );
+print("datasize: " + tojson( s.getPrimaryShard("test" ).getDB("admin" )
+                               .runCommand( { datasize : "test.foo" } ) ) );
 s.printChunks();
 
 function doCountsGlobal(){

@@ -179,9 +179,9 @@ var ShardingTest = function(params) {
     };
 
     /*
-     * Gets the _id of the primary shard of the database 'dbname', e.g., 'test-rs0'
+     * Finds the _id of the primary shard for database 'dbname', e.g., 'test-rs0'
      */
-    this.getServerName = function(dbname) {
+    this.getPrimaryShardIdForDatabase = function(dbname) {
         var x = this.config.databases.findOne({ _id : "" + dbname });
         if (x) {
             return x.primary;
@@ -192,7 +192,8 @@ var ShardingTest = function(params) {
             countDBsFound++;
             printjson(db);
         });
-        throw Error("couldn't find dbname: " + dbname + " total: " + countDBsFound);
+        throw Error("couldn't find dbname: " + dbname + " in config.databases. Total DBs: "
+                                                                          + countDBsFound);
     };
 
     this.getNonPrimaries = function(dbname) {
@@ -213,25 +214,27 @@ var ShardingTest = function(params) {
         return names;
     };
 
-    this.getServer = function(dbname) {
-        var name = this.getServerName(dbname);
+    /*
+     * Find the connection to the primary shard for database 'dbname'.
+     */
+    this.getPrimaryShard = function(dbname) {
+        var dbPrimaryShardId = this.getPrimaryShardIdForDatabase(dbname);
+        var primaryShard = this.config.shards.findOne({ _id : dbPrimaryShardId });
 
-        var x = this.config.shards.findOne({ _id : name });
-        if (x)
-            name = x.host;
+        if (primaryShard) {
+            shardConnectionString = primaryShard.host;
+            var rsName = shardConnectionString.substring(0, shardConnectionString.indexOf("/"));
 
-        var rsName = null;
-        if (name.indexOf("/") > 0)
-        rsName = name.substring(0, name.indexOf("/"));
-
-        for (var i=0; i<this._connections.length; i++) {
-            var c = this._connections[i];
-            if (connectionURLTheSame(name, c.name) || 
-                 connectionURLTheSame(rsName, c.name))
-                return c;
+            for (var i=0; i<this._connections.length; i++) {
+                var c = this._connections[i];
+                if (connectionURLTheSame(shardConnectionString, c.name) ||
+                    connectionURLTheSame(rsName, c.name))
+                    return c;
+            }
         }
 
-        throw Error("can't find server for: " + dbname + " name:" + name);
+        throw Error("can't find server connection for db '" + dbname + "'s primary shard: "
+                                                                   + tojson(primaryShard));
     };
 
     this.normalize = function(x) {
@@ -241,9 +244,12 @@ var ShardingTest = function(params) {
         return x;
     };
 
+    /*
+     * Find a different shard connection than the one given.
+     */
     this.getOther = function(one) {
         if (this._connections.length < 2) {
-            throw Error("getOther only works with 2 servers");
+            throw Error("getOther only works with 2 shards");
         }
 
         if (one._mongo) {
@@ -567,9 +573,10 @@ var ShardingTest = function(params) {
 
         var result;
         for(var i = 0; i < 5; i++) {
+            var otherShard = this.getOther(this.getPrimaryShard(dbName)).name;
             result = this.s.adminCommand({ movechunk: c,
                                            find: move,
-                                           to: this.getOther(this.getServer(dbName)).name,
+                                           to: otherShard,
                                            _waitForDelete: waitForDelete });
             if (result.ok) break;
 

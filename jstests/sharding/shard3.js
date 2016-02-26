@@ -29,7 +29,7 @@ s.config.databases.find().forEach( printjson );
 a = s.getDB( "test" ).foo;
 b = s2.getDB( "test" ).foo;
 
-primary = s.getServer( "test" ).getDB( "test" ).foo;
+primary = s.getPrimaryShard( "test" ).getDB( "test" ).foo;
 secondary = s.getOther( primary.name ).getDB( "test" ).foo;
 
 a.save( { num : 1 } );
@@ -45,7 +45,10 @@ assert.eq( 0 , secondary.count() , "s1" );
 assert.eq( 1 , s.onNumShards( "foo" ) , "on 1 shards" );
 
 s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
-s.adminCommand( { movechunk : "test.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test" ) ).name, _waitForDelete : true } );
+s.adminCommand( { movechunk : "test.foo",
+                  find : { num : 3 },
+                  to : s.getOther( s.getPrimaryShard( "test" ) ).name,
+                  _waitForDelete : true } );
 
 assert( primary.find().toArray().length > 0 , "blah 1" );
 assert( secondary.find().toArray().length > 0 , "blah 2" );
@@ -100,7 +103,7 @@ assert( b.findOne( { num : 1 } ) );
 print( "GOING TO MOVE" );
 assert( a.findOne( { num : 1 } ) , "pre move 1" );
 s.printCollectionInfo( "test.foo" );
-myto = s.getOther( s.getServer( "test" ) ).name;
+myto = s.getOther( s.getPrimaryShard( "test" ) ).name;
 print( "counts before move: " + tojson( s.shardCounts( "foo" ) ) );
 s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : myto, _waitForDelete : true } );
 print( "counts after move: " + tojson( s.shardCounts( "foo" ) ) );
@@ -130,7 +133,10 @@ s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 a.save( { num : 2 } );
 a.save( { num : 3 } );
 s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
-s.adminCommand( { movechunk : "test.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test" ) ).name, _waitForDelete : true } );
+s.adminCommand( { movechunk : "test.foo" ,
+                  find : { num : 3 } ,
+                  to : s.getOther( s.getPrimaryShard( "test" ) ).name,
+                  _waitForDelete : true } );
 s.printShardingStatus();
 
 s.printCollectionInfo( "test.foo" , "after dropDatabase setup" );
@@ -163,7 +169,10 @@ assert.eq( 3 , dba.foo.count() , "Ba" );
 assert.eq( 3 , dbb.foo.count() , "Bb" );
 
 s.adminCommand( { split : "test2.foo" , middle : { num : 2 } } );
-s.adminCommand( { movechunk : "test2.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test2" ) ).name, _waitForDelete : true } );
+s.adminCommand( { movechunk : "test2.foo",
+                  find : { num : 3 } ,
+                  to : s.getOther( s.getPrimaryShard( "test2" ) ).name,
+                  _waitForDelete : true } );
 
 assert.eq( 2 , s.onNumShards( "foo" , "test2" ) , "B on 2 shards" );
 

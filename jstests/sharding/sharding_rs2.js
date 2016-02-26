@@ -48,16 +48,16 @@ assert.eq(1, db.foo.count());
 s.config.databases.find().forEach(printjson);
 s.config.shards.find().forEach(printjson);
 
-var serverName = s.getServerName("test");
+var dbPrimaryShardId = s.getPrimaryShardIdForDatabase("test");
 
 function countNodes(){
-    var x = s.config.shards.findOne({ _id: serverName });
+    var x = s.config.shards.findOne({ _id: dbPrimaryShardId });
     return x.host.split(",").length;
 }
 
 assert.eq(2, countNodes(), "A1");
 
-var rs = s.getRSEntry(serverName);
+var rs = s.getRSEntry(dbPrimaryShardId);
 rs.test.add();
 try {
     rs.test.reInitiate();
@@ -160,7 +160,7 @@ assert.commandWorked(s.s0.adminCommand({ split: "test.foo", middle: { x: 50 } })
 
 s.printShardingStatus();
 
-var other = s.config.shards.findOne({ _id: { $ne: serverName } });
+var other = s.config.shards.findOne({ _id: { $ne: dbPrimaryShardId } });
 assert.commandWorked(s.getDB('admin').runCommand({ moveChunk: "test.foo",
                                                    find: { x: 10 },
                                                    to: other._id,

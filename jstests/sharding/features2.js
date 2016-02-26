@@ -138,7 +138,7 @@ doMR( "after" );
 
 s.adminCommand({split:'test.mr' , middle:{x:3}} );
 s.adminCommand({split:'test.mr' , middle:{x:4}} );
-s.adminCommand({movechunk:'test.mr', find:{x:3}, to: s.getServer('test').name } );
+s.adminCommand({movechunk:'test.mr', find:{x:3}, to: s.getPrimaryShard('test').name } );
 
 doMR( "after extra split" );
 

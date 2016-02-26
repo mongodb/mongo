@@ -38,7 +38,7 @@ s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 
 assert.eq( 1 , s.config.chunks.count() , "step 1 - need one large chunk" );
 
-primary = s.getServer( "test" ).getDB( "test" );
+primary = s.getPrimaryShard( "test" ).getDB( "test" );
 secondary = s.getOther( primary ).getDB( "test" );
 
 // Make sure that we don't move that chunk if it goes past what we consider the maximum chunk size

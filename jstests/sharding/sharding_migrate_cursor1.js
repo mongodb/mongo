@@ -36,7 +36,7 @@ s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 
 assert.lt( numChunks ,  s.config.chunks.find().count() , "initial 1" );
 
-primary = s.getServer( "test" ).getDB( "test" ).foo;
+primary = s.getPrimaryShard( "test" ).getDB( "test" ).foo;
 secondaryName = s.getOther( primary.name );
 secondary = secondaryName.getDB( "test" ).foo;
 

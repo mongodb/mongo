@@ -11,7 +11,7 @@ s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection: "test.foo", key: { _id: 1 } } );
 
 db = s.getDB( "test" );
-primary = s.getServer( "test" ).getDB( "test" );
+primary = s.getPrimaryShard( "test" ).getDB( "test" );
 secondary = s.getOther( primary ).getDB( "test" );
 
 var numObjs = 30;

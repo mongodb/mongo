@@ -24,7 +24,7 @@ for (var i=0; i<50; i++) {
   db.foo.insert({count: "" + i}); // chunk ["", MaxKey]
 }
 
-var theOtherShard = s.getOther( s.getServer( "test" ) ).name;
+var theOtherShard = s.getOther( s.getPrimaryShard( "test" ) ).name;
 s.printShardingStatus();
 
 // Count documents on both shards

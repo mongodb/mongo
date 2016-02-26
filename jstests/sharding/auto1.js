@@ -24,7 +24,7 @@ for ( ; i<100; i++ ){
 }
 assert.writeOK( bulk.execute() );
 
-primary = s.getServer( "test" ).getDB( "test" );
+primary = s.getPrimaryShard( "test" ).getDB( "test" );
 
 counts = [];
 
@@ -32,7 +32,8 @@ s.printChunks();
 counts.push( s.config.chunks.count() );
 assert.eq(100, db.foo.find().itcount());
 
-print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
+print( "datasize: " + tojson( s.getPrimaryShard( "test" ).getDB( "admin" )
+                                .runCommand( { datasize : "test.foo" } ) ) );
 
 bulk = coll.initializeUnorderedBulkOp();
 for ( ; i<200; i++ ){
