@@ -26,53 +26,34 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <string>
-#include <vector>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/base/status.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/metadata_loader.h"
-#include "mongo/dbtests/mock/mock_conn_registry.h"
-#include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
+#include "mongo/db/s/metadata_loader_fixture.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/net/hostandport.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 namespace {
 
-using std::make_pair;
 using std::string;
 using std::unique_ptr;
 using std::vector;
 
-const std::string CONFIG_HOST_PORT = "$dummy_config:27017";
+using executor::RemoteCommandResponse;
 
-class NoChunkFixture : public mongo::unittest::Test {
+class NoChunkFixture : public MetadataLoaderFixture {
 protected:
     void setUp() {
-        OperationContextNoop txn;
-        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
-        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-        MockConnRegistry::get()->addServer(_dummyConfig.get());
-
-        OID epoch = OID::gen();
+        MetadataLoaderFixture::setUp();
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(epoch);
+        collType.setEpoch(_epoch);
         ASSERT_OK(collType.validate());
-
-        _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
 
         // Need a chunk on another shard, otherwise the chunks are invalid in general and we
         // can't load metadata
@@ -81,27 +62,27 @@ protected:
         chunkType.setShard("shard0001");
         chunkType.setMin(BSON("a" << MINKEY));
         chunkType.setMax(BSON("a" << MAXKEY));
-        chunkType.setVersion(ChunkVersion(1, 0, epoch));
+        chunkType.setVersion(ChunkVersion(1, 0, _epoch));
         chunkType.setName(OID::gen().toString());
-        ASSERT_OK(collType.validate());
+        ASSERT_OK(chunkType.validate());
+        std::vector<BSONObj> chunksToSend{chunkType.toBSON()};
 
-        _dummyConfig->insert(ChunkType::ConfigNS, chunkType.toBSON());
+        auto future = launchAsync([this] {
+            MetadataLoader loader;
+            auto status = loader.makeCollectionMetadata(operationContext(),
+                                                        catalogManager(),
+                                                        "test.foo",
+                                                        "shard0000",
+                                                        NULL, /* no old metadata */
+                                                        &_metadata);
+            ASSERT_OK(status);
+            ASSERT_EQUALS(0u, _metadata.getNumChunks());
+        });
 
-        ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
-        ASSERT(configLoc.isValid());
-        CatalogManagerLegacy catalogManager;
-        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
-        catalogManager.init(configLoc, lockProcessId);
+        expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
+        expectFindOnConfigSendBSONObjVector(chunksToSend);
 
-        MetadataLoader loader;
-        Status status = loader.makeCollectionMetadata(
-            &txn, &catalogManager, "test.foo", "shard0000", NULL, &_metadata);
-        ASSERT_OK(status);
-        ASSERT_EQUALS(0u, _metadata.getNumChunks());
-    }
-
-    void tearDown() {
-        MockConnRegistry::get()->clear();
+        future.timed_get(kFutureTimeout);
     }
 
     const CollectionMetadata& getCollMetadata() const {
@@ -109,7 +90,6 @@ protected:
     }
 
 private:
-    unique_ptr<MockRemoteDBServer> _dummyConfig;
     CollectionMetadata _metadata;
 };
 
@@ -446,47 +426,43 @@ TEST_F(NoChunkFixture, PendingOrphanedDataRanges) {
  * Fixture with single chunk containing:
  * [10->20)
  */
-class SingleChunkFixture : public mongo::unittest::Test {
+class SingleChunkFixture : public MetadataLoaderFixture {
 protected:
     void setUp() {
-        OperationContextNoop txn;
-        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
-        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-        MockConnRegistry::get()->addServer(_dummyConfig.get());
+        MetadataLoaderFixture::setUp();
 
-        OID epoch = OID::gen();
-        ChunkVersion chunkVersion = ChunkVersion(1, 0, epoch);
+        ChunkVersion chunkVersion = ChunkVersion(1, 0, _epoch);
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(epoch);
-        _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
+        collType.setEpoch(_epoch);
 
         BSONObj fooSingle = BSON(
             ChunkType::name("test.foo-a_10")
             << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 10))
             << ChunkType::max(BSON("a" << 20))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000"));
-        _dummyConfig->insert(ChunkType::ConfigNS, fooSingle);
+            << ChunkType::DEPRECATED_epoch(_epoch) << ChunkType::shard("shard0000"));
+        std::vector<BSONObj> chunksToSend{fooSingle};
 
-        ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
-        ASSERT(configLoc.isValid());
-        CatalogManagerLegacy catalogManager;
-        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
-        catalogManager.init(configLoc, lockProcessId);
+        auto future = launchAsync([this] {
+            MetadataLoader loader;
+            auto status = loader.makeCollectionMetadata(operationContext(),
+                                                        catalogManager(),
+                                                        "test.foo",
+                                                        "shard0000",
+                                                        NULL, /* no old metadata */
+                                                        &_metadata);
+            ASSERT_OK(status);
+        });
 
-        MetadataLoader loader;
-        Status status = loader.makeCollectionMetadata(
-            &txn, &catalogManager, "test.foo", "shard0000", NULL, &_metadata);
-        ASSERT_OK(status);
-    }
+        expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
+        expectFindOnConfigSendBSONObjVector(chunksToSend);
 
-    void tearDown() {
-        MockConnRegistry::get()->clear();
+        future.timed_get(kFutureTimeout);
     }
 
     const CollectionMetadata& getCollMetadata() const {
@@ -494,7 +470,6 @@ protected:
     }
 
 private:
-    unique_ptr<MockRemoteDBServer> _dummyConfig;
     CollectionMetadata _metadata;
 };
 
@@ -762,47 +737,43 @@ TEST_F(SingleChunkFixture, ChunkOrphanedDataRanges) {
  * Fixture with single chunk containing:
  * [(min, min)->(max, max))
  */
-class SingleChunkMinMaxCompoundKeyFixture : public mongo::unittest::Test {
+class SingleChunkMinMaxCompoundKeyFixture : public MetadataLoaderFixture {
 protected:
     void setUp() {
-        OperationContextNoop txn;
-        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
-        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-        MockConnRegistry::get()->addServer(_dummyConfig.get());
+        MetadataLoaderFixture::setUp();
 
-        OID epoch = OID::gen();
-        ChunkVersion chunkVersion = ChunkVersion(1, 0, epoch);
+        ChunkVersion chunkVersion = ChunkVersion(1, 0, _epoch);
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(epoch);
-        _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
+        collType.setEpoch(_epoch);
 
         BSONObj fooSingle = BSON(
             ChunkType::name("test.foo-a_MinKey")
             << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << MINKEY << "b" << MINKEY))
             << ChunkType::max(BSON("a" << MAXKEY << "b" << MAXKEY))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000"));
-        _dummyConfig->insert(ChunkType::ConfigNS, fooSingle);
+            << ChunkType::DEPRECATED_epoch(_epoch) << ChunkType::shard("shard0000"));
+        std::vector<BSONObj> chunksToSend{fooSingle};
 
-        ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
-        ASSERT(configLoc.isValid());
-        CatalogManagerLegacy catalogManager;
-        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
-        catalogManager.init(configLoc, lockProcessId);
+        auto future = launchAsync([this] {
+            MetadataLoader loader;
+            auto status = loader.makeCollectionMetadata(operationContext(),
+                                                        catalogManager(),
+                                                        "test.foo",
+                                                        "shard0000",
+                                                        NULL, /* no old metadata */
+                                                        &_metadata);
+            ASSERT_OK(status);
+        });
 
-        MetadataLoader loader;
-        Status status = loader.makeCollectionMetadata(
-            &txn, &catalogManager, "test.foo", "shard0000", NULL, &_metadata);
-        ASSERT_OK(status);
-    }
+        expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
+        expectFindOnConfigSendBSONObjVector(chunksToSend);
 
-    void tearDown() {
-        MockConnRegistry::get()->clear();
+        future.timed_get(kFutureTimeout);
     }
 
     const CollectionMetadata& getCollMetadata() const {
@@ -810,7 +781,6 @@ protected:
     }
 
 private:
-    unique_ptr<MockRemoteDBServer> _dummyConfig;
     CollectionMetadata _metadata;
 };
 
@@ -828,57 +798,49 @@ TEST_F(SingleChunkMinMaxCompoundKeyFixture, CompoudKeyBelongsToMe) {
  * Fixture with chunks:
  * [(10, 0)->(20, 0)), [(30, 0)->(40, 0))
  */
-class TwoChunksWithGapCompoundKeyFixture : public mongo::unittest::Test {
+class TwoChunksWithGapCompoundKeyFixture : public MetadataLoaderFixture {
 protected:
     void setUp() {
-        OperationContextNoop txn;
-        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
-        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-        MockConnRegistry::get()->addServer(_dummyConfig.get());
+        MetadataLoaderFixture::setUp();
 
-        OID epoch = OID::gen();
-        ChunkVersion chunkVersion = ChunkVersion(1, 0, epoch);
+        ChunkVersion chunkVersion = ChunkVersion(1, 0, _epoch);
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(epoch);
-        _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
+        collType.setEpoch(_epoch);
 
-        _dummyConfig->insert(
-            ChunkType::ConfigNS,
-            BSON(ChunkType::name("test.foo-a_10")
-                 << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 10 << "b" << 0))
-                 << ChunkType::max(BSON("a" << 20 << "b" << 0))
-                 << ChunkType::DEPRECATED_lastmod(
-                        Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-                 << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000")));
+        std::vector<BSONObj> chunksToSend;
+        chunksToSend.push_back(BSON(
+            ChunkType::name("test.foo-a_10")
+            << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 10 << "b" << 0))
+            << ChunkType::max(BSON("a" << 20 << "b" << 0))
+            << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
+            << ChunkType::DEPRECATED_epoch(_epoch) << ChunkType::shard("shard0000")));
+        chunksToSend.push_back(BSON(
+            ChunkType::name("test.foo-a_10")
+            << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 30 << "b" << 0))
+            << ChunkType::max(BSON("a" << 40 << "b" << 0))
+            << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
+            << ChunkType::DEPRECATED_epoch(_epoch) << ChunkType::shard("shard0000")));
 
-        _dummyConfig->insert(
-            ChunkType::ConfigNS,
-            BSON(ChunkType::name("test.foo-a_10")
-                 << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 30 << "b" << 0))
-                 << ChunkType::max(BSON("a" << 40 << "b" << 0))
-                 << ChunkType::DEPRECATED_lastmod(
-                        Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-                 << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000")));
+        auto future = launchAsync([this] {
+            MetadataLoader loader;
+            auto status = loader.makeCollectionMetadata(operationContext(),
+                                                        catalogManager(),
+                                                        "test.foo",
+                                                        "shard0000",
+                                                        NULL, /* no old metadata */
+                                                        &_metadata);
+            ASSERT_OK(status);
+        });
 
-        ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
-        ASSERT(configLoc.isValid());
-        CatalogManagerLegacy catalogManager;
-        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
-        catalogManager.init(configLoc, lockProcessId);
+        expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
+        expectFindOnConfigSendBSONObjVector(chunksToSend);
 
-        MetadataLoader loader;
-        Status status = loader.makeCollectionMetadata(
-            &txn, &catalogManager, "test.foo", "shard0000", NULL, &_metadata);
-        ASSERT_OK(status);
-    }
-
-    void tearDown() {
-        MockConnRegistry::get()->clear();
+        future.timed_get(kFutureTimeout);
     }
 
     const CollectionMetadata& getCollMetadata() const {
@@ -886,7 +848,6 @@ protected:
     }
 
 private:
-    unique_ptr<MockRemoteDBServer> _dummyConfig;
     CollectionMetadata _metadata;
 };
 
@@ -1080,76 +1041,64 @@ TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapAndPendingOrphanedDataRanges)
  * Fixture with chunk containing:
  * [min->10) , [10->20) , <gap> , [30->max)
  */
-class ThreeChunkWithRangeGapFixture : public mongo::unittest::Test {
+class ThreeChunkWithRangeGapFixture : public MetadataLoaderFixture {
 protected:
     void setUp() {
-        OperationContextNoop txn;
-        _dummyConfig.reset(new MockRemoteDBServer(CONFIG_HOST_PORT));
-        mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-        MockConnRegistry::get()->addServer(_dummyConfig.get());
+        MetadataLoaderFixture::setUp();
 
-        OID epoch(OID::gen());
+        CollectionType collType;
+        collType.setNs(NamespaceString{"x.y"});
+        collType.setKeyPattern(BSON("a" << 1));
+        collType.setUnique(false);
+        collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
+        collType.setEpoch(_epoch);
 
+        std::vector<BSONObj> chunksToSend;
         {
-            CollectionType collType;
-            collType.setNs(NamespaceString{"x.y"});
-            collType.setKeyPattern(BSON("a" << 1));
-            collType.setUnique(false);
-            collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-            collType.setEpoch(epoch);
-            _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
+            ChunkVersion version(1, 1, _epoch);
+            chunksToSend.push_back(BSON(
+                ChunkType::name("x.y-a_MinKey")
+                << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << MINKEY))
+                << ChunkType::max(BSON("a" << 10))
+                << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(version.toLong()))
+                << ChunkType::DEPRECATED_epoch(version.epoch()) << ChunkType::shard("shard0000")));
         }
 
         {
-            ChunkVersion version(1, 1, epoch);
-            _dummyConfig->insert(ChunkType::ConfigNS,
-                                 BSON(ChunkType::name("x.y-a_MinKey")
-                                      << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << MINKEY))
-                                      << ChunkType::max(BSON("a" << 10))
-                                      << ChunkType::DEPRECATED_lastmod(
-                                             Date_t::fromMillisSinceEpoch(version.toLong()))
-                                      << ChunkType::DEPRECATED_epoch(version.epoch())
-                                      << ChunkType::shard("shard0000")));
+            ChunkVersion version(1, 3, _epoch);
+            chunksToSend.push_back(BSON(
+                ChunkType::name("x.y-a_10")
+                << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << 10))
+                << ChunkType::max(BSON("a" << 20))
+                << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(version.toLong()))
+                << ChunkType::DEPRECATED_epoch(version.epoch()) << ChunkType::shard("shard0000")));
         }
 
         {
-            ChunkVersion version(1, 3, epoch);
-            _dummyConfig->insert(ChunkType::ConfigNS,
-                                 BSON(ChunkType::name("x.y-a_10")
-                                      << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << 10))
-                                      << ChunkType::max(BSON("a" << 20))
-                                      << ChunkType::DEPRECATED_lastmod(
-                                             Date_t::fromMillisSinceEpoch(version.toLong()))
-                                      << ChunkType::DEPRECATED_epoch(version.epoch())
-                                      << ChunkType::shard("shard0000")));
+            ChunkVersion version(1, 2, _epoch);
+            chunksToSend.push_back(BSON(
+                ChunkType::name("x.y-a_30")
+                << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << 30))
+                << ChunkType::max(BSON("a" << MAXKEY))
+                << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(version.toLong()))
+                << ChunkType::DEPRECATED_epoch(version.epoch()) << ChunkType::shard("shard0000")));
         }
 
-        {
-            ChunkVersion version(1, 2, epoch);
-            _dummyConfig->insert(ChunkType::ConfigNS,
-                                 BSON(ChunkType::name("x.y-a_30")
-                                      << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << 30))
-                                      << ChunkType::max(BSON("a" << MAXKEY))
-                                      << ChunkType::DEPRECATED_lastmod(
-                                             Date_t::fromMillisSinceEpoch(version.toLong()))
-                                      << ChunkType::DEPRECATED_epoch(version.epoch())
-                                      << ChunkType::shard("shard0000")));
-        }
+        auto future = launchAsync([this] {
+            MetadataLoader loader;
+            auto status = loader.makeCollectionMetadata(operationContext(),
+                                                        catalogManager(),
+                                                        "test.foo",
+                                                        "shard0000",
+                                                        NULL, /* no old metadata */
+                                                        &_metadata);
+            ASSERT_OK(status);
+        });
 
-        ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
-        ASSERT(configLoc.isValid());
-        CatalogManagerLegacy catalogManager;
-        std::string lockProcessId = "testhost:123455:1234567890:9876543210";
-        catalogManager.init(configLoc, lockProcessId);
+        expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
+        expectFindOnConfigSendBSONObjVector(chunksToSend);
 
-        MetadataLoader loader;
-        Status status = loader.makeCollectionMetadata(
-            &txn, &catalogManager, "test.foo", "shard0000", NULL, &_metadata);
-        ASSERT_OK(status);
-    }
-
-    void tearDown() {
-        MockConnRegistry::get()->clear();
+        future.timed_get(kFutureTimeout);
     }
 
     const CollectionMetadata& getCollMetadata() const {
@@ -1157,7 +1106,6 @@ protected:
     }
 
 private:
-    unique_ptr<MockRemoteDBServer> _dummyConfig;
     CollectionMetadata _metadata;
 };
 

@@ -100,7 +100,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy',
+        '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
     ]
