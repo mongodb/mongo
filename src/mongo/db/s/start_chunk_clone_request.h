@@ -32,7 +32,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/chunk_version.h"
+#include "mongo/db/s/migration_session_id.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 
 namespace mongo {
@@ -42,36 +42,31 @@ template <typename T>
 class StatusWith;
 
 /**
- * Parses the arguments for a move chunk operation.
+ * Parses the arguments for a start chunk clone operation.
  */
-class MoveChunkRequest {
+class StartChunkCloneRequest {
 public:
     /**
-     * Parses the input command and produces a request corresponding to its arguments. The parsing
-     * ignores arguments, which are processed at the command level, in particular shardVersion and
-     * maxTimeMS.
+     * Parses the input command and produces a request corresponding to its arguments.
      */
-    static StatusWith<MoveChunkRequest> createFromCommand(NamespaceString nss, const BSONObj& obj);
+    static StatusWith<StartChunkCloneRequest> createFromCommand(NamespaceString nss,
+                                                                const BSONObj& obj);
 
     /**
-     * Constructs a moveChunk command with the specified parameters and writes it to the builder,
-     * without closing the builder. The builder must be empty, but callers are free to append more
-     * fields once the command has been constructed.
-     *
-     * The shardVersion argument is appended, but not parsed by the createFromCommand method above,
-     * because it is processed by the mongod generic command parsing code.
+     * Constructs a start chunk clone command with the specified parameters and writes it to the
+     * builder, without closing the builder. The builder must be empty, but callers are free to
+     * append more fields once the command has been constructed.
      */
     static void appendAsCommand(BSONObjBuilder* builder,
                                 const NamespaceString& nss,
-                                const ChunkVersion& shardVersion,
+                                const MigrationSessionId& sessionId,
                                 const ConnectionString& configServerConnectionString,
                                 const std::string& fromShardId,
                                 const std::string& toShardId,
                                 const BSONObj& chunkMinKey,
                                 const BSONObj& chunkMaxKey,
-                                int64_t maxChunkSizeBytes,
-                                const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                bool waitForDelete);
+                                const BSONObj& shardKeyPattern,
+                                const MigrationSecondaryThrottleOptions& secondaryThrottle);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -97,23 +92,24 @@ public:
         return _maxKey;
     }
 
-    int64_t getMaxChunkSizeBytes() const {
-        return _maxChunkSizeBytes;
+    const BSONObj& getShardKeyPattern() const {
+        return _shardKeyPattern;
     }
 
     const MigrationSecondaryThrottleOptions& getSecondaryThrottle() const {
         return _secondaryThrottle;
     }
 
-    bool getWaitForDelete() const {
-        return _waitForDelete;
-    }
-
 private:
-    MoveChunkRequest(NamespaceString nss, MigrationSecondaryThrottleOptions secondaryThrottle);
+    StartChunkCloneRequest(NamespaceString nss,
+                           MigrationSessionId sessionId,
+                           MigrationSecondaryThrottleOptions secondaryThrottle);
 
     // The collection for which this request applies
     NamespaceString _nss;
+
+    // The session id of this migration
+    MigrationSessionId _sessionId;
 
     // Connections string for the config server. This is a legacy field and is used in order to
     // initialize the sharding state on the donor shard in case it doesn't yet know that it is part
@@ -130,16 +126,11 @@ private:
     BSONObj _minKey;
     BSONObj _maxKey;
 
-    // This value is used by the migration source to determine the data size threshold above which a
-    // chunk would be considered jumbo and migrations will not proceed.
-    int64_t _maxChunkSizeBytes{0};
+    // Shard key pattern used by the collection
+    BSONObj _shardKeyPattern;
 
     // The parsed secondary throttle options
     MigrationSecondaryThrottleOptions _secondaryThrottle;
-
-    // Whether to block and wait for the range deleter to cleanup the orphaned documents at the end
-    // of move.
-    bool _waitForDelete;
 };
 
 }  // namespace mongo

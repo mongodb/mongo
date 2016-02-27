@@ -23,10 +23,12 @@ env.Library(
     target='migration_types',
     source=[
         'migration_session_id.cpp',
+        'start_chunk_clone_request.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/s/common',
     ],
 )
 
@@ -79,6 +81,7 @@ env.CppUnitTest(
     target='migration_types_test',
     source=[
         'migration_session_id_test.cpp',
+        'start_chunk_clone_request_test.cpp',
     ],
     LIBDEPS=[
         'migration_types',

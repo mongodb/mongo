@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/migration_session_id.h"
+#include "mongo/db/s/start_chunk_clone_request.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -41,40 +41,33 @@ using unittest::assertGet;
 
 namespace {
 
-TEST(MigrationSessionId, GenerateAndExtract) {
-    MigrationSessionId origSessionId = MigrationSessionId::generate("Source", "Dest");
-
+TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     BSONObjBuilder builder;
-    origSessionId.append(&builder);
-    BSONObj obj = builder.obj();
+    StartChunkCloneRequest::appendAsCommand(
+        &builder,
+        NamespaceString("TestDB.TestColl"),
+        MigrationSessionId::generate("shard0001", "shard0002"),
+        assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
+        "shard0001",
+        "shard0002",
+        BSON("Key" << -100),
+        BSON("Key" << 100),
+        BSON("Key" << 1),
+        MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff));
 
-    MigrationSessionId sessionIdAfter = assertGet(MigrationSessionId::extractFromBSON(obj));
-    ASSERT(origSessionId.matches(sessionIdAfter));
-    ASSERT_EQ(origSessionId.toString(), sessionIdAfter.toString());
-}
+    BSONObj cmdObj = builder.obj();
 
-TEST(MigrationSessionId, Comparison) {
-    MigrationSessionId emptySessionId =
-        assertGet(MigrationSessionId::extractFromBSON(BSON("SomeField" << 1)));
-    MigrationSessionId nonEmptySessionId =
-        assertGet(MigrationSessionId::extractFromBSON(BSON("SomeField" << 1 << "sessionId"
-                                                                       << "TestSessionID")));
-
-    ASSERT(!emptySessionId.matches(nonEmptySessionId));
-    ASSERT(!nonEmptySessionId.matches(emptySessionId));
-
-    MigrationSessionId sessionIdToCompare =
-        assertGet(MigrationSessionId::extractFromBSON(BSON("SomeOtherField" << 1 << "sessionId"
-                                                                            << "TestSessionID")));
-    ASSERT(nonEmptySessionId.matches(sessionIdToCompare));
-    ASSERT(sessionIdToCompare.matches(nonEmptySessionId));
-}
-
-TEST(MigrationSessionId, ErrorWhenTypeIsNotString) {
-    ASSERT_NOT_OK(MigrationSessionId::extractFromBSON(
-                      BSON("SomeField" << 1 << "sessionId" << Date_t::now())).getStatus());
-    ASSERT_NOT_OK(MigrationSessionId::extractFromBSON(BSON("SomeField" << 1 << "sessionId" << 2))
-                      .getStatus());
+    auto request = assertGet(StartChunkCloneRequest::createFromCommand(
+        NamespaceString(cmdObj["_recvChunkStart"].String()), cmdObj));
+    ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
+    ASSERT_EQ("TestConfigRS/CS1:12345,CS2:12345,CS3:12345", request.getConfigServerCS().toString());
+    ASSERT_EQ("shard0001", request.getFromShardId());
+    ASSERT_EQ("shard0002", request.getToShardId());
+    ASSERT_EQ(BSON("Key" << -100), request.getMinKey());
+    ASSERT_EQ(BSON("Key" << 100), request.getMaxKey());
+    ASSERT_EQ(BSON("Key" << 1), request.getShardKeyPattern());
+    ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff,
+              request.getSecondaryThrottle().getSecondaryThrottle());
 }
 
 }  // namespace
