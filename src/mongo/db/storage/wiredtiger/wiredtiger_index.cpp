@@ -391,7 +391,41 @@ Status WiredTigerIndex::touch(OperationContext* txn) const {
 
 
 long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* txn) const {
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
+    auto ru = WiredTigerRecoveryUnit::get(txn);
+    WiredTigerSession* session = ru->getSession(txn);
+
+    if (ru->getSessionCache()->isEphemeral()) {
+        // For ephemeral case, use cursor statistics
+        const auto statsUri = "statistics:" + uri();
+
+        // Helper function to retrieve stats and check for errors
+        auto getStats = [&](int key) -> int64_t {
+            StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
+                session->getSession(), statsUri, "statistics=(fast)", key);
+            if (!result.isOK()) {
+                if (result.getStatus().code() == ErrorCodes::CursorNotFound)
+                    return 0;  // ident gone, so return 0
+
+                uassertStatusOK(result.getStatus());
+            }
+            return result.getValue();
+        };
+
+        auto inserts = getStats(WT_STAT_DSRC_CURSOR_INSERT);
+        auto removes = getStats(WT_STAT_DSRC_CURSOR_REMOVE);
+        auto insertBytes = getStats(WT_STAT_DSRC_CURSOR_INSERT_BYTES);
+
+        if (inserts == 0 or removes >= inserts)
+            return 0;
+
+        // Rough approximation of index size as average entry size times number of entries.
+        // May be off if key sizes change significantly over the life time of the collection,
+        // but is the best we can do currrently with the statistics available.
+        auto bytesPerEntry = (insertBytes + inserts - 1) / inserts;  // round up
+        auto numEntries = inserts - removes;
+        return numEntries * bytesPerEntry;
+    }
+
     return static_cast<long long>(WiredTigerUtil::getIdentSize(session->getSession(), _uri));
 }
 
