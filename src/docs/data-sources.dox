@@ -38,7 +38,7 @@ cursor types that give access to data managed by WiredTiger:
 	key=<code>string</code>\, value=<code>string</code>\,<br>
 	see @ref metadata for details}
 @row{<tt>statistics:[\<data source URI\>]</tt>,
-	database or data source statistics cursor,
+	database, data source or join statistics cursor,
 	key=<code>int id</code>\,<br>
 	value=<code>(string description\,
 	string value\, uint64_t value)</code>\,<br>
@@ -106,7 +106,9 @@ WiredTiger database as well as statistics for individual data sources.
 The statistics are at two levels: per-database and per-individual data
 source.  Database-wide statistics are retrieved with the \c "statistics:"
 URI; individual data source statistics are available by specifying
-\c "statistics:<data source URI>".
+\c "statistics:<data source URI>".  Additionally, statistics about a
+join cursor can be retrieved by specifying \c "statistics:join" and
+supplying the join cursor as an argument in the SESSION::open_cursor call.
 
 The statistic key is an integer from the list of keys in
 @ref_single statistics_keys "Statistics Keys".  Statistics cursors return
@@ -127,7 +129,11 @@ The following is an example of printing statistics about a table:
 
 @snippet ex_stat.c statistics table function
 
-Both examples can use a common display routine that iterates through the
+The following is an example of printing statistics about a join cursor:
+
+@snippet ex_stat.c statistics join cursor function
+
+These three examples can use a common display routine that iterates through the
 statistics until the cursor returns the end of the list.
 
 @snippet ex_stat.c statistics display function
