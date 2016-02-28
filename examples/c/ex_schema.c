@@ -69,7 +69,7 @@ main(void)
 {
 	POP_RECORD *p;
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor, *cursor2, *join_cursor;
+	WT_CURSOR *cursor, *cursor2, *join_cursor, *stat_cursor;
 	WT_SESSION *session;
 	const char *country;
 	uint64_t recno, population;
@@ -354,6 +354,14 @@ main(void)
 		    country, year, population);
 	}
 	/*! [Join cursors] */
+
+	/*! [Statistics cursor join cursor] */
+	ret = session->open_cursor(session,
+	    "statistics:join",
+	    join_cursor, NULL, &stat_cursor);
+	/*! [Statistics cursor join cursor] */
+
+	ret = stat_cursor->close(stat_cursor);
 	ret = join_cursor->close(join_cursor);
 	ret = cursor2->close(cursor2);
 	ret = cursor->close(cursor);

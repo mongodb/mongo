@@ -76,7 +76,7 @@ public class ex_schema {
         throws WiredTigerException
     {
         Connection conn;
-        Cursor cursor, cursor2, join_cursor;
+        Cursor cursor, cursor2, join_cursor, stat_cursor;
         Session session;
         String country;
         long recno, population;
@@ -368,6 +368,13 @@ public class ex_schema {
                 ", population " + population);
 	}
 	/*! [Join cursors] */
+
+        /*! [Statistics cursor join cursor] */
+        stat_cursor = session.open_cursor(
+            "statistics:join", join_cursor, null);
+        /*! [Statistics cursor join cursor] */
+
+        ret = stat_cursor.close();
 	ret = join_cursor.close();
 	ret = cursor2.close();
 	ret = cursor.close();
