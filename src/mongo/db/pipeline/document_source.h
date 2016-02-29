@@ -276,8 +276,15 @@ public:
         virtual ~MongodInterface(){};
 
         /**
-         * Always returns a DBDirectClient.
-         * Callers must not cache the returned pointer outside the scope of a single function.
+         * Sets the OperationContext of the DBDirectClient returned by directClient(). This method
+         * must be called after updating the 'opCtx' member of the ExpressionContext associated with
+         * the document source.
+         */
+        virtual void setOperationContext(OperationContext* opCtx) = 0;
+
+        /**
+         * Always returns a DBDirectClient. The return type in the function signature is a
+         * DBClientBase* because DBDirectClient isn't linked into mongos.
          */
         virtual DBClientBase* directClient() = 0;
 
@@ -301,6 +308,11 @@ public:
 
     void injectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
         _mongod = mongod;
+    }
+
+    void setOperationContext(OperationContext* opCtx) {
+        invariant(_mongod);
+        _mongod->setOperationContext(opCtx);
     }
 
 protected:

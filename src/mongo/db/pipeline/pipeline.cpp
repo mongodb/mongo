@@ -254,6 +254,23 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
     return Status(ErrorCodes::Unauthorized, "unauthorized");
 }
 
+void Pipeline::detachFromOperationContext() {
+    pCtx->opCtx = nullptr;
+
+    for (auto* source : sourcesNeedingMongod) {
+        source->setOperationContext(nullptr);
+    }
+}
+
+void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
+    invariant(pCtx->opCtx == nullptr);
+    pCtx->opCtx = opCtx;
+
+    for (auto* source : sourcesNeedingMongod) {
+        source->setOperationContext(opCtx);
+    }
+}
+
 intrusive_ptr<Pipeline> Pipeline::splitForSharded() {
     // Create and initialize the shard spec we'll return. We start with an empty pipeline on the
     // shards and all work being done in the merger. Optimizations can move operations between
@@ -413,6 +430,14 @@ void Pipeline::stitch() {
         intrusive_ptr<DocumentSource> pTemp(*iter);
         pTemp->setSource(prevSource);
         prevSource = pTemp.get();
+    }
+
+    // Cache the document sources that have a MongodInterface to avoid the cost of a dynamic cast
+    // when updating the OperationContext of their DBDirectClients while executing the pipeline.
+    for (auto&& source : sources) {
+        if (auto* needsMongod = dynamic_cast<DocumentSourceNeedsMongod*>(source.get())) {
+            sourcesNeedingMongod.push_back(needsMongod);
+        }
     }
 }
 
