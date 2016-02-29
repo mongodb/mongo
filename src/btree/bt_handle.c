@@ -147,6 +147,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 
+	/* Close the block manager. */
 	if ((bm = btree->bm) != NULL) {
 		/* Unload the checkpoint, unless it's a special command. */
 		if (!F_ISSET(btree,
@@ -162,10 +163,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Close the Huffman tree. */
 	__wt_btree_huffman_close(session);
 
-	/* Destroy locks. */
 	WT_TRET(__wt_rwlock_destroy(session, &btree->ovfl_lock));
-	__wt_spin_destroy(session, &btree->evict_lock);
-	__wt_spin_destroy(session, &btree->flush_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
@@ -181,6 +179,17 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	btree->kencryptor = NULL;
 
 	btree->bulk_load_ok = false;
+
+	/* Reset eviction information. */
+	__wt_spin_destroy(session, &btree->evict_lock);
+	btree->evict_ref = NULL;
+	btree->evict_walk_period = 0;
+	btree->evict_walk_skips = 0;
+	btree->evict_disabled = 0;
+	btree->evict_busy = 0;
+	F_CLR(btree, WT_BTREE_NO_EVICTION);
+
+	__wt_spin_destroy(session, &btree->flush_lock);
 
 	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
