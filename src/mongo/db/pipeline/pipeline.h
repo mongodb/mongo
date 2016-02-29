@@ -44,7 +44,9 @@ class ClientBasic;
 class Command;
 struct DepsTracker;
 class DocumentSource;
+class DocumentSourceNeedsMongod;
 struct ExpressionContext;
+class OperationContext;
 class Privilege;
 
 /** mongodb "commands" (sent via db.$cmd.findOne(...))
@@ -72,6 +74,22 @@ public:
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
         return pCtx;
     }
+
+    /**
+     * Sets the OperationContext of 'pCtx' to nullptr.
+     *
+     * The PipelineProxyStage is responsible for detaching the OperationContext and releasing any
+     * storage-engine state of the DocumentSourceCursor that may be present in 'sources'.
+     */
+    void detachFromOperationContext();
+
+    /**
+     * Sets the OperationContext of 'pCtx' to 'opCtx'.
+     *
+     * The PipelineProxyStage is responsible for reattaching the OperationContext and reacquiring
+     * any storage-engine state of the DocumentSourceCursor that may be present in 'sources'.
+     */
+    void reattachToOperationContext(OperationContext* opCtx);
 
     /**
       Split the current Pipeline into a Pipeline for each shard, and
@@ -192,6 +210,10 @@ private:
     typedef std::deque<boost::intrusive_ptr<DocumentSource>> SourceContainer;
     SourceContainer sources;
     bool explain;
+
+    // Cache of the document sources for which dynamic_cast<DocumentSourceNeedsMongod*>() returns a
+    // non-null pointer.
+    std::vector<DocumentSourceNeedsMongod*> sourcesNeedingMongod;
 
     boost::intrusive_ptr<ExpressionContext> pCtx;
 };

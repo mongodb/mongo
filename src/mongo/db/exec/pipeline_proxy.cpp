@@ -95,22 +95,21 @@ bool PipelineProxyStage::isEOF() {
 void PipelineProxyStage::doInvalidate(OperationContext* txn,
                                       const RecordId& dl,
                                       InvalidationType type) {
-    // propagate to child executor if still in use
-    if (std::shared_ptr<PlanExecutor> exec = _childExec.lock()) {
-        exec->invalidate(txn, dl, type);
+    // Propagate the invalidation to the child executor of the pipeline if it is still in use.
+    if (auto child = getChildExecutor()) {
+        child->invalidate(txn, dl, type);
     }
 }
 
 void PipelineProxyStage::doDetachFromOperationContext() {
-    _pipeline->getContext()->opCtx = NULL;
+    _pipeline->detachFromOperationContext();
     if (auto child = getChildExecutor()) {
         child->detachFromOperationContext();
     }
 }
 
 void PipelineProxyStage::doReattachToOperationContext() {
-    invariant(_pipeline->getContext()->opCtx == NULL);
-    _pipeline->getContext()->opCtx = getOpCtx();
+    _pipeline->reattachToOperationContext(getOpCtx());
     if (auto child = getChildExecutor()) {
         child->reattachToOperationContext(getOpCtx());
     }

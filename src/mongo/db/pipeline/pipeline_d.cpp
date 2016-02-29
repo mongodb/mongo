@@ -72,10 +72,12 @@ public:
     MongodImplementation(const intrusive_ptr<ExpressionContext>& ctx)
         : _ctx(ctx), _client(ctx->opCtx) {}
 
+    void setOperationContext(OperationContext* opCtx) {
+        invariant(_ctx->opCtx == opCtx);
+        _client.setOpCtx(opCtx);
+    }
+
     DBClientBase* directClient() final {
-        // opCtx may have changed since our last call
-        invariant(_ctx->opCtx);
-        _client.setOpCtx(_ctx->opCtx);
         return &_client;
     }
 
