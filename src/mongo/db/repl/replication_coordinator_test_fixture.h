@@ -224,6 +224,7 @@ protected:
         return _isStorageEngineDurable;
     }
 
+    void simulateEnoughHeartbeatsForAllNodesUp();
 
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;

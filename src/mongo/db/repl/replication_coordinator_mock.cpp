@@ -36,6 +36,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/util/assert_util.h"
 
@@ -359,6 +360,11 @@ bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& curre
                                                         const OpTime& syncSourceLastOpTime,
                                                         bool syncSourceHasSyncSource) {
     invariant(false);
+}
+
+SyncSourceResolverResponse ReplicationCoordinatorMock::selectSyncSource(
+    OperationContext* txn, const OpTime& lastOpTimeFetched) {
+    return SyncSourceResolverResponse();
 }
 
 OpTime ReplicationCoordinatorMock::getLastCommittedOpTime() const {

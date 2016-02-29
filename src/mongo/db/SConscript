@@ -610,6 +610,7 @@ serverOnlyFiles = [
     "repl/minvalid.cpp",
     "repl/oplog.cpp",
     "repl/oplogreader.cpp",
+    "repl/sync_source_resolver.cpp", # TODO(dannenberg) move this into DataReplicator in repl/SConscript.
     "repl/replication_coordinator_external_state_impl.cpp",
     "repl/replication_info.cpp",
     "repl/resync.cpp",

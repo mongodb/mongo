@@ -69,6 +69,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
@@ -3064,6 +3065,78 @@ bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& curre
     fassert(18906, cbh.getStatus());
     _replExecutor.wait(cbh.getValue());
     return shouldChange;
+}
+
+SyncSourceResolverResponse ReplicationCoordinatorImpl::selectSyncSource(
+    OperationContext* txn, const OpTime& lastOpTimeFetched) {
+    const Timestamp sentinelTimestamp(duration_cast<Seconds>(Milliseconds(curTimeMillis64())), 0);
+    const OpTime sentinel(sentinelTimestamp, std::numeric_limits<long long>::max());
+    OpTime earliestOpTimeSeen = sentinel;
+    SyncSourceResolverResponse resp;
+    while (true) {
+        HostAndPort candidate = chooseNewSyncSource(lastOpTimeFetched.getTimestamp());
+
+        if (candidate.empty()) {
+            if (earliestOpTimeSeen == sentinel) {
+                // If, in this invocation of selectSyncSource(), we did not successfully connect
+                // to any node ahead of us, we apparently have no sync sources to connect to.
+                // This situation is common; e.g. if there are no writes to the primary at
+                // the moment.
+                resp.syncSourceStatus = HostAndPort();
+                return resp;
+            }
+
+            resp.syncSourceStatus = {ErrorCodes::OplogStartMissing, "too stale to catch up"};
+            resp.earliestOpTimeSeen = earliestOpTimeSeen;
+            return resp;
+        }
+
+        // Candidate found.
+        BSONObj firstObjFound;
+        auto work = [&firstObjFound](const StatusWith<Fetcher::QueryResponse>& queryResult,
+                                     NextAction* nextActiion,
+                                     BSONObjBuilder* bob) {
+            if (queryResult.isOK() && !queryResult.getValue().documents.empty()) {
+                firstObjFound = queryResult.getValue().documents.front();
+            }
+        };
+        Fetcher candidateProber(&_replExecutor,
+                                candidate,
+                                "local",
+                                BSON("find"
+                                     << "oplog.rs"
+                                     << "limit" << 1 << "sort" << BSON("$natural" << 1)),
+                                work,
+                                rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                                Milliseconds(30000));
+        candidateProber.schedule();
+        candidateProber.wait();
+
+        if (firstObjFound.isEmpty()) {
+            // Remote oplog is emtpy, or we got an error.
+            blacklistSyncSource(candidate, Date_t::now() + Minutes(1));
+            continue;
+        }
+
+        OpTime remoteEarliestOpTime =
+            fassertStatusOK(34432, OpTime::parseFromOplogEntry(firstObjFound));
+
+        // remoteEarliestOpTime may come from a very old config, so we cannot compare their terms.
+        if (!lastOpTimeFetched.isNull() &&
+            lastOpTimeFetched.getTimestamp() < remoteEarliestOpTime.getTimestamp()) {
+            // We're too stale to use this sync source.
+            blacklistSyncSource(candidate, Date_t::now() + Minutes(1));
+            if (earliestOpTimeSeen.getTimestamp() > remoteEarliestOpTime.getTimestamp()) {
+                log() << "we are too stale to use " << candidate << " as a sync source";
+                earliestOpTimeSeen = remoteEarliestOpTime;
+            }
+            continue;
+        }
+
+        // Got a valid sync source.
+        resp.syncSourceStatus = candidate;
+        return resp;
+    }
 }
 
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {

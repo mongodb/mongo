@@ -32,6 +32,7 @@
 #include "mongo/client/fetcher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
@@ -204,6 +205,10 @@ private:
 
     // A pointer to the replication coordinator running the show.
     ReplicationCoordinator* _replCoord;
+
+    // Used to determine sync source.
+    // TODO(dannenberg) move into DataReplicator.
+    SyncSourceResolver _syncSourceResolver;
 
     // bool for indicating resync need on this node and the mutex that protects it
     // The resync command sets this flag; the Applier thread observes and clears it.

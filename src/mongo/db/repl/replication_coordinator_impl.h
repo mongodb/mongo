@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -280,6 +281,9 @@ public:
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const OpTime& syncSourceLastOpTime,
                                         bool syncSourceHasSyncSource) override;
+
+    virtual SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
+                                                        const OpTime& lastOpTimeFetched) override;
 
     virtual OpTime getLastCommittedOpTime() const override;
 

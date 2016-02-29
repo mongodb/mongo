@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point_service.h"
@@ -82,6 +83,11 @@ public:
                                 bool syncSourceHasSyncSource) override {
         return false;
     }
+    SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
+                                                const OpTime& lastOpTimeFetched) override {
+        return SyncSourceResolverResponse();
+    }
+
     HostAndPort _syncSource;
     HostAndPort _blacklistedSource;
 };
@@ -120,6 +126,10 @@ public:
                                 bool syncSourceHasSyncSource) override {
         return _syncSourceSelector->shouldChangeSyncSource(
             currentSource, sourcesOpTime, syncSourceHasSyncSource);
+    }
+    SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
+                                                const OpTime& lastOpTimeFetched) override {
+        return SyncSourceResolverResponse();
     }
 
     void scheduleNetworkResponse(const BSONObj& obj) {
@@ -566,6 +576,10 @@ public:
                                 bool syncSourceHasSyncSource) override {
         return false;
     }
+    SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
+                                                const OpTime& lastOpTimeFetched) override {
+        return SyncSourceResolverResponse();
+    }
     mutable stdx::mutex _mutex;
     stdx::condition_variable _condition;
     int _nextSourceNum{0};
@@ -693,6 +707,10 @@ public:
                                 const OpTime& sourcesOpTime,
                                 bool syncSourceHasSyncSource) override {
         return false;
+    }
+    SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
+                                                const OpTime& lastOpTimeFetched) override {
+        return SyncSourceResolverResponse();
     }
     ReplicationExecutor* _exec;
 };

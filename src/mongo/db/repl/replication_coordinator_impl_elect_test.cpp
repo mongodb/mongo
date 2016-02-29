@@ -56,41 +56,11 @@ using executor::RemoteCommandResponse;
 class ReplCoordElectTest : public ReplCoordTest {
 protected:
     void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
-    void simulateEnoughHeartbeatsForElectability();
     void simulateFreshEnoughForElectability();
 };
 
 void ReplCoordElectTest::assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost) {
     ReplCoordTest::assertStartSuccess(addProtocolVersion(configDoc, 0), selfHost);
-}
-
-void ReplCoordElectTest::simulateEnoughHeartbeatsForElectability() {
-    ReplicationCoordinatorImpl* replCoord = getReplCoord();
-    ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
-    NetworkInterfaceMock* net = getNet();
-    net->enterNetwork();
-    for (int i = 0; i < rsConfig.getNumMembers() - 1; ++i) {
-        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-        const RemoteCommandRequest& request = noi->getRequest();
-        log() << request.target.toString() << " processing " << request.cmdObj;
-        ReplSetHeartbeatArgs hbArgs;
-        if (hbArgs.initialize(request.cmdObj).isOK()) {
-            ReplSetHeartbeatResponse hbResp;
-            hbResp.setSetName(rsConfig.getReplSetName());
-            hbResp.setState(MemberState::RS_SECONDARY);
-            hbResp.setConfigVersion(rsConfig.getConfigVersion());
-            BSONObjBuilder respObj;
-            respObj << "ok" << 1;
-            hbResp.addToBSON(&respObj, false);
-            net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
-        } else {
-            error() << "Black holing unexpected request to " << request.target << ": "
-                    << request.cmdObj;
-            net->blackHole(noi);
-        }
-        net->runReadyNetworkOperations();
-    }
-    net->exitNetwork();
 }
 
 void ReplCoordElectTest::simulateFreshEnoughForElectability() {
@@ -133,7 +103,7 @@ TEST_F(ReplCoordElectTest, StartElectionDoesNotStartAnElectionWhenNodeHasNoOplog
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    simulateEnoughHeartbeatsForElectability();
+    simulateEnoughHeartbeatsForAllNodesUp();
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("node has no applied oplog entries"));
 }
@@ -263,7 +233,7 @@ TEST_F(ReplCoordElectTest, ElectionFailsWhenOneNodeVotesNay) {
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
-    simulateEnoughHeartbeatsForElectability();
+    simulateEnoughHeartbeatsForAllNodesUp();
     simulateFreshEnoughForElectability();
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
@@ -308,7 +278,7 @@ TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
-    simulateEnoughHeartbeatsForElectability();
+    simulateEnoughHeartbeatsForAllNodesUp();
     simulateFreshEnoughForElectability();
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
@@ -353,7 +323,7 @@ TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
-    simulateEnoughHeartbeatsForElectability();
+    simulateEnoughHeartbeatsForAllNodesUp();
     simulateFreshEnoughForElectability();
 
     bool success = false;
@@ -548,7 +518,7 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringFresh
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
-    simulateEnoughHeartbeatsForElectability();
+    simulateEnoughHeartbeatsForAllNodesUp();
     simulateFreshEnoughForElectability();
     ASSERT(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 
@@ -597,7 +567,7 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringElect
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
-    simulateEnoughHeartbeatsForElectability();
+    simulateEnoughHeartbeatsForAllNodesUp();
     simulateFreshEnoughForElectability();
     ASSERT(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 

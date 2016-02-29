@@ -46,12 +46,12 @@
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -74,6 +74,7 @@ namespace {
 const char hashFieldName[] = "h";
 int SleepToAllowBatchingMillis = 2;
 const int BatchIsSmallish = 40000;  // bytes
+const Milliseconds oplogSocketTimeout(30000);
 
 /**
  * Returns new thread pool for thead pool task executor.
@@ -113,6 +114,10 @@ Status checkRemoteOplogStart(stdx::function<StatusWith<BSONObj>()> getNextOperat
     return Status::OK();
 }
 
+size_t getSize(const BSONObj& o) {
+    // SERVER-9808 Avoid Fortify complaint about implicit signed->unsigned conversion
+    return static_cast<size_t>(o.objsize());
+}
 }  // namespace
 
 MONGO_FP_DECLARE(rsBgSyncProduce);
@@ -147,13 +152,6 @@ static ServerStatusMetricField<int> displayBufferMaxSize("repl.buffer.maxSizeByt
 
 BackgroundSyncInterface::~BackgroundSyncInterface() {}
 
-namespace {
-size_t getSize(const BSONObj& o) {
-    // SERVER-9808 Avoid Fortify complaint about implicit signed->unsigned conversion
-    return static_cast<size_t>(o.objsize());
-}
-}  // namespace
-
 BackgroundSync::BackgroundSync()
     : _buffer(bufferMaxSizeGauge, &getSize),
       _threadPoolTaskExecutor(makeThreadPool(),
@@ -163,6 +161,7 @@ BackgroundSync::BackgroundSync()
       _lastFetchedHash(0),
       _stopped(true),
       _replCoord(getGlobalReplicationCoordinator()),
+      _syncSourceResolver(_replCoord),
       _initialSyncRequestedFlag(false),
       _indexPrefetchConfig(PREFETCH_ALL) {}
 
@@ -287,13 +286,34 @@ void BackgroundSync::_produce(OperationContext* txn) {
         lastOpTimeFetched = _lastOpTimeFetched;
         _syncSourceHost = HostAndPort();
     }
-    OplogReader syncSourceReader;
-    syncSourceReader.connectToSyncSource(txn, lastOpTimeFetched, _replCoord);
+    SyncSourceResolverResponse syncSourceResp =
+        _syncSourceResolver.findSyncSource(txn, lastOpTimeFetched);
 
-    // no server found
-    if (syncSourceReader.getHost().empty()) {
+    if (syncSourceResp.syncSourceStatus == ErrorCodes::OplogStartMissing) {
+        // All (accessible) sync sources were too stale.
+        error() << "too stale to catch up -- entering maintenance mode";
+        log() << "Our newest OpTime : " << lastOpTimeFetched;
+        log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen;
+        log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
+        setMinValid(txn, {lastOpTimeFetched, syncSourceResp.earliestOpTimeSeen});
+        auto status = _replCoord->setMaintenanceMode(true);
+        if (!status.isOK()) {
+            warning() << "Failed to transition into maintenance mode.";
+        }
+        bool worked = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+        if (!worked) {
+            warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
+                      << ". Current state: " << _replCoord->getMemberState();
+        }
+    } else if (syncSourceResp.isOK() && !syncSourceResp.getSyncSource().empty()) {
+        _syncSourceHost = syncSourceResp.getSyncSource();
+    } else {
+        if (!syncSourceResp.isOK()) {
+            log() << "failed to find sync source, received error "
+                  << syncSourceResp.syncSourceStatus.getStatus();
+        }
+        // No sync source found.
         sleepsecs(1);
-        // if there is no one to sync from
         return;
     }
 
@@ -305,11 +325,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
         }
         lastOpTimeFetched = _lastOpTimeFetched;
         lastHashFetched = _lastFetchedHash;
-        _syncSourceHost = syncSourceReader.getHost();
         _replCoord->signalUpstreamUpdater();
     }
-
-    const Milliseconds oplogSocketTimeout(OplogReader::kSocketTimeout);
 
     const auto isV1ElectionProtocol = _replCoord->isV1ElectionProtocol();
     // Under protocol version 1, make the awaitData timeout (maxTimeMS) dependent on the election
@@ -318,18 +335,12 @@ void BackgroundSync::_produce(OperationContext* txn) {
     const Milliseconds fetcherMaxTimeMS(
         isV1ElectionProtocol ? _replCoord->getConfig().getElectionTimeoutPeriod() / 2 : Seconds(2));
 
-    // Prefer host in oplog reader to _syncSourceHost because _syncSourceHost may be cleared
-    // if sync source feedback fails.
-    const HostAndPort source = syncSourceReader.getHost();
-    syncSourceReader.resetConnection();
-    // no more references to oplog reader from here on.
-
     Status fetcherReturnStatus = Status::OK();
     auto fetcherCallback = stdx::bind(&BackgroundSync::_fetcherCallback,
                                       this,
                                       stdx::placeholders::_1,
                                       stdx::placeholders::_3,
-                                      stdx::cref(source),
+                                      stdx::cref(_syncSourceHost),
                                       lastOpTimeFetched,
                                       lastHashFetched,
                                       fetcherMaxTimeMS,
@@ -354,23 +365,23 @@ void BackgroundSync::_produce(OperationContext* txn) {
     auto cmdObj = cmdBob.obj();
     auto metadataObj = metadataBob.obj();
     Fetcher fetcher(&_threadPoolTaskExecutor,
-                    source,
+                    _syncSourceHost,
                     dbName,
                     cmdObj,
                     fetcherCallback,
                     metadataObj,
                     _replCoord->getConfig().getElectionTimeoutPeriod());
 
-    LOG(1) << "scheduling fetcher to read remote oplog on " << source << " starting at "
+    LOG(1) << "scheduling fetcher to read remote oplog on " << _syncSourceHost << " starting at "
            << cmdObj["filter"];
     auto scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
-        warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "
-                  << scheduleStatus;
+        warning() << "unable to schedule fetcher to read remote oplog on " << _syncSourceHost
+                  << ": " << scheduleStatus;
         return;
     }
     fetcher.wait();
-    LOG(1) << "fetcher stopped reading remote oplog on " << source;
+    LOG(1) << "fetcher stopped reading remote oplog on " << _syncSourceHost;
 
     // If the background sync is stopped after the fetcher is started, we need to
     // re-evaluate our sync source and oplog common point.
@@ -393,14 +404,14 @@ void BackgroundSync::_produce(OperationContext* txn) {
         const int messagingPortTags = 0;
         ConnectionPool connectionPool(messagingPortTags);
         std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
-        auto getConnection =
-            [&connection, &connectionPool, oplogSocketTimeout, source]() -> DBClientBase* {
-                if (!connection.get()) {
-                    connection.reset(new ConnectionPool::ConnectionPtr(
-                        &connectionPool, source, Date_t::now(), oplogSocketTimeout));
-                };
-                return connection->get();
+        HostAndPort source = _syncSourceHost;
+        auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
+            if (!connection.get()) {
+                connection.reset(new ConnectionPool::ConnectionPtr(
+                    &connectionPool, source, Date_t::now(), oplogSocketTimeout));
             };
+            return connection->get();
+        };
 
         {
             stdx::lock_guard<stdx::mutex> lock(_mutex);

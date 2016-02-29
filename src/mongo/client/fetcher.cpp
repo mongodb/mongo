@@ -143,15 +143,6 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const std::string& dbname,
                  const BSONObj& findCmdObj,
                  const CallbackFn& work,
-                 const BSONObj& metadata)
-    : Fetcher(
-          executor, source, dbname, findCmdObj, work, metadata, RemoteCommandRequest::kNoTimeout) {}
-
-Fetcher::Fetcher(executor::TaskExecutor* executor,
-                 const HostAndPort& source,
-                 const std::string& dbname,
-                 const BSONObj& findCmdObj,
-                 const CallbackFn& work,
                  const BSONObj& metadata,
                  Milliseconds timeout)
     : _executor(executor),

@@ -39,6 +39,7 @@ class Timestamp;
 namespace repl {
 
 class OpTime;
+struct SyncSourceResolverResponse;
 
 /**
  * Manage list of viable and blocked sync sources that we can replicate from.
@@ -78,6 +79,13 @@ public:
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const OpTime& syncSourceLastOpTime,
                                         bool syncSourceHasSyncSource) = 0;
+
+    /**
+     * Returns a SyncSourceResolverResponse containing the syncSource or a new MinValid boundry as
+     * described in SyncSourceResolverResponse.
+     */
+    virtual SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
+                                                        const OpTime& lastOpTimeFetched) = 0;
 };
 
 }  // namespace repl

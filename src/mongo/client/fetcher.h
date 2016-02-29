@@ -44,6 +44,10 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+namespace {
+using executor::RemoteCommandRequest;
+}
+
 class Fetcher {
     MONGO_DISALLOW_COPYING(Fetcher);
 
@@ -118,15 +122,8 @@ public:
             const std::string& dbname,
             const BSONObj& cmdObj,
             const CallbackFn& work,
-            const BSONObj& metadata = rpc::makeEmptyMetadata());
-
-    Fetcher(executor::TaskExecutor* executor,
-            const HostAndPort& source,
-            const std::string& dbname,
-            const BSONObj& cmdObj,
-            const CallbackFn& work,
-            const BSONObj& metadata,
-            Milliseconds timeout);
+            const BSONObj& metadata = rpc::makeEmptyMetadata(),
+            Milliseconds timeout = RemoteCommandRequest::kNoTimeout);
 
     virtual ~Fetcher();
 
