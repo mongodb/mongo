@@ -1365,7 +1365,9 @@ static void multiRemove(OperationContext* txn,
 
             PlanSummaryStats summary;
             Explain::getSummaryStats(*exec, &summary);
-            collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+            if (collection) {
+                collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+            }
             CurOp::get(txn)->debug().fromMultiPlanner = summary.fromMultiPlanner;
             CurOp::get(txn)->debug().replanned = summary.replanned;
 

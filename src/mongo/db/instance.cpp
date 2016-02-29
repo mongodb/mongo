@@ -772,6 +772,7 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
         }
 
         auto collection = ctx.db()->getCollection(nsString);
+        invariant(collection);
         unique_ptr<PlanExecutor> exec =
             uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, &op.debug()));
 
@@ -861,7 +862,9 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
 
             PlanSummaryStats summary;
             Explain::getSummaryStats(*exec, &summary);
-            collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+            if (collection) {
+                collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+            }
             op.debug().fromMultiPlanner = summary.fromMultiPlanner;
             op.debug().replanned = summary.replanned;
 
