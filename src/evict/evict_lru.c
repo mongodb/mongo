@@ -720,12 +720,32 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_request_walk_clear --
+ * __evict_clear_all_walks --
+ *	Clear the eviction walk points for all files a session is waiting on.
+ */
+static int
+__evict_clear_all_walks(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
+		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
+			WT_WITH_DHANDLE(session,
+			    dhandle, WT_TRET(__evict_clear_walk(session)));
+	return (ret);
+}
+
+/*
+ * __evict_request_clear_walk --
  *	Request that the eviction server clear the tree's current eviction
  *	point.
  */
 static int
-__evict_request_walk_clear(WT_SESSION_IMPL *session)
+__evict_request_clear_walk(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -749,26 +769,6 @@ __evict_request_walk_clear(WT_SESSION_IMPL *session)
 	if (ret != 0)
 		__wt_err(session, ret, "Failed to clear eviction walk point");
 
-	return (ret);
-}
-
-/*
- * __evict_clear_all_walks --
- *	Clear the eviction walk points for all files a session is waiting on.
- */
-static int
-__evict_clear_all_walks(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle;
-	WT_DECL_RET;
-
-	conn = S2C(session);
-
-	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
-		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
-			WT_WITH_DHANDLE(session,
-			    dhandle, WT_TRET(__evict_clear_walk(session)));
 	return (ret);
 }
 
@@ -812,7 +812,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 	WT_FULL_BARRIER();
 
 	/* Clear any existing LRU eviction walk for the file. */
-	WT_ERR(__evict_request_walk_clear(session));
+	WT_ERR(__evict_request_clear_walk(session));
 
 	/*
 	 * The eviction candidate list might reference pages from the file,
