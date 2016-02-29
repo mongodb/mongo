@@ -340,6 +340,10 @@ bool MMAPV1Engine::isDurable() const {
     return getDur().isDurable();
 }
 
+bool MMAPV1Engine::isEphemeral() const {
+    return false;
+}
+
 RecordAccessTracker& MMAPV1Engine::getRecordAccessTracker() {
     return _recordAccessTracker;
 }

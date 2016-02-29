@@ -56,7 +56,8 @@ public:
         auto engine = txn->getClient()->getServiceContext()->getGlobalStorageEngine();
         return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
                            << bool(engine->getSnapshotManager()) << "readOnly"
-                           << storageGlobalParams.readOnly);
+                           << storageGlobalParams.readOnly << "persistent"
+                           << !engine->isEphemeral());
     }
 
 } storageSSS;

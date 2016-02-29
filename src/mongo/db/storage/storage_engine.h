@@ -183,6 +183,11 @@ public:
     virtual bool isDurable() const = 0;
 
     /**
+     * Returns true if the engine does not persist data to disk; false otherwise.
+     */
+    virtual bool isEphemeral() const = 0;
+
+    /**
      * Only MMAPv1 should override this and return true to trigger MMAPv1-specific behavior.
      */
     virtual bool isMmapV1() const {
