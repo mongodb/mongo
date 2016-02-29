@@ -53,6 +53,10 @@ struct DepsTracker {
     std::set<std::string> fields;  // names of needed fields in dotted notation
     bool needWholeDocument;        // if true, ignore fields and assume the whole document is needed
     bool needTextScore;
+
+    bool hasNoRequirements() const {
+        return fields.empty() && !needWholeDocument && !needTextScore;
+    }
 };
 
 /**

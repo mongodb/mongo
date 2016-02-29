@@ -315,8 +315,7 @@ Status prepareExecution(OperationContext* opCtx,
         Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs, &qs);
 
         if (status.isOK()) {
-            if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) &&
-                turnIxscanIntoCount(qs)) {
+            if ((plannerParams.options & QueryPlannerParams::IS_COUNT) && turnIxscanIntoCount(qs)) {
                 LOG(2) << "Using fast count: " << canonicalQuery->toStringShort();
             }
 
@@ -360,7 +359,7 @@ Status prepareExecution(OperationContext* opCtx,
     }
 
     // See if one of our solutions is a fast count hack in disguise.
-    if (plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) {
+    if (plannerParams.options & QueryPlannerParams::IS_COUNT) {
         for (size_t i = 0; i < solutions.size(); ++i) {
             if (turnIxscanIntoCount(solutions[i])) {
                 // Great, we can use solutions[i].  Clean up the other QuerySolution(s).
@@ -1200,7 +1199,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
             txn, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
     }
 
-    const size_t plannerOptions = QueryPlannerParams::PRIVATE_IS_COUNT;
+    const size_t plannerOptions = QueryPlannerParams::IS_COUNT;
     PlanStage* child;
     QuerySolution* rawQuerySolution;
     Status prepStatus = prepareExecution(

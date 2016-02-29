@@ -398,6 +398,14 @@ public:
     /// returns -1 for no limit
     long long getLimit() const;
 
+    /**
+     * If subsequent sources need no information from the cursor, the cursor can simply output empty
+     * documents, avoiding the overhead of converting BSONObjs to Documents.
+     */
+    void shouldProduceEmptyDocs() {
+        _shouldProduceEmptyDocs = true;
+    }
+
 private:
     DocumentSourceCursor(const std::string& ns,
                          const std::shared_ptr<PlanExecutor>& exec,
@@ -411,6 +419,7 @@ private:
     BSONObj _query;
     BSONObj _sort;
     BSONObj _projection;
+    bool _shouldProduceEmptyDocs = false;
     boost::optional<ParsedDeps> _dependencies;
     boost::intrusive_ptr<DocumentSourceLimit> _limit;
     long long _docsAddedToBatches;  // for _limit enforcement

@@ -74,9 +74,9 @@ struct QueryPlannerParams {
         // of the query in the query results.
         KEEP_MUTATIONS = 1 << 5,
 
-        // Nobody should set this above the getExecutor interface.  Internal flag set as a hint
-        // to the planner that the caller is actually the count command.
-        PRIVATE_IS_COUNT = 1 << 6,
+        // Indicate to the planner that the caller is requesting a count operation, possibly through
+        // a count command, or as part of an aggregation pipeline.
+        IS_COUNT = 1 << 6,
 
         // Set this if you want to handle batchSize properly with sort(). If limits on SORT
         // stages are always actually limits, then this should be left off. If they are

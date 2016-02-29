@@ -352,6 +352,12 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
         plannerOpts |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
+    if (deps.hasNoRequirements()) {
+        // If we don't need any fields from the input document, performing a count is faster, and
+        // will output empty documents, which is okay.
+        plannerOpts |= QueryPlannerParams::IS_COUNT;
+    }
+
     // The only way to get a text score is to let the query system handle the projection. In all
     // other cases, unless the query system can do an index-covered projection and avoid going to
     // the raw record at all, it is faster to have ParsedDeps filter the fields we need.
@@ -430,6 +436,10 @@ shared_ptr<PlanExecutor> PipelineD::addCursorSource(const intrusive_ptr<Pipeline
     // Note the query, sort, and projection for explain.
     pSource->setQuery(queryObj);
     pSource->setSort(sortObj);
+
+    if (deps.hasNoRequirements()) {
+        pSource->shouldProduceEmptyDocs();
+    }
 
     if (!projectionObj.isEmpty()) {
         pSource->setProjection(projectionObj, boost::none);

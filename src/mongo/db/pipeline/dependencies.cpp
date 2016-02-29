@@ -53,10 +53,7 @@ BSONObj DepsTracker::toProjection() const {
         return bb.obj();
 
     if (fields.empty()) {
-        // Projection language lacks good a way to say no fields needed. This fakes it.
-        bb.append("_id", 0);
-        bb.append("$noFieldsNeeded", 1);
-        return bb.obj();
+        return BSONObj();
     }
 
     bool needId = false;

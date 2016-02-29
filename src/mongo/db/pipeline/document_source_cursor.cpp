@@ -94,7 +94,9 @@ void DocumentSourceCursor::loadBatch() {
     BSONObj obj;
     PlanExecutor::ExecState state;
     while ((state = _exec->getNext(&obj, NULL)) == PlanExecutor::ADVANCED) {
-        if (_dependencies) {
+        if (_shouldProduceEmptyDocs) {
+            _currentBatch.push_back(Document());
+        } else if (_dependencies) {
             _currentBatch.push_back(_dependencies->extractFields(obj));
         } else {
             _currentBatch.push_back(Document::fromBsonWithMetaData(obj));
