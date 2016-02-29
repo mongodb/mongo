@@ -66,6 +66,8 @@ public:
 
     virtual bool isDurable() const;
 
+    virtual bool isEphemeral() const;
+
     virtual Status closeDatabase(OperationContext* txn, StringData db);
 
     virtual Status dropDatabase(OperationContext* txn, StringData db);
