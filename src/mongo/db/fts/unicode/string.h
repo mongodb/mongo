@@ -45,6 +45,34 @@ namespace unicode {
  */
 class String {
 public:
+    /**
+     * A StringData that may own its own buffer.
+     */
+    class MaybeOwnedStringData : public StringData {
+    public:
+        /**
+         * Makes an empty, unowned string.
+         */
+        MaybeOwnedStringData() = default;
+
+        /**
+         * Makes an owned string.
+         */
+        MaybeOwnedStringData(std::unique_ptr<char[]>&& buffer, const char* endIt)
+            : StringData(buffer.get(), endIt - buffer.get()), _buffer(std::move(buffer)) {}
+
+        /**
+         * Makes an unowned string.
+         */
+        /*implicit*/ MaybeOwnedStringData(StringData str) : StringData(str) {}
+        MaybeOwnedStringData& operator=(StringData str) {
+            return (*this = MaybeOwnedStringData(str));
+        }
+
+    private:
+        std::unique_ptr<char[]> _buffer;
+    };
+
     String() = default;
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -155,13 +183,10 @@ public:
 
     /**
      * Strips diacritics and case-folds the utf8 input string, as needed to support options.
-     *
-     * Returns an owned buffer containing the output utf8 string and an end iterator for the string
-     * (points at the first byte after the string).
      */
-    static std::pair<std::unique_ptr<char[]>, char*> prepForSubstrMatch(StringData utf8,
-                                                                        SubstrMatchOptions options,
-                                                                        CaseFoldMode mode);
+    static MaybeOwnedStringData caseFoldAndStripDiacritics(StringData utf8,
+                                                           SubstrMatchOptions options,
+                                                           CaseFoldMode mode);
 
 private:
     /**

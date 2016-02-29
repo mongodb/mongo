@@ -158,11 +158,13 @@ void String::removeDiacriticsToBuf(String& buffer) const {
     buffer._needsOutputConversion = true;
 }
 
-std::pair<std::unique_ptr<char[]>, char*> String::prepForSubstrMatch(StringData utf8,
-                                                                     SubstrMatchOptions options,
-                                                                     CaseFoldMode mode) {
-    // This function should only be called when casefolding or stripping diacritics.
-    dassert(!(options & kCaseSensitive) || !(options & kDiacriticSensitive));
+String::MaybeOwnedStringData String::caseFoldAndStripDiacritics(StringData utf8,
+                                                                SubstrMatchOptions options,
+                                                                CaseFoldMode mode) {
+    if ((options & kCaseSensitive) && (options & kDiacriticSensitive)) {
+        // No transformation needed. Just return the input data unmodified.
+        return utf8;
+    }
 
     // Allocate space for up to 2x growth which is the worst possible case for stripping diacritics
     // and casefolding. Proof: the only case where 1 byte goes to >1 is 'I' in Turkish going to 2
@@ -286,19 +288,12 @@ bool String::substrMatch(const std::string& str,
         options &= ~kCaseSensitive;
     }
 
-    if ((options & kCaseSensitive) && (options & kDiacriticSensitive)) {
-        // No transformation needed. Just do the search on the input strings.
-        return boost::algorithm::boyer_moore_search(
-                   str.cbegin(), str.cend(), find.cbegin(), find.cend()) != str.cend();
-    }
-
-    auto haystack = prepForSubstrMatch(str, options, cfMode);
-    auto needle = prepForSubstrMatch(find, options, cfMode);
+    auto haystack = caseFoldAndStripDiacritics(str, options, cfMode);
+    auto needle = caseFoldAndStripDiacritics(find, options, cfMode);
 
     // Case sensitive and diacritic sensitive.
     return boost::algorithm::boyer_moore_search(
-               haystack.first.get(), haystack.second, needle.first.get(), needle.second) !=
-        haystack.second;
+               haystack.begin(), haystack.end(), needle.begin(), needle.end()) != haystack.end();
 }
 
 }  // namespace unicode
