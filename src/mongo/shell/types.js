@@ -24,7 +24,7 @@ Date.timeFunc = function(theFunc, numTimes){
     var start = new Date();
     numTimes = numTimes || 1;
     for (var i=0; i<numTimes; i++){
-        theFunc.apply(null, argumentsToArray(arguments).slice(2));
+        theFunc.apply(null, Array.from(arguments).slice(2));
     }
 
     return (new Date()).getTime() - start.getTime();

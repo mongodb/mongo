@@ -1140,7 +1140,7 @@ DBCollection.prototype.isCapped = function(){
 DBCollection.prototype.aggregate = function(pipeline, aggregateOptions) {
     if (!(pipeline instanceof Array)) {
         // support legacy varargs form. (Also handles db.foo.aggregate())
-        pipeline = argumentsToArray(arguments);
+        pipeline = Array.from(arguments);
         aggregateOptions = {};
     } else if (aggregateOptions === undefined) {
         aggregateOptions = {};

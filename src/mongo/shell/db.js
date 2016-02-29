@@ -544,7 +544,7 @@ DB.prototype.eval = function(jsfunction) {
 
     var cmd = { $eval : jsfunction };
     if ( arguments.length > 1 ) {
-        cmd.args = argumentsToArray( arguments ).slice(1);
+        cmd.args = Array.from(arguments).slice(1);
     }
     
     var res = this._dbCommand( cmd );

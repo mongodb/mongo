@@ -78,13 +78,6 @@ setVerboseShell = function( value ) {
     _verboseShell = value; 
 };
 
-argumentsToArray = function( a ){
-    var arr = [];
-    for ( var i=0; i<a.length; i++ )
-        arr[i] = a[i];
-    return arr;
-};
-
 // Formats a simple stacked horizontal histogram bar in the shell.
 // @param data array of the form [[ratio, symbol], ...] where ratio is between 0 and 1 and
 //             symbol is a string of length 1

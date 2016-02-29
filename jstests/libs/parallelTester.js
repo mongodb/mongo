@@ -61,7 +61,7 @@ if (typeof _threadInject != "undefined") {
     };
     
     EventGenerator.dispatch = function() {
-        var args = argumentsToArray( arguments );
+        var args = Array.from(arguments);
         var me = args.shift();
         var collectionName = args.shift();
         var host = args.shift();
@@ -211,7 +211,7 @@ if (typeof _threadInject != "undefined") {
     // runs a set of test files
     // first argument is an identifier for this tester, remaining arguments are file names
     ParallelTester.fileTester = function() {
-        var args = argumentsToArray( arguments );
+        var args = Array.from(arguments);
         var suite = args.shift();
         args.forEach(
             function( x ) {

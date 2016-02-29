@@ -103,7 +103,7 @@ var Explainable = (function() {
         this.aggregate = function(pipeline, extraOpts) {
             if (!(pipeline instanceof Array)) {
                 // support legacy varargs form. (Also handles db.foo.aggregate())
-                pipeline = argumentsToArray(arguments);
+                pipeline = Array.from(arguments);
                 extraOpts = {};
             }
 
