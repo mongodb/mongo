@@ -84,6 +84,10 @@ public:
         return true;
     }
 
+    virtual bool isEphemeral() const {
+        return true;
+    }
+
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident);
 
     virtual Status repairIdent(OperationContext* opCtx, StringData ident) {

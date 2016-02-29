@@ -113,11 +113,10 @@ public:
     virtual bool isDurable() const = 0;
 
     /**
-     * See StorageEngine::isEphemeral for details
+     * Returns true if the KVEngine is ephemeral -- that is, it is NOT persistent and all data is
+     * lost after shutdown. Otherwise, returns false.
      */
-    virtual bool isEphemeral() {
-        return false;
-    }
+    virtual bool isEphemeral() const = 0;
 
     /**
      * This must not change over the lifetime of the engine.

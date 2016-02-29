@@ -70,7 +70,7 @@ public:
         return _durable;
     }
 
-    virtual bool isEphemeral() {
+    virtual bool isEphemeral() const {
         return _ephemeral;
     }
 
