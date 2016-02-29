@@ -25,7 +25,6 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
 	uint64_t oldest_id, saved_snap_min;
 	uint32_t flags;
-	bool evict_reset;
 
 	btree = S2BT(session);
 	walk = NULL;
@@ -123,9 +122,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 */
 		WT_PUBLISH(btree->checkpointing, WT_CKPT_PREPARE);
 
-		WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
-		if (evict_reset)
-			__wt_evict_file_exclusive_off(session);
+		WT_ERR(__wt_evict_file_exclusive_on(session));
+		__wt_evict_file_exclusive_off(session);
 
 		WT_PUBLISH(btree->checkpointing, WT_CKPT_RUNNING);
 

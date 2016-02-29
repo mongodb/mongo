@@ -439,7 +439,8 @@ __wt_bt_rebalance(WT_SESSION_IMPL *session, const char *cfg[])
 	 * cache is the root page, and that cannot be evicted; however, this way
 	 * eviction ignores the tree entirely.)
 	 */
-	WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
+	WT_ERR(__wt_evict_file_exclusive_on(session));
+	evict_reset = true;
 
 	/* Recursively walk the tree. */
 	switch (rs->type) {
