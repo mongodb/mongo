@@ -43,6 +43,7 @@
 #include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 
@@ -102,6 +103,20 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
             rpc::negotiate(op->connection().serverProtocols(), op->connection().clientProtocols());
 
         if (!negotiatedProtocol.isOK()) {
+            // Add relatively verbose logging here, since this should not happen unless we are
+            // mongos and we try to connect to a node that doesn't support OP_COMMAND.
+            warning() << "failed to negotiate protocol with remote host: " << op->request().target;
+            warning() << "request was: " << op->request().cmdObj;
+            warning() << "response was: " << commandReply.data;
+
+            auto clientProtos = rpc::toString(op->connection().clientProtocols());
+            if (clientProtos.isOK()) {
+                warning() << "our (client) supported protocols: " << clientProtos.getValue();
+            }
+            auto serverProtos = rpc::toString(op->connection().serverProtocols());
+            if (serverProtos.isOK()) {
+                warning() << "remote server's supported protocols:" << serverProtos.getValue();
+            }
             return _completeOperation(op, negotiatedProtocol.getStatus());
         }
 
