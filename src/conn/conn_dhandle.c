@@ -129,18 +129,19 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	bool marked_dead, no_schema_lock;
+	bool evict_reset, marked_dead, no_schema_lock;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 	dhandle = session->dhandle;
-	marked_dead = false;
+	evict_reset = marked_dead = false;
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
 
 	/* Turn off eviction. */
 	WT_RET(__wt_evict_file_exclusive_on(session));
+	evict_reset = true;
 
 	/*
 	 * If we don't already have the schema lock, make it an error to try
@@ -185,11 +186,16 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 			WT_ERR(__wt_checkpoint_close(session, final));
 	}
 
+	/*
+	 * Once the underlying btree handle is closed, don't turn eviction back
+	 * on, that function operates on the underlying btree handle.
+	 */
 	WT_TRET(__wt_btree_close(session));
+	evict_reset = false;
 
 	/*
-	 * If we marked a handle dead it will be closed by sweep, via
-	 * another call to sync and close.
+	 * If we marked a handle dead it will be closed by sweep, via another
+	 * call to sync and close.
 	 */
 	if (!marked_dead) {
 		F_CLR(dhandle, WT_DHANDLE_OPEN);
@@ -205,7 +211,8 @@ err:	__wt_spin_unlock(session, &dhandle->close_lock);
 	if (no_schema_lock)
 		F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);
 
-	__wt_evict_file_exclusive_off(session);
+	if (evict_reset)
+		__wt_evict_file_exclusive_off(session);
 
 	return (ret);
 }
