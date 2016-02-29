@@ -52,14 +52,6 @@ namespace {
 // implementation.
 const std::string filler(32, 'x');
 
-/**
- * Converts return from prepForSubstrMatch to a StringData that is only useful in the current
- * expression.
- */
-StringData toStringData(std::pair<std::unique_ptr<char[]>, char*> result) {
-    return {result.first.get(), size_t(result.second - result.first.get())};
-}
-
 auto kDiacriticSensitive = String::kDiacriticSensitive;
 auto kCaseSensitive = String::kCaseSensitive;
 
@@ -69,10 +61,10 @@ auto kNormal = CaseFoldMode::kNormal;
 
 
 // Macro to preserve line numbers and arguments in error messages.
-#define TEST_PREP_FOR_SUBSTR_MATCH(expected, input, options, caseFoldMode)                       \
-    ASSERT_EQ(expected, toStringData(String::prepForSubstrMatch(input, options, caseFoldMode))); \
-    ASSERT_EQ(expected + filler,                                                                 \
-              toStringData(String::prepForSubstrMatch(input + filler, options, caseFoldMode)))
+#define TEST_CASE_FOLD_AND_STRIP_DIACRITICS(expected, input, options, caseFoldMode)        \
+    ASSERT_EQ(expected, String::caseFoldAndStripDiacritics(input, options, caseFoldMode)); \
+    ASSERT_EQ(expected + filler,                                                           \
+              String::caseFoldAndStripDiacritics(input + filler, options, caseFoldMode))
 
 TEST(UnicodeString, RemoveDiacritics) {
     // Test all ascii chars.
@@ -82,7 +74,7 @@ TEST(UnicodeString, RemoveDiacritics) {
         if (ch) {  // String's constructor doesn't handle embedded NUL bytes.
             ASSERT_EQUALS(output, String(input).removeDiacritics().toString());
         }
-        TEST_PREP_FOR_SUBSTR_MATCH(output, input, kCaseSensitive, kNormal);
+        TEST_CASE_FOLD_AND_STRIP_DIACRITICS(output, input, kCaseSensitive, kNormal);
     }
 
     // NFC Normalized Text.
@@ -94,8 +86,9 @@ TEST(UnicodeString, RemoveDiacritics) {
     ASSERT_EQUALS(UTF8("¿CUANTOS ANOS TIENES TU?"), String(test1).removeDiacritics().toString());
     ASSERT_EQUALS(UTF8("Cafe"), String(test2).removeDiacritics().toString());
 
-    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("¿CUANTOS ANOS TIENES TU?"), test1, kCaseSensitive, kNormal);
-    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("Cafe"), test2, kCaseSensitive, kNormal);
+    TEST_CASE_FOLD_AND_STRIP_DIACRITICS(
+        UTF8("¿CUANTOS ANOS TIENES TU?"), test1, kCaseSensitive, kNormal);
+    TEST_CASE_FOLD_AND_STRIP_DIACRITICS(UTF8("Cafe"), test2, kCaseSensitive, kNormal);
 }
 
 TEST(UnicodeString, CaseFolding) {
@@ -106,7 +99,7 @@ TEST(UnicodeString, CaseFolding) {
         if (ch) {  // String's constructor doesn't handle embedded NUL bytes.
             ASSERT_EQUALS(lower, String(upper).toLower().toString());
         }
-        TEST_PREP_FOR_SUBSTR_MATCH(lower, upper, kDiacriticSensitive, kNormal);
+        TEST_CASE_FOLD_AND_STRIP_DIACRITICS(lower, upper, kDiacriticSensitive, kNormal);
     }
 
     const char test1[] = UTF8("СКОЛЬКО ТЕБЕ ЛЕТ?");
@@ -115,8 +108,9 @@ TEST(UnicodeString, CaseFolding) {
     ASSERT_EQUALS(UTF8("сколько тебе лет?"), String(test1).toLower().toString());
     ASSERT_EQUALS(UTF8("¿cuántos años tienes tú?"), String(test2).toLower().toString());
 
-    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("сколько тебе лет?"), test1, kDiacriticSensitive, kNormal);
-    TEST_PREP_FOR_SUBSTR_MATCH(
+    TEST_CASE_FOLD_AND_STRIP_DIACRITICS(
+        UTF8("сколько тебе лет?"), test1, kDiacriticSensitive, kNormal);
+    TEST_CASE_FOLD_AND_STRIP_DIACRITICS(
         UTF8("¿cuántos años tienes tú?"), test2, kDiacriticSensitive, kNormal);
 }
 
@@ -129,8 +123,10 @@ TEST(UnicodeString, CaseFoldingTurkish) {
     ASSERT_EQUALS(UTF8("kac yasindasiniz"),
                   String(test2).toLower(CaseFoldMode::kTurkish).toString());
 
-    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("kac yasındasınız"), test1, kDiacriticSensitive, kTurkish);
-    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("kac yasindasiniz"), test2, kDiacriticSensitive, kTurkish);
+    TEST_CASE_FOLD_AND_STRIP_DIACRITICS(
+        UTF8("kac yasındasınız"), test1, kDiacriticSensitive, kTurkish);
+    TEST_CASE_FOLD_AND_STRIP_DIACRITICS(
+        UTF8("kac yasindasiniz"), test2, kDiacriticSensitive, kTurkish);
 }
 
 TEST(UnicodeString, CaseFoldingAndRemoveDiacritics) {
@@ -147,9 +143,9 @@ TEST(UnicodeString, CaseFoldingAndRemoveDiacritics) {
                   String(test2).toLower().removeDiacritics().toString());
     ASSERT_EQUALS(UTF8("cafe"), String(test3).toLower().removeDiacritics().toString());
 
-    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("ποσο χρονων εισαι?"), test1, 0, kNormal);
-    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("¿cuantos anos tienes tu?"), test2, 0, kNormal);
-    TEST_PREP_FOR_SUBSTR_MATCH(UTF8("cafe"), test3, 0, kNormal);
+    TEST_CASE_FOLD_AND_STRIP_DIACRITICS(UTF8("ποσο χρονων εισαι?"), test1, 0, kNormal);
+    TEST_CASE_FOLD_AND_STRIP_DIACRITICS(UTF8("¿cuantos anos tienes tu?"), test2, 0, kNormal);
+    TEST_CASE_FOLD_AND_STRIP_DIACRITICS(UTF8("cafe"), test3, 0, kNormal);
 }
 
 TEST(UnicodeString, SubstringMatch) {
@@ -218,13 +214,13 @@ TEST(UnicodeString, BadUTF8) {
     ASSERT_THROWS(String test3(invalid3), AssertionException);
     ASSERT_THROWS(String test4(invalid4), AssertionException);
 
-    // preForSubstrMatch doesn't make any guarantees about behavior when fed invalid utf8.
+    // caseFoldAndStripDiacritics doesn't make any guarantees about behavior when fed invalid utf8.
     // These calls are to ensure that they don't trigger any faults in sanitizing builds.
-    String::prepForSubstrMatch(invalid1, 0, kNormal);
-    String::prepForSubstrMatch(invalid2, 0, kNormal);
-    String::prepForSubstrMatch(invalid3, 0, kNormal);
+    String::caseFoldAndStripDiacritics(invalid1, 0, kNormal);
+    String::caseFoldAndStripDiacritics(invalid2, 0, kNormal);
+    String::caseFoldAndStripDiacritics(invalid3, 0, kNormal);
 
-    ASSERT_THROWS(String::prepForSubstrMatch(invalid4, 0, kNormal), AssertionException);
+    ASSERT_THROWS(String::caseFoldAndStripDiacritics(invalid4, 0, kNormal), AssertionException);
 }
 
 TEST(UnicodeString, UTF32ToUTF8) {
