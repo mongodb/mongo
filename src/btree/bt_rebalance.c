@@ -412,6 +412,7 @@ __wt_bt_rebalance(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	btree = S2BT(session);
+	evict_reset = false;
 
 	/*
 	 * If the tree has never been written to disk, we're done, rebalance
@@ -470,7 +471,10 @@ __wt_bt_rebalance(WT_SESSION_IMPL *session, const char *cfg[])
 	btree->root.page = rs->root;
 	rs->root = NULL;
 
-err:	/* Discard any leftover root page we created. */
+err:	if (evict_reset)
+	    __wt_evict_file_exclusive_off(session);
+
+	/* Discard any leftover root page we created. */
 	if (rs->root != NULL) {
 		__wt_page_modify_clear(session, rs->root);
 		__wt_page_out(session, &rs->root);
