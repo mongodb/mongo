@@ -106,7 +106,7 @@ public class ex_schema {
             home = null;
 
         try {
-            conn = wiredtiger.open(home, "create");
+            conn = wiredtiger.open(home, "create,statistics=(fast)");
             session = conn.open_session(null);
         } catch (WiredTigerException wte) {
             System.err.println("WiredTigerException: " + wte);
