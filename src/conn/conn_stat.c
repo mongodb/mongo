@@ -106,10 +106,6 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	 * If any statistics logging is done, this must not be a read-only
 	 * connection.
 	 */
-	if (F_ISSET(conn, WT_CONN_READONLY))
-		WT_RET_MSG(session, EINVAL,
-		    "Read-only configuration incompatible with statistics "
-		    "logging");
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
 	WT_RET(__wt_config_subinit(session, &objectconf, &cval));
 	for (cnt = 0; (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
