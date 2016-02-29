@@ -477,6 +477,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
+	WT_STAT_FAST_CONN_SET(session, cache_eviction_aggressive_set, 0);
 	/* Clear previous state. */
 	cache->state = 0;
 
@@ -534,8 +535,11 @@ __evict_update_work(WT_SESSION_IMPL *session)
 
 	return (false);
 
-done:	if (F_ISSET(cache, WT_CACHE_STUCK))
+done:	if (F_ISSET(cache, WT_CACHE_STUCK)) {
+		WT_STAT_FAST_CONN_SET(session,
+		    cache_eviction_aggressive_set, 1);
 		FLD_SET(cache->state, WT_EVICT_PASS_AGGRESSIVE);
+	}
 	return (true);
 }
 
@@ -594,8 +598,11 @@ __evict_pass(WT_SESSION_IMPL *session)
 		if (!__evict_update_work(session))
 			break;
 
-		if (loop > 10)
+		if (loop > 10) {
+			WT_STAT_FAST_CONN_SET(session,
+			    cache_eviction_aggressive_set, 1);
 			FLD_SET(cache->state, WT_EVICT_PASS_AGGRESSIVE);
+		}
 
 		/*
 		 * Start a worker if we have capacity and we haven't reached
@@ -1267,7 +1274,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 
 		/* Pages we no longer need (clean or dirty), are found money. */
 		if (__wt_page_is_empty(page) ||
-		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
+		    page->read_gen == WT_READGEN_OLDEST)
 			goto fast;
 
 		/* Skip clean pages if appropriate. */
@@ -1280,14 +1288,13 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 * eviction, skip anything that isn't marked.
 		 */
 		if (FLD_ISSET(cache->state, WT_EVICT_PASS_WOULD_BLOCK) &&
-		    page->memory_footprint < btree->splitmempage &&
-		    page->read_gen != WT_READGEN_OLDEST)
+		    page->memory_footprint < btree->splitmempage)
 			continue;
 
 		/* Limit internal pages to 50% unless we get aggressive. */
 		if (WT_PAGE_IS_INTERNAL(page) &&
-		    ++internal_pages > WT_EVICT_WALK_PER_FILE / 2 &&
-		    !FLD_ISSET(cache->state, WT_EVICT_PASS_AGGRESSIVE))
+		    !FLD_ISSET(cache->state, WT_EVICT_PASS_AGGRESSIVE) &&
+		    internal_pages >= (int)(evict - start) / 2)
 			continue;
 
 		/*
@@ -1331,6 +1338,9 @@ fast:		/* If the page can't be evicted, give up. */
 		WT_ASSERT(session, evict->ref == NULL);
 		__evict_init_candidate(session, evict, ref);
 		++evict;
+
+		if (WT_PAGE_IS_INTERNAL(page))
+		    ++internal_pages;
 
 		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "select: %p, size %" PRIu64, page, page->memory_footprint));
@@ -1392,8 +1402,9 @@ __evict_get_ref(
 	}
 
 	/*
-	 * The eviction server only tries to evict half of the pages before
-	 * looking for more.
+	 * Only evict half of the pages before looking for more. The remainder
+	 * are left to eviction workers (if configured), or application threads
+	 * if necessary.
 	 */
 	candidates = cache->evict_candidates;
 	if (is_server && candidates > 1)

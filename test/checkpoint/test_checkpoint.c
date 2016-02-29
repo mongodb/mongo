@@ -41,6 +41,8 @@ static int  wt_shutdown(void);
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+void (*custom_die)(void) = NULL;
+
 int
 main(int argc, char *argv[])
 {

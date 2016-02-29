@@ -171,11 +171,9 @@ static inline void
 reverse_scan_op(
     SHARED_CONFIG *cfg, WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
-	uint64_t i;
+	uint64_t i, initial_key_range, prev_key, this_key;
 	int ret;
 	char *strkey;
-	uint64_t initial_key_range;
-	uint64_t prev_key, this_key;
 
 	WT_UNUSED(session);
 	WT_UNUSED(s);
@@ -184,7 +182,8 @@ reverse_scan_op(
 	prev_key = this_key = 0;
 
 	/* Reset the cursor */
-	cursor->reset(cursor);
+	if ((ret = cursor->reset(cursor)) != 0)
+		testutil_die(ret, "cursor.reset");
 
 	/* Save the key range. */
 	initial_key_range = cfg->key_range - cfg->append_inserters;
@@ -197,10 +196,13 @@ reverse_scan_op(
 		}
 
 		if (cfg->ftype == ROW) {
-			cursor->get_key(cursor, &strkey);
+			if ((ret = cursor->get_key(cursor, &strkey)) != 0)
+				testutil_die(ret, "cursor.get_key");
 			this_key = (uint64_t)atol(strkey);
 		} else
-			cursor->get_key(cursor, (uint64_t*)&this_key);
+			if ((ret = cursor->get_key(
+			    cursor, (uint64_t *)&this_key)) != 0)
+				testutil_die(ret, "cursor.get_key");
 
 		if (i == 0 && this_key < initial_key_range)
 			testutil_die(ret,
@@ -227,17 +229,19 @@ reverse_scan(void *arg)
 	SHARED_CONFIG *cfg;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	int id, ret;
-	char tid[128];
+	uintmax_t id;
 	uint64_t i;
+	int ret;
+	char tid[128];
 
-	id = (int)(uintptr_t)arg;
+	id = (uintmax_t)arg;
 	s = &run_info[id];
 	cfg = s->cfg;
 	__wt_thread_id(tid, sizeof(tid));
 	__wt_random_init(&s->rnd);
 
-	printf(" reverse scan thread %2d starting: tid: %s, file: %s\n",
+	printf(" reverse scan thread %2" PRIuMAX
+	    " starting: tid: %s, file: %s\n",
 	    id, tid, s->name);
 
 	__wt_yield();		/* Get all the threads created. */
@@ -254,7 +258,8 @@ reverse_scan(void *arg)
 	if ((ret = session->close(session, NULL)) != 0)
 		testutil_die(ret, "session.close");
 
-	printf(" reverse scan thread %2d stopping: tid: %s, file: %s\n",
+	printf(" reverse scan thread %2" PRIuMAX
+	    " stopping: tid: %s, file: %s\n",
 	    id, tid, s->name);
 
 	/* Notify all other threads to finish once the first thread is done */
@@ -283,7 +288,7 @@ append_insert_op(
 	keyno = __wt_atomic_add64(&cfg->key_range, 1);
 	if (cfg->ftype == ROW) {
 		snprintf(keybuf, sizeof(keybuf), "%016u", (u_int)keyno);
-		cursor->set_key(cursor, &keybuf);
+		cursor->set_key(cursor, keybuf);
 	} else
 		cursor->set_key(cursor, (uint32_t)keyno);
 
@@ -311,17 +316,18 @@ append_insert(void *arg)
 	SHARED_CONFIG *cfg;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
+	uintmax_t id;
 	uint64_t i;
-	int id, ret;
+	int ret;
 	char tid[128];
 
-	id = (int)(uintptr_t)arg;
+	id = (uintmax_t)arg;
 	s = &run_info[id];
 	cfg = s->cfg;
 	__wt_thread_id(tid, sizeof(tid));
 	__wt_random_init(&s->rnd);
 
-	printf("write thread %2d starting: tid: %s, file: %s\n",
+	printf("write thread %2" PRIuMAX " starting: tid: %s, file: %s\n",
 	    id, tid, s->name);
 
 	__wt_yield();		/* Get all the threads created. */
@@ -337,7 +343,7 @@ append_insert(void *arg)
 	if ((ret = session->close(session, NULL)) != 0)
 		testutil_die(ret, "session.close");
 
-	printf("write thread %2d stopping: tid: %s, file: %s\n",
+	printf("write thread %2" PRIuMAX " stopping: tid: %s, file: %s\n",
 	    id, tid, s->name);
 
 	/* Notify all other threads to finish once the first thread is done */

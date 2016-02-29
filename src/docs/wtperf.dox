@@ -212,6 +212,10 @@ insert operations
 generate random content for the value
 @par read_range (unsigned int, default=0)
 scan a range of keys after each search
+@par readonly (boolean, default=false)
+reopen the connection between populate and workload phases in readonly
+mode.  Requires reopen_connection turned on (default).  Requires that
+read be the only workload specified
 @par reopen_connection (boolean, default=true)
 close and reopen the connection between populate and workload phases
 @par report_interval (unsigned int, default=2)

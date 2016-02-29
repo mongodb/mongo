@@ -96,14 +96,13 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_REF *ref;
-	bool block_manager_begin, skip;
+	bool skip;
 
 	WT_UNUSED(cfg);
 
 	btree = S2BT(session);
 	bm = btree->bm;
 	ref = NULL;
-	block_manager_begin = false;
 
 	WT_STAT_FAST_DATA_INCR(session, session_compact);
 
@@ -123,23 +122,11 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 * We need to ensure we don't race with page reconciliation as it's
 	 * writing the page modify information.
 	 *
-	 * There are three ways we call reconciliation: checkpoints, threads
-	 * writing leaf pages (usually in preparation for a checkpoint or if
-	 * closing a file), and eviction.
-	 *
-	 * We're holding the schema lock which serializes with checkpoints.
-	 */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
-
-	/*
-	 * Get the tree handle's flush lock which blocks threads writing leaf
-	 * pages.
+	 * There are two ways we call reconciliation: checkpoints and eviction.
+	 * Get the tree's flush lock which blocks threads writing pages for
+	 * checkpoints.
 	 */
 	__wt_spin_lock(session, &btree->flush_lock);
-
-	/* Start compaction. */
-	WT_ERR(bm->compact_start(bm, session));
-	block_manager_begin = true;
 
 	/* Walk the tree reviewing pages to see if they should be re-written. */
 	for (;;) {
@@ -169,9 +156,6 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 
 err:	if (ref != NULL)
 		WT_TRET(__wt_page_release(session, ref, 0));
-
-	if (block_manager_begin)
-		WT_TRET(bm->compact_end(bm, session));
 
 	/* Unblock threads writing leaf pages. */
 	__wt_spin_unlock(session, &btree->flush_lock);

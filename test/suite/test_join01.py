@@ -33,7 +33,6 @@ from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
 #    Join operations
 # Basic tests for join
 class test_join01(wttest.WiredTigerTestCase):
-    table_name1 = 'test_join01'
     nentries = 100
 
     scenarios = [
@@ -342,11 +341,12 @@ class test_join01(wttest.WiredTigerTestCase):
             '/index cursor is being used in a join/')
 
         # Only a small number of operations allowed on a join cursor
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: jc.search())
+        msg = "/not supported/"
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: jc.search(), msg)
 
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: jc.prev())
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: jc.prev(), msg)
 
         self.assertEquals(jc.next(), 0)
         self.assertEquals(jc.next(), wiredtiger.WT_NOTFOUND)
@@ -390,6 +390,7 @@ class test_join01(wttest.WiredTigerTestCase):
     def test_cursor_close2(self):
         self.cursor_close_common(False)
 
+    # test statistics using the framework set up for this test
     def test_stats(self):
         bloomcfg1000 = ',strategy=bloom,count=1000'
         bloomcfg10 = ',strategy=bloom,count=10'
@@ -398,6 +399,40 @@ class test_join01(wttest.WiredTigerTestCase):
         # Intentially run with an underconfigured Bloom filter,
         # statistics should pick up some false positives.
         self.join_common(bloomcfg10, bloomcfg10, False, True)
+
+    # test statistics with a simple one index join cursor
+    def test_simple_stats(self):
+        self.session.create("table:join01b",
+                       "key_format=i,value_format=i,columns=(k,v)")
+        self.session.create("index:join01b:index", "columns=(v)")
+
+        cursor = self.session.open_cursor("table:join01b", None, None)
+        cursor[1] = 11
+        cursor[2] = 12
+        cursor[3] = 13
+        cursor.close()
+
+        cursor = self.session.open_cursor("index:join01b:index", None, None)
+        cursor.set_key(11)
+        cursor.search()
+
+        jcursor = self.session.open_cursor("join:table:join01b", None, None)
+        self.session.join(jcursor, cursor, "compare=gt")
+
+        while jcursor.next() == 0:
+            [k] = jcursor.get_keys()
+            [v] = jcursor.get_values()
+
+        statcur = self.session.open_cursor("statistics:join", jcursor, None)
+        found = False
+        while statcur.next() == 0:
+            [desc, pvalue, value] = statcur.get_values()
+            #self.tty(str(desc) + "=" + str(pvalue))
+            found = True
+        self.assertEquals(found, True)
+
+        jcursor.close()
+        cursor.close()
 
 
 if __name__ == '__main__':

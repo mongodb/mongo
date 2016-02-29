@@ -134,9 +134,11 @@ config_free(CONFIG *cfg)
 	}
 
 	cleanup_truncate_config(cfg);
-	free(cfg->ckptthreads);
-	free(cfg->popthreads);
 	free(cfg->base_uri);
+	free(cfg->ckptthreads);
+	free(cfg->partial_config);
+	free(cfg->popthreads);
+	free(cfg->reopen_config);
 	free(cfg->workers);
 	free(cfg->workload);
 }
@@ -157,13 +159,19 @@ config_compress(CONFIG *cfg)
 		cfg->compress_ext = NULL;
 		cfg->compress_table = NULL;
 	} else if (strcmp(s, "lz4") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_LZ4
 		cfg->compress_ext = LZ4_EXT;
+#endif
 		cfg->compress_table = LZ4_BLK;
 	} else if (strcmp(s, "snappy") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_SNAPPY
 		cfg->compress_ext = SNAPPY_EXT;
+#endif
 		cfg->compress_table = SNAPPY_BLK;
 	} else if (strcmp(s, "zlib") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_ZLIB
 		cfg->compress_ext = ZLIB_EXT;
+#endif
 		cfg->compress_table = ZLIB_BLK;
 	} else {
 		fprintf(stderr,
@@ -634,6 +642,9 @@ config_opt_str(CONFIG *cfg, const char *name, const char *value)
 int
 config_sanity(CONFIG *cfg)
 {
+	WORKLOAD *workp;
+	u_int i;
+
 	/* Various intervals should be less than the run-time. */
 	if (cfg->run_time > 0 &&
 	    ((cfg->checkpoint_threads != 0 &&
@@ -660,6 +671,17 @@ config_sanity(CONFIG *cfg)
 		    "Invalid pareto distribution - should be a percentage\n");
 		return (EINVAL);
 	}
+
+	if (cfg->readonly && cfg->workload != NULL)
+		for (i = 0, workp = cfg->workload;
+		    i < cfg->workload_cnt; ++i, ++workp)
+			if (workp->insert != 0 || workp->update != 0 ||
+			    workp->truncate != 0) {
+				fprintf(stderr,
+				    "Invalid workload: insert, update or "
+				    "truncate specified with readonly\n");
+				return (EINVAL);
+			}
 	return (0);
 }
 

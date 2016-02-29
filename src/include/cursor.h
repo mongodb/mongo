@@ -31,22 +31,22 @@
 	NULL,				/* uri */			\
 	NULL,				/* key_format */		\
 	NULL,				/* value_format */		\
-	(int (*)(WT_CURSOR *, ...))(get_key),				\
-	(int (*)(WT_CURSOR *, ...))(get_value),				\
-	(void (*)(WT_CURSOR *, ...))(set_key),				\
-	(void (*)(WT_CURSOR *, ...))(set_value),			\
-	(int (*)(WT_CURSOR *, WT_CURSOR *, int *))(compare),		\
-	(int (*)(WT_CURSOR *, WT_CURSOR *, int *))(equals),		\
+	get_key,							\
+	get_value,							\
+	set_key,							\
+	set_value,							\
+	compare,							\
+	equals,								\
 	next,								\
 	prev,								\
 	reset,								\
 	search,								\
-	(int (*)(WT_CURSOR *, int *))(search_near),			\
+	search_near,							\
 	insert,								\
 	update,								\
 	remove,								\
 	close,								\
-	(int (*)(WT_CURSOR *, const char *))(reconfigure),		\
+	reconfigure,							\
 	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
 	0,				/* recno key */			\
 	{ 0 },				/* recno raw buffer */		\

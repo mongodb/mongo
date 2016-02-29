@@ -15,24 +15,21 @@ static int __session_dhandle_sweep(WT_SESSION_IMPL *);
  *	Add a handle to the session's cache.
  */
 static int
-__session_add_dhandle(
-    WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE **dhandle_cachep)
+__session_add_dhandle(WT_SESSION_IMPL *session)
 {
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	uint64_t bucket;
 
+	/* Allocate a handle cache entry. */
 	WT_RET(__wt_calloc_one(session, &dhandle_cache));
+
 	dhandle_cache->dhandle = session->dhandle;
 
 	bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 	TAILQ_INSERT_HEAD(&session->dhandles, dhandle_cache, q);
 	TAILQ_INSERT_HEAD(&session->dhhash[bucket], dhandle_cache, hashq);
 
-	if (dhandle_cachep != NULL)
-		*dhandle_cachep = dhandle_cache;
-
-	/* Sweep the handle list to remove any dead handles. */
-	return (__session_dhandle_sweep(session));
+	return (0);
 }
 
 /*
@@ -450,14 +447,23 @@ __session_get_dhandle(
 		return (0);
 	}
 
+	/* Sweep the handle list to remove any dead handles. */
+	WT_RET(__session_dhandle_sweep(session));
+
 	/*
 	 * We didn't find a match in the session cache, search the shared
 	 * handle list and cache the handle we find.
 	 */
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __session_find_shared_dhandle(session, uri, checkpoint));
-	if (ret == 0)
-		ret = __session_add_dhandle(session, NULL);
+	WT_RET(ret);
+
+	/*
+	 * Fixup the reference count on failure (we incremented the reference
+	 * count while holding the handle-list lock).
+	 */
+	if ((ret = __session_add_dhandle(session)) != 0)
+		(void)__wt_atomic_sub32(&session->dhandle->session_ref, 1);
 
 	return (ret);
 }

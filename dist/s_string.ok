@@ -107,11 +107,13 @@ FALLTHROUGH
 FH
 FLD
 FLSv
+FLv
 FNV
 FORALL
 FOREACH
 FULLFSYNC
 FindFirstFile
+Fixup
 Fk
 FlushFileBuffers
 Fprintf
@@ -211,6 +213,7 @@ MySecret
 NEEDKEY
 NEEDVALUE
 NOLL
+NOLOCK
 NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
@@ -244,6 +247,7 @@ Preload
 Prepend
 Qsort
 RCS
+RDNOLOCK
 RECNO
 REF's
 REFs
@@ -256,6 +260,7 @@ RNG
 RPC
 RUNDIR
 Radu
+Readonly
 Rebalance
 RedHat
 Redistributions
@@ -329,6 +334,7 @@ VxWorks
 WAL
 WIREDTIGER
 WRLSN
+WRNOLOCK
 WakeAllConditionVariable
 Wconditional
 WeakHashLen
@@ -431,6 +437,8 @@ cfg
 cfkos
 change's
 changelog
+chdir
+checkfmt
 checkpointed
 checkpointer
 checkpointing
@@ -438,6 +446,7 @@ checksum
 checksums
 children's
 chk
+chmod
 chongo
 cip
 cjoin
@@ -502,6 +511,7 @@ datasets
 datasource
 datastore
 dbc
+dbs
 dcalloc
 decile
 deciles
@@ -671,6 +681,7 @@ inline
 inmem
 insertK
 insertV
+inserters
 instantiation
 intl
 intnum
@@ -717,6 +728,7 @@ libwiredtiger
 llll
 llu
 loadtext
+localTime
 localtime
 logf
 logmgr
@@ -795,6 +807,7 @@ nhex
 nlpo
 nocase
 nocrypto
+nolock
 nonliteral
 noop
 nop
@@ -872,6 +885,7 @@ rS
 rb
 rbrace
 rbracket
+rdonly
 rduppo
 readlock
 readonly
@@ -901,6 +915,7 @@ rng
 rocksdb
 rotN
 rotn
+rp
 rpc
 run's
 runtime
@@ -1057,9 +1072,12 @@ vsize
 vsnprintf
 vtype
 vunpack
+vw
+waitpid
 walk's
 warmup
 wb
+wiredTiger
 wiredtiger
 workFactor
 wrapup
