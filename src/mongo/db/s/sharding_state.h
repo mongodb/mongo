@@ -47,6 +47,7 @@ class BSONObjBuilder;
 struct ChunkVersion;
 class Client;
 class CollectionMetadata;
+class CollectionShardingState;
 class ConnectionString;
 class OperationContext;
 class ServiceContext;
@@ -123,6 +124,8 @@ public:
      * match what was previously installed.
      */
     void setShardName(const std::string& shardName);
+
+    CollectionShardingState* getNS(const std::string& ns);
 
     /**
      * Clears the collection metadata cache after step down.
@@ -316,8 +319,9 @@ public:
     void resetMetadata(const std::string& ns);
 
 private:
-    // Map from a namespace into the metadata we need for each collection on this shard
-    typedef std::map<std::string, std::shared_ptr<CollectionMetadata>> CollectionMetadataMap;
+    // Map from a namespace into the sharding state for each collection we have
+    typedef std::map<std::string, std::unique_ptr<CollectionShardingState>>
+        CollectionShardingStateMap;
 
     // Progress of the sharding state initialization
     enum class InitializationState : uint32_t {
@@ -411,8 +415,10 @@ private:
     // Protects from hitting the config server from too many threads at once
     TicketHolder _configServerTickets;
 
-    // Cache of collection metadata on this shard
-    CollectionMetadataMap _collMetadata;
+    // Cache of collection metadata on this shard. It is not safe to look-up values from this map
+    // without holding some form of collection lock. It is only safe to add/remove values when
+    // holding X lock on the respective namespace.
+    CollectionShardingStateMap _collections;
 };
 
 }  // namespace mongo

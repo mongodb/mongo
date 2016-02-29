@@ -36,6 +36,7 @@ env.Library(
     target='sharding',
     source=[
         'chunk_move_write_concern_options.cpp',
+        'collection_sharding_state.cpp',
         'migration_destination_manager.cpp',
         'migration_impl.cpp',
         'migration_source_manager.cpp',
