@@ -119,12 +119,11 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 		return (0);
 
 	/*
-	 * LSM sets the no-eviction flag when holding the LSM tree lock,
-	 * in that case, or when holding the schema lock, we don't want to
-	 * highjack the thread for eviction.
+	 * LSM sets the no-eviction flag when holding the LSM tree lock, in that
+	 * case, or when holding the schema lock, we don't want to highjack the
+	 * thread for eviction.
 	 */
-	if (F_ISSET(session,
-	    WT_SESSION_NO_EVICTION | WT_SESSION_LOCKED_SCHEMA))
+	if (F_ISSET(session, WT_SESSION_NO_EVICTION | WT_SESSION_LOCKED_SCHEMA))
 		return (0);
 
 	return (1);
@@ -224,11 +223,11 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 		return (0);
 
 	/*
-	 * Threads operating on trees that cannot be evicted are ignored,
-	 * mostly because they're not contributing to the problem.
+	 * Threads operating on cache-resident trees are ignored because they're
+	 * not contributing to the problem.
 	 */
 	btree = S2BT_SAFE(session);
-	if (btree != NULL && F_ISSET(btree, WT_BTREE_NO_EVICTION))
+	if (btree != NULL && F_ISSET(btree, WT_BTREE_IN_MEMORY))
 		return (0);
 
 	/* Check if eviction is needed. */
