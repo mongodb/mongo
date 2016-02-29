@@ -799,12 +799,12 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp)
 	 * Hold the walk lock to set the "no eviction" flag: no new pages from
 	 * the file will be queued for eviction after this point.
 	 */
-	__wt_spin_lock(session, &cache->evict_walk_lock);
+	__wt_spin_lock(session, &btree->evict_lock);
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 		F_SET(btree, WT_BTREE_NO_EVICTION);
 		*evict_resetp = true;
 	}
-	__wt_spin_unlock(session, &cache->evict_walk_lock);
+	__wt_spin_unlock(session, &btree->evict_lock);
 
 	/* If some other operation has disabled eviction, we're done. */
 	if (!*evict_resetp)
@@ -1127,22 +1127,21 @@ retry:	while (slot < max_entries && ret == 0) {
 		__wt_spin_unlock(session, &conn->dhandle_lock);
 		dhandle_locked = false;
 
-		__wt_spin_lock(session, &cache->evict_walk_lock);
-
 		/*
-		 * Re-check the "no eviction" flag -- it is used to enforce
-		 * exclusive access when a handle is being closed.
+		 * Re-check the "no eviction" flag, used to enforce exclusive
+		 * access when a handle is being closed. If not set, remember
+		 * the file to visit first, next loop.
 		 */
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
-			/* Remember the file to visit first, next loop. */
-			cache->evict_file_next = dhandle;
-
-			WT_WITH_DHANDLE(session, dhandle,
-			    ret = __evict_walk_file(session, &slot));
-			WT_ASSERT(session, session->split_gen == 0);
+			__wt_spin_lock(session, &btree->evict_lock);
+			if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+				cache->evict_file_next = dhandle;
+				WT_WITH_DHANDLE(session, dhandle,
+				    ret = __evict_walk_file(session, &slot));
+				WT_ASSERT(session, session->split_gen == 0);
+			}
+			__wt_spin_unlock(session, &btree->evict_lock);
 		}
-
-		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
 		/*
 		 * If we didn't find any candidates in the file, skip it next

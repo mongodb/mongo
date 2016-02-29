@@ -84,7 +84,6 @@ struct __wt_cache {
 	 */
 	WT_CONDVAR *evict_cond;		/* Eviction server condition */
 	WT_SPINLOCK evict_lock;		/* Eviction LRU queue */
-	WT_SPINLOCK evict_walk_lock;	/* Eviction walk location */
 	/* Condition signalled when the eviction server populates the queue */
 	WT_CONDVAR *evict_waiter_cond;
 
