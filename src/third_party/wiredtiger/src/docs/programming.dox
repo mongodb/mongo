@@ -30,6 +30,7 @@ each of which is ordered by one or more columns.
 <h2>Programming notes</h2>
 - @subpage threads
 - @subpage namespace
+- @subpage readonly
 @m_if{c}
 - @subpage signals
 @m_endif

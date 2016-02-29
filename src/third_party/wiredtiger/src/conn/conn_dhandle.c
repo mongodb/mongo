@@ -355,13 +355,25 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 /*
  * __conn_btree_apply_internal --
- *	Apply a function to the open btree handles.
+ *	Apply a function to an open data handle.
  */
 static int
 __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
-    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
+    int (*file_func)(WT_SESSION_IMPL *, const char *[]),
+    int (*name_func)(WT_SESSION_IMPL *, const char *, bool *),
+    const char *cfg[])
 {
 	WT_DECL_RET;
+	bool skip;
+
+	/* Always apply the name function, if supplied. */
+	skip = false;
+	if (name_func != NULL)
+		WT_RET(name_func(session, dhandle->name, &skip));
+
+	/* If there is no file function, don't bother locking the handle */
+	if (file_func == NULL || skip)
+		return (0);
 
 	/*
 	 * We need to pull the handle into the session handle cache and make
@@ -372,7 +384,7 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
 	    dhandle->name, dhandle->checkpoint, NULL, 0)) != 0)
 		return (ret == EBUSY ? 0 : ret);
 
-	WT_SAVE_DHANDLE(session, ret = func(session, cfg));
+	WT_SAVE_DHANDLE(session, ret = file_func(session, cfg));
 	if (WT_META_TRACKING(session))
 		WT_TRET(__wt_meta_track_handle_lock(session, false));
 	else
@@ -385,9 +397,10 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
  *	Apply a function to all open btree handles with the given URI.
  */
 int
-__wt_conn_btree_apply(WT_SESSION_IMPL *session,
-    bool apply_checkpoints, const char *uri,
-    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
+__wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
+    int (*file_func)(WT_SESSION_IMPL *, const char *[]),
+    int (*name_func)(WT_SESSION_IMPL *, const char *, bool *),
+    const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -404,23 +417,26 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	if (uri != NULL) {
 		bucket =
 		    __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
-		TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq)
-			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-			    !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
-			    strcmp(uri, dhandle->name) == 0 &&
-			    (apply_checkpoints || dhandle->checkpoint == NULL))
-				WT_RET(__conn_btree_apply_internal(
-				    session, dhandle, func, cfg));
+		TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq) {
+			if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+			    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
+			    dhandle->checkpoint != NULL ||
+			    strcmp(uri, dhandle->name) != 0)
+				continue;
+			WT_RET(__conn_btree_apply_internal(
+			    session, dhandle, file_func, name_func, cfg));
+		}
 	} else {
-		TAILQ_FOREACH(dhandle, &conn->dhqh, q)
-			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-			    !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
-			    (apply_checkpoints ||
-			    dhandle->checkpoint == NULL) &&
-			    WT_PREFIX_MATCH(dhandle->name, "file:") &&
-			    !WT_IS_METADATA(session, dhandle))
-				WT_RET(__conn_btree_apply_internal(
-				    session, dhandle, func, cfg));
+		TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+			if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+			    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
+			    dhandle->checkpoint != NULL ||
+			    !WT_PREFIX_MATCH(dhandle->name, "file:") ||
+			    WT_IS_METADATA(session, dhandle))
+				continue;
+			WT_RET(__conn_btree_apply_internal(
+			    session, dhandle, file_func, name_func, cfg));
+		}
 	}
 
 	return (0);

@@ -1319,10 +1319,8 @@ __wt_cksum_init(void)
 		__wt_cksum_func = __wt_cksum_hw;
 	else
 		__wt_cksum_func = __wt_cksum_sw;
-
-// SERVER-22773 - disabled as hardware CRC32 is corrupting memory
-//#elif defined(__powerpc64__)
-//	__wt_cksum_func = __wt_cksum_hw;
+#elif defined(__powerpc64__)
+	__wt_cksum_func = __wt_cksum_hw;
 #else
 	__wt_cksum_func = __wt_cksum_sw;
 #endif

@@ -157,6 +157,7 @@ connection_stats = [
     CacheStat('cache_bytes_overflow', 'tracked bytes belonging to overflow pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_bytes_read', 'bytes read into cache'),
     CacheStat('cache_bytes_write', 'bytes written from cache'),
+    CacheStat('cache_eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
     CacheStat('cache_eviction_app', 'pages evicted by application threads'),
     CacheStat('cache_eviction_checkpoint', 'checkpoint blocked page eviction'),
     CacheStat('cache_eviction_clean', 'unmodified pages evicted'),
@@ -315,7 +316,7 @@ connection_stats = [
     YieldStat('page_sleep', 'page acquire time sleeping (usecs)'),
 ]
 
-connection_stats = sorted(connection_stats, key=attrgetter('name'))
+connection_stats = sorted(connection_stats, key=attrgetter('desc'))
 
 ##########################################
 # Data source statistics
@@ -457,7 +458,7 @@ dsrc_stats = [
     TxnStat('txn_update_conflict', 'update conflicts'),
 ]
 
-dsrc_stats = sorted(dsrc_stats, key=attrgetter('name'))
+dsrc_stats = sorted(dsrc_stats, key=attrgetter('desc'))
 
 ##########################################
 # Cursor Join statistics
@@ -468,4 +469,4 @@ join_stats = [
     JoinStat('bloom_false_positive', 'bloom filter false positives'),
 ]
 
-join_stats = sorted(join_stats, key=attrgetter('name'))
+join_stats = sorted(join_stats, key=attrgetter('desc'))

@@ -583,22 +583,22 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_CURJOIN_EXTRACTOR extract_cursor;
 	WT_CURSOR *c;
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_cursor_get_key,	/* get-key */
-	    __wt_cursor_get_value,	/* get-value */
-	    __wt_cursor_set_key,	/* set-key */
-	    __wt_cursor_set_value,	/* set-value */
-	    __wt_cursor_notsup,		/* compare */
-	    __wt_cursor_notsup,		/* equals */
-	    __wt_cursor_notsup,		/* next */
-	    __wt_cursor_notsup,		/* prev */
-	    __wt_cursor_notsup,		/* reset */
-	    __wt_cursor_notsup,		/* search */
-	    __wt_cursor_notsup,		/* search-near */
-	    __curjoin_extract_insert,	/* insert */
-	    __wt_cursor_notsup,		/* update */
-	    __wt_cursor_notsup,		/* reconfigure */
-	    __wt_cursor_notsup,		/* remove */
-	    __wt_cursor_notsup);	/* close */
+	    __wt_cursor_get_key,		/* get-key */
+	    __wt_cursor_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __wt_cursor_set_value,		/* set-value */
+	    __wt_cursor_compare_notsup,		/* compare */
+	    __wt_cursor_equals_notsup,		/* equals */
+	    __wt_cursor_notsup,			/* next */
+	    __wt_cursor_notsup,			/* prev */
+	    __wt_cursor_notsup,			/* reset */
+	    __wt_cursor_notsup,			/* search */
+	    __wt_cursor_search_near_notsup,	/* search-near */
+	    __curjoin_extract_insert,		/* insert */
+	    __wt_cursor_notsup,			/* update */
+	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __wt_cursor_notsup);		/* close */
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_ITEM *key, v;
@@ -797,22 +797,22 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    __curjoin_get_key,		/* get-key */
-	    __curjoin_get_value,	/* get-value */
-	    __wt_cursor_notsup,		/* set-key */
-	    __wt_cursor_notsup,		/* set-value */
-	    __wt_cursor_notsup,		/* compare */
-	    __wt_cursor_notsup,		/* equals */
-	    __curjoin_next,		/* next */
-	    __wt_cursor_notsup,		/* prev */
-	    __curjoin_reset,		/* reset */
-	    __wt_cursor_notsup,		/* search */
-	    __wt_cursor_notsup,		/* search-near */
-	    __wt_cursor_notsup,		/* insert */
-	    __wt_cursor_notsup,		/* update */
-	    __wt_cursor_notsup,		/* remove */
-	    __wt_cursor_notsup,		/* reconfigure */
-	    __curjoin_close);		/* close */
+	    __curjoin_get_key,			/* get-key */
+	    __curjoin_get_value,		/* get-value */
+	    __wt_cursor_set_key_notsup,		/* set-key */
+	    __wt_cursor_set_value_notsup,	/* set-value */
+	    __wt_cursor_compare_notsup,		/* compare */
+	    __wt_cursor_equals_notsup,		/* equals */
+	    __curjoin_next,			/* next */
+	    __wt_cursor_notsup,			/* prev */
+	    __curjoin_reset,			/* reset */
+	    __wt_cursor_notsup,			/* search */
+	    __wt_cursor_search_near_notsup,	/* search-near */
+	    __wt_cursor_notsup,			/* insert */
+	    __wt_cursor_notsup,			/* update */
+	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __curjoin_close);			/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_JOIN *cjoin;
 	WT_DECL_ITEM(tmp);

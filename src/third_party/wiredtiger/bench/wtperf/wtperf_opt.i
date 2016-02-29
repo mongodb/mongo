@@ -145,6 +145,10 @@ DEF_OPT_AS_UINT32(random_range, 0,
     "insert operations")
 DEF_OPT_AS_BOOL(random_value, 0, "generate random content for the value")
 DEF_OPT_AS_UINT32(read_range, 0, "scan a range of keys after each search")
+DEF_OPT_AS_BOOL(readonly, 0,
+    "reopen the connection between populate and workload phases in readonly "
+    "mode.  Requires reopen_connection turned on (default).  Requires that "
+    "read be the only workload specified")
 DEF_OPT_AS_BOOL(reopen_connection, 1,
     "close and reopen the connection between populate and workload phases")
 DEF_OPT_AS_UINT32(report_interval, 2,

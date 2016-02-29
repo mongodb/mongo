@@ -12,6 +12,7 @@ noinst_PROGRAMS = \
 	ex_cursor \
 	ex_data_source \
 	ex_encrypt \
+	ex_event_handler \
 	ex_extending \
 	ex_extractor \
 	ex_hello \
