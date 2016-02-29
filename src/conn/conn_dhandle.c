@@ -159,7 +159,11 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	 */
 	__wt_spin_lock(session, &dhandle->close_lock);
 
-	/* Ensure that we aren't racing with the eviction server */
+	/*
+	 * Ensure we aren't racing with the eviction server; inside the close
+	 * lock so threads won't race setting/clearing the tree's "no eviction"
+	 * flag.
+	 */
 	WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
 
 	/*
@@ -178,10 +182,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 			F_SET(session->dhandle, WT_DHANDLE_DEAD);
 			marked_dead = true;
 
-			/*
-			 * Reset the tree's eviction priority, and the tree is
-			 * evictable by definition.
-			 */
+			/* Reset the tree's eviction priority (if any). */
 			__wt_evict_priority_clear(session);
 		}
 		if (!marked_dead || final)
