@@ -89,7 +89,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
             self.session.drop(uri, "force")
             self.populate(uri)
             cursor = self.session.open_cursor(uri, None, open_config)
-            msg = '/not supported/'
+            msg = '/Unsupported cursor/'
             if open_config == "readonly=1":
                 self.set_kv(cursor)
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

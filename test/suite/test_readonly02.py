@@ -66,8 +66,10 @@ class test_readonly02(wttest.WiredTigerTestCase, suite_subprocess):
         if self.create:
             #   1. setting readonly on a new database directory
             # Setting readonly prevents creation so we should see an
-            # ENOENT error because the lock file does not exist.
+            # error because the lock file does not exist.
             msg = '/No such file/'
+            if os.name != 'posix':
+                msg = '/cannot find the file/'
             os.mkdir(rdonlydir)
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.wiredtiger_open(
