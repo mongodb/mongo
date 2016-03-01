@@ -197,16 +197,16 @@ BSONObj SyncClusterConnection::getLastErrorDetailed(
 void SyncClusterConnection::_connect(const std::string& hostStr) {
     log() << "SyncClusterConnection connecting to [" << hostStr << "]" << endl;
     const HostAndPort host(hostStr);
-    DBClientConnection* c;
+    std::unique_ptr<DBClientConnection> c;
     if (connectionHook) {
-        c = new DBClientConnection(
+        c.reset(new DBClientConnection(
             true,  // auto reconnect
             0,     // socket timeout
             [this, host](const executor::RemoteCommandResponse& isMasterReply) {
                 return connectionHook(host, isMasterReply);
-            });
+            }));
     } else {
-        c = new DBClientConnection(true);
+        c.reset(new DBClientConnection(true));
     }
 
     c->setRequestMetadataWriter(getRequestMetadataWriter());
@@ -222,7 +222,7 @@ void SyncClusterConnection::_connect(const std::string& hostStr) {
         }
     }
     _connAddresses.push_back(hostStr);
-    _conns.push_back(c);
+    _conns.push_back(c.release());
 }
 
 bool SyncClusterConnection::runCommand(const std::string& dbname,
