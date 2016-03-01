@@ -23,7 +23,7 @@
 
     var primary = replSet.getPrimary();
     var secondary = replSet.getSecondary();
-    var isPV0 = replSet.getConfigFromPrimary().protocolVersion != 1;
+    var isPV0 = replSet.getReplSetConfigFromNode().protocolVersion != 1;
 
     // Do an initial insert to prevent the secondary from going into recovery
     var numDocuments = 20;

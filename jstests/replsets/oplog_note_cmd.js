@@ -12,7 +12,7 @@ db.foo.insert({a:1});
 var statusBefore = db.runCommand({replSetGetStatus: 1});
 assert.commandWorked(db.runCommand({appendOplogNote: 1, data: {a: 1}}));
 var statusAfter = db.runCommand({replSetGetStatus: 1});
-if (rs.getConfigFromPrimary().protocolVersion != 1) {
+if (rs.getReplSetConfigFromNode().protocolVersion != 1) {
     assert.lt(statusBefore.members[0].optime, statusAfter.members[0].optime);
 } else {
     assert.lt(statusBefore.members[0].optime.ts, statusAfter.members[0].optime.ts);

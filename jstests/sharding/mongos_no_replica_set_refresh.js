@@ -2,21 +2,22 @@
 load("jstests/replsets/rslib.js");
 
 (function () {
+'use strict';
 
 var st = new ShardingTest({ name: 'mongos_no_replica_set_refresh',
                             shards: 1,
-                            mongos: 2,
+                            mongos: 1,
                             other: {
                                 rs0: {
                                     nodes: [
-                                        {rsConfig: {priority: 10}},
                                         {},
-                                        {},
+                                        {rsConfig: {priority: 0}},
+                                        {rsConfig: {priority: 0}},
                                     ],
                                 }
                             } });
 
-var rsObj = st._rs[0].test;
+var rsObj = st.rs0;
 assert.commandWorked(
     rsObj.nodes[0].adminCommand({
         replSetTest: 1,
@@ -31,29 +32,27 @@ var config = mongos.getDB("config");
 
 printjson( mongos.getCollection("foo.bar").findOne() );
 
-var primary = rsObj.getPrimary();
-
 jsTestLog( "Reconfiguring replica set..." );
 
-var rsConfig = rsObj.getConfigFromPrimary();
+var rsConfig = rsObj.getRSConfig(0);
 
 // Now remove the last node in the config.
 var removedNode = rsConfig.members.pop();
 rsConfig.version++;
 reconfig(rsObj, rsConfig);
 
+// Wait for the election round to complete
+rsObj.getPrimary();
+
 var numRSHosts = function(){
-    jsTestLog('Checking number of active nodes in ' + rsObj.name);
-    var result = assert.commandWorked(primary.adminCommand({ismaster : 1}));
-    jsTestLog('Active nodes in ' + rsObj.name + ': ' + tojson(result));
-    return result.hosts.length;
+    var result = assert.commandWorked(rsObj.nodes[0].adminCommand({ismaster : 1}));
+    jsTestLog('Nodes in ' + rsObj.name + ': ' + tojson(result));
+    return result.hosts.length + result.passives.length;
 };
 
-primary = rsObj.getPrimary();
 assert.soon( function(){ return numRSHosts() < 3; } );
 
 var numMongosHosts = function(){
-    jsTestLog('Checking number of nodes in ' + rsObj.name + ' connected to mongos...');
     var commandResult = assert.commandWorked(mongos.adminCommand("connPoolStats"));
     var result = commandResult.replicaSets[rsObj.name];
     jsTestLog('Nodes in ' + rsObj.name + ' connected to mongos: ' + tojson(result));
@@ -75,7 +74,7 @@ assert.soon( function(){ return configServerURL().indexOf( removedNode.host ) < 
 
 jsTestLog( "Now test adding new replica set servers..." );
 
-config.shards.update({ _id : rsObj.name }, { $set : { host : rsObj.name + "/" + primary.host } });
+config.shards.update({ _id : rsObj.name }, { $set : { host : rsObj.name + "/" + rsObj.nodes[0].host } });
 printjson( config.shards.find().toArray() );
 
 rsConfig.members.push(removedNode);
@@ -87,8 +86,6 @@ assert.soon( function(){ return numRSHosts() > 2; } );
 assert.soon( function(){ return numMongosHosts() > 2; } );
 
 assert.soon( function(){ return configServerURL().indexOf( removedNode.host ) >= 0; } );
-
-jsTestLog( "Done..." );
 
 st.stop();
 

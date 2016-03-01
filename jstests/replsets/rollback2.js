@@ -70,7 +70,7 @@ load("jstests/replsets/rslib.js");
     replTest.awaitReplication();
 
     var timeout;
-    if (replTest.getConfigFromPrimary().protocolVersion == 1) {
+    if (replTest.getReplSetConfigFromNode().protocolVersion == 1) {
         timeout = 30 * 1000;
     } else {
         timeout = 60 * 1000;

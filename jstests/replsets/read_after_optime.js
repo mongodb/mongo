@@ -6,7 +6,7 @@
 var replTest = new ReplSetTest({ nodes: 2 });
 replTest.startSet();
 replTest.initiate();
-var config = replTest.getConfigFromPrimary();
+var config = replTest.getReplSetConfigFromNode();
 
 var runTest = function(testDB, primaryConn) {
     primaryConn.getDB('test').user.insert({ x: 1 }, { writeConcern: { w: 2 }});

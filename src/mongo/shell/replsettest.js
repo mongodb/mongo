@@ -590,18 +590,25 @@ var ReplSetTest = function(opts) {
     };
 
     /**
-     * Gets the current replica set config from the primary.
-     *
-     * throws if any error occurs on the command.
+     * Gets the current replica set config from the specified node index. If no nodeId is specified,
+     * uses the primary node.
      */
-    this.getConfigFromPrimary = function() {
-        // Use 90 seconds timeout
-        return _replSetGetConfig(this.getPrimary(90 * 1000));
+    this.getReplSetConfigFromNode = function(nodeId) {
+        if (nodeId == undefined) {
+            // Use 90 seconds timeout for finding a primary
+            return _replSetGetConfig(self.getPrimary(90 * 1000));
+        }
+
+        if (!isNumber(nodeId)) {
+            throw Error(nodeId + ' is not a number');
+        }
+
+        return _replSetGetConfig(self.nodes[nodeId]);
     };
 
     this.reInitiate = function() {
         var config = this.getReplSetConfig();
-        var newVersion = this.getConfigFromPrimary().version + 1;
+        var newVersion = this.getReplSetConfigFromNode().version + 1;
         config.version = newVersion;
 
         if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
@@ -685,13 +692,13 @@ var ReplSetTest = function(opts) {
 
         try {
             master = this.getPrimary();
-            configVersion = this.getConfigFromPrimary().version;
+            configVersion = this.getReplSetConfigFromNode().version;
             masterOpTime = _getLastOpTimeTimestamp(master);
             masterName = master.toString().substr(14); // strip "connection to "
         }
         catch (e) {
             master = this.getPrimary();
-            configVersion = this.getConfigFromPrimary().version;
+            configVersion = this.getReplSetConfigFromNode().version;
             masterOpTime = _getLastOpTimeTimestamp(master);
             masterName = master.toString().substr(14); // strip "connection to "
         }

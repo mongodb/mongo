@@ -179,7 +179,7 @@ ShardingTest = function ShardingTestWithContinuousConfigPrimaryStepdown() {
 
     };
 
-    assert.eq(this.configRS.getConfigFromPrimary().settings.electionTimeoutMillis, 5000,
+    assert.eq(this.configRS.getReplSetConfigFromNode().settings.electionTimeoutMillis, 5000,
         "Failed to set the electionTimeoutMillis to 5000 milliseconds");
 
     // Start the continuous config server stepdown thread

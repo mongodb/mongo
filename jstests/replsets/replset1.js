@@ -29,7 +29,7 @@ var doTest = function( signal ) {
     // elected master.
     var master = replTest.getPrimary();
 
-    var isPV1 = (replTest.getConfigFromPrimary().protocolVersion == 1);
+    var isPV1 = (replTest.getReplSetConfigFromNode().protocolVersion == 1);
     if (isPV1) {
         // Ensure the primary logs an n-op to the oplog upon transitioning to primary.
         var oplog_entry = master.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
@@ -135,7 +135,7 @@ var doTest = function( signal ) {
     printjson(result);
     var lastOp = result.lastOp;
     var lastOplogOp = master.getDB("local").oplog.rs.find().sort({$natural : -1}).limit(1).next();
-    if (replTest.getConfigFromPrimary().protocolVersion != 1) {
+    if (replTest.getReplSetConfigFromNode().protocolVersion != 1) {
         assert.eq(lastOplogOp['ts'], lastOp);
     }
     else {

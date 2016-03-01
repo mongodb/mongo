@@ -39,7 +39,7 @@ var oldElectionId = res.repl.electionId;
 
 // Upgrade protocol version
 //
-conf = rst.getConfigFromPrimary();
+conf = rst.getReplSetConfigFromNode();
 conf.protocolVersion = 1;
 conf.version++;
 reconfig(rst, conf);
@@ -69,9 +69,9 @@ checkPV1ElectionId(newElectionId);
 oldElectionId = newElectionId;
 
 
-// Downgrade protocol veresion
+// Downgrade protocol version
 //
-conf = rst.getConfigFromPrimary();
+conf = rst.getReplSetConfigFromNode();
 conf.protocolVersion = 0;
 conf.version++;
 reconfig(rst, conf);
