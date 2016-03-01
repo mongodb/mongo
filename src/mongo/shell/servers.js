@@ -65,6 +65,10 @@ assert( connectionURLTheSame( "foo/a,b" , "foo/b,a" ) );
 assert( ! connectionURLTheSame( "foo/a,b" , "bar/a,b" ) );
 
 createMongoArgs = function( binaryName , args ){
+    if (!Array.isArray(args)) {
+        throw new Error("The second argument to createMongoArgs must be an array");
+    }
+
     var fullArgs = [ binaryName ];
 
     if ( args.length == 1 && isObject( args[0] ) ){
@@ -816,7 +820,7 @@ MongoRunner.getAndPrepareDumpDirectory = function(testName) {
 // The specified 'dbpath' is cleared if it exists, created if not.
 // var conn = _startMongodEmpty("--port", 30000, "--dbpath", "asdf");
 _startMongodEmpty = function () {
-    var args = createMongoArgs("mongod", arguments);
+    var args = createMongoArgs("mongod", Array.from(arguments));
 
     var dbpath = _parsePath.apply(null, args);
     resetDbpath(dbpath);
@@ -830,7 +834,7 @@ _startMongod = function () {
 };
 
 _startMongodNoReset = function(){
-    var args = createMongoArgs( "mongod" , arguments );
+    var args = createMongoArgs( "mongod" , Array.from(arguments) );
     return startMongoProgram.apply( null, args );
 };
 
