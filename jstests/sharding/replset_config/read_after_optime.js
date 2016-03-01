@@ -12,7 +12,7 @@
     var lastOp = configReplSetTest.awaitLastOpCommitted();
     assert(lastOp, 'invalid op returned from ReplSetTest.awaitLastOpCommitted()');
 
-    var config = configReplSetTest.getConfigFromPrimary();
+    var config = configReplSetTest.getReplSetConfigFromNode();
     var term = -1;
     if (config.protocolVersion === 1) {
         term = lastOp.t;

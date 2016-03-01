@@ -39,7 +39,7 @@ load("jstests/replsets/rslib.js");
 
     // Upgrade protocol version
     //
-    conf = rst.getConfigFromPrimary();
+    conf = rst.getReplSetConfigFromNode();
     conf.protocolVersion = 1;
     conf.version++;
     reconfig(rst, conf);
@@ -70,7 +70,7 @@ load("jstests/replsets/rslib.js");
 
     // Downgrade protocol veresion
     //
-    conf = rst.getConfigFromPrimary();
+    conf = rst.getReplSetConfigFromNode();
     conf.protocolVersion = 0;
     conf.version++;
     reconfig(rst, conf);

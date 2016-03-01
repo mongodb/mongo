@@ -222,7 +222,7 @@ load("jstests/replsets/rslib.js");
 
         };
 
-        assert.eq(this.configRS.getConfigFromPrimary().settings.electionTimeoutMillis,
+        assert.eq(this.configRS.getReplSetConfigFromNode().settings.electionTimeoutMillis,
                   5000,
                   "Failed to set the electionTimeoutMillis to 5000 milliseconds");
 
