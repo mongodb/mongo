@@ -24,9 +24,8 @@ function runReadOnlyTest(test) {
     assert.eq(typeof(test.load), 'function');
     assert.eq(typeof(test.name), 'string');
 
-    // TODO: read storageEngine from testData when read-only mode is supported in WiredTiger.
     var options = {
-        storageEngine: 'mmapv1',
+        storageEngine: TestData.storageEngine,
         nopreallocj: ''
     };
 

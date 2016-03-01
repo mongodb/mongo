@@ -75,13 +75,15 @@ KVStorageEngine::KVStorageEngine(KVEngine* engine, const KVStorageEngineOptions&
 
     OperationContextNoop opCtx(_engine->newRecoveryUnit());
 
-    if (options.forRepair && engine->hasIdent(&opCtx, catalogInfo)) {
+    bool catalogExists = engine->hasIdent(&opCtx, catalogInfo);
+
+    if (options.forRepair && catalogExists) {
         log() << "Repairing catalog metadata";
         // TODO should also validate all BSON in the catalog.
         engine->repairIdent(&opCtx, catalogInfo);
     }
 
-    {
+    if (!catalogExists) {
         WriteUnitOfWork uow(&opCtx);
 
         Status status =
@@ -92,39 +94,41 @@ KVStorageEngine::KVStorageEngine(KVEngine* engine, const KVStorageEngineOptions&
             fassertFailedNoTrace(28562);
         }
         fassert(28520, status);
+        uow.commit();
+    }
 
-        _catalogRecordStore.reset(
-            _engine->getRecordStore(&opCtx, catalogInfo, catalogInfo, CollectionOptions()));
-        _catalog.reset(new KVCatalog(_catalogRecordStore.get(),
-                                     _supportsDocLocking,
-                                     _options.directoryPerDB,
-                                     _options.directoryForIndexes));
-        _catalog->init(&opCtx);
+    _catalogRecordStore.reset(
+        _engine->getRecordStore(&opCtx, catalogInfo, catalogInfo, CollectionOptions()));
+    _catalog.reset(new KVCatalog(_catalogRecordStore.get(),
+                                 _supportsDocLocking,
+                                 _options.directoryPerDB,
+                                 _options.directoryForIndexes));
+    _catalog->init(&opCtx);
 
-        std::vector<std::string> collections;
-        _catalog->getAllCollections(&collections);
+    std::vector<std::string> collections;
+    _catalog->getAllCollections(&collections);
 
-        for (size_t i = 0; i < collections.size(); i++) {
-            std::string coll = collections[i];
-            NamespaceString nss(coll);
-            string dbName = nss.db().toString();
+    for (size_t i = 0; i < collections.size(); i++) {
+        std::string coll = collections[i];
+        NamespaceString nss(coll);
+        string dbName = nss.db().toString();
 
-            // No rollback since this is only for committed dbs.
-            KVDatabaseCatalogEntry*& db = _dbs[dbName];
-            if (!db) {
-                db = new KVDatabaseCatalogEntry(dbName, this);
-            }
-
-            db->initCollection(&opCtx, coll, options.forRepair);
+        // No rollback since this is only for committed dbs.
+        KVDatabaseCatalogEntry*& db = _dbs[dbName];
+        if (!db) {
+            db = new KVDatabaseCatalogEntry(dbName, this);
         }
 
-        uow.commit();
+        db->initCollection(&opCtx, coll, options.forRepair);
     }
 
     opCtx.recoveryUnit()->abandonSnapshot();
 
     // now clean up orphaned idents
-
+    // we don't do this in readOnly mode.
+    if (storageGlobalParams.readOnly) {
+        return;
+    }
     {
         // get all idents
         std::set<std::string> allIdents;

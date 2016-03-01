@@ -1707,7 +1707,16 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=read_only
+      resmoke_args: --suites=read_only --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: read_only_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=read_only --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - name: push
@@ -2229,6 +2238,7 @@ buildvariants:
   - name: concurrency_simultaneous_WT
   - name: read_concern_majority_passthrough_WT
   - name: read_only
+  - name: read_only_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -3247,6 +3257,7 @@ buildvariants:
     - windows-64-vs2013-compile
   - name: read_concern_majority_passthrough_WT
   - name: read_only
+  - name: read_only_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -3915,6 +3926,7 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: read_concern_majority_passthrough_WT
   - name: read_only
+  - name: read_only_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_WT_ese
@@ -5591,6 +5603,7 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: read_concern_majority_passthrough_WT
   - name: read_only
+  - name: read_only_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_WT_ese

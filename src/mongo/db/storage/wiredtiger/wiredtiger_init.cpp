@@ -82,7 +82,8 @@ public:
                                                         cacheSizeGB,
                                                         params.dur,
                                                         ephemeral,
-                                                        params.repair);
+                                                        params.repair,
+                                                        params.readOnly);
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
         // Intentionally leaked.
@@ -130,6 +131,10 @@ public:
         builder.appendBool("directoryPerDB", params.directoryperdb);
         builder.appendBool("directoryForIndexes", wiredTigerGlobalOptions.directoryForIndexes);
         return builder.obj();
+    }
+
+    bool supportsReadOnly() const final {
+        return true;
     }
 };
 }  // namespace

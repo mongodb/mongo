@@ -56,7 +56,9 @@ public:
                        size_t cacheSizeGB,
                        bool durable,
                        bool ephemeral,
-                       bool repair);
+                       bool repair,
+                       bool readOnly);
+
     virtual ~WiredTigerKVEngine();
 
     void setRecordStoreExtraOptions(const std::string& options);
@@ -170,6 +172,7 @@ private:
 
     bool _durable;
     bool _ephemeral;
+    bool _readOnly;
     std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;  // Depends on _sizeStorer
 
     std::string _rsOptions;
