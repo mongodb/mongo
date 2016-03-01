@@ -193,6 +193,8 @@ DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
 DEF_OPT_AS_STRING(table_name, "test", "table name")
 DEF_OPT_AS_UINT32(value_sz_max, 1000,
     "maximum value size when delta updates are present. Default disabled")
+DEF_OPT_AS_UINT32(value_sz_min, 1,
+    "minimum value size when delta updates are present. Default disabled")
 DEF_OPT_AS_UINT32(value_sz, 100, "value size")
 DEF_OPT_AS_UINT32(verbose, 1, "verbosity")
 DEF_OPT_AS_UINT32(warmup, 0,

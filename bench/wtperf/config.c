@@ -266,10 +266,9 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				if ((workp->truncate = v.val) != 1)
 					goto err;
 				/* There can only be one Truncate thread. */
-				if (cfg->has_truncate != 0) {
+				if (F_ISSET(cfg, CFG_TRUNCATE))
 					goto err;
-				}
-				cfg->has_truncate = 1;
+				F_SET(cfg, CFG_TRUNCATE);
 				continue;
 			}
 			if (STRING_MATCH("truncate_pct", k.str, k.len)) {
@@ -297,8 +296,13 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 						goto err;
 					/* Special random value */
 					workp->update_delta = INT64_MAX;
-				} else
+				} else {
 					workp->update_delta = v.val;
+					if (v.val > 0)
+						F_SET(cfg, CFG_GROW);
+					if (v.val < 0)
+						F_SET(cfg, CFG_SHRINK);
+				}
 				continue;
 			}
 			goto err;
@@ -690,9 +694,22 @@ config_sanity(CONFIG *cfg)
 	}
 
 	if (cfg->value_sz_max < cfg->value_sz) {
-		fprintf(stderr,
-		    "value_sz_max must greater than or equal to value_sz\n");
-		return (EINVAL);
+		if (F_ISSET(cfg, CFG_GROW)) {
+			fprintf(stderr, "value_sz_max %" PRIu32
+			    " must be greater than or equal to value_sz %"
+			    PRIu32 "\n", cfg->value_sz_max, cfg->value_sz);
+			return (EINVAL);
+		} else
+			cfg->value_sz_max = cfg->value_sz;
+	}
+	if (cfg->value_sz_min > cfg->value_sz) {
+		if (F_ISSET(cfg, CFG_SHRINK)) {
+			fprintf(stderr, "value_sz_min %" PRIu32
+			    " must be less than or equal to value_sz %"
+			    PRIu32 "\n", cfg->value_sz_min, cfg->value_sz);
+			return (EINVAL);
+		} else
+			cfg->value_sz_min = cfg->value_sz;
 	}
 
 	if (cfg->readonly && cfg->workload != NULL)

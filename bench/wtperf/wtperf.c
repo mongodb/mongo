@@ -60,7 +60,7 @@ static const CONFIG default_cfg = {
 	0,				/* in warmup phase */
 	false,				/* Signal for idle cycle thread */
 	0,				/* total seconds running */
-	0,				/* has truncate */
+	0,				/* flags */
 	{NULL, NULL},			/* the truncate queue */
 	{NULL, NULL},                   /* the config queue */
 
@@ -125,8 +125,10 @@ randomize_value(CONFIG_THREAD *thread, char *value_buf)
 	 */
 	if (thread->workload->update_delta == 0)
 		max_range = thread->cfg->value_sz;
-	else
+	else if (thread->workload->update_delta > 0)
 		max_range = thread->cfg->value_sz_max;
+	else
+		max_range = thread->cfg->value_sz_min;
 
 	/*
 	 * Generate a single random value and re-use it. We generally only
@@ -176,16 +178,16 @@ update_value_delta(CONFIG_THREAD *thread)
 	/* Ensure we aren't changing across boundaries */
 	if (delta > 0 && len + delta > cfg->value_sz_max)
 		delta = cfg->value_sz_max - len;
-	else if (delta < 0 && -delta > len)
-		delta = -(len - 1);
+	else if (delta < 0 && len + delta < cfg->value_sz_min)
+		delta = cfg->value_sz_min - len;
 
 	/* Bail if there isn't anything to do */
 	if (delta == 0)
 		return;
 
-	if (delta < 0) {
+	if (delta < 0)
 		value[len + delta] = '\0';
-	} else {
+	else {
 		/* Extend the value by the configured amount. */
 		for (new_len = len;
 		    new_len < cfg->value_sz_max && new_len - len < delta;
@@ -2265,7 +2267,7 @@ main(int argc, char *argv[])
 	 * the compact operation, but not for the workloads.
 	 */
 	if (cfg->async_threads > 0) {
-		if (cfg->has_truncate > 0) {
+		if (F_ISSET(cfg, CFG_TRUNCATE) > 0) {
 			lprintf(cfg, 1, 0, "Cannot run truncate and async\n");
 			goto err;
 		}
@@ -2290,13 +2292,13 @@ main(int argc, char *argv[])
 		goto err;
 
 	/* You can't have truncate on a random collection. */
-	if (cfg->has_truncate && cfg->random_range) {
+	if (F_ISSET(cfg, CFG_TRUNCATE) && cfg->random_range) {
 		lprintf(cfg, 1, 0, "Cannot run truncate and random_range\n");
 		goto err;
 	}
 
 	/* We can't run truncate with more than one table. */
-	if (cfg->has_truncate && cfg->table_count > 1) {
+	if (F_ISSET(cfg, CFG_TRUNCATE) && cfg->table_count > 1) {
 		lprintf(cfg, 1, 0, "Cannot truncate more than 1 table\n");
 		goto err;
 	}
