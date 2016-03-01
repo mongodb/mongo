@@ -225,6 +225,16 @@ protected:
     }
 
 
+    /**
+     * Disables read concern majority support.
+     */
+    void disableReadConcernMajoritySupport();
+
+    /**
+     * Disables snapshot support.
+     */
+    void disableSnapshots();
+
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl

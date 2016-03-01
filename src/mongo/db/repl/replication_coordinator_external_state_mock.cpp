@@ -219,7 +219,11 @@ void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(SnapshotNa
 void ReplicationCoordinatorExternalStateMock::forceSnapshotCreation() {}
 
 bool ReplicationCoordinatorExternalStateMock::snapshotsEnabled() const {
-    return true;
+    return _areSnapshotsEnabled;
+}
+
+void ReplicationCoordinatorExternalStateMock::setAreSnapshotsEnabled(bool val) {
+    _areSnapshotsEnabled = val;
 }
 
 void ReplicationCoordinatorExternalStateMock::notifyOplogMetadataWaiters() {}
@@ -230,7 +234,11 @@ double ReplicationCoordinatorExternalStateMock::getElectionTimeoutOffsetLimitFra
 
 bool ReplicationCoordinatorExternalStateMock::isReadCommittedSupportedByStorageEngine(
     OperationContext* txn) const {
-    return true;
+    return _isReadCommittedSupported;
+}
+
+void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val) {
+    _isReadCommittedSupported = val;
 }
 
 OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationContext* txn,

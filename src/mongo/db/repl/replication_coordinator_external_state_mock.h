@@ -146,6 +146,16 @@ public:
      */
     bool threadsStarted() const;
 
+    /**
+     * Sets if the storage engine is configured to support ReadConcern::Majority (committed point).
+     */
+    void setIsReadCommittedEnabled(bool val);
+
+    /**
+     * Sets if we are taking snapshots for read concern majority use.
+     */
+    void setAreSnapshotsEnabled(bool val);
+
 private:
     StatusWith<BSONObj> _localRsConfigDocument;
     StatusWith<LastVote> _localRsLastVoteDocument;
@@ -166,6 +176,8 @@ private:
     bool _connectionsClosed;
     HostAndPort _clientHostAndPort;
     bool _threadsStarted;
+    bool _isReadCommittedSupported = true;
+    bool _areSnapshotsEnabled = true;
 };
 
 }  // namespace repl

@@ -91,6 +91,10 @@ struct OpTimeWithTermZero {
         return OpTime(timestamp, 0);
     }
 
+    OpTime asOpTime() const {
+        return this->operator mongo::repl::OpTime();
+    }
+
     Timestamp timestamp;
 };
 
