@@ -759,12 +759,15 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTake
         _cancelAndRescheduleElectionTimeout_inlock();
     }
 
-    if (!_topCoord->becomeCandidateIfElectable(_replExecutor.now(), getMyLastDurableOpTime())) {
+    const auto status =
+        _topCoord->becomeCandidateIfElectable(_replExecutor.now(), getMyLastAppliedOpTime());
+    if (!status.isOK()) {
         if (isPriorityTakeOver) {
-            log() << "Not starting an election for a priority takeover, since we are not "
-                     "electable";
+            log() << "Not starting an election for a priority takeover, "
+                  << "since we are not electable due to: " << status.reason();
         } else {
-            log() << "Not starting an election, since we are not electable";
+            log() << "Not starting an election, since we are not electable due to: "
+                  << status.reason();
         }
         return;
     }

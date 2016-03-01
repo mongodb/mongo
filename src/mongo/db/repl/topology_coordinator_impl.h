@@ -215,7 +215,7 @@ public:
     virtual void setElectionInfo(OID electionId, Timestamp electionOpTime);
     virtual void processWinElection(OID electionId, Timestamp electionOpTime);
     virtual void processLoseElection();
-    virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) const;
+    virtual Status checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) const;
     virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
     virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied);
     virtual bool stepDownIfPending();
@@ -236,7 +236,7 @@ public:
     virtual HeartbeatResponseAction setMemberAsDown(Date_t now,
                                                     const int memberIndex,
                                                     const OpTime& myLastOpApplied);
-    virtual bool becomeCandidateIfElectable(const Date_t now, const OpTime& lastOpApplied);
+    virtual Status becomeCandidateIfElectable(const Date_t now, const OpTime& lastOpApplied);
     virtual void setStorageEngineSupportsReadCommitted(bool supported);
 
     ////////////////////////////////////////////////////////////

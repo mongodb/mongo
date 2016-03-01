@@ -31,6 +31,8 @@
 #include <cstdint>
 #include <limits>
 
+#include "mongo/util/mongoutils/str.h"
+
 namespace mongo {
 
 class SnapshotName {
@@ -58,6 +60,9 @@ public:
         return _value;
     }
 
+    std::string toString() const {
+        return (str::stream() << _value);
+    }
     bool operator==(const SnapshotName& rhs) const {
         return _value == rhs._value;
     }

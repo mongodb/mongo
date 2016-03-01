@@ -161,6 +161,19 @@ struct ReplicationCoordinatorImpl::WaiterInfo {
         list->erase(std::remove(list->begin(), list->end(), this), list->end());
     }
 
+    BSONObj toBSON() const {
+        BSONObjBuilder bob;
+        bob.append("opId", opID);
+        bob.append("opTime", opTime->toBSON());
+        bob.append("master", master);
+        bob.append("writeConcern", writeConcern);
+        return bob.obj();
+    };
+
+    std::string toString() const {
+        return toBSON().toString();
+    };
+
     std::vector<WaiterInfo*>* list;
     bool master;  // Set to false to indicate that stepDown was called while waiting
     const unsigned int opID;
@@ -204,6 +217,13 @@ DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCo
     return options;
 }
 }  // namespace
+
+std::string ReplicationCoordinatorImpl::SnapshotInfo::toString() const {
+    BSONObjBuilder bob;
+    bob.append("optime", opTime.toBSON());
+    bob.append("name-id", name.toString());
+    return bob.obj().toString();
+}
 
 ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     const ReplSettings& settings,
@@ -1286,25 +1306,30 @@ void ReplicationCoordinatorImpl::interruptAll() {
 
 bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
     const OpTime& opTime, SnapshotName minSnapshot, const WriteConcernOptions& writeConcern) {
+    // The syncMode cannot be unset.
     invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
     Status status = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
     if (!status.isOK()) {
         return true;
     }
 
-    if (writeConcern.wMode.empty())
-        return _haveNumNodesReachedOpTime_inlock(opTime,
-                                                 writeConcern.wNumNodes,
-                                                 writeConcern.syncMode ==
-                                                     WriteConcernOptions::SyncMode::JOURNAL);
+    const bool useDurableOpTime = writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL;
+
+    if (writeConcern.wMode.empty()) {
+        return _haveNumNodesReachedOpTime_inlock(opTime, writeConcern.wNumNodes, useDurableOpTime);
+    }
 
     StringData patternName;
     if (writeConcern.wMode == WriteConcernOptions::kMajority) {
-        if (writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL &&
-            _externalState->snapshotsEnabled()) {
+        if (useDurableOpTime && _externalState->snapshotsEnabled()) {
+            // Make sure we have a valid snapshot.
             if (!_currentCommittedSnapshot) {
                 return false;
             }
+
+            // Wait for the "current" snapshot to advance to/past the opTime.
+            // We cannot have this committed snapshot until we have replicated to a majority,
+            // so we can return true here once that requirement is met.
             return (_currentCommittedSnapshot->opTime >= opTime &&
                     _currentCommittedSnapshot->name >= minSnapshot);
         } else {
@@ -1318,10 +1343,7 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
     if (!tagPattern.isOK()) {
         return true;
     }
-    return _haveTaggedNodesReachedOpTime_inlock(opTime,
-                                                tagPattern.getValue(),
-                                                writeConcern.syncMode ==
-                                                    WriteConcernOptions::SyncMode::JOURNAL);
+    return _haveTaggedNodesReachedOpTime_inlock(opTime, tagPattern.getValue(), useDurableOpTime);
 }
 
 bool ReplicationCoordinatorImpl::_haveNumNodesReachedOpTime_inlock(const OpTime& targetOpTime,
@@ -1472,7 +1494,8 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
                 std::min<Microseconds>(Milliseconds{writeConcern.wTimeout} - elapsed, waitTime);
         }
 
-        if (waitTime == Microseconds::max()) {
+        const bool waitForever = waitTime == Microseconds::max();
+        if (waitForever) {
             condVar.wait(*lock);
         } else {
             condVar.wait_for(*lock, waitTime);

@@ -5270,7 +5270,9 @@ TEST_F(TopoCoordTest, ShouldNotStandForElectionWhileAwareOfPrimary) {
 
     heartbeatFromMember(
         HostAndPort("h2"), "rs0", MemberState::RS_PRIMARY, OpTime(Timestamp(1, 0), 0));
-    ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, OpTime()));
+    const auto status = getTopoCoord().checkShouldStandForElection(now()++, OpTime());
+    ASSERT_EQ(ErrorCodes::NodeNotElectable, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "there is a Primary");
 }
 
 TEST_F(TopoCoordTest, ShouldNotStandForElectionWhileTooStale) {
@@ -5287,7 +5289,10 @@ TEST_F(TopoCoordTest, ShouldNotStandForElectionWhileTooStale) {
 
     heartbeatFromMember(
         HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(10000, 0), 0));
-    ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, OpTime(Timestamp(100, 0), 0)));
+    const auto status =
+        getTopoCoord().checkShouldStandForElection(now()++, OpTime(Timestamp(100, 0), 0));
+    ASSERT_EQ(ErrorCodes::NodeNotElectable, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "my last optime is");
 }
 
 TEST_F(TopoCoordTest, VoteForMyselfFailsWhileNotCandidate) {
@@ -5319,12 +5324,10 @@ TEST_F(TopoCoordTest, NodeReturnsArbiterWhenGetMemberStateRunsAgainstArbiter) {
 }
 
 TEST_F(TopoCoordTest, ShouldNotStandForElectionWhileRemovedFromTheConfig) {
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
-    startCapturingLogMessages();
-    ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, OpTime(Timestamp(10, 0), 0)));
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("not a member of a valid replica set config"));
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
+    const auto status =
+        getTopoCoord().checkShouldStandForElection(now()++, OpTime(Timestamp(10, 0), 0));
+    ASSERT_EQ(ErrorCodes::NodeNotElectable, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "not a member of a valid replica set config");
 }
 
 TEST_F(TopoCoordTest, ShouldNotStandForElectionWhenAPositiveResponseWasGivenInTheVoteLeasePeriod) {
@@ -5361,12 +5364,10 @@ TEST_F(TopoCoordTest, ShouldNotStandForElectionWhenAPositiveResponseWasGivenInTh
     ASSERT_EQUALS(1, response["vote"].Int());
     ASSERT_EQUALS(remoteRound, response["round"].OID());
 
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
-    startCapturingLogMessages();
-    ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, OpTime(Timestamp(10, 0), 0)));
-    stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("I recently voted for "));
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
+    const auto status =
+        getTopoCoord().checkShouldStandForElection(now()++, OpTime(Timestamp(10, 0), 0));
+    ASSERT_EQ(ErrorCodes::NodeNotElectable, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "I recently voted for ");
 }
 
 TEST_F(TopoCoordTest, NodeDoesNotGrantVotesToTwoDifferentNodesInTheSameTerm) {

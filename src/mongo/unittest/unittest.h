@@ -324,6 +324,11 @@ protected:
      */
     int64_t countLogLinesContaining(const std::string& needle);
 
+    /**
+     * Prints the captured log lines.
+     */
+    void printCapturedLogLines() const;
+
 private:
     /**
      * Called on the test object before running the test.

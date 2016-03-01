@@ -444,6 +444,7 @@ private:
         bool operator>=(const SnapshotInfo& other) const {
             return std::tie(opTime, name) >= std::tie(other.opTime, other.name);
         }
+        std::string toString() const;
     };
 
     class LoseElectionGuardV1;

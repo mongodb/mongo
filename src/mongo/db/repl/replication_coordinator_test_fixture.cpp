@@ -444,5 +444,13 @@ void ReplCoordTest::replyToReceivedHeartbeatV1() {
     getNet()->exitNetwork();
 }
 
+void ReplCoordTest::disableReadConcernMajoritySupport() {
+    _externalState->setIsReadCommittedEnabled(false);
+}
+
+void ReplCoordTest::disableSnapshots() {
+    _externalState->setAreSnapshotsEnabled(false);
+}
+
 }  // namespace repl
 }  // namespace mongo
