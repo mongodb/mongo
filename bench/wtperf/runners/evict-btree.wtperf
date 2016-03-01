@@ -1,5 +1,5 @@
 # wtperf options file: evict btree configuration
-conn_config="cache_size=50M"
+conn_config="cache_size=50M,eviction=(threads_max=4)"
 table_config="type=file"
 icount=10000000
 report_interval=5
