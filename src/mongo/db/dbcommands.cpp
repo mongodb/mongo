@@ -528,10 +528,10 @@ public:
                      string& errmsg,
                      BSONObjBuilder& result) {
         if (cmdObj.hasField("autoIndexId")) {
-            const char* deprecationWarning =
-                "the autoIndexId option is deprecated and will be removed in a future release";
-            warning() << deprecationWarning;
-            result.append("note", deprecationWarning);
+            if (!cmdObj["autoIndexId"].trueValue()) {
+                errmsg = "autoIndexId option cannot be false in replica set";
+                return false;
+            }
         }
         return appendCommandStatus(result, createCollection(txn, dbname, cmdObj));
     }
