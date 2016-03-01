@@ -241,10 +241,6 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 					goto err;
 				continue;
 			}
-			if (STRING_MATCH("throttle", k.str, k.len)) {
-				workp->throttle = (uint64_t)v.val;
-				continue;
-			}
 			if (STRING_MATCH("insert", k.str, k.len) ||
 			    STRING_MATCH("inserts", k.str, k.len)) {
 				if ((workp->insert = v.val) < 0)
@@ -262,10 +258,8 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 					goto err;
 				continue;
 			}
-			if (STRING_MATCH("update", k.str, k.len) ||
-			    STRING_MATCH("updates", k.str, k.len)) {
-				if ((workp->update = v.val) < 0)
-					goto err;
+			if (STRING_MATCH("throttle", k.str, k.len)) {
+				workp->throttle = (uint64_t)v.val;
 				continue;
 			}
 			if (STRING_MATCH("truncate", k.str, k.len)) {
@@ -288,6 +282,23 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				if (v.val <= 0)
 					goto err;
 				workp->truncate_count = (uint64_t)v.val;
+				continue;
+			}
+			if (STRING_MATCH("update", k.str, k.len) ||
+			    STRING_MATCH("updates", k.str, k.len)) {
+				if ((workp->update = v.val) < 0)
+					goto err;
+				continue;
+			}
+			if (STRING_MATCH("update_delta", k.str, k.len)) {
+				if (v.type == WT_CONFIG_ITEM_STRING ||
+				    v.type == WT_CONFIG_ITEM_ID) {
+					if (strncmp(v.str, "rand", 4) != 0)
+						goto err;
+					/* Special random value */
+					workp->update_delta = INT64_MAX;
+				} else
+					workp->update_delta = v.val;
 				continue;
 			}
 			goto err;
@@ -409,7 +420,12 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		*(uint32_t *)valueloc = (uint32_t)v->val;
 		break;
 	case CONFIG_STRING_TYPE:
-		if (v->type != WT_CONFIG_ITEM_STRING) {
+		/*
+		 * Configuration parsing uses string/ID to distinguish
+		 * between quoted and unquoted values.
+		 */
+		if (v->type != WT_CONFIG_ITEM_STRING &&
+		    v->type != WT_CONFIG_ITEM_ID) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad string value for \'%.*s=%.*s\'\n",
 			    (int)k->len, k->str, (int)v->len, v->str);
@@ -438,7 +454,8 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		    STRING_MATCH("threads", k->str, k->len))
 			return (config_threads(cfg, v->str, v->len));
 
-		if (v->type != WT_CONFIG_ITEM_STRING) {
+		if (v->type != WT_CONFIG_ITEM_STRING &&
+		    v->type != WT_CONFIG_ITEM_ID) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad string value for \'%.*s=%.*s\'\n",
 			    (int)k->len, k->str, (int)v->len, v->str);
@@ -669,6 +686,12 @@ config_sanity(CONFIG *cfg)
 	if (cfg->pareto > 100) {
 		fprintf(stderr,
 		    "Invalid pareto distribution - should be a percentage\n");
+		return (EINVAL);
+	}
+
+	if (cfg->value_sz_max < cfg->value_sz) {
+		fprintf(stderr,
+		    "value_sz_max must greater than or equal to value_sz\n");
 		return (EINVAL);
 	}
 
