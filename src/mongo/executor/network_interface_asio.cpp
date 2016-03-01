@@ -324,8 +324,6 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                         stdx::lock_guard<stdx::mutex> lk(access->mutex);
                         if (generation != access->id) {
                             // The operation has been cleaned up, do not access.
-                            LOG(2) << "Could not time out request " << requestId
-                                   << ", operation has already been cleaned up";
                             return;
                         }
 

@@ -239,6 +239,10 @@ void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& status) {
     // We never hold the access lock when we call finish from NetworkInterfaceASIO.
     _transitionToState(AsyncOp::State::kFinished);
 
+    LOG(2) << "Request " << _request.id << " finished with response: "
+           << (status.getStatus().isOK() ? status.getValue().data.toString()
+                                         : status.getStatus().toString());
+
     // Calling the completion handler may invalidate state in this op, so do it last.
     _onFinish(status);
 }
