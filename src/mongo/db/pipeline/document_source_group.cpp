@@ -366,7 +366,7 @@ void DocumentSourceGroup::populate() {
         // We are done with the ROOT document so release it.
         _variables->clearRoot();
 
-        DEV {
+        if (kDebugBuild && !storageGlobalParams.readOnly) {
             // In debug mode, spill every time we have a duplicate id to stress merge logic.
             if (!inserted  // is a dup
                 &&
