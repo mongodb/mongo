@@ -43,7 +43,7 @@ struct IsEndian : std::false_type {};
     template <typename T>                                  \
     struct name {                                          \
         using value_type = T;                              \
-        name() {}                                          \
+        name() : value(T{}) {}                             \
         name(T t) : value(t) {}                            \
         T value;                                           \
                                                            \

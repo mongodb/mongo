@@ -197,11 +197,10 @@ public:
         verify(!_done);
         fillIfNeeded();
 
-        Data out;
         // Note: key must be read before value so can't pass directly to Data constructor
-        out.first = Key::deserializeForSorter(*_reader, _settings.first);
-        out.second = Value::deserializeForSorter(*_reader, _settings.second);
-        return out;
+        auto first = Key::deserializeForSorter(*_reader, _settings.first);
+        auto second = Value::deserializeForSorter(*_reader, _settings.second);
+        return Data(std::move(first), std::move(second));
     }
 
 private:

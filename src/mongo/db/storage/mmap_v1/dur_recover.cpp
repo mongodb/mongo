@@ -34,6 +34,7 @@
 
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 
+#include <cstring>
 #include <fcntl.h>
 #include <iomanip>
 #include <iostream>
@@ -177,7 +178,7 @@ public:
      *  throws on premature end of section.
      */
     void next(ParsedJournalEntry& e) {
-        unsigned lenOrOpCode;
+        unsigned lenOrOpCode{};
         _entries->read(lenOrOpCode);
 
         if (lenOrOpCode > JEntry::OpCode_Min) {
@@ -471,6 +472,8 @@ bool RecoveryJob::processFileBuffer(const void* p, unsigned len) {
         {
             // read file header
             JHeader h;
+            std::memset(&h, 0, sizeof(h));
+
             br.read(h);
 
             if (!h.valid()) {
@@ -498,6 +501,8 @@ bool RecoveryJob::processFileBuffer(const void* p, unsigned len) {
         // read sections
         while (!br.atEof()) {
             JSectHeader h;
+            std::memset(&h, 0, sizeof(h));
+
             br.peek(h);
             if (h.fileId != fileId) {
                 if (kDebugBuild ||

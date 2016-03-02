@@ -76,7 +76,7 @@ public:
     /** read in and return an object of the specified type, and advance buffer pointer */
     template <typename T>
     T read() {
-        T out;
+        T out{};
         read(out);
         return out;
     }
@@ -93,7 +93,7 @@ public:
     /** read in and return an object of the specified type, but do not advance buffer pointer */
     template <typename T>
     T peek() const {
-        T out;
+        T out{};
         peek(out);
         return out;
     }
