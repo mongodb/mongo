@@ -2803,6 +2803,11 @@ TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {
                                                                          << "node3:12345"
                                                                          << "_id" << 2))),
                        HostAndPort("node1", 12345));
+
+    // Turn off readconcern majority support, and snapshots.
+    disableReadConcernMajoritySupport();
+    disableSnapshots();
+
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastAppliedOpTime(OpTimeWithTermZero(100, 2));
     getReplCoord()->setMyLastDurableOpTime(OpTimeWithTermZero(100, 2));
@@ -2946,6 +2951,11 @@ TEST_F(ReplCoordTest,
                                                                          << "node5:12345"
                                                                          << "_id" << 4))),
                        HostAndPort("node1", 12345));
+
+    // Turn off readconcern majority support, and snapshots.
+    disableReadConcernMajoritySupport();
+    disableSnapshots();
+
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastAppliedOpTime(OpTimeWithTermZero(100, 1));
     getReplCoord()->setMyLastDurableOpTime(OpTimeWithTermZero(100, 1));

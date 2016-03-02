@@ -27,14 +27,16 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     }
 
     var nodes = rst.nodeList();
-    rst.initiate({
+    var config = {
         _id: replSetName,
         members: [
             {_id: 0, host: nodes[0]},
             {_id: 1, host: nodes[1], priority: 0},
             {_id: 2, host: nodes[2], arbiterOnly: true},
         ]
-    });
+    };
+    updateConfigIfNotDurable(config);
+    rst.initiate(config);
 
     var primary = rst.getPrimary();
     var secondary = rst.liveNodes.slaves[0];

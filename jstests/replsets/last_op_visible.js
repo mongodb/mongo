@@ -4,6 +4,8 @@
 // We then confirm that a writeConcern majority write will be seen as the lastVisibleOp by a
 // majority read.
 
+load("jstests/replsets/rslib.js");  // For updateConfigIfNotDurable.
+
 (function() {
     "use strict";
 
@@ -26,6 +28,13 @@
     replTest.initiate();
 
     var primary = replTest.getPrimary();
+
+    // Update the replset config if not durable.
+    var config = replTest.getReplSetConfigFromNode();
+    updateConfigIfNotDurable(config);
+    config.version++;
+    assert.commandWorked(primary.getDB("admin").adminCommand({replSetReconfig: config}));
+    primary = replTest.getPrimary();
 
     // Do an insert without writeConcern.
     var res = primary.getDB(name).runCommandWithMetadata(

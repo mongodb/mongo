@@ -1,6 +1,4 @@
 /**
- * @tags: [requires_journaling]
- *
  * Test basic read committed maxTimeMS timeout while waiting for a committed snapshot:
  *  - Reads with an 'afterOpTime' snapshot >= current time should be able to see things that
  *    happened before or at that opTime.
@@ -23,7 +21,7 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
     }
 
     var nodes = replTest.nodeList();
-    replTest.initiate({
+    var config = {
         "_id": name,
         "members": [
             {"_id": 0, "host": nodes[0]},
@@ -31,7 +29,9 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
             {"_id": 2, "host": nodes[2], arbiterOnly: true}
         ],
         "protocolVersion": 1
-    });
+    };
+    updateConfigIfNotDurable(config);
+    replTest.initiate(config);
 
     // Get connections and collection.
     var primary = replTest.getPrimary();

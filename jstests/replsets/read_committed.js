@@ -1,6 +1,4 @@
 /**
- * @tags: [requires_journaling]
- *
  * Test basic read committed functionality, including:
  *  - Writes with writeConcern 'majority' should be visible once the write completes.
  *  - With the only data-bearing secondary down, committed reads should not include newly inserted
@@ -13,6 +11,10 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 (function() {
     "use strict";
 
+    function log(arg) {
+        jsTest.log(tojson(arg));
+    }
+
     // Set up a set and grab things for later.
     var name = "read_committed";
     var replTest =
@@ -24,14 +26,16 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     }
 
     var nodes = replTest.nodeList();
-    replTest.initiate({
+    var config = {
         "_id": name,
         "members": [
             {"_id": 0, "host": nodes[0]},
             {"_id": 1, "host": nodes[1], priority: 0},
             {"_id": 2, "host": nodes[2], arbiterOnly: true}
         ]
-    });
+    };
+    updateConfigIfNotDurable(config);
+    replTest.initiate(config);
 
     // Get connections and collection.
     var primary = replTest.getPrimary();
@@ -40,16 +44,26 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     var db = primary.getDB(name);
     var t = db[name];
 
+    function doRead(readConcern) {
+        readConcern.maxTimeMS = 3000;
+        var res = assert.commandWorked(t.runCommand('find', readConcern));
+        var docs = (new DBCommandCursor(db.getMongo(), res)).toArray();
+        assert.gt(docs.length, 0, "no docs returned!");
+        return docs[0].state;
+    }
+
     function doDirtyRead() {
-        var res = t.runCommand('find', {"readConcern": {"level": "local"}});
-        assert.commandWorked(res);
-        return new DBCommandCursor(db.getMongo(), res).toArray()[0].state;
+        log("doing dirty read");
+        var ret = doRead({"readConcern": {"level": "local"}});
+        log("done doing dirty read.");
+        return ret;
     }
 
     function doCommittedRead() {
-        var res = t.runCommand('find', {"readConcern": {"level": "majority"}});
-        assert.commandWorked(res);
-        return new DBCommandCursor(db.getMongo(), res).toArray()[0].state;
+        log("doing committed read");
+        var ret = doRead({"readConcern": {"level": "majority"}});
+        log("done doing committed read.");
+        return ret;
     }
 
     // Do a write, wait for it to replicate, and ensure it is visible.

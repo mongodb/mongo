@@ -581,16 +581,22 @@ var ReplSetTest = function(opts) {
         }
     };
 
+    this._setDefaultConfigOptions = function(config) {
+        if (jsTestOptions().useLegacyReplicationProtocol &&
+            !config.hasOwnProperty("protocolVersion")) {
+            config.protocolVersion = 0;
+        }
+    };
+
     this.initiate = function(cfg, initCmd, timeout) {
         var master = this.nodes[0].getDB("admin");
         var config = cfg || this.getReplSetConfig();
         var cmd = {};
         var cmdKey = initCmd || 'replSetInitiate';
         timeout = timeout || 120000;
-        if (jsTestOptions().useLegacyReplicationProtocol &&
-            !config.hasOwnProperty("protocolVersion")) {
-            config.protocolVersion = 0;
-        }
+
+        this._setDefaultConfigOptions(config);
+
         cmd[cmdKey] = config;
         printjson(cmd);
 
@@ -626,10 +632,8 @@ var ReplSetTest = function(opts) {
         var newVersion = this.getReplSetConfigFromNode().version + 1;
         config.version = newVersion;
 
-        if (jsTestOptions().useLegacyReplicationProtocol &&
-            !config.hasOwnProperty("protocolVersion")) {
-            config.protocolVersion = 0;
-        }
+        this._setDefaultConfigOptions(config);
+
         try {
             assert.commandWorked(this.getPrimary().adminCommand({replSetReconfig: config}));
         } catch (e) {

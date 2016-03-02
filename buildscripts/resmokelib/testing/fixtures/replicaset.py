@@ -29,6 +29,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                  dbpath_prefix=None,
                  preserve_dbpath=False,
                  num_nodes=2,
+                 write_concern_majority_journal_default=None,
                  auth_options=None,
                  replset_config_options=None):
 
@@ -38,6 +39,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.mongod_options = utils.default_if_none(mongod_options, {})
         self.preserve_dbpath = preserve_dbpath
         self.num_nodes = num_nodes
+        self.write_concern_majority_journal_default = write_concern_majority_journal_default
         self.auth_options = auth_options
         self.replset_config_options = utils.default_if_none(replset_config_options, {})
 
@@ -87,6 +89,9 @@ class ReplicaSetFixture(interface.ReplFixture):
             members.append(member_info)
         initiate_cmd_obj = {"replSetInitiate": {"_id": self.replset_name, "members": members}}
 
+        if self.write_concern_majority_journal_default is not None:
+            initiate_cmd_obj["replSetInitiate"]["writeConcernMajorityJournalDefault"] = self.write_concern_majority_journal_default
+
         client = utils.new_mongo_client(port=self.port)
         if self.auth_options is not None:
             auth_db = client[self.auth_options["authenticationDatabase"]]
@@ -97,7 +102,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         if self.replset_config_options.get("configsvr", False):
             initiate_cmd_obj["replSetInitiate"]["configsvr"] = True
 
-        self.logger.info("Issuing replSetInitiate command...")
+        self.logger.info("Issuing replSetInitiate command...%s", initiate_cmd_obj)
         client.admin.command(initiate_cmd_obj)
 
     def await_ready(self):

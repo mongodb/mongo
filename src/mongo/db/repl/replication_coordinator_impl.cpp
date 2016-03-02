@@ -1103,7 +1103,9 @@ Status ReplicationCoordinatorImpl::setLastDurableOptime_forTest(long long cfgVer
 
     const UpdatePositionArgs::UpdateInfo update(OpTime(), opTime, cfgVer, memberId);
     long long configVersion;
-    return _setLastOptime_inlock(update, &configVersion);
+    const auto status = _setLastOptime_inlock(update, &configVersion);
+    _updateLastCommittedOpTime_inlock();
+    return status;
 }
 
 Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer,
@@ -1114,7 +1116,9 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
 
     const UpdatePositionArgs::UpdateInfo update(opTime, OpTime(), cfgVer, memberId);
     long long configVersion;
-    return _setLastOptime_inlock(update, &configVersion);
+    const auto status = _setLastOptime_inlock(update, &configVersion);
+    _updateLastCommittedOpTime_inlock();
+    return status;
 }
 
 Status ReplicationCoordinatorImpl::_setLastOptime_inlock(

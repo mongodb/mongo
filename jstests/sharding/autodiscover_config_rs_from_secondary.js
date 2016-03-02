@@ -11,6 +11,7 @@
     var conf = rst.getReplSetConfig();
     conf.members[1].priority = 0;
     conf.members[2].priority = 0;
+    conf.writeConcernMajorityJournalDefault = true;
     rst.initiate(conf);
 
     var seedList = rst.name + "/" + rst.nodes[1].host;  // node 1 is guaranteed to not be primary
