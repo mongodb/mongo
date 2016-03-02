@@ -12,4 +12,4 @@ populate_threads=1
 threads=((count=1,inserts=1,throttle=1000),(count=4,update=1,update_delta=-100))
 # Start with moderate values and let them shrink slowly.
 value_sz_min=1000
-value_sz=20000
+value_sz=10000
