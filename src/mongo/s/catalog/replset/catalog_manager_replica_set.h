@@ -164,15 +164,6 @@ private:
                                          int cappedSize) override;
 
     /**
-     * Helper method for running a read command against the config server. Automatically retries on
-     * NotMaster and network errors, so these will never be returned.
-     */
-    StatusWith<BSONObj> _runReadCommand(OperationContext* txn,
-                                        const std::string& dbname,
-                                        const BSONObj& cmdObj,
-                                        const ReadPreferenceSetting& readPref);
-
-    /**
      * Executes the specified batch write command on the current config server's primary and retries
      * on the specified set of errors using the default retry policy.
      */

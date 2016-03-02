@@ -42,12 +42,12 @@ namespace shardutil {
 StatusWith<long long> retrieveTotalShardSize(OperationContext* txn,
                                              ShardId shardId,
                                              ShardRegistry* shardRegistry) {
-    auto listDatabasesStatus =
-        shardRegistry->runCommandOnShard(txn,
-                                         shardId,
-                                         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                                         "admin",
-                                         BSON("listDatabases" << 1));
+    auto listDatabasesStatus = shardRegistry->runIdempotentCommandOnShard(
+        txn,
+        shardId,
+        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+        "admin",
+        BSON("listDatabases" << 1));
     if (!listDatabasesStatus.isOK()) {
         return listDatabasesStatus.getStatus();
     }

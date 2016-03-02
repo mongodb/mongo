@@ -643,11 +643,12 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
     MONGO_UNREACHABLE;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
-                                                     const std::shared_ptr<Shard>& shard,
-                                                     const ReadPreferenceSetting& readPref,
-                                                     const std::string& dbName,
-                                                     const BSONObj& cmdObj) {
+StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
+    OperationContext* txn,
+    const std::shared_ptr<Shard>& shard,
+    const ReadPreferenceSetting& readPref,
+    const std::string& dbName,
+    const BSONObj& cmdObj) {
     auto response = _runCommandWithRetries(txn,
                                            _executorPool->getFixedExecutor(),
                                            shard,
@@ -657,7 +658,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
                                            readPref.pref == ReadPreference::PrimaryOnly
                                                ? rpc::makeEmptyMetadata()
                                                : kSecondaryOkMetadata,
-                                           kNotMasterErrors);
+                                           kAllRetriableErrors);
     if (!response.isOK()) {
         return response.getStatus();
     }
@@ -665,24 +666,26 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
     return response.getValue().response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
-                                                     ShardId shardId,
-                                                     const ReadPreferenceSetting& readPref,
-                                                     const std::string& dbName,
-                                                     const BSONObj& cmdObj) {
+StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnShard(
+    OperationContext* txn,
+    ShardId shardId,
+    const ReadPreferenceSetting& readPref,
+    const std::string& dbName,
+    const BSONObj& cmdObj) {
     auto shard = getShard(txn, shardId);
     if (!shard) {
         return {ErrorCodes::ShardNotFound, str::stream() << "shard " << shardId << " not found"};
     }
-    return runCommandOnShard(txn, shard, readPref, dbName, cmdObj);
+    return runIdempotentCommandOnShard(txn, shard, readPref, dbName, cmdObj);
 }
 
 
-StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
-                                                         const std::shared_ptr<Shard>& shard,
-                                                         const ReadPreferenceSetting& readPref,
-                                                         const std::string& dbName,
-                                                         const BSONObj& cmdObj) {
+StatusWith<BSONObj> ShardRegistry::runIdempotentCommandForAddShard(
+    OperationContext* txn,
+    const std::shared_ptr<Shard>& shard,
+    const ReadPreferenceSetting& readPref,
+    const std::string& dbName,
+    const BSONObj& cmdObj) {
     auto status = _runCommandWithRetries(txn,
                                          _executorForAddShard.get(),
                                          shard,
@@ -692,7 +695,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
                                          readPref.pref == ReadPreference::PrimaryOnly
                                              ? rpc::makeEmptyMetadata()
                                              : kSecondaryOkMetadata,
-                                         kNotMasterErrors);
+                                         kAllRetriableErrors);
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -700,10 +703,11 @@ StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
     return status.getValue().response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
-                                                      const ReadPreferenceSetting& readPref,
-                                                      const std::string& dbName,
-                                                      const BSONObj& cmdObj) {
+StatusWith<BSONObj> ShardRegistry::runIdempotentCommandOnConfig(
+    OperationContext* txn,
+    const ReadPreferenceSetting& readPref,
+    const std::string& dbName,
+    const BSONObj& cmdObj) {
     auto response = _runCommandWithRetries(
         txn,
         _executorPool->getFixedExecutor(),
@@ -712,30 +716,8 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
         dbName,
         cmdObj,
         readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata : kReplSecondaryOkMetadata,
-        kNotMasterErrors);
+        kAllRetriableErrors);
 
-    if (!response.isOK()) {
-        return response.getStatus();
-    }
-
-    return response.getValue().response;
-}
-
-StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationContext* txn,
-                                                                  const ShardId& shardId,
-                                                                  const std::string& dbname,
-                                                                  const BSONObj& cmdObj) {
-    auto shard = getShard(txn, shardId);
-    invariant(!shard->isConfig());
-
-    auto response = _runCommandWithRetries(txn,
-                                           _executorPool->getFixedExecutor(),
-                                           shard,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           dbname,
-                                           cmdObj,
-                                           rpc::makeEmptyMetadata(),
-                                           kNotMasterErrors);
     if (!response.isOK()) {
         return response.getStatus();
     }

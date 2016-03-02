@@ -245,55 +245,41 @@ public:
     /**
      * Runs a command against a host belonging to the specified shard and matching the given
      * readPref, and returns the result.  It is the responsibility of the caller to check the
-     * returned BSON for command-specific failures.
+     * returned BSON for command-specific failures. It is also important that the command is safe
+     * to be retried in case we cannot verify whether or not it ran successfully.
      */
-    StatusWith<BSONObj> runCommandOnShard(OperationContext* txn,
-                                          const std::shared_ptr<Shard>& shard,
-                                          const ReadPreferenceSetting& readPref,
-                                          const std::string& dbName,
-                                          const BSONObj& cmdObj);
-    StatusWith<BSONObj> runCommandOnShard(OperationContext* txn,
-                                          ShardId shardId,
-                                          const ReadPreferenceSetting& readPref,
-                                          const std::string& dbName,
-                                          const BSONObj& cmdObj);
+    StatusWith<BSONObj> runIdempotentCommandOnShard(OperationContext* txn,
+                                                    const std::shared_ptr<Shard>& shard,
+                                                    const ReadPreferenceSetting& readPref,
+                                                    const std::string& dbName,
+                                                    const BSONObj& cmdObj);
+    StatusWith<BSONObj> runIdempotentCommandOnShard(OperationContext* txn,
+                                                    ShardId shardId,
+                                                    const ReadPreferenceSetting& readPref,
+                                                    const std::string& dbName,
+                                                    const BSONObj& cmdObj);
 
 
     /**
-     * Same as runCommandOnShard above but used for talking to nodes that are not yet in the
-     * ShardRegistry.
+     * Same as runIdempotentCommandOnShard above but used for talking to nodes that are not yet in
+     * the ShardRegistry.
      */
-    StatusWith<BSONObj> runCommandForAddShard(OperationContext* txn,
-                                              const std::shared_ptr<Shard>& shard,
-                                              const ReadPreferenceSetting& readPref,
-                                              const std::string& dbName,
-                                              const BSONObj& cmdObj);
+    StatusWith<BSONObj> runIdempotentCommandForAddShard(OperationContext* txn,
+                                                        const std::shared_ptr<Shard>& shard,
+                                                        const ReadPreferenceSetting& readPref,
+                                                        const std::string& dbName,
+                                                        const BSONObj& cmdObj);
 
     /**
-     * Runs a command against a config server that matches the given read preference, and returns
-     * the result.  It is the responsibility of the caller to check the returned BSON for
-     * command-specific failures.
+     * Runs command against a config server that matches the given read preference,  and returns
+     * the result.  It is the responsibility of the caller to check the returned BSON
+     * for command-specific failures.  It is also important that the command is safe to be retried
+     * in case we cannot verify whether or not it ran successfully.
      */
-    StatusWith<BSONObj> runCommandOnConfig(OperationContext* txn,
-                                           const ReadPreferenceSetting& readPref,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj);
-
-    /**
-     * Helpers for running commands against a given shard with logic for retargeting and
-     * retrying the command in the event of a NotMaster response.
-     * Returns ErrorCodes::NotMaster if after the max number of retries we still haven't
-     * successfully delivered the command to a primary.  Can also return a non-ok status in the
-     * event of a network error communicating with the shard.  If we are able to get
-     * a valid response from running the command then we will return it, even if the command
-     * response indicates failure.  Thus the caller is responsible for checking the command
-     * response object for any kind of command-specific failure.  The only exception is
-     * NotMaster errors, which we intercept and follow the rules described above for handling.
-     */
-    StatusWith<BSONObj> runCommandWithNotMasterRetries(OperationContext* txn,
-                                                       const ShardId& shard,
-                                                       const std::string& dbname,
-                                                       const BSONObj& cmdObj);
+    StatusWith<BSONObj> runIdempotentCommandOnConfig(OperationContext* txn,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const std::string& dbname,
+                                                     const BSONObj& cmdObj);
 
     class ErrorCodesHash {
     public:
