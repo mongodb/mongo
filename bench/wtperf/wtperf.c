@@ -123,7 +123,7 @@ randomize_value(CONFIG_THREAD *thread, char *value_buf)
 	 * off for avoiding figuring out how long the value is more accurately
 	 * in this performance sensitive function.
 	 */
-	if (thread->workload->update_delta == 0)
+	if (thread->workload == NULL || thread->workload->update_delta == 0)
 		max_range = thread->cfg->value_sz;
 	else if (thread->workload->update_delta > 0)
 		max_range = thread->cfg->value_sz_max;
