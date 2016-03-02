@@ -134,13 +134,10 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	btree = S2BT(session);
 	bm = btree->bm;
 	dhandle = session->dhandle;
-	marked_dead = false;
+	evict_reset = marked_dead = false;
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
-
-	/* Ensure that we aren't racing with the eviction server */
-	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
 
 	/*
 	 * If we don't already have the schema lock, make it an error to try
@@ -163,6 +160,13 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	__wt_spin_lock(session, &dhandle->close_lock);
 
 	/*
+	 * Ensure we aren't racing with the eviction server; inside the close
+	 * lock so threads won't race setting/clearing the tree's "no eviction"
+	 * flag.
+	 */
+	WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
+
+	/*
 	 * The close can fail if an update cannot be written, return the EBUSY
 	 * error to our caller for eventual retry.
 	 *
@@ -176,23 +180,19 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		if (force && (bm == NULL || !bm->is_mapped(bm, session))) {
 			F_SET(session->dhandle, WT_DHANDLE_DEAD);
-
-			/*
-			 * Reset the tree's eviction priority, and the tree is
-			 * evictable by definition.
-			 */
-			__wt_evict_priority_clear(session);
-			F_CLR(S2BT(session), WT_BTREE_NO_EVICTION);
-
 			marked_dead = true;
+
+			/* Reset the tree's eviction priority (if any). */
+			__wt_evict_priority_clear(session);
 		}
 		if (!marked_dead || final)
 			WT_ERR(__wt_checkpoint_close(session, final));
 	}
 
 	WT_TRET(__wt_btree_close(session));
+
 	/*
-	 * If we marked a handle as dead it will be closed by sweep, via
+	 * If we marked a handle dead it will be closed by sweep, via
 	 * another call to sync and close.
 	 */
 	if (!marked_dead) {
@@ -204,10 +204,9 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
 	    !F_ISSET(dhandle, WT_DHANDLE_OPEN));
 
-err:	__wt_spin_unlock(session, &dhandle->close_lock);
-
-	if (evict_reset)
+err:	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
+	__wt_spin_unlock(session, &dhandle->close_lock);
 
 	if (no_schema_lock)
 		F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);

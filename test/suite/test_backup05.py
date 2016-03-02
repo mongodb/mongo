@@ -44,14 +44,6 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
     create_params = 'key_format=i,value_format=i'
     freq = 5
 
-    def copy_windows(self, olddir, newdir):
-        os.mkdir(newdir)
-        for fname in os.listdir(olddir):
-            fullname = os.path.join(olddir, fname)
-            # Skip lock file on Windows since it is locked
-            if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
-                shutil.copy(fullname, newdir)
-
     def check_manual_backup(self, i, olddir, newdir):
         ''' Simulate a manual backup from olddir and restart in newdir. '''
         self.session.checkpoint()

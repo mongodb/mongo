@@ -60,7 +60,7 @@ static const CONFIG default_cfg = {
 	0,				/* in warmup phase */
 	false,				/* Signal for idle cycle thread */
 	0,				/* total seconds running */
-	0,				/* has truncate */
+	0,				/* flags */
 	{NULL, NULL},			/* the truncate queue */
 	{NULL, NULL},                   /* the config queue */
 
@@ -87,6 +87,7 @@ static int	 start_threads(CONFIG *,
 		    WORKLOAD *, CONFIG_THREAD *, u_int, void *(*)(void *));
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*thread_run_wtperf(void *);
+static void	 update_value_delta(CONFIG_THREAD *);
 static void	*worker(void *);
 
 static uint64_t	 wtperf_rand(CONFIG_THREAD *);
@@ -105,24 +106,93 @@ get_next_incr(CONFIG *cfg)
 	return (__wt_atomic_add64(&cfg->insert_key, 1));
 }
 
+/*
+ * Each time this function is called we will overwrite the first and one
+ * other element in the value buffer.
+ */
 static void
 randomize_value(CONFIG_THREAD *thread, char *value_buf)
 {
 	uint8_t *vb;
-	uint32_t i;
+	uint32_t i, max_range, rand_val;
 
 	/*
-	 * Each time we're called overwrite value_buf[0] and one other
-	 * randomly chosen byte (other than the trailing NUL).
-	 * Make sure we don't write a NUL: keep the value the same length.
+	 * Limit how much of the buffer we validate for length, this means
+	 * that only threads that do growing updates will ever make changes to
+	 * values outside of the initial value size, but that's a fair trade
+	 * off for avoiding figuring out how long the value is more accurately
+	 * in this performance sensitive function.
 	 */
-	i = __wt_random(&thread->rnd) % (thread->cfg->value_sz - 1);
+	if (thread->workload == NULL || thread->workload->update_delta == 0)
+		max_range = thread->cfg->value_sz;
+	else if (thread->workload->update_delta > 0)
+		max_range = thread->cfg->value_sz_max;
+	else
+		max_range = thread->cfg->value_sz_min;
+
+	/*
+	 * Generate a single random value and re-use it. We generally only
+	 * have small ranges in this function, so avoiding a bunch of calls
+	 * is worthwhile.
+	 */
+	rand_val = __wt_random(&thread->rnd);
+	i = rand_val % (max_range - 1);
+
+	/*
+	 * Ensure we don't write past the end of a value when configured for
+	 * randomly sized values.
+	 */
 	while (value_buf[i] == '\0' && i > 0)
 		--i;
-	if (i > 0) {
-		vb = (uint8_t *)value_buf;
-		vb[0] = (__wt_random(&thread->rnd) % 255) + 1;
-		vb[i] = (__wt_random(&thread->rnd) % 255) + 1;
+
+	vb = (uint8_t *)value_buf;
+	vb[0] = ((rand_val >> 8) % 255) + 1;
+	/*
+	 * If i happened to be 0, we'll be re-writing the same value
+	 * twice, but that doesn't matter.
+	 */
+	vb[i] = ((rand_val >> 16) % 255) + 1;
+}
+
+/*
+ * Figure out and extend the size of the value string, used for growing
+ * updates. We know that the value to be updated is in the threads value
+ * scratch buffer.
+ */
+static inline void
+update_value_delta(CONFIG_THREAD *thread)
+{
+	CONFIG *cfg;
+	char * value;
+	int64_t delta, len, new_len;
+
+	cfg = thread->cfg;
+	value = thread->value_buf;
+	delta = thread->workload->update_delta;
+	len = (int64_t)strlen(value);
+
+	if (delta == INT64_MAX)
+		delta = __wt_random(&thread->rnd) %
+		    (cfg->value_sz_max - cfg->value_sz);
+
+	/* Ensure we aren't changing across boundaries */
+	if (delta > 0 && len + delta > cfg->value_sz_max)
+		delta = cfg->value_sz_max - len;
+	else if (delta < 0 && len + delta < cfg->value_sz_min)
+		delta = cfg->value_sz_min - len;
+
+	/* Bail if there isn't anything to do */
+	if (delta == 0)
+		return;
+
+	if (delta < 0)
+		value[len + delta] = '\0';
+	else {
+		/* Extend the value by the configured amount. */
+		for (new_len = len;
+		    new_len < cfg->value_sz_max && new_len - len < delta;
+		    new_len++)
+			value[new_len] = 'a';
 	}
 }
 
@@ -624,8 +694,10 @@ worker(void *arg)
 				 * Copy as much of the previous value as is
 				 * safe, and be sure to NUL-terminate.
 				 */
-				strncpy(value_buf, value, cfg->value_sz);
-				value_buf[cfg->value_sz - 1] = '\0';
+				strncpy(value_buf,
+				    value, cfg->value_sz_max - 1);
+				if (thread->workload->update_delta != 0)
+					update_value_delta(thread);
 				if (value_buf[0] == 'a')
 					value_buf[0] = 'b';
 				else
@@ -2195,7 +2267,7 @@ main(int argc, char *argv[])
 	 * the compact operation, but not for the workloads.
 	 */
 	if (cfg->async_threads > 0) {
-		if (cfg->has_truncate > 0) {
+		if (F_ISSET(cfg, CFG_TRUNCATE) > 0) {
 			lprintf(cfg, 1, 0, "Cannot run truncate and async\n");
 			goto err;
 		}
@@ -2220,13 +2292,13 @@ main(int argc, char *argv[])
 		goto err;
 
 	/* You can't have truncate on a random collection. */
-	if (cfg->has_truncate && cfg->random_range) {
+	if (F_ISSET(cfg, CFG_TRUNCATE) && cfg->random_range) {
 		lprintf(cfg, 1, 0, "Cannot run truncate and random_range\n");
 		goto err;
 	}
 
 	/* We can't run truncate with more than one table. */
-	if (cfg->has_truncate && cfg->table_count > 1) {
+	if (F_ISSET(cfg, CFG_TRUNCATE) && cfg->table_count > 1) {
 		lprintf(cfg, 1, 0, "Cannot truncate more than 1 table\n");
 		goto err;
 	}
@@ -2374,7 +2446,8 @@ start_threads(CONFIG *cfg,
 		 * strings: trailing NUL is included in the size.
 		 */
 		thread->key_buf = dcalloc(cfg->key_sz, 1);
-		thread->value_buf = dcalloc(cfg->value_sz, 1);
+		thread->value_buf = dcalloc(cfg->value_sz_max, 1);
+
 		/*
 		 * Initialize and then toss in a bit of random values if needed.
 		 */
