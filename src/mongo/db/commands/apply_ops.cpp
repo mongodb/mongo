@@ -57,6 +57,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -118,7 +119,22 @@ public:
         txn->setWriteConcern(wcResult.getValue());
         setupSynchronousCommit(txn);
 
+
+        auto client = txn->getClient();
+        auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+        ScopeGuard lastOpSetterGuard =
+            MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                         &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                         txn);
+
         auto applyOpsStatus = appendCommandStatus(result, applyOps(txn, dbname, cmdObj, &result));
+
+        if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
+            // If this operation has already generated a new lastOp, don't bother setting it
+            // here. No-op applyOps will not generate a new lastOp, so we still need the guard to
+            // fire in that case.
+            lastOpSetterGuard.Dismiss();
+        }
 
         WriteConcernResult res;
         auto waitForWCStatus =
