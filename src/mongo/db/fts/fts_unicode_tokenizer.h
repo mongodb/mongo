@@ -73,22 +73,19 @@ private:
      */
     void _skipDelimiters();
 
-    unicode::DelimiterListLanguage _delimListLanguage;
-    unicode::CaseFoldMode _caseFoldMode;
-
     const FTSLanguage* const _language;
     const Stemmer _stemmer;
     const StopWords* const _stopWords;
+    const unicode::DelimiterListLanguage _delimListLanguage;
+    const unicode::CaseFoldMode _caseFoldMode;
 
     unicode::String _document;
     size_t _pos;
-
-    unicode::String _tokenBuf;
-    unicode::String _wordBuf;
-
+    StringData _word;
     Options _options;
 
-    std::string _stem;
+    StackBufBuilder _wordBuf;
+    StackBufBuilder _finalBuf;
 };
 
 }  // namespace fts

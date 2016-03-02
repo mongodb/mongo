@@ -68,9 +68,7 @@ bool BasicFTSTokenizer::moveNext() {
             continue;
         }
 
-        string word = token.data.toString();
-
-        word = tolowerString(token.data);
+        string word = tolowerString(token.data);
 
         // Stop words are case-sensitive so we need them to be lower cased to check
         // against the stop word list
@@ -82,7 +80,7 @@ bool BasicFTSTokenizer::moveNext() {
             word = token.data.toString();
         }
 
-        _stem = _stemmer.stem(word);
+        _stem = _stemmer.stem(word).toString();
         return true;
     }
 }

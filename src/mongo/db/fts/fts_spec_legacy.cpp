@@ -81,7 +81,7 @@ void FTSSpec::_scoreStringV1(const Tools& tools,
         string term = tolowerString(t.data);
         if (tools.stopwords->isStopWord(term))
             continue;
-        term = tools.stemmer->stem(term);
+        term = tools.stemmer->stem(term).toString();
 
         ScoreHelperStruct& data = terms[term];
 

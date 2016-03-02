@@ -61,19 +61,30 @@ auto kNormal = CaseFoldMode::kNormal;
 
 
 // Macro to preserve line numbers and arguments in error messages.
-#define TEST_CASE_FOLD_AND_STRIP_DIACRITICS(expected, input, options, caseFoldMode)        \
-    ASSERT_EQ(expected, String::caseFoldAndStripDiacritics(input, options, caseFoldMode)); \
-    ASSERT_EQ(expected + filler,                                                           \
-              String::caseFoldAndStripDiacritics(input + filler, options, caseFoldMode))
+#define TEST_CASE_FOLD_AND_STRIP_DIACRITICS(expected, input, options, caseFoldMode)           \
+    do {                                                                                      \
+        StackBufBuilder buf;                                                                  \
+        ASSERT_EQ(expected,                                                                   \
+                  String::caseFoldAndStripDiacritics(&buf, input, options, caseFoldMode));    \
+        ASSERT_EQ(                                                                            \
+            expected + filler,                                                                \
+            String::caseFoldAndStripDiacritics(&buf, input + filler, options, caseFoldMode)); \
+    } while (0)
+
+TEST(UnicodeString, SubstrTest) {
+    StackBufBuilder buf;
+    String indexes("01234");
+    ASSERT_EQ("123", indexes.substrToBuf(&buf, 1, 3));
+    ASSERT_EQ("4", indexes.substrToBuf(&buf, 4, 3));  // len too long.
+    ASSERT_EQ("", indexes.substrToBuf(&buf, 6, 3));   // pos past end.
+    ASSERT_EQ("", indexes.substrToBuf(&buf, 1, 0));   // len == 0.
+}
 
 TEST(UnicodeString, RemoveDiacritics) {
     // Test all ascii chars.
     for (unsigned char ch = 0; ch <= 0x7F; ch++) {
         const auto input = std::string(1, ch);
         const auto output = codepointIsDiacritic(ch) ? std::string() : std::string(1, ch);
-        if (ch) {  // String's constructor doesn't handle embedded NUL bytes.
-            ASSERT_EQUALS(output, String(input).removeDiacritics().toString());
-        }
         TEST_CASE_FOLD_AND_STRIP_DIACRITICS(output, input, kCaseSensitive, kNormal);
     }
 
@@ -83,21 +94,20 @@ TEST(UnicodeString, RemoveDiacritics) {
     // NFD Normalized Text ("Café").
     const char test2[] = {'C', 'a', 'f', 'e', static_cast<char>(0xcc), static_cast<char>(0x81), 0};
 
-    ASSERT_EQUALS(UTF8("¿CUANTOS ANOS TIENES TU?"), String(test1).removeDiacritics().toString());
-    ASSERT_EQUALS(UTF8("Cafe"), String(test2).removeDiacritics().toString());
-
     TEST_CASE_FOLD_AND_STRIP_DIACRITICS(
         UTF8("¿CUANTOS ANOS TIENES TU?"), test1, kCaseSensitive, kNormal);
     TEST_CASE_FOLD_AND_STRIP_DIACRITICS(UTF8("Cafe"), test2, kCaseSensitive, kNormal);
 }
 
 TEST(UnicodeString, CaseFolding) {
+    StackBufBuilder buf;
+
     // Test all ascii chars.
     for (unsigned char ch = 0; ch <= 0x7F; ch++) {
         const auto upper = std::string(1, ch);
         const auto lower = std::string(1, std::tolower(ch));
         if (ch) {  // String's constructor doesn't handle embedded NUL bytes.
-            ASSERT_EQUALS(lower, String(upper).toLower().toString());
+            ASSERT_EQUALS(lower, String(upper).toLowerToBuf(&buf, kNormal));
         }
         TEST_CASE_FOLD_AND_STRIP_DIACRITICS(lower, upper, kDiacriticSensitive, kNormal);
     }
@@ -105,8 +115,8 @@ TEST(UnicodeString, CaseFolding) {
     const char test1[] = UTF8("СКОЛЬКО ТЕБЕ ЛЕТ?");
     const char test2[] = UTF8("¿CUÁNTOS AÑOS TIENES TÚ?");
 
-    ASSERT_EQUALS(UTF8("сколько тебе лет?"), String(test1).toLower().toString());
-    ASSERT_EQUALS(UTF8("¿cuántos años tienes tú?"), String(test2).toLower().toString());
+    ASSERT_EQUALS(UTF8("сколько тебе лет?"), String(test1).toLowerToBuf(&buf, kNormal));
+    ASSERT_EQUALS(UTF8("¿cuántos años tienes tú?"), String(test2).toLowerToBuf(&buf, kNormal));
 
     TEST_CASE_FOLD_AND_STRIP_DIACRITICS(
         UTF8("сколько тебе лет?"), test1, kDiacriticSensitive, kNormal);
@@ -115,13 +125,14 @@ TEST(UnicodeString, CaseFolding) {
 }
 
 TEST(UnicodeString, CaseFoldingTurkish) {
+    StackBufBuilder buf;
     const char test1[] = UTF8("KAC YASINDASINIZ");
     const char test2[] = UTF8("KAC YASİNDASİNİZ");
 
     ASSERT_EQUALS(UTF8("kac yasındasınız"),
-                  String(test1).toLower(CaseFoldMode::kTurkish).toString());
+                  String(test1).toLowerToBuf(&buf, CaseFoldMode::kTurkish));
     ASSERT_EQUALS(UTF8("kac yasindasiniz"),
-                  String(test2).toLower(CaseFoldMode::kTurkish).toString());
+                  String(test2).toLowerToBuf(&buf, CaseFoldMode::kTurkish));
 
     TEST_CASE_FOLD_AND_STRIP_DIACRITICS(
         UTF8("kac yasındasınız"), test1, kDiacriticSensitive, kTurkish);
@@ -136,12 +147,6 @@ TEST(UnicodeString, CaseFoldingAndRemoveDiacritics) {
 
     // NFD Normalized Text ("CAFÉ").
     const char test3[] = {'C', 'A', 'F', 'E', static_cast<char>(0xcc), static_cast<char>(0x81), 0};
-
-    ASSERT_EQUALS(UTF8("ποσο χρονων εισαι?"),
-                  String(test1).toLower().removeDiacritics().toString());
-    ASSERT_EQUALS(UTF8("¿cuantos anos tienes tu?"),
-                  String(test2).toLower().removeDiacritics().toString());
-    ASSERT_EQUALS(UTF8("cafe"), String(test3).toLower().removeDiacritics().toString());
 
     TEST_CASE_FOLD_AND_STRIP_DIACRITICS(UTF8("ποσο χρονων εισαι?"), test1, 0, kNormal);
     TEST_CASE_FOLD_AND_STRIP_DIACRITICS(UTF8("¿cuantos anos tienes tu?"), test2, 0, kNormal);
@@ -214,13 +219,16 @@ TEST(UnicodeString, BadUTF8) {
     ASSERT_THROWS(String test3(invalid3), AssertionException);
     ASSERT_THROWS(String test4(invalid4), AssertionException);
 
+    StackBufBuilder buf;
+
     // caseFoldAndStripDiacritics doesn't make any guarantees about behavior when fed invalid utf8.
     // These calls are to ensure that they don't trigger any faults in sanitizing builds.
-    String::caseFoldAndStripDiacritics(invalid1, 0, kNormal);
-    String::caseFoldAndStripDiacritics(invalid2, 0, kNormal);
-    String::caseFoldAndStripDiacritics(invalid3, 0, kNormal);
+    String::caseFoldAndStripDiacritics(&buf, invalid1, 0, kNormal);
+    String::caseFoldAndStripDiacritics(&buf, invalid2, 0, kNormal);
+    String::caseFoldAndStripDiacritics(&buf, invalid3, 0, kNormal);
 
-    ASSERT_THROWS(String::caseFoldAndStripDiacritics(invalid4, 0, kNormal), AssertionException);
+    ASSERT_THROWS(String::caseFoldAndStripDiacritics(&buf, invalid4, 0, kNormal),
+                  AssertionException);
 }
 
 TEST(UnicodeString, UTF32ToUTF8) {
