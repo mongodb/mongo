@@ -90,6 +90,31 @@ FUNC_START(__crc32_vpmsum)
 	std	r26,-48(r1)
 	std	r25,-56(r1)
 
+	li 	r31, -256
+	stvx 	v20, r31, r1
+	li 	r31, -240
+	stvx 	v21, r31, r1
+	li 	r31, -224
+	stvx 	v22, r31, r1
+	li 	r31, -208
+	stvx 	v23, r31, r1
+	li 	r31, -192
+	stvx 	v24, r31, r1
+	li 	r31, -176
+	stvx 	v25, r31, r1
+	li 	r31, -160
+	stvx 	v26, r31, r1
+	li 	r31, -144
+	stvx 	v27, r31, r1
+	li 	r31, -128
+	stvx 	v28, r31, r1
+	li 	r31, -112
+	stvx 	v29, r31, r1
+	li 	r31, -96
+	stvx 	v30, r31, r1
+	li 	r31, -80
+	stvx 	v31, r31, r1
+
 	li	off16,16
 	li	off32,32
 	li	off48,48
@@ -570,6 +595,31 @@ FUNC_START(__crc32_vpmsum)
 
 	/* Get it into r3 */
 	MFVRD(r3, v0)
+
+	li 	r31, -256
+	lvx 	v20, r31, r1
+	li 	r31, -240
+	lvx 	v21, r31, r1
+	li 	r31, -224
+	lvx 	v22, r31, r1
+	li 	r31, -208
+	lvx 	v23, r31, r1
+	li 	r31, -192
+	lvx 	v24, r31, r1
+	li 	r31, -176
+	lvx 	v25, r31, r1
+	li 	r31, -160
+	lvx 	v26, r31, r1
+	li 	r31, -144
+	lvx 	v27, r31, r1
+	li 	r31, -128
+	lvx 	v28, r31, r1
+	li 	r31, -112
+	lvx 	v29, r31, r1
+	li 	r31, -96
+	lvx 	v30, r31, r1
+	li 	r31, -80
+	lvx 	v31, r31, r1
 
 	ld	r31,-8(r1)
 	ld	r30,-16(r1)
