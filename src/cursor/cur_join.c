@@ -638,7 +638,7 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			ret = c->get_value(c, &v);
 		else if (ret == WT_NOTFOUND)
 			WT_ERR_MSG(session, WT_ERROR,
-			    "main table for join is missing entry.");
+			    "main table for join is missing entry");
 		WT_TRET(c->reset(c));
 		WT_ERR(ret);
 	} else
