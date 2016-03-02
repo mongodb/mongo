@@ -136,7 +136,7 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
         self.create = True
 
     def test_readonly(self):
-        if self.dirchmod:
+        if self.dirchmod and os.name == 'posix':
             with self.expectedStderrPattern('Permission'):
                 self.readonly()
         else:
