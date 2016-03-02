@@ -296,6 +296,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 						goto err;
 					/* Special random value */
 					workp->update_delta = INT64_MAX;
+					F_SET(cfg, CFG_GROW);
 				} else {
 					workp->update_delta = v.val;
 					if (v.val > 0)
