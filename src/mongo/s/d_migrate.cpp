@@ -43,11 +43,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
-#include "mongo/db/s/migration_impl.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
@@ -56,11 +54,7 @@
 
 namespace mongo {
 
-using std::list;
-using std::set;
 using std::string;
-using std::unique_ptr;
-using std::vector;
 
 namespace {
 
@@ -433,36 +427,4 @@ public:
 } recvChunkAbortCommand;
 
 }  // namespace
-
-void logInsertOpForSharding(OperationContext* txn,
-                            const char* ns,
-                            const BSONObj& obj,
-                            bool notInActiveChunk) {
-    ShardingState* shardingState = ShardingState::get(txn);
-    if (shardingState->enabled())
-        shardingState->migrationSourceManager()->logInsertOp(txn, ns, obj, notInActiveChunk);
-}
-
-void logUpdateOpForSharding(OperationContext* txn,
-                            const char* ns,
-                            const BSONObj& updatedDoc,
-                            bool notInActiveChunk) {
-    ShardingState* shardingState = ShardingState::get(txn);
-    if (shardingState->enabled())
-        shardingState->migrationSourceManager()->logUpdateOp(txn, ns, updatedDoc, notInActiveChunk);
-}
-
-void logDeleteOpForSharding(OperationContext* txn,
-                            const char* ns,
-                            const BSONObj& obj,
-                            bool notInActiveChunk) {
-    ShardingState* shardingState = ShardingState::get(txn);
-    if (shardingState->enabled())
-        shardingState->migrationSourceManager()->logDeleteOp(txn, ns, obj, notInActiveChunk);
-}
-
-bool isInMigratingChunk(OperationContext* txn, const NamespaceString& ns, const BSONObj& doc) {
-    return ShardingState::get(txn)->migrationSourceManager()->isInMigratingChunk(ns, doc);
-}
-
 }  // namespace mongo

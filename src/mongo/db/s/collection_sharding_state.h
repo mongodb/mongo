@@ -80,6 +80,17 @@ public:
      */
     void setMetadata(std::shared_ptr<CollectionMetadata> newMetadata);
 
+    // Replication subsystem hooks. If this collection is serving as a source for migration, these
+    // methods inform it of any changes to its contents.
+
+    bool isDocumentInMigratingChunk(OperationContext* txn, const BSONObj& doc);
+
+    void onInsertOp(OperationContext* txn, const BSONObj& insertedDoc);
+
+    void onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc);
+
+    void onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId);
+
 private:
     // Namespace to which this state belongs.
     const NamespaceString _nss;

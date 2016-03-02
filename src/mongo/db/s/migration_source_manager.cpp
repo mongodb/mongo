@@ -223,12 +223,8 @@ void MigrationSourceManager::done(OperationContext* txn) {
 
 void MigrationSourceManager::logInsertOp(OperationContext* txn,
                                          const char* ns,
-                                         const BSONObj& obj,
-                                         bool notInActiveChunk) {
+                                         const BSONObj& obj) {
     ensureShardVersionOKOrThrow(txn, ns);
-
-    if (notInActiveChunk)
-        return;
 
     dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
 
@@ -252,12 +248,8 @@ void MigrationSourceManager::logInsertOp(OperationContext* txn,
 
 void MigrationSourceManager::logUpdateOp(OperationContext* txn,
                                          const char* ns,
-                                         const BSONObj& updatedDoc,
-                                         bool notInActiveChunk) {
+                                         const BSONObj& updatedDoc) {
     ensureShardVersionOKOrThrow(txn, ns);
-
-    if (notInActiveChunk)
-        return;
 
     dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
 
@@ -281,12 +273,8 @@ void MigrationSourceManager::logUpdateOp(OperationContext* txn,
 
 void MigrationSourceManager::logDeleteOp(OperationContext* txn,
                                          const char* ns,
-                                         const BSONObj& obj,
-                                         bool notInActiveChunk) {
+                                         const BSONObj& obj) {
     ensureShardVersionOKOrThrow(txn, ns);
-
-    if (notInActiveChunk)
-        return;
 
     dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
 

@@ -60,4 +60,32 @@ void CollectionShardingState::setMetadata(std::shared_ptr<CollectionMetadata> ne
     _metadata = std::move(newMetadata);
 }
 
+bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* txn,
+                                                         const BSONObj& doc) {
+    dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+
+    return ShardingState::get(txn)->migrationSourceManager()->isInMigratingChunk(_nss, doc);
+}
+
+void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& insertedDoc) {
+    dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+
+    ShardingState::get(txn)->migrationSourceManager()->logInsertOp(
+        txn, _nss.ns().c_str(), insertedDoc);
+}
+
+void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc) {
+    dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+
+    ShardingState::get(txn)->migrationSourceManager()->logUpdateOp(
+        txn, _nss.ns().c_str(), updatedDoc);
+}
+
+void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId) {
+    dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+
+    ShardingState::get(txn)->migrationSourceManager()->logDeleteOp(
+        txn, _nss.ns().c_str(), deletedDocId);
+}
+
 }  // namespace mongo

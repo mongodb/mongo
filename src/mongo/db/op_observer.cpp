@@ -33,14 +33,11 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands/dbhash.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/s/d_state.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 
@@ -53,7 +50,12 @@ void OpObserver::onCreateIndex(OperationContext* txn,
     repl::logOp(txn, "i", ns.c_str(), indexDoc, nullptr, fromMigrate);
     AuthorizationManager::get(txn->getServiceContext())
         ->logOp(txn, "i", ns.c_str(), indexDoc, nullptr);
-    logInsertOpForSharding(txn, ns.c_str(), indexDoc, fromMigrate);
+
+    CollectionShardingState* const css = CollectionShardingState::get(txn, ns);
+    if (css && !fromMigrate) {
+        css->onInsertOp(txn, indexDoc);
+    }
+
     logOpForDbHash(txn, ns.c_str());
 }
 
@@ -64,10 +66,14 @@ void OpObserver::onInserts(OperationContext* txn,
                            bool fromMigrate) {
     repl::logOps(txn, "i", nss, begin, end, fromMigrate);
 
+    CollectionShardingState* const css = CollectionShardingState::get(txn, nss.ns());
     const char* ns = nss.ns().c_str();
+
     for (auto it = begin; it != end; it++) {
         AuthorizationManager::get(txn->getServiceContext())->logOp(txn, "i", ns, *it, nullptr);
-        logInsertOpForSharding(txn, ns, *it, fromMigrate);
+        if (css && !fromMigrate) {
+            css->onInsertOp(txn, *it);
+        }
     }
 
     logOpForDbHash(txn, ns);
@@ -85,7 +91,12 @@ void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& arg
     repl::logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria, args.fromMigrate);
     AuthorizationManager::get(txn->getServiceContext())
         ->logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria);
-    logUpdateOpForSharding(txn, args.ns.c_str(), args.updatedDoc, args.fromMigrate);
+
+    CollectionShardingState* const css = CollectionShardingState::get(txn, args.ns);
+    if (css && !args.fromMigrate) {
+        css->onUpdateOp(txn, args.updatedDoc);
+    }
+
     logOpForDbHash(txn, args.ns.c_str());
     if (strstr(args.ns.c_str(), ".system.js")) {
         Scope::storedFuncMod(txn);
@@ -100,7 +111,12 @@ OpObserver::DeleteState OpObserver::aboutToDelete(OperationContext* txn,
     if (!idElement.eoo()) {
         deleteState.idDoc = idElement.wrap();
     }
-    deleteState.isMigrating = isInMigratingChunk(txn, ns, doc);
+
+    CollectionShardingState* const css = CollectionShardingState::get(txn, ns.ns());
+    if (css) {
+        deleteState.isMigrating = css->isDocumentInMigratingChunk(txn, doc);
+    }
+
     return deleteState;
 }
 
@@ -114,8 +130,12 @@ void OpObserver::onDelete(OperationContext* txn,
     repl::logOp(txn, "d", ns.ns().c_str(), deleteState.idDoc, nullptr, fromMigrate);
     AuthorizationManager::get(txn->getServiceContext())
         ->logOp(txn, "d", ns.ns().c_str(), deleteState.idDoc, nullptr);
-    logDeleteOpForSharding(
-        txn, ns.ns().c_str(), deleteState.idDoc, fromMigrate || !deleteState.isMigrating);
+
+    CollectionShardingState* const css = CollectionShardingState::get(txn, ns.ns());
+    if (css && !fromMigrate && deleteState.isMigrating) {
+        css->onDeleteOp(txn, deleteState.idDoc);
+    }
+
     logOpForDbHash(txn, ns.ns().c_str());
     if (ns.coll() == "system.js") {
         Scope::storedFuncMod(txn);

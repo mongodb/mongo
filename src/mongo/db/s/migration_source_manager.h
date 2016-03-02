@@ -70,30 +70,21 @@ public:
      * to the transfer mods log. The entries saved here are later transferred to the receiving
      * side of the migration.
      */
-    void logInsertOp(OperationContext* txn,
-                     const char* ns,
-                     const BSONObj& obj,
-                     bool notInActiveChunk);
+    void logInsertOp(OperationContext* txn, const char* ns, const BSONObj& obj);
 
     /**
      * If a migration for the chunk in 'ns' containing 'updatedDoc' is in progress, saves this
      * update to the transfer mods log. The entries saved here are later transferred to the
      * receiving side of the migration.
      */
-    void logUpdateOp(OperationContext* txn,
-                     const char* ns,
-                     const BSONObj& updatedDoc,
-                     bool notInActiveChunk);
+    void logUpdateOp(OperationContext* txn, const char* ns, const BSONObj& updatedDoc);
 
     /**
      * If a migration for the chunk in 'ns' containing 'obj' is in progress, saves this delete
      * to the transfer mods log. The entries saved here are later transferred to the receiving
      * side of the migration.
      */
-    void logDeleteOp(OperationContext* txn,
-                     const char* ns,
-                     const BSONObj& obj,
-                     bool notInActiveChunk);
+    void logDeleteOp(OperationContext* txn, const char* ns, const BSONObj& obj);
 
     /**
      * Determines whether the given document 'doc' in namespace 'ns' is within the range
