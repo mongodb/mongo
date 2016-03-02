@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/fts/unicode/codepoints.h"
 
 namespace mongo {
@@ -45,34 +46,6 @@ namespace unicode {
  */
 class String {
 public:
-    /**
-     * A StringData that may own its own buffer.
-     */
-    class MaybeOwnedStringData : public StringData {
-    public:
-        /**
-         * Makes an empty, unowned string.
-         */
-        MaybeOwnedStringData() = default;
-
-        /**
-         * Makes an owned string.
-         */
-        MaybeOwnedStringData(std::unique_ptr<char[]>&& buffer, const char* endIt)
-            : StringData(buffer.get(), endIt - buffer.get()), _buffer(std::move(buffer)) {}
-
-        /**
-         * Makes an unowned string.
-         */
-        /*implicit*/ MaybeOwnedStringData(StringData str) : StringData(str) {}
-        MaybeOwnedStringData& operator=(StringData str) {
-            return (*this = MaybeOwnedStringData(str));
-        }
-
-    private:
-        std::unique_ptr<char[]> _buffer;
-    };
-
     String() = default;
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -96,39 +69,19 @@ public:
     void resetData(const StringData utf8_src);
 
     /**
-     * Return a lowercased version of the String instance.
-     */
-    String toLower(CaseFoldMode mode = CaseFoldMode::kNormal) const;
-
-    /**
-     * Returns a version of the String instance with diacritics and combining marks removed.
-     */
-    String removeDiacritics() const;
-
-    /**
-     * Returns a substring of the String instance, using the same semantics as std::string::substr.
-     */
-    String substr(size_t begin, size_t end) const;
-
-    /**
-     * Copies the current String to another String.
-     */
-    void copyToBuf(String& buffer) const;
-
-    /**
      * Takes a substring of the current String and puts it in another String.
+     * Overwrites buffer's previous contents rather than appending.
      */
-    void substrToBuf(size_t pos, size_t len, String& buffer) const;
+    StringData substrToBuf(StackBufBuilder* buffer, size_t pos, size_t len) const;
 
     /**
-     * Lowercases the current String and stores the result in another String.
+     * Lowercases a substring of the current String and stores the UTF8 result in buffer.
+     * Overwrites buffer's previous contents rather than appending.
      */
-    void toLowerToBuf(CaseFoldMode mode, String& buffer) const;
-
-    /**
-     * Removes diacritics from the current String and stores the result in another String.
-     */
-    void removeDiacriticsToBuf(String& buffer) const;
+    StringData toLowerToBuf(StackBufBuilder* buffer,
+                            CaseFoldMode mode,
+                            size_t offset = 0,
+                            size_t len = std::string::npos) const;
 
     /**
      * Returns a UTF-8 encoded std::string version of the String instance. Uses the conversion
@@ -183,16 +136,35 @@ public:
 
     /**
      * Strips diacritics and case-folds the utf8 input string, as needed to support options.
+     *
+     * The options field specifies what operations to *skip*, so kCaseSensitive means to skip case
+     * folding and kDiacriticSensitive means to skip diacritic striping. If both flags are
+     * specified, the input utf8 StringData is returned directly without any processing or copying.
+     *
+     * If processing is performed, the returned StringData will be placed in buffer. buffer's
+     * contents (if any) will be replaced. Since we may return the input unmodified the returned
+     * StringData's lifetime is the shorter of the input utf8 and the next modification to buffer.
+     * The input utf8 must not point into buffer.
      */
-    static MaybeOwnedStringData caseFoldAndStripDiacritics(StringData utf8,
-                                                           SubstrMatchOptions options,
-                                                           CaseFoldMode mode);
+    static StringData caseFoldAndStripDiacritics(StackBufBuilder* buffer,
+                                                 StringData utf8,
+                                                 SubstrMatchOptions options,
+                                                 CaseFoldMode mode);
 
 private:
     /**
      * Helper method for converting a UTF-8 string to a UTF-32 string.
      */
     void setData(const StringData utf8_src);
+
+    /**
+     * Unified implementation of substrToBuf and toLowerToBuf.
+     */
+    template <typename Func>
+    StringData substrToBufWithTransform(StackBufBuilder* buffer,
+                                        size_t pos,
+                                        size_t len,
+                                        Func transform) const;
 
     /**
      * The underlying UTF-32 data.

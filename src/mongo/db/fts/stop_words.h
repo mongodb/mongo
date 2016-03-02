@@ -35,7 +35,7 @@
 #include <string>
 
 #include "mongo/db/fts/fts_language.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -48,8 +48,8 @@ public:
     StopWords();
     StopWords(const std::set<std::string>& words);
 
-    bool isStopWord(const std::string& word) const {
-        return _words.count(word) > 0;
+    bool isStopWord(StringData word) const {
+        return _words.find(word) != _words.end();
     }
 
     size_t numStopWords() const {
@@ -59,7 +59,7 @@ public:
     static const StopWords* getStopWords(const FTSLanguage* language);
 
 private:
-    unordered_set<std::string> _words;
+    StringMap<bool> _words;  // Used as a set. The values have no meaning.
 };
 }
 }

@@ -39,6 +39,28 @@
 namespace mongo {
 namespace unicode {
 
+namespace {
+template <typename OutputIterator>
+inline void appendUtf8Codepoint(char32_t codepoint, OutputIterator* outputIt) {
+    if (codepoint <= 0x7f /* max 1-byte codepoint */) {
+        *(*outputIt)++ = (codepoint);
+    } else if (codepoint <= 0x7ff /* max 2-byte codepoint*/) {
+        *(*outputIt)++ = ((codepoint >> (6 * 1)) | 0xc0);  // 2 leading 1s.
+        *(*outputIt)++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
+    } else if (codepoint <= 0xffff /* max 3-byte codepoint*/) {
+        *(*outputIt)++ = ((codepoint >> (6 * 2)) | 0xe0);  // 3 leading 1s.
+        *(*outputIt)++ = (((codepoint >> (6 * 1)) & 0x3f) | 0x80);
+        *(*outputIt)++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
+    } else {
+        uassert(ErrorCodes::BadValue, "text contains invalid UTF-8", codepoint <= 0x10FFFF);
+        *(*outputIt)++ = ((codepoint >> (6 * 3)) | 0xf0);  // 4 leading 1s.
+        *(*outputIt)++ = (((codepoint >> (6 * 2)) & 0x3f) | 0x80);
+        *(*outputIt)++ = (((codepoint >> (6 * 1)) & 0x3f) | 0x80);
+        *(*outputIt)++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
+    }
+}
+}
+
 using linenoise_utf8::copyString32to8;
 using linenoise_utf8::copyString8to32;
 
@@ -93,74 +115,45 @@ std::string String::toString() {
     return _outputBuf;
 }
 
-String String::substr(size_t pos, size_t len) const {
-    unicode::String buf;
-    substrToBuf(pos, len, buf);
-    return buf;
-}
+template <typename Func>
+StringData String::substrToBufWithTransform(StackBufBuilder* buffer,
+                                            size_t pos,
+                                            size_t len,
+                                            Func func) const {
+    pos = std::min(pos, _data.size());
+    len = std::min(len, _data.size() - pos);
 
-String String::toLower(CaseFoldMode mode) const {
-    unicode::String buf;
-    toLowerToBuf(mode, buf);
-    return buf;
-}
-
-String String::removeDiacritics() const {
-    unicode::String buf;
-    removeDiacriticsToBuf(buf);
-    return buf;
-}
-
-void String::copyToBuf(String& buffer) const {
-    buffer._data = _data;
-    buffer._data.resize(_data.size());
-    auto index = 0;
-    for (auto codepoint : _data) {
-        buffer._data[index++] = codepoint;
+    buffer->reset();
+    auto outputIt = buffer->skip(len * 4);  // Reserve room for worst-case expansion.
+    auto inputIt = _data.begin() + pos;
+    for (size_t i = 0; i < len; i++) {
+        appendUtf8Codepoint(func(*inputIt++), &outputIt);
     }
-    buffer._needsOutputConversion = true;
+    buffer->setlen(outputIt - buffer->buf());
+    return {buffer->buf(), size_t(buffer->len())};
 }
 
-void String::substrToBuf(size_t pos, size_t len, String& buffer) const {
-    buffer._data.resize(len + 1);
-    for (size_t index = 0, src_pos = pos; index < len;) {
-        buffer._data[index++] = _data[src_pos++];
-    }
-    buffer._data[len] = '\0';
-    buffer._needsOutputConversion = true;
+StringData String::substrToBuf(StackBufBuilder* buffer, size_t pos, size_t len) const {
+    const auto identityFunc = [](char32_t ch) { return ch; };
+    return substrToBufWithTransform(buffer, pos, len, identityFunc);
 }
 
-void String::toLowerToBuf(CaseFoldMode mode, String& buffer) const {
-    buffer._data.resize(_data.size());
-    auto outIt = buffer._data.begin();
-    for (auto codepoint : _data) {
-        *outIt++ = codepointToLower(codepoint, mode);
-    }
-    buffer._needsOutputConversion = true;
+StringData String::toLowerToBuf(StackBufBuilder* buffer,
+                                CaseFoldMode mode,
+                                size_t pos,
+                                size_t len) const {
+    const auto toLower = [mode](char32_t ch) { return codepointToLower(ch, mode); };
+    return substrToBufWithTransform(buffer, pos, len, toLower);
 }
 
-void String::removeDiacriticsToBuf(String& buffer) const {
-    buffer._data.resize(_data.size());
-    auto outIt = buffer._data.begin();
-    for (auto codepoint : _data) {
-        if (codepoint <= 0x7f) {
-            // ASCII only has two diacritics so they are hard-coded here.
-            if (codepoint != '^' && codepoint != '`') {
-                *outIt++ = codepoint;
-            }
-        } else if (auto clean = codepointRemoveDiacritics(codepoint)) {
-            *outIt++ = clean;
-        } else {
-            // codepoint was a pure diacritic mark, so skip it.
-        }
-    }
-    buffer._data.resize(outIt - buffer._data.begin());
-    buffer._needsOutputConversion = true;
-}
 
-String::MaybeOwnedStringData String::caseFoldAndStripDiacritics(StringData utf8,
-                                                                SubstrMatchOptions options,
-                                                                CaseFoldMode mode) {
+StringData String::caseFoldAndStripDiacritics(StackBufBuilder* buffer,
+                                              StringData utf8,
+                                              SubstrMatchOptions options,
+                                              CaseFoldMode mode) {
+    // This fires if your input buffer the same as your output buffer.
+    invariant(buffer->buf() != utf8.rawData());
+
     if ((options & kCaseSensitive) && (options & kDiacriticSensitive)) {
         // No transformation needed. Just return the input data unmodified.
         return utf8;
@@ -170,8 +163,8 @@ String::MaybeOwnedStringData String::caseFoldAndStripDiacritics(StringData utf8,
     // and casefolding. Proof: the only case where 1 byte goes to >1 is 'I' in Turkish going to 2
     // bytes. The biggest codepoint is 4 bytes which is also 2x 2 bytes. This holds as long as we
     // don't map a single code point to more than one.
-    std::unique_ptr<char[]> buffer(new char[utf8.size() * 2]);
-    auto outputIt = buffer.get();
+    buffer->reset();
+    auto outputIt = buffer->skip(utf8.size() * 2);
 
     for (auto inputIt = utf8.begin(), endIt = utf8.end(); inputIt != endIt;) {
 #ifdef MONGO_HAVE_FAST_BYTE_VECTOR
@@ -258,25 +251,11 @@ String::MaybeOwnedStringData String::caseFoldAndStripDiacritics(StringData utf8,
             }
         }
 
-        // Back to utf-8.
-        if (codepoint <= 0x7f /* max 1-byte codepoint */) {
-            *outputIt++ = (codepoint);
-        } else if (codepoint <= 0x7ff /* max 2-byte codepoint*/) {
-            *outputIt++ = ((codepoint >> (6 * 1)) | 0xc0);  // 2 leading 1s.
-            *outputIt++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
-        } else if (codepoint <= 0xffff /* max 3-byte codepoint*/) {
-            *outputIt++ = ((codepoint >> (6 * 2)) | 0xe0);  // 3 leading 1s.
-            *outputIt++ = (((codepoint >> (6 * 1)) & 0x3f) | 0x80);
-            *outputIt++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
-        } else {
-            *outputIt++ = ((codepoint >> (6 * 3)) | 0xf0);  // 4 leading 1s.
-            *outputIt++ = (((codepoint >> (6 * 2)) & 0x3f) | 0x80);
-            *outputIt++ = (((codepoint >> (6 * 1)) & 0x3f) | 0x80);
-            *outputIt++ = (((codepoint >> (6 * 0)) & 0x3f) | 0x80);
-        }
+        appendUtf8Codepoint(codepoint, &outputIt);
     }
 
-    return {std::move(buffer), outputIt};
+    buffer->setlen(outputIt - buffer->buf());
+    return {buffer->buf(), size_t(buffer->len())};
 }
 
 bool String::substrMatch(const std::string& str,
@@ -288,8 +267,10 @@ bool String::substrMatch(const std::string& str,
         options &= ~kCaseSensitive;
     }
 
-    auto haystack = caseFoldAndStripDiacritics(str, options, cfMode);
-    auto needle = caseFoldAndStripDiacritics(find, options, cfMode);
+    StackBufBuilder haystackBuf;
+    StackBufBuilder needleBuf;
+    auto haystack = caseFoldAndStripDiacritics(&haystackBuf, str, options, cfMode);
+    auto needle = caseFoldAndStripDiacritics(&needleBuf, find, options, cfMode);
 
     // Case sensitive and diacritic sensitive.
     return boost::algorithm::boyer_moore_search(

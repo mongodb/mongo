@@ -52,7 +52,7 @@ StopWords::StopWords() {}
 
 StopWords::StopWords(const std::set<std::string>& words) {
     for (std::set<std::string>::const_iterator i = words.begin(); i != words.end(); ++i)
-        _words.insert(*i);
+        _words[*i] = true;
 }
 
 const StopWords* StopWords::getStopWords(const FTSLanguage* language) {

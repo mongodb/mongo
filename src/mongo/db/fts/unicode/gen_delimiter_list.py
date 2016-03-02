@@ -58,23 +58,32 @@ def generate(unicode_proplist_file, target):
 
     # As of Unicode 8.0.0, all of the delimiters we used for text index 
     # version 2 are also in the list.
+    out.write("static const bool englishAsciiDelimiters[128] = {\n")
+    for cp in range(0x80):
+        if cp == ord("'"):
+            out.write("    0, // ' special case\n")
+        else:
+            out.write("    %d, // 0x%x\n" % (cp in delim_codepoints, cp))
+    out.write("};\n")
 
-    out.write("""bool codepointIsDelimiter(char32_t codepoint, \
-DelimiterListLanguage lang) {
-    if (lang == DelimiterListLanguage::kEnglish && codepoint == '\\'') {
-        return false;
-    }
+    out.write("static const bool nonEnglishAsciiDelimiters[128] = {\n")
+    for cp in range(0x80):
+        out.write("    %d, // 0x%x\n" % (cp in delim_codepoints, cp))
+    out.write("};\n")
 
-    // Most characters are latin letters, so filter those out first.
-    if (codepoint >= 'A' && codepoint <= 'Z') {
-        return false;
-    } else if (codepoint >= 'a' && codepoint <= 'z') {
-        return false;
+    out.write("""bool codepointIsDelimiter(char32_t codepoint, DelimiterListLanguage lang) {
+    if (codepoint <= 0x7f) {
+        if (lang == DelimiterListLanguage::kEnglish) {
+            return englishAsciiDelimiters[codepoint];
+        }
+        return nonEnglishAsciiDelimiters[codepoint];
     }
 
     switch (codepoint) {\n""")
 
     for delim in sorted(delim_codepoints):
+        if delim <= 0x7f: # ascii codepoints handled in lists above.
+            continue
         out.write("\
     case " + str(hex(delim)) + ": return true;\n")
 
