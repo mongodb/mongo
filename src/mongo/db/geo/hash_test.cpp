@@ -42,15 +42,17 @@
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
-using mongo::GeoHash;
-using mongo::GeoHashConverter;
+namespace {
+
+using namespace mongo;
+
 using std::cout;
 using std::endl;
 using std::string;
 using std::stringstream;
 
-namespace {
 TEST(GeoHash, MakeZeroHash) {
     unsigned x = 0, y = 0;
     GeoHash hash(x, y);
@@ -515,5 +517,35 @@ TEST(GeoHash, NeighborsAtFinestLevel) {
     cellHash.appendVertexNeighbors(1u, &neighbors);
     ASSERT_EQUALS(neighbors.size(), (size_t)1);
     ASSERT_EQUALS(neighbors[0], GeoHash("00"));
+}
+
+TEST(GeoHash, ClearUnusedBitsClearsSomeBits) {
+    GeoHash geoHash("10110010");
+    // 'parent' should have the four higher order bits from the original hash (1011, or the
+    // hexidecimal digit 'b').
+    GeoHash parent = geoHash.parent(2);
+    ASSERT_EQUALS(parent, GeoHash("1011"));
+    const long long expectedHash = 0xb000000000000000LL;
+    ASSERT_EQUALS(expectedHash, parent.getHash());
+}
+
+TEST(GeoHash, ClearUnusedBitsOnLengthZeroHashClearsAllBits) {
+    GeoHash geoHash("11");
+    const long long expectedHash = 0xc000000000000000LL;
+    ASSERT_EQUALS(expectedHash, geoHash.getHash());
+    GeoHash parent = geoHash.parent();
+    ASSERT_EQUALS(GeoHash(), parent);
+    ASSERT_EQUALS(0LL, parent.getHash());
+}
+
+TEST(GeoHash, ClearUnusedBitsIsNoopIfNoBitsAreUnused) {
+    // 64 pairs of "10" repeated.
+    str::stream ss;
+    for (int i = 0; i < 32; ++i) {
+        ss << "10";
+    }
+    GeoHash geoHash(ss);
+    GeoHash other = geoHash.parent(32);
+    ASSERT_EQUALS(geoHash, other);
 }
 }

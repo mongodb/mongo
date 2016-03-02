@@ -471,10 +471,9 @@ GeoHash GeoHash::operator+(const std::string& s) const {
     return operator+(s.c_str());
 }
 
-/*
- * Keep the upper _bits*2 bits of _hash, clear the lower bits.
- * Maybe there's junk in there?  Not sure why this is done.
- */
+// Keep the most significant _bits*2 bits of _hash, clear the least significant bits. If shorter
+// than 64 bits, the hash occupies the higher order bits, so we ensure that the lower order bits are
+// zeroed.
 void GeoHash::clearUnusedBits() {
     // Left shift count should be less than 64
     if (_bits == 0) {
@@ -482,9 +481,8 @@ void GeoHash::clearUnusedBits() {
         return;
     }
 
-    static long long FULL = 0xFFFFFFFFFFFFFFFFLL;
-    long long mask = FULL << (64 - (_bits * 2));
-    _hash &= mask;
+    unsigned long long mask = (1LL << (64U - (_bits * 2U))) - 1LL;
+    _hash &= ~mask;
 }
 
 static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const char* fieldName) {
