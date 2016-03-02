@@ -34,7 +34,7 @@ printjson( mongos.getCollection("foo.bar").findOne() );
 
 jsTestLog( "Reconfiguring replica set..." );
 
-var rsConfig = rsObj.getRSConfig(0);
+var rsConfig = rsObj.getReplSetConfigFromNode(0);
 
 // Now remove the last node in the config.
 var removedNode = rsConfig.members.pop();
