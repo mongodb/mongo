@@ -81,7 +81,7 @@ class test_join06(wttest.WiredTigerTestCase):
 
         if self.uncommitted:
             self.session.begin_transaction('isolation=read-uncommitted')
-        
+
         jc = self.session.open_cursor('join:table:join06', None, None)
         c0 = self.session.open_cursor('index:join06:index0', None, None)
         c0.set_key('520')
@@ -130,7 +130,7 @@ class test_join06(wttest.WiredTigerTestCase):
                          str(mbr))
             self.assertTrue(k in mbr)
             mbr.remove(k)
-    
+
             # In another session, we remove entries for keys ending in 6,
             # and add entries for keys ending in 5.  Depending on the
             # isolation level for the transaction, these changes may or
@@ -142,7 +142,7 @@ class test_join06(wttest.WiredTigerTestCase):
                 s.commit_transaction()
                 s.close()
                 altered = True
-    
+
         if len(mbr) != 0:
             self.tty('**** ERROR: did not see these: ' + str(mbr))
         self.assertEquals(0, len(mbr))
