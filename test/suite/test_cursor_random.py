@@ -51,7 +51,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         uri = self.type
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri, None, self.config)
-        msg = "/not supported/"
+        msg = "/Unsupported cursor/"
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, lambda: cursor.compare(cursor), msg)
         self.assertRaisesWithMessage(
