@@ -341,7 +341,7 @@ class test_join01(wttest.WiredTigerTestCase):
             '/index cursor is being used in a join/')
 
         # Only a small number of operations allowed on a join cursor
-        msg = "/not supported/"
+        msg = "/Unsupported cursor/"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: jc.search(), msg)
 

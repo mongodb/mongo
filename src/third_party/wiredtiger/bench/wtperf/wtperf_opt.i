@@ -184,13 +184,17 @@ DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' "
     "which would create 2 threads doing nothing but reads and 8 threads "
     "each doing 50% inserts and 25% reads and updates.  Allowed configuration "
-    "values are 'count', 'throttle', 'reads', 'inserts', 'updates', 'truncate',"
-    " 'truncate_pct' and 'truncate_count'. There are "
+    "values are 'count', 'throttle', 'update_delta', 'reads', 'inserts', "
+    "'updates', 'truncate', 'truncate_pct' and 'truncate_count'. There are "
     "also behavior modifiers, supported modifiers are 'ops_per_txn'")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "transaction configuration string, relevant when populate_opts_per_txn "
     "is nonzero")
 DEF_OPT_AS_STRING(table_name, "test", "table name")
+DEF_OPT_AS_UINT32(value_sz_max, 1000,
+    "maximum value size when delta updates are present. Default disabled")
+DEF_OPT_AS_UINT32(value_sz_min, 1,
+    "minimum value size when delta updates are present. Default disabled")
 DEF_OPT_AS_UINT32(value_sz, 100, "value size")
 DEF_OPT_AS_UINT32(verbose, 1, "verbosity")
 DEF_OPT_AS_UINT32(warmup, 0,

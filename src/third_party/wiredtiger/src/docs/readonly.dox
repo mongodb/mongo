@@ -18,7 +18,7 @@ tree merges are turned off when LSM trees are configured, and log file
 archiving is disabled when logging is configured.
 
 Where a user configured setting contradicts read-only operation, WiredTiger
-will return an error.  For example, statistics logging or zero-filling
+will return an error.  For example, zero-filling
 log files is not allowed in read-only mode, and attempting to configure
 them will return an error.
 
