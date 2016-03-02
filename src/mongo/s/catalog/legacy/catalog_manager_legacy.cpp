@@ -351,8 +351,12 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
         manager->getVersion(),
         true);
 
-    auto ssvStatus = grid.shardRegistry()->runCommandWithNotMasterRetries(
-        txn, dbPrimaryShardId, "admin", ssv.toBSON());
+    auto ssvStatus = grid.shardRegistry()->runIdempotentCommandOnShard(
+        txn,
+        dbPrimaryShardId,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        ssv.toBSON());
     if (!ssvStatus.isOK()) {
         warning() << "could not update initial version of " << ns << " on shard primary "
                   << dbPrimaryShardId << ssvStatus.getStatus();
@@ -550,8 +554,12 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
     auto* shardRegistry = grid.shardRegistry();
 
     for (const auto& shardEntry : allShards) {
-        auto dropResult = shardRegistry->runCommandWithNotMasterRetries(
-            txn, shardEntry.getName(), ns.db().toString(), BSON("drop" << ns.coll()));
+        auto dropResult = shardRegistry->runIdempotentCommandOnShard(
+            txn,
+            shardEntry.getName(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            ns.db().toString(),
+            BSON("drop" << ns.coll()));
 
         if (!dropResult.isOK()) {
             return dropResult.getStatus();
@@ -615,8 +623,12 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
             ChunkVersion::DROPPED(),
             true);
 
-        auto ssvResult = shardRegistry->runCommandWithNotMasterRetries(
-            txn, shardEntry.getName(), "admin", ssv.toBSON());
+        auto ssvResult = shardRegistry->runIdempotentCommandOnShard(
+            txn,
+            shardEntry.getName(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            ssv.toBSON());
 
         if (!ssvResult.isOK()) {
             return ssvResult.getStatus();
@@ -627,8 +639,12 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
             return ssvStatus;
         }
 
-        auto unsetShardingStatus = shardRegistry->runCommandWithNotMasterRetries(
-            txn, shardEntry.getName(), "admin", BSON("unsetSharding" << 1));
+        auto unsetShardingStatus = shardRegistry->runIdempotentCommandOnShard(
+            txn,
+            shardEntry.getName(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            BSON("unsetSharding" << 1));
 
         if (!unsetShardingStatus.isOK()) {
             return unsetShardingStatus.getStatus();

@@ -485,10 +485,12 @@ TEST_F(AddShardTest, UnreachableHost) {
         ASSERT_EQUALS("host unreachable", status.getStatus().reason());
     });
 
-    onCommandForAddShard([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
-        return StatusWith<BSONObj>{ErrorCodes::HostUnreachable, "host unreachable"};
-    });
+    for (int i = 0; i < 3; i++) {  // ShardRegistry will retry 3 times
+        onCommandForAddShard([](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
+            return StatusWith<BSONObj>{ErrorCodes::HostUnreachable, "host unreachable"};
+        });
+    }
 
     future.timed_get(kFutureTimeout);
 }

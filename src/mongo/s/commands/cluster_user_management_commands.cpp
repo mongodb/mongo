@@ -829,8 +829,8 @@ Status runUpgradeOnAllShards(OperationContext* txn, int maxSteps, const BSONObj&
     shardRegistry->getAllShardIds(&shardIds);
 
     for (const auto& shardId : shardIds) {
-        auto cmdResult =
-            shardRegistry->runCommandWithNotMasterRetries(txn, shardId, "admin", cmdObj);
+        auto cmdResult = shardRegistry->runIdempotentCommandOnShard(
+            txn, shardId, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, "admin", cmdObj);
 
         if (!cmdResult.isOK()) {
             return Status(cmdResult.getStatus().code(),
