@@ -342,7 +342,7 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
 
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(OperationContext* txn) {
     auto resultStatus =
-        _client->runCommandOnConfig(txn, kReadPref, "admin", BSON("serverStatus" << 1));
+        _client->runIdempotentCommandOnConfig(txn, kReadPref, "admin", BSON("serverStatus" << 1));
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();

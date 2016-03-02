@@ -358,7 +358,7 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
         // discover split points
         const auto primaryShard = grid.shardRegistry()->getShard(txn, primaryShardId);
         const NamespaceString nss{getns()};
-        auto result = grid.shardRegistry()->runCommandOnShard(
+        auto result = grid.shardRegistry()->runIdempotentCommandOnShard(
             txn,
             primaryShard,
             ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
