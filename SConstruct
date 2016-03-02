@@ -2200,6 +2200,41 @@ def doConfigure(myenv):
 
     myenv = conf.Finish()
 
+    def CheckCXX14EnableIfT(context):
+        test_body = """
+        #include <cstdlib>
+        #include <type_traits>
+
+        template <typename = void>
+        struct scons {
+            bool hasSupport() { return false; }
+        };
+
+        template <>
+        struct scons<typename std::enable_if_t<true>> {
+            bool hasSupport() { return true; }
+        };
+
+        int main(int argc, char **argv) {
+            scons<> SCons;
+            return SCons.hasSupport() ? EXIT_SUCCESS : EXIT_FAILURE;
+        }
+        """
+        context.Message('Checking for C++14 std::enable_if_t support...')
+        ret = context.TryCompile(textwrap.dedent(test_body), '.cpp')
+        context.Result(ret)
+        return ret
+
+    # Check for std::enable_if_t support without using the __cplusplus macro
+    conf = Configure(myenv, help=False, custom_tests = {
+        'CheckCXX14EnableIfT' : CheckCXX14EnableIfT,
+    })
+
+    if conf.CheckCXX14EnableIfT():
+        conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_ENABLE_IF_T')
+
+    myenv = conf.Finish()
+
     def CheckCXX14MakeUnique(context):
         test_body = """
         #include <memory>
