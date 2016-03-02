@@ -30,27 +30,39 @@
 
 #include "mongo/db/query/collation/collator_interface.h"
 
-#include <memory>
-#include <unicode/coll.h>
-
 namespace mongo {
 
 /**
- * An implementation of the CollatorInterface which is backed by the implementation of collations
- * from the ICU library.
+ * An implementation of the CollatorInterface used for testing that does not depend on the ICU
+ * library.
  */
-class CollatorInterfaceICU final : public CollatorInterface {
+class CollatorInterfaceMock final : public CollatorInterface {
 public:
-    CollatorInterfaceICU(CollationSpec spec, std::unique_ptr<icu::Collator> collator);
+    /**
+     * The mock can compute a number of artificial collations. A test can request a particular
+     * kind of mock collator and then assert that it obtains the mock behavior.
+     */
+    enum class MockType {
+        // Compares strings after reversing them. For example, the comparison key for "abc" is
+        // "cba".
+        kReverseString,
+
+        // Considers all strings equal.
+        kAlwaysEqual,
+    };
+
+    /**
+     * Constructs a mock collator which computes the collation described by 'mockType'. The
+     * collator's spec will have a fake locale string such as "mock_reverse".
+     */
+    CollatorInterfaceMock(MockType mockType);
 
     int compare(StringData left, StringData right) final;
 
     ComparisonKey getComparisonKey(StringData stringData) final;
 
 private:
-    // The ICU implementation of the collator to which we delegate interesting work. Const methods
-    // on the ICU collator are expected to be thread-safe.
-    const std::unique_ptr<icu::Collator> _collator;
+    const MockType _mockType;
 };
 
 }  // namespace mongo
