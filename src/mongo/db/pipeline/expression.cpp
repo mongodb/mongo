@@ -403,7 +403,7 @@ Value ExpressionAdd::evaluateInternal(Variables* vars) const {
             doubleTotal += val.coerceToDouble();
             longTotal += val.coerceToLong();
         } else if (val.getType() == Date) {
-            uassert(16612, "only one Date allowed in an $add expression", !haveDate);
+            uassert(16612, "only one date allowed in an $add expression", !haveDate);
             haveDate = true;
 
             // We don't manipulate totalType here.
@@ -1642,7 +1642,7 @@ Value ExpressionFilter::evaluateInternal(Variables* vars) const {
         return Value(BSONNULL);
 
     uassert(28651,
-            str::stream() << "input to $filter must be an Array not "
+            str::stream() << "input to $filter must be an array not "
                           << typeName(inputVal.getType()),
             inputVal.getType() == Array);
 
@@ -1846,7 +1846,7 @@ Value ExpressionMap::evaluateInternal(Variables* vars) const {
         return Value(BSONNULL);
 
     uassert(16883,
-            str::stream() << "input to $map must be an Array not " << typeName(inputVal.getType()),
+            str::stream() << "input to $map must be an array not " << typeName(inputVal.getType()),
             inputVal.getType() == Array);
 
     const vector<Value>& input = inputVal.getArray();
@@ -1879,7 +1879,7 @@ void ExpressionMap::addDependencies(DepsTracker* deps, vector<string>* path) con
 REGISTER_EXPRESSION(meta, ExpressionMeta::parse);
 intrusive_ptr<Expression> ExpressionMeta::parse(BSONElement expr,
                                                 const VariablesParseState& vpsIn) {
-    uassert(17307, "$meta only supports String arguments", expr.type() == String);
+    uassert(17307, "$meta only supports string arguments", expr.type() == String);
     if (expr.valueStringData() == "textScore") {
         return new ExpressionMeta(MetaType::TEXT_SCORE);
     } else if (expr.valueStringData() == "randVal") {
@@ -2774,7 +2774,7 @@ Value ExpressionSlice::evaluateInternal(Variables* vars) const {
     }
 
     uassert(28724,
-            str::stream() << "First argument to $slice must be an Array, but is"
+            str::stream() << "First argument to $slice must be an array, but is"
                           << " of type: " << typeName(arrayVal.getType()),
             arrayVal.getType() == Array);
     uassert(28725,
@@ -2852,7 +2852,7 @@ Value ExpressionSize::evaluateInternal(Variables* vars) const {
     Value array = vpOperand[0]->evaluateInternal(vars);
 
     uassert(17124,
-            str::stream() << "The argument to $size must be an Array, but was of type: "
+            str::stream() << "The argument to $size must be an array, but was of type: "
                           << typeName(array.getType()),
             array.getType() == Array);
     return Value::createIntOrLong(array.getArray().size());
@@ -3038,6 +3038,18 @@ Value ExpressionTrunc::evaluateNumericArg(const Value& numericArg) const {
 REGISTER_EXPRESSION(trunc, ExpressionTrunc::parse);
 const char* ExpressionTrunc::getOpName() const {
     return "$trunc";
+}
+
+/* ------------------------- ExpressionType ----------------------------- */
+
+Value ExpressionType::evaluateInternal(Variables* vars) const {
+    Value val(vpOperand[0]->evaluateInternal(vars));
+    return Value(typeName(val.getType()));
+}
+
+REGISTER_EXPRESSION(type, ExpressionType::parse);
+const char* ExpressionType::getOpName() const {
+    return "$type";
 }
 
 /* ------------------------- ExpressionWeek ----------------------------- */

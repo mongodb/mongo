@@ -4345,6 +4345,100 @@ class DropEndingNull : public ExpectedResultBase {
 
 }  // namespace Substr
 
+namespace Type {
+
+TEST(ExpressionTypeTest, WithMinKeyValue) {
+    assertExpectedResults("$type", {{{Value(MINKEY)}, Value("minKey")}});
+}
+
+TEST(ExpressionTypeTest, WithDoubleValue) {
+    assertExpectedResults("$type", {{{Value(1.0)}, Value("double")}});
+}
+
+TEST(ExpressionTypeTest, WithStringValue) {
+    assertExpectedResults("$type", {{{Value("stringValue")}, Value("string")}});
+}
+
+TEST(ExpressionTypeTest, WithObjectValue) {
+    BSONObj objectVal = fromjson("{a: {$literal: 1}}");
+    assertExpectedResults("$type", {{{Value(objectVal)}, Value("object")}});
+}
+
+TEST(ExpressionTypeTest, WithArrayValue) {
+    assertExpectedResults("$type", {{{Value(BSON_ARRAY(1 << 2))}, Value("array")}});
+}
+
+TEST(ExpressionTypeTest, WithBinDataValue) {
+    BSONBinData binDataVal = BSONBinData("", 0, BinDataGeneral);
+    assertExpectedResults("$type", {{{Value(binDataVal)}, Value("binData")}});
+}
+
+TEST(ExpressionTypeTest, WithUndefinedValue) {
+    assertExpectedResults("$type", {{{Value(BSONUndefined)}, Value("undefined")}});
+}
+
+TEST(ExpressionTypeTest, WithOIDValue) {
+    assertExpectedResults("$type", {{{Value(OID())}, Value("objectId")}});
+}
+
+TEST(ExpressionTypeTest, WithBoolValue) {
+    assertExpectedResults("$type", {{{Value(true)}, Value("bool")}});
+}
+
+TEST(ExpressionTypeTest, WithDateValue) {
+    Date_t dateVal = BSON("" << DATENOW).firstElement().Date();
+    assertExpectedResults("$type", {{{Value(dateVal)}, Value("date")}});
+}
+
+TEST(ExpressionTypeTest, WithNullValue) {
+    assertExpectedResults("$type", {{{Value(BSONNULL)}, Value("null")}});
+}
+
+TEST(ExpressionTypeTest, WithRegexValue) {
+    assertExpectedResults("$type", {{{Value(BSONRegEx("a.b"))}, Value("regex")}});
+}
+
+TEST(ExpressionTypeTest, WithSymbolValue) {
+    assertExpectedResults("$type", {{{Value(BSONSymbol("a"))}, Value("symbol")}});
+}
+
+TEST(ExpressionTypeTest, WithDBRefValue) {
+    assertExpectedResults("$type", {{{Value(BSONDBRef("", OID()))}, Value("dbPointer")}});
+}
+
+TEST(ExpressionTypeTest, WithCodeWScopeValue) {
+    assertExpectedResults(
+        "$type", {{{Value(BSONCodeWScope("var x = 3", BSONObj()))}, Value("javascriptWithScope")}});
+}
+
+TEST(ExpressionTypeTest, WithCodeValue) {
+    assertExpectedResults("$type", {{{Value(BSONCode("var x = 3"))}, Value("javascript")}});
+}
+
+TEST(ExpressionTypeTest, WithIntValue) {
+    assertExpectedResults("$type", {{{Value(1)}, Value("int")}});
+}
+
+#ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
+TEST(ExpressionTypeTest, WithDecimalValue) {
+    assertExpectedResults("$type", {{{Value(Decimal128(0.3))}, Value("decimal")}});
+}
+#endif
+
+TEST(ExpressionTypeTest, WithLongValue) {
+    assertExpectedResults("$type", {{{Value(1LL)}, Value("long")}});
+}
+
+TEST(ExpressionTypeTest, WithTimestampValue) {
+    assertExpectedResults("$type", {{{Value(Timestamp(0, 0))}, Value("timestamp")}});
+}
+
+TEST(ExpressionTypeTest, WithMaxKeyValue) {
+    assertExpectedResults("$type", {{{Value(MAXKEY)}, Value("maxKey")}});
+}
+
+}  // namespace Type
+
 namespace ToLower {
 
 class ExpectedResultBase {

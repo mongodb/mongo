@@ -393,30 +393,29 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 const std::string TypeMatchExpression::kMatchesAllNumbersAlias = "number";
 
 const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMap = {
-    {"double", NumberDouble},
+    {typeName(NumberDouble), NumberDouble},
+    {typeName(String), String},
+    {typeName(Object), Object},
+    {typeName(Array), Array},
+    {typeName(BinData), BinData},
+    {typeName(Undefined), Undefined},
+    {typeName(jstOID), jstOID},
+    {typeName(Bool), Bool},
+    {typeName(Date), Date},
+    {typeName(jstNULL), jstNULL},
+    {typeName(RegEx), RegEx},
+    {typeName(DBRef), DBRef},
+    {typeName(Code), Code},
+    {typeName(Symbol), Symbol},
+    {typeName(CodeWScope), CodeWScope},
+    {typeName(NumberInt), NumberInt},
+    {typeName(bsonTimestamp), bsonTimestamp},
+    {typeName(NumberLong), NumberLong},
 #ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
-    {"decimal", NumberDecimal},
+    {typeName(NumberDecimal), NumberDecimal},
 #endif
-    {"string", String},
-    {"object", Object},
-    {"array", Array},
-    {"binData", BinData},
-    {"undefined", Undefined},
-    {"objectId", jstOID},
-    {"bool", Bool},
-    {"date", Date},
-    {"null", jstNULL},
-    {"regex", RegEx},
-    {"dbPointer", DBRef},
-    {"javascript", Code},
-    {"symbol", Symbol},
-    {"javascriptWithScope", CodeWScope},
-    {"int", NumberInt},
-    {"timestamp", bsonTimestamp},
-    {"long", NumberLong},
-    {"decimal", NumberDecimal},
-    {"maxKey", MaxKey},
-    {"minKey", MinKey}};
+    {typeName(MaxKey), MaxKey},
+    {typeName(MinKey), MinKey}};
 
 Status TypeMatchExpression::initWithBSONType(StringData path, int type) {
     if (!isValidBSONType(type)) {

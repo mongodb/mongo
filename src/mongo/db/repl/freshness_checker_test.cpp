@@ -357,7 +357,7 @@ TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponse) {
     ASSERT_EQUALS(1,
                   countLogLinesContaining(
                       "wrong type for opTime argument in replSetFresh "
-                      "response: NumberInt32"));
+                      "response: int"));
 }
 
 TEST_F(FreshnessCheckerTest, ElectVetoed) {
@@ -601,7 +601,7 @@ TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponseManyNodes) {
     ASSERT_EQUALS(1,
                   countLogLinesContaining(
                       "wrong type for opTime argument in replSetFresh "
-                      "response: NumberInt32"));
+                      "response: int"));
 }
 
 TEST_F(FreshnessCheckerTest, ElectVetoedManyNodes) {

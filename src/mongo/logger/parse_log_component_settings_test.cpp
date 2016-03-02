@@ -69,7 +69,7 @@ TEST(Flat, FailNonNumeric) {
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
     ASSERT_EQUALS(result.getStatus().reason(),
-                  "Expected default.verbosity to be a number, but found String");
+                  "Expected default.verbosity to be a number, but found string");
 }
 
 TEST(Flat, FailBadComponent) {
@@ -102,7 +102,7 @@ TEST(Nested, FailNonNumeric) {
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
     ASSERT_EQUALS(result.getStatus().reason(),
-                  "Expected accessControl.verbosity to be a number, but found String");
+                  "Expected accessControl.verbosity to be a number, but found string");
 }
 
 TEST(Nested, FailBadComponent) {

@@ -1263,6 +1263,13 @@ public:
 };
 
 
+class ExpressionType final : public ExpressionFixedArity<ExpressionType, 1> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+};
+
+
 class ExpressionWeek final : public ExpressionFixedArity<ExpressionWeek, 1> {
 public:
     Value evaluateInternal(Variables* vars) const final;

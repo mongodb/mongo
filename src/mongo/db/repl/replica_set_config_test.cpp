@@ -1402,7 +1402,7 @@ TEST(ReplicaSetConfig, ReplSetId) {
                                          << BSON("replicaSetId" << 12345)));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
     ASSERT_STRING_CONTAINS(status.reason(),
-                           "\"replicaSetId\" had the wrong type. Expected OID, found NumberInt32");
+                           "\"replicaSetId\" had the wrong type. Expected objectId, found int");
 }
 
 }  // namespace

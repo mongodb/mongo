@@ -44,52 +44,52 @@ const BSONObj kMinBSONKey(kMinKeyData);
 const char* typeName(BSONType type) {
     switch (type) {
         case MinKey:
-            return "MinKey";
+            return "minKey";
         case EOO:
-            return "EOO";
+            return "missing";
         case NumberDouble:
-            return "NumberDouble";
+            return "double";
         case String:
-            return "String";
+            return "string";
         case Object:
-            return "Object";
+            return "object";
         case Array:
-            return "Array";
+            return "array";
         case BinData:
-            return "BinaryData";
+            return "binData";
         case Undefined:
-            return "Undefined";
+            return "undefined";
         case jstOID:
-            return "OID";
+            return "objectId";
         case Bool:
-            return "Bool";
+            return "bool";
         case Date:
-            return "Date";
+            return "date";
         case jstNULL:
-            return "NULL";
+            return "null";
         case RegEx:
-            return "RegEx";
+            return "regex";
         case DBRef:
-            return "DBRef";
+            return "dbPointer";
         case Code:
-            return "Code";
+            return "javascript";
         case Symbol:
-            return "Symbol";
+            return "symbol";
         case CodeWScope:
-            return "CodeWScope";
+            return "javascriptWithScope";
         case NumberInt:
-            return "NumberInt32";
+            return "int";
         case bsonTimestamp:
-            return "Timestamp";
+            return "timestamp";
         case NumberLong:
-            return "NumberLong64";
+            return "long";
         case NumberDecimal:
-            return "NumberDecimal128";
+            return "decimal";
         // JSTypeMax doesn't make sense to turn into a string; overlaps with highest-valued type
         case MaxKey:
-            return "MaxKey";
+            return "maxKey";
         default:
-            return "Invalid";
+            return "invalid";
     }
 }
 

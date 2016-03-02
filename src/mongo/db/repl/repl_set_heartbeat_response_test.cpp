@@ -606,7 +606,7 @@ TEST(ReplSetHeartbeatResponse, InitializeWrongElectionTimeType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"electionTime\" field in response to replSetHeartbeat command to "
-        "have type Date or Timestamp, but found type String",
+        "have type Date or Timestamp, but found type string",
         result.reason());
 }
 
@@ -618,7 +618,7 @@ TEST(ReplSetHeartbeatResponse, InitializeWrongTimeType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"time\" field in response to replSetHeartbeat command to "
-        "have a numeric type, but found type String",
+        "have a numeric type, but found type string",
         result.reason());
 }
 
@@ -628,13 +628,13 @@ TEST(ReplSetHeartbeatResponse, InitializeWrongDurableOpTimeType) {
                                        << "hello");
     Status result = hbResponse.initialize(initializerObj, 0);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
-    ASSERT_EQUALS("\"durableOpTime\" had the wrong type. Expected Object, found String",
+    ASSERT_EQUALS("\"durableOpTime\" had the wrong type. Expected object, found string",
                   result.reason());
 
     BSONObj initializerObj2 = BSON("ok" << 1.0 << "durableOpTime" << OpTime().getTimestamp());
     Status result2 = hbResponse.initialize(initializerObj2, 0);
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result2);
-    ASSERT_EQUALS("\"durableOpTime\" had the wrong type. Expected Object, found Timestamp",
+    ASSERT_EQUALS("\"durableOpTime\" had the wrong type. Expected object, found timestamp",
                   result2.reason());
 }
 
@@ -646,7 +646,7 @@ TEST(ReplSetHeartbeatResponse, InitializeWrongAppliedOpTimeType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"opTime\" field in response to replSetHeartbeat command to "
-        "have type Date or Timestamp, but found type String",
+        "have type Date or Timestamp, but found type string",
         result.reason());
 }
 
@@ -658,7 +658,7 @@ TEST(ReplSetHeartbeatResponse, InitializeMemberStateWrongType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"state\" field in response to replSetHeartbeat command to "
-        "have type NumberInt or NumberLong, but found type String",
+        "have type NumberInt or NumberLong, but found type string",
         result.reason());
 }
 
@@ -692,7 +692,7 @@ TEST(ReplSetHeartbeatResponse, InitializeVersionWrongType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"v\" field in response to replSetHeartbeat to "
-        "have type NumberInt, but found String",
+        "have type NumberInt, but found string",
         result.reason());
 }
 
@@ -705,7 +705,7 @@ TEST(ReplSetHeartbeatResponse, InitializeReplSetNameWrongType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"set\" field in response to replSetHeartbeat to "
-        "have type String, but found NumberInt32",
+        "have type String, but found int",
         result.reason());
 }
 
@@ -718,7 +718,7 @@ TEST(ReplSetHeartbeatResponse, InitializeHeartbeatMeessageWrongType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"hbmsg\" field in response to replSetHeartbeat to "
-        "have type String, but found NumberInt32",
+        "have type String, but found int",
         result.reason());
 }
 
@@ -731,7 +731,7 @@ TEST(ReplSetHeartbeatResponse, InitializeSyncingToWrongType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"syncingTo\" field in response to replSetHeartbeat to "
-        "have type String, but found NumberInt32",
+        "have type String, but found int",
         result.reason());
 }
 
@@ -744,7 +744,7 @@ TEST(ReplSetHeartbeatResponse, InitializeConfigWrongType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"config\" in response to replSetHeartbeat to "
-        "have type Object, but found NumberInt32",
+        "have type Object, but found int",
         result.reason());
 }
 
