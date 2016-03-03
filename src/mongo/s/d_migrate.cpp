@@ -54,6 +54,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dur.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
@@ -434,8 +435,10 @@ namespace mongo {
             // we want the number of records to better report, in that case
             bool isLargeChunk = false;
             unsigned long long recCount = 0;;
+            BSONObj obj;
             DiskLoc dl;
-            while (Runner::RUNNER_ADVANCED == runner->getNext(NULL, &dl)) {
+            Runner::RunnerState state;
+            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, &dl))) {
                 if ( ! isLargeChunk ) {
                     scoped_spinlock lk( _trackerLocks );
                     _cloneLocs.insert( dl );
@@ -445,6 +448,18 @@ namespace mongo {
                     isLargeChunk = true;
                 }
             }
+
+            if (Runner::RUNNER_DEAD == state) {
+                errmsg = "Runner error while scanning for documents belonging to chunk.";
+                return false;
+            }
+
+            if (Runner::RUNNER_ERROR == state) {
+                errmsg = "Runner error while scanning for documents belonging to chunk: " +
+                    WorkingSetCommon::toStatusString(obj);
+                return false;
+            }
+
             runner.reset();
 
             if ( isLargeChunk ) {
