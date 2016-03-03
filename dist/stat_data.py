@@ -12,6 +12,7 @@
 #       max_aggregate   Take the maximum value when aggregating statistics
 #       no_clear        Value not cleared when statistics cleared
 #       no_scale        Don't scale value per second in the logging tool script
+#       size            Used by timeseries tool, indicates value is a byte count
 #
 # The no_clear and no_scale flags are normally always set together (values that
 # are maintained over time are normally not scaled per second).
@@ -138,9 +139,9 @@ connection_stats = [
     ##########################################
     # Block manager statistics
     ##########################################
-    BlockStat('block_byte_map_read', 'mapped bytes read'),
-    BlockStat('block_byte_read', 'bytes read'),
-    BlockStat('block_byte_write', 'bytes written'),
+    BlockStat('block_byte_map_read', 'mapped bytes read', 'size'),
+    BlockStat('block_byte_read', 'bytes read', 'size'),
+    BlockStat('block_byte_write', 'bytes written', 'size'),
     BlockStat('block_map_read', 'mapped blocks read'),
     BlockStat('block_preload', 'blocks pre-loaded'),
     BlockStat('block_read', 'blocks read'),
@@ -149,14 +150,15 @@ connection_stats = [
     ##########################################
     # Cache and eviction statistics
     ##########################################
-    CacheStat('cache_bytes_dirty', 'tracked dirty bytes in the cache', 'no_clear,no_scale'),
-    CacheStat('cache_bytes_internal', 'tracked bytes belonging to internal pages in the cache', 'no_clear,no_scale'),
-    CacheStat('cache_bytes_inuse', 'bytes currently in the cache', 'no_clear,no_scale'),
-    CacheStat('cache_bytes_leaf', 'tracked bytes belonging to leaf pages in the cache', 'no_clear,no_scale'),
-    CacheStat('cache_bytes_max', 'maximum bytes configured', 'no_clear,no_scale'),
-    CacheStat('cache_bytes_overflow', 'tracked bytes belonging to overflow pages in the cache', 'no_clear,no_scale'),
-    CacheStat('cache_bytes_read', 'bytes read into cache'),
-    CacheStat('cache_bytes_write', 'bytes written from cache'),
+    CacheStat('cache_bytes_dirty', 'tracked dirty bytes in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_internal', 'tracked bytes belonging to internal pages in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_inuse', 'bytes currently in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_leaf', 'tracked bytes belonging to leaf pages in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_max', 'maximum bytes configured', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_overflow', 'tracked bytes belonging to overflow pages in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_read', 'bytes read into cache', 'size'),
+    CacheStat('cache_bytes_write', 'bytes written from cache', 'size'),
+    CacheStat('cache_eviction_aggressive_set', 'eviction currently operating in aggressive mode', 'no_clear,no_scale'),
     CacheStat('cache_eviction_app', 'pages evicted by application threads'),
     CacheStat('cache_eviction_checkpoint', 'checkpoint blocked page eviction'),
     CacheStat('cache_eviction_clean', 'unmodified pages evicted'),
@@ -168,7 +170,7 @@ connection_stats = [
     CacheStat('cache_eviction_force_fail', 'failed eviction of pages that exceeded the in-memory maximum'),
     CacheStat('cache_eviction_hazard', 'hazard pointer blocked page eviction'),
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
-    CacheStat('cache_eviction_maximum_page_size', 'maximum page size at eviction', 'no_clear,no_scale'),
+    CacheStat('cache_eviction_maximum_page_size', 'maximum page size at eviction', 'no_clear,no_scale,size'),
     CacheStat('cache_eviction_queue_empty', 'eviction server candidate queue empty when topping up'),
     CacheStat('cache_eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
     CacheStat('cache_eviction_server_evicting', 'eviction server evicting pages'),
@@ -206,17 +208,17 @@ connection_stats = [
     ##########################################
     # Logging statistics
     ##########################################
-    LogStat('log_buffer_size', 'total log buffer size', 'no_clear,no_scale'),
-    LogStat('log_bytes_payload', 'log bytes of payload data'),
-    LogStat('log_bytes_written', 'log bytes written'),
+    LogStat('log_buffer_size', 'total log buffer size', 'no_clear,no_scale,size'),
+    LogStat('log_bytes_payload', 'log bytes of payload data', 'size'),
+    LogStat('log_bytes_written', 'log bytes written', 'size'),
     LogStat('log_close_yields', 'yields waiting for previous log file close'),
-    LogStat('log_compress_len', 'total size of compressed records'),
-    LogStat('log_compress_mem', 'total in-memory size of compressed records'),
+    LogStat('log_compress_len', 'total size of compressed records', 'size'),
+    LogStat('log_compress_mem', 'total in-memory size of compressed records', 'size'),
     LogStat('log_compress_small', 'log records too small to compress'),
     LogStat('log_compress_write_fails', 'log records not compressed'),
     LogStat('log_compress_writes', 'log records compressed'),
     LogStat('log_flush', 'log flush operations'),
-    LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale'),
+    LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale,size'),
     LogStat('log_prealloc_files', 'pre-allocated log files prepared'),
     LogStat('log_prealloc_max', 'number of pre-allocated log files to create', 'no_clear,no_scale'),
     LogStat('log_prealloc_missed', 'pre-allocated log files not ready and missed'),
@@ -227,7 +229,7 @@ connection_stats = [
     LogStat('log_scans', 'log scan operations'),
     LogStat('log_slot_closes', 'consolidated slot closures'),
     LogStat('log_slot_coalesced', 'written slots coalesced'),
-    LogStat('log_slot_consolidated', 'logging bytes consolidated'),
+    LogStat('log_slot_consolidated', 'logging bytes consolidated', 'size'),
     LogStat('log_slot_joins', 'consolidated slot joins'),
     LogStat('log_slot_races', 'consolidated slot join races'),
     LogStat('log_slot_switch_busy', 'busy returns attempting to switch slots'),
@@ -246,7 +248,7 @@ connection_stats = [
     RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_pages', 'page reconciliation calls'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
-    RecStat('rec_split_stashed_bytes', 'split bytes currently awaiting free', 'no_clear,no_scale'),
+    RecStat('rec_split_stashed_bytes', 'split bytes currently awaiting free', 'no_clear,no_scale,size'),
     RecStat('rec_split_stashed_objects', 'split objects currently awaiting free', 'no_clear,no_scale'),
 
     ##########################################
@@ -315,7 +317,7 @@ connection_stats = [
     YieldStat('page_sleep', 'page acquire time sleeping (usecs)'),
 ]
 
-connection_stats = sorted(connection_stats, key=attrgetter('name'))
+connection_stats = sorted(connection_stats, key=attrgetter('desc'))
 
 ##########################################
 # Data source statistics
@@ -333,18 +335,18 @@ dsrc_stats = [
     CursorStat('cursor_create', 'create calls'),
     CursorStat('cursor_insert', 'insert calls'),
     CursorStat('cursor_insert_bulk', 'bulk-loaded cursor-insert calls'),
-    CursorStat('cursor_insert_bytes', 'cursor-insert key and value bytes inserted'),
+    CursorStat('cursor_insert_bytes', 'cursor-insert key and value bytes inserted', 'size'),
     CursorStat('cursor_next', 'next calls'),
     CursorStat('cursor_prev', 'prev calls'),
     CursorStat('cursor_remove', 'remove calls'),
-    CursorStat('cursor_remove_bytes', 'cursor-remove key bytes removed'),
+    CursorStat('cursor_remove_bytes', 'cursor-remove key bytes removed', 'size'),
     CursorStat('cursor_reset', 'reset calls'),
     CursorStat('cursor_restart', 'restarted searches'),
     CursorStat('cursor_search', 'search calls'),
     CursorStat('cursor_search_near', 'search near calls'),
     CursorStat('cursor_truncate', 'truncate calls'),
     CursorStat('cursor_update', 'update calls'),
-    CursorStat('cursor_update_bytes', 'cursor-update value bytes updated'),
+    CursorStat('cursor_update_bytes', 'cursor-update value bytes updated', 'size'),
 
     ##########################################
     # Btree statistics
@@ -357,13 +359,13 @@ dsrc_stats = [
     BtreeStat('btree_column_variable', 'column-store variable-size leaf pages', 'no_scale'),
     BtreeStat('btree_compact_rewrite', 'pages rewritten by compaction'),
     BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale'),
-    BtreeStat('btree_fixed_len', 'fixed-record size', 'max_aggregate,no_scale'),
+    BtreeStat('btree_fixed_len', 'fixed-record size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maximum_depth', 'maximum tree depth', 'max_aggregate,no_scale'),
-    BtreeStat('btree_maxintlkey', 'maximum internal page key size', 'max_aggregate,no_scale'),
-    BtreeStat('btree_maxintlpage', 'maximum internal page size', 'max_aggregate,no_scale'),
-    BtreeStat('btree_maxleafkey', 'maximum leaf page key size', 'max_aggregate,no_scale'),
-    BtreeStat('btree_maxleafpage', 'maximum leaf page size', 'max_aggregate,no_scale'),
-    BtreeStat('btree_maxleafvalue', 'maximum leaf page value size', 'max_aggregate,no_scale'),
+    BtreeStat('btree_maxintlkey', 'maximum internal page key size', 'max_aggregate,no_scale,size'),
+    BtreeStat('btree_maxintlpage', 'maximum internal page size', 'max_aggregate,no_scale,size'),
+    BtreeStat('btree_maxleafkey', 'maximum leaf page key size', 'max_aggregate,no_scale,size'),
+    BtreeStat('btree_maxleafpage', 'maximum leaf page size', 'max_aggregate,no_scale,size'),
+    BtreeStat('btree_maxleafvalue', 'maximum leaf page value size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_overflow', 'overflow pages', 'no_scale'),
     BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale'),
     BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale'),
@@ -377,7 +379,7 @@ dsrc_stats = [
     LSMStat('bloom_miss', 'bloom filter misses'),
     LSMStat('bloom_page_evict', 'bloom filter pages evicted from cache'),
     LSMStat('bloom_page_read', 'bloom filter pages read into cache'),
-    LSMStat('bloom_size', 'total size of bloom filters', 'no_scale'),
+    LSMStat('bloom_size', 'total size of bloom filters', 'no_scale,size'),
     LSMStat('lsm_checkpoint_throttle', 'sleep for LSM checkpoint throttle'),
     LSMStat('lsm_chunk_count', 'chunks in the LSM tree', 'no_scale'),
     LSMStat('lsm_generation_max', 'highest merge generation in the LSM tree', 'max_aggregate,no_scale'),
@@ -387,22 +389,22 @@ dsrc_stats = [
     ##########################################
     # Block manager statistics
     ##########################################
-    BlockStat('allocation_size', 'file allocation unit size', 'max_aggregate,no_scale'),
+    BlockStat('allocation_size', 'file allocation unit size', 'max_aggregate,no_scale,size'),
     BlockStat('block_alloc', 'blocks allocated'),
-    BlockStat('block_checkpoint_size', 'checkpoint size', 'no_scale'),
+    BlockStat('block_checkpoint_size', 'checkpoint size', 'no_scale,size'),
     BlockStat('block_extension', 'allocations requiring file extension'),
     BlockStat('block_free', 'blocks freed'),
     BlockStat('block_magic', 'file magic number', 'max_aggregate,no_scale'),
     BlockStat('block_major', 'file major version number', 'max_aggregate,no_scale'),
     BlockStat('block_minor', 'minor version number', 'max_aggregate,no_scale'),
-    BlockStat('block_reuse_bytes', 'file bytes available for reuse'),
-    BlockStat('block_size', 'file size in bytes', 'no_scale'),
+    BlockStat('block_reuse_bytes', 'file bytes available for reuse', 'size'),
+    BlockStat('block_size', 'file size in bytes', 'no_scale,size'),
 
     ##########################################
     # Cache and eviction statistics
     ##########################################
-    CacheStat('cache_bytes_read', 'bytes read into cache'),
-    CacheStat('cache_bytes_write', 'bytes written from cache'),
+    CacheStat('cache_bytes_read', 'bytes read into cache', 'size'),
+    CacheStat('cache_bytes_write', 'bytes written from cache', 'size'),
     CacheStat('cache_eviction_checkpoint', 'checkpoint blocked page eviction'),
     CacheStat('cache_eviction_clean', 'unmodified pages evicted'),
     CacheStat('cache_eviction_deepen', 'page split during eviction deepened the tree'),
@@ -448,8 +450,8 @@ dsrc_stats = [
     RecStat('rec_page_match', 'page checksum matches'),
     RecStat('rec_pages', 'page reconciliation calls'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
-    RecStat('rec_prefix_compression', 'leaf page key bytes discarded using prefix compression'),
-    RecStat('rec_suffix_compression', 'internal page key bytes discarded using suffix compression'),
+    RecStat('rec_prefix_compression', 'leaf page key bytes discarded using prefix compression', 'size'),
+    RecStat('rec_suffix_compression', 'internal page key bytes discarded using suffix compression', 'size'),
 
     ##########################################
     # Transaction statistics
@@ -457,7 +459,7 @@ dsrc_stats = [
     TxnStat('txn_update_conflict', 'update conflicts'),
 ]
 
-dsrc_stats = sorted(dsrc_stats, key=attrgetter('name'))
+dsrc_stats = sorted(dsrc_stats, key=attrgetter('desc'))
 
 ##########################################
 # Cursor Join statistics
@@ -468,4 +470,4 @@ join_stats = [
     JoinStat('bloom_false_positive', 'bloom filter false positives'),
 ]
 
-join_stats = sorted(join_stats, key=attrgetter('name'))
+join_stats = sorted(join_stats, key=attrgetter('desc'))

@@ -40,7 +40,8 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session, bool free_buffers)
 		/* Stop when there are no positioned cursors. */
 		if (session->ncursors == 0)
 			break;
-		WT_TRET(cursor->reset(cursor));
+		if (!F_ISSET(cursor, WT_CURSTD_JOINED))
+			WT_TRET(cursor->reset(cursor));
 		/* Optionally, free the cursor buffers */
 		if (free_buffers) {
 			__wt_buf_free(session, &cursor->key);

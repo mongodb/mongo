@@ -96,7 +96,10 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
         # connection with readonly.
         #
         self.close_conn()
-        if self.dirchmod:
+        #
+        # The chmod command is not fully portable to windows.
+        #
+        if self.dirchmod and os.name == 'posix':
             for f in os.listdir(self.home):
                 if os.path.isfile(f):
                     os.chmod(f, 0444)
@@ -133,7 +136,7 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
         self.create = True
 
     def test_readonly(self):
-        if self.dirchmod:
+        if self.dirchmod and os.name == 'posix':
             with self.expectedStderrPattern('Permission'):
                 self.readonly()
         else:

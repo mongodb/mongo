@@ -200,8 +200,6 @@ __curstat_next(WT_CURSOR *cursor)
 	if (cst->notinitialized) {
 		WT_ERR(__wt_curstat_init(
 		    session, cursor->internal_uri, NULL, cst->cfg, cst));
-		if (cst->next_set != NULL)
-			WT_ERR((*cst->next_set)(session, cst, true, true));
 		cst->notinitialized = false;
 	}
 
@@ -209,6 +207,8 @@ __curstat_next(WT_CURSOR *cursor)
 	if (cst->notpositioned) {
 		cst->notpositioned = false;
 		cst->key = WT_STAT_KEY_MIN(cst);
+		if (cst->next_set != NULL)
+			WT_ERR((*cst->next_set)(session, cst, true, true));
 	} else if (cst->key < WT_STAT_KEY_MAX(cst))
 		++cst->key;
 	else if (cst->next_set != NULL)
@@ -244,8 +244,6 @@ __curstat_prev(WT_CURSOR *cursor)
 	if (cst->notinitialized) {
 		WT_ERR(__wt_curstat_init(
 		    session, cursor->internal_uri, NULL, cst->cfg, cst));
-		if (cst->next_set != NULL)
-			WT_ERR((*cst->next_set)(session, cst, false, true));
 		cst->notinitialized = false;
 	}
 
@@ -253,6 +251,8 @@ __curstat_prev(WT_CURSOR *cursor)
 	if (cst->notpositioned) {
 		cst->notpositioned = false;
 		cst->key = WT_STAT_KEY_MAX(cst);
+		if (cst->next_set != NULL)
+			WT_ERR((*cst->next_set)(session, cst, false, true));
 	} else if (cst->key > WT_STAT_KEY_MIN(cst))
 		--cst->key;
 	else if (cst->next_set != NULL)
@@ -449,7 +449,6 @@ __curstat_join_next_set(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst,
 	WT_JOIN_STATS_GROUP *join_group;
 	ssize_t pos;
 
-	WT_ASSERT(session, WT_STREQ(cst->iface.uri, "statistics:join"));
 	join_group = &cst->u.join_stats_group;
 	cjoin = join_group->join_cursor;
 	if (init)
@@ -542,25 +541,28 @@ __wt_curstat_init(WT_SESSION_IMPL *session,
 	dsrc_uri = uri + strlen("statistics:");
 
 	if (WT_STREQ(dsrc_uri, "join"))
-		return (__curstat_join_init(session, curjoin, cfg, cst));
+		WT_RET(__curstat_join_init(session, curjoin, cfg, cst));
 
-	if (WT_PREFIX_MATCH(dsrc_uri, "colgroup:"))
-		return (
+	else if (WT_PREFIX_MATCH(dsrc_uri, "colgroup:"))
+		WT_RET(
 		    __wt_curstat_colgroup_init(session, dsrc_uri, cfg, cst));
 
-	if (WT_PREFIX_MATCH(dsrc_uri, "file:"))
-		return (__curstat_file_init(session, dsrc_uri, cfg, cst));
+	else if (WT_PREFIX_MATCH(dsrc_uri, "file:"))
+		WT_RET(__curstat_file_init(session, dsrc_uri, cfg, cst));
 
-	if (WT_PREFIX_MATCH(dsrc_uri, "index:"))
-		return (__wt_curstat_index_init(session, dsrc_uri, cfg, cst));
+	else if (WT_PREFIX_MATCH(dsrc_uri, "index:"))
+		WT_RET(__wt_curstat_index_init(session, dsrc_uri, cfg, cst));
 
-	if (WT_PREFIX_MATCH(dsrc_uri, "lsm:"))
-		return (__wt_curstat_lsm_init(session, dsrc_uri, cst));
+	else if (WT_PREFIX_MATCH(dsrc_uri, "lsm:"))
+		WT_RET(__wt_curstat_lsm_init(session, dsrc_uri, cst));
 
-	if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
-		return (__wt_curstat_table_init(session, dsrc_uri, cfg, cst));
+	else if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
+		WT_RET(__wt_curstat_table_init(session, dsrc_uri, cfg, cst));
 
-	return (__wt_bad_object_type(session, uri));
+	else
+		return (__wt_bad_object_type(session, uri));
+
+	return (0);
 }
 
 /*
