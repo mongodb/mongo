@@ -299,11 +299,17 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 
 	/* Initially position the cursor if necessary. */
 	endmax = &entry->ends[entry->ends_next];
-	if ((end = &entry->ends[0]) < endmax &&
-	    F_ISSET(end, WT_CURJOIN_END_GE)) {
-		WT_ERR(__wt_cursor_dup_position(end->cursor, c));
-		if (WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_GE)
-			skip = 1;
+	if ((end = &entry->ends[0]) < endmax) {
+		if (F_ISSET(end, WT_CURJOIN_END_GT) ||
+		    WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_EQ) {
+			WT_ERR(__wt_cursor_dup_position(end->cursor, c));
+			if (WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_GE)
+				skip = 1;
+		} else if (F_ISSET(end, WT_CURJOIN_END_LT)) {
+			if ((ret = c->next(c)) == WT_NOTFOUND)
+				goto done;
+			WT_ERR(ret);
+		}
 	}
 	collator = (entry->index == NULL) ? NULL : entry->index->collator;
 	while (ret == 0) {
