@@ -434,8 +434,7 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 		       if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
 			       WT_RET_MSG(session, EINVAL,
 				   "join cursors with Bloom filters cannot be "
-				   "used with WT_ISO_READ_UNCOMMITTED "
-				   "isolation");
+				   "used with read-uncommitted isolation");
 			if (je->bloom == NULL) {
 				/*
 				 * Look for compatible filters to be shared,
