@@ -13,10 +13,6 @@ import (
 	"github.com/spacemonkeygo/openssl"
 )
 
-var (
-	DefaultSSLDialTimeout = time.Second * 3
-)
-
 // For connecting to the database over ssl
 type SSLDBConnector struct {
 	dialInfo  *mgo.DialInfo
@@ -50,10 +46,15 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 		return conn, err
 	}
 
+	timeout := time.Duration(options.DefaultDialTimeoutSeconds) * time.Second
+	if opts.HiddenOptions != nil && opts.HiddenOptions.DialTimeoutSeconds != nil {
+		timeout = time.Duration(*opts.HiddenOptions.DialTimeoutSeconds) * time.Second
+	}
+
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:          connectionAddrs,
-		Timeout:        DefaultSSLDialTimeout,
+		Timeout:        timeout,
 		Direct:         opts.Direct,
 		ReplicaSetName: opts.ReplicaSetName,
 		DialServer:     dialer,

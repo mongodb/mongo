@@ -6,6 +6,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2"
 	"testing"
+	"time"
 )
 
 func TestVanillaDBConnector(t *testing.T) {
@@ -31,7 +32,7 @@ func TestVanillaDBConnector(t *testing.T) {
 			So(connector.Configure(opts), ShouldBeNil)
 			So(connector.dialInfo.Addrs, ShouldResemble,
 				[]string{"host1:20000", "host2:20000"})
-			So(connector.dialInfo.Timeout, ShouldResemble, DefaultDialTimeout)
+			So(connector.dialInfo.Timeout, ShouldResemble, time.Duration(options.DefaultDialTimeoutSeconds)*time.Second)
 
 		})
 

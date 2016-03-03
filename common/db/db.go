@@ -3,15 +3,15 @@
 package db
 
 import (
-	"fmt"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/password"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	"fmt"
 	"io"
 	"strings"
 	"sync"
-	"time"
 )
 
 type (
@@ -51,8 +51,7 @@ const (
 )
 
 var (
-	DefaultDialTimeout = time.Second * 3
-	GetConnectorFuncs  = []GetConnectorFunc{}
+	GetConnectorFuncs = []GetConnectorFunc{}
 )
 
 // Used to manage database sessions

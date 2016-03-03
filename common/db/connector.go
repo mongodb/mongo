@@ -1,6 +1,8 @@
 package db
 
 import (
+	"time"
+
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
@@ -27,10 +29,14 @@ func (self *VanillaDBConnector) Configure(opts options.ToolOptions) error {
 	// create the addresses to be used to connect
 	connectionAddrs := util.CreateConnectionAddrs(opts.Host, opts.Port)
 
+	timeout := time.Duration(options.DefaultDialTimeoutSeconds) * time.Second
+	if opts.HiddenOptions != nil && opts.HiddenOptions.DialTimeoutSeconds != nil {
+		timeout = time.Duration(*opts.HiddenOptions.DialTimeoutSeconds) * time.Second
+	}
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:          connectionAddrs,
-		Timeout:        DefaultDialTimeout,
+		Timeout:        timeout,
 		Direct:         opts.Direct,
 		ReplicaSetName: opts.ReplicaSetName,
 		Username:       opts.Auth.Username,
