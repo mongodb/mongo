@@ -102,7 +102,10 @@ sh.moveChunk = function( fullName , find , to ) {
 };
 
 sh.setBalancerState = function( onOrNot ) { 
-    sh._getConfigDB().settings.update({ _id: "balancer" }, { $set : { stopped: onOrNot ? false : true } }, true );
+    return sh._getConfigDB().settings.update({ _id: 'balancer' },
+                                             { $set : { stopped: onOrNot ? false : true } },
+                                             { upsert: true,
+                                               writeConcern: { w: 'majority', timeout: 30 } });
 };
 
 sh.getBalancerState = function(configDB) {

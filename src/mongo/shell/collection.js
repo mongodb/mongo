@@ -500,9 +500,10 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         this._validateUpdateDoc(obj);
         this.getMongo().update(this._fullName, query, obj, upsert, multi);
 
-        // enforce write concern, if required
-        if (wc)
+        // Enforce write concern, if required
+        if (wc) {
             result = this.runCommand("getLastError", wc instanceof WriteConcern ? wc.toJSON() : wc);
+        }
     }
 
     this._printExtraInfo("Updated", startTime);
