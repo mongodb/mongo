@@ -99,7 +99,7 @@ class test_join06(wttest.WiredTigerTestCase):
         if self.uncommitted and self.bloom:
             # Make sure that read-uncommitted with Bloom is not allowed.
             # This is detected on the first next() operation.
-            msg = '/cannot be used with WT_ISO_READ_UNCOMMITTED/'
+            msg = '/cannot be used with read-uncommitted/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: jc.next(), msg)
             return
