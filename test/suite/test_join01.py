@@ -74,8 +74,18 @@ class test_join01(wttest.WiredTigerTestCase):
     # the join cursor and iterating again.
     def stats(self, jc, which):
         statcur = self.session.open_cursor('statistics:join', jc, None)
-        self.check_stats(statcur, 0, 'join: index:join01:index1: ' +
-                         'bloom filter false positives')
+        # pick a stat we always expect to see
+        statdesc = 'bloom filter false positives'
+        expectstats = [
+            'join: index:join01:index1: ' + statdesc,
+            'join: index:join01:index2: ' + statdesc ]
+        if self.ref == 'index':
+            expectstats.append('join: index:join01:index0: ' + statdesc)
+        else:
+            expectstats.append('join: table:join01: ' + statdesc)
+        self.check_stats(statcur, expectstats)
+        statcur.reset()
+        self.check_stats(statcur, expectstats)
         statcur.close()
 
     def statstr_to_int(self, str):
@@ -86,16 +96,14 @@ class test_join01(wttest.WiredTigerTestCase):
         parts = str.rpartition('(')
         return int(parts[2].rstrip(')'))
 
-    # string should appear with a minimum value of least "min".
-    def check_stats(self, statcursor, min, lookfor):
+    # All of the expect strings should appear
+    def check_stats(self, statcursor, expectstats):
         stringclass = ''.__class__
         intclass = (0).__class__
 
         # Reset the cursor, we're called multiple times.
         statcursor.reset()
 
-        found = False
-        foundval = 0
         self.printVerbose(3, 'statistics:')
         for id, desc, valstr, val in statcursor:
             self.assertEqual(type(desc), stringclass)
@@ -104,12 +112,11 @@ class test_join01(wttest.WiredTigerTestCase):
             self.assertEqual(val, self.statstr_to_int(valstr))
             self.printVerbose(3, '  stat: \'' + desc + '\', \'' +
                               valstr + '\', ' + str(val))
-            if desc == lookfor:
-                found = True
-                foundval = val
+            if desc in expectstats:
+                expectstats.remove(desc)
 
-        self.assertTrue(found, 'in stats, did not see: ' + lookfor)
-        self.assertTrue(foundval >= min)
+        self.assertTrue(len(expectstats) == 0,
+                        'missing expected values in stats: ' + str(expectstats))
 
     # Common function for testing the most basic functionality
     # of joins
