@@ -174,11 +174,6 @@ ShardingTest = function ShardingTestWithContinuousConfigPrimaryStepdown() {
     }
     arguments[0].verbose = 2;
 
-    if (!arguments[0].other.shardOptions) {
-        arguments[0].other.shardOptions = {};
-    }
-    arguments[0].other.shardOptions.verbose = 2;
-
     // Set electionTimeoutMillis to 5 seconds, from 10, so that chunk migrations don't
     // time out because of the CSRS primary being down so often for so long.
     arguments[0].configReplSetTestOptions = Object.merge(arguments[0].configReplSetTestOptions, {
