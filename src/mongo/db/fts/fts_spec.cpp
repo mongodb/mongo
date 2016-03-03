@@ -193,7 +193,7 @@ void FTSSpec::_scoreStringV2(FTSTokenizer* tokenizer,
     tokenizer->reset(raw.rawData(), FTSTokenizer::kFilterStopWords);
 
     while (tokenizer->moveNext()) {
-        string term = tokenizer->get().toString();
+        StringData term = tokenizer->get();
 
         ScoreHelperStruct& data = terms[term];
 

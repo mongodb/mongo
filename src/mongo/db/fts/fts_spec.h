@@ -40,6 +40,7 @@
 #include "mongo/db/fts/stop_words.h"
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -58,7 +59,7 @@ struct ScoreHelperStruct {
     double count;
     double exp;
 };
-typedef unordered_map<std::string, ScoreHelperStruct> ScoreHelperMap;
+typedef StringMap<ScoreHelperStruct> ScoreHelperMap;
 
 class FTSSpec {
     struct Tools {
