@@ -2267,7 +2267,7 @@ main(int argc, char *argv[])
 	 * the compact operation, but not for the workloads.
 	 */
 	if (cfg->async_threads > 0) {
-		if (F_ISSET(cfg, CFG_TRUNCATE) > 0) {
+		if (F_ISSET(cfg, CFG_TRUNCATE)) {
 			lprintf(cfg, 1, 0, "Cannot run truncate and async\n");
 			goto err;
 		}

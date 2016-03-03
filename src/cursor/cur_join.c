@@ -8,9 +8,8 @@
 
 #include "wt_internal.h"
 
-static int
-__curjoin_insert_endpoint(WT_SESSION_IMPL *, WT_CURSOR_JOIN_ENTRY *, u_int,
-    WT_CURSOR_JOIN_ENDPOINT **);
+static int __curjoin_insert_endpoint(WT_SESSION_IMPL *,
+    WT_CURSOR_JOIN_ENTRY *, u_int, WT_CURSOR_JOIN_ENDPOINT **);
 
 /*
  * __curjoin_entry_iter_init --
@@ -464,7 +463,7 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 			F_SET(cjoin, WT_CURJOIN_SKIP_FIRST_LEFT);
 
 		if (F_ISSET(je, WT_CURJOIN_ENTRY_BLOOM)) {
-		       if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
+			if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
 			       WT_RET_MSG(session, EINVAL,
 				   "join cursors with Bloom filters cannot be "
 				   "used with read-uncommitted isolation");
