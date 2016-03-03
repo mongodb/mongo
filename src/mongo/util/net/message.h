@@ -55,7 +55,7 @@ class MessagingPort;
 
 typedef uint32_t MSGID;
 
-enum NetworkOp {
+enum NetworkOp : int32_t {
     opInvalid = 0,
     opReply = 1,     /* reply. responseTo is set. */
     dbMsg = 1000,    /* generic msg command followed by a std::string */
