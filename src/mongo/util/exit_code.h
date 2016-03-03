@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-enum ExitCode {
+enum ExitCode : int {
     EXIT_CLEAN = 0,
     EXIT_BADOPTIONS = 2,
     EXIT_REPLICATION_ERROR = 3,
