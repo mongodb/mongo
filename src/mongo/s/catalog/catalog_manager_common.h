@@ -79,6 +79,11 @@ public:
                      const std::string& ns,
                      const BSONObj& detail) final;
 
+    StatusWith<DistLockManager::ScopedDistLock> distLock(OperationContext* txn,
+                                                         StringData name,
+                                                         StringData whyMessage,
+                                                         stdx::chrono::milliseconds waitFor) final;
+
 protected:
     /**
      * Selects an optimal shard on which to place a newly created database from the set of

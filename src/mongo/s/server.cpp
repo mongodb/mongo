@@ -59,7 +59,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
-#include "mongo/s/catalog/forwarding_catalog_manager.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_connection_hook.h"

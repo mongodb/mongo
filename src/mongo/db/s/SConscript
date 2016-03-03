@@ -103,5 +103,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
+        '$BUILD_DIR/mongo/s/sharding_test_fixture',
     ]
 )

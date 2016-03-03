@@ -190,7 +190,6 @@ private:
     std::map<std::string, int> _staleNSMap;
 
     int _totalTries;
-    bool _cmChangeAttempted;
 
     std::map<ShardId, PCMData> _cursorMap;
 

@@ -48,11 +48,13 @@
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
-#include "mongo/s/catalog/forwarding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
+#include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
+#include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -67,6 +69,28 @@ using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
+
+
+std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
+                                                   ShardRegistry* shardRegistry,
+                                                   const HostAndPort& thisHost) {
+    std::unique_ptr<SecureRandom> rng(SecureRandom::create());
+    std::string distLockProcessId = str::stream()
+        << thisHost.toString() << ':'
+        << durationCount<Seconds>(service->getClockSource()->now().toDurationSinceEpoch()) << ':'
+        << static_cast<int32_t>(rng->nextInt64());
+
+    auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(shardRegistry);
+    auto distLockManager =
+        stdx::make_unique<ReplSetDistLockManager>(service,
+                                                  distLockProcessId,
+                                                  std::move(distLockCatalog),
+                                                  ReplSetDistLockManager::kDistLockPingInterval,
+                                                  ReplSetDistLockManager::kDistLockExpirationTime);
+
+    return stdx::make_unique<CatalogManagerReplicaSet>(std::move(distLockManager));
+}
+
 
 // Same logic as sharding_connection_hook.cpp.
 class ShardingEgressMetadataHook final : public rpc::EgressMetadataHook {
@@ -153,6 +177,11 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkIn
 Status initializeGlobalShardingState(OperationContext* txn,
                                      const ConnectionString& configCS,
                                      bool allowNetworking) {
+    if (configCS.type() == ConnectionString::SYNC) {
+        return {ErrorCodes::UnsupportedFormat,
+                "SYNC config server connection string is not allowed."};
+    }
+
     SyncClusterConnection::setConnectionValidationHook(
         [](const HostAndPort& target, const executor::RemoteCommandResponse& isMasterReply) {
             return ShardingNetworkConnectionHook::validateHostImpl(target, isMasterReply);
@@ -170,12 +199,9 @@ Status initializeGlobalShardingState(OperationContext* txn,
                                              "NetworkInterfaceASIO-ShardRegistry-TaskExecutor")),
                                          configCS));
 
-    std::unique_ptr<ForwardingCatalogManager> catalogManager =
-        stdx::make_unique<ForwardingCatalogManager>(
-            getGlobalServiceContext(),
-            configCS,
-            shardRegistry.get(),
-            HostAndPort(getHostName(), serverGlobalParams.port));
+    auto catalogManager = makeCatalogManager(getGlobalServiceContext(),
+                                             shardRegistry.get(),
+                                             HostAndPort(getHostName(), serverGlobalParams.port));
 
     shardRegistry->startup();
     grid.init(std::move(catalogManager),
@@ -193,12 +219,6 @@ Status initializeGlobalShardingState(OperationContext* txn,
             return Status::OK();
         } catch (const DBException& ex) {
             Status status = ex.toStatus();
-            if (status == ErrorCodes::ConfigServersInconsistent) {
-                // Legacy catalog manager can return ConfigServersInconsistent.  When that happens
-                // we should immediately fail initialization.  For all other failures we should
-                // retry.
-                return status;
-            }
             if (status == ErrorCodes::ReplicaSetNotFound) {
                 // ReplicaSetNotFound most likely means we've been waiting for the config replica
                 // set to come up for so long that the ReplicaSetMonitor stopped monitoring the set.

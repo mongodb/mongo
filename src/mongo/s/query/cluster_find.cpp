@@ -132,67 +132,6 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
                                           lpq.isAllowPartialResults());
 }
 
-/**
- * Runs a find command against the "config" shard in SyncClusterConnection (SCCC) mode. Special
- * handling is required for SCCC since the config shard's NS targeter is only available if the
- * config servers are in CSRS mode.
- *
- * 'query' is the query to run against the config shard. 'shard' must represent the config shard.
- *
- * On success, fills out 'results' with the documents returned from the config shard and returns the
- * cursor id which should be handed back to the client.
- *
- * TODO: This should not be required for 3.4, since the config server mode must be config server
- * replica set (CSRS) in order to upgrade.
- */
-StatusWith<CursorId> runConfigServerQuerySCCC(const CanonicalQuery& query,
-                                              const Shard& shard,
-                                              std::vector<BSONObj>* results) {
-    BSONObj findCommand = query.getParsed().asFindCommand();
-
-    // XXX: This is a temporary hack. We use ScopedDbConnection and query the $cmd namespace
-    // explicitly because this gives us the particular host that the command ran on via
-    // originalHost(). We need to know the host that the remote cursor was established on in order
-    // to issue getMore or killCursors operations against this remote cursor.
-    ScopedDbConnection conn(shard.getConnString());
-    auto cursor = conn->query(str::stream() << query.nss().db() << ".$cmd",
-                              findCommand,
-                              -1,       // nToReturn
-                              0,        // nToSkip
-                              nullptr,  // fieldsToReturn
-                              0);       // options
-    if (!cursor || !cursor->more()) {
-        return {ErrorCodes::OperationFailed, "failed to run find command against config shard"};
-    }
-    BSONObj result = cursor->nextSafe().getOwned();
-    conn.done();
-
-    auto status = Command::getStatusFromCommandResult(result);
-    if (ErrorCodes::SendStaleConfig == status || ErrorCodes::RecvStaleConfig == status) {
-        throw RecvStaleConfigException("find command failed because of stale config", result);
-    }
-
-    auto executorPool = grid.shardRegistry()->getExecutorPool();
-    auto transformedResult = storePossibleCursor(HostAndPort(cursor->originalHost()),
-                                                 result,
-                                                 executorPool->getArbitraryExecutor(),
-                                                 grid.getCursorManager());
-    if (!transformedResult.isOK()) {
-        return transformedResult.getStatus();
-    }
-
-    auto outgoingCursorResponse = CursorResponse::parseFromBSON(transformedResult.getValue());
-    if (!outgoingCursorResponse.isOK()) {
-        return outgoingCursorResponse.getStatus();
-    }
-
-    for (const auto& doc : outgoingCursorResponse.getValue().getBatch()) {
-        results->push_back(doc.getOwned());
-    }
-
-    return outgoingCursorResponse.getValue().getCursorId();
-}
-
 StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
                                              const CanonicalQuery& query,
                                              const ReadPreferenceSetting& readPref,
@@ -251,21 +190,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     // Use read pref to target a particular host from each shard. Also construct the find command
     // that we will forward to each shard.
     for (const auto& shard : shards) {
-        // The unified targeting logic only works for config server replica sets, so we need special
-        // handling for querying config server content with legacy 3-host config servers.
-        if (shard->isConfig() && shard->getConnString().type() == ConnectionString::SYNC) {
-            invariant(shards.size() == 1U);
-            try {
-                return runConfigServerQuerySCCC(query, *shard, results);
-            } catch (const DBException& e) {
-                if (e.getCode() != ErrorCodes::IncompatibleCatalogManager) {
-                    throw;
-                }
-                grid.forwardingCatalogManager()->waitForCatalogManagerChange(txn);
-                // Fall through to normal code path now that the catalog manager mode has been
-                // swapped and the config servers are a normal replica set.
-            }
-        }
+        invariant(!shard->isConfig() || shard->getConnString().type() != ConnectionString::SYNC);
 
         // Build the find command, and attach shard version if necessary.
         BSONObjBuilder cmdBuilder;

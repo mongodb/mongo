@@ -200,7 +200,6 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
         return;
 
     int loops = 5;
-    bool cmChangeAttempted = false;
 
     while (true) {
         try {
@@ -254,20 +253,13 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
             if (loops < 4)
                 versionManager.forceRemoteCheckShardVersionCB(txn, staleNS);
         } catch (const DBException& e) {
-            if (e.getCode() == ErrorCodes::IncompatibleCatalogManager) {
-                fassert(28791, !cmChangeAttempted);
-                cmChangeAttempted = true;
-
-                grid.forwardingCatalogManager()->waitForCatalogManagerChange(txn);
-            } else {
-                OpQueryReplyBuilder reply;
-                {
-                    BSONObjBuilder builder(reply.bufBuilderForResults());
-                    Command::appendCommandStatus(builder, e.toStatus());
-                }
-                reply.sendCommandReply(request.p(), request.m());
-                return;
+            OpQueryReplyBuilder reply;
+            {
+                BSONObjBuilder builder(reply.bufBuilderForResults());
+                Command::appendCommandStatus(builder, e.toStatus());
             }
+            reply.sendCommandReply(request.p(), request.m());
+            return;
         }
     }
 }

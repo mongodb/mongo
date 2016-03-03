@@ -239,13 +239,6 @@ public:
 
         timing.done(2);
 
-        Status distLockStatus = distLock->checkForPendingCatalogChange();
-        if (!distLockStatus.isOK()) {
-            warning() << "Aborting migration due to need to swap current catalog manager"
-                      << causedBy(distLockStatus);
-            return appendCommandStatus(result, distLockStatus);
-        }
-
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);
 
         // 3.
@@ -310,13 +303,6 @@ public:
         }
 
         timing.done(3);
-
-        distLockStatus = distLock->checkForPendingCatalogChange();
-        if (!distLockStatus.isOK()) {
-            warning() << "Aborting migration due to need to swap current catalog manager"
-                      << causedBy(distLockStatus);
-            return appendCommandStatus(result, distLockStatus);
-        }
 
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep3);
 
@@ -414,23 +400,9 @@ public:
             }
 
             txn->checkForInterrupt();
-
-            distLockStatus = distLock->checkForPendingCatalogChange();
-            if (!distLockStatus.isOK()) {
-                warning() << "Aborting migration due to need to swap current catalog manager"
-                          << causedBy(distLockStatus);
-                return appendCommandStatus(result, distLockStatus);
-            }
         }
 
         timing.done(4);
-
-        distLockStatus = distLock->checkForPendingCatalogChange();
-        if (!distLockStatus.isOK()) {
-            warning() << "Aborting migration due to need to swap current catalog manager"
-                      << causedBy(distLockStatus);
-            return appendCommandStatus(result, distLockStatus);
-        }
 
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep4);
 

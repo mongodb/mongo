@@ -7,11 +7,13 @@ load('./jstests/multiVersion/libs/verify_versions.js');
 (function() {
 "use strict";
 // Check our latest versions
-var versionsToCheck = [ "last-stable",
-                        "latest" ];
+//var versionsToCheck = [ "last-stable", "latest" ];
+//var versionsToCheckMongos = [ "last-stable" ];
+// TODO put this back when SERVER-22761 is resolved
                        
-var versionsToCheckMongos = [ "last-stable" ];
-                       
+var versionsToCheck = [ "latest" ];
+var versionsToCheckMongos = [ "latest" ];
+
 jsTest.log( "Testing legacy versions..." );
 
 for( var i = 0; i < versionsToCheck.length; i++ ){
@@ -22,7 +24,6 @@ for( var i = 0; i < versionsToCheck.length; i++ ){
     
     var st = new ShardingTest({ shards : 2, 
                                 mongos : 2,
-                                sync: true, // Old clusters can't use replsets for config servers
                                 other : { 
                                     mongosOptions : { binVersion : version },
                                     configOptions : { binVersion : version },
@@ -48,10 +49,6 @@ jsTest.log( "Testing mixed versions..." );
 st = new ShardingTest({ shards : 2,
                             mongos : 2,
                             other : {
-                                
-                                // Three config servers
-                                sync : true,
-                                
                                 mongosOptions : { binVersion : versionsToCheckMongos },
                                 configOptions : { binVersion : versionsToCheck },
                                 shardOptions : { binVersion : versionsToCheck }
@@ -91,10 +88,6 @@ jsTest.log( "Testing mixed versions with replica sets..." );
 st = new ShardingTest({ shards : 2,
                             mongos : 2,
                             other : {
-                                
-                                // Three config servers
-                                sync : true,
-                                
                                 // Replica set shards
                                 rs : true,
                                 

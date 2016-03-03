@@ -462,7 +462,7 @@ public:
             map<BSONObj, int> chunkSizes;
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock = grid.forwardingCatalogManager()->distLock(
+                auto scopedDistLock = grid.catalogManager(txn)->distLock(
                     txn, finalColLong, "mr-post-process", kNoDistLockTimeout);
 
                 if (!scopedDistLock.isOK()) {

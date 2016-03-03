@@ -144,12 +144,11 @@ Status ChunkMoveOperationState::initialize(const BSONObj& cmdObj) {
     return Status::OK();
 }
 
-StatusWith<ForwardingCatalogManager::ScopedDistLock*>
-ChunkMoveOperationState::acquireMoveMetadata() {
+StatusWith<DistLockManager::ScopedDistLock*> ChunkMoveOperationState::acquireMoveMetadata() {
     // Get the distributed lock
     const string whyMessage(stream() << "migrating chunk [" << _minKey << ", " << _maxKey << ") in "
                                      << _nss.ns());
-    _distLockStatus = grid.forwardingCatalogManager()->distLock(_txn, _nss.ns(), whyMessage);
+    _distLockStatus = grid.catalogManager(_txn)->distLock(_txn, _nss.ns(), whyMessage);
 
     if (!_distLockStatus->isOK()) {
         const string msg = stream() << "could not acquire collection lock for " << _nss.ns()

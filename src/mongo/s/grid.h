@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/s/catalog/forwarding_catalog_manager.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
 
@@ -62,7 +62,7 @@ public:
      * NOTE: Unit-tests are allowed to call it more than once, provided they reset the object's
      *       state using clearForUnitTests.
      */
-    void init(std::unique_ptr<ForwardingCatalogManager> catalogManager,
+    void init(std::unique_ptr<CatalogManager> catalogManager,
               std::unique_ptr<ShardRegistry> shardRegistry,
               std::unique_ptr<ClusterCursorManager> cursorManager);
 
@@ -97,19 +97,14 @@ public:
      * Returns a pointer to a CatalogManager to use for accessing catalog data stored on the config
      * servers.
      */
-    CatalogManager* catalogManager(OperationContext* txn);
-
-    /**
-     * Returns a direct pointer to the ForwardingCatalogManager.  This should only be used for
-     * calling methods that are specific to the ForwardingCatalogManager and not part of the generic
-     * CatalogManager interface, such as for taking the distributed lock and scheduling replacement
-     * of the underlying CatalogManager that the ForwardingCatalogManager is delegating to.
-     */
-    ForwardingCatalogManager* forwardingCatalogManager();
+    CatalogManager* catalogManager(OperationContext* txn) {
+        return _catalogManager.get();
+    }
 
     CatalogCache* catalogCache() {
         return _catalogCache.get();
     }
+
     ShardRegistry* shardRegistry() {
         return _shardRegistry.get();
     }
@@ -128,7 +123,7 @@ public:
     void clearForUnitTests();
 
 private:
-    std::unique_ptr<ForwardingCatalogManager> _catalogManager;
+    std::unique_ptr<CatalogManager> _catalogManager;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;

@@ -34,7 +34,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/forwarding_catalog_manager.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/util/log.h"
@@ -46,7 +46,7 @@ Grid grid;
 
 Grid::Grid() : _allowLocalShard(true) {}
 
-void Grid::init(std::unique_ptr<ForwardingCatalogManager> catalogManager,
+void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
                 std::unique_ptr<ShardRegistry> shardRegistry,
                 std::unique_ptr<ClusterCursorManager> cursorManager) {
     invariant(!_catalogManager);
@@ -134,14 +134,6 @@ void Grid::clearForUnitTests() {
     _shardRegistry.reset();
 
     _cursorManager.reset();
-}
-
-ForwardingCatalogManager* Grid::forwardingCatalogManager() {
-    return _catalogManager.get();
-}
-
-CatalogManager* Grid::catalogManager(OperationContext* txn) {
-    return _catalogManager->getCatalogManagerToUse(txn);
 }
 
 }  // namespace mongo

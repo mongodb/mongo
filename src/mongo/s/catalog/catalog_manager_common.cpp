@@ -606,4 +606,12 @@ Status CatalogManagerCommon::_log(OperationContext* txn,
     return result;
 }
 
+StatusWith<DistLockManager::ScopedDistLock> CatalogManagerCommon::distLock(
+    OperationContext* txn,
+    StringData name,
+    StringData whyMessage,
+    stdx::chrono::milliseconds waitFor) {
+    return getDistLockManager()->lock(txn, name, whyMessage, waitFor);
+}
+
 }  // namespace mongo

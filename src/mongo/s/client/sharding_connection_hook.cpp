@@ -136,14 +136,13 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
             return _shardingRequestMetadataWriter(_shardedConnections, metadataBob, hostStringData);
         });
 
-    // For every SCC created, add a hook that will allow fastest-config-first config reads if
-    // the appropriate server options are set.
     if (conn->type() == ConnectionString::SYNC) {
-        SyncClusterConnection* scc = dynamic_cast<SyncClusterConnection*>(conn);
-        if (scc) {
-            scc->attachQueryHandler(new SCCFastQueryHandler);
-        }
-    } else if (conn->type() == ConnectionString::MASTER) {
+        throw UserException(ErrorCodes::UnsupportedFormat,
+                            str::stream() << "Unrecognized connection string type: " << conn->type()
+                                          << ".");
+    }
+
+    if (conn->type() == ConnectionString::MASTER) {
         BSONObj isMasterResponse;
         if (!conn->runCommand("admin", BSON("ismaster" << 1), isMasterResponse)) {
             uassertStatusOK(getStatusFromCommandResult(isMasterResponse));
@@ -163,12 +162,6 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
                               << ". Expected either 0 or 1",
                 configServerModeNumber == 0 || configServerModeNumber == 1);
 
-        BSONElement setName = isMasterResponse["setName"];
-        status = grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
-            configServerModeNumber == 0 ? CatalogManager::ConfigServerMode::SCCC
-                                        : CatalogManager::ConfigServerMode::CSRS,
-            setName.type() == String ? setName.valueStringData() : StringData(),
-            static_cast<DBClientConnection*>(conn)->getServerHostAndPort());
         uassertStatusOK(status);
     }
 }

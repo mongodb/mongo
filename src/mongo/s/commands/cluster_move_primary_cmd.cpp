@@ -147,8 +147,8 @@ public:
               << " to: " << toShard->toString();
 
         string whyMessage(str::stream() << "Moving primary shard of " << dbname);
-        auto scopedDistLock =
-            grid.forwardingCatalogManager()->distLock(txn, dbname + "-movePrimary", whyMessage);
+        auto scopedDistLock = grid.catalogManager(txn)->distLock(
+            txn, dbname + "-movePrimary", whyMessage, DistLockManager::kSingleLockAttemptTimeout);
 
         if (!scopedDistLock.isOK()) {
             return appendCommandStatus(result, scopedDistLock.getStatus());
@@ -160,8 +160,6 @@ public:
         // Record start in changelog
         BSONObj moveStartDetails =
             _buildMoveEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls);
-
-        uassertStatusOK(scopedDistLock.getValue().checkForPendingCatalogChange());
 
         auto catalogManager = grid.catalogManager(txn);
         catalogManager->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
@@ -202,8 +200,6 @@ public:
             return false;
         }
 
-        uassertStatusOK(scopedDistLock.getValue().checkForPendingCatalogChange());
-
         const string oldPrimary = fromShard->getConnString().toString();
 
         ScopedDbConnection fromconn(fromShard->getConnString());
@@ -241,7 +237,6 @@ public:
                     try {
                         log() << "movePrimary dropping cloned collection " << el.String() << " on "
                               << oldPrimary;
-                        uassertStatusOK(scopedDistLock.getValue().checkForPendingCatalogChange());
                         fromconn->dropCollection(el.String());
                     } catch (DBException& e) {
                         e.addContext(str::stream()

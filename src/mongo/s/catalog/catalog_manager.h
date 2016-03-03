@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/optime_pair.h"
 
@@ -51,7 +52,6 @@ struct ChunkVersion;
 class CollectionType;
 class ConnectionString;
 class DatabaseType;
-class DistLockManager;
 class NamespaceString;
 class OperationContext;
 class SettingsType;
@@ -82,7 +82,6 @@ enum ShardDrainingStatus {
  */
 class CatalogManager {
     MONGO_DISALLOW_COPYING(CatalogManager);
-    friend class ForwardingCatalogManager;
 
 public:
     enum class ConfigServerMode {
@@ -104,12 +103,6 @@ public:
      * Performs necessary cleanup when shutting down cleanly.
      */
     virtual void shutDown(OperationContext* txn, bool allowNetworking = true) = 0;
-
-    /**
-     * Returns what type of catalog manager this is - CSRS for the CatalogManagerReplicaSet and
-     * SCCC for the CatalogManagerLegacy.
-     */
-    virtual ConfigServerMode getMode() = 0;
 
     /**
      * Creates a new database or updates the sharding status for an existing one. Cannot be
@@ -444,6 +437,13 @@ public:
      */
     virtual Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                                       BSONArrayBuilder* builder) = 0;
+
+
+    virtual StatusWith<DistLockManager::ScopedDistLock> distLock(
+        OperationContext* txn,
+        StringData name,
+        StringData whyMessage,
+        stdx::chrono::milliseconds waitFor = DistLockManager::kSingleLockAttemptTimeout) = 0;
 
 protected:
     CatalogManager() = default;

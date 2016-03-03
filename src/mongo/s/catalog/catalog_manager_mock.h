@@ -41,10 +41,6 @@ public:
     CatalogManagerMock();
     ~CatalogManagerMock();
 
-    ConfigServerMode getMode() override {
-        return ConfigServerMode::NONE;
-    }
-
     Status startup(OperationContext* txn, bool allowNetworking) override;
 
     void shutDown(OperationContext* txn, bool allowNetworking) override;
@@ -159,6 +155,12 @@ public:
     Status createDatabase(OperationContext* txn, const std::string& dbName);
 
     DistLockManager* getDistLockManager() override;
+
+    StatusWith<DistLockManager::ScopedDistLock> distLock(
+        OperationContext* txn,
+        StringData name,
+        StringData whyMessage,
+        stdx::chrono::milliseconds waitFor) override;
 
     Status initConfigVersion(OperationContext* txn) override;
 

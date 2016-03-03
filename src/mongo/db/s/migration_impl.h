@@ -36,7 +36,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/forwarding_catalog_manager.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
@@ -77,7 +77,7 @@ public:
      * TODO: Once the entire chunk move process is moved to be inside this state machine, there
      *       will not be any need to expose the distributed lock.
      */
-    StatusWith<ForwardingCatalogManager::ScopedDistLock*> acquireMoveMetadata();
+    StatusWith<DistLockManager::ScopedDistLock*> acquireMoveMetadata();
 
     /**
      * Starts the move chunk operation.
@@ -158,7 +158,7 @@ private:
     BSONObj _maxKey;
 
     // The distributed lock, which protects other migrations from happening on the same collection
-    boost::optional<StatusWith<ForwardingCatalogManager::ScopedDistLock>> _distLockStatus;
+    boost::optional<StatusWith<DistLockManager::ScopedDistLock>> _distLockStatus;
 
     // The cached collection metadata and the shard version from the time the migration process
     // started. This metadata is guaranteed to not change until either failure or successful

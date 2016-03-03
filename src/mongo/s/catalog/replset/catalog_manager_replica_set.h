@@ -48,10 +48,6 @@ public:
     explicit CatalogManagerReplicaSet(std::unique_ptr<DistLockManager> distLockManager);
     virtual ~CatalogManagerReplicaSet();
 
-    ConfigServerMode getMode() override {
-        return ConfigServerMode::CSRS;
-    }
-
     /**
      * Safe to call multiple times as long as they
      */

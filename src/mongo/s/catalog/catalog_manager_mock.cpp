@@ -145,6 +145,14 @@ StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerMock::getAllShards(
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+StatusWith<DistLockManager::ScopedDistLock> CatalogManagerMock::distLock(
+    OperationContext* txn,
+    StringData name,
+    StringData whyMessage,
+    stdx::chrono::milliseconds waitFor) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
 bool CatalogManagerMock::runUserManagementWriteCommand(OperationContext* txn,
                                                        const string& commandName,
                                                        const string& dbname,

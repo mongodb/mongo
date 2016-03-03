@@ -114,7 +114,6 @@ public:
                            "Cannot run clone command for use by sharding movePrimary command on a "
                            "node that isn't yet sharding aware"));
             }
-            opts.initialCatalogMode = catalogManager->getMode();
         }
 
         // See if there's any collections we should ignore

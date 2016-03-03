@@ -4,7 +4,6 @@ Import("env")
 
 env.SConscript(
     dirs=[
-        'legacy',
         'replset',
     ],
 )
@@ -65,13 +64,11 @@ env.Library(
 )
 
 env.Library(
-    target='forwarding_catalog_manager',
+    target='catalog_manager_impl',
     source=[
-        'forwarding_catalog_manager.cpp'
     ],
     LIBDEPS=[
         'catalog_manager',
-        'legacy/catalog_manager_legacy',
         'replset/catalog_manager_replica_set',
         'replset/dist_lock_catalog_impl',
         'replset/replset_dist_lock_manager',

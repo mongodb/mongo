@@ -344,7 +344,7 @@ void warnOnMultiVersion(const ShardInfoMap& shardInfo) {
 }
 
 void Balancer::_doBalanceRound(OperationContext* txn,
-                               ForwardingCatalogManager::ScopedDistLock* distLock,
+                               DistLockManager::ScopedDistLock* distLock,
                                vector<shared_ptr<MigrateInfo>>* candidateChunks) {
     invariant(candidateChunks);
 
@@ -383,8 +383,6 @@ void Balancer::_doBalanceRound(OperationContext* txn,
 
     // For each collection, check if the balancing policy recommends moving anything around.
     for (const auto& coll : collections) {
-        uassertStatusOK(distLock->checkForPendingCatalogChange());
-
         // Skip collections for which balancing is disabled
         const NamespaceString& nss = coll.getNs();
 
@@ -603,8 +601,11 @@ void Balancer::run() {
             uassert(13258, "oids broken after resetting!", _checkOIDs(txn.get()));
 
             {
-                auto scopedDistLock = grid.forwardingCatalogManager()->distLock(
-                    txn.get(), "balancer", "doing balance round");
+                auto scopedDistLock = grid.catalogManager(txn.get())
+                                          ->distLock(txn.get(),
+                                                     "balancer",
+                                                     "doing balance round",
+                                                     DistLockManager::kSingleLockAttemptTimeout);
 
                 if (!scopedDistLock.isOK()) {
                     LOG(1) << "skipping balancing round" << causedBy(scopedDistLock.getStatus());

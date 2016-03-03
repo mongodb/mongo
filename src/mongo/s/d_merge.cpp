@@ -70,7 +70,8 @@ bool mergeChunks(OperationContext* txn,
     // Get the distributed lock
     string whyMessage = stream() << "merging chunks in " << nss.ns() << " from " << minKey << " to "
                                  << maxKey;
-    auto scopedDistLock = grid.forwardingCatalogManager()->distLock(txn, nss.ns(), whyMessage);
+    auto scopedDistLock = grid.catalogManager(txn)->distLock(
+        txn, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
 
     if (!scopedDistLock.isOK()) {
         *errMsg = stream() << "could not acquire collection lock for " << nss.ns()

@@ -58,6 +58,7 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
 
     long long configServerModeNumber;
     auto status = bsonExtractIntegerField(isMasterReply.data, "configsvr", &configServerModeNumber);
+    // TODO SERVER-22320 fix should collapse the switch to only NoSuchKey handling
 
     switch (status.code()) {
         case ErrorCodes::OK: {
@@ -67,12 +68,7 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
                         str::stream() << "Surprised to discover that " << remoteHost.toString()
                                       << " believes it is a config server"};
             }
-            using ConfigServerMode = CatalogManager::ConfigServerMode;
-            const BSONElement setName = isMasterReply.data["setName"];
-            return grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
-                (configServerModeNumber == 0 ? ConfigServerMode::SCCC : ConfigServerMode::CSRS),
-                (setName.type() == String ? setName.valueStringData() : StringData()),
-                remoteHost);
+            return Status::OK();
         }
         case ErrorCodes::NoSuchKey: {
             // The ismaster response indicates that remoteHost is not a config server, or that
