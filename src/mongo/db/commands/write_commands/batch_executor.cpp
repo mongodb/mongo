@@ -341,7 +341,7 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
                             _txn->getWriteConcern(),
                             &res);
     if (!status.isOK()) {
-        wcError = std::move(toWriteConcernError(status, res));
+        wcError = toWriteConcernError(status, res);
     }
 
     //
