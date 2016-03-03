@@ -487,11 +487,11 @@ int mongoSMain(int argc, char* argv[], char** envp) {
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     WindowsCommandLine wcl(argc, argvW, envpW);
     int exitCode = mongoSMain(argc, wcl.argv(), wcl.envp());
-    quickExit(exitCode);
+    exitCleanly(ExitCode(exitCode));
 }
 #else
 int main(int argc, char* argv[], char** envp) {
     int exitCode = mongoSMain(argc, argv, envp);
-    quickExit(exitCode);
+    exitCleanly(ExitCode(exitCode));
 }
 #endif
