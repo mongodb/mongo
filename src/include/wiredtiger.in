@@ -874,7 +874,7 @@ struct __wt_session {
 	 *  updates).  See @ref data_sources for more information.
 	 *  <br>
 	 *  @copydoc doc_cursor_types
-	 * @param to_dup a cursor to duplicate
+	 * @param to_dup a cursor to duplicate or gather statistics on
 	 * @configstart{WT_SESSION.open_cursor, see dist/api_data.py}
 	 * @config{append, append the value as a new record\, creating a new
 	 * record number key; valid only for cursors with record number keys., a
