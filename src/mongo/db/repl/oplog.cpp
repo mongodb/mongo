@@ -1022,6 +1022,7 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
 
                 BackgroundOperation::awaitNoBgOpInProgForDb(nsToDatabaseSubstring(ns));
                 txn->recoveryUnit()->abandonSnapshot();
+                txn->checkForInterrupt();
                 break;
             }
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
@@ -1031,6 +1032,7 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
                 invariant(cmd);
                 BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nsToDatabase(ns), o));
                 txn->recoveryUnit()->abandonSnapshot();
+                txn->checkForInterrupt();
                 break;
             }
             default:
