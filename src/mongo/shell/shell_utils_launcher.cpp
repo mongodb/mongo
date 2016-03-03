@@ -213,12 +213,7 @@ void ProgramOutputMultiplexer::appendLine(int port, ProcessId pid, const char* l
 
 string ProgramOutputMultiplexer::str() const {
     stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
-    string ret = _buffer.str();
-    size_t len = ret.length();
-    if (len > 100000) {
-        ret = ret.substr(len - 100000, 100000);
-    }
-    return ret;
+    return _buffer.str();
 }
 
 void ProgramOutputMultiplexer::clear() {
