@@ -464,6 +464,10 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 			F_SET(cjoin, WT_CURJOIN_SKIP_FIRST_LEFT);
 
 		if (F_ISSET(je, WT_CURJOIN_ENTRY_BLOOM)) {
+		       if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
+			       WT_RET_MSG(session, EINVAL,
+				   "join cursors with Bloom filters cannot be "
+				   "used with read-uncommitted isolation");
 			if (je->bloom == NULL) {
 				/*
 				 * Look for compatible filters to be shared,
@@ -666,7 +670,7 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			ret = c->get_value(c, &v);
 		else if (ret == WT_NOTFOUND)
 			WT_ERR_MSG(session, WT_ERROR,
-			    "main table for join is missing entry.");
+			    "main table for join is missing entry");
 		WT_TRET(c->reset(c));
 		WT_ERR(ret);
 	} else
