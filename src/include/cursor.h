@@ -303,6 +303,7 @@ struct __wt_cursor_join_endpoint {
 #define	WT_CURJOIN_END_GT	0x04		/* include values >  cursor */
 #define	WT_CURJOIN_END_GE	(WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ)
 #define	WT_CURJOIN_END_LE	(WT_CURJOIN_END_LT | WT_CURJOIN_END_EQ)
+#define	WT_CURJOIN_END_OWN_CURSOR 0x08		/* must close cursor */
 	uint8_t			 flags;		/* range for this endpoint */
 };
 #define	WT_CURJOIN_END_RANGE(endp)					\
