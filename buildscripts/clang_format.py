@@ -482,9 +482,11 @@ class Repo(object):
         # This allows us to pick all the interesting files
         # in the mongo and mongo-enterprise repos
         file_list = [line.rstrip()
-                for line in gito.splitlines() if "src" in line and not "src/third_party" in line]
+                for line in gito.splitlines()
+                    if (line.startswith("jstests") or line.startswith("src"))
+                        and not line.startswith("src/third_party")]
 
-        files_match = re.compile('\\.(h|cpp)$')
+        files_match = re.compile('\\.(h|cpp|js)$')
 
         file_list = [a for a in file_list if files_match.search(a)]
 
