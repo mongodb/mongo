@@ -493,10 +493,13 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 		/*
 		 * We can't disallow type entirely, a configuration string might
 		 * innocently include it, for example, a dump/load pair.  If the
-		 * URI type prefix and the type are the same, let it go.
+		 * underlying type is "file", it's OK ("file" is the underlying
+		 * type for every type); if the URI type prefix and the type are
+		 * the same, let it go.
 		 */
 		if ((ret =
 		    __wt_config_getones(session, config, "type", &cval)) == 0 &&
+		    !WT_STRING_MATCH("file", cval.str, cval.len) &&
 		    (strncmp(uri, cval.str, cval.len) != 0 ||
 		    uri[cval.len] != ':'))
 			WT_ERR_MSG(session, EINVAL,
