@@ -306,15 +306,15 @@ int
 __wt_lsm_tree_create(WT_SESSION_IMPL *session,
     const char *uri, bool exclusive, const char *config)
 {
-	WT_CONFIG_ITEM cval;
-	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	const char *cfg[] =
-	    { WT_CONFIG_BASE(session, WT_SESSION_create), config, NULL };
-	char *tmpconfig;
+	    { WT_CONFIG_BASE(session, lsm_meta), config, NULL };
+	const char *metadata;
 
-	/* If the tree is open, it already exists. */
+	metadata = NULL;
+
+	/* If the tree can be opened, it already exists. */
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, false, &lsm_tree));
 	if (ret == 0) {
@@ -323,128 +323,9 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
-	/*
-	 * If the tree has metadata, it already exists.
-	 *
-	 * !!!
-	 * Use a local variable: we don't care what the existing configuration
-	 * is, but we don't want to overwrite the real config.
-	 */
-	if (__wt_metadata_search(session, uri, &tmpconfig) == 0) {
-		__wt_free(session, tmpconfig);
-		return (exclusive ? EEXIST : 0);
-	}
-	WT_RET_NOTFOUND_OK(ret);
-
-	/* In-memory configurations don't make sense for LSM. */
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_RET_MSG(session, EINVAL,
-		    "LSM trees not supported by in-memory configurations");
-
-	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
-	if (WT_STRING_MATCH("r", cval.str, cval.len))
-		WT_RET_MSG(session, EINVAL,
-		    "LSM trees cannot be configured as column stores");
-
-	WT_RET(__wt_calloc_one(session, &lsm_tree));
-
-	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
-
-	WT_ERR(__wt_config_gets(session, cfg, "key_format", &cval));
-	WT_ERR(__wt_strndup(
-	    session, cval.str, cval.len, &lsm_tree->key_format));
-	WT_ERR(__wt_config_gets(session, cfg, "value_format", &cval));
-	WT_ERR(__wt_strndup(
-	    session, cval.str, cval.len, &lsm_tree->value_format));
-
-	WT_ERR(__wt_config_gets_none(session, cfg, "collator", &cval));
-	WT_ERR(__wt_strndup(
-	    session, cval.str, cval.len, &lsm_tree->collator_name));
-
-	WT_ERR(__wt_config_gets(session, cfg, "cache_resident", &cval));
-	if (cval.val != 0)
-		WT_ERR_MSG(session, EINVAL,
-		    "The cache_resident flag is not compatible with LSM");
-
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.auto_throttle", &cval));
-	if (cval.val)
-		F_SET(lsm_tree, WT_LSM_TREE_THROTTLE);
-	else
-		F_CLR(lsm_tree, WT_LSM_TREE_THROTTLE);
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom", &cval));
-	FLD_SET(lsm_tree->bloom,
-	    (cval.val == 0 ? WT_LSM_BLOOM_OFF : WT_LSM_BLOOM_MERGED));
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_oldest", &cval));
-	if (cval.val != 0)
-		FLD_SET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST);
-
-	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) &&
-	    FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST))
-		WT_ERR_MSG(session, EINVAL,
-		    "Bloom filters can only be created on newest and oldest "
-		    "chunks if bloom filters are enabled");
-
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_config", &cval));
-	if (cval.type == WT_CONFIG_ITEM_STRUCT) {
-		cval.str++;
-		cval.len -= 2;
-	}
-	WT_ERR(__wt_config_check(session,
-	   WT_CONFIG_REF(session, WT_SESSION_create), cval.str, cval.len));
-	WT_ERR(__wt_strndup(
-	    session, cval.str, cval.len, &lsm_tree->bloom_config));
-
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_bit_count", &cval));
-	lsm_tree->bloom_bit_count = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_hash_count", &cval));
-	lsm_tree->bloom_hash_count = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_count_limit", &cval));
-	lsm_tree->chunk_count_limit = (uint32_t)cval.val;
-	if (cval.val == 0)
-		F_SET(lsm_tree, WT_LSM_TREE_MERGES);
-	else
-		F_CLR(lsm_tree, WT_LSM_TREE_MERGES);
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_max", &cval));
-	lsm_tree->chunk_max = (uint64_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_size", &cval));
-	lsm_tree->chunk_size = (uint64_t)cval.val;
-	if (lsm_tree->chunk_size > lsm_tree->chunk_max)
-		WT_ERR_MSG(session, EINVAL,
-		    "Chunk size (chunk_size) must be smaller than or equal to "
-		    "the maximum chunk size (chunk_max)");
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_max", &cval));
-	lsm_tree->merge_max = (uint32_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_min", &cval));
-	lsm_tree->merge_min = (uint32_t)cval.val;
-	if (lsm_tree->merge_min > lsm_tree->merge_max)
-		WT_ERR_MSG(session, EINVAL,
-		    "LSM merge_min must be less than or equal to merge_max");
-
 	if (!F_ISSET(S2C(session), WT_CONN_READONLY)) {
-		/*
-		 * Set up the config for each chunk.
-		 *
-		 * Make the memory_page_max double the chunk size, so
-		 * application threads don't immediately try to force evict
-		 * the chunk when the worker thread clears the NO_EVICTION flag.
-		 */
-		WT_ERR(__wt_scr_alloc(session, 0, &buf));
-		WT_ERR(__wt_buf_fmt(session, buf,
-		    "%s,key_format=u,value_format=u,memory_page_max=%" PRIu64,
-		    config, 2 * lsm_tree->chunk_max));
-		WT_ERR(__wt_strndup(
-		    session, buf->data, buf->size, &lsm_tree->file_config));
-
-		/* Create the first chunk and flush the metadata. */
-		WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
-
-		/* Discard our partially populated handle. */
-		ret = __lsm_tree_discard(session, lsm_tree, false);
-		lsm_tree = NULL;
-	} else {
-		F_CLR(lsm_tree, WT_LSM_TREE_MERGES);
-		FLD_SET(lsm_tree->bloom, WT_LSM_BLOOM_OFF);
-		FLD_CLR(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST);
+		WT_ERR(__wt_config_merge(session, cfg, NULL, &metadata));
+		WT_ERR(__wt_metadata_insert(session, uri, metadata));
 	}
 
 	/*
@@ -452,16 +333,12 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 * error: the returned handle is NULL on error, and the metadata
 	 * tracking macros handle cleaning up on failure.
 	 */
-	if (ret == 0)
-		WT_WITH_HANDLE_LIST_LOCK(session,
-		    ret = __lsm_tree_open(session, uri, true, &lsm_tree));
+	WT_WITH_HANDLE_LIST_LOCK(session,
+	    ret = __lsm_tree_open(session, uri, true, &lsm_tree));
 	if (ret == 0)
 		__wt_lsm_tree_release(session, lsm_tree);
 
-	if (0) {
-err:		WT_TRET(__lsm_tree_discard(session, lsm_tree, false));
-	}
-	__wt_scr_free(session, &buf);
+err:	__wt_free(session, metadata);
 	return (ret);
 }
 
