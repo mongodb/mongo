@@ -3,10 +3,9 @@
 package options
 
 import (
+	"fmt"
 	"github.com/jessevdk/go-flags"
 	"github.com/mongodb/mongo-tools/common/log"
-
-	"fmt"
 	"os"
 	"regexp"
 	"runtime"
@@ -15,8 +14,7 @@ import (
 )
 
 const (
-	VersionStr                = "3.3.3-pre-"
-	DefaultDialTimeoutSeconds = 3
+	VersionStr = "3.3.3-pre-"
 )
 
 // Gitspec that the tool was built with. Needs to be set using -ldflags
@@ -68,9 +66,8 @@ type HiddenOptions struct {
 	// Deprecated flag for csv writing in mongoexport
 	CSVOutputType bool
 
-	TempUsersColl      *string
-	TempRolesColl      *string
-	DialTimeoutSeconds int
+	TempUsersColl *string
+	TempRolesColl *string
 }
 
 type Namespace struct {
@@ -154,8 +151,7 @@ func parseVal(val string) int {
 // Ask for a new instance of tool options
 func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 	hiddenOpts := &HiddenOptions{
-		BulkBufferSize:     10000,
-		DialTimeoutSeconds: DefaultDialTimeoutSeconds,
+		BulkBufferSize: 10000,
 	}
 
 	opts := &ToolOptions{
@@ -190,7 +186,9 @@ func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 		}
 	}
 
-	opts.parser.UnknownOptionHandler = hiddenOpts.parseHiddenOption
+	opts.parser.UnknownOptionHandler = func(option string, arg flags.SplitArgument, args []string) ([]string, error) {
+		return parseHiddenOption(hiddenOpts, option, arg, args)
+	}
 
 	if _, err := opts.parser.AddGroup("general options", "", opts.General); err != nil {
 		panic(fmt.Errorf("couldn't register general options: %v", err))
@@ -296,10 +294,10 @@ func (o *ToolOptions) Parse() ([]string, error) {
 	return o.parser.Parse()
 }
 
-func (opts *HiddenOptions) parseHiddenOption(option string, arg flags.SplitArgument, args []string) ([]string, error) {
+func parseHiddenOption(opts *HiddenOptions, option string, arg flags.SplitArgument, args []string) ([]string, error) {
 	if option == "dbpath" || option == "directoryperdb" || option == "journal" {
-		return args, fmt.Errorf("--dbpath and related flags are not supported in 3.0 tools.\n" +
-			"See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information")
+		return args, fmt.Errorf(`--dbpath and related flags are not supported in 3.0 tools.
+See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`)
 	}
 
 	if option == "csv" {
@@ -340,12 +338,6 @@ func (opts *HiddenOptions) parseHiddenOption(option string, arg flags.SplitArgum
 		opts.BulkBufferSize = optionValue
 	case "numDecodingWorkers":
 		opts.NumDecodingWorkers = optionValue
-	case "dialTimeout":
-		if optionValue >= 0 {
-			opts.DialTimeoutSeconds = optionValue
-		} else {
-			return args, fmt.Errorf("invalid negative value for --dialTimeout")
-		}
 	default:
 		return args, fmt.Errorf(`unknown option "%v"`, option)
 	}
