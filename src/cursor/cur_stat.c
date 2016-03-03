@@ -207,6 +207,8 @@ __curstat_next(WT_CURSOR *cursor)
 	if (cst->notpositioned) {
 		cst->notpositioned = false;
 		cst->key = WT_STAT_KEY_MIN(cst);
+		if (cst->next_set != NULL)
+			WT_ERR((*cst->next_set)(session, cst, true, true));
 	} else if (cst->key < WT_STAT_KEY_MAX(cst))
 		++cst->key;
 	else if (cst->next_set != NULL)
@@ -249,6 +251,8 @@ __curstat_prev(WT_CURSOR *cursor)
 	if (cst->notpositioned) {
 		cst->notpositioned = false;
 		cst->key = WT_STAT_KEY_MAX(cst);
+		if (cst->next_set != NULL)
+			WT_ERR((*cst->next_set)(session, cst, false, true));
 	} else if (cst->key > WT_STAT_KEY_MIN(cst))
 		--cst->key;
 	else if (cst->next_set != NULL)
@@ -557,9 +561,6 @@ __wt_curstat_init(WT_SESSION_IMPL *session,
 
 	else
 		return (__wt_bad_object_type(session, uri));
-
-	if (cst->next_set != NULL)
-		WT_RET((*cst->next_set)(session, cst, false, true));
 
 	return (0);
 }
