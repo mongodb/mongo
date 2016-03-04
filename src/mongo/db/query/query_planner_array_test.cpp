@@ -1137,4 +1137,280 @@ TEST_F(QueryPlannerTest, MultikeyElemMatchAllCompound3) {
         "bounds: {'arr.k': [[3,3,true,true]], 'arr.v': [[3,3,true,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, CanIntersectBoundsWhenFirstFieldIsNotMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$gte: 0, $lt: 10}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$gte: 0, $lt: 10}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[0, 10, true, false]], b: [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanIntersectBoundsOnFirstFieldWhenItAndSharedPrefixAreNotMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {1U}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+    runQuery(fromjson("{'a.b': {$gte: 0, $lt: 10}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {'a.b': {$gte: 0, $lt: 10}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[0, 10, true, false]], 'a.c': [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotIntersectBoundsWhenFirstFieldIsMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$gte: 0, $lt: 10}}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$gte: 0, $lt: 10}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$lt: 10}}, node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[0, Infinity, true, true]], b: [['MinKey', 'MaxKey', true, true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$gte: 0}}, node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[-Infinity, 10, true, false]], b: [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanIntersectBoundsWhenFirstFieldIsMultikeyButHasElemMatch) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {$gte: 0, $lt: 10}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$elemMatch: {$gte: 0, $lt: 10}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[0, 10, true, false]], b: [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanComplementBoundsOnFirstFieldWhenItIsMultikeyAndHasNotEqualExpr) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$ne: 3}, b: 2}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [['MinKey', 3, true, false], [3, 'MaxKey', false, true]], "
+        "b: [[2, 2, true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanIntersectBoundsWhenFirstFieldIsMultikeyAndHasNotInsideElemMatch) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {$not: {$gte: 10}, $gte: 0}}, b: 2}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[0, 10, true, false]], b: [[2, 2, true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanIntersectBoundsOnFirstFieldWhenSharedPrefixIsMultikeyButHasElemMatch) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {b: {$gte: 0, $lt: 10}}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$elemMatch: {b: {$gte: 0, $lt: 10}}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[0, 10, true, false]], 'a.c': [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotIntersectBoundsOnFirstFieldWhenItAndSharedPrefixAreMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U, 1U}, {0U}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {b: {$gte: 0, $lt: 10}, c: 2}}}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists(
+        "{cscan: {dir: 1, filter: {a: {$elemMatch: {b: {$gte: 0, $lt: 10}, c: 2}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[0, Infinity, true, true]], 'a.c': [[2, 2, true, true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[-Infinity, 10, true, false]], 'a.c': [[2, 2, true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsNotMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: 2, b: {$gte: 0, $lt: 10}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: 2, b: {$gte: 0, $lt: 10}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[2, 2, true, true]], b: [[0, 10, true, false]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanIntersectBoundsOnSecondFieldWhenItAndSharedPrefixAreNotMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{{1U}, std::set<size_t>{}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+    runQuery(fromjson("{'a.b': 2, 'a.c': {$gte: 0, $lt: 10}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {'a.b': 2, 'a.c': {$gte: 0, $lt: 10}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[2, 2, true, true]], 'a.c': [[0, 10, true, false]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotIntersectBoundsWhenSecondFieldIsMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: 2, b: {$gte: 0, $lt: 10}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: 2, b: {$gte: 0, $lt: 10}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[2, 2, true, true]], b: [[-Infinity, 10, true, false]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsMultikeyButHasElemMatch) {
+    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: 2, b: {$elemMatch: {$gte: 0, $lt: 10}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: 2, b: {$elemMatch: {$gte: 0, $lt: 10}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[2, 2, true, true]], b: [[0, 10, true, false]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanComplementBoundsOnSecondFieldWhenItIsMultikeyAndHasNotEqualExpr) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: 2, b: {$ne: 3}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[2, 2, true, true]], "
+        "b: [['MinKey', 3, true, false], [3, 'MaxKey', false, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsMultikeyAndHasNotInsideElemMatch) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: 2, b: {$elemMatch: {$not: {$gte: 10}, $gte: 0}}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[2, 2, true, true]], b: [[0, 10, true, false]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanIntersectBoundsOnSecondFieldWhenSharedPrefixIsMultikeyButHasElemMatch) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {b: 2, c: {$gte: 0, $lt: 10}}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{cscan: {dir: 1, filter: {a: {$elemMatch: {b: 2, c: {$gte: 0, $lt: 10}}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[2, 2, true, true]], 'a.c': [[0, 10, true, false]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotIntersectBoundsOnSecondFieldWhenItAndSharedPrefixAreMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U, 1U}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {b: 2, c: {$gte: 0, $lt: 10}}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{cscan: {dir: 1, filter: {a: {$elemMatch: {b: 2, c: {$gte: 0, $lt: 10}}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[2, 2, true, true]], 'a.c': [[-Infinity, 10, true, false]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotIntersectBoundsOfTwoSeparateElemMatches) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+
+    runQuery(fromjson(
+        "{$and: [{a: {$elemMatch: {b: {$gte: 0}, c: {$lt: 20}}}}, "
+        "{a: {$elemMatch: {b: {$lt: 10}, c: {$gte: 5}}}}]}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists(
+        "{cscan: {dir: 1, "
+        "filter: {$and: [{a: {$elemMatch: {b: {$gte: 0}, c: {$lt: 20}}}}, "
+        "{a: {$elemMatch: {b: {$lt: 10}, c: {$gte: 5}}}}]}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[0, Infinity, true, true]], 'a.c': [[-Infinity, 20, true, false]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[-Infinity, 10, true, false]], 'a.c': [[5, Infinity, true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanCompoundBoundsWhenSharedPrefixIsNotMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{{1U}, {1U}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+    runQuery(fromjson("{'a.b': 2, 'a.c': 3}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {'a.b': 2, 'a.c': 3}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[2, 2, true, true]], 'a.c': [[3, 3, true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotCompoundBoundsWhenSharedPrefixIsMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+    runQuery(fromjson("{'a.b': 2, 'a.c': 3}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {'a.b': 2, 'a.c': 3}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[2, 2, true, true]], 'a.c': [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanCompoundBoundsWhenSharedPrefixIsMultikeyButHasElemMatch) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {b: 2, c: 3}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$elemMatch: {b: 2, c: 3}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {a: [[2, 2, true, true]], b: [[3, 3, true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotCompoundBoundsWhenSharedPrefixInsideElemMatchIsMultikey) {
+    IndexEntry::MultikeyPaths multikeyPaths{{0U, 1U}, {0U, 1U}};
+    addIndex(BSON("a.b.c" << 1 << "a.b.d" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {'b.c': 2, 'b.d': 3}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$elemMatch: {'b.c': 2, 'b.d': 3}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b.c': 1, 'a.b.d': 1}, "
+        "bounds: {'a.b.c': [[2, 2, true, true]], 'a.b.d': [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
 }  // namespace

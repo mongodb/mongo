@@ -345,6 +345,31 @@ private:
                                       std::vector<MatchExpression*>* out);
 
     /**
+     * Assigns predicates from 'couldAssign' to 'indexAssignment' that can safely be assigned
+     * according to the intersecting and compounding rules for multikey indexes. The rules can
+     * loosely be stated as follows:
+     *
+     *   - It is always safe to assign a predicate on path Y to the index when no prefix of the path
+     *     Y causes the index to be multikey.
+     *
+     *   - For any non-$elemMatch predicate on path X already assigned to the index, it isn't safe
+     *     to assign a predicate on path Y (possibly equal to X) to the index when a shared prefix
+     *     of the paths X and Y causes the index to be multikey.
+     *
+     *   - For any $elemMatch predicate on path X already assigned to the index, it isn't safe to
+     *     assign a predicate on path Y (possibly equal to X) to the index when
+     *       (a) a shared prefix of the paths X and Y causes the index to be multikey and the
+     *           predicates aren't joined by the same $elemMatch context, or
+     *       (b) a shared prefix of the paths X and Y inside the innermost $elemMatch causes the
+     *           index to be multikey.
+     *
+     * This function should only be called if the index has path-level multikey information.
+     * Otherwise, getMultikeyCompoundablePreds() and compound() should be used instead.
+     */
+    void assignMultikeySafePredicates(const std::vector<MatchExpression*>& couldAssign,
+                                      OneIndexAssignment* indexAssignment);
+
+    /**
      * 'andAssignment' contains assignments that we've already committed to outputting,
      * including both single index assignments and ixisect assignments.
      *
