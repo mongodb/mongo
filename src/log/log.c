@@ -46,7 +46,7 @@ __wt_log_flush_lsn(WT_SESSION_IMPL *session, WT_LSN *lsn, bool start)
 
 	conn = S2C(session);
 	log = conn->log;
-	WT_RET(__wt_log_force_write(session, 1));
+	WT_RET(__wt_log_force_write(session, 1, NULL));
 	WT_RET(__wt_log_wrlsn(session, NULL));
 	if (start)
 		*lsn = log->write_start_lsn;
@@ -273,7 +273,7 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	 * These may be files needed by backup.  Force the current slot
 	 * to get written to the file.
 	 */
-	WT_RET(__wt_log_force_write(session, 1));
+	WT_RET(__wt_log_force_write(session, 1, NULL));
 	WT_RET(__log_get_files(session, WT_LOG_FILENAME, &files, &count));
 
 	/* Filter out any files that are below the checkpoint LSN. */
@@ -1758,14 +1758,25 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
  *	Wrapper function that takes the lock.
  */
 int
-__wt_log_force_write(WT_SESSION_IMPL *session, bool retry)
+__wt_log_force_write(WT_SESSION_IMPL *session, bool retry, bool *did_work)
 {
 	WT_LOG *log;
 	WT_MYSLOT myslot;
+	uint32_t joined;
 
 	log = S2C(session)->log;
 	memset(&myslot, 0, sizeof(myslot));
+	WT_STAT_FAST_CONN_INCR(session, log_force_write);
+	if (did_work != NULL)
+		*did_work = true;
 	myslot.slot = log->active_slot;
+	joined = WT_LOG_SLOT_JOINED(log->active_slot->slot_state);
+	if (joined == 0) {
+		WT_STAT_FAST_CONN_INCR(session, log_force_write_skip);
+		if (did_work != NULL)
+			*did_work = false;
+		return (0);
+	}
 	return (__wt_log_slot_switch(session, &myslot, retry, true));
 }
 
@@ -2001,7 +2012,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			WT_ERR(__wt_cond_signal(session, conn->log_cond));
 			__wt_yield();
 		} else
-			WT_ERR(__wt_log_force_write(session, 1));
+			WT_ERR(__wt_log_force_write(session, 1, NULL));
 	}
 	if (LF_ISSET(WT_LOG_FLUSH)) {
 		/* Wait for our writes to reach the OS */

@@ -667,31 +667,54 @@ __log_wrlsn_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_LOG *log;
+	WT_LSN prev;
 	WT_SESSION_IMPL *session;
 	int yield;
+	bool did_work;
 
 	session = arg;
 	conn = S2C(session);
+	log = conn->log;
 	yield = 0;
+	WT_INIT_LSN(&prev);
+	did_work = false;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
-		 * Write out any log record buffers.
+		 * Write out any log record buffers if anything was done
+		 * since last time.  Only call the function to walk the
+		 * slots if the system is not idle.  On an idle system
+		 * the alloc_lsn will not advance and the written lsn will
+		 * match the alloc_lsn.
 		 */
-		WT_ERR(__wt_log_wrlsn(session, &yield));
+		if (__wt_log_cmp(&prev, &log->alloc_lsn) != 0 ||
+		    __wt_log_cmp(&log->write_lsn, &log->alloc_lsn) != 0)
+			WT_ERR(__wt_log_wrlsn(session, &yield));
+		else
+			WT_STAT_FAST_CONN_INCR(session, log_write_lsn_skip);
+		prev = log->alloc_lsn;
+		if (yield == 0)
+			did_work = true;
+		else
+			did_work = false;
 		/*
 		 * If __wt_log_wrlsn did work we want to yield instead of sleep.
 		 */
 		if (yield++ < WT_THOUSAND)
 			__wt_yield();
 		else
-			WT_ERR(__wt_cond_wait(
-			    session, conn->log_wrlsn_cond, 10000));
+			/*
+			 * Send in false because if we did any work we would
+			 * not be on this path.
+			 */
+			WT_ERR(__wt_cond_auto_wait(
+			    session, conn->log_wrlsn_cond, did_work));
 	}
 	/*
 	 * On close we need to do this one more time because there could
 	 * be straggling log writes that need to be written.
 	 */
-	WT_ERR(__wt_log_force_write(session, 1));
+	WT_ERR(__wt_log_force_write(session, 1, NULL));
 	WT_ERR(__wt_log_wrlsn(session, NULL));
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
@@ -711,7 +734,7 @@ __log_server(void *arg)
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 	int freq_per_sec;
-	bool locked, signalled;
+	bool did_work, locked, signalled;
 
 	session = arg;
 	conn = S2C(session);
@@ -736,6 +759,7 @@ __log_server(void *arg)
 	 * don't want log records sitting in the buffer over the time it
 	 * takes to sync out an earlier file.
 	 */
+	did_work = true;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Slots depend on future activity.  Force out buffered
@@ -744,7 +768,7 @@ __log_server(void *arg)
 		 * and a buffer may need to wait for the write_lsn to advance
 		 * in the case of a synchronous buffer.  We end up with a hang.
 		 */
-		WT_ERR_BUSY_OK(__wt_log_force_write(session, 0));
+		WT_ERR_BUSY_OK(__wt_log_force_write(session, 0, &did_work));
 
 		/*
 		 * We don't want to archive or pre-allocate files as often as
@@ -793,8 +817,8 @@ __log_server(void *arg)
 		}
 
 		/* Wait until the next event. */
-		WT_ERR(__wt_cond_wait_signal(session, conn->log_cond,
-		    WT_MILLION / WT_FORCE_PER_SECOND, &signalled));
+		WT_ERR(__wt_cond_auto_wait_signal(session, conn->log_cond,
+		    did_work || signalled, &signalled));
 	}
 
 	if (0) {
@@ -906,8 +930,9 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	 */
 	WT_RET(__wt_open_internal_session(conn, "log-wrlsn-server",
 	    false, session_flags, &conn->log_wrlsn_session));
-	WT_RET(__wt_cond_alloc(conn->log_wrlsn_session,
-	    "log write lsn server", false, &conn->log_wrlsn_cond));
+	WT_RET(__wt_cond_auto_alloc(conn->log_wrlsn_session,
+	    "log write lsn server", false, 10000, WT_MILLION,
+	    &conn->log_wrlsn_cond));
 	WT_RET(__wt_thread_create(conn->log_wrlsn_session,
 	    &conn->log_wrlsn_tid, __log_wrlsn_server, conn->log_wrlsn_session));
 	conn->log_wrlsn_tid_set = true;
@@ -926,8 +951,8 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 		/* The log server gets its own session. */
 		WT_RET(__wt_open_internal_session(conn,
 		    "log-server", false, session_flags, &conn->log_session));
-		WT_RET(__wt_cond_alloc(conn->log_session,
-		    "log server", false, &conn->log_cond));
+		WT_RET(__wt_cond_auto_alloc(conn->log_session,
+		    "log server", false, 50000, WT_MILLION, &conn->log_cond));
 
 		/*
 		 * Start the thread.
@@ -999,9 +1024,9 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	}
 
 	/* Destroy the condition variables now that all threads are stopped */
-	WT_TRET(__wt_cond_destroy(session, &conn->log_cond));
+	WT_TRET(__wt_cond_auto_destroy(session, &conn->log_cond));
 	WT_TRET(__wt_cond_destroy(session, &conn->log_file_cond));
-	WT_TRET(__wt_cond_destroy(session, &conn->log_wrlsn_cond));
+	WT_TRET(__wt_cond_auto_destroy(session, &conn->log_wrlsn_cond));
 
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_write_cond));

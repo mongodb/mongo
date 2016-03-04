@@ -73,6 +73,7 @@ __wt_cond_auto_wait_signal(
 	 */
 	WT_ASSERT(session, cond->min_wait != 0);
 
+	WT_STAT_FAST_CONN_INCR(session, cond_auto_wait);
 	if (progress)
 		cond->prev_wait = cond->min_wait;
 	else {
@@ -84,6 +85,8 @@ __wt_cond_auto_wait_signal(
 	WT_RET(__wt_cond_wait_signal(
 	    session, cond, cond->prev_wait, signalled));
 
+	if (progress || *signalled)
+		WT_STAT_FAST_CONN_INCR(session, cond_auto_wait_reset);
 	if (*signalled)
 		cond->prev_wait = cond->min_wait;
 
