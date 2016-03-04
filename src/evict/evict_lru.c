@@ -175,8 +175,8 @@ __evict_server(void *arg)
 	WT_SESSION_IMPL *session;
 #ifdef HAVE_DIAGNOSTIC
 	struct timespec now, stuck_ts;
-	uint64_t pages_evicted = 0;
 #endif
+	uint64_t pages_evicted = 0;
 	u_int spins;
 
 	session = arg;
@@ -219,11 +219,11 @@ __evict_server(void *arg)
 
 			/* Next time we wake up, reverse the sweep direction. */
 			cache->flags ^= WT_CACHE_WALK_REVERSE;
-#ifdef HAVE_DIAGNOSTIC
 			pages_evicted = 0;
 		} else if (pages_evicted != cache->pages_evict) {
-			WT_ERR(__wt_epoch(session, &stuck_ts));
 			pages_evicted = cache->pages_evict;
+#ifdef HAVE_DIAGNOSTIC
+			WT_ERR(__wt_epoch(session, &stuck_ts));
 		} else {
 			/* After being stuck for 5 minutes, give up. */
 			WT_ERR(__wt_epoch(session, &now));
@@ -238,7 +238,8 @@ __evict_server(void *arg)
 
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping"));
 		/* Don't rely on signals: check periodically. */
-		WT_ERR(__wt_cond_wait(session, cache->evict_cond, 100000));
+		WT_ERR(__wt_cond_auto_wait(
+		    session, cache->evict_cond, pages_evicted != 0));
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "waking"));
 	}
 
