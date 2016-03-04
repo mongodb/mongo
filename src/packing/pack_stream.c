@@ -327,3 +327,115 @@ wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up)
 	}
 	return (0);
 }
+
+/*
+ * __wt_ext_pack_start --
+ *	WT_EXTENSION.pack_start method.
+ */
+int
+__wt_ext_pack_start(WT_SESSION *session, const char *format,
+    void *buffer, size_t size, WT_PACK_STREAM **psp)
+{
+	return (wiredtiger_pack_start(session, format, buffer, size, psp));
+}
+
+/*
+ * __wt_ext_unpack_start --
+ *	WT_EXTENSION.unpack_start
+ */
+int
+__wt_ext_unpack_start(WT_SESSION *session, const char *format,
+    const void *buffer, size_t size, WT_PACK_STREAM **psp)
+{
+	return (wiredtiger_unpack_start(session, format, buffer, size, psp));
+}
+
+/*
+ * __wt_ext_pack_close --
+ *	WT_EXTENSION.pack_close
+ */
+int
+__wt_ext_pack_close(WT_PACK_STREAM *ps, size_t *usedp)
+{
+	return (wiredtiger_pack_close(ps, usedp));
+}
+
+/*
+ * __wt_ext_pack_item --
+ *	WT_EXTENSION.pack_item
+ */
+int
+__wt_ext_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
+{
+	return (wiredtiger_pack_item(ps, item));
+}
+
+/*
+ * __wt_ext_pack_int --
+ *	WT_EXTENSION.pack_int
+ */
+int
+__wt_ext_pack_int(WT_PACK_STREAM *ps, int64_t i)
+{
+	return (wiredtiger_pack_int(ps, i));
+}
+
+/*
+ * __wt_ext_pack_str --
+ *	WT_EXTENSION.pack_str
+ */
+int
+__wt_ext_pack_str(WT_PACK_STREAM *ps, const char *s)
+{
+	return (wiredtiger_pack_str(ps, s));
+}
+
+/*
+ * __wt_ext_pack_uint --
+ *	WT_EXTENSION.pack_uint
+ */
+int
+__wt_ext_pack_uint(WT_PACK_STREAM *ps, uint64_t u)
+{
+	return (wiredtiger_pack_uint(ps, u));
+}
+
+/*
+ * __wt_ext_unpack_item --
+ *	WT_EXTENSION.unpack_item
+ */
+int
+__wt_ext_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
+{
+	return (wiredtiger_unpack_item(ps, item));
+}
+
+/*
+ * __wt_ext_unpack_int --
+ *	WT_EXTENSION.unpack_int
+ */
+int
+__wt_ext_unpack_int(WT_PACK_STREAM *ps, int64_t *ip)
+{
+	return (wiredtiger_unpack_int(ps, ip));
+}
+
+/*
+ * __wt_ext_unpack_str --
+ *	WT_EXTENSION.unpack_str
+ */
+int
+__wt_ext_unpack_str(WT_PACK_STREAM *ps, const char **sp)
+{
+	return (wiredtiger_unpack_str(ps, sp));
+}
+
+/*
+ * __wt_ext_unpack_uint --
+ *	WT_EXTENSION.unpack_uint
+ */
+int
+__wt_ext_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up)
+{
+	return (wiredtiger_unpack_uint(ps, up));
+}

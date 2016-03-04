@@ -558,6 +558,17 @@ extern int __wt_struct_size(WT_SESSION_IMPL *session, size_t *sizep, const char 
 extern int __wt_struct_pack(WT_SESSION_IMPL *session, void *buffer, size_t size, const char *fmt, ...);
 extern int __wt_struct_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt, ...);
 extern int __wt_struct_repack(WT_SESSION_IMPL *session, const char *infmt, const char *outfmt, const WT_ITEM *inbuf, WT_ITEM *outbuf);
+extern int __wt_ext_pack_start(WT_SESSION *session, const char *format, void *buffer, size_t size, WT_PACK_STREAM **psp);
+extern int __wt_ext_unpack_start(WT_SESSION *session, const char *format, const void *buffer, size_t size, WT_PACK_STREAM **psp);
+extern int __wt_ext_pack_close(WT_PACK_STREAM *ps, size_t *usedp);
+extern int __wt_ext_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+extern int __wt_ext_pack_int(WT_PACK_STREAM *ps, int64_t i);
+extern int __wt_ext_pack_str(WT_PACK_STREAM *ps, const char *s);
+extern int __wt_ext_pack_uint(WT_PACK_STREAM *ps, uint64_t u);
+extern int __wt_ext_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+extern int __wt_ext_unpack_int(WT_PACK_STREAM *ps, int64_t *ip);
+extern int __wt_ext_unpack_str(WT_PACK_STREAM *ps, const char **sp);
+extern int __wt_ext_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
 extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell);
 extern void __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page, uint8_t **addrp, size_t *addr_sizep, const void *value, size_t value_size);
