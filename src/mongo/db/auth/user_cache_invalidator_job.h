@@ -44,6 +44,7 @@ class OperationContext;
 class UserCacheInvalidator : public BackgroundJob {
 public:
     UserCacheInvalidator(AuthorizationManager* authzManager);
+    ~UserCacheInvalidator();
 
     void initialize(OperationContext* txn);
 
