@@ -560,7 +560,7 @@ void dropAllDatabasesExceptLocal(OperationContext* txn) {
                 if (db == nullptr) {
                     log() << "database disappeared after listDatabases but before drop: " << *i;
                 } else {
-                    dropDatabase(txn, db);
+                    Database::dropDatabase(txn, db);
                 }
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropAllDatabasesExceptLocal", *i);
@@ -568,18 +568,18 @@ void dropAllDatabasesExceptLocal(OperationContext* txn) {
     }
 }
 
-void dropDatabase(OperationContext* txn, Database* db) {
+void Database::dropDatabase(OperationContext* txn, Database* db) {
     invariant(db);
 
     // Store the name so we have if for after the db object is deleted
     const string name = db->name();
-    LOG(1) << "dropDatabase " << name << endl;
+    LOG(1) << "dropDatabase " << name;
 
     invariant(txn->lockState()->isDbLockedForMode(name, MODE_X));
 
-    BackgroundOperation::assertNoBgOpInProgForDb(name.c_str());
+    BackgroundOperation::assertNoBgOpInProgForDb(name);
 
-    audit::logDropDatabase(&cc(), name);
+    audit::logDropDatabase(txn->getClient(), name);
 
     dbHolder().close(txn, name);
     db = NULL;  // d is now deleted

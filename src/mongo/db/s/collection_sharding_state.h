@@ -66,6 +66,7 @@ public:
      * Must be called with some lock held on the specific collection being looked up and the
      * returned pointer should never be stored.
      */
+    static CollectionShardingState* get(OperationContext* txn, const NamespaceString& nss);
     static CollectionShardingState* get(OperationContext* txn, const std::string& ns);
 
     /**

@@ -48,7 +48,15 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
 Status dropDatabase(OperationContext* txn, const std::string& dbName) {
+    // TODO (Kal): OldClientContext legacy, needs to be removed
+    {
+        CurOp::get(txn)->ensureStarted();
+        stdx::lock_guard<Client> lk(*txn->getClient());
+        CurOp::get(txn)->setNS_inlock(dbName);
+    }
+
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
@@ -59,7 +67,6 @@ Status dropDatabase(OperationContext* txn, const std::string& dbName) {
                           str::stream() << "Could not drop database " << dbName
                                         << " because it does not exist");
         }
-        OldClientContext context(txn, dbName);
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
             !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName);
@@ -70,10 +77,7 @@ Status dropDatabase(OperationContext* txn, const std::string& dbName) {
         }
 
         log() << "dropDatabase " << dbName << " starting";
-
-        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
-        mongo::dropDatabase(txn, db);
-
+        Database::dropDatabase(txn, db);
         log() << "dropDatabase " << dbName << " finished";
 
         WriteUnitOfWork wunit(txn);

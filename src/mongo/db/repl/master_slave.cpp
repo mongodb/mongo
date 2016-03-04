@@ -459,10 +459,12 @@ void ReplSource::forceResync(OperationContext* txn, const char* requester) {
     save(txn);
 }
 
-void ReplSource::resyncDrop(OperationContext* txn, const string& db) {
-    log() << "resync: dropping database " << db;
-    OldClientContext ctx(txn, db);
-    dropDatabase(txn, ctx.db());
+void ReplSource::resyncDrop(OperationContext* txn, const string& dbName) {
+    log() << "resync: dropping database " << dbName;
+    invariant(txn->lockState()->isW());
+
+    Database* const db = dbHolder().get(txn, dbName);
+    Database::dropDatabase(txn, db);
 }
 
 /* grab initial copy of a database from the master */
@@ -604,8 +606,8 @@ bool ReplSource::handleDuplicateDbName(OperationContext* txn,
         incompleteCloneDbs.erase(*i);
         addDbNextPass.erase(*i);
 
-        OldClientContext ctx(txn, *i);
-        dropDatabase(txn, ctx.db());
+        AutoGetDb autoDb(txn, *i, MODE_X);
+        Database::dropDatabase(txn, autoDb.getDb());
     }
 
     massert(14034,

@@ -100,7 +100,7 @@ class ReplSource {
     /// TODO(spencer): Remove this once the LegacyReplicationCoordinator is gone.
     BSONObj _me;
 
-    void resyncDrop(OperationContext* txn, const std::string& db);
+    void resyncDrop(OperationContext* txn, const std::string& dbName);
     // call without the db mutex
     void syncToTailOfRemoteLog();
     std::string ns() const {

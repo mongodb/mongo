@@ -139,9 +139,6 @@ public:
                              ChunkVersion received,
                              ChunkVersion wanted)
         : StaleConfigException(ns, raw, ErrorCodes::SendStaleConfig, received, wanted) {}
-
-    SendStaleConfigException(const std::string& raw, const BSONObj& error)
-        : StaleConfigException(raw, ErrorCodes::SendStaleConfig, error) {}
 };
 
 class RecvStaleConfigException : public StaleConfigException {

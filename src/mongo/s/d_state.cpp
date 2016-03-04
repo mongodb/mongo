@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -141,13 +142,12 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const string ns = cmdObj["getShardVersion"].valuestrsafe();
-        if (ns.size() == 0) {
-            errmsg = "need to specify full namespace";
-            return false;
+        const NamespaceString nss(cmdObj["getShardVersion"].valuestrsafe());
+        if (!nss.isValid()) {
+            uasserted(ErrorCodes::InvalidNamespace, "Command requires valid collection namespace");
         }
 
-        ShardingState* shardingState = ShardingState::get(txn);
+        ShardingState* const shardingState = ShardingState::get(txn);
 
         if (shardingState->enabled()) {
             result.append("configServer", shardingState->getConfigServer(txn).toString());
@@ -155,18 +155,27 @@ public:
             result.append("configServer", "");
         }
 
-        result.appendTimestamp("global", shardingState->getVersion(ns).toLong());
+        AutoGetCollection autoColl(txn, nss, MODE_IS);
+        CollectionShardingState* const css = CollectionShardingState::get(txn, nss);
+
+        shared_ptr<CollectionMetadata> metadata(css ? css->getMetadata() : nullptr);
+        if (metadata) {
+            result.appendTimestamp("global", metadata->getShardVersion().toLong());
+        } else {
+            result.appendTimestamp("global", ChunkVersion(0, 0, OID()).toLong());
+        }
 
         ShardedConnectionInfo* const info = ShardedConnectionInfo::get(txn->getClient(), false);
         result.appendBool("inShardedMode", info != NULL);
         if (info) {
-            result.appendTimestamp("mine", info->getVersion(ns).toLong());
+            result.appendTimestamp("mine", info->getVersion(nss.ns()).toLong());
         } else {
             result.appendTimestamp("mine", 0);
         }
 
         if (cmdObj["fullMetadata"].trueValue()) {
-            shared_ptr<CollectionMetadata> metadata = shardingState->getCollectionMetadata(ns);
+            shared_ptr<CollectionMetadata> metadata =
+                shardingState->getCollectionMetadata(nss.ns());
             if (metadata) {
                 result.append("metadata", metadata->toBSON());
             } else {
@@ -177,7 +186,7 @@ public:
         return true;
     }
 
-} getShardVersion;
+} getShardVersionCmd;
 
 class ShardingStateCmd : public Command {
 public:
@@ -209,10 +218,6 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-        OldClientContext ctx(txn, dbname);
-
         ShardingState::get(txn)->appendInfo(txn, result);
         return true;
     }

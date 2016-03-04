@@ -266,7 +266,13 @@ public:
         // TODO: SERVER-4328 Don't lock globally
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
-        OldClientContext context(txn, dbname);
+
+        // TODO (Kal): OldClientContext legacy, needs to be removed
+        {
+            CurOp::get(txn)->ensureStarted();
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            CurOp::get(txn)->setNS_inlock(dbname);
+        }
 
         log() << "repairDatabase " << dbname;
         BackgroundOperation::assertNoBgOpInProgForDb(dbname);
@@ -426,7 +432,13 @@ public:
         //
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-        OldClientContext ctx(txn, dbname);
+
+        // TODO (Kal): OldClientContext legacy, needs to be removed
+        {
+            CurOp::get(txn)->ensureStarted();
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            CurOp::get(txn)->setNS_inlock(dbname);
+        }
 
         int was = _diaglog.setLevel(cmdObj.firstElement().numberInt());
         _diaglog.flush();
@@ -1064,9 +1076,9 @@ public:
 
         const string ns = parseNs(dbname, jsobj);
 
-        // TODO: OldClientContext legacy, needs to be removed
-        CurOp::get(txn)->ensureStarted();
+        // TODO (Kal): OldClientContext legacy, needs to be removed
         {
+            CurOp::get(txn)->ensureStarted();
             stdx::lock_guard<Client> lk(*txn->getClient());
             CurOp::get(txn)->setNS_inlock(dbname);
         }

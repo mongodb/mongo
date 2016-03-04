@@ -26,6 +26,7 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
@@ -52,7 +53,7 @@ void dropDatabase(OperationContext* txn, const NamespaceString& nss) {
     Database* db = dbHolder().get(txn, nss.db());
 
     if (db) {
-        dropDatabase(txn, db);
+        Database::dropDatabase(txn, db);
     }
 }
 bool collectionExists(OldClientContext* ctx, const string& ns) {

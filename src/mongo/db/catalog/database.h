@@ -168,6 +168,15 @@ public:
                             bool stayTemp);
 
     /**
+     * Physically drops the specified opened database and removes it from the server's metadata. It
+     * doesn't notify the replication subsystem or do any other consistency checks, so it should
+     * not be used directly from user commands.
+     *
+     * Must be called with the specified database locked in X mode.
+     */
+    static void dropDatabase(OperationContext* txn, Database* db);
+
+    /**
      * @return name of an existing database with same text name but different
      * casing, if one exists.  Otherwise the empty std::string is returned.  If
      * 'duplicates' is specified, it is filled with all duplicate names.
@@ -216,8 +225,6 @@ private:
     friend class NamespaceDetails;
     friend class IndexCatalog;
 };
-
-void dropDatabase(OperationContext* txn, Database* db);
 
 void dropAllDatabasesExceptLocal(OperationContext* txn);
 

@@ -47,6 +47,11 @@ CollectionShardingState::CollectionShardingState(
 CollectionShardingState::~CollectionShardingState() = default;
 
 CollectionShardingState* CollectionShardingState::get(OperationContext* txn,
+                                                      const NamespaceString& nss) {
+    return CollectionShardingState::get(txn, nss.ns());
+}
+
+CollectionShardingState* CollectionShardingState::get(OperationContext* txn,
                                                       const std::string& ns) {
     // Collection lock must be held to have a reference to the collection's sharding state
     dassert(txn->lockState()->isCollectionLockedForMode(ns, MODE_IS));

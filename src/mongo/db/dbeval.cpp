@@ -184,7 +184,7 @@ public:
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
 
-        OldClientContext ctx(txn, dbname);
+        OldClientContext ctx(txn, dbname, false /* no shard version checking */);
 
         return dbEval(txn, dbname, cmdObj, result, errmsg);
     }

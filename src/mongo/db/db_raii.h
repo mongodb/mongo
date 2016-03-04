@@ -182,9 +182,6 @@ public:
     Database* db() const {
         return _db;
     }
-    const char* ns() const {
-        return _ns.c_str();
-    }
 
     /** @return if the db was created by this OldClientContext */
     bool justCreated() const {
