@@ -278,14 +278,21 @@ bool QueryPlannerAccess::shouldMergeWithLeaf(const MatchExpression* expr,
     const IndexBounds* boundsToFillOut = &scan->bounds;
 
     if (boundsToFillOut->fields[pos].name.empty()) {
-        // The bounds will be compounded. This is OK because the
-        // plan enumerator told us that it is OK.
+        // Bounds have yet to be assigned for the 'pos' position in the index. The plan enumerator
+        // should have told us that it is safe to compound bounds in this case.
+        invariant(scanState.ixtag->canCombineBounds);
         return true;
     } else {
+        // Bounds have already been assigned for the 'pos' position in the index.
         if (MatchExpression::AND == mergeType) {
-            // The bounds will be intersected. This is OK provided
-            // that the index is NOT multikey.
-            return !index.multikey;
+            // The bounds on the 'pos' position in the index would be intersected if we merged these
+            // two leaf expressions.
+            if (!scanState.ixtag->canCombineBounds) {
+                // If the plan enumerator told us that it isn't safe to intersect bounds in this
+                // case, then it must be because we're using a multikey index.
+                invariant(index.multikey);
+            }
+            return scanState.ixtag->canCombineBounds;
         } else {
             // The bounds will be unionized.
             return true;

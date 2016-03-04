@@ -40,25 +40,43 @@ class IndexTag : public MatchExpression::TagData {
 public:
     static const size_t kNoIndex;
 
-    IndexTag() : index(kNoIndex), pos(0) {}
-    IndexTag(size_t i) : index(i), pos(0) {}
-    IndexTag(size_t i, size_t p) : index(i), pos(p) {}
+    /**
+     * Assigns a leaf expression to the leading field of index 'i' where combining bounds with other
+     * leaf expressions is known to be safe.
+     */
+    IndexTag(size_t i) : index(i) {}
+
+    /**
+     * Assigns a leaf expresssion to position 'p' of index 'i' where whether it is safe to combine
+     * bounds with other leaf expressions is defined by 'canCombineBounds_'.
+     */
+    IndexTag(size_t i, size_t p, bool canCombineBounds_)
+        : index(i), pos(p), canCombineBounds(canCombineBounds_) {}
 
     virtual ~IndexTag() {}
 
     virtual void debugString(StringBuilder* builder) const {
-        *builder << " || Selected Index #" << index << " pos " << pos;
+        *builder << " || Selected Index #" << index << " pos " << pos << " combine "
+                 << canCombineBounds;
     }
 
     virtual MatchExpression::TagData* clone() const {
-        return new IndexTag(index, pos);
+        return new IndexTag(index, pos, canCombineBounds);
     }
 
     // What index should we try to use for this leaf?
-    size_t index;
+    size_t index = kNoIndex;
 
     // What position are we in the index?  (Compound.)
-    size_t pos;
+    size_t pos = 0U;
+
+    // The plan enumerator can assign multiple predicates to the same position of a multikey index
+    // when generating a self-intersection index assignment in enumerateAndIntersect().
+    // 'canCombineBounds' gives the access planner enough information to know when it is safe to
+    // intersect the bounds for multiple leaf expressions on the 'pos' field of 'index' and when it
+    // isn't. The plan enumerator should never generate an index assignment where it isn't safe to
+    // compound the bounds for multiple leaf expressions on the index.
+    bool canCombineBounds = true;
 };
 
 // used internally

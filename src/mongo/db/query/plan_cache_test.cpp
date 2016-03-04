@@ -46,6 +46,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 using namespace mongo;
 
@@ -961,6 +962,108 @@ TEST_F(CachePlanSelectionTest, CollscanMergeSort) {
                                     BSONObj(),
                                     "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: "
                                     "{node: {cscan: {dir: 1}}}}}}");
+}
+
+//
+// Caching plans that use multikey indexes.
+//
+
+TEST_F(CachePlanSelectionTest, CachedPlanForCompoundMultikeyIndexCanCompoundBounds) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+
+    const bool multikey = true;
+    addIndex(BSON("a" << 1 << "b" << 1), multikey);
+
+    BSONObj query = fromjson("{a: 2, b: 3}");
+    runQuery(query);
+
+    assertPlanCacheRecoversSolution(
+        query,
+        "{fetch: {filter: null, node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[2, 2, true, true]], b: [[3, 3, true, true]]}}}}}");
+}
+
+TEST_F(CachePlanSelectionTest,
+       CachedPlanForSelfIntersectionOfMultikeyIndexPointRangesCannotIntersectBounds) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+
+    const bool multikey = true;
+    addIndex(BSON("a" << 1), multikey);
+
+    BSONObj query = fromjson("{$and: [{a: 2}, {a: 3}]}");
+    runQuery(query);
+
+    assertPlanCacheRecoversSolution(
+        query,
+        "{fetch: {filter: null, node: {andSorted: {nodes: ["
+        "{ixscan: {pattern: {a: 1}, bounds: {a: [[2, 2, true, true]]}}}, "
+        "{ixscan: {pattern: {a: 1}, bounds: {a: [[3, 3, true, true]]}}}]}}}}");
+}
+
+TEST_F(CachePlanSelectionTest,
+       CachedPlanForSelfIntersectionOfMultikeyIndexNonPointRangesCannotIntersectBounds) {
+    // Enable a hash-based index intersection plan to be generated because we are scanning a
+    // non-point range on the "a" field.
+    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection;
+    ON_BLOCK_EXIT([oldEnableHashIntersection] {
+        internalQueryPlannerEnableHashIntersection = oldEnableHashIntersection;
+    });
+    internalQueryPlannerEnableHashIntersection = true;
+    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+
+    const bool multikey = true;
+    addIndex(BSON("a" << 1), multikey);
+
+    BSONObj query = fromjson("{$and: [{a: {$gte: 2}}, {a: {$lt: 3}}]}");
+    runQuery(query);
+
+    assertPlanCacheRecoversSolution(
+        query,
+        "{fetch: {filter: null, node: {andHash: {nodes: ["
+        "{ixscan: {pattern: {a: 1}, bounds: {a: [[2, Infinity, true, true]]}}}, "
+        "{ixscan: {pattern: {a: 1}, bounds: {a: [[-Infinity, 3, true, false]]}}}]}}}}");
+}
+
+
+TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionOfMultikeyIndexesWhenUsingElemMatch) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+
+    const bool multikey = true;
+    addIndex(BSON("a.b" << 1), multikey);
+    addIndex(BSON("a.c" << 1), multikey);
+
+    BSONObj query = fromjson("{a: {$elemMatch: {b: 2, c: 3}}}");
+    runQuery(query);
+
+    assertPlanCacheRecoversSolution(
+        query,
+        "{fetch: {filter: {a: {$elemMatch: {b: 2, c: 3}}}, node: {andSorted: {nodes: ["
+        "{ixscan: {pattern: {'a.b': 1}, bounds: {'a.b': [[2, 2, true, true]]}}},"
+        "{ixscan: {pattern: {'a.c': 1}, bounds: {'a.c': [[3, 3, true, true]]}}}]}}}}");
+}
+
+TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionWithNonMultikeyIndexCanIntersectBounds) {
+    // Enable a hash-based index intersection plan to be generated because we are scanning a
+    // non-point range on the "a.c" field.
+    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection;
+    ON_BLOCK_EXIT([oldEnableHashIntersection] {
+        internalQueryPlannerEnableHashIntersection = oldEnableHashIntersection;
+    });
+    internalQueryPlannerEnableHashIntersection = true;
+    params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+
+    const bool multikey = true;
+    addIndex(BSON("a.b" << 1), multikey);
+    addIndex(BSON("a.c" << 1), !multikey);
+
+    BSONObj query = fromjson("{'a.b': 2, 'a.c': {$gte: 0, $lt: 10}}}}");
+    runQuery(query);
+
+    assertPlanCacheRecoversSolution(
+        query,
+        "{fetch: {node: {andHash: {nodes: ["
+        "{ixscan: {pattern: {'a.b': 1}, bounds: {'a.b': [[2, 2, true, true]]}}},"
+        "{ixscan: {pattern: {'a.c': 1}, bounds: {'a.c': [[0, 10, true, false]]}}}]}}}}");
 }
 
 //

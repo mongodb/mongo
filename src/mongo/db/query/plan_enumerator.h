@@ -205,6 +205,12 @@ private:
         std::vector<MatchExpression*> preds;
         std::vector<IndexPosition> positions;
         IndexID index;
+
+        // True if the bounds on 'index' for the leaf expressions in 'preds' can be intersected
+        // and/or compounded, and false otherwise. If 'canCombineBounds' is set to false and
+        // multiple predicates are assigned to the same position of a multikey index, then the
+        // access planner should generate a self-intersection plan.
+        bool canCombineBounds = true;
     };
 
     struct AndEnumerableState {

@@ -712,6 +712,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
         // have at least 2 scans (one predicate per scan as the planner can't
         // intersect bounds when the index is multikey), so we stop here.
         if (oneIndex.multikey && oneAssign.preds.size() > 1) {
+            oneAssign.canCombineBounds = false;
             // One could imagine an enormous auto-generated $all query with too many clauses to
             // have an ixscan per clause.
             static const size_t kMaxSelfIntersections = 10;
@@ -1172,7 +1173,8 @@ void PlanEnumerator::tagMemo(size_t id) {
             for (size_t j = 0; j < assign.preds.size(); ++j) {
                 MatchExpression* pred = assign.preds[j];
                 verify(NULL == pred->getTag());
-                pred->setTag(new IndexTag(assign.index, assign.positions[j]));
+                pred->setTag(
+                    new IndexTag(assign.index, assign.positions[j], assign.canCombineBounds));
             }
         }
     } else {
