@@ -1,6 +1,6 @@
 # wtperf options file: Test performance with a log file enabled.
 # Set the log file small to catch log-swtich bottlenecks.
-conn_config="cache_size=1G,log=(enabled=true,file_max=200K),checkpoint=(log_size=500MB),statistics=(fast),statistics_log=(wait=10)"
+conn_config="cache_size=1G,log=(enabled=true,file_max=200K),checkpoint=(log_size=500MB)"
 table_config="type=file"
 icount=50000
 report_interval=5
