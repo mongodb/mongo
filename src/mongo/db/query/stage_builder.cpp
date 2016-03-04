@@ -266,7 +266,6 @@ PlanStage* buildStages(OperationContext* txn,
 
         TextStageParams params(fam->getSpec());
         params.index = desc;
-        params.spec = fam->getSpec();
         params.indexPrefix = node->indexPrefix;
         // We assume here that node->ftsQuery is an FTSQueryImpl, not an FTSQueryNoop. In practice,
         // this means that it is illegal to use the StageBuilder on a QuerySolution created by
