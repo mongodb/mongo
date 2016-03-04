@@ -57,6 +57,17 @@ env.CppUnitTest(
         ]
     )
 
+env.CppUnitTest(
+    target='represent_as_test',
+    source=[
+        'represent_as_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_boost',
+    ],
+)
+
 env.Library(
     target='progress_meter',
     source=[
