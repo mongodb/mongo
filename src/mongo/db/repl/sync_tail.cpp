@@ -1130,6 +1130,9 @@ void multiSyncApply(const std::vector<SyncTail::OplogEntry>& ops, SyncTail* st) 
 
             if (!s.isOK()) {
                 severe() << "Error applying operation (" << entry->raw.toString() << "): " << s;
+                if (inShutdown()) {
+                    return;
+                }
                 fassertFailedNoTrace(16359);
             }
         } catch (const DBException& e) {
