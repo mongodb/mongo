@@ -49,7 +49,7 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
@@ -243,8 +243,8 @@ public:
 
         ShardingState* const shardingState = ShardingState::get(txn);
 
-        if (OperationShardVersion::get(txn).hasShardVersion() && shardingState->enabled()) {
-            ChunkVersion receivedVersion = OperationShardVersion::get(txn).getShardVersion(nss);
+        if (OperationShardingState::get(txn).hasShardVersion() && shardingState->enabled()) {
+            ChunkVersion receivedVersion = OperationShardingState::get(txn).getShardVersion(nss);
             ChunkVersion latestVersion;
             // Wait for migration completion to get the correct chunk version.
             const int maxTimeoutSec = 30;

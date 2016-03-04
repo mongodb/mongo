@@ -50,7 +50,7 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/chunk_version.h"
@@ -163,7 +163,7 @@ public:
         CurOp::get(txn)->debug().cursorid = request.cursorid;
 
         // Disable shard version checking - getmore commands are always unversioned
-        OperationShardVersion::get(txn).setShardVersion(request.nss, ChunkVersion::IGNORED());
+        OperationShardingState::get(txn).setShardVersion(request.nss, ChunkVersion::IGNORED());
 
         // Validate term before acquiring locks, if provided.
         if (request.term) {

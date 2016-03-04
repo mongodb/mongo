@@ -63,7 +63,7 @@
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -584,7 +584,7 @@ unsigned long long _safeCount(OperationContext* txn,
                               int options = 0,
                               int limit = 0,
                               int skip = 0) {
-    OperationShardVersion::IgnoreVersioningBlock ignoreVersion(txn, NamespaceString(ns));
+    OperationShardingState::IgnoreVersioningBlock ignoreVersion(txn, NamespaceString(ns));
     return db.count(ns, query, options, limit, skip);
 }
 

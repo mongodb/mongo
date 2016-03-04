@@ -28,38 +28,31 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
 namespace {
 
-const OperationContext::Decoration<OperationShardVersion> shardingMetadataDecoration =
-    OperationContext::declareDecoration<OperationShardVersion>();
+const OperationContext::Decoration<OperationShardingState> shardingMetadataDecoration =
+    OperationContext::declareDecoration<OperationShardingState>();
 
-const char kShardVersionField[] = "shardVersion";
 const ChunkVersion kUnshardedVersion(ChunkVersion::UNSHARDED());
 
 }  // namespace mongo
 
-OperationShardVersion::OperationShardVersion() = default;
+OperationShardingState::OperationShardingState() = default;
 
-OperationShardVersion& OperationShardVersion::get(OperationContext* txn) {
+OperationShardingState& OperationShardingState::get(OperationContext* txn) {
     return shardingMetadataDecoration(txn);
 }
 
-StringData OperationShardVersion::fieldName() {
-    return kShardVersionField;
-}
+void OperationShardingState::initializeShardVersion(NamespaceString ns,
+                                                    const BSONElement& shardVersionElt) {
+    invariant(!hasShardVersion());
 
-void OperationShardVersion::initializeFromCommand(NamespaceString ns, const BSONObj& cmdObj) {
-    initializeFromCommand(std::move(ns), cmdObj[fieldName()]);
-}
-
-void OperationShardVersion::initializeFromCommand(NamespaceString ns,
-                                                  const BSONElement& shardVersionElt) {
     if (ns.isSystemDotIndexes()) {
         setShardVersion(std::move(ns), ChunkVersion::IGNORED());
         return;
@@ -76,14 +69,15 @@ void OperationShardVersion::initializeFromCommand(NamespaceString ns,
     if (!hasVersion) {
         return;
     }
+
     setShardVersion(std::move(ns), std::move(newVersion));
 }
 
-bool OperationShardVersion::hasShardVersion() const {
+bool OperationShardingState::hasShardVersion() const {
     return _hasVersion;
 }
 
-const ChunkVersion& OperationShardVersion::getShardVersion(const NamespaceString& ns) const {
+const ChunkVersion& OperationShardingState::getShardVersion(const NamespaceString& ns) const {
     if (_ns != ns) {
         return kUnshardedVersion;
     }
@@ -91,7 +85,7 @@ const ChunkVersion& OperationShardVersion::getShardVersion(const NamespaceString
     return _shardVersion;
 }
 
-void OperationShardVersion::setShardVersion(NamespaceString ns, ChunkVersion newVersion) {
+void OperationShardingState::setShardVersion(NamespaceString ns, ChunkVersion newVersion) {
     // This currently supports only setting the shard version for one namespace.
     invariant(!_hasVersion || _ns == ns);
     invariant(!ns.isSystemDotIndexes() || ChunkVersion::isIgnoredVersion(newVersion));
@@ -101,16 +95,16 @@ void OperationShardVersion::setShardVersion(NamespaceString ns, ChunkVersion new
     _hasVersion = true;
 }
 
-void OperationShardVersion::_clear() {
+void OperationShardingState::_clear() {
     _hasVersion = false;
     _shardVersion = ChunkVersion();
     _ns = NamespaceString();
 }
 
-OperationShardVersion::IgnoreVersioningBlock::IgnoreVersioningBlock(OperationContext* txn,
-                                                                    const NamespaceString& ns)
+OperationShardingState::IgnoreVersioningBlock::IgnoreVersioningBlock(OperationContext* txn,
+                                                                     const NamespaceString& ns)
     : _txn(txn), _ns(ns) {
-    auto& operationVersion = OperationShardVersion::get(txn);
+    auto& operationVersion = OperationShardingState::get(txn);
     _hadOriginalVersion = operationVersion._hasVersion;
     if (_hadOriginalVersion) {
         _originalVersion = operationVersion.getShardVersion(ns);
@@ -118,8 +112,8 @@ OperationShardVersion::IgnoreVersioningBlock::IgnoreVersioningBlock(OperationCon
     operationVersion.setShardVersion(ns, ChunkVersion::IGNORED());
 }
 
-OperationShardVersion::IgnoreVersioningBlock::~IgnoreVersioningBlock() {
-    auto& operationVersion = OperationShardVersion::get(_txn);
+OperationShardingState::IgnoreVersioningBlock::~IgnoreVersioningBlock() {
+    auto& operationVersion = OperationShardingState::get(_txn);
     invariant(ChunkVersion::isIgnoredVersion(operationVersion.getShardVersion(_ns)));
     if (_hadOriginalVersion) {
         operationVersion.setShardVersion(_ns, _originalVersion);

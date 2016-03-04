@@ -45,7 +45,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
@@ -250,10 +250,12 @@ bool shardVersionOk(OperationContext* txn,
         return true;
     }
 
+    auto& oss = OperationShardingState::get(txn);
+
     // If there is a version attached to the OperationContext, use it as the received version.
     // Otherwise, get the received version from the ShardedConnectionInfo.
-    if (OperationShardVersion::get(txn).hasShardVersion()) {
-        received = OperationShardVersion::get(txn).getShardVersion(NamespaceString(ns));
+    if (oss.hasShardVersion()) {
+        received = oss.getShardVersion(NamespaceString(ns));
     } else {
         ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, false);
         if (!info) {

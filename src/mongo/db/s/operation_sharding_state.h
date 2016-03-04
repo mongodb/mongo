@@ -32,10 +32,11 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
+
+class OperationContext;
 
 /**
  * A decoration on OperationContext representing per-operation shard version metadata sent to mongod
@@ -45,20 +46,18 @@ namespace mongo {
  *
  * Note: This only supports storing the version for a single namespace.
  */
-class OperationShardVersion {
-    MONGO_DISALLOW_COPYING(OperationShardVersion);
+class OperationShardingState {
+    MONGO_DISALLOW_COPYING(OperationShardingState);
 
 public:
     class IgnoreVersioningBlock;
 
-    OperationShardVersion();
-
-    static StringData fieldName();
+    OperationShardingState();
 
     /**
      * Retrieves a reference to the shard version decorating the OperationContext, 'txn'.
      */
-    static OperationShardVersion& get(OperationContext* txn);
+    static OperationShardingState& get(OperationContext* txn);
 
     /**
      * Parses shard version from the command parameters 'cmdObj' and stores the results in this
@@ -66,9 +65,11 @@ public:
      * if no shard version is attached to the command.
      *
      * Expects the format { ..., shardVersion: [<version>, <epoch>] }.
+     *
+     * This initialization may only be performed once for the lifetime of the object, which
+     * coincides with the lifetime of the request.
      */
-    void initializeFromCommand(NamespaceString ns, const BSONObj& cmdObj);
-    void initializeFromCommand(NamespaceString ns, const BSONElement& shardVersionElement);
+    void initializeShardVersion(NamespaceString ns, const BSONElement& shardVersionElement);
 
     /**
      * Returns whether or not there is a shard version associated with this operation.
@@ -109,7 +110,7 @@ private:
  * but may be part of a larger group of operations with a single OperationContext where the other
  * sub-operations might still require versioning.
  */
-class OperationShardVersion::IgnoreVersioningBlock {
+class OperationShardingState::IgnoreVersioningBlock {
     MONGO_DISALLOW_COPYING(IgnoreVersioningBlock);
 
 public:

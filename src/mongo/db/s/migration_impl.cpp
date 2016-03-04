@@ -37,7 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/logger/ramlog.h"
@@ -134,7 +134,7 @@ Status ChunkMoveOperationState::initialize(const BSONObj& cmdObj) {
         _toShardCS = toShard->getConnString();
     }
 
-    auto& operationVersion = OperationShardVersion::get(_txn);
+    auto& operationVersion = OperationShardingState::get(_txn);
     if (!operationVersion.hasShardVersion()) {
         return Status{ErrorCodes::InvalidOptions, "moveChunk command is missing shard version"};
     }

@@ -43,7 +43,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_loader.h"
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -923,7 +923,7 @@ bool ShardingState::needCollectionMetadata(OperationContext* txn, const string& 
     // Shard version information received from mongos may either by attached to the Client or
     // directly to the OperationContext.
     return ShardedConnectionInfo::get(client, false) ||
-        OperationShardVersion::get(txn).hasShardVersion();
+        OperationShardingState::get(txn).hasShardVersion();
 }
 
 shared_ptr<CollectionMetadata> ShardingState::getCollectionMetadata(const string& ns) {

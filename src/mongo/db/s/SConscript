@@ -5,7 +5,6 @@ Import("env")
 env.Library(
     target='metadata',
     source=[
-        'operation_shard_version.cpp',
         'collection_metadata.cpp',
         'metadata_loader.cpp',
     ],
@@ -40,6 +39,7 @@ env.Library(
         'migration_destination_manager.cpp',
         'migration_impl.cpp',
         'migration_source_manager.cpp',
+        'operation_sharding_state.cpp',
         'sharded_connection_info.cpp',
         'sharding_state.cpp',
         'sharding_state_recovery.cpp',
@@ -49,6 +49,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/s/sharding_initialization',
+        'metadata',
         'migration_types',
     ],
     LIBDEPS_TAGS=[

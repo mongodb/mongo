@@ -51,7 +51,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -690,7 +690,7 @@ public:
             // Mongos >= v3.2 sends the full version, v3.0 only sends the epoch.
             // TODO(SERVER-20742): Stop parsing epoch separately after 3.2.
             OID cmdEpoch;
-            auto& operationVersion = OperationShardVersion::get(txn);
+            auto& operationVersion = OperationShardingState::get(txn);
             if (operationVersion.hasShardVersion()) {
                 cmdVersion = operationVersion.getShardVersion(nss);
                 cmdEpoch = cmdVersion.epoch();

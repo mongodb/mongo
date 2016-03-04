@@ -65,7 +65,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/stats/counters.h"
@@ -197,11 +197,13 @@ bool checkShardVersion(OperationContext* txn,
     const NamespaceString& nss = request.getTargetingNSS();
     dassert(txn->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IX));
 
-    if (!OperationShardVersion::get(txn).hasShardVersion()) {
+    auto& oss = OperationShardingState::get(txn);
+
+    if (!oss.hasShardVersion()) {
         return true;
     }
 
-    ChunkVersion operationShardVersion = OperationShardVersion::get(txn).getShardVersion(nss);
+    ChunkVersion operationShardVersion = oss.getShardVersion(nss);
     if (ChunkVersion::isIgnoredVersion(operationShardVersion)) {
         return true;
     }
@@ -292,7 +294,6 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
     OwnedPointerVector<BatchedUpsertDetail> upsertedOwned;
     vector<BatchedUpsertDetail*>& upserted = upsertedOwned.mutableVector();
 
-
     //
     // Apply each batch item, possibly bulking some items together in the write lock.
     // Stops on error if batch is ordered.
@@ -330,9 +331,9 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
 
     if (staleBatch) {
         ShardingState* shardingState = ShardingState::get(_txn);
-        const OperationShardVersion& operationShardVersion = OperationShardVersion::get(_txn);
-        const ChunkVersion& requestShardVersion =
-            operationShardVersion.getShardVersion(request.getTargetingNSS());
+
+        auto& oss = OperationShardingState::get(_txn);
+        ChunkVersion requestShardVersion = oss.getShardVersion(request.getTargetingNSS());
 
         //
         // First, we refresh metadata if we need to based on the requested version.

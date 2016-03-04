@@ -86,7 +86,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/operation_shard_version.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/write_concern.h"
@@ -97,6 +97,7 @@
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/protocol.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
@@ -1206,14 +1207,14 @@ namespace {
 // Symbolic names for indexes to make code more readable.
 const std::size_t kCmdOptionMaxTimeMSField = 0;
 const std::size_t kHelpField = 1;
-const std::size_t kShardVersionField = 2;
+const std::size_t kShardVersionFieldIdx = 2;
 const std::size_t kQueryOptionMaxTimeMSField = 3;
 
 // We make an array of the fields we need so we can call getFields once. This saves repeated
 // scans over the command object.
 const std::array<StringData, 4> neededFieldNames{LiteParsedQuery::cmdOptionMaxTimeMS,
                                                  Command::kHelpFieldName,
-                                                 OperationShardVersion::fieldName(),
+                                                 ChunkVersion::kShardVersionField,
                                                  LiteParsedQuery::queryOptionMaxTimeMS};
 }  // namespace
 
@@ -1323,12 +1324,10 @@ void Command::execCommand(OperationContext* txn,
         if (iAmPrimary && !txn->getClient()->isInDirectClient()) {
             // Handle shard version and config optime information that may have been sent along with
             // the command.
-            auto& operationShardVersion = OperationShardVersion::get(txn);
-            invariant(!operationShardVersion.hasShardVersion());
+            auto& oss = OperationShardingState::get(txn);
 
             auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
-            operationShardVersion.initializeFromCommand(commandNS,
-                                                        extractedFields[kShardVersionField]);
+            oss.initializeShardVersion(commandNS, extractedFields[kShardVersionFieldIdx]);
 
             auto shardingState = ShardingState::get(txn);
             if (shardingState->enabled()) {
@@ -1341,9 +1340,8 @@ void Command::execCommand(OperationContext* txn,
                     str::stream()
                         << "Received a command with sharding chunk version information but this "
                            "node is not sharding aware: " << request.getCommandArgs().jsonString(),
-                    !operationShardVersion.hasShardVersion() ||
-                        ChunkVersion::isIgnoredVersion(
-                            operationShardVersion.getShardVersion(commandNS)));
+                    !oss.hasShardVersion() ||
+                        ChunkVersion::isIgnoredVersion(oss.getShardVersion(commandNS)));
             }
         }
 

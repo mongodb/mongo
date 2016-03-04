@@ -40,13 +40,14 @@ namespace mongo {
 namespace {
 
 const char kVersion[] = "version";
-const char kShardVersion[] = "shardVersion";
 
 }  // namespace
 
+const char ChunkVersion::kShardVersionField[] = "shardVersion";
+
 StatusWith<ChunkVersion> ChunkVersion::parseFromBSONForCommands(const BSONObj& obj) {
     BSONElement versionElem;
-    Status status = bsonExtractField(obj, kShardVersion, &versionElem);
+    Status status = bsonExtractField(obj, kShardVersionField, &versionElem);
     if (!status.isOK())
         return status;
 
@@ -101,7 +102,7 @@ void ChunkVersion::appendForSetShardVersion(BSONObjBuilder* builder) const {
 }
 
 void ChunkVersion::appendForCommands(BSONObjBuilder* builder) const {
-    builder->appendArray(kShardVersion, toBSON());
+    builder->appendArray(kShardVersionField, toBSON());
 }
 
 BSONObj ChunkVersion::toBSON() const {

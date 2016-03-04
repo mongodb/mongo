@@ -51,6 +51,12 @@ class StatusWith;
  */
 struct ChunkVersion {
 public:
+    /**
+     * The name for the shard version information field, which shard-aware commands should include
+     * if they want to convey shard version.
+     */
+    static const char kShardVersionField[];
+
     ChunkVersion() : _combined(0), _epoch(OID()) {}
 
     ChunkVersion(int major, int minor, const OID& epoch)
