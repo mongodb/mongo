@@ -110,6 +110,12 @@ StatusWith<OID> getCurrentCacheGeneration(OperationContext* txn) {
 UserCacheInvalidator::UserCacheInvalidator(AuthorizationManager* authzManager)
     : _authzManager(authzManager) {}
 
+UserCacheInvalidator::~UserCacheInvalidator() {
+    invariant(inShutdown());
+    // Wait to stop running.
+    wait();
+}
+
 void UserCacheInvalidator::initialize(OperationContext* txn) {
     StatusWith<OID> currentGeneration = getCurrentCacheGeneration(txn);
     if (currentGeneration.isOK()) {
