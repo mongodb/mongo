@@ -31,6 +31,7 @@
 
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
@@ -68,10 +69,12 @@ private:
 
     /* Inform the sync target of our current position in the oplog, as well as the positions
      * of all secondaries chained through us.
-     * "oldStyle" indicates whether or not the upstream node is pre-3.2.2 and needs the older style
+     * "commandStyle" indicates whether or not the upstream node is pre-3.2.4 and needs the older
+     * style
      * ReplSetUpdatePosition commands as a result.
      */
-    Status updateUpstream(OperationContext* txn, bool oldStyle);
+    Status updateUpstream(OperationContext* txn,
+                          ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle);
 
     bool hasConnection() {
         return _connection.get();
@@ -94,8 +97,8 @@ private:
     bool _positionChanged = false;
     // Once this is set to true the _run method will terminate
     bool _shutdownSignaled = false;
-    // Indicates whether our syncSource can't accept the new version of the UpdatePosition command.
-    bool _fallBackToOldUpdatePosition = false;
+    // Indicates version of the UpdatePosition command accepted by our syncSource.
+    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle _commandStyle;
 };
 }  // namespace repl
 }  // namespace mongo

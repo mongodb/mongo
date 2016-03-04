@@ -217,15 +217,11 @@ Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {
 
 void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 
-bool ReplicationCoordinatorMock::prepareOldReplSetUpdatePositionCommand(
-    BSONObjBuilder* cmdBuilder) {
-    cmdBuilder->append("replSetUpdatePosition", 1);
-    return true;
-}
-
-bool ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
-    cmdBuilder->append("replSetUpdatePosition", 1);
-    return true;
+StatusWith<BSONObj> ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
+    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) const {
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append("replSetUpdatePosition", 1);
+    return cmdBuilder.obj();
 }
 
 ReplicaSetConfig ReplicationCoordinatorMock::getConfig() const {
@@ -390,7 +386,7 @@ Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgs
     return Status::OK();
 }
 
-bool ReplicationCoordinatorMock::isV1ElectionProtocol() {
+bool ReplicationCoordinatorMock::isV1ElectionProtocol() const {
     return true;
 }
 

@@ -135,8 +135,8 @@ public:
 
     virtual void signalUpstreamUpdater();
 
-    virtual bool prepareOldReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
-    virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
+        ReplSetUpdatePositionCommandStyle commandStyle) const override;
 
     virtual Status processReplSetGetStatus(BSONObjBuilder* result);
 
@@ -224,7 +224,7 @@ public:
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response);
 
-    virtual bool isV1ElectionProtocol();
+    virtual bool isV1ElectionProtocol() const override;
 
     virtual bool getWriteConcernMajorityShouldJournal();
 

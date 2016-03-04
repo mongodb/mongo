@@ -44,6 +44,14 @@ namespace repl {
  */
 class OldUpdatePositionArgs {
 public:
+    static const char kCommandFieldName[];
+    static const char kUpdateArrayFieldName[];
+    static const char kMemberRIDFieldName[];
+    static const char kMemberConfigFieldName[];
+    static const char kOpTimeFieldName[];
+    static const char kMemberIdFieldName[];
+    static const char kConfigVersionFieldName[];
+
     struct UpdateInfo {
         UpdateInfo(const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberId);
 

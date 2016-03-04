@@ -60,7 +60,7 @@ namespace repl {
 void SyncSourceFeedback::_resetConnection() {
     LOG(1) << "resetting connection in sync source feedback";
     _connection.reset();
-    _fallBackToOldUpdatePosition = false;
+    _commandStyle = ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle;
 }
 
 bool SyncSourceFeedback::replAuthenticate() {
@@ -106,34 +106,34 @@ void SyncSourceFeedback::forwardSlaveProgress() {
     _cond.notify_all();
 }
 
-Status SyncSourceFeedback::updateUpstream(OperationContext* txn, bool oldStyle) {
+Status SyncSourceFeedback::updateUpstream(
+    OperationContext* txn, ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) {
     auto replCoord = repl::ReplicationCoordinator::get(txn);
     if (replCoord->getMemberState().primary()) {
         // Primary has no one to send updates to.
         return Status::OK();
     }
-    BSONObjBuilder cmd;
+    BSONObj cmd;
     {
         stdx::unique_lock<stdx::mutex> lock(_mtx);
         // The command could not be created, likely because this node was removed from the set.
-        if (!oldStyle) {
-            if (!replCoord->prepareReplSetUpdatePositionCommand(&cmd)) {
-                return Status::OK();
-            }
-        } else {
-            if (!replCoord->prepareOldReplSetUpdatePositionCommand(&cmd)) {
-                return Status::OK();
-            }
+        auto prepareResult = replCoord->prepareReplSetUpdatePositionCommand(commandStyle);
+        if (!prepareResult.isOK()) {
+            return Status::OK();
         }
+        cmd = prepareResult.getValue();
     }
     BSONObj res;
 
-    LOG(2) << "Sending slave oplog progress to upstream updater: " << cmd.done();
+    LOG(2) << "Sending slave oplog progress to upstream updater: " << cmd;
     try {
-        _connection->runCommand("admin", cmd.obj(), res);
+        _connection->runCommand("admin", cmd, res);
     } catch (const DBException& e) {
-        log() << "SyncSourceFeedback error sending " << (oldStyle ? "old style " : "")
-              << "update: " << e.what();
+        log() << "SyncSourceFeedback error sending "
+              << (commandStyle ==
+                          ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kOldStyle
+                      ? "old style "
+                      : "") << "update: " << e.what();
         // Blacklist sync target for .5 seconds and find a new one.
         replCoord->blacklistSyncSource(_syncTarget, Date_t::now() + Milliseconds(500));
         BackgroundSync::get()->clearSyncTarget();
@@ -143,11 +143,15 @@ Status SyncSourceFeedback::updateUpstream(OperationContext* txn, bool oldStyle) 
 
     Status status = Command::getStatusFromCommandResult(res);
     if (!status.isOK()) {
-        log() << "SyncSourceFeedback error sending " << (oldStyle ? "old style " : "")
-              << "update, response: " << res.toString();
-        if (status == ErrorCodes::BadValue && !oldStyle) {
+        log() << "SyncSourceFeedback error sending "
+              << (commandStyle ==
+                          ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kOldStyle
+                      ? "old style "
+                      : "") << "update, response: " << res.toString();
+        if (status == ErrorCodes::BadValue &&
+            commandStyle == ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle) {
             log() << "SyncSourceFeedback falling back to old style UpdatePosition command";
-            _fallBackToOldUpdatePosition = true;
+            _commandStyle = ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kOldStyle;
         } else if (status != ErrorCodes::InvalidReplicaSetConfig || res["configVersion"].eoo() ||
                    res["configVersion"].numberLong() < replCoord->getConfig().getConfigVersion()) {
             // Blacklist sync target for .5 seconds and find a new one, unless we were rejected due
@@ -207,15 +211,19 @@ void SyncSourceFeedback::run() {
                 continue;
             }
         }
-        bool oldFallBackValue = _fallBackToOldUpdatePosition;
-        Status status = updateUpstream(txn.get(), _fallBackToOldUpdatePosition);
+        ReplicationCoordinator::ReplSetUpdatePositionCommandStyle oldCommandStyle = _commandStyle;
+        Status status = updateUpstream(txn.get(), _commandStyle);
         if (!status.isOK()) {
-            if (_fallBackToOldUpdatePosition != oldFallBackValue) {
+            if (_commandStyle != oldCommandStyle) {
                 stdx::unique_lock<stdx::mutex> lock(_mtx);
                 _positionChanged = true;
             } else {
-                log() << (_fallBackToOldUpdatePosition ? "old style " : "") << "updateUpstream"
-                      << " failed: " << status << ", will retry";
+                log()
+                    << (_commandStyle ==
+                                ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kOldStyle
+                            ? "old style "
+                            : "") << "updateUpstream"
+                    << " failed: " << status << ", will retry";
             }
         }
     }

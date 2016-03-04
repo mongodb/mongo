@@ -38,32 +38,18 @@
 namespace mongo {
 namespace repl {
 
+const char UpdatePositionArgs::kCommandFieldName[] = "replSetUpdatePosition";
+const char UpdatePositionArgs::kUpdateArrayFieldName[] = "optimes";
+const char UpdatePositionArgs::kAppliedOpTimeFieldName[] = "appliedOpTime";
+const char UpdatePositionArgs::kDurableOpTimeFieldName[] = "durableOpTime";
+const char UpdatePositionArgs::kMemberIdFieldName[] = "memberId";
+const char UpdatePositionArgs::kConfigVersionFieldName[] = "cfgver";
 
 UpdatePositionArgs::UpdateInfo::UpdateInfo(const OpTime& applied,
                                            const OpTime& durable,
                                            long long aCfgver,
                                            long long aMemberId)
     : appliedOpTime(applied), durableOpTime(durable), cfgver(aCfgver), memberId(aMemberId) {}
-
-namespace {
-
-const std::string kCommandFieldName = "replSetUpdatePosition";
-const std::string kUpdateArrayFieldName = "optimes";
-
-const std::string kLegalUpdatePositionFieldNames[] = {
-    kCommandFieldName, kUpdateArrayFieldName,
-};
-
-const std::string kAppliedOpTimeFieldName = "appliedOpTime";
-const std::string kDurableOpTimeFieldName = "durableOpTime";
-const std::string kMemberIdFieldName = "memberId";
-const std::string kConfigVersionFieldName = "cfgver";
-
-const std::string kLegalUpdateInfoFieldNames[] = {
-    kAppliedOpTimeFieldName, kDurableOpTimeFieldName, kMemberIdFieldName, kConfigVersionFieldName,
-};
-
-}  // namespace
 
 Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
     // grab the array of changes

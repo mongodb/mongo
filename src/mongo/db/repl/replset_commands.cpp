@@ -681,7 +681,7 @@ public:
 
         status = args.initialize(cmdObj);
         if (status.isOK()) {
-            // v3.2.2+ style replSetUpdatePosition command.
+            // v3.2.4+ style replSetUpdatePosition command.
             status = getGlobalReplicationCoordinator()->processReplSetUpdatePosition(
                 args, &configVersion);
 
@@ -690,7 +690,7 @@ public:
             }
             return appendCommandStatus(result, status);
         } else if (status == ErrorCodes::NoSuchKey) {
-            // Pre-3.2.2 style replSetUpdatePosition command.
+            // Pre-3.2.4 style replSetUpdatePosition command.
             OldUpdatePositionArgs oldArgs;
             status = oldArgs.initialize(cmdObj);
             if (!status.isOK())

@@ -38,6 +38,13 @@
 namespace mongo {
 namespace repl {
 
+const char OldUpdatePositionArgs::kCommandFieldName[] = "replSetUpdatePosition";
+const char OldUpdatePositionArgs::kUpdateArrayFieldName[] = "optimes";
+const char OldUpdatePositionArgs::kMemberRIDFieldName[] = "_id";
+const char OldUpdatePositionArgs::kMemberConfigFieldName[] = "config";
+const char OldUpdatePositionArgs::kOpTimeFieldName[] = "optime";
+const char OldUpdatePositionArgs::kMemberIdFieldName[] = "memberId";
+const char OldUpdatePositionArgs::kConfigVersionFieldName[] = "cfgver";
 
 OldUpdatePositionArgs::UpdateInfo::UpdateInfo(const OID& anRid,
                                               const OpTime& aTs,
@@ -47,25 +54,16 @@ OldUpdatePositionArgs::UpdateInfo::UpdateInfo(const OID& anRid,
 
 namespace {
 
-const std::string kCommandFieldName = "replSetUpdatePosition";
-const std::string kUpdateArrayFieldName = "optimes";
-
 const std::string kLegalUpdatePositionFieldNames[] = {
-    kCommandFieldName, kUpdateArrayFieldName,
+    OldUpdatePositionArgs::kCommandFieldName, OldUpdatePositionArgs::kUpdateArrayFieldName,
 };
 
-const std::string kMemberRIDFieldName = "_id";
-const std::string kMemberConfigFieldName = "config";
-const std::string kOpTimeFieldName = "optime";
-const std::string kMemberIdFieldName = "memberId";
-const std::string kConfigVersionFieldName = "cfgver";
-
 const std::string kLegalUpdateInfoFieldNames[] = {
-    kMemberConfigFieldName,
-    kMemberRIDFieldName,
-    kOpTimeFieldName,
-    kMemberIdFieldName,
-    kConfigVersionFieldName,
+    OldUpdatePositionArgs::kMemberConfigFieldName,
+    OldUpdatePositionArgs::kMemberRIDFieldName,
+    OldUpdatePositionArgs::kOpTimeFieldName,
+    OldUpdatePositionArgs::kMemberIdFieldName,
+    OldUpdatePositionArgs::kConfigVersionFieldName,
 };
 
 }  // namespace

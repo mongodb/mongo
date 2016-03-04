@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/sync_source_selector.h"
@@ -429,14 +430,17 @@ public:
      */
     virtual void signalUpstreamUpdater() = 0;
 
+    enum class ReplSetUpdatePositionCommandStyle {
+        kNewStyle,
+        kOldStyle  // Pre-3.2.4 servers.
+    };
+
     /**
      * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
      * be sent to this node's sync source to update it about our progress in replication.
-     *
-     * The returned bool indicates whether or not the command was created.
      */
-    virtual bool prepareOldReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
-    virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
+    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
+        ReplSetUpdatePositionCommandStyle commandStyle) const = 0;
 
     /**
      * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
@@ -602,7 +606,7 @@ public:
      * "configVersion" will be populated with our config version if and only if we return
      * InvalidReplicaSetConfig.
      *
-     * The OldUpdatePositionArgs version provides support for the pre-3.2.2 format of
+     * The OldUpdatePositionArgs version provides support for the pre-3.2.4 format of
      * UpdatePositionArgs.
      */
     virtual Status processReplSetUpdatePosition(const OldUpdatePositionArgs& updates,
@@ -692,7 +696,7 @@ public:
     /**
      * Returns true if the V1 election protocol is being used and false otherwise.
      */
-    virtual bool isV1ElectionProtocol() = 0;
+    virtual bool isV1ElectionProtocol() const = 0;
 
     /**
      * Returns whether or not majority write concerns should implicitly journal, if j has not been

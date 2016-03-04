@@ -184,12 +184,8 @@ DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCo
     options.rollbackFn =
         [](OperationContext*, const OpTime&, const HostAndPort&) { return Status::OK(); };
     options.prepareReplSetUpdatePositionCommandFn = [replCoord]() -> StatusWith<BSONObj> {
-        BSONObjBuilder bob;
-        if (replCoord->prepareReplSetUpdatePositionCommand(&bob)) {
-            return bob.obj();
-        }
-        return Status(ErrorCodes::OperationFailed,
-                      "unable to prepare replSetUpdatePosition command object");
+        return replCoord->prepareReplSetUpdatePositionCommand(
+            ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle);
     };
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
     options.setMyLastOptime =
@@ -1820,69 +1816,52 @@ int ReplicationCoordinatorImpl::_getMyId_inlock() const {
     return self.getId();
 }
 
-bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
+StatusWith<BSONObj> ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
+    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(_rsConfig.isInitialized());
     // Do not send updates if we have been removed from the config.
     if (_selfIndex == -1) {
-        return false;
+        return Status(ErrorCodes::NodeNotFound,
+                      "This node is not in the current replset configuration.");
     }
-    cmdBuilder->append("replSetUpdatePosition", 1);
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append(UpdatePositionArgs::kCommandFieldName, 1);
     // Create an array containing objects each live member connected to us and for ourself.
-    BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
-    for (SlaveInfoVector::iterator itr = _slaveInfo.begin(); itr != _slaveInfo.end(); ++itr) {
-        if (itr->lastAppliedOpTime.isNull()) {
+    BSONArrayBuilder arrayBuilder(cmdBuilder.subarrayStart("optimes"));
+    for (const auto& slaveInfo : _slaveInfo) {
+        if (slaveInfo.lastAppliedOpTime.isNull()) {
             // Don't include info on members we haven't heard from yet.
             continue;
         }
         // Don't include members we think are down.
-        if (!itr->self && itr->down) {
+        if (!slaveInfo.self && slaveInfo.down) {
             continue;
         }
 
         BSONObjBuilder entry(arrayBuilder.subobjStart());
-        itr->lastDurableOpTime.append(&entry, "durableOpTime");
-        itr->lastAppliedOpTime.append(&entry, "appliedOpTime");
-        entry.append("memberId", itr->memberId);
-        entry.append("cfgver", _rsConfig.getConfigVersion());
-    }
-
-    return true;
-}
-
-bool ReplicationCoordinatorImpl::prepareOldReplSetUpdatePositionCommand(
-    BSONObjBuilder* cmdBuilder) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(_rsConfig.isInitialized());
-    // do not send updates if we have been removed from the config
-    if (_selfIndex == -1) {
-        return false;
-    }
-    cmdBuilder->append("replSetUpdatePosition", 1);
-    // create an array containing objects each member connected to us and for ourself
-    BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
-    for (SlaveInfoVector::iterator itr = _slaveInfo.begin(); itr != _slaveInfo.end(); ++itr) {
-        if (itr->lastDurableOpTime.isNull()) {
-            // Don't include info on members we haven't heard from yet.
-            continue;
+        switch (commandStyle) {
+            case ReplSetUpdatePositionCommandStyle::kNewStyle:
+                slaveInfo.lastDurableOpTime.append(&entry,
+                                                   UpdatePositionArgs::kDurableOpTimeFieldName);
+                slaveInfo.lastAppliedOpTime.append(&entry,
+                                                   UpdatePositionArgs::kAppliedOpTimeFieldName);
+                break;
+            case ReplSetUpdatePositionCommandStyle::kOldStyle:
+                entry.append("_id", slaveInfo.rid);
+                if (isV1ElectionProtocol()) {
+                    slaveInfo.lastDurableOpTime.append(&entry, "optime");
+                } else {
+                    entry.append("optime", slaveInfo.lastDurableOpTime.getTimestamp());
+                }
+                break;
         }
-        // Don't include members we think are down.
-        if (!itr->self && itr->down) {
-            continue;
-        }
-
-        BSONObjBuilder entry(arrayBuilder.subobjStart());
-        entry.append("_id", itr->rid);
-        if (isV1ElectionProtocol()) {
-            itr->lastDurableOpTime.append(&entry, "optime");
-        } else {
-            entry.append("optime", itr->lastDurableOpTime.getTimestamp());
-        }
-        entry.append("memberId", itr->memberId);
-        entry.append("cfgver", _rsConfig.getConfigVersion());
+        entry.append(UpdatePositionArgs::kMemberIdFieldName, slaveInfo.memberId);
+        entry.append(UpdatePositionArgs::kConfigVersionFieldName, _rsConfig.getConfigVersion());
     }
+    arrayBuilder.done();
 
-    return true;
+    return cmdBuilder.obj();
 }
 
 Status ReplicationCoordinatorImpl::processReplSetGetStatus(BSONObjBuilder* response) {
@@ -3294,7 +3273,7 @@ void ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish(
     _topCoord->prepareReplResponseMetadata(metadata, lastVisibleOpTime, _lastCommittedOpTime);
 }
 
-bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {
+bool ReplicationCoordinatorImpl::isV1ElectionProtocol() const {
     return _protVersion.load() == 1;
 }
 

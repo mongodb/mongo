@@ -204,8 +204,8 @@ public:
 
     virtual void signalUpstreamUpdater() override;
 
-    virtual bool prepareOldReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) override;
-    virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) override;
+    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
+        ReplSetUpdatePositionCommandStyle commandStyle) const override;
 
     virtual Status processReplSetGetStatus(BSONObjBuilder* result) override;
 
@@ -297,7 +297,7 @@ public:
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                       ReplSetHeartbeatResponse* response) override;
 
-    virtual bool isV1ElectionProtocol() override;
+    virtual bool isV1ElectionProtocol() const override;
 
     virtual bool getWriteConcernMajorityShouldJournal() override;
 
@@ -761,7 +761,7 @@ private:
      * "configVersion" will be populated with our config version if it and the configVersion
      * of "args" differ.
      *
-     * The OldUpdatePositionArgs version provides support for the pre-3.2.2 format of
+     * The OldUpdatePositionArgs version provides support for the pre-3.2.4 format of
      * UpdatePositionArgs.
      */
     Status _setLastOptime_inlock(const OldUpdatePositionArgs::UpdateInfo& args,

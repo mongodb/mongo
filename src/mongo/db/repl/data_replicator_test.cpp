@@ -38,6 +38,7 @@
 #include "mongo/db/repl/data_replicator.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/reporter.h"
@@ -179,8 +180,9 @@ protected:
             return _rollbackFn(txn, lastOpTimeWritten, syncSource);
         };
 
-        options.prepareReplSetUpdatePositionCommandFn =
-            []() -> StatusWith<BSONObj> { return BSON("replSetUpdatePosition" << 1); };
+        options.prepareReplSetUpdatePositionCommandFn = []() -> StatusWith<BSONObj> {
+            return BSON(UpdatePositionArgs::kCommandFieldName << 1);
+        };
         options.getMyLastOptime = [this]() { return _myLastOpTime; };
         options.setMyLastOptime = [this](const OpTime& opTime) { _setMyLastOptime(opTime); };
         options.setFollowerMode = [this](const MemberState& state) {
@@ -992,7 +994,8 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
         auto commandRequest = networkRequest->getRequest();
         ASSERT_EQUALS("admin", commandRequest.dbname);
         const auto& cmdObj = commandRequest.cmdObj;
-        ASSERT_EQUALS(std::string("replSetUpdatePosition"), cmdObj.firstElementFieldName());
+        ASSERT_EQUALS(std::string(UpdatePositionArgs::kCommandFieldName),
+                      cmdObj.firstElementFieldName());
     }
 }
 
