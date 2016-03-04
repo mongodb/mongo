@@ -67,6 +67,12 @@ __wt_cond_auto_wait_signal(
 {
 	uint64_t delta;
 
+	/*
+	 * Catch cases where this function is called with a condition variable
+	 * that was initialized non-auto.
+	 */
+	WT_ASSERT(session, cond->min_wait != 0);
+
 	if (progress)
 		cond->prev_wait = cond->min_wait;
 	else {
