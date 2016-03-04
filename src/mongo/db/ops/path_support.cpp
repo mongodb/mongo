@@ -59,15 +59,16 @@ bool isNumeric(StringData str, size_t* num) {
 Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
     dassert(elemArray->getType() == Array);
 
-    if (sizeRequired > kMaxPaddingAllowed) {
-        return Status(ErrorCodes::CannotBackfillArray,
-                      mongoutils::str::stream() << "can't backfill array to larger than "
-                                                << kMaxPaddingAllowed << " elements");
-    }
-
     size_t currSize = mutablebson::countChildren(*elemArray);
     if (sizeRequired > currSize) {
         size_t toPad = sizeRequired - currSize;
+
+        if (toPad > kMaxPaddingAllowed) {
+            return Status(ErrorCodes::CannotBackfillArray,
+                          mongoutils::str::stream() << "can't backfill more than "
+                                                    << kMaxPaddingAllowed << " elements");
+        }
+
         for (size_t i = 0; i < toPad; i++) {
             Status status = elemArray->appendNull("");
             if (!status.isOK()) {

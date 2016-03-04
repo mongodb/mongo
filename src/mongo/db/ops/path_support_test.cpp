@@ -455,9 +455,9 @@ TEST_F(ArrayDoc, ArrayPaddingNecessary) {
 }
 
 TEST_F(ArrayDoc, ExcessivePaddingRequested) {
-    // Try to create an array item beyond what we're allowed to pad.
-    string paddedField = stream() << "b." << mongo::pathsupport::kMaxPaddingAllowed + 1;
-    ;
+    // Try to create an array item beyond what we're allowed to pad. The index is two beyond the max
+    // padding since the array already has one element.
+    string paddedField = stream() << "b." << mongo::pathsupport::kMaxPaddingAllowed + 2;
     setField(paddedField);
 
     size_t idxFound;
@@ -471,6 +471,36 @@ TEST_F(ArrayDoc, ExcessivePaddingRequested) {
 
     Status status = createPathAt(field(), idxFound + 1, elemFound, newElem);
     ASSERT_EQUALS(status.code(), ErrorCodes::CannotBackfillArray);
+}
+
+TEST_F(ArrayDoc, ExcessivePaddingNotRequestedIfArrayAlreadyPadded) {
+    // We will try to set an array element whose index is 5 beyond the max padding.
+    string paddedField = stream() << "a." << mongo::pathsupport::kMaxPaddingAllowed + 5;
+    setField(paddedField);
+
+    // Add 5 elements to the array.
+    for (size_t i = 0; i < 5; ++i) {
+        Element arrayA = doc().root().leftChild();
+        ASSERT_EQ(arrayA.getFieldName(), "a");
+        ASSERT_EQ(arrayA.getType(), mongo::Array);
+        arrayA.appendInt("", 1);
+    }
+
+    size_t idxFound;
+    Element elemFound = root();
+    ASSERT_OK(findLongestPrefix(field(), root(), &idxFound, &elemFound));
+    ASSERT_TRUE(elemFound.ok());
+    ASSERT_EQUALS(countChildren(elemFound), 5u);
+
+    Element newElem = doc().makeElementInt("", 99);
+    ASSERT_TRUE(newElem.ok());
+
+    ASSERT_OK(createPathAt(field(), idxFound + 1, elemFound, newElem));
+
+    // Array should now have maxPadding + 6 elements, since the highest array index is maxPadding +
+    // 5. maxPadding of these elements are nulls adding as padding, 5 were appended at the
+    // beginning, and 1 was added by createPathAt().
+    ASSERT_EQ(countChildren(doc().root().leftChild()), mongo::pathsupport::kMaxPaddingAllowed + 6);
 }
 
 TEST_F(ArrayDoc, NonNumericPathInArray) {
