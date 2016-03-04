@@ -97,6 +97,10 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Dump, re-load and do a content comparison.
     def test_dump(self):
+	# LSM and column-store isn't a valid combination.
+	if self.type == 'lsm:' and self.keyfmt == 'r':
+		return
+
         # Create the object.
         uri = self.type + self.name
         self.populate(self, uri, 'key_format=' + self.keyfmt, self.nentries)
