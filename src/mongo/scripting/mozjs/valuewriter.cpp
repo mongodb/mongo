@@ -39,6 +39,7 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/represent_as.h"
 
 namespace mongo {
 namespace mozjs {
@@ -203,14 +204,14 @@ void ValueWriter::writeThis(BSONObjBuilder* b,
     } else if (_value.isNumber()) {
         double val = toNumber();
 
-        // if previous type was integer, keep it
-        int intval = static_cast<int>(val);
+        // if previous type was integer, attempt to represent 'val' as an integer
+        auto intval = representAs<int>(val);
 
-        if (val == intval && _originalParent) {
+        if (intval && _originalParent) {
             // This makes copying an object of numbers O(n**2) :(
             BSONElement elmt = _originalParent->getField(sd);
             if (elmt.type() == mongo::NumberInt) {
-                b->append(sd, intval);
+                b->append(sd, *intval);
                 return;
             }
         }
