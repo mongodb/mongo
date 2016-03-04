@@ -209,6 +209,7 @@ env.Library(
     target='sync_tail',
     source=[
         'sync_tail.cpp',
+        'oplog_entry.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
