@@ -267,7 +267,7 @@ functions:
             export ${library_path}
         fi
         . ./set_gopath.sh
-        go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
+        go build -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec `git rev-parse HEAD` -X github.com/mongodb/mongo-tools/common/options.VersionStr $(git describe)" ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
 
   "download mongod":
     command: shell.exec

@@ -14,13 +14,12 @@ import (
 	"strings"
 )
 
-const VersionStr = "3.3.3-pre-"
-
 const DefaultDialTimeoutSeconds = 3
 
 // Gitspec that the tool was built with. Needs to be set using -ldflags
 var (
-	Gitspec = "not-built-with-ldflags"
+	VersionStr = "not-built-with-ldflags"
+	Gitspec    = "not-built-with-ldflags"
 )
 
 // Struct encompassing all of the options that are reused across tools: "help",

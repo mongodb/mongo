@@ -19,5 +19,5 @@ mkdir -p bin
 for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
 	echo "Building ${i}..."
   	# Build the tool, using -ldflags to link in the current gitspec
-	go build -o "bin/$i" -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec `git rev-parse HEAD`" -tags "$tags" "$i/main/$i.go"
+        go build -o "bin/$i" -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec `git rev-parse HEAD` -X github.com/mongodb/mongo-tools/common/options.VersionStr $(git describe)" -tags "$tags" "$i/main/$i.go"
 done
