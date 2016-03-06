@@ -460,12 +460,12 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	WT_DECL_RET;
 	WT_PAGE *page;
 	u_int sleep_cnt, wait_cnt;
-	bool busy, cache_work, oldgen, stalled;
+	bool busy, cache_work, evict_soon, stalled;
 	int force_attempts;
 
 	btree = S2BT(session);
 
-	for (oldgen = stalled = false,
+	for (evict_soon = stalled = false,
 	    force_attempts = 0, sleep_cnt = wait_cnt = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DELETED:
@@ -486,7 +486,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				WT_RET(__wt_cache_eviction_check(
 				    session, 1, NULL));
 			WT_RET(__page_read(session, ref));
-			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
+			evict_soon = LF_ISSET(WT_READ_WONT_NEED) ||
 			    F_ISSET(session, WT_SESSION_NO_CACHE);
 			continue;
 		case WT_REF_READING:
@@ -586,7 +586,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * read generation.
 			 */
 			page = ref->page;
-			if (oldgen && page->read_gen == WT_READGEN_NOTSET)
+			if (evict_soon && page->read_gen == WT_READGEN_NOTSET)
 				__wt_page_evict_soon(page);
 			else if (page->read_gen == WT_READGEN_NOTSET ||
 			    (!LF_ISSET(WT_READ_NO_GEN) &&
