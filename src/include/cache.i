@@ -46,19 +46,6 @@ __wt_cache_read_gen_bump(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_cache_read_gen_new --
- *      Get the read generation for a new page in memory.
- */
-static inline uint64_t
-__wt_cache_read_gen_new(WT_SESSION_IMPL *session)
-{
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-	return (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2;
-}
-
-/*
  * __wt_cache_pages_inuse --
  *	Return the number of pages in use.
  */

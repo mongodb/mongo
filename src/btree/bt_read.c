@@ -575,18 +575,23 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			}
 
 			/*
-			 * If we read the page and we are configured to not
-			 * trash the cache, set the oldest read generation so
-			 * the page is forcibly evicted as soon as possible.
+			 * If we read the page and are configured to not trash
+			 * the cache, and no other thread has already used the
+			 * page, set the oldest read generation so the page is
+			 * forcibly evicted as soon as possible.
 			 *
-			 * Otherwise, update the page's read generation.
+			 * Otherwise, if we read the page, or, if configured to
+			 * update the page's read generation and the page isn't
+			 * already flagged for forced eviction, update the page
+			 * read generation.
 			 */
 			page = ref->page;
 			if (oldgen && page->read_gen == WT_READGEN_NOTSET)
 				__wt_page_evict_soon(page);
-			else if (!LF_ISSET(WT_READ_NO_GEN) &&
+			else if (page->read_gen == WT_READGEN_NOTSET ||
+			    (!LF_ISSET(WT_READ_NO_GEN) &&
 			    page->read_gen != WT_READGEN_OLDEST &&
-			    page->read_gen < __wt_cache_read_gen(session))
+			    page->read_gen < __wt_cache_read_gen(session)))
 				page->read_gen =
 				    __wt_cache_read_gen_bump(session);
 skip_evict:

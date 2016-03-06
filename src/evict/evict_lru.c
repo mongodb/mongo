@@ -933,9 +933,6 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 
 	WT_ASSERT(session, cache->evict_queue[0].ref != NULL);
 
-	/* Track the oldest read generation we have in the queue. */
-	cache->read_gen_oldest = cache->evict_queue[0].ref->page->read_gen;
-
 	if (FLD_ISSET(cache->state,
 	    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK))
 		/*
@@ -1312,11 +1309,13 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			continue;
 
 		/*
-		 * If this page has never been considered for eviction, set its
-		 * read generation to somewhere in the middle of the LRU list.
+		 * It's possible (but unlikely) to visit a page without a read
+		 * generation, if we race with the read instantiating the page.
+		 * Be safe and set the page's read generation here to ensure a
+		 * bug doesn't somehow leave a page without a read generation.
 		 */
 		if (page->read_gen == WT_READGEN_NOTSET)
-			page->read_gen = __wt_cache_read_gen_new(session);
+			page->read_gen = __wt_cache_read_gen_bump(session);
 
 fast:		/* If the page can't be evicted, give up. */
 		if (!__wt_page_can_evict(session, ref, NULL))
