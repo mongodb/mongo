@@ -1315,7 +1315,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 * bug doesn't somehow leave a page without a read generation.
 		 */
 		if (page->read_gen == WT_READGEN_NOTSET)
-			page->read_gen = __wt_cache_read_gen_bump(session);
+			__wt_cache_read_gen_bump(session, page);
 
 fast:		/* If the page can't be evicted, give up. */
 		if (!__wt_page_can_evict(session, ref, NULL))
@@ -1476,7 +1476,6 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_PAGE *page;
 	WT_REF *ref;
 
 	WT_RET(__evict_get_ref(session, is_server, &btree, &ref));
@@ -1505,9 +1504,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 	 * the page and some other thread may have evicted it by the time we
 	 * look at it.
 	 */
-	page = ref->page;
-	if (page->read_gen != WT_READGEN_OLDEST)
-		page->read_gen = __wt_cache_read_gen_bump(session);
+	__wt_cache_read_gen_bump(session, ref->page);
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, false));
 

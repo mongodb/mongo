@@ -597,12 +597,9 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			page = ref->page;
 			if (evict_soon && page->read_gen == WT_READGEN_NOTSET)
 				__wt_page_evict_soon(page);
-			else if (page->read_gen == WT_READGEN_NOTSET ||
-			    (!LF_ISSET(WT_READ_NO_GEN) &&
-			    page->read_gen != WT_READGEN_OLDEST &&
-			    page->read_gen < __wt_cache_read_gen(session)))
-				page->read_gen =
-				    __wt_cache_read_gen_bump(session);
+			else if (!LF_ISSET(WT_READ_NO_GEN) ||
+			    page->read_gen == WT_READGEN_NOTSET)
+				__wt_cache_read_gen_bump(session, page);
 skip_evict:
 			/*
 			 * Check if we need an autocommit transaction.
