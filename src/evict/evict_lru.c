@@ -1283,6 +1283,18 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 			continue;
 
+		/*
+		 * It's possible (but unlikely) to visit a page without a read
+		 * generation, if we race with the read instantiating the page.
+		 * Ignore those pages, but set the page's read generation here
+		 * to ensure a bug doesn't somehow leave a page without a read
+		 * generation.
+		 */
+		if (page->read_gen == WT_READGEN_NOTSET) {
+			__wt_cache_read_gen_bump(session, page);
+			continue;
+		}
+
 		/* Pages we no longer need (clean or dirty), are found money. */
 		if (__wt_page_is_empty(page) ||
 		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
@@ -1307,15 +1319,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		    !FLD_ISSET(cache->state, WT_EVICT_PASS_AGGRESSIVE) &&
 		    internal_pages >= (int)(evict - start) / 2)
 			continue;
-
-		/*
-		 * It's possible (but unlikely) to visit a page without a read
-		 * generation, if we race with the read instantiating the page.
-		 * Be safe and set the page's read generation here to ensure a
-		 * bug doesn't somehow leave a page without a read generation.
-		 */
-		if (page->read_gen == WT_READGEN_NOTSET)
-			__wt_cache_read_gen_bump(session, page);
 
 fast:		/* If the page can't be evicted, give up. */
 		if (!__wt_page_can_evict(session, ref, NULL))
