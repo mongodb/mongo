@@ -595,10 +595,12 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * read generation.
 			 */
 			page = ref->page;
-			if (evict_soon && page->read_gen == WT_READGEN_NOTSET)
-				__wt_page_evict_soon(page);
-			else if (!LF_ISSET(WT_READ_NO_GEN) ||
-			    page->read_gen == WT_READGEN_NOTSET)
+			if (page->read_gen == WT_READGEN_NOTSET) {
+				if (evict_soon)
+					__wt_page_evict_soon(page);
+				else
+					__wt_cache_read_gen_new(session, page);
+			} else if (!LF_ISSET(WT_READ_NO_GEN))
 				__wt_cache_read_gen_bump(session, page);
 skip_evict:
 			/*

@@ -890,7 +890,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
-	uint64_t cutoff;
+	uint64_t cutoff, read_gen_oldest;
 	uint32_t candidates, entries;
 
 	cache = S2C(session)->cache;
@@ -931,31 +931,62 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		return (0);
 	}
 
-	WT_ASSERT(session, cache->evict_queue[0].ref != NULL);
-
+	/* Decide how many of the candidates we're going to try and evict. */
 	if (FLD_ISSET(cache->state,
-	    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK))
+	    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK)) {
 		/*
 		 * Take all candidates if we only gathered pages with an oldest
 		 * read generation set.
 		 */
 		cache->evict_candidates = entries;
-	else {
-		/* Find the bottom 25% of read generations. */
-		cutoff = (3 * __evict_read_gen(&cache->evict_queue[0]) +
-		    __evict_read_gen(&cache->evict_queue[entries - 1])) / 4;
+	} else {
 		/*
-		 * Don't take less than 10% or more than 50% of entries,
-		 * regardless.  That said, if there is only one entry, which is
-		 * normal when populating an empty file, don't exclude it.
+		 * Find the oldest read generation we have in the queue, used
+		 * to set the initial value for pages read into the system.
+		 * The queue is sorted, find the first "normal" generation.
 		 */
-		for (candidates = 1 + entries / 10;
-		    candidates < entries / 2;
-		    candidates++)
-			if (__evict_read_gen(
-			    &cache->evict_queue[candidates]) > cutoff)
+		read_gen_oldest = WT_READGEN_OLDEST;
+		for (candidates = 0; candidates < entries; ++candidates) {
+			read_gen_oldest =
+			    __evict_read_gen(&cache->evict_queue[candidates]);
+			if (read_gen_oldest != WT_READGEN_OLDEST)
 				break;
-		cache->evict_candidates = candidates;
+		}
+
+		/*
+		 * Take all candidates if we only gathered pages with an oldest
+		 * read generation set.
+		 *
+		 * We normally never take more than 50% of the entries; if 50%
+		 * of the entries were at the oldest read generation, take them.
+		 */
+		if (read_gen_oldest == WT_READGEN_OLDEST)
+			cache->evict_candidates = entries;
+		else if (candidates >= entries / 2)
+			cache->evict_candidates = candidates;
+		else {
+			/* Save the calculated oldest generation. */
+			cache->read_gen_oldest = read_gen_oldest;
+
+			/* Find the bottom 25% of read generations. */
+			cutoff =
+			    (3 * read_gen_oldest + __evict_read_gen(
+			    &cache->evict_queue[entries - 1])) / 4;
+
+			/*
+			 * Don't take less than 10% or more than 50% of entries,
+			 * regardless. That said, if there is only one entry,
+			 * which is normal when populating an empty file, don't
+			 * exclude it.
+			 */
+			for (candidates = 1 + entries / 10;
+			    candidates < entries / 2;
+			    candidates++)
+				if (__evict_read_gen(
+				    &cache->evict_queue[candidates]) > cutoff)
+					break;
+			cache->evict_candidates = candidates;
+		}
 	}
 
 	cache->evict_current = cache->evict_queue;
@@ -1291,7 +1322,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 * generation.
 		 */
 		if (page->read_gen == WT_READGEN_NOTSET) {
-			__wt_cache_read_gen_bump(session, page);
+			__wt_cache_read_gen_new(session, page);
 			continue;
 		}
 
