@@ -486,6 +486,15 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				WT_RET(__wt_cache_eviction_check(
 				    session, 1, NULL));
 			WT_RET(__page_read(session, ref));
+
+			/*
+			 * If configured to not trash the cache, leave the page
+			 * generation unset, we'll set it before returning to
+			 * the oldest read generation, so the page is forcibly
+			 * evicted as soon as possible. We don't do that set
+			 * here because we don't want to evict the page before
+			 * we "acquire" it.
+			 */
 			evict_soon = LF_ISSET(WT_READ_WONT_NEED) ||
 			    F_ISSET(session, WT_SESSION_NO_CACHE);
 			continue;
