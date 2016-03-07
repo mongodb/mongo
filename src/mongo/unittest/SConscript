@@ -47,3 +47,13 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
 )
+
+env.Library(
+    target='task_executor_proxy',
+    source=[
+        'task_executor_proxy.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+    ],
+)

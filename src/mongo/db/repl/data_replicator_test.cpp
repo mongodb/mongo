@@ -190,9 +190,9 @@ protected:
             return _rollbackFn(txn, lastOpTimeWritten, syncSource);
         };
 
-        options.prepareReplSetUpdatePositionCommandFn = []() -> StatusWith<BSONObj> {
-            return BSON(UpdatePositionArgs::kCommandFieldName << 1);
-        };
+        options.prepareReplSetUpdatePositionCommandFn =
+            [](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle)
+                -> StatusWith<BSONObj> { return BSON(UpdatePositionArgs::kCommandFieldName << 1); };
         options.getMyLastOptime = [this]() { return _myLastOpTime; };
         options.setMyLastOptime = [this](const OpTime& opTime) { _setMyLastOptime(opTime); };
         options.setFollowerMode = [this](const MemberState& state) {
@@ -1006,15 +1006,20 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
 
     // Ensure that we send position information upstream after completing batch.
     net->enterNetwork();
-    ASSERT_TRUE(net->hasReadyRequests());
-    {
+    bool found = false;
+    while (net->hasReadyRequests()) {
         auto networkRequest = net->getNextReadyRequest();
         auto commandRequest = networkRequest->getRequest();
-        ASSERT_EQUALS("admin", commandRequest.dbname);
         const auto& cmdObj = commandRequest.cmdObj;
-        ASSERT_EQUALS(std::string(UpdatePositionArgs::kCommandFieldName),
-                      cmdObj.firstElementFieldName());
+        if (str::equals(cmdObj.firstElementFieldName(), UpdatePositionArgs::kCommandFieldName) &&
+            commandRequest.dbname == "admin") {
+            found = true;
+            break;
+        } else {
+            net->blackHole(networkRequest);
+        }
     }
+    ASSERT_TRUE(found);
 }
 
 }  // namespace

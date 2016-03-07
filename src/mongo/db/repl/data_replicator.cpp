@@ -719,9 +719,9 @@ TimestampStatus DataReplicator::initialSync() {
 
     _setState_inlock(DataReplicatorState::InitialSync);
 
-    // The reporter is paused for the duration of the initial sync, so cancel just in case.
+    // The reporter is paused for the duration of the initial sync, so shut down just in case.
     if (_reporter) {
-        _reporter->cancel();
+        _reporter->shutdown();
     }
     _reporterPaused = true;
     _applierPaused = true;
@@ -892,7 +892,7 @@ void DataReplicator::_cancelAllHandles_inlock() {
     if (_applier)
         _applier->cancel();
     if (_reporter)
-        _reporter->cancel();
+        _reporter->shutdown();
     if (_initialSyncState && _initialSyncState->dbsCloner.isActive())
         _initialSyncState->dbsCloner.cancel();
 }
@@ -903,7 +903,7 @@ void DataReplicator::_waitOnAll_inlock() {
     if (_applier)
         _applier->wait();
     if (_reporter)
-        _reporter->wait();
+        _reporter->join();
     if (_initialSyncState)
         _initialSyncState->dbsCloner.wait();
 }
@@ -1017,9 +1017,11 @@ void DataReplicator::_doNextActions_Steady_inlock() {
         _scheduleApplyBatch_inlock();
     }
 
-    if (!_reporterPaused && (!_reporter || !_reporter->getStatus().isOK())) {
-        _reporter.reset(
-            new Reporter(_exec, _opts.prepareReplSetUpdatePositionCommandFn, _syncSource));
+    // TODO(benety): Initialize from replica set config election timeout / 2.
+    Milliseconds keepAliveInterval(1000);
+    if (!_reporterPaused && (!_reporter || !_reporter->isActive()) && !_syncSource.empty()) {
+        _reporter.reset(new Reporter(
+            _exec, _opts.prepareReplSetUpdatePositionCommandFn, _syncSource, keepAliveInterval));
     }
 }
 
