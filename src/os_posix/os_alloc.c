@@ -159,30 +159,36 @@ __wt_realloc(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_realloc_item --
- *	Allocate or reallocate memory for a WT_ITEM, optionally aligning to
- * buffer boundaries (configured with "buffer_alignment" to wiredtiger_open).
+ * __wt_realloc_noclear --
+ *	WiredTiger's realloc API, not clearing allocated memory.
  */
 int
-__wt_realloc_item(
-    WT_SESSION_IMPL *session, WT_ITEM *buf, size_t bytes_to_allocate)
+__wt_realloc_noclear(WT_SESSION_IMPL *session,
+    size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
-	size_t *bytes_allocated_ret;
-	void *retp;
+	return (__realloc_func(
+	    session, bytes_allocated_ret, bytes_to_allocate, false, retp));
+}
 
-	bytes_allocated_ret = &buf->memsize;
-	retp = &buf->mem;
-
+/*
+ * __wt_realloc_aligned --
+ *	ANSI realloc function that aligns to buffer boundaries, configured with
+ * the "buffer_alignment" key to wiredtiger_open.
+ */
+int
+__wt_realloc_aligned(WT_SESSION_IMPL *session,
+    size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
+{
 #if defined(HAVE_POSIX_MEMALIGN)
+	WT_DECL_RET;
+
 	/*
 	 * !!!
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
-	if (F_ISSET(buf, WT_ITEM_ALIGNED) &&
-	    session != NULL && S2C(session)->buffer_alignment > 0) {
-		WT_DECL_RET;
-		size_t bytes_allocated;
+	if (session != NULL && S2C(session)->buffer_alignment > 0) {
 		void *p, *newp;
+		size_t bytes_allocated;
 
 		/*
 		 * Sometimes we're allocating memory and we don't care about the
