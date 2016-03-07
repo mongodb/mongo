@@ -806,6 +806,7 @@ nfilename
 nhex
 nlpo
 nocase
+noclear
 nocrypto
 nolock
 nonliteral
