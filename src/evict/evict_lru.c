@@ -159,7 +159,7 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 		    bytes_max / WT_MEGABYTE));
 	}
 
-	return (__wt_cond_signal(session, cache->evict_cond));
+	return (__wt_cond_auto_signal(session, cache->evict_cond));
 }
 
 /*

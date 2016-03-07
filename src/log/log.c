@@ -29,7 +29,7 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 	log = conn->log;
 	log->ckpt_lsn = *ckp_lsn;
 	if (conn->log_cond != NULL)
-		WT_RET(__wt_cond_signal(session, conn->log_cond));
+		WT_RET(__wt_cond_auto_signal(session, conn->log_cond));
 	return (0);
 }
 
@@ -824,7 +824,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 		if (create_log) {
 			WT_STAT_FAST_CONN_INCR(session, log_prealloc_missed);
 			if (conn->log_cond != NULL)
-				WT_RET(__wt_cond_signal(
+				WT_RET(__wt_cond_auto_signal(
 				    session, conn->log_cond));
 		}
 	}
@@ -1338,7 +1338,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		 */
 		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
 			__wt_spin_unlock(session, &log->log_slot_lock);
-		WT_ERR(__wt_cond_signal(session, conn->log_wrlsn_cond));
+		WT_ERR(__wt_cond_auto_signal(session, conn->log_wrlsn_cond));
 		if (++yield_count < WT_THOUSAND)
 			__wt_yield();
 		else
@@ -2009,7 +2009,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 * XXX I've seen times when conditions are NULL.
 		 */
 		if (conn->log_cond != NULL) {
-			WT_ERR(__wt_cond_signal(session, conn->log_cond));
+			WT_ERR(__wt_cond_auto_signal(session, conn->log_cond));
 			__wt_yield();
 		} else
 			WT_ERR(__wt_log_force_write(session, 1, NULL));

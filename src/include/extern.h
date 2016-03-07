@@ -638,6 +638,7 @@ extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_cksum_init(void);
 extern int __wt_cond_auto_alloc( WT_SESSION_IMPL *session, const char *name, bool is_signalled, uint64_t min, uint64_t max, WT_CONDVAR **condp);
+extern int __wt_cond_auto_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_auto_wait_signal( WT_SESSION_IMPL *session, WT_CONDVAR *cond, bool progress, bool *signalled);
 extern int __wt_cond_auto_wait( WT_SESSION_IMPL *session, WT_CONDVAR *cond, bool progress);
 extern int __wt_cond_auto_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);

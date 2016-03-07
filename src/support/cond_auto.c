@@ -55,6 +55,18 @@ __wt_cond_auto_alloc(
 }
 
 /*
+ * __wt_cond_auto_signal --
+ *	Signal a condition variable.
+ */
+int
+__wt_cond_auto_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
+{
+
+	WT_ASSERT(session, cond->min_wait != 0);
+	return (__wt_cond_signal(session, cond));
+}
+
+/*
  * __wt_cond_auto_wait_signal --
  *	Wait on a mutex, optionally timing out.  If we get it before the time
  *	out period expires, let the caller know.
