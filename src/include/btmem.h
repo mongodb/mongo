@@ -598,9 +598,14 @@ struct __wt_page {
 	 * read generation is incremented by the eviction server each time it
 	 * becomes active.  To avoid incrementing a page's read generation too
 	 * frequently, it is set to a future point.
+	 *
+	 * Because low read generation values have special meaning, and there
+	 * are places where we manipulate the value, use an initial value well
+	 * outside of the special range.
 	 */
 #define	WT_READGEN_NOTSET	0
 #define	WT_READGEN_OLDEST	1
+#define	WT_READGEN_START_VALUE	100
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
 
