@@ -142,6 +142,8 @@ __logmgr_config(
 	}
 
 	WT_RET(__logmgr_sync_cfg(session, cfg));
+	if (conn->log_cond != NULL)
+		WT_RET(__wt_cond_auto_signal(session, conn->log_cond));
 	return (0);
 }
 
@@ -729,11 +731,12 @@ err:		__wt_err(session, ret, "log wrlsn server error");
 static WT_THREAD_RET
 __log_server(void *arg)
 {
+	struct timespec start, now;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	int freq_per_sec;
+	uint64_t timediff;
 	bool did_work, locked, signalled;
 
 	session = arg;
@@ -742,11 +745,10 @@ __log_server(void *arg)
 	locked = signalled = false;
 
 	/*
-	 * Set this to the number of times per second we want to force out the
-	 * log slot buffer.
+	 * Set this to the number of milliseconds we want to run archive and
+	 * pre-allocation.  Start it so that we run on the first time through.
 	 */
-#define	WT_FORCE_PER_SECOND	20
-	freq_per_sec = WT_FORCE_PER_SECOND;
+	timediff = WT_THOUSAND;
 
 	/*
 	 * The log server thread does a variety of work.  It forces out any
@@ -775,8 +777,7 @@ __log_server(void *arg)
 		 * we want to force out log buffers.  Only do it once per second
 		 * or if the condition was signalled.
 		 */
-		if (--freq_per_sec <= 0 || signalled) {
-			freq_per_sec = WT_FORCE_PER_SECOND;
+		if (timediff >= WT_THOUSAND || signalled) {
 
 			/*
 			 * Perform log pre-allocation.
@@ -817,8 +818,12 @@ __log_server(void *arg)
 		}
 
 		/* Wait until the next event. */
+
+		WT_ERR(__wt_epoch(session, &start));
 		WT_ERR(__wt_cond_auto_wait_signal(session, conn->log_cond,
 		    did_work || signalled, &signalled));
+		WT_ERR(__wt_epoch(session, &now));
+		timediff = WT_TIMEDIFF_MS(now, start);
 	}
 
 	if (0) {
