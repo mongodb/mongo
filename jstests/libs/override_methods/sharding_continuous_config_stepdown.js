@@ -74,7 +74,7 @@ ReplSetTest = function ReplSetTestWithContinuousPrimaryStepdown() {
                 assert.throws(function() {
                     var result = primary.adminCommand({
                         replSetStepDown: stepdownDelaySeconds,
-                        secondaryCatchUpPeriodSecs: stepdownDelaySeconds });
+                        force: true });
                     print('replSetStepDown command did not throw and returned: ' + tojson(result));
 
                     // The call to replSetStepDown should never succeed
