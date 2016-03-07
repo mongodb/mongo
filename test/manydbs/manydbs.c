@@ -49,7 +49,7 @@ static const char *progname;		/* Program name */
 #define	ENV_CONFIG						\
     "create,log=(file_max=10M,archive=false,enabled),"
 
-#define	MAX_CPU	1.0
+#define	MAX_CPU	10.0
 #define	MAX_DBS	10
 
 static void
@@ -69,7 +69,7 @@ main(int argc, char *argv[])
 {
 	FILE *fp;
 	WT_CONNECTION **conn;
-	float cpu;
+	float cpu, max;
 	int ch;
 	u_int dbs, i;
 	const char *working_dir;
@@ -81,8 +81,12 @@ main(int argc, char *argv[])
 		++progname;
 	dbs = MAX_DBS;
 	working_dir = HOME_BASE;
-	while ((ch = __wt_getopt(progname, argc, argv, "D:h:")) != EOF)
+	max = MAX_CPU;
+	while ((ch = __wt_getopt(progname, argc, argv, "C:D:h:")) != EOF)
 		switch (ch) {
+		case 'C':
+			max = (float)atof(__wt_optarg);
+			break;
 		case 'D':
 			dbs = (u_int)atoi(__wt_optarg);
 			break;
@@ -118,8 +122,8 @@ main(int argc, char *argv[])
 	if ((fp = popen(cmd, "r")) == NULL)
 		testutil_die(errno, "popen");
 	fscanf(fp, "%f", &cpu);
-	if (cpu > MAX_CPU) {
-		fprintf(stderr, "CPU usage: %f, max %f\n", cpu, MAX_CPU);
+	if (cpu > max) {
+		fprintf(stderr, "CPU usage: %f, max %f\n", cpu, max);
 		testutil_die(ERANGE, "CPU Usage");
 	}
 	if (pclose(fp) != 0)
