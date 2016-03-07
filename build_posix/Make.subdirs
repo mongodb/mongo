@@ -30,6 +30,7 @@ test/cursor_order
 test/fops
 test/format
 test/huge
+test/manydbs
 test/packing
 test/readonly
 test/recovery
