@@ -570,7 +570,12 @@ public:
             }
         }
 
-        if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
+        if (PlanExecutor::DEAD == state) {
+            errmsg = "Executor error while scanning for documents belonging to chunk.";
+            return false;
+        }
+
+        if (PlanExecutor::FAILURE == state) {
             errmsg = "Executor error while scanning for documents belonging to chunk: " +
                 WorkingSetCommon::toStatusString(obj);
             return false;
