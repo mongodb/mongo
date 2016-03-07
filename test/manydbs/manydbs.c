@@ -119,15 +119,17 @@ main(int argc, char *argv[])
 	sleep(10);
 	(void)snprintf(cmd, sizeof(cmd),
 	    "ps -p %lu -o pcpu=", (unsigned long)getpid());
-	if ((fp = popen(cmd, "r")) == NULL)
-		testutil_die(errno, "popen");
-	fscanf(fp, "%f", &cpu);
-	if (cpu > max) {
-		fprintf(stderr, "CPU usage: %f, max %f\n", cpu, max);
-		testutil_die(ERANGE, "CPU Usage");
+	for (i = 0; i < 30; i += 5) {
+		if ((fp = popen(cmd, "r")) == NULL)
+			testutil_die(errno, "popen");
+		fscanf(fp, "%f", &cpu);
+		if (cpu > max) {
+			fprintf(stderr, "CPU usage: %f, max %f\n", cpu, max);
+			testutil_die(ERANGE, "CPU Usage");
+		}
+		if (pclose(fp) != 0)
+			testutil_die(errno, "pclose");
 	}
-	if (pclose(fp) != 0)
-		testutil_die(errno, "pclose");
 
 	for (i = 0; i < dbs; ++i)
 		testutil_check(conn[i]->close(conn[i], NULL));
