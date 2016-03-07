@@ -16,12 +16,13 @@
         assert.writeOK(st.s.getDB('test').foo.insert({_id: i}));
     }
 
+    assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
     st.ensurePrimaryShard('test', 'shard0000');
 
-    st.adminCommand({enableSharding: 'test'});
-    st.adminCommand({shardCollection: 'test.foo', key: {_id: 1}});
-    st.adminCommand({split: 'test.foo', find: {_id: 50}});
-    st.adminCommand({moveChunk: 'test.foo', find: {_id: 75}, to: 'shard0001'});
+    assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.foo', key: {_id: 1}}));
+    assert.commandWorked(st.s0.adminCommand({split: 'test.foo', find: {_id: 50}}));
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: 'test.foo', find: {_id: 75}, to: 'shard0001'}));
 
     // Make sure the pre-existing mongos already has the routing information loaded into memory
     assert.eq(100, st.s.getDB('test').foo.find().itcount());
@@ -54,6 +55,9 @@
     for (var i = 0; i < st._configServers.length; i++) {
         st.restartConfigServer(i);
     }
+
+    // TODO: SERVER-23192 - restart mongos because it has deemend the CSRS config server set as unusable
+    st.restartMongos(0);
 
     jsTestLog("Queries against the original mongos should work again");
     assert.eq(100, st.s.getDB('test').foo.find().itcount());

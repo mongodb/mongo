@@ -425,14 +425,6 @@ void ShardingState::mergeChunks(OperationContext* txn,
     it->second->setMetadata(std::move(cloned));
 }
 
-bool ShardingState::inCriticalMigrateSection() {
-    return _migrationSourceManager.getInCriticalSection();
-}
-
-bool ShardingState::waitTillNotInCriticalSection(int maxSecondsToWait) {
-    return _migrationSourceManager.waitTillNotInCriticalSection(maxSecondsToWait);
-}
-
 void ShardingState::resetMetadata(const string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -441,46 +433,44 @@ void ShardingState::resetMetadata(const string& ns) {
     _collections.erase(ns);
 }
 
-Status ShardingState::refreshMetadataIfNeeded(OperationContext* txn,
-                                              const string& ns,
-                                              const ChunkVersion& reqShardVersion,
-                                              ChunkVersion* latestShardVersion) {
-    // The _configServerTickets serializes this process such that only a small number of threads
-    // can try to refresh at the same time.
+Status ShardingState::onStaleShardVersion(OperationContext* txn,
+                                          const NamespaceString& nss,
+                                          const ChunkVersion& expectedVersion) {
+    invariant(!txn->lockState()->isLocked());
+    invariant(enabled());
 
-    LOG(2) << "metadata refresh requested for " << ns << " at shard version " << reqShardVersion;
+    LOG(2) << "metadata refresh requested for " << nss.ns() << " at shard version "
+           << expectedVersion;
 
-    //
-    // Queuing of refresh requests starts here when remote reload is needed. This may take time.
-    // TODO: Explicitly expose the queuing discipline.
-    //
+    // Ensure any ongoing migrations have completed
+    auto& oss = OperationShardingState::get(txn);
+    oss.waitForMigrationCriticalSection(txn);
 
+    ChunkVersion collectionShardVersion;
+
+    // Fast path - check if the requested version is at a higher version than the current metadata
+    // version or a different epoch before verifying against config server.
+    {
+        AutoGetCollection autoColl(txn, nss, MODE_IS);
+
+        shared_ptr<CollectionMetadata> storedMetadata =
+            CollectionShardingState::get(txn, nss)->getMetadata();
+        if (storedMetadata) {
+            collectionShardVersion = storedMetadata->getShardVersion();
+        }
+
+        if (collectionShardVersion >= expectedVersion &&
+            collectionShardVersion.epoch() == expectedVersion.epoch()) {
+            // Don't need to remotely reload if we're in the same epoch and the requested version is
+            // smaller than the one we know about. This means that the remote side is behind.
+            return Status::OK();
+        }
+    }
+
+    // The _configServerTickets serializes this process such that only a small number of threads can
+    // try to refresh at the same time
     _configServerTickets.waitForTicket();
     TicketHolderReleaser needTicketFrom(&_configServerTickets);
-
-    //
-    // Fast path - check if the requested version is at a higher version than the current
-    // metadata version or a different epoch before verifying against config server.
-    //
-
-    shared_ptr<CollectionMetadata> storedMetadata;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        CollectionShardingStateMap::iterator it = _collections.find(ns);
-        if (it != _collections.end())
-            storedMetadata = it->second->getMetadata();
-    }
-
-    ChunkVersion storedShardVersion;
-    if (storedMetadata)
-        storedShardVersion = storedMetadata->getShardVersion();
-    *latestShardVersion = storedShardVersion;
-
-    if (storedShardVersion >= reqShardVersion &&
-        storedShardVersion.epoch() == reqShardVersion.epoch()) {
-        // Don't need to remotely reload if we're in the same epoch with a >= version
-        return Status::OK();
-    }
 
     //
     // Slow path - remotely reload
@@ -491,19 +481,20 @@ Status ShardingState::refreshMetadataIfNeeded(OperationContext* txn,
     // C) Dropping a collection, notified (currently) by mongos.
     // D) Stale client wants to reload metadata with a different *epoch*, so we aren't sure.
 
-    if (storedShardVersion.epoch() != reqShardVersion.epoch()) {
+    if (collectionShardVersion.epoch() != expectedVersion.epoch()) {
         // Need to remotely reload if our epochs aren't the same, to verify
-        LOG(1) << "metadata change requested for " << ns << ", from shard version "
-               << storedShardVersion << " to " << reqShardVersion
+        LOG(1) << "metadata change requested for " << nss.ns() << ", from shard version "
+               << collectionShardVersion << " to " << expectedVersion
                << ", need to verify with config server";
     } else {
         // Need to remotely reload since our epochs aren't the same but our version is greater
-        LOG(1) << "metadata version update requested for " << ns << ", from shard version "
-               << storedShardVersion << " to " << reqShardVersion
+        LOG(1) << "metadata version update requested for " << nss.ns() << ", from shard version "
+               << collectionShardVersion << " to " << expectedVersion
                << ", need to verify with config server";
     }
 
-    return _refreshMetadata(txn, ns, reqShardVersion, true, latestShardVersion);
+    ChunkVersion unusedLatestShardVersion;
+    return _refreshMetadata(txn, nss.ns(), expectedVersion, true, &unusedLatestShardVersion);
 }
 
 Status ShardingState::refreshMetadataNow(OperationContext* txn,

@@ -49,6 +49,8 @@ class MigrationSourceManager {
     MONGO_DISALLOW_COPYING(MigrationSourceManager);
 
 public:
+    class CriticalSectionState;
+
     MigrationSourceManager();
     ~MigrationSourceManager();
 
@@ -127,17 +129,11 @@ public:
 
     long long mbUsed() const;
 
-    bool getInCriticalSection() const;
-
     void setInCriticalSection(bool inCritSec);
 
-    /**
-     * Blocks until the "in critical section" state changes and returns true if we are NOT in the
-     * critical section
-     */
-    bool waitTillNotInCriticalSection(int maxSecondsToWait);
-
     bool isActive() const;
+
+    std::shared_ptr<CriticalSectionState> getMigrationCriticalSection();
 
 private:
     friend class LogOpForShardingHandler;
@@ -175,11 +171,6 @@ private:
 
     mutable stdx::mutex _mutex;
 
-    stdx::condition_variable _inCriticalSectionCV;  // (M)
-
-    // Is migration currently in critical section. This can be used to block new writes.
-    bool _inCriticalSection{false};  // (M)
-
     std::unique_ptr<PlanExecutor> _deleteNotifyExec;  // (M)
 
     // List of _id of documents that were modified that must be re-cloned.
@@ -203,6 +194,42 @@ private:
 
     // List of record id that needs to be transferred from here to the other side.
     std::set<RecordId> _cloneLocs;  // (C)
+
+    // This value is set when setInCriticalSection is called with true argument and is signalled and
+    // cleared when it is called with false argument.
+    std::shared_ptr<CriticalSectionState> _critSec;
+};
+
+/**
+ * This object is instantiated once the migration logic enters critical section. It contains all
+ * the state which is associated with being in a critical section, such as the bumped metadata
+ * version (which has not yet been reflected on the config server).
+ */
+class MigrationSourceManager::CriticalSectionState {
+    MONGO_DISALLOW_COPYING(CriticalSectionState);
+
+public:
+    CriticalSectionState();
+
+    /**
+     * Blocks until the critical section completes. Returns true if the wait succeeded and the
+     * critical section is no longer active, or false if the waitTimeout was exceeded.
+     */
+    bool waitUntilOutOfCriticalSection(Microseconds waitTimeout);
+
+    /**
+     * To be called when the critical section has completed. Signals any threads sitting blocked in
+     * waitUntilOutOfCriticalSection. Must only be used once for the lifetime of this object.
+     */
+    void exitCriticalSection();
+
+private:
+    // Only moves from true to false once. Happens under the critical section mutex and the critical
+    // section will be signalled.
+    bool _inCriticalSection{true};
+
+    stdx::mutex _criticalSectionMutex;
+    stdx::condition_variable _criticalSectionCV;
 };
 
 }  // namespace mongo

@@ -21,7 +21,7 @@
 
     num = 0;
 
-    counts = {};
+    var counts = {};
 
     //
     // TODO: Rewrite to make much clearer.
@@ -38,10 +38,11 @@
         var up = {
             $inc: {x: 1}
         };
-        if (includeString)
+        if (includeString) {
             up["$set"] = {
                 s: bigString
             };
+        }
         var myid = optionalId == undefined ? Random.randInt(N) : optionalId;
         bulk.find({_id: myid}).upsert().update(up);
 

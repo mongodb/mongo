@@ -48,6 +48,7 @@
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/log.h"
 
@@ -209,8 +210,11 @@ void MigrationSourceManager::done(OperationContext* txn) {
 
     _sessionId = boost::none;
     _deleteNotifyExec.reset(NULL);
-    _inCriticalSection = false;
-    _inCriticalSectionCV.notify_all();
+
+    if (_critSec) {
+        _critSec->exitCriticalSection();
+        _critSec = nullptr;
+    }
 
     _deleted.clear();
     _reload.clear();
@@ -577,30 +581,23 @@ long long MigrationSourceManager::mbUsed() const {
     return _memoryUsed / (1024 * 1024);
 }
 
-bool MigrationSourceManager::getInCriticalSection() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _inCriticalSection;
-}
-
 void MigrationSourceManager::setInCriticalSection(bool inCritSec) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _inCriticalSection = inCritSec;
-    _inCriticalSectionCV.notify_all();
+
+    if (inCritSec) {
+        invariant(!_critSec);
+        _critSec = std::make_shared<CriticalSectionState>();
+    } else {
+        invariant(_critSec);
+        _critSec->exitCriticalSection();
+        _critSec = nullptr;
+    }
 }
 
-bool MigrationSourceManager::waitTillNotInCriticalSection(int maxSecondsToWait) {
-    const auto deadline = stdx::chrono::system_clock::now() + Seconds(maxSecondsToWait);
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    while (_inCriticalSection) {
-        log() << "Waiting for " << maxSecondsToWait
-              << " seconds for the migration critical section to end";
-
-        if (stdx::cv_status::timeout == _inCriticalSectionCV.wait_until(lk, deadline)) {
-            return false;
-        }
-    }
-
-    return true;
+std::shared_ptr<MigrationSourceManager::CriticalSectionState>
+MigrationSourceManager::getMigrationCriticalSection() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _critSec;
 }
 
 bool MigrationSourceManager::isActive() const {
@@ -647,6 +644,28 @@ void MigrationSourceManager::_xfer(OperationContext* txn,
 NamespaceString MigrationSourceManager::_getNS() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _nss;
+}
+
+MigrationSourceManager::CriticalSectionState::CriticalSectionState() = default;
+
+bool MigrationSourceManager::CriticalSectionState::waitUntilOutOfCriticalSection(
+    Microseconds waitTimeout) {
+    const auto waitDeadline = stdx::chrono::system_clock::now() + waitTimeout;
+
+    stdx::unique_lock<stdx::mutex> sl(_criticalSectionMutex);
+    while (_inCriticalSection) {
+        if (stdx::cv_status::timeout == _criticalSectionCV.wait_until(sl, waitDeadline)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void MigrationSourceManager::CriticalSectionState::exitCriticalSection() {
+    stdx::unique_lock<stdx::mutex> sl(_criticalSectionMutex);
+    _inCriticalSection = false;
+    _criticalSectionCV.notify_all();
 }
 
 }  // namespace mongo

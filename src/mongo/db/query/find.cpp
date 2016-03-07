@@ -51,7 +51,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
@@ -553,11 +553,6 @@ std::string runQuery(OperationContext* txn,
         return "";
     }
 
-    ShardingState* const shardingState = ShardingState::get(txn);
-
-    // We freak out later if this changes before we're done with the query.
-    const ChunkVersion shardingVersionAtStart = shardingState->getVersion(nss.ns());
-
     // Handle query option $maxTimeMS (not used with commands).
     curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
     txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
@@ -583,7 +578,6 @@ std::string runQuery(OperationContext* txn,
 
     BSONObj obj;
     PlanExecutor::ExecState state;
-    // uint64_t numMisplacedDocs = 0;
 
     // Get summary info about which plan the executor is using.
     {
@@ -635,17 +629,10 @@ std::string runQuery(OperationContext* txn,
         uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
     }
 
-    // TODO: Currently, chunk ranges are kept around until all ClientCursors created while the
-    // chunk belonged on this node are gone. Separating chunk lifetime management from
-    // ClientCursor should allow this check to go away.
-    if (!shardingState->getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
-        // if the version changed during the query we might be missing some data and its safe to
-        // send this as mongos can resend at this point
-        throw SendStaleConfigException(nss.ns(),
-                                       "version changed during initial query",
-                                       shardingVersionAtStart,
-                                       shardingState->getVersion(nss.ns()));
-    }
+    // Before saving the cursor, ensure that whatever plan we established happened with the expected
+    // collection version
+    auto css = CollectionShardingState::get(txn, nss);
+    css->checkShardVersionOrThrow(txn);
 
     // Fill out curop based on query results. If we have a cursorid, we will fill out curop with
     // this cursorid later.

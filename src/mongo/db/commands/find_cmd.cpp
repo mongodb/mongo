@@ -49,11 +49,9 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -238,40 +236,12 @@ public:
         }
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        ShardingState* const shardingState = ShardingState::get(txn);
-
-        if (OperationShardingState::get(txn).hasShardVersion() && shardingState->enabled()) {
-            ChunkVersion receivedVersion = OperationShardingState::get(txn).getShardVersion(nss);
-            ChunkVersion latestVersion;
-            // Wait for migration completion to get the correct chunk version.
-            const int maxTimeoutSec = 30;
-            int timeoutSec = cq->getParsed().getMaxTimeMS() / 1000;
-            if (!timeoutSec || timeoutSec > maxTimeoutSec) {
-                timeoutSec = maxTimeoutSec;
-            }
-
-            if (!shardingState->waitTillNotInCriticalSection(timeoutSec)) {
-                uasserted(ErrorCodes::LockTimeout, "Timeout while waiting for migration commit");
-            }
-
-            // If the received version is newer than the version cached in 'shardingState', then we
-            // have to refresh 'shardingState' from the config servers. We do this before acquiring
-            // locks so that we don't hold locks while waiting on the network.
-            uassertStatusOK(shardingState->refreshMetadataIfNeeded(
-                txn, nss.ns(), receivedVersion, &latestVersion));
-        }
-
         // Acquire locks.
         AutoGetCollectionForRead ctx(txn, nss);
         Collection* collection = ctx.getCollection();
 
         const int dbProfilingLevel =
             ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
-
-        // It is possible that the sharding version will change during yield while we are
-        // retrieving a plan executor. If this happens we will throw an error and mongos will
-        // retry.
-        const ChunkVersion shardingVersionAtStart = shardingState->getVersion(nss.ns());
 
         // Get the execution plan for the query.
         auto statusWithPlanExecutor =
@@ -325,17 +295,10 @@ public:
                                                   << WorkingSetCommon::toStatusString(obj)));
         }
 
-        // TODO: Currently, chunk ranges are kept around until all ClientCursors created while the
-        // chunk belonged on this node are gone. Separating chunk lifetime management from
-        // ClientCursor should allow this check to go away.
-        if (!shardingState->getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
-            // Version changed while retrieving a PlanExecutor. Terminate the operation,
-            // signaling that mongos should retry.
-            throw SendStaleConfigException(nss.ns(),
-                                           "version changed during find command",
-                                           shardingVersionAtStart,
-                                           shardingState->getVersion(nss.ns()));
-        }
+        // Before saving the cursor, ensure that whatever plan we established happened with the
+        // expected collection version
+        auto css = CollectionShardingState::get(txn, nss);
+        css->checkShardVersionOrThrow(txn);
 
         // Set up the cursor for getMore.
         CursorId cursorId = 0;

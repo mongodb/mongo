@@ -102,9 +102,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
     // We have both the DB and collection locked, which is the prerequisite to do a stable shard
     // version check, but we'd like to do the check after we have a satisfactory snapshot.
     auto css = CollectionShardingState::get(txn, nss);
-    if (css) {
-        css->checkShardVersionOrThrow(txn);
-    }
+    css->checkShardVersionOrThrow(txn);
 }
 
 AutoGetCollectionForRead::~AutoGetCollectionForRead() {
@@ -196,9 +194,7 @@ void OldClientContext::_checkNotStale() const {
             break;
         default:
             auto css = CollectionShardingState::get(_txn, _ns);
-            if (css) {
-                css->checkShardVersionOrThrow(_txn);
-            }
+            css->checkShardVersionOrThrow(_txn);
     }
 }
 

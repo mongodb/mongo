@@ -68,6 +68,11 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* txn,
 }
 
 void CollectionShardingState::setMetadata(std::shared_ptr<CollectionMetadata> newMetadata) {
+    if (newMetadata) {
+        invariant(!newMetadata->getCollVersion().isWriteCompatibleWith(ChunkVersion::UNSHARDED()));
+        invariant(!newMetadata->getShardVersion().isWriteCompatibleWith(ChunkVersion::UNSHARDED()));
+    }
+
     _metadata = std::move(newMetadata);
 }
 
@@ -76,6 +81,13 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* txn) co
     ChunkVersion received;
     ChunkVersion wanted;
     if (!_checkShardVersionOk(txn, &errmsg, &received, &wanted)) {
+        // Set migration critical section in case we failed because of migration
+        auto migrationCritSec =
+            ShardingState::get(txn)->migrationSourceManager()->getMigrationCriticalSection();
+        if (migrationCritSec) {
+            OperationShardingState::get(txn).setMigrationCriticalSection(migrationCritSec);
+        }
+
         throw SendStaleConfigException(_nss.ns(),
                                        str::stream() << "[" << _nss.ns()
                                                      << "] shard version not ok: " << errmsg,

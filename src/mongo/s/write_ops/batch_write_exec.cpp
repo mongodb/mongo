@@ -79,12 +79,6 @@ static void noteStaleResponses(const vector<ShardError*>& staleErrors, NSTargete
     }
 }
 
-static bool isShardMetadataChanging(const vector<ShardError*>& staleErrors) {
-    if (!staleErrors.empty() && staleErrors.back()->error.isErrInfoSet())
-        return staleErrors.back()->error.getErrInfo()["inCriticalSection"].trueValue();
-    return false;
-}
-
 // The number of times we'll try to continue a batch op if no progress is being made
 // This only applies when no writes are occurring and metadata is not changing on reload
 static const int kMaxRoundsWithoutProgress(5);
@@ -152,7 +146,6 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
 
         size_t numSent = 0;
         size_t numToSend = childBatches.size();
-        bool remoteMetadataChanging = false;
         while (numSent != numToSend) {
             // Collect batches out on the network, mapped by endpoint
             OwnedHostBatchMap ownedPendingBatches;
@@ -270,11 +263,6 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                         ++stats->numStaleBatches;
                     }
 
-                    // Remember if the shard is actively changing metadata right now
-                    if (isShardMetadataChanging(staleErrors)) {
-                        remoteMetadataChanging = true;
-                    }
-
                     // Remember that we successfully wrote to this shard
                     // NOTE: This will record lastOps for shards where we actually didn't update
                     // or delete any documents, which preserves old behavior but is conservative
@@ -327,7 +315,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
         //
 
         int currCompletedOps = batchOp.numWriteOpsIn(WriteOpState_Completed);
-        if (currCompletedOps == numCompletedOps && !targeterChanged && !remoteMetadataChanging) {
+        if (currCompletedOps == numCompletedOps && !targeterChanged) {
             ++numRoundsWithoutProgress;
         } else {
             numRoundsWithoutProgress = 0;

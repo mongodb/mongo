@@ -681,9 +681,9 @@ public:
             // Mongos >= v3.2 sends the full version, v3.0 only sends the epoch.
             // TODO(SERVER-20742): Stop parsing epoch separately after 3.2.
             OID cmdEpoch;
-            auto& operationVersion = OperationShardingState::get(txn);
-            if (operationVersion.hasShardVersion()) {
-                cmdVersion = operationVersion.getShardVersion(nss);
+            auto& oss = OperationShardingState::get(txn);
+            if (oss.hasShardVersion()) {
+                cmdVersion = oss.getShardVersion(nss);
                 cmdEpoch = cmdVersion.epoch();
             } else {
                 BSONElement epochElem(cmdObj["epoch"]);

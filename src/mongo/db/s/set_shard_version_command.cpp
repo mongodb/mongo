@@ -37,9 +37,12 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/wire_version.h"
@@ -152,157 +155,191 @@ public:
             return false;
         }
 
+        const NamespaceString nss(ns);
+
+        // Backwards compatibility for SERVER-23119
+        if (!nss.isValid()) {
+            warning() << "Invalid namespace used for setShardVersion: " << ns;
+            return true;
+        }
 
         // we can run on a slave up to here
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                nsToDatabase(ns))) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nss.db())) {
             result.append("errmsg", "not master");
             result.append("note", "from post init in setShardVersion");
             return false;
         }
 
         // step 2
-        ChunkVersion version =
+        const ChunkVersion requestedVersion =
             uassertStatusOK(ChunkVersion::parseFromBSONForSetShardVersion(cmdObj));
 
-        // step 3
-        const ChunkVersion oldVersion = info->getVersion(ns);
-        const ChunkVersion globalVersion = shardingState->getVersion(ns);
+        // step 3 - Actual version checking
+        const ChunkVersion connectionVersion = info->getVersion(ns);
+        connectionVersion.addToBSON(result, "oldVersion");
 
-        oldVersion.addToBSON(result, "oldVersion");
+        {
+            // Use a stable collection metadata while performing the checks
+            boost::optional<AutoGetCollection> autoColl;
+            autoColl.emplace(txn, nss, MODE_IS);
 
-        if (version.isWriteCompatibleWith(globalVersion)) {
-            // mongos and mongod agree!
-            if (!oldVersion.isWriteCompatibleWith(version)) {
-                if (oldVersion < globalVersion && oldVersion.hasEqualEpoch(globalVersion)) {
-                    info->setVersion(ns, version);
-                } else if (authoritative) {
-                    // this means there was a drop and our version is reset
-                    info->setVersion(ns, version);
-                } else {
-                    result.append("ns", ns);
+            auto css = CollectionShardingState::get(txn, nss);
+            const ChunkVersion collectionShardVersion =
+                (css->getMetadata() ? css->getMetadata()->getShardVersion()
+                                    : ChunkVersion::UNSHARDED());
+
+            if (requestedVersion.isWriteCompatibleWith(collectionShardVersion)) {
+                // mongos and mongod agree!
+                if (!connectionVersion.isWriteCompatibleWith(requestedVersion)) {
+                    if (connectionVersion < collectionShardVersion &&
+                        connectionVersion.epoch() == collectionShardVersion.epoch()) {
+                        info->setVersion(ns, requestedVersion);
+                    } else if (authoritative) {
+                        // this means there was a drop and our version is reset
+                        info->setVersion(ns, requestedVersion);
+                    } else {
+                        result.append("ns", ns);
+                        result.appendBool("need_authoritative", true);
+                        errmsg = "verifying drop on '" + ns + "'";
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            // step 4
+            // Cases below all either return OR fall-through to remote metadata reload.
+            const bool isDropRequested =
+                !requestedVersion.isSet() && collectionShardVersion.isSet();
+
+            if (isDropRequested) {
+                if (!authoritative) {
                     result.appendBool("need_authoritative", true);
-                    errmsg = "verifying drop on '" + ns + "'";
+                    result.append("ns", ns);
+                    collectionShardVersion.addToBSON(result, "globalVersion");
+                    errmsg = "dropping needs to be authoritative";
                     return false;
                 }
-            }
 
-            return true;
-        }
-
-        // step 4
-        // Cases below all either return OR fall-through to remote metadata reload.
-        const bool isDropRequested = !version.isSet() && globalVersion.isSet();
-
-        if (isDropRequested) {
-            if (!authoritative) {
-                result.appendBool("need_authoritative", true);
-                result.append("ns", ns);
-                globalVersion.addToBSON(result, "globalVersion");
-                errmsg = "dropping needs to be authoritative";
-                return false;
-            }
-
-            // Fall through to metadata reload below
-        } else {
-            // Not Dropping
-
-            // TODO: Refactor all of this
-            if (version < oldVersion && version.hasEqualEpoch(oldVersion)) {
-                errmsg = str::stream() << "this connection already had a newer version "
-                                       << "of collection '" << ns << "'";
-                result.append("ns", ns);
-                version.addToBSON(result, "newVersion");
-                globalVersion.addToBSON(result, "globalVersion");
-                return false;
-            }
-
-            // TODO: Refactor all of this
-            if (version < globalVersion && version.hasEqualEpoch(globalVersion)) {
-                while (shardingState->inCriticalMigrateSection()) {
-                    log() << "waiting till out of critical section";
-                    shardingState->waitTillNotInCriticalSection(10);
-                }
-                errmsg = str::stream() << "shard global version for collection is higher "
-                                       << "than trying to set to '" << ns << "'";
-                result.append("ns", ns);
-                version.addToBSON(result, "version");
-                globalVersion.addToBSON(result, "globalVersion");
-                result.appendBool("reloadConfig", true);
-                return false;
-            }
-
-            if (!globalVersion.isSet() && !authoritative) {
-                // Needed b/c when the last chunk is moved off a shard,
-                // the version gets reset to zero, which should require a reload.
-                while (shardingState->inCriticalMigrateSection()) {
-                    log() << "waiting till out of critical section";
-                    shardingState->waitTillNotInCriticalSection(10);
-                }
-
-                // need authoritative for first look
-                result.append("ns", ns);
-                result.appendBool("need_authoritative", true);
-                errmsg = "first time for collection '" + ns + "'";
-                return false;
-            }
-
-            // Fall through to metadata reload below
-        }
-
-        ChunkVersion currVersion;
-        Status status = shardingState->refreshMetadataIfNeeded(txn, ns, version, &currVersion);
-
-        if (!status.isOK()) {
-            // The reload itself was interrupted or confused here
-
-            errmsg = str::stream() << "could not refresh metadata for " << ns
-                                   << " with requested shard version " << version.toString()
-                                   << ", stored shard version is " << currVersion.toString()
-                                   << causedBy(status.reason());
-
-            warning() << errmsg;
-
-            result.append("ns", ns);
-            version.addToBSON(result, "version");
-            currVersion.addToBSON(result, "globalVersion");
-            result.appendBool("reloadConfig", true);
-
-            return false;
-        } else if (!version.isWriteCompatibleWith(currVersion)) {
-            // We reloaded a version that doesn't match the version mongos was trying to
-            // set.
-
-            errmsg = str::stream() << "requested shard version differs from"
-                                   << " config shard version for " << ns
-                                   << ", requested version is " << version.toString()
-                                   << " but found version " << currVersion.toString();
-
-            OCCASIONALLY warning() << errmsg;
-
-            // WARNING: the exact fields below are important for compatibility with mongos
-            // version reload.
-
-            result.append("ns", ns);
-            currVersion.addToBSON(result, "globalVersion");
-
-            // If this was a reset of a collection or the last chunk moved out, inform mongos to
-            // do a full reload.
-            if (currVersion.epoch() != version.epoch() || !currVersion.isSet()) {
-                result.appendBool("reloadConfig", true);
-                // Zero-version also needed to trigger full mongos reload, sadly
-                // TODO: Make this saner, and less impactful (full reload on last chunk is bad)
-                ChunkVersion(0, 0, OID()).addToBSON(result, "version");
-                // For debugging
-                version.addToBSON(result, "origVersion");
+                // Fall through to metadata reload below
             } else {
-                version.addToBSON(result, "version");
-            }
+                // Not Dropping
 
-            return false;
+                // TODO: Refactor all of this
+                if (requestedVersion < connectionVersion &&
+                    requestedVersion.epoch() == connectionVersion.epoch()) {
+                    errmsg = str::stream() << "this connection already had a newer version "
+                                           << "of collection '" << ns << "'";
+                    result.append("ns", ns);
+                    requestedVersion.addToBSON(result, "newVersion");
+                    collectionShardVersion.addToBSON(result, "globalVersion");
+                    return false;
+                }
+
+                // TODO: Refactor all of this
+                if (requestedVersion < collectionShardVersion &&
+                    requestedVersion.epoch() == collectionShardVersion.epoch()) {
+                    auto critSec =
+                        shardingState->migrationSourceManager()->getMigrationCriticalSection();
+                    if (critSec) {
+                        autoColl.reset();
+                        log() << "waiting till out of critical section";
+                        critSec->waitUntilOutOfCriticalSection(Seconds(10));
+                    }
+
+                    errmsg = str::stream() << "shard global version for collection is higher "
+                                           << "than trying to set to '" << ns << "'";
+                    result.append("ns", ns);
+                    requestedVersion.addToBSON(result, "version");
+                    collectionShardVersion.addToBSON(result, "globalVersion");
+                    result.appendBool("reloadConfig", true);
+                    return false;
+                }
+
+                if (!collectionShardVersion.isSet() && !authoritative) {
+                    // Needed b/c when the last chunk is moved off a shard, the version gets reset
+                    // to zero, which should require a reload.
+                    auto critSec =
+                        shardingState->migrationSourceManager()->getMigrationCriticalSection();
+                    if (critSec) {
+                        autoColl.reset();
+                        log() << "waiting till out of critical section";
+                        critSec->waitUntilOutOfCriticalSection(Seconds(10));
+                    }
+
+                    // need authoritative for first look
+                    result.append("ns", ns);
+                    result.appendBool("need_authoritative", true);
+                    errmsg = "first time for collection '" + ns + "'";
+                    return false;
+                }
+
+                // Fall through to metadata reload below
+            }
         }
 
-        info->setVersion(ns, version);
+        Status status = shardingState->onStaleShardVersion(txn, nss, requestedVersion);
+
+        {
+            AutoGetCollection autoColl(txn, nss, MODE_IS);
+
+            ChunkVersion currVersion = ChunkVersion::UNSHARDED();
+            auto collMetadata = CollectionShardingState::get(txn, nss)->getMetadata();
+            if (collMetadata) {
+                currVersion = collMetadata->getShardVersion();
+            }
+
+            if (!status.isOK()) {
+                // The reload itself was interrupted or confused here
+
+                errmsg = str::stream()
+                    << "could not refresh metadata for " << ns << " with requested shard version "
+                    << requestedVersion.toString() << ", stored shard version is "
+                    << currVersion.toString() << causedBy(status.reason());
+
+                warning() << errmsg;
+
+                result.append("ns", ns);
+                requestedVersion.addToBSON(result, "version");
+                currVersion.addToBSON(result, "globalVersion");
+                result.appendBool("reloadConfig", true);
+
+                return false;
+            } else if (!requestedVersion.isWriteCompatibleWith(currVersion)) {
+                // We reloaded a version that doesn't match the version mongos was trying to
+                // set.
+                errmsg = str::stream() << "requested shard version differs from"
+                                       << " config shard version for " << ns
+                                       << ", requested version is " << requestedVersion.toString()
+                                       << " but found version " << currVersion.toString();
+
+                OCCASIONALLY warning() << errmsg;
+
+                // WARNING: the exact fields below are important for compatibility with mongos
+                // version reload.
+
+                result.append("ns", ns);
+                currVersion.addToBSON(result, "globalVersion");
+
+                // If this was a reset of a collection or the last chunk moved out, inform mongos to
+                // do a full reload.
+                if (currVersion.epoch() != requestedVersion.epoch() || !currVersion.isSet()) {
+                    result.appendBool("reloadConfig", true);
+                    // Zero-version also needed to trigger full mongos reload, sadly
+                    // TODO: Make this saner, and less impactful (full reload on last chunk is bad)
+                    ChunkVersion(0, 0, OID()).addToBSON(result, "version");
+                    // For debugging
+                    requestedVersion.addToBSON(result, "origVersion");
+                } else {
+                    requestedVersion.addToBSON(result, "version");
+                }
+
+                return false;
+            }
+        }
+
+        info->setVersion(ns, requestedVersion);
         return true;
     }
 

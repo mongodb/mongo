@@ -290,11 +290,6 @@ TEST(BatchWriteExecTests, ManyStaleOpWithMigration) {
     error.setErrCode(ErrorCodes::StaleShardVersion);
     error.setErrMessage("mock stale error");
     for (int i = 0; i < 10; i++) {
-        if (i % 2 == 0)
-            error.setErrInfo(BSONObj());
-        else
-            error.setErrInfo(BSON("inCriticalSection" << true));
-
         mockResults.push_back(new MockWriteResult(backend.shardHost, error));
     }
 
@@ -306,7 +301,7 @@ TEST(BatchWriteExecTests, ManyStaleOpWithMigration) {
     backend.exec->executeBatch(&txn, request, &response, &stats);
     ASSERT(response.getOk());
 
-    ASSERT_EQUALS(stats.numStaleBatches, 10);
+    ASSERT_EQUALS(stats.numStaleBatches, 6);
 }
 
 }  // namespace

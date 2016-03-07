@@ -135,24 +135,12 @@ public:
     ChunkVersion getVersion(const std::string& ns);
 
     /**
-     * If the metadata for 'ns' at this shard is at or above the requested version,
-     * 'reqShardVersion', returns OK and fills in 'latestShardVersion' with the latest shard
-     * version. The latter is always greater or equal than 'reqShardVersion' if in the same epoch.
-     *
-     * Otherwise, falls back to refreshMetadataNow.
-     *
-     * This call blocks if there are more than _configServerTickets threads currently refreshing
-     * metadata (currently set to 3).
-     *
-     * Locking Note:
-     *   + Must NOT be called with the write lock because this call may go into the network,
-     *     and deadlocks may occur with shard-as-a-config.  Therefore, nothing here guarantees
-     *     that 'latestShardVersion' is indeed the current one on return.
+     * Refreshes the local metadata based on whether the expected version is higher than what we
+     * have cached.
      */
-    Status refreshMetadataIfNeeded(OperationContext* txn,
-                                   const std::string& ns,
-                                   const ChunkVersion& reqShardVersion,
-                                   ChunkVersion* latestShardVersion);
+    Status onStaleShardVersion(OperationContext* txn,
+                               const NamespaceString& nss,
+                               const ChunkVersion& expectedVersion);
 
     /**
      * Refreshes collection metadata by asking the config server for the latest information.
@@ -302,13 +290,6 @@ public:
                      const BSONObj& minKey,
                      const BSONObj& maxKey,
                      ChunkVersion mergedVersion);
-
-    bool inCriticalMigrateSection();
-
-    /**
-     * @return true if we are NOT in the critical section
-     */
-    bool waitTillNotInCriticalSection(int maxSecondsToWait);
 
     /**
      * TESTING ONLY

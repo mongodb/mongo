@@ -69,6 +69,7 @@ BSONObj createRecvChunkCommitRequest(const MigrationSessionId& sessionId) {
 }
 
 MONGO_FP_DECLARE(failMigrationCommit);
+MONGO_FP_DECLARE(hangBeforeCommitMigration);
 MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
 
 }  // namespace
@@ -133,12 +134,12 @@ Status ChunkMoveOperationState::initialize(const BSONObj& cmdObj) {
         _toShardCS = toShard->getConnString();
     }
 
-    auto& operationVersion = OperationShardingState::get(_txn);
-    if (!operationVersion.hasShardVersion()) {
+    auto& oss = OperationShardingState::get(_txn);
+    if (!oss.hasShardVersion()) {
         return Status{ErrorCodes::InvalidOptions, "moveChunk command is missing shard version"};
     }
 
-    _collectionVersion = operationVersion.getShardVersion(_nss);
+    _collectionVersion = oss.getShardVersion(_nss);
 
     return Status::OK();
 }
@@ -384,6 +385,8 @@ Status ChunkMoveOperationState::commitMigration(const MigrationSessionId& sessio
 
         preCond.append(b.obj());
     }
+
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeCommitMigration);
 
     fassertStatusOK(34431,
                     grid.catalogManager(_txn)->applyChunkOpsDeprecated(

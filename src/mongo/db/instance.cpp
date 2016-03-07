@@ -79,6 +79,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -399,9 +400,16 @@ static void receivedQuery(OperationContext* txn,
         uassertStatusOK(status);
 
         dbResponse.exhaustNS = runQuery(txn, q, nss, dbResponse.response);
-    } catch (const AssertionException& exception) {
+    } catch (const AssertionException& e) {
+        // If we got a stale config, wait in case the operation is stuck in a critical section
+        if (e.getCode() == ErrorCodes::SendStaleConfig) {
+            auto& sce = static_cast<const StaleConfigException&>(e);
+            ShardingState::get(txn)
+                ->onStaleShardVersion(txn, NamespaceString(sce.getns()), sce.getVersionReceived());
+        }
+
         dbResponse.response.reset();
-        generateLegacyQueryErrorResponse(&exception, q, &op, &dbResponse.response);
+        generateLegacyQueryErrorResponse(&e, q, &op, &dbResponse.response);
     }
 
     op.debug().responseLength = dbResponse.response.header().dataLen();

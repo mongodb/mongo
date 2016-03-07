@@ -51,8 +51,8 @@ void OpObserver::onCreateIndex(OperationContext* txn,
     AuthorizationManager::get(txn->getServiceContext())
         ->logOp(txn, "i", ns.c_str(), indexDoc, nullptr);
 
-    CollectionShardingState* const css = CollectionShardingState::get(txn, ns);
-    if (css && !fromMigrate) {
+    auto css = CollectionShardingState::get(txn, ns);
+    if (!fromMigrate) {
         css->onInsertOp(txn, indexDoc);
     }
 
@@ -66,12 +66,12 @@ void OpObserver::onInserts(OperationContext* txn,
                            bool fromMigrate) {
     repl::logOps(txn, "i", nss, begin, end, fromMigrate);
 
-    CollectionShardingState* const css = CollectionShardingState::get(txn, nss.ns());
+    auto css = CollectionShardingState::get(txn, nss.ns());
     const char* ns = nss.ns().c_str();
 
     for (auto it = begin; it != end; it++) {
         AuthorizationManager::get(txn->getServiceContext())->logOp(txn, "i", ns, *it, nullptr);
-        if (css && !fromMigrate) {
+        if (!fromMigrate) {
             css->onInsertOp(txn, *it);
         }
     }
@@ -92,8 +92,8 @@ void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& arg
     AuthorizationManager::get(txn->getServiceContext())
         ->logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria);
 
-    CollectionShardingState* const css = CollectionShardingState::get(txn, args.ns);
-    if (css && !args.fromMigrate) {
+    auto css = CollectionShardingState::get(txn, args.ns);
+    if (!args.fromMigrate) {
         css->onUpdateOp(txn, args.updatedDoc);
     }
 
@@ -112,10 +112,8 @@ OpObserver::DeleteState OpObserver::aboutToDelete(OperationContext* txn,
         deleteState.idDoc = idElement.wrap();
     }
 
-    CollectionShardingState* const css = CollectionShardingState::get(txn, ns.ns());
-    if (css) {
-        deleteState.isMigrating = css->isDocumentInMigratingChunk(txn, doc);
-    }
+    auto css = CollectionShardingState::get(txn, ns.ns());
+    deleteState.isMigrating = css->isDocumentInMigratingChunk(txn, doc);
 
     return deleteState;
 }
@@ -131,8 +129,8 @@ void OpObserver::onDelete(OperationContext* txn,
     AuthorizationManager::get(txn->getServiceContext())
         ->logOp(txn, "d", ns.ns().c_str(), deleteState.idDoc, nullptr);
 
-    CollectionShardingState* const css = CollectionShardingState::get(txn, ns.ns());
-    if (css && !fromMigrate && deleteState.isMigrating) {
+    auto css = CollectionShardingState::get(txn, ns.ns());
+    if (!fromMigrate && deleteState.isMigrating) {
         css->onDeleteOp(txn, deleteState.idDoc);
     }
 

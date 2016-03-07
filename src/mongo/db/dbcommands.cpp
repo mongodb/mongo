@@ -1209,7 +1209,6 @@ void Command::execCommand(OperationContext* txn,
         std::string dbname = request.getDatabase().toString();
         unique_ptr<MaintenanceModeSetter> mmSetter;
 
-
         std::array<BSONElement, std::tuple_size<decltype(neededFieldNames)>::value>
             extractedFields{};
         request.getCommandArgs().getFields(neededFieldNames, &extractedFields);
@@ -1322,7 +1321,14 @@ void Command::execCommand(OperationContext* txn,
         if (!retval) {
             command->_commandsFailed.increment();
         }
-    } catch (const DBException& exception) {
+    } catch (const DBException& e) {
+        // If we got a stale config, wait in case the operation is stuck in a critical section
+        if (e.getCode() == ErrorCodes::SendStaleConfig) {
+            auto& sce = static_cast<const StaleConfigException&>(e);
+            ShardingState::get(txn)
+                ->onStaleShardVersion(txn, NamespaceString(sce.getns()), sce.getVersionReceived());
+        }
+
         BSONObj metadata = rpc::makeEmptyMetadata();
         if (ShardingState::get(txn)->enabled()) {
             auto opTime = grid.shardRegistry()->getConfigOpTime();
@@ -1331,7 +1337,7 @@ void Command::execCommand(OperationContext* txn,
             metadata = metadataBob.obj();
         }
 
-        Command::generateErrorResponse(txn, replyBuilder, exception, request, command, metadata);
+        Command::generateErrorResponse(txn, replyBuilder, e, request, command, metadata);
     }
 }
 

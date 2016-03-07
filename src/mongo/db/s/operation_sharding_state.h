@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
@@ -69,7 +70,7 @@ public:
      * This initialization may only be performed once for the lifetime of the object, which
      * coincides with the lifetime of the request.
      */
-    void initializeShardVersion(NamespaceString ns, const BSONElement& shardVersionElement);
+    void initializeShardVersion(NamespaceString nss, const BSONElement& shardVersionElement);
 
     /**
      * Returns whether or not there is a shard version associated with this operation.
@@ -84,12 +85,29 @@ public:
      * Returns ChunkVersion::UNSHARDED() if this operation has no shard version information
      * for the requested namespace.
      */
-    const ChunkVersion& getShardVersion(const NamespaceString& ns) const;
+    ChunkVersion getShardVersion(const NamespaceString& nss) const;
 
     /**
      * Stores the given chunk version of a namespace into this object.
      */
-    void setShardVersion(NamespaceString ns, ChunkVersion newVersion);
+    void setShardVersion(NamespaceString nss, ChunkVersion newVersion);
+
+    /**
+     * This call is a no op if there isn't a currently active migration critical section. Otherwise
+     * it will wait for the critical section to complete up to the remaining operation time.
+     *
+     * Returns true if the call actually waited because of migration critical section (regardless if
+     * whether it timed out or not), false if there was no active migration critical section.
+     */
+    bool waitForMigrationCriticalSection(OperationContext* txn);
+
+    /**
+     * Setting this value indicates that when the version check failed, there was an active
+     * migration for the namespace and that it would be prudent to wait for the critical section to
+     * complete before retrying so the router doesn't make wasteful requests.
+     */
+    void setMigrationCriticalSection(
+        std::shared_ptr<MigrationSourceManager::CriticalSectionState> critSec);
 
 private:
     /**
@@ -101,6 +119,10 @@ private:
     bool _hasVersion = false;
     ChunkVersion _shardVersion;
     NamespaceString _ns;
+
+    // This value will only be non-null if version check during the operation execution failed due
+    // to stale version and there was a migration for that namespace, which was in critical section.
+    std::shared_ptr<MigrationSourceManager::CriticalSectionState> _migrationCriticalSection;
 };
 
 /**
