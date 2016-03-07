@@ -86,6 +86,11 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	conn->stat_usecs = (uint64_t)cval.val * WT_MILLION;
 
 	WT_RET(__wt_config_gets(
+	    session, cfg, "statistics_log.json", &cval));
+	if (cval.val != 0)
+		FLD_SET(conn->stat_flags, WT_CONN_STAT_JSON);
+
+	WT_RET(__wt_config_gets(
 	    session, cfg, "statistics_log.on_close", &cval));
 	if (cval.val != 0)
 		FLD_SET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE);
@@ -97,6 +102,10 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	if (!*runp && !FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
 		return (0);
 
+	/*
+	 * If any statistics logging is done, this must not be a read-only
+	 * connection.
+	 */
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
 	WT_RET(__wt_config_subinit(session, &objectconf, &cval));
 	for (cnt = 0; (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
@@ -132,9 +141,24 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	WT_ERR(__wt_config_gets(session, cfg, "statistics_log.path", &cval));
 	WT_ERR(__wt_nfilename(session, cval.str, cval.len, &conn->stat_path));
 
-	WT_ERR(__wt_config_gets(
-	    session, cfg, "statistics_log.timestamp", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &conn->stat_format));
+	/*
+	 * When using JSON format, use the same timestamp format as MongoDB by
+	 * default.
+	 */
+	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_JSON)) {
+		ret = __wt_config_gets(
+		    session, &cfg[1], "statistics_log.timestamp", &cval);
+		if (ret == WT_NOTFOUND)
+			WT_ERR(__wt_strdup(
+			    session, "%FT%T.000Z", &conn->stat_format));
+		WT_ERR_NOTFOUND_OK(ret);
+	}
+	if (conn->stat_format == NULL) {
+		WT_ERR(__wt_config_gets(
+		    session, cfg, "statistics_log.timestamp", &cval));
+		WT_ERR(__wt_strndup(
+		    session, cval.str, cval.len, &conn->stat_format));
+	}
 
 err:	__stat_sources_free(session, &sources);
 	return (ret);
@@ -149,22 +173,25 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
-	WT_CURSOR_STAT *cst;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	int64_t *stats;
-	int i;
-	const char *desc, *uri;
+	int64_t val;
+	size_t prefixlen;
+	const char *desc, *endprefix, *valstr, *uri;
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
+	bool first, groupfirst;
 
 	conn = S2C(session);
+	cursor = NULL;
+
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+	first = groupfirst = true;
 
 	/* Build URI and configuration string. */
 	if (conn_stats)
 		uri = "statistics:";
 	else {
-		WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__wt_buf_fmt(session, tmp, "statistics:%s", name));
 		uri = tmp->data;
 	}
@@ -175,31 +202,54 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 	 * If we don't find an underlying object, silently ignore it, the object
 	 * may exist only intermittently.
 	 */
-	switch (ret = __wt_curstat_open(session, uri, NULL, cfg, &cursor)) {
-	case 0:
-		cst = (WT_CURSOR_STAT *)cursor;
-		for (stats = cst->stats, i = 0; i <  cst->stats_count; ++i) {
-			if (conn_stats)
-				WT_ERR(__wt_stat_connection_desc(cst, i,
-				    &desc));
-			else
-				WT_ERR(__wt_stat_dsrc_desc(cst, i, &desc));
+	if ((ret = __wt_curstat_open(session, uri, NULL, cfg, &cursor)) != 0) {
+		if (ret == EBUSY || ret == ENOENT || ret == WT_NOTFOUND)
+			ret = 0;
+		goto err;
+	}
+
+	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_JSON)) {
+		WT_ERR(__wt_fprintf(conn->stat_fp,
+		     "{\"version\":\"%s\",\"localTime\":\"%s\"",
+		     WIREDTIGER_VERSION_STRING, conn->stat_stamp));
+		WT_ERR(__wt_fprintf(conn->stat_fp, ",\"wiredTiger\":{"));
+		while ((ret = cursor->next(cursor)) == 0) {
+			WT_ERR(cursor->get_value(cursor, &desc, &valstr, &val));
+			/* Check if we are starting a new section. */
+			endprefix = strchr(desc, ':');
+			prefixlen = WT_PTRDIFF(endprefix, desc);
+			WT_ASSERT(session, endprefix != NULL);
+			if (first ||
+			    tmp->size != prefixlen ||
+			    strncmp(desc, tmp->data, tmp->size) != 0) {
+				WT_ERR(__wt_buf_set(
+				    session, tmp, desc, prefixlen));
+				WT_ERR(__wt_fprintf(conn->stat_fp,
+				    "%s\"%.*s\":{", first ? "" : "},",
+				    (int)prefixlen, desc));
+				first = false;
+				groupfirst = true;
+			}
+			WT_ERR(__wt_fprintf(conn->stat_fp,
+			    "%s\"%s\":%" PRId64,
+			    groupfirst ? "" : ",", endprefix + 2, val));
+			groupfirst = false;
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+		WT_ERR(__wt_fprintf(conn->stat_fp, "}}}\n"));
+	} else {
+		while ((ret = cursor->next(cursor)) == 0) {
+			WT_ERR(cursor->get_value(cursor, &desc, &valstr, &val));
 			WT_ERR(__wt_fprintf(conn->stat_fp,
 			    "%s %" PRId64 " %s %s\n",
-			    conn->stat_stamp, stats[i], name, desc));
+			    conn->stat_stamp, val, name, desc));
 		}
-		WT_ERR(cursor->close(cursor));
-		break;
-	case EBUSY:
-	case ENOENT:
-	case WT_NOTFOUND:
-		ret = 0;
-		break;
-	default:
-		break;
+		WT_ERR_NOTFOUND_OK(ret);
 	}
 
 err:	__wt_scr_free(session, &tmp);
+	if (cursor != NULL)
+		WT_TRET(cursor->close(cursor));
 	return (ret);
 }
 
@@ -340,9 +390,9 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	 * any that match the list of object sources.
 	 */
 	if (conn->stat_sources != NULL) {
-		WT_WITH_HANDLE_LIST_LOCK(session, ret,
+		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __wt_conn_btree_apply(
-		    session, false, NULL, __statlog_apply, NULL));
+		    session, NULL, __statlog_apply, NULL, NULL));
 		WT_RET(ret);
 	}
 

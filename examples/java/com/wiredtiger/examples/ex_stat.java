@@ -92,6 +92,33 @@ public class ex_stat {
     }
 
     int 
+    print_join_cursor_stats(Session session)
+        throws WiredTigerException
+    {
+	Cursor idx_cursor, join_cursor, stat_cursor;
+	int ret;
+
+	ret = session.create("index:access:idx", "columns=(v)");
+	idx_cursor = session.open_cursor("index:access:idx", null, null);
+	ret = idx_cursor.next();
+	join_cursor = session.open_cursor("join:table:access", null, null);
+	ret = session.join(join_cursor, idx_cursor, "compare=gt");
+	ret = join_cursor.next();
+
+	/*! [statistics join cursor function] */
+	stat_cursor = session.open_cursor("statistics:join", join_cursor, null);
+
+	ret = print_cursor(stat_cursor);
+	ret = stat_cursor.close();
+	/*! [statistics join cursor function] */
+
+	ret = join_cursor.close();
+	ret = idx_cursor.close();
+
+	return (ret);
+    }
+
+    int
     print_overflow_pages(Session session)
         throws WiredTigerException
     {
@@ -220,7 +247,8 @@ public class ex_stat {
         conn = wiredtiger.open(home, "create,statistics=(all)");
         session = conn.open_session(null);
 
-        ret = session.create("table:access", "key_format=S,value_format=S");
+        ret = session.create("table:access",
+            "key_format=S,value_format=S,columns=(k,v)");
 
         cursor = session.open_cursor("table:access", null, null);
         cursor.putKeyString("key");
@@ -233,6 +261,8 @@ public class ex_stat {
         ret = print_database_stats(session);
 
         ret = print_file_stats(session);
+
+        ret = print_join_cursor_stats(session);
 
         ret = print_overflow_pages(session);
 

@@ -6,6 +6,23 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * WT_LSN --
+ *	A log sequence number, representing a position in the transaction log.
+ */
+union __wt_lsn {
+	struct {
+#ifdef	WORDS_BIGENDIAN
+		uint32_t file;
+		uint32_t offset;
+#else
+		uint32_t offset;
+		uint32_t file;
+#endif
+	} l;
+	uint64_t file_offset;
+};
+
 #define	WT_LOG_FILENAME	"WiredTigerLog"		/* Log file name */
 #define	WT_LOG_PREPNAME	"WiredTigerPreplog"	/* Log pre-allocated name */
 #define	WT_LOG_TMPNAME	"WiredTigerTmplog"	/* Log temporary name */
@@ -13,32 +30,33 @@
 /* Logging subsystem declarations. */
 #define	WT_LOG_ALIGN			128
 
-#define	WT_INIT_LSN(l)	do {						\
-	(l)->file = 1;							\
-	(l)->offset = 0;						\
-} while (0)
+/*
+ * Atomically set the two components of the LSN.
+ */
+#define	WT_SET_LSN(l, f, o) (l)->file_offset = (((uint64_t)(f) << 32) + (o))
 
-#define	WT_MAX_LSN(l)	do {						\
-	(l)->file = UINT32_MAX;						\
-	(l)->offset = INT64_MAX;					\
-} while (0)
+#define	WT_INIT_LSN(l)	WT_SET_LSN((l), 1, 0)
 
-#define	WT_ZERO_LSN(l)	do {						\
-	(l)->file = 0;							\
-	(l)->offset = 0;						\
-} while (0)
+#define	WT_MAX_LSN(l)	WT_SET_LSN((l), UINT32_MAX, INT32_MAX)
 
-#define	WT_IS_INIT_LSN(l)						\
-	((l)->file == 1 && (l)->offset == 0)
-#define	WT_IS_MAX_LSN(l)						\
-	((l)->file == UINT32_MAX && (l)->offset == INT64_MAX)
+#define	WT_ZERO_LSN(l)	WT_SET_LSN((l), 0, 0)
+
+/*
+ * Initialize LSN is (1,0).  We only need to shift the 1 for comparison.
+ */
+#define	WT_IS_INIT_LSN(l)	((l)->file_offset == ((uint64_t)1 << 32))
+/*
+ * XXX Original tested INT32_MAX.
+ */
+#define	WT_IS_MAX_LSN(lsn)						\
+	((lsn)->l.file == UINT32_MAX && (lsn)->l.offset == INT32_MAX)
 
 /*
  * Both of the macros below need to change if the content of __wt_lsn
  * ever changes.  The value is the following:
  * txnid, record type, operation type, file id, operation key, operation value
  */
-#define	WT_LOGC_KEY_FORMAT	WT_UNCHECKED_STRING(IqI)
+#define	WT_LOGC_KEY_FORMAT	WT_UNCHECKED_STRING(III)
 #define	WT_LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
 #define	WT_LOG_SKIP_HEADER(data)					\
@@ -253,6 +271,24 @@ struct __wt_log_record {
 };
 
 /*
+ * __wt_log_record_byteswap --
+ *	Handle big- and little-endian transformation of the log record
+ *	header block.
+ */
+static inline void
+__wt_log_record_byteswap(WT_LOG_RECORD *record)
+{
+#ifdef	WORDS_BIGENDIAN
+	record->len = __wt_bswap32(record->len);
+	record->checksum = __wt_bswap32(record->checksum);
+	record->flags = __wt_bswap16(record->flags);
+	record->mem_len = __wt_bswap32(record->mem_len);
+#else
+	WT_UNUSED(record);
+#endif
+}
+
+/*
  * WT_LOG_DESC --
  *	The log file's description.
  */
@@ -265,6 +301,24 @@ struct __wt_log_desc {
 	uint16_t	minorv;		/* 06-07: Minor version */
 	uint64_t	log_size;	/* 08-15: Log file size */
 };
+
+/*
+ * __wt_log_desc_byteswap --
+ *	Handle big- and little-endian transformation of the log file
+ *	description block.
+ */
+static inline void
+__wt_log_desc_byteswap(WT_LOG_DESC *desc)
+{
+#ifdef	WORDS_BIGENDIAN
+	desc->log_magic = __wt_bswap32(desc->log_magic);
+	desc->majorv = __wt_bswap16(desc->majorv);
+	desc->minorv = __wt_bswap16(desc->minorv);
+	desc->log_size = __wt_bswap64(desc->log_size);
+#else
+	WT_UNUSED(desc);
+#endif
+}
 
 /*
  * Flags for __wt_txn_op_printlog.

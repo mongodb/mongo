@@ -21,6 +21,7 @@
 #define	WT_METADATA_TURTLE_SET	"WiredTiger.turtle.set"	/* Turtle temp file */
 
 #define	WT_METADATA_URI		"metadata:"		/* Metadata alias */
+#define	WT_METAFILE		"WiredTiger.wt"		/* Metadata table */
 #define	WT_METAFILE_URI		"file:WiredTiger.wt"	/* Metadata table URI */
 
 #define	WT_LAS_URI		"file:WiredTigerLAS.wt"	/* Lookaside table URI*/
@@ -30,9 +31,8 @@
  * against the metafile URI. The validity is checked on connection open
  * when diagnostic is enabled.
  */
-#define	WT_METAFILE_NAME_HASH	1045034099109282882LLU	/* Metadata file hash */
-#define	WT_IS_METADATA(dh)						\
-	((dh)->name_hash == WT_METAFILE_NAME_HASH &&			\
+#define	WT_IS_METADATA(session, dh)					\
+	((dh)->name_hash == S2C(session)->meta_uri_hash &&		\
 	strcmp((dh)->name, WT_METAFILE_URI) == 0)
 #define	WT_METAFILE_ID		0			/* Metadata file ID */
 

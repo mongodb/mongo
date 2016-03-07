@@ -31,14 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <wiredtiger_config.h>
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
-
-/*
- * We need to include the configuration file to detect whether this extension
- * is being built into the WiredTiger library.
- */
-#include "wiredtiger_config.h"
 
 /* Local compressor structure. */
 typedef struct {
@@ -46,6 +41,27 @@ typedef struct {
 
 	WT_EXTENSION_API *wt_api;		/* Extension API */
 } SNAPPY_COMPRESSOR;
+
+#ifdef WORDS_BIGENDIAN
+/*
+ * snappy_bswap64 --
+ *	64-bit unsigned little-endian to/from big-endian value.
+ */
+static inline uint64_t
+snappy_bswap64(uint64_t v)
+{
+	return (
+	    ((v << 56) & 0xff00000000000000UL) |
+	    ((v << 40) & 0x00ff000000000000UL) |
+	    ((v << 24) & 0x0000ff0000000000UL) |
+	    ((v <<  8) & 0x000000ff00000000UL) |
+	    ((v >>  8) & 0x00000000ff000000UL) |
+	    ((v >> 24) & 0x0000000000ff0000UL) |
+	    ((v >> 40) & 0x000000000000ff00UL) |
+	    ((v >> 56) & 0x00000000000000ffUL)
+	);
+}
+#endif
 
 /*
  * wt_snappy_error --
@@ -103,16 +119,22 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	snret = snappy_compress((char *)src, src_len, snapbuf, &snaplen);
 
 	if (snret == SNAPPY_OK) {
-		/*
-		 * On decompression, snappy requires the exact compressed byte
-		 * count (the current value of snaplen).  WiredTiger does not
-		 * preserve that value, so save snaplen at the beginning of the
-		 * destination buffer.
-		 */
 		if (snaplen + sizeof(size_t) < src_len) {
-			*(size_t *)dst = snaplen;
 			*result_lenp = snaplen + sizeof(size_t);
 			*compression_failed = 0;
+
+			/*
+			 * On decompression, snappy requires an exact compressed
+			 * byte count (the current value of snaplen). WiredTiger
+			 * does not preserve that value, so save snaplen at the
+			 * beginning of the destination buffer.
+			 *
+			 * Store the value in little-endian format.
+			 */
+#ifdef WORDS_BIGENDIAN
+			snaplen = snappy_bswap64(snaplen);
+#endif
+			*(size_t *)dst = snaplen;
 		} else
 			/* The compressor failed to produce a smaller result. */
 			*compression_failed = 1;
@@ -137,8 +159,14 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	wt_api = ((SNAPPY_COMPRESSOR *)compressor)->wt_api;
 
-	/* retrieve the saved length */
+	/*
+	 * Retrieve the saved length, handling little- to big-endian conversion
+	 * as necessary.
+	 */
 	snaplen = *(size_t *)src;
+#ifdef WORDS_BIGENDIAN
+	snaplen = snappy_bswap64(snaplen);
+#endif
 	if (snaplen + sizeof(size_t) > src_len) {
 		(void)wt_api->err_printf(wt_api,
 		    session,

@@ -33,7 +33,6 @@ wts_rebalance(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	int ret;
 	char cmd[1024];
 
 	if (g.c_rebalance == 0)
@@ -45,26 +44,23 @@ wts_rebalance(void)
 	(void)snprintf(cmd, sizeof(cmd),
 	    "../../wt -h %s dump -f %s/rebalance.orig %s",
 	    g.home, g.home, g.uri);
-	if ((ret = system(cmd)) != 0)
-		die(ret, "command failed: %s", cmd);
+	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
 	/* Rebalance, then verify the object. */
 	wts_reopen();
 	conn = g.wts_conn;
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== rebalance start ===============");
 
-	if ((ret = session->rebalance(session, g.uri, NULL)) != 0)
-		die(ret, "session.rebalance: %s: %s", g.uri);
+	testutil_checkfmt(
+	    session->rebalance(session, g.uri, NULL), "%s", g.uri);
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== rebalance stop ===============");
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+	testutil_check(session->close(session, NULL));
 
 	wts_verify("post-rebalance verify");
 	wts_close();
@@ -72,13 +68,11 @@ wts_rebalance(void)
 	(void)snprintf(cmd, sizeof(cmd),
 	    "../../wt -h %s dump -f %s/rebalance.new %s",
 	    g.home, g.home, g.uri);
-	if ((ret = system(cmd)) != 0)
-		die(ret, "command failed: %s", cmd);
+	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
 	/* Compare the old/new versions of the object. */
 	(void)snprintf(cmd, sizeof(cmd),
 	    "cmp %s/rebalance.orig %s/rebalance.new > /dev/null",
 	    g.home, g.home);
-	if ((ret = system(cmd)) != 0)
-		die(ret, "command failed: %s", cmd);
+	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 }

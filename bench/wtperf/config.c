@@ -134,9 +134,11 @@ config_free(CONFIG *cfg)
 	}
 
 	cleanup_truncate_config(cfg);
-	free(cfg->ckptthreads);
-	free(cfg->popthreads);
 	free(cfg->base_uri);
+	free(cfg->ckptthreads);
+	free(cfg->partial_config);
+	free(cfg->popthreads);
+	free(cfg->reopen_config);
 	free(cfg->workers);
 	free(cfg->workload);
 }
@@ -157,13 +159,19 @@ config_compress(CONFIG *cfg)
 		cfg->compress_ext = NULL;
 		cfg->compress_table = NULL;
 	} else if (strcmp(s, "lz4") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_LZ4
 		cfg->compress_ext = LZ4_EXT;
+#endif
 		cfg->compress_table = LZ4_BLK;
 	} else if (strcmp(s, "snappy") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_SNAPPY
 		cfg->compress_ext = SNAPPY_EXT;
+#endif
 		cfg->compress_table = SNAPPY_BLK;
 	} else if (strcmp(s, "zlib") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_ZLIB
 		cfg->compress_ext = ZLIB_EXT;
+#endif
 		cfg->compress_table = ZLIB_BLK;
 	} else {
 		fprintf(stderr,
@@ -233,10 +241,6 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 					goto err;
 				continue;
 			}
-			if (STRING_MATCH("throttle", k.str, k.len)) {
-				workp->throttle = (uint64_t)v.val;
-				continue;
-			}
 			if (STRING_MATCH("insert", k.str, k.len) ||
 			    STRING_MATCH("inserts", k.str, k.len)) {
 				if ((workp->insert = v.val) < 0)
@@ -254,20 +258,17 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 					goto err;
 				continue;
 			}
-			if (STRING_MATCH("update", k.str, k.len) ||
-			    STRING_MATCH("updates", k.str, k.len)) {
-				if ((workp->update = v.val) < 0)
-					goto err;
+			if (STRING_MATCH("throttle", k.str, k.len)) {
+				workp->throttle = (uint64_t)v.val;
 				continue;
 			}
 			if (STRING_MATCH("truncate", k.str, k.len)) {
 				if ((workp->truncate = v.val) != 1)
 					goto err;
 				/* There can only be one Truncate thread. */
-				if (cfg->has_truncate != 0) {
+				if (F_ISSET(cfg, CFG_TRUNCATE))
 					goto err;
-				}
-				cfg->has_truncate = 1;
+				F_SET(cfg, CFG_TRUNCATE);
 				continue;
 			}
 			if (STRING_MATCH("truncate_pct", k.str, k.len)) {
@@ -280,6 +281,29 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				if (v.val <= 0)
 					goto err;
 				workp->truncate_count = (uint64_t)v.val;
+				continue;
+			}
+			if (STRING_MATCH("update", k.str, k.len) ||
+			    STRING_MATCH("updates", k.str, k.len)) {
+				if ((workp->update = v.val) < 0)
+					goto err;
+				continue;
+			}
+			if (STRING_MATCH("update_delta", k.str, k.len)) {
+				if (v.type == WT_CONFIG_ITEM_STRING ||
+				    v.type == WT_CONFIG_ITEM_ID) {
+					if (strncmp(v.str, "rand", 4) != 0)
+						goto err;
+					/* Special random value */
+					workp->update_delta = INT64_MAX;
+					F_SET(cfg, CFG_GROW);
+				} else {
+					workp->update_delta = v.val;
+					if (v.val > 0)
+						F_SET(cfg, CFG_GROW);
+					if (v.val < 0)
+						F_SET(cfg, CFG_SHRINK);
+				}
 				continue;
 			}
 			goto err;
@@ -401,7 +425,12 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		*(uint32_t *)valueloc = (uint32_t)v->val;
 		break;
 	case CONFIG_STRING_TYPE:
-		if (v->type != WT_CONFIG_ITEM_STRING) {
+		/*
+		 * Configuration parsing uses string/ID to distinguish
+		 * between quoted and unquoted values.
+		 */
+		if (v->type != WT_CONFIG_ITEM_STRING &&
+		    v->type != WT_CONFIG_ITEM_ID) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad string value for \'%.*s=%.*s\'\n",
 			    (int)k->len, k->str, (int)v->len, v->str);
@@ -430,7 +459,8 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		    STRING_MATCH("threads", k->str, k->len))
 			return (config_threads(cfg, v->str, v->len));
 
-		if (v->type != WT_CONFIG_ITEM_STRING) {
+		if (v->type != WT_CONFIG_ITEM_STRING &&
+		    v->type != WT_CONFIG_ITEM_ID) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad string value for \'%.*s=%.*s\'\n",
 			    (int)k->len, k->str, (int)v->len, v->str);
@@ -634,6 +664,9 @@ config_opt_str(CONFIG *cfg, const char *name, const char *value)
 int
 config_sanity(CONFIG *cfg)
 {
+	WORKLOAD *workp;
+	u_int i;
+
 	/* Various intervals should be less than the run-time. */
 	if (cfg->run_time > 0 &&
 	    ((cfg->checkpoint_threads != 0 &&
@@ -660,6 +693,36 @@ config_sanity(CONFIG *cfg)
 		    "Invalid pareto distribution - should be a percentage\n");
 		return (EINVAL);
 	}
+
+	if (cfg->value_sz_max < cfg->value_sz) {
+		if (F_ISSET(cfg, CFG_GROW)) {
+			fprintf(stderr, "value_sz_max %" PRIu32
+			    " must be greater than or equal to value_sz %"
+			    PRIu32 "\n", cfg->value_sz_max, cfg->value_sz);
+			return (EINVAL);
+		} else
+			cfg->value_sz_max = cfg->value_sz;
+	}
+	if (cfg->value_sz_min > cfg->value_sz) {
+		if (F_ISSET(cfg, CFG_SHRINK)) {
+			fprintf(stderr, "value_sz_min %" PRIu32
+			    " must be less than or equal to value_sz %"
+			    PRIu32 "\n", cfg->value_sz_min, cfg->value_sz);
+			return (EINVAL);
+		} else
+			cfg->value_sz_min = cfg->value_sz;
+	}
+
+	if (cfg->readonly && cfg->workload != NULL)
+		for (i = 0, workp = cfg->workload;
+		    i < cfg->workload_cnt; ++i, ++workp)
+			if (workp->insert != 0 || workp->update != 0 ||
+			    workp->truncate != 0) {
+				fprintf(stderr,
+				    "Invalid workload: insert, update or "
+				    "truncate specified with readonly\n");
+				return (EINVAL);
+			}
 	return (0);
 }
 

@@ -16,25 +16,14 @@ static inline int __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2);
 static inline int
 __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2)
 {
-	WT_LSN l1, l2;
+	uint64_t l1, l2;
 
 	/*
 	 * Read LSNs into local variables so that we only read each field
 	 * once and all comparisons are on the same values.
 	 */
-	l1 = *(volatile WT_LSN *)lsn1;
-	l2 = *(volatile WT_LSN *)lsn2;
+	l1 = ((volatile WT_LSN *)lsn1)->file_offset;
+	l2 = ((volatile WT_LSN *)lsn2)->file_offset;
 
-	/*
-	 * If the file numbers are different we don't need to compare the
-	 * offset.
-	 */
-	if (l1.file != l2.file)
-		return (l1.file < l2.file ? -1 : 1);
-	/*
-	 * If the file numbers are the same, compare the offset.
-	 */
-	if (l1.offset != l2.offset)
-	    return (l1.offset < l2.offset ? -1 : 1);
-	return (0);
+	return (l1 < l2 ? -1 : (l1 > l2 ? 1 : 0));
 }

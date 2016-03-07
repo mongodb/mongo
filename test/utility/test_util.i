@@ -42,14 +42,27 @@
 #define	DEFAULT_DIR "WT_TEST"
 #define	MKDIR_COMMAND "mkdir "
 
+/* Allow tests to add their own death handling. */
+extern void (*custom_die)(void);
+
+static void	 testutil_die(int, const char *, ...)
+#if defined(__GNUC__)
+__attribute__((__noreturn__))
+#endif
+;
+
 /*
  * die --
  *	Report an error and quit.
  */
-static inline void
+static void
 testutil_die(int e, const char *fmt, ...)
 {
 	va_list ap;
+
+	/* Allow test programs to cleanup on fatal error. */
+	if (custom_die != NULL)
+		(*custom_die)();
 
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
@@ -57,8 +70,30 @@ testutil_die(int e, const char *fmt, ...)
 	if (e != 0)
 		fprintf(stderr, ": %s", wiredtiger_strerror(e));
 	fprintf(stderr, "\n");
+
 	exit(EXIT_FAILURE);
 }
+
+/*
+ * testutil_check --
+ *	Complain and quit if a function call fails.
+ */
+#define	testutil_check(call) do {					\
+	int __r;							\
+	if ((__r = (call)) != 0)					\
+		testutil_die(__r, "%s/%d: %s", __func__, __LINE__, #call);\
+} while (0)
+
+/*
+ * testutil_checkfmt --
+ *	Complain and quit if a function call fails, with additional arguments.
+ */
+#define	testutil_checkfmt(call, fmt, ...) do {				\
+	int __r;							\
+	if ((__r = (call)) != 0)					\
+		testutil_die(__r, "%s/%d: %s: " fmt,			\
+		    __func__, __LINE__, #call, __VA_ARGS__);		\
+} while (0)
 
 /*
  * testutil_work_dir_from_path --
@@ -66,26 +101,17 @@ testutil_die(int e, const char *fmt, ...)
  *	Creates the full intended work directory in buffer.
  */
 static inline void
-testutil_work_dir_from_path(char *buffer, size_t inputSize, char *dir)
+testutil_work_dir_from_path(char *buffer, size_t inputSize, const char *dir)
 {
 	/* If no directory is provided, use the default. */
-	if (dir == NULL) {
-		if (inputSize < sizeof(DEFAULT_DIR))
-			testutil_die(ENOMEM,
-			    "Not enough memory in buffer for directory %s%c%s",
-			    dir, DIR_DELIM, DEFAULT_DIR);
+	if (dir == NULL)
+		dir = DEFAULT_DIR;
 
-		snprintf(buffer, inputSize, DEFAULT_DIR);
-		return;
-	}
-
-	/* Additional bytes for the directory and WT_TEST. */
-	if (inputSize < strlen(dir) + sizeof(DEFAULT_DIR) + sizeof(DIR_DELIM))
+	if (inputSize < strlen(dir) + 1)
 		testutil_die(ENOMEM,
-		    "Not enough memory in buffer for directory %s%c%s",
-		    dir, DIR_DELIM, DEFAULT_DIR);
+		    "Not enough memory in buffer for directory %s", dir);
 
-	snprintf(buffer, inputSize, "%s%c%s", dir, DIR_DELIM, DEFAULT_DIR);
+	strcpy(buffer, dir);
 }
 
 /*

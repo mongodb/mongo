@@ -31,17 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <wiredtiger_config.h>
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
-
-/*
- * We need to include the configuration file to detect whether this extension
- * is being built into the WiredTiger library.
- */
-#include "wiredtiger_config.h"
-#ifdef _MSC_VER
-#define	inline __inline
-#endif
 
 /* Local compressor structure. */
 typedef struct {
@@ -71,6 +63,37 @@ typedef struct {
 	uint32_t useful_len;		/* Decompression return value */
 	uint32_t unused;		/* Guaranteed to be 0 */
 } LZ4_PREFIX;
+
+#ifdef WORDS_BIGENDIAN
+/*
+ * lz4_bswap32 --
+ *	32-bit unsigned little-endian to/from big-endian value.
+ */
+static inline uint32_t
+lz4_bswap32(uint32_t v)
+{
+	return (
+	    ((v << 24) & 0xff000000) |
+	    ((v <<  8) & 0x00ff0000) |
+	    ((v >>  8) & 0x0000ff00) |
+	    ((v >> 24) & 0x000000ff)
+	);
+}
+
+/*
+ * lz4_prefix_swap --
+ *	The additional information is written in little-endian format, handle
+ * the conversion.
+ */
+static inline void
+lz4_prefix_swap(LZ4_PREFIX *prefix)
+{
+	prefix->compressed_len = lz4_bswap32(prefix->compressed_len);
+	prefix->uncompressed_len = lz4_bswap32(prefix->uncompressed_len);
+	prefix->useful_len = lz4_bswap32(prefix->useful_len);
+	prefix->unused = lz4_bswap32(prefix->unused);
+}
+#endif
 
 /*
  * lz4_error --
@@ -119,6 +142,9 @@ lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		prefix.uncompressed_len = (uint32_t)src_len;
 		prefix.useful_len = (uint32_t)src_len;
 		prefix.unused = 0;
+#ifdef WORDS_BIGENDIAN
+		lz4_prefix_swap(&prefix);
+#endif
 		memcpy(dst, &prefix, sizeof(LZ4_PREFIX));
 
 		*result_lenp = (size_t)lz4_len + sizeof(LZ4_PREFIX);
@@ -154,6 +180,9 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * decompressed bytes to return from the start of the source buffer.
 	 */
 	memcpy(&prefix, src, sizeof(LZ4_PREFIX));
+#ifdef WORDS_BIGENDIAN
+	lz4_prefix_swap(&prefix);
+#endif
 
 	/*
 	 * Decompress, starting after the prefix bytes. Use safe decompression:
@@ -268,6 +297,9 @@ lz4_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 			prefix.uncompressed_len = (uint32_t)sourceSize;
 			prefix.useful_len = offsets[slot];
 			prefix.unused = 0;
+#ifdef WORDS_BIGENDIAN
+			lz4_prefix_swap(&prefix);
+#endif
 			memcpy(dst, &prefix, sizeof(LZ4_PREFIX));
 
 			*result_slotsp = slot;

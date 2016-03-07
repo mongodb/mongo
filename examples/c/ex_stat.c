@@ -39,6 +39,7 @@
 int print_cursor(WT_CURSOR *);
 int print_database_stats(WT_SESSION *);
 int print_file_stats(WT_SESSION *);
+int print_join_cursor_stats(WT_SESSION *);
 int print_overflow_pages(WT_SESSION *);
 int get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep);
 int print_derived_stats(WT_SESSION *);
@@ -99,6 +100,37 @@ print_file_stats(WT_SESSION *session)
 }
 
 int 
+print_join_cursor_stats(WT_SESSION *session)
+{
+	WT_CURSOR *idx_cursor, *join_cursor, *stat_cursor;
+	int ret;
+
+	ret = session->create(
+	    session, "index:access:idx", "columns=(v)");
+	ret = session->open_cursor(
+	    session, "index:access:idx", NULL, NULL, &idx_cursor);
+	ret = idx_cursor->next(idx_cursor);
+	ret = session->open_cursor(
+	    session, "join:table:access", NULL, NULL, &join_cursor);
+	ret = session->join(session, join_cursor, idx_cursor, "compare=gt");
+	ret = join_cursor->next(join_cursor);
+
+	/*! [statistics join cursor function] */
+	if ((ret = session->open_cursor(session,
+	    "statistics:join", join_cursor, NULL, &stat_cursor)) != 0)
+		return (ret);
+
+	ret = print_cursor(stat_cursor);
+	ret = stat_cursor->close(stat_cursor);
+	/*! [statistics join cursor function] */
+
+	ret = join_cursor->close(join_cursor);
+	ret = idx_cursor->close(idx_cursor);
+
+	return (ret);
+}
+
+int
 print_overflow_pages(WT_SESSION *session)
 {
 	/*! [statistics retrieve by key] */
@@ -204,7 +236,8 @@ main(void)
 	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create(
-	    session, "table:access", "key_format=S,value_format=S");
+	    session, "table:access",
+	    "key_format=S,value_format=S,columns=(k,v)");
 
 	ret = session->open_cursor(
 	    session, "table:access", NULL, NULL, &cursor);
@@ -218,6 +251,8 @@ main(void)
 	ret = print_database_stats(session);
 
 	ret = print_file_stats(session);
+
+	ret = print_join_cursor_stats(session);
 
 	ret = print_overflow_pages(session);
 

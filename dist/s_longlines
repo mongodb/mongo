@@ -9,8 +9,9 @@ l=`(cd .. &&
     find dist -name '*.py' &&
     find src -name '*.in') |
     sed -e '/dist\/stat_data\.py/d' \
-        -e '/support\/stat\.c/d' \
-        -e '/include\/extern\.h/d'`
+        -e '/include\/extern\.h/d' \
+        -e '/support\/power8/d' \
+        -e '/support\/stat\.c/d'`
 
 for f in $l ; do
 	expand -t8 < ../$f | awk -- \

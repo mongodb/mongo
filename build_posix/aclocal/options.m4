@@ -148,10 +148,8 @@ no)	if test "$wt_cv_with_builtin_extension_snappy" = "yes"; then
 esac
 AC_MSG_RESULT($wt_cv_enable_snappy)
 if test "$wt_cv_enable_snappy" = "yes"; then
-	AC_LANG_PUSH([C++])
-	AC_CHECK_HEADER(snappy.h,,
+	AC_CHECK_HEADER(snappy-c.h,,
 	    [AC_MSG_ERROR([--enable-snappy requires snappy.h])])
-	AC_LANG_POP([C++])
 	AC_CHECK_LIB(snappy, snappy_compress,,
 	    [AC_MSG_ERROR([--enable-snappy requires snappy library])])
 fi
@@ -176,10 +174,8 @@ no)	if test "$wt_cv_with_builtin_extension_lz4" = "yes"; then
 esac
 AC_MSG_RESULT($wt_cv_enable_lz4)
 if test "$wt_cv_enable_lz4" = "yes"; then
-	AC_LANG_PUSH([C++])
 	AC_CHECK_HEADER(lz4.h,,
 	    [AC_MSG_ERROR([--enable-lz4 requires lz4.h])])
-	AC_LANG_POP([C++])
 	AC_CHECK_LIB(lz4, LZ4_compress_destSize,,
 	    [AC_MSG_ERROR([--enable-lz4 requires lz4 library with LZ4_compress_destSize support])])
 fi
@@ -195,10 +191,8 @@ no)	wt_cv_enable_tcmalloc=no;;
 esac
 AC_MSG_RESULT($wt_cv_enable_tcmalloc)
 if test "$wt_cv_enable_tcmalloc" = "yes"; then
-	AC_LANG_PUSH([C++])
 	AC_CHECK_HEADER(gperftools/tcmalloc.h,,
 	    [AC_MSG_ERROR([--enable-tcmalloc requires gperftools/tcmalloc.h])])
-	AC_LANG_POP([C++])
 	AC_CHECK_LIB(tcmalloc, tc_calloc,,
 	    [AC_MSG_ERROR([--enable-tcmalloc requires tcmalloc library])])
 fi

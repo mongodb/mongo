@@ -3,102 +3,102 @@
 #include "wt_internal.h"
 
 static const char * const __stats_dsrc_desc[] = {
-	"block-manager: file allocation unit size",
-	"block-manager: blocks allocated",
-	"block-manager: checkpoint size",
-	"block-manager: allocations requiring file extension",
-	"block-manager: blocks freed",
-	"block-manager: file magic number",
-	"block-manager: file major version number",
-	"block-manager: minor version number",
-	"block-manager: file bytes available for reuse",
-	"block-manager: file size in bytes",
-	"LSM: bloom filters in the LSM tree",
 	"LSM: bloom filter false positives",
 	"LSM: bloom filter hits",
 	"LSM: bloom filter misses",
 	"LSM: bloom filter pages evicted from cache",
 	"LSM: bloom filter pages read into cache",
+	"LSM: bloom filters in the LSM tree",
+	"LSM: chunks in the LSM tree",
+	"LSM: highest merge generation in the LSM tree",
+	"LSM: queries that could have benefited from a Bloom filter that did not exist",
+	"LSM: sleep for LSM checkpoint throttle",
+	"LSM: sleep for LSM merge throttle",
 	"LSM: total size of bloom filters",
+	"block-manager: allocations requiring file extension",
+	"block-manager: blocks allocated",
+	"block-manager: blocks freed",
+	"block-manager: checkpoint size",
+	"block-manager: file allocation unit size",
+	"block-manager: file bytes available for reuse",
+	"block-manager: file magic number",
+	"block-manager: file major version number",
+	"block-manager: file size in bytes",
+	"block-manager: minor version number",
 	"btree: btree checkpoint generation",
-	"btree: column-store variable-size deleted values",
 	"btree: column-store fixed-size leaf pages",
 	"btree: column-store internal pages",
 	"btree: column-store variable-size RLE encoded values",
+	"btree: column-store variable-size deleted values",
 	"btree: column-store variable-size leaf pages",
-	"btree: pages rewritten by compaction",
-	"btree: number of key/value pairs",
 	"btree: fixed-record size",
-	"btree: maximum tree depth",
 	"btree: maximum internal page key size",
 	"btree: maximum internal page size",
 	"btree: maximum leaf page key size",
 	"btree: maximum leaf page size",
 	"btree: maximum leaf page value size",
+	"btree: maximum tree depth",
+	"btree: number of key/value pairs",
 	"btree: overflow pages",
+	"btree: pages rewritten by compaction",
 	"btree: row-store internal pages",
 	"btree: row-store leaf pages",
 	"cache: bytes read into cache",
 	"cache: bytes written from cache",
 	"cache: checkpoint blocked page eviction",
-	"cache: unmodified pages evicted",
-	"cache: page split during eviction deepened the tree",
-	"cache: modified pages evicted",
 	"cache: data source pages selected for eviction unable to be evicted",
 	"cache: hazard pointer blocked page eviction",
+	"cache: in-memory page passed criteria to be split",
+	"cache: in-memory page splits",
 	"cache: internal pages evicted",
 	"cache: internal pages split during eviction",
 	"cache: leaf pages split during eviction",
-	"cache: in-memory page splits",
-	"cache: in-memory page passed criteria to be split",
+	"cache: modified pages evicted",
+	"cache: overflow pages read into cache",
 	"cache: overflow values cached in memory",
+	"cache: page split during eviction deepened the tree",
+	"cache: page written requiring lookaside records",
 	"cache: pages read into cache",
 	"cache: pages read into cache requiring lookaside entries",
-	"cache: overflow pages read into cache",
 	"cache: pages written from cache",
-	"cache: page written requiring lookaside records",
 	"cache: pages written requiring in-memory restoration",
-	"compression: raw compression call failed, no additional data available",
-	"compression: raw compression call failed, additional data available",
-	"compression: raw compression call succeeded",
+	"cache: unmodified pages evicted",
 	"compression: compressed pages read",
 	"compression: compressed pages written",
 	"compression: page written failed to compress",
 	"compression: page written was too small to compress",
-	"cursor: create calls",
-	"cursor: insert calls",
+	"compression: raw compression call failed, additional data available",
+	"compression: raw compression call failed, no additional data available",
+	"compression: raw compression call succeeded",
 	"cursor: bulk-loaded cursor-insert calls",
+	"cursor: create calls",
 	"cursor: cursor-insert key and value bytes inserted",
+	"cursor: cursor-remove key bytes removed",
+	"cursor: cursor-update value bytes updated",
+	"cursor: insert calls",
 	"cursor: next calls",
 	"cursor: prev calls",
 	"cursor: remove calls",
-	"cursor: cursor-remove key bytes removed",
 	"cursor: reset calls",
 	"cursor: restarted searches",
 	"cursor: search calls",
 	"cursor: search near calls",
 	"cursor: truncate calls",
 	"cursor: update calls",
-	"cursor: cursor-update value bytes updated",
-	"LSM: sleep for LSM checkpoint throttle",
-	"LSM: chunks in the LSM tree",
-	"LSM: highest merge generation in the LSM tree",
-	"LSM: queries that could have benefited from a Bloom filter that did not exist",
-	"LSM: sleep for LSM merge throttle",
 	"reconciliation: dictionary matches",
-	"reconciliation: internal page multi-block writes",
-	"reconciliation: leaf page multi-block writes",
-	"reconciliation: maximum blocks required for a page",
-	"reconciliation: internal-page overflow keys",
-	"reconciliation: leaf-page overflow keys",
-	"reconciliation: overflow values written",
-	"reconciliation: pages deleted",
 	"reconciliation: fast-path pages deleted",
+	"reconciliation: internal page key bytes discarded using suffix compression",
+	"reconciliation: internal page multi-block writes",
+	"reconciliation: internal-page overflow keys",
+	"reconciliation: leaf page key bytes discarded using prefix compression",
+	"reconciliation: leaf page multi-block writes",
+	"reconciliation: leaf-page overflow keys",
+	"reconciliation: maximum blocks required for a page",
+	"reconciliation: overflow values written",
 	"reconciliation: page checksum matches",
 	"reconciliation: page reconciliation calls",
 	"reconciliation: page reconciliation calls for eviction",
-	"reconciliation: leaf page key bytes discarded using prefix compression",
-	"reconciliation: internal page key bytes discarded using suffix compression",
+	"reconciliation: pages deleted",
 	"session: object compaction",
 	"session: open cursor count",
 	"transaction: update conflicts",
@@ -132,6 +132,18 @@ __wt_stat_dsrc_init(WT_DATA_HANDLE *handle)
 void
 __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 {
+	stats->bloom_false_positive = 0;
+	stats->bloom_hit = 0;
+	stats->bloom_miss = 0;
+	stats->bloom_page_evict = 0;
+	stats->bloom_page_read = 0;
+	stats->bloom_count = 0;
+	stats->lsm_chunk_count = 0;
+	stats->lsm_generation_max = 0;
+	stats->lsm_lookup_no_bloom = 0;
+	stats->lsm_checkpoint_throttle = 0;
+	stats->lsm_merge_throttle = 0;
+	stats->bloom_size = 0;
 	stats->block_extension = 0;
 	stats->block_alloc = 0;
 	stats->block_free = 0;
@@ -145,9 +157,9 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 		/* not clearing btree_checkpoint_generation */
 	stats->btree_column_fix = 0;
 	stats->btree_column_internal = 0;
+	stats->btree_column_rle = 0;
 	stats->btree_column_deleted = 0;
 	stats->btree_column_variable = 0;
-	stats->btree_column_rle = 0;
 	stats->btree_fixed_len = 0;
 	stats->btree_maxintlkey = 0;
 	stats->btree_maxintlpage = 0;
@@ -202,18 +214,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cursor_search_near = 0;
 	stats->cursor_truncate = 0;
 	stats->cursor_update = 0;
-	stats->bloom_false_positive = 0;
-	stats->bloom_hit = 0;
-	stats->bloom_miss = 0;
-	stats->bloom_page_evict = 0;
-	stats->bloom_page_read = 0;
-	stats->bloom_count = 0;
-	stats->lsm_chunk_count = 0;
-	stats->lsm_generation_max = 0;
-	stats->lsm_lookup_no_bloom = 0;
-	stats->lsm_checkpoint_throttle = 0;
-	stats->lsm_merge_throttle = 0;
-	stats->bloom_size = 0;
 	stats->rec_dictionary = 0;
 	stats->rec_page_delete_fast = 0;
 	stats->rec_suffix_compression = 0;
@@ -246,6 +246,19 @@ void
 __wt_stat_dsrc_aggregate_single(
     WT_DSRC_STATS *from, WT_DSRC_STATS *to)
 {
+	to->bloom_false_positive += from->bloom_false_positive;
+	to->bloom_hit += from->bloom_hit;
+	to->bloom_miss += from->bloom_miss;
+	to->bloom_page_evict += from->bloom_page_evict;
+	to->bloom_page_read += from->bloom_page_read;
+	to->bloom_count += from->bloom_count;
+	to->lsm_chunk_count += from->lsm_chunk_count;
+	if (from->lsm_generation_max > to->lsm_generation_max)
+		to->lsm_generation_max = from->lsm_generation_max;
+	to->lsm_lookup_no_bloom += from->lsm_lookup_no_bloom;
+	to->lsm_checkpoint_throttle += from->lsm_checkpoint_throttle;
+	to->lsm_merge_throttle += from->lsm_merge_throttle;
+	to->bloom_size += from->bloom_size;
 	to->block_extension += from->block_extension;
 	to->block_alloc += from->block_alloc;
 	to->block_free += from->block_free;
@@ -263,9 +276,9 @@ __wt_stat_dsrc_aggregate_single(
 	to->btree_checkpoint_generation += from->btree_checkpoint_generation;
 	to->btree_column_fix += from->btree_column_fix;
 	to->btree_column_internal += from->btree_column_internal;
+	to->btree_column_rle += from->btree_column_rle;
 	to->btree_column_deleted += from->btree_column_deleted;
 	to->btree_column_variable += from->btree_column_variable;
-	to->btree_column_rle += from->btree_column_rle;
 	if (from->btree_fixed_len > to->btree_fixed_len)
 		to->btree_fixed_len = from->btree_fixed_len;
 	if (from->btree_maxintlkey > to->btree_maxintlkey)
@@ -328,19 +341,6 @@ __wt_stat_dsrc_aggregate_single(
 	to->cursor_search_near += from->cursor_search_near;
 	to->cursor_truncate += from->cursor_truncate;
 	to->cursor_update += from->cursor_update;
-	to->bloom_false_positive += from->bloom_false_positive;
-	to->bloom_hit += from->bloom_hit;
-	to->bloom_miss += from->bloom_miss;
-	to->bloom_page_evict += from->bloom_page_evict;
-	to->bloom_page_read += from->bloom_page_read;
-	to->bloom_count += from->bloom_count;
-	to->lsm_chunk_count += from->lsm_chunk_count;
-	if (from->lsm_generation_max > to->lsm_generation_max)
-		to->lsm_generation_max = from->lsm_generation_max;
-	to->lsm_lookup_no_bloom += from->lsm_lookup_no_bloom;
-	to->lsm_checkpoint_throttle += from->lsm_checkpoint_throttle;
-	to->lsm_merge_throttle += from->lsm_merge_throttle;
-	to->bloom_size += from->bloom_size;
 	to->rec_dictionary += from->rec_dictionary;
 	to->rec_page_delete_fast += from->rec_page_delete_fast;
 	to->rec_suffix_compression += from->rec_suffix_compression;
@@ -367,6 +367,21 @@ __wt_stat_dsrc_aggregate(
 {
 	int64_t v;
 
+	to->bloom_false_positive += WT_STAT_READ(from, bloom_false_positive);
+	to->bloom_hit += WT_STAT_READ(from, bloom_hit);
+	to->bloom_miss += WT_STAT_READ(from, bloom_miss);
+	to->bloom_page_evict += WT_STAT_READ(from, bloom_page_evict);
+	to->bloom_page_read += WT_STAT_READ(from, bloom_page_read);
+	to->bloom_count += WT_STAT_READ(from, bloom_count);
+	to->lsm_chunk_count += WT_STAT_READ(from, lsm_chunk_count);
+	if ((v = WT_STAT_READ(from, lsm_generation_max)) >
+	    to->lsm_generation_max)
+		to->lsm_generation_max = v;
+	to->lsm_lookup_no_bloom += WT_STAT_READ(from, lsm_lookup_no_bloom);
+	to->lsm_checkpoint_throttle +=
+	    WT_STAT_READ(from, lsm_checkpoint_throttle);
+	to->lsm_merge_throttle += WT_STAT_READ(from, lsm_merge_throttle);
+	to->bloom_size += WT_STAT_READ(from, bloom_size);
 	to->block_extension += WT_STAT_READ(from, block_extension);
 	to->block_alloc += WT_STAT_READ(from, block_alloc);
 	to->block_free += WT_STAT_READ(from, block_free);
@@ -387,10 +402,10 @@ __wt_stat_dsrc_aggregate(
 	to->btree_column_fix += WT_STAT_READ(from, btree_column_fix);
 	to->btree_column_internal +=
 	    WT_STAT_READ(from, btree_column_internal);
+	to->btree_column_rle += WT_STAT_READ(from, btree_column_rle);
 	to->btree_column_deleted += WT_STAT_READ(from, btree_column_deleted);
 	to->btree_column_variable +=
 	    WT_STAT_READ(from, btree_column_variable);
-	to->btree_column_rle += WT_STAT_READ(from, btree_column_rle);
 	if ((v = WT_STAT_READ(from, btree_fixed_len)) > to->btree_fixed_len)
 		to->btree_fixed_len = v;
 	if ((v = WT_STAT_READ(from, btree_maxintlkey)) > to->btree_maxintlkey)
@@ -467,21 +482,6 @@ __wt_stat_dsrc_aggregate(
 	to->cursor_search_near += WT_STAT_READ(from, cursor_search_near);
 	to->cursor_truncate += WT_STAT_READ(from, cursor_truncate);
 	to->cursor_update += WT_STAT_READ(from, cursor_update);
-	to->bloom_false_positive += WT_STAT_READ(from, bloom_false_positive);
-	to->bloom_hit += WT_STAT_READ(from, bloom_hit);
-	to->bloom_miss += WT_STAT_READ(from, bloom_miss);
-	to->bloom_page_evict += WT_STAT_READ(from, bloom_page_evict);
-	to->bloom_page_read += WT_STAT_READ(from, bloom_page_read);
-	to->bloom_count += WT_STAT_READ(from, bloom_count);
-	to->lsm_chunk_count += WT_STAT_READ(from, lsm_chunk_count);
-	if ((v = WT_STAT_READ(from, lsm_generation_max)) >
-	    to->lsm_generation_max)
-		to->lsm_generation_max = v;
-	to->lsm_lookup_no_bloom += WT_STAT_READ(from, lsm_lookup_no_bloom);
-	to->lsm_checkpoint_throttle +=
-	    WT_STAT_READ(from, lsm_checkpoint_throttle);
-	to->lsm_merge_throttle += WT_STAT_READ(from, lsm_merge_throttle);
-	to->bloom_size += WT_STAT_READ(from, bloom_size);
 	to->rec_dictionary += WT_STAT_READ(from, rec_dictionary);
 	to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
 	to->rec_suffix_compression +=
@@ -509,12 +509,22 @@ __wt_stat_dsrc_aggregate(
 }
 
 static const char * const __stats_connection_desc[] = {
-	"async: number of allocation state races",
-	"async: number of operation slots viewed for allocation",
+	"LSM: application work units currently queued",
+	"LSM: merge work units currently queued",
+	"LSM: rows merged in an LSM tree",
+	"LSM: sleep for LSM checkpoint throttle",
+	"LSM: sleep for LSM merge throttle",
+	"LSM: switch work units currently queued",
+	"LSM: tree maintenance operations discarded",
+	"LSM: tree maintenance operations executed",
+	"LSM: tree maintenance operations scheduled",
+	"LSM: tree queue hit maximum",
 	"async: current work queue length",
-	"async: number of flush calls",
-	"async: number of times operation allocation failed",
 	"async: maximum work queue length",
+	"async: number of allocation state races",
+	"async: number of flush calls",
+	"async: number of operation slots viewed for allocation",
+	"async: number of times operation allocation failed",
 	"async: number of times worker found no work",
 	"async: total allocations",
 	"async: total compact calls",
@@ -522,55 +532,64 @@ static const char * const __stats_connection_desc[] = {
 	"async: total remove calls",
 	"async: total search calls",
 	"async: total update calls",
-	"block-manager: mapped bytes read",
-	"block-manager: bytes read",
-	"block-manager: bytes written",
-	"block-manager: mapped blocks read",
 	"block-manager: blocks pre-loaded",
 	"block-manager: blocks read",
 	"block-manager: blocks written",
-	"cache: tracked dirty bytes in the cache",
-	"cache: tracked bytes belonging to internal pages in the cache",
+	"block-manager: bytes read",
+	"block-manager: bytes written",
+	"block-manager: mapped blocks read",
+	"block-manager: mapped bytes read",
 	"cache: bytes currently in the cache",
-	"cache: tracked bytes belonging to leaf pages in the cache",
-	"cache: maximum bytes configured",
-	"cache: tracked bytes belonging to overflow pages in the cache",
 	"cache: bytes read into cache",
 	"cache: bytes written from cache",
-	"cache: pages evicted by application threads",
 	"cache: checkpoint blocked page eviction",
-	"cache: unmodified pages evicted",
-	"cache: page split during eviction deepened the tree",
-	"cache: modified pages evicted",
-	"cache: pages selected for eviction unable to be evicted",
-	"cache: pages evicted because they exceeded the in-memory maximum",
-	"cache: pages evicted because they had chains of deleted items",
-	"cache: failed eviction of pages that exceeded the in-memory maximum",
-	"cache: hazard pointer blocked page eviction",
-	"cache: internal pages evicted",
-	"cache: maximum page size at eviction",
+	"cache: eviction currently operating in aggressive mode",
 	"cache: eviction server candidate queue empty when topping up",
 	"cache: eviction server candidate queue not empty when topping up",
 	"cache: eviction server evicting pages",
 	"cache: eviction server populating queue, but not evicting pages",
 	"cache: eviction server unable to reach eviction goal",
+	"cache: eviction worker thread evicting pages",
+	"cache: failed eviction of pages that exceeded the in-memory maximum",
+	"cache: hazard pointer blocked page eviction",
+	"cache: in-memory page passed criteria to be split",
+	"cache: in-memory page splits",
+	"cache: internal pages evicted",
 	"cache: internal pages split during eviction",
 	"cache: leaf pages split during eviction",
-	"cache: pages walked for eviction",
-	"cache: eviction worker thread evicting pages",
-	"cache: in-memory page splits",
-	"cache: in-memory page passed criteria to be split",
 	"cache: lookaside table insert calls",
 	"cache: lookaside table remove calls",
-	"cache: percentage overhead",
-	"cache: tracked dirty pages in the cache",
+	"cache: maximum bytes configured",
+	"cache: maximum page size at eviction",
+	"cache: modified pages evicted",
+	"cache: page split during eviction deepened the tree",
+	"cache: page written requiring lookaside records",
 	"cache: pages currently held in the cache",
+	"cache: pages evicted because they exceeded the in-memory maximum",
+	"cache: pages evicted because they had chains of deleted items",
+	"cache: pages evicted by application threads",
 	"cache: pages read into cache",
 	"cache: pages read into cache requiring lookaside entries",
+	"cache: pages selected for eviction unable to be evicted",
+	"cache: pages walked for eviction",
 	"cache: pages written from cache",
-	"cache: page written requiring lookaside records",
 	"cache: pages written requiring in-memory restoration",
+	"cache: percentage overhead",
+	"cache: tracked bytes belonging to internal pages in the cache",
+	"cache: tracked bytes belonging to leaf pages in the cache",
+	"cache: tracked bytes belonging to overflow pages in the cache",
+	"cache: tracked dirty bytes in the cache",
+	"cache: tracked dirty pages in the cache",
+	"cache: unmodified pages evicted",
+	"connection: files currently open",
+	"connection: memory allocations",
+	"connection: memory frees",
+	"connection: memory re-allocations",
 	"connection: pthread mutex condition wait calls",
+	"connection: pthread mutex shared lock read-lock calls",
+	"connection: pthread mutex shared lock write-lock calls",
+	"connection: total read I/Os",
+	"connection: total write I/Os",
 	"cursor: cursor create calls",
 	"cursor: cursor insert calls",
 	"cursor: cursor next calls",
@@ -580,96 +599,78 @@ static const char * const __stats_connection_desc[] = {
 	"cursor: cursor restarted searches",
 	"cursor: cursor search calls",
 	"cursor: cursor search near calls",
-	"cursor: truncate calls",
 	"cursor: cursor update calls",
+	"cursor: truncate calls",
 	"data-handle: connection data handles currently active",
-	"data-handle: session dhandles swept",
-	"data-handle: session sweep attempts",
-	"data-handle: connection sweep dhandles closed",
 	"data-handle: connection sweep candidate became referenced",
+	"data-handle: connection sweep dhandles closed",
 	"data-handle: connection sweep dhandles removed from hash list",
 	"data-handle: connection sweep time-of-death sets",
 	"data-handle: connection sweeps",
-	"connection: files currently open",
-	"log: total log buffer size",
+	"data-handle: session dhandles swept",
+	"data-handle: session sweep attempts",
+	"log: busy returns attempting to switch slots",
+	"log: consolidated slot closures",
+	"log: consolidated slot join races",
+	"log: consolidated slot join transitions",
+	"log: consolidated slot joins",
+	"log: consolidated slot unbuffered writes",
 	"log: log bytes of payload data",
 	"log: log bytes written",
-	"log: yields waiting for previous log file close",
-	"log: total size of compressed records",
-	"log: total in-memory size of compressed records",
-	"log: log records too small to compress",
-	"log: log records not compressed",
-	"log: log records compressed",
+	"log: log files manually zero-filled",
 	"log: log flush operations",
-	"log: maximum log file size",
-	"log: pre-allocated log files prepared",
-	"log: number of pre-allocated log files to create",
-	"log: pre-allocated log files not ready and missed",
-	"log: pre-allocated log files used",
+	"log: log records compressed",
+	"log: log records not compressed",
+	"log: log records too small to compress",
 	"log: log release advances write LSN",
-	"log: records processed by log scan",
-	"log: log scan records requiring two reads",
 	"log: log scan operations",
-	"log: consolidated slot closures",
-	"log: written slots coalesced",
-	"log: logging bytes consolidated",
-	"log: consolidated slot joins",
-	"log: consolidated slot join races",
-	"log: busy returns attempting to switch slots",
-	"log: consolidated slot join transitions",
-	"log: consolidated slot unbuffered writes",
+	"log: log scan records requiring two reads",
+	"log: log server thread advances write LSN",
 	"log: log sync operations",
 	"log: log sync_dir operations",
-	"log: log server thread advances write LSN",
 	"log: log write operations",
-	"log: log files manually zero-filled",
-	"LSM: sleep for LSM checkpoint throttle",
-	"LSM: sleep for LSM merge throttle",
-	"LSM: rows merged in an LSM tree",
-	"LSM: application work units currently queued",
-	"LSM: merge work units currently queued",
-	"LSM: tree queue hit maximum",
-	"LSM: switch work units currently queued",
-	"LSM: tree maintenance operations scheduled",
-	"LSM: tree maintenance operations discarded",
-	"LSM: tree maintenance operations executed",
-	"connection: memory allocations",
-	"connection: memory frees",
-	"connection: memory re-allocations",
+	"log: logging bytes consolidated",
+	"log: maximum log file size",
+	"log: number of pre-allocated log files to create",
+	"log: pre-allocated log files not ready and missed",
+	"log: pre-allocated log files prepared",
+	"log: pre-allocated log files used",
+	"log: records processed by log scan",
+	"log: total in-memory size of compressed records",
+	"log: total log buffer size",
+	"log: total size of compressed records",
+	"log: written slots coalesced",
+	"log: yields waiting for previous log file close",
+	"reconciliation: fast-path pages deleted",
+	"reconciliation: page reconciliation calls",
+	"reconciliation: page reconciliation calls for eviction",
+	"reconciliation: pages deleted",
+	"reconciliation: split bytes currently awaiting free",
+	"reconciliation: split objects currently awaiting free",
+	"session: open cursor count",
+	"session: open session count",
 	"thread-yield: page acquire busy blocked",
 	"thread-yield: page acquire eviction blocked",
 	"thread-yield: page acquire locked blocked",
 	"thread-yield: page acquire read blocked",
 	"thread-yield: page acquire time sleeping (usecs)",
-	"connection: total read I/Os",
-	"reconciliation: pages deleted",
-	"reconciliation: fast-path pages deleted",
-	"reconciliation: page reconciliation calls",
-	"reconciliation: page reconciliation calls for eviction",
-	"reconciliation: split bytes currently awaiting free",
-	"reconciliation: split objects currently awaiting free",
-	"connection: pthread mutex shared lock read-lock calls",
-	"connection: pthread mutex shared lock write-lock calls",
-	"session: open cursor count",
-	"session: open session count",
+	"transaction: number of named snapshots created",
+	"transaction: number of named snapshots dropped",
 	"transaction: transaction begins",
-	"transaction: transaction checkpoints",
-	"transaction: transaction checkpoint generation",
 	"transaction: transaction checkpoint currently running",
+	"transaction: transaction checkpoint generation",
 	"transaction: transaction checkpoint max time (msecs)",
 	"transaction: transaction checkpoint min time (msecs)",
 	"transaction: transaction checkpoint most recent time (msecs)",
 	"transaction: transaction checkpoint total time (msecs)",
-	"transaction: transactions committed",
+	"transaction: transaction checkpoints",
 	"transaction: transaction failures due to cache overflow",
-	"transaction: transaction range of IDs currently pinned by a checkpoint",
 	"transaction: transaction range of IDs currently pinned",
+	"transaction: transaction range of IDs currently pinned by a checkpoint",
 	"transaction: transaction range of IDs currently pinned by named snapshots",
-	"transaction: transactions rolled back",
-	"transaction: number of named snapshots created",
-	"transaction: number of named snapshots dropped",
 	"transaction: transaction sync calls",
-	"connection: total write I/Os",
+	"transaction: transactions committed",
+	"transaction: transactions rolled back",
 };
 
 int
@@ -700,6 +701,16 @@ __wt_stat_connection_init(WT_CONNECTION_IMPL *handle)
 void
 __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 {
+		/* not clearing lsm_work_queue_app */
+		/* not clearing lsm_work_queue_manager */
+	stats->lsm_rows_merged = 0;
+	stats->lsm_checkpoint_throttle = 0;
+	stats->lsm_merge_throttle = 0;
+		/* not clearing lsm_work_queue_switch */
+	stats->lsm_work_units_discarded = 0;
+	stats->lsm_work_units_done = 0;
+	stats->lsm_work_units_created = 0;
+	stats->lsm_work_queue_max = 0;
 	stats->async_cur_queue = 0;
 		/* not clearing async_max_queue */
 	stats->async_alloc_race = 0;
@@ -724,6 +735,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_bytes_read = 0;
 	stats->cache_bytes_write = 0;
 	stats->cache_eviction_checkpoint = 0;
+		/* not clearing cache_eviction_aggressive_set */
 	stats->cache_eviction_queue_empty = 0;
 	stats->cache_eviction_queue_not_empty = 0;
 	stats->cache_eviction_server_evicting = 0;
@@ -821,16 +833,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_compress_len = 0;
 	stats->log_slot_coalesced = 0;
 	stats->log_close_yields = 0;
-		/* not clearing lsm_work_queue_app */
-		/* not clearing lsm_work_queue_manager */
-	stats->lsm_rows_merged = 0;
-	stats->lsm_checkpoint_throttle = 0;
-	stats->lsm_merge_throttle = 0;
-		/* not clearing lsm_work_queue_switch */
-	stats->lsm_work_units_discarded = 0;
-	stats->lsm_work_units_done = 0;
-	stats->lsm_work_units_created = 0;
-	stats->lsm_work_queue_max = 0;
 	stats->rec_page_delete_fast = 0;
 	stats->rec_pages = 0;
 	stats->rec_pages_eviction = 0;
@@ -876,6 +878,21 @@ void
 __wt_stat_connection_aggregate(
     WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *to)
 {
+	to->lsm_work_queue_app += WT_STAT_READ(from, lsm_work_queue_app);
+	to->lsm_work_queue_manager +=
+	    WT_STAT_READ(from, lsm_work_queue_manager);
+	to->lsm_rows_merged += WT_STAT_READ(from, lsm_rows_merged);
+	to->lsm_checkpoint_throttle +=
+	    WT_STAT_READ(from, lsm_checkpoint_throttle);
+	to->lsm_merge_throttle += WT_STAT_READ(from, lsm_merge_throttle);
+	to->lsm_work_queue_switch +=
+	    WT_STAT_READ(from, lsm_work_queue_switch);
+	to->lsm_work_units_discarded +=
+	    WT_STAT_READ(from, lsm_work_units_discarded);
+	to->lsm_work_units_done += WT_STAT_READ(from, lsm_work_units_done);
+	to->lsm_work_units_created +=
+	    WT_STAT_READ(from, lsm_work_units_created);
+	to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
 	to->async_cur_queue += WT_STAT_READ(from, async_cur_queue);
 	to->async_max_queue += WT_STAT_READ(from, async_max_queue);
 	to->async_alloc_race += WT_STAT_READ(from, async_alloc_race);
@@ -901,6 +918,8 @@ __wt_stat_connection_aggregate(
 	to->cache_bytes_write += WT_STAT_READ(from, cache_bytes_write);
 	to->cache_eviction_checkpoint +=
 	    WT_STAT_READ(from, cache_eviction_checkpoint);
+	to->cache_eviction_aggressive_set +=
+	    WT_STAT_READ(from, cache_eviction_aggressive_set);
 	to->cache_eviction_queue_empty +=
 	    WT_STAT_READ(from, cache_eviction_queue_empty);
 	to->cache_eviction_queue_not_empty +=
@@ -1018,21 +1037,6 @@ __wt_stat_connection_aggregate(
 	to->log_compress_len += WT_STAT_READ(from, log_compress_len);
 	to->log_slot_coalesced += WT_STAT_READ(from, log_slot_coalesced);
 	to->log_close_yields += WT_STAT_READ(from, log_close_yields);
-	to->lsm_work_queue_app += WT_STAT_READ(from, lsm_work_queue_app);
-	to->lsm_work_queue_manager +=
-	    WT_STAT_READ(from, lsm_work_queue_manager);
-	to->lsm_rows_merged += WT_STAT_READ(from, lsm_rows_merged);
-	to->lsm_checkpoint_throttle +=
-	    WT_STAT_READ(from, lsm_checkpoint_throttle);
-	to->lsm_merge_throttle += WT_STAT_READ(from, lsm_merge_throttle);
-	to->lsm_work_queue_switch +=
-	    WT_STAT_READ(from, lsm_work_queue_switch);
-	to->lsm_work_units_discarded +=
-	    WT_STAT_READ(from, lsm_work_units_discarded);
-	to->lsm_work_units_done += WT_STAT_READ(from, lsm_work_units_done);
-	to->lsm_work_units_created +=
-	    WT_STAT_READ(from, lsm_work_units_created);
-	to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
 	to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
 	to->rec_pages += WT_STAT_READ(from, rec_pages);
 	to->rec_pages_eviction += WT_STAT_READ(from, rec_pages_eviction);

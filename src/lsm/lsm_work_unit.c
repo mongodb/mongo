@@ -272,7 +272,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(chunk, WT_LSM_CHUNK_STABLE) &&
 	    !chunk->evicted) {
-		WT_WITH_HANDLE_LIST_LOCK(session, ret,
+		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __lsm_discard_handle(session, chunk->uri, NULL));
 		if (ret == 0)
 			chunk->evicted = 1;
@@ -334,11 +334,17 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/*
 	 * Turn on metadata tracking to ensure the checkpoint gets the
 	 * necessary handle locks.
+	 *
+	 * Ensure that we don't race with a running checkpoint: the checkpoint
+	 * lock protects against us racing with an application checkpoint in
+	 * this chunk.  Don't wait for it, though: checkpoints can take a long
+	 * time, and our checkpoint operation should be very quick.
 	 */
 	WT_ERR(__wt_meta_track_on(session));
-	WT_WITH_SCHEMA_LOCK(session, ret,
-	    ret = __wt_schema_worker(
-	    session, chunk->uri, __wt_checkpoint, NULL, NULL, 0));
+	WT_WITH_CHECKPOINT_LOCK(session, ret,
+	    WT_WITH_SCHEMA_LOCK(session, ret,
+		ret = __wt_schema_worker(
+		session, chunk->uri, __wt_checkpoint, NULL, NULL, 0)));
 	WT_TRET(__wt_meta_track_off(session, false, ret != 0));
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "LSM checkpoint");
@@ -506,7 +512,7 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	 *
 	 * This will fail with EBUSY if the file is still in use.
 	 */
-	WT_WITH_HANDLE_LIST_LOCK(session, ret,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	   ret = __lsm_discard_handle(session, uri, WT_CHECKPOINT));
 	WT_RET(ret);
 

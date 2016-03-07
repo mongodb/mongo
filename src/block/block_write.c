@@ -203,10 +203,17 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_FH *fh;
 	size_t align_size;
 	wt_off_t offset;
+	uint32_t cksum;
 	bool local_locked;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	fh = block->fh;
+
+	/*
+	 * Swap the page-header as needed; this doesn't belong here, but it's
+	 * the best place to catch all callers.
+	 */
+	__wt_page_header_byteswap(buf->mem);
 
 	/* Buffers should be aligned for writing. */
 	if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
@@ -255,13 +262,21 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * because they're not compressed, both to give salvage a quick test
 	 * of whether a block is useful and to give us a test so we don't lose
 	 * the first WT_BLOCK_COMPRESS_SKIP bytes without noticing.
+	 *
+	 * Checksum a little-endian version of the header, and write everything
+	 * in little-endian format. The checksum is (potentially) returned in a
+	 * big-endian format, swap it into place in a separate step.
 	 */
 	blk->flags = 0;
 	if (data_cksum)
 		F_SET(blk, WT_BLOCK_DATA_CKSUM);
 	blk->cksum = 0;
-	blk->cksum = __wt_cksum(
+	__wt_block_header_byteswap(blk);
+	blk->cksum = cksum = __wt_cksum(
 	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
+#ifdef WORDS_BIGENDIAN
+	blk->cksum = __wt_bswap32(blk->cksum);
+#endif
 
 	/* Pre-allocate some number of extension structures. */
 	WT_RET(__wt_block_ext_prealloc(session, 5));
@@ -325,11 +340,11 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	WT_RET(__wt_verbose(session, WT_VERB_WRITE,
 	    "off %" PRIuMAX ", size %" PRIuMAX ", cksum %" PRIu32,
-	    (uintmax_t)offset, (uintmax_t)align_size, blk->cksum));
+	    (uintmax_t)offset, (uintmax_t)align_size, cksum));
 
 	*offsetp = offset;
 	*sizep = WT_STORE_SIZE(align_size);
-	*cksump = blk->cksum;
+	*cksump = cksum;
 
-	return (ret);
+	return (0);
 }

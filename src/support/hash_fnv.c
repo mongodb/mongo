@@ -83,7 +83,6 @@
  * Share and Enjoy!	:-)
  */
 
-#include <stdlib.h>
 #include "wt_internal.h"
 
 /*

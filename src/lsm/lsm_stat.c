@@ -33,7 +33,7 @@ __curstat_lsm_init(
 	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = false;
-	WT_WITH_HANDLE_LIST_LOCK(session, ret,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, false, &lsm_tree));
 	WT_RET(ret);
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));

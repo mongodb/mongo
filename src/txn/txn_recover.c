@@ -91,9 +91,9 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	WT_ERR(__recovery_cursor(					\
 	    (session), (r), (lsnp), (fileid), false, (cp)));		\
 	WT_ERR(__wt_verbose((session), WT_VERB_RECOVERY,		\
-	    "%s op %d to file %d at LSN %u/%" PRIuMAX,			\
+	    "%s op %d to file %d at LSN %u/%u",				\
 	    (cursor == NULL) ? "Skipping" : "Applying",			\
-	    optype, fileid, lsnp->file, (uintmax_t)lsnp->offset));	\
+	    optype, fileid, lsnp->l.file, lsnp->l.offset));		\
 	if (cursor == NULL)						\
 		break
 
@@ -303,8 +303,7 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_LSN lsn;
-	intmax_t offset;
-	uint32_t fileid;
+	uint32_t fileid, lsnfile, lsnoffset;
 
 	WT_RET(__wt_config_getones(r->session, config, "id", &cval));
 	fileid = (uint32_t)cval.val;
@@ -326,8 +325,8 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 	if (cval.type != WT_CONFIG_ITEM_STRUCT)
 		WT_INIT_LSN(&lsn);
 	else if (sscanf(cval.str,
-	    "(%" SCNu32 ",%" SCNdMAX ")", &lsn.file, &offset) == 2)
-		lsn.offset = offset;
+	    "(%" SCNu32 ",%" SCNu32 ")", &lsnfile, &lsnoffset) == 2)
+		WT_SET_LSN(&lsn, lsnfile, lsnoffset);
 	else
 		WT_RET_MSG(r->session, EINVAL,
 		    "Failed to parse checkpoint LSN '%.*s'",
@@ -335,8 +334,8 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 	r->files[fileid].ckpt_lsn = lsn;
 
 	WT_RET(__wt_verbose(r->session, WT_VERB_RECOVERY,
-	    "Recovering %s with id %u @ (%" PRIu32 ", %" PRIu64 ")",
-	    uri, fileid, lsn.file, lsn.offset));
+	    "Recovering %s with id %u @ (%" PRIu32 ", %" PRIu32 ")",
+	    uri, fileid, lsn.l.file, lsn.l.offset));
 
 	return (0);
 
@@ -450,6 +449,18 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 */
 	if (!was_backup) {
 		r.metadata_only = true;
+		/*
+		 * If this is a read-only connection, check if the checkpoint
+		 * LSN in the metadata file is up to date, indicating a clean
+		 * shutdown.
+		 */
+		if (F_ISSET(conn, WT_CONN_READONLY)) {
+			WT_ERR(__wt_log_needs_recovery(
+			    session, &metafile->ckpt_lsn, &needs_rec));
+			if (needs_rec)
+				WT_ERR_MSG(session, WT_RUN_RECOVERY,
+				    "Read-only database needs recovery");
+		}
 		if (WT_IS_INIT_LSN(&metafile->ckpt_lsn))
 			WT_ERR(__wt_log_scan(session,
 			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
@@ -485,16 +496,25 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 */
 	r.metadata_only = false;
 	WT_ERR(__wt_verbose(session, WT_VERB_RECOVERY,
-	    "Main recovery loop: starting at %u/%" PRIuMAX,
-	    r.ckpt_lsn.file, (uintmax_t)r.ckpt_lsn.offset));
+	    "Main recovery loop: starting at %u/%u",
+	    r.ckpt_lsn.l.file, r.ckpt_lsn.l.offset));
 	WT_ERR(__wt_log_needs_recovery(session, &r.ckpt_lsn, &needs_rec));
 	/*
 	 * Check if the database was shut down cleanly.  If not
 	 * return an error if the user does not want automatic
 	 * recovery.
 	 */
-	if (needs_rec && FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR))
+	if (needs_rec &&
+	    (FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR) ||
+	     F_ISSET(conn, WT_CONN_READONLY))) {
+		if (F_ISSET(conn, WT_CONN_READONLY))
+			WT_ERR_MSG(session, WT_RUN_RECOVERY,
+			    "Read-only database needs recovery");
 		WT_ERR(WT_RUN_RECOVERY);
+	}
+
+	if (F_ISSET(conn, WT_CONN_READONLY))
+		goto done;
 
 	/*
 	 * Recovery can touch more data than fits in cache, so it relies on
@@ -505,7 +525,8 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	eviction_started = true;
 
 	/*
-	 * Always run recovery even if it was a clean shutdown.
+	 * Always run recovery even if it was a clean shutdown only if
+	 * this is not a read-only connection.
 	 * We can consider skipping it in the future.
 	 */
 	if (WT_IS_INIT_LSN(&r.ckpt_lsn))

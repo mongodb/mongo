@@ -108,15 +108,15 @@ compare_tables(WT_SESSION *session, WT_SESSION *sess_copy)
 
 /*! [log cursor walk] */
 static void
-print_record(WT_LSN *lsn, uint32_t opcount,
+print_record(uint32_t log_file, uint32_t log_offset, uint32_t opcount,
    uint32_t rectype, uint32_t optype, uint64_t txnid, uint32_t fileid,
    WT_ITEM *key, WT_ITEM *value)
 {
 	printf(
-	    "LSN [%" PRIu32 "][%" PRIu64 "].%" PRIu32
+	    "LSN [%" PRIu32 "][%" PRIu32 "].%" PRIu32
 	    ": record type %" PRIu32 " optype %" PRIu32
 	    " txnid %" PRIu64 " fileid %" PRIu32,
-	    lsn->file, (uint64_t)lsn->offset, opcount,
+	    log_file, log_offset, opcount,
 	    rectype, optype, txnid, fileid);
 	printf(" key size %zu value size %zu\n", key->size, value->size);
 	if (rectype == WT_LOGREC_MESSAGE)
@@ -131,10 +131,9 @@ static int
 simple_walk_log(WT_SESSION *session, int count_min)
 {
 	WT_CURSOR *cursor;
-	WT_LSN lsn;
 	WT_ITEM logrec_key, logrec_value;
 	uint64_t txnid;
-	uint32_t fileid, opcount, optype, rectype;
+	uint32_t fileid, log_file, log_offset, opcount, optype, rectype;
 	int count, ret;
 
 	/*! [log cursor open] */
@@ -145,14 +144,14 @@ simple_walk_log(WT_SESSION *session, int count_min)
 	while ((ret = cursor->next(cursor)) == 0) {
 		count++;
 		/*! [log cursor get_key] */
-		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset, &opcount);
+		ret = cursor->get_key(cursor, &log_file, &log_offset, &opcount);
 		/*! [log cursor get_key] */
 		/*! [log cursor get_value] */
 		ret = cursor->get_value(cursor, &txnid,
 		    &rectype, &optype, &fileid, &logrec_key, &logrec_value);
 		/*! [log cursor get_value] */
 
-		print_record(&lsn, opcount,
+		print_record(log_file, log_offset, opcount,
 		    rectype, optype, txnid, fileid, &logrec_key, &logrec_value);
 	}
 	if (ret == WT_NOTFOUND)
@@ -173,11 +172,11 @@ walk_log(WT_SESSION *session)
 {
 	WT_CONNECTION *wt_conn2;
 	WT_CURSOR *cursor, *cursor2;
-	WT_LSN lsn, lsnsave;
 	WT_ITEM logrec_key, logrec_value;
 	WT_SESSION *session2;
 	uint64_t txnid;
 	uint32_t fileid, opcount, optype, rectype;
+	uint32_t log_file, log_offset, save_file, save_offset;
 	int first, i, in_txn, ret;
 
 	ret = setup_copy(&wt_conn2, &session2);
@@ -186,21 +185,23 @@ walk_log(WT_SESSION *session)
 	i = 0;
 	in_txn = 0;
 	txnid = 0;
-	memset(&lsnsave, 0, sizeof(lsnsave));
+	save_file = save_offset = 0;
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset, &opcount);
+		ret = cursor->get_key(cursor, &log_file, &log_offset, &opcount);
 		/*
 		 * Save one of the LSNs we get back to search for it
 		 * later.  Pick a later one because we want to walk from
 		 * that LSN to the end (where the multi-step transaction
 		 * was performed).  Just choose the record that is MAX_KEYS.
 		 */
-		if (++i == MAX_KEYS)
-			lsnsave = lsn;
+		if (++i == MAX_KEYS) {
+			save_file = log_file;
+			save_offset = log_offset;
+		}
 		ret = cursor->get_value(cursor, &txnid, &rectype,
 		    &optype, &fileid, &logrec_key, &logrec_value);
 
-		print_record(&lsn, opcount,
+		print_record(log_file, log_offset, opcount,
 		    rectype, optype, txnid, fileid, &logrec_key, &logrec_value);
 
 		/*
@@ -245,7 +246,7 @@ walk_log(WT_SESSION *session)
 
 	ret = cursor->reset(cursor);
 	/*! [log cursor set_key] */
-	cursor->set_key(cursor, lsnsave.file, lsnsave.offset, 0);
+	cursor->set_key(cursor, save_file, save_offset, 0);
 	/*! [log cursor set_key] */
 	/*! [log cursor search] */
 	ret = cursor->search(cursor);
@@ -256,11 +257,11 @@ walk_log(WT_SESSION *session)
 	 */
 	first = 1;
 	while ((ret = cursor->get_key(cursor,
-	    &lsn.file, &lsn.offset, &opcount)) == 0) {
+	    &log_file, &log_offset, &opcount)) == 0) {
 		if (first) {
 			first = 0;
-			if (lsnsave.file != lsn.file ||
-			    lsnsave.offset != lsn.offset) {
+			if (save_file != log_file ||
+			    save_offset != log_offset) {
 				fprintf(stderr,
 				    "search returned the wrong LSN\n");
 				exit (1);
@@ -269,7 +270,7 @@ walk_log(WT_SESSION *session)
 		ret = cursor->get_value(cursor, &txnid, &rectype,
 		    &optype, &fileid, &logrec_key, &logrec_value);
 
-		print_record(&lsn, opcount,
+		print_record(log_file, log_offset, opcount,
 		    rectype, optype, txnid, fileid, &logrec_key, &logrec_value);
 
 		ret = cursor->next(cursor);

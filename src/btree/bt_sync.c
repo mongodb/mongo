@@ -23,12 +23,11 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_REF *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
-	uint64_t saved_snap_min;
+	uint64_t oldest_id, saved_snap_min;
 	uint32_t flags;
 	bool evict_reset;
 
 	btree = S2BT(session);
-
 	walk = NULL;
 	txn = &session->txn;
 	saved_snap_min = WT_SESSION_TXN_STATE(session)->snap_min;
@@ -56,6 +55,15 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 			return (0);
 		}
 
+		/*
+		 * Save the oldest transaction ID we need to keep around.
+		 * Otherwise, in a busy system, we could be updating pages so
+		 * fast that write leaves never catches up.  We deliberately
+		 * have no transaction running at this point that would keep
+		 * the oldest ID from moving forwards as we walk the tree.
+		 */
+		oldest_id = __wt_txn_oldest_id(session);
+
 		flags |= WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
 		for (walk = NULL;;) {
 			WT_ERR(__wt_tree_walk(session, &walk, flags));
@@ -64,13 +72,13 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
 			/*
 			 * Write dirty pages if nobody beat us to it.  Don't
-			 * try to write the hottest pages: checkpoint will have
-			 * to visit them anyway.
+			 * try to write hot pages (defined as pages that have
+			 * been updated since the write phase leaves started):
+			 * checkpoint will have to visit them anyway.
 			 */
 			page = walk->page;
 			if (__wt_page_is_modified(page) &&
-			    __wt_txn_visible_all(
-			    session, page->modify->update_txn)) {
+			    WT_TXNID_LT(page->modify->update_txn, oldest_id)) {
 				if (txn->isolation == WT_ISO_READ_COMMITTED)
 					__wt_txn_get_snapshot(session);
 				leaf_bytes += page->memory_footprint;
@@ -105,13 +113,13 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		__wt_spin_lock(session, &btree->flush_lock);
 
 		/*
-		 * When internal pages are being reconciled by checkpoint their
-		 * child pages cannot disappear from underneath them or be split
-		 * into them, nor can underlying blocks be freed until the block
-		 * lists for the checkpoint are stable.  Set the checkpointing
-		 * flag to block eviction of dirty pages until the checkpoint's
-		 * internal page pass is complete, then wait for any existing
-		 * eviction to complete.
+		 * In the final checkpoint pass, child pages cannot be evicted
+		 * from underneath internal pages nor can underlying blocks be
+		 * freed until the checkpoint's block lists are stable. Also,
+		 * we cannot split child pages into parents unless we know the
+		 * final pass will write a consistent view of that namespace.
+		 * Set the checkpointing flag to block such actions and wait for
+		 * any problematic eviction or page splits to complete.
 		 */
 		WT_PUBLISH(btree->checkpointing, WT_CKPT_PREPARE);
 

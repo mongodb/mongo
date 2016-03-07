@@ -142,7 +142,6 @@ typedef struct {
 	FILE *logfp;				/* Log file */
 
 	int replay;				/* Replaying a run. */
-	int track;				/* Track progress */
 	int workers_finished;			/* Operations completed */
 
 	pthread_rwlock_t backup_lock;		/* Hot backup running */
@@ -210,6 +209,7 @@ typedef struct {
 	uint32_t c_merge_max;
 	uint32_t c_mmap;
 	uint32_t c_ops;
+	uint32_t c_quiet;
 	uint32_t c_prefix_compression;
 	uint32_t c_prefix_compression_min;
 	uint32_t c_repeat_data_pct;
@@ -333,12 +333,6 @@ void	 wts_reopen(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
-
-void	 die(int, const char *, ...)
-#if defined(__GNUC__)
-__attribute__((__noreturn__))
-#endif
-;
 
 /*
  * mmrand --

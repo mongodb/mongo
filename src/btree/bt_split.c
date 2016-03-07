@@ -875,16 +875,24 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	/* The split is complete and correct, ignore benign errors. */
 	complete = WT_ERR_IGNORE;
 
-	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-	    "%p: %s %s" "split into parent %p, %" PRIu32 " -> %" PRIu32
-	    " (%s%" PRIu32 ")",
-	    ref->page, ref->page == NULL ?
-	    "unknown page type" : __wt_page_type_string(ref->page->type),
-	    ref->page == NULL ? "reverse " : "", parent,
-	    parent_entries, result_entries,
-	    ref->page == NULL ?  "-" : "+",
-	    ref->page == NULL ?
-	    parent_entries - result_entries : result_entries - parent_entries));
+	/*
+	 * !!!
+	 * Swapping in the new page index released the page for eviction, we can
+	 * no longer look inside the page.
+	 */
+
+	if (ref->page == NULL)
+		WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+		    "%p: reverse split into parent %p, %" PRIu32 " -> %" PRIu32
+		    " (-%" PRIu32 ")",
+		    ref->page, parent, parent_entries, result_entries,
+		    parent_entries - result_entries));
+	else
+		WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+		    "%p: split into parent %p, %" PRIu32 " -> %" PRIu32
+		    " (+%" PRIu32 ")",
+		    ref->page, parent, parent_entries, result_entries,
+		    result_entries - parent_entries));
 
 	/*
 	 * The new page index is in place, free the WT_REF we were splitting and
@@ -935,8 +943,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		parent_decr += sizeof(WT_REF);
 	}
 
-	/* We freed the reference that was split in the loop above. */
-	ref = NULL;
+	/*
+	 * !!!
+	 * The original WT_REF has now been freed, we can no longer look at it.
+	 */
 
 	/*
 	 * We can't free the previous page index, there may be threads using it.
@@ -1373,10 +1383,26 @@ __split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
 static int
 __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *parent;
 	WT_REF *ref;
 	bool parent_hazard;
+
+	btree = S2BT(session);
+
+	/*
+	 * Disallow internal splits during the final pass of a checkpoint. Most
+	 * splits are already disallowed during checkpoints, but an important
+	 * exception is insert splits. The danger is an insert split creates a
+	 * new chunk of the namespace, and then the internal split will move it
+	 * to a different part of the tree where it will be written; in other
+	 * words, in one part of the tree we'll skip the newly created insert
+	 * split chunk, but we'll write it upon finding it in a different part
+	 * of the tree.
+	 */
+	if (btree->checkpointing != WT_CKPT_OFF)
+		return (__split_internal_unlock(session, page, page_hazard));
 
 	/*
 	 * Page splits trickle up the tree, that is, as leaf pages grow large
@@ -1761,8 +1787,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		    type, WT_INSERT_RECNO(moved_ins), 0, false, &right));
 
 	/*
-	 * The new page is dirty by definition, column-store splits update the
-	 * page-modify structure, so create it now.
+	 * The new page is dirty by definition, plus column-store splits update
+	 * the page-modify structure, so create it now.
 	 */
 	WT_ERR(__wt_page_modify_init(session, right));
 	__wt_page_modify_set(session, right);
@@ -1801,15 +1827,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		    page->modify->mod_split_recno == WT_RECNO_OOB);
 		page->modify->mod_split_recno = child->key.recno;
 	}
-
-	/*
-	 * We modified the page above, which will have set the first dirty
-	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Set the first dirty
-	 * transaction to an impossibly old value so this page is never skipped
-	 * in a checkpoint.
-	 */
-	right->modify->first_dirty_txn = WT_TXN_FIRST;
 
 	/*
 	 * Calculate how much memory we're moving: figure out how deep the skip
@@ -1909,6 +1926,24 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 #endif
 
 	/*
+	 * We perform insert splits concurrently with checkpoints, where the
+	 * requirement is a checkpoint must include either the original page
+	 * or both new pages. The page we're splitting is dirty, but that's
+	 * insufficient: set the first dirty transaction to an impossibly old
+	 * value so this page is not skipped by a checkpoint.
+	 */
+	page->modify->first_dirty_txn = WT_TXN_FIRST;
+
+	/*
+	 * We modified the page above, which will have set the first dirty
+	 * transaction to the last transaction current running.  However, the
+	 * updates we installed may be older than that.  Set the first dirty
+	 * transaction to an impossibly old value so this page is never skipped
+	 * in a checkpoint.
+	 */
+	right->modify->first_dirty_txn = WT_TXN_FIRST;
+
+	/*
 	 * Update the page accounting.
 	 *
 	 * XXX
@@ -1918,10 +1953,14 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_cache_page_inmem_incr(session, right, right_incr);
 
 	/*
-	 * Split into the parent. On successful return, the original page is no
-	 * longer locked, so we cannot safely look at it.
+	 * The act of splitting into the parent releases the pages for eviction;
+	 * ensure the page contents are consistent.
 	 */
-	page = NULL;
+	WT_WRITE_BARRIER();
+
+	/*
+	 * Split into the parent.
+	 */
 	if ((ret = __split_parent(
 	    session, ref, split_ref, 2, parent_incr, false, true)) == 0)
 		return (0);
@@ -1931,7 +1970,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 *
 	 * Reset the split column-store page record.
 	 */
-	page->modify->mod_split_recno = WT_RECNO_OOB;
+	if (type != WT_PAGE_ROW_LEAF)
+		page->modify->mod_split_recno = WT_RECNO_OOB;
 
 	/*
 	 * Clear the allocated page's reference to the moved insert list element

@@ -62,6 +62,23 @@ struct __wt_page_header {
 #define	WT_PAGE_HEADER_SIZE		28
 
 /*
+ * __wt_page_header_byteswap --
+ *	Handle big- and little-endian transformation of a page header.
+ */
+static inline void
+__wt_page_header_byteswap(WT_PAGE_HEADER *dsk)
+{
+#ifdef WORDS_BIGENDIAN
+	dsk->recno = __wt_bswap64(dsk->recno);
+	dsk->write_gen = __wt_bswap64(dsk->write_gen);
+	dsk->mem_size = __wt_bswap32(dsk->mem_size);
+	dsk->u.entries = __wt_bswap32(dsk->u.entries);
+#else
+	WT_UNUSED(dsk);
+#endif
+}
+
+/*
  * The block-manager specific information immediately follows the WT_PAGE_HEADER
  * structure.
  */
@@ -581,9 +598,14 @@ struct __wt_page {
 	 * read generation is incremented by the eviction server each time it
 	 * becomes active.  To avoid incrementing a page's read generation too
 	 * frequently, it is set to a future point.
+	 *
+	 * Because low read generation values have special meaning, and there
+	 * are places where we manipulate the value, use an initial value well
+	 * outside of the special range.
 	 */
 #define	WT_READGEN_NOTSET	0
 #define	WT_READGEN_OLDEST	1
+#define	WT_READGEN_START_VALUE	100
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
 
