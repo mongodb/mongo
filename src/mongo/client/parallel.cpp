@@ -849,8 +849,14 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
                 }
                 throw;
             } else {
-                warning() << "db exception when finishing on " << shardId
-                          << ", current connection state is " << mdata.toBSON() << causedBy(e);
+                // the InvalidBSON exception indicates that the BSON is malformed ->
+                // don't print/call "mdata.toBSON()" to avoid unexpected errors e.g. a segfault
+                if (e.getCode() == 22)
+                    warning() << "bson is malformed :: db exception when finishing on " << shardId
+                              << causedBy(e);
+                else
+                    warning() << "db exception when finishing on " << shardId
+                              << ", current connection state is " << mdata.toBSON() << causedBy(e);
                 mdata.errored = true;
                 throw;
             }
