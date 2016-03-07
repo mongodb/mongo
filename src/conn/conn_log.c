@@ -821,7 +821,7 @@ __log_server(void *arg)
 
 		WT_ERR(__wt_epoch(session, &start));
 		WT_ERR(__wt_cond_auto_wait_signal(session, conn->log_cond,
-		    did_work || signalled, &signalled));
+		    did_work, &signalled));
 		WT_ERR(__wt_epoch(session, &now));
 		timediff = WT_TIMEDIFF_MS(now, start);
 	}
