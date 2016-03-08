@@ -174,11 +174,10 @@ main(int argc, char *argv[])
 	argv += __wt_optind;
 	/*
 	 * Adjust the maxcpu in relation to the number of databases, unless
-	 * the user set it explicitly.  If we're doing operations add in
-	 * another 10%.
+	 * the user set it explicitly.
 	 */
 	if (!setmax)
-		max = (float)dbs + (idle ? 0.0 : (float)dbs * 0.10);
+		max = (float)dbs;
 	if (argc != 0)
 		usage();
 
@@ -209,19 +208,7 @@ main(int argc, char *argv[])
 	}
 
 	sleep(10);
-	(void)snprintf(cmd, sizeof(cmd),
-	    "ps -p %lu -o pcpu=", (unsigned long)getpid());
 	for (i = 0; i < MAX_IDLE_TIME; i += IDLE_INCR) {
-		if ((fp = popen(cmd, "r")) == NULL)
-			testutil_die(errno, "popen");
-		fscanf(fp, "%f", &cpu);
-		if (cpu > max) {
-			fprintf(stderr,
-			    "ERROR: CPU usage: %f, max %f\n", cpu, max);
-			testutil_die(ERANGE, "CPU");
-		}
-		if (pclose(fp) != 0)
-			testutil_die(errno, "pclose");
 		if (!idle)
 			testutil_check(run_ops(dbs));
 		printf("Sleep %d (%d of %d)\n", IDLE_INCR, i, MAX_IDLE_TIME);
@@ -229,8 +216,10 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Check CPU usage one last time.
+	 * Check CPU after all idling or work is done.
 	 */
+	(void)snprintf(cmd, sizeof(cmd),
+	    "ps -p %lu -o pcpu=", (unsigned long)getpid());
 	if ((fp = popen(cmd, "r")) == NULL)
 		testutil_die(errno, "popen");
 	fscanf(fp, "%f", &cpu);
