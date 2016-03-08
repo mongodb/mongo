@@ -55,7 +55,7 @@ var res = m2.getDB('foo').runCommand({ applyOps: deleteApplyOps,
                                        preCondition: badPreCondition,
                                        writeConcern: majorityWriteConcern });
 assert.commandFailed(res, "The applyOps command was expected to fail, but instead succeeded.");
-assert.eq(res.errmsg, "pre-condition failed", "The applyOps command failed for the wrong reason.")
+assert.eq(res.errmsg, "pre-condition failed", "The applyOps command failed for the wrong reason.");
 var noOp = m2.getDB('foo').getLastErrorObj('majority', 30000).lastOp;
 
 // Check that each connection has the same last optime

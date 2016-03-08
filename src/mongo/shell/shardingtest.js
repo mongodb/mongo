@@ -698,7 +698,7 @@ var ShardingTest = function(params) {
             db = oldDB;
             return false;
         }
-    }
+    };
 
     this.isAnyBalanceInFlight = function() {
         if (this.config.locks.find({ _id : { $ne : "balancer" }, state : 2 }).count() > 0)

@@ -22,7 +22,7 @@ var resetCollection = function() {
         assert.writeOK(staleMongos.getCollection(collNS).insert({ x: i, fieldToUpdate: 0 }));
         assert.writeOK(staleMongos.getCollection(collNS).insert({ x: i, fieldToUpdate: 0 }));
     }
-}
+};
 
 // Create a new sharded collection, and split data into two chunks on different shards using the
 // stale mongos. Then use the fresh mongos to consolidate the chunks onto one of the shards.
@@ -53,7 +53,7 @@ var makeStaleMongosTargetMultipleShards = function() {
                                                     find: { x: 0 },
                                                     to: st._shardNames[0],
                                                     _waitForDelete: true }));
-}
+};
 
 // Create a new sharded collection and move a chunk from one shard to another. In the end,
 // staleMongos will see:
@@ -74,7 +74,7 @@ var makeStaleMongosTargetSingleShard = function() {
                                                     find: { x: 0 },
                                                     to: st._shardNames[1],
                                                     _waitForDelete: true }));
-}
+};
 
 var checkAllRemoveQueries = function(makeMongosStaleFunc) {
     var multi = { justOne: false };
@@ -90,13 +90,13 @@ var checkAllRemoveQueries = function(makeMongosStaleFunc) {
             // All documents matching the query should have been removed.
             assert.eq(0, staleMongos.getCollection(collNS).find(query).itcount());
         }
-    }
+    };
 
     var checkRemoveIsInvalid = function(query, multiOption, makeMongosStaleFunc) {
         makeMongosStaleFunc();
         var res = staleMongos.getCollection(collNS).remove(query, multiOption); 
         assert.writeError(res);
-    }
+    };
 
     // Not possible because single remove requires equality match on shard key.
     checkRemoveIsInvalid(emptyQuery, single, makeMongosStaleFunc);
@@ -113,7 +113,7 @@ var checkAllRemoveQueries = function(makeMongosStaleFunc) {
     // (not within $or).
     checkRemoveIsInvalid(multiPointQuery, single, makeMongosStaleFunc);
     doRemove(multiPointQuery, multi, makeMongosStaleFunc);
-}
+};
 
 var checkAllUpdateQueries = function(makeMongosStaleFunc) {
     var oUpdate = { $inc: { fieldToUpdate: 1 }}; // op-style update (non-idempotent)
@@ -134,13 +134,13 @@ var checkAllUpdateQueries = function(makeMongosStaleFunc) {
             // A total of one document should have been updated.
             assert.eq(1, staleMongos.getCollection(collNS).find(queryAfterUpdate).itcount());
         }
-    }
+    };
 
     var checkUpdateIsInvalid = function(query, update, multiOption, makeMongosStaleFunc, err) {
         makeMongosStaleFunc();
         var res = staleMongos.getCollection(collNS).update(query, update, multiOption);
         assert.writeError(res);
-    }
+    };
 
     // This update has inconsistent behavior as explained in SERVER-22895.
     //doUpdate(emptyQuery, rUpdate, single, makeMongosStaleFunc);
@@ -170,7 +170,7 @@ var checkAllUpdateQueries = function(makeMongosStaleFunc) {
     // (not within $or).
     checkUpdateIsInvalid(multiPointQuery, oUpdate, single, makeMongosStaleFunc);
     doUpdate(multiPointQuery, oUpdate, multi, makeMongosStaleFunc);
-}
+};
 
 var st = new ShardingTest({shards: 2, mongos: 2, other: { mongosOptions: { noAutoSplit: "" }} });
 var dbName = 'test';

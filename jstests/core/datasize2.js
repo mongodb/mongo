@@ -4,7 +4,7 @@
 //
 
 (function() {
-"use strict"
+"use strict";
 
 var coll = db.foo;
 var adminDB = db.getSiblingDB('admin');
