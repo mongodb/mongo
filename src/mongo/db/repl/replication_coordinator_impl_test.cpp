@@ -4500,7 +4500,6 @@ TEST_F(ReplCoordTest, SelectSyncSourceReturnsStatusOkAndAnEmptyHostWhenNoViableH
                        HostAndPort("node1", 12345));
 
     OperationContextReplMock txn;
-    OpTime opTime = OpTime(Timestamp(100, 1), 0);
 
     simulateEnoughHeartbeatsForAllNodesUp();
 
@@ -4531,7 +4530,6 @@ public:
                            HostAndPort("node1", 12345));
 
         OperationContextReplMock txn;
-        OpTime opTime = OpTime(Timestamp(100, 1), 0);
 
         simulateEnoughHeartbeatsForAllNodesUp();
         ASSERT_TRUE(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
