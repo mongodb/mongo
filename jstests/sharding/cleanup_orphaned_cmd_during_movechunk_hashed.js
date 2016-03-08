@@ -84,7 +84,7 @@ var joinMoveChunk = moveChunkParallel(
 
 waitForMoveChunkStep(donor, moveChunkStepNames.startedMoveChunk);
 waitForMigrateStep(recip, migrateStepNames.cloned);
-proceedToMigrateStep(recip, migrateStepNames.transferredMods);
+proceedToMigrateStep(recip, migrateStepNames.catchup);
 // recipient has run _recvChunkStart and begun its migration thread;
 // 'doc' has been cloned and chunkWithDoc is noted as 'pending' on recipient.
 
@@ -104,7 +104,7 @@ assert.eq(1, recipColl.count());
 // recip has been waiting for donor to call _recvChunkCommit.
 pauseMoveChunkAtStep(donor, moveChunkStepNames.committed);
 unpauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
-unpauseMigrateAtStep(recip, migrateStepNames.transferredMods);
+proceedToMigrateStep(recip, migrateStepNames.steady);
 proceedToMigrateStep(recip, migrateStepNames.done);
 
 // cleanupOrphaned removes migrated data from donor. The donor would

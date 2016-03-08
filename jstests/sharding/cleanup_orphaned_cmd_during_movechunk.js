@@ -99,9 +99,9 @@ assert.eq(21, donorColl.count());
 
 // Recipient transfers this modification.
 jsTest.log('Let migrate proceed to transferredMods');
-pauseMigrateAtStep(recipient, migrateStepNames.transferredMods);
+pauseMigrateAtStep(recipient, migrateStepNames.catchup);
 unpauseMigrateAtStep(recipient, migrateStepNames.cloned);
-waitForMigrateStep(recipient, migrateStepNames.transferredMods);
+waitForMigrateStep(recipient, migrateStepNames.catchup);
 jsTest.log('Done letting migrate proceed to transferredMods');
 
 assert.eq(
@@ -129,7 +129,7 @@ assert.eq(21, recipientColl.count());
 // Recipient has been waiting for donor to call _recvChunkCommit.
 pauseMoveChunkAtStep(donor, moveChunkStepNames.committed);
 unpauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
-unpauseMigrateAtStep(recipient, migrateStepNames.transferredMods);
+proceedToMigrateStep(recipient, migrateStepNames.steady);
 proceedToMigrateStep(recipient, migrateStepNames.done);
 
 // Create orphans.

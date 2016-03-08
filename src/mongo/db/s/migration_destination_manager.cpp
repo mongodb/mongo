@@ -198,6 +198,7 @@ MONGO_FP_DECLARE(migrateThreadHangAtStep2);
 MONGO_FP_DECLARE(migrateThreadHangAtStep3);
 MONGO_FP_DECLARE(migrateThreadHangAtStep4);
 MONGO_FP_DECLARE(migrateThreadHangAtStep5);
+MONGO_FP_DECLARE(migrateThreadHangAtStep6);
 
 
 MigrationDestinationManager::MigrationDestinationManager() = default;
@@ -418,7 +419,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
           << " for collection " << ns << " from " << fromShard << " at epoch " << epoch.toString();
 
     string errmsg;
-    MoveTimingHelper timing(txn, "to", ns, min, max, 5 /* steps */, &errmsg, "", "");
+    MoveTimingHelper timing(txn, "to", ns, min, max, 6 /* steps */, &errmsg, "", "");
 
     ScopedDbConnection conn(fromShard);
 
@@ -840,6 +841,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
     }
 
     setState(DONE);
+    timing.done(6);
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep6);
     conn.done();
 }
 
