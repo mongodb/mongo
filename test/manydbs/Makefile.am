@@ -7,7 +7,7 @@ t_LDADD = $(top_builddir)/libwiredtiger.la
 t_LDFLAGS = -static
 
 # Run this during a "make check" smoke test.
-TESTS = $(noinst_PROGRAMS)
+TESTS = smoke.sh
 
 clean-local:
 	rm -rf WiredTiger* *.core __*
