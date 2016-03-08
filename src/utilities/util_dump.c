@@ -22,7 +22,7 @@ static int dump_prefix(WT_SESSION *, bool);
 static int dump_record(WT_CURSOR *, bool, bool);
 static int dump_suffix(WT_SESSION *);
 static int dump_table_config(WT_SESSION *, WT_CURSOR *, const char *);
-static int dump_table_config_type(
+static int dump_table_config_complex(
     WT_SESSION *, WT_CURSOR *, WT_CURSOR *, const char *, const char *);
 static int dup_json_string(const char *, char **);
 static int print_config(WT_SESSION *, const char *, char *[]);
@@ -459,6 +459,7 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 	WT_DECL_RET;
 	size_t len;
 	int tret;
+	bool complex_table;
 	const char *name, *v;
 	char *p, **cfg, *_cfg[4] = {NULL, NULL, NULL, NULL};
 
@@ -487,11 +488,12 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 	/*
 	 * Workaround for WiredTiger "simple" table handling. Simple tables
 	 * have column-group entries, but they aren't listed in the metadata's
-	 * table entry. Figure out if it's a simple table and in that case,
-	 * retrieve the column-group entry and then retrieve the value from
-	 * its "source" file, where the column-group entry configuration
-	 * overrides the source value.
+	 * table entry, and the name is different from other column-groups.
+	 * Figure out if it's a simple table and in that case, retrieve the
+	 * column-group's configuration value and the column-group's "source"
+	 * entry, where the column-group entry overrides the source's.
 	 */
+	complex_table = false;
 	if (WT_PREFIX_MATCH(uri, "table:")) {
 		len = strlen(uri) + strlen("colgroup:");
 		if ((p = malloc(len)) == NULL)
@@ -520,29 +522,33 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 				return (util_cerr(cursor, "get_value", ret));
 			if ((*--cfg = strdup(v)) == NULL)
 				return (util_err(session, errno, NULL));
-		}
+		} else
+			complex_table = true;
 	}
 
 	if (print_config(session, uri, cfg) != 0)
 		return (1);
 
-	/*
-	 * The underlying table configuration function needs a second cursor:
-	 * open one before calling it, it makes error handling hugely simpler.
-	 */
-	if ((ret = session->open_cursor(
-	    session, "metadata:create", NULL, NULL, &srch)) != 0)
-		return (util_cerr(cursor, "open_cursor", ret));
+	if (complex_table) {
+		/*
+		 * The underlying table configuration function needs a second
+		 * cursor: open one before calling it, it makes error handling
+		 * hugely simpler.
+		 */
+		if ((ret = session->open_cursor(
+		    session, "metadata:create", NULL, NULL, &srch)) != 0)
+			return (util_cerr(cursor, "open_cursor", ret));
 
-	if ((ret = dump_table_config_type(
-	    session, cursor, srch, name, "colgroup:")) == 0)
-		ret = dump_table_config_type(
-		    session, cursor, srch, name, "index:");
+		if ((ret = dump_table_config_complex(
+		    session, cursor, srch, name, "colgroup:")) == 0)
+			ret = dump_table_config_complex(
+			    session, cursor, srch, name, "index:");
 
-	if ((tret = srch->close(srch)) != 0) {
-		tret = util_cerr(cursor, "close", tret);
-		if (ret == 0)
-			ret = tret;
+		if ((tret = srch->close(srch)) != 0) {
+			tret = util_cerr(cursor, "close", tret);
+			if (ret == 0)
+				ret = tret;
+		}
 	}
 
 	free(p);
@@ -553,11 +559,11 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 }
 
 /*
- * dump_table_config_type --
+ * dump_table_config_complex --
  *	Dump the column groups or indices for a table.
  */
 static int
-dump_table_config_type(WT_SESSION *session,
+dump_table_config_complex(WT_SESSION *session,
     WT_CURSOR *cursor, WT_CURSOR *srch, const char *name, const char *entry)
 {
 	WT_CONFIG_ITEM cval;
@@ -590,7 +596,12 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 		if (!WT_PREFIX_MATCH(key, entry))
 			return (0);
 
-		/* Check for a table name match. */
+		/*
+		 * Check for a table name match. This test will match "simple"
+		 * table column-groups as well as the more complex ones, but
+		 * the previous version of the test was wrong and we're only
+		 * in this function in the case of complex tables.
+		 */
 		if (!WT_PREFIX_MATCH(key + strlen(entry), name))
 			continue;
 
