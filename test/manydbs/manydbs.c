@@ -140,7 +140,7 @@ main(int argc, char *argv[])
 	float cpu, max;
 	int cfg, ch, dbs, i;
 	const char *working_dir;
-	bool idle;
+	bool idle, setmax;
 	const char *wt_cfg;
 	char cmd[128];
 
@@ -150,12 +150,13 @@ main(int argc, char *argv[])
 		++progname;
 	dbs = MAX_DBS;
 	working_dir = HOME_BASE;
-	max = MAX_CPU;
-	idle = false;
+	max = (float)dbs;
+	idle = setmax = false;
 	while ((ch = __wt_getopt(progname, argc, argv, "C:D:h:I")) != EOF)
 		switch (ch) {
 		case 'C':
 			max = (float)atof(__wt_optarg);
+			setmax = true;
 			break;
 		case 'D':
 			dbs = atoi(__wt_optarg);
@@ -171,6 +172,13 @@ main(int argc, char *argv[])
 		}
 	argc -= __wt_optind;
 	argv += __wt_optind;
+	/*
+	 * Adjust the max cpu in relation to the number of databases, unless
+	 * the user set it explicitly.  If we're doing operations add in
+	 * another 10%.
+	 */
+	if (!setmax)
+		max = (float)dbs + (idle ? 0.0 : (float)dbs * 0.10);
 	if (argc != 0)
 		usage();
 
@@ -208,8 +216,9 @@ main(int argc, char *argv[])
 			testutil_die(errno, "popen");
 		fscanf(fp, "%f", &cpu);
 		if (cpu > max) {
-			fprintf(stderr, "CPU usage: %f, max %f\n", cpu, max);
-			testutil_die(ERANGE, "CPU Usage");
+			fprintf(stderr,
+			    "ERROR: CPU usage: %f, max %f\n", cpu, max);
+			testutil_die(ERANGE, "CPU");
 		}
 		if (pclose(fp) != 0)
 			testutil_die(errno, "pclose");
@@ -227,8 +236,8 @@ main(int argc, char *argv[])
 	fscanf(fp, "%f", &cpu);
 	printf("Final CPU %f, max %f\n", cpu, max);
 	if (cpu > max) {
-		fprintf(stderr, "CPU usage: %f, max %f\n", cpu, max);
-		testutil_die(ERANGE, "CPU Usage");
+		fprintf(stderr, "ERROR: CPU usage: %f, max %f\n", cpu, max);
+		testutil_die(ERANGE, "CPU");
 	}
 	if (pclose(fp) != 0)
 		testutil_die(errno, "pclose");
