@@ -219,7 +219,7 @@ void ReplSource::save(OperationContext* txn) {
     {
         OpDebug debug;
 
-        OldClientContext ctx(txn, "local.sources");
+        OldClientContext ctx(txn, "local.sources", false);
 
         const NamespaceString requestNs("local.sources");
         UpdateRequest request(requestNs);
@@ -258,7 +258,7 @@ static void addSourceToList(OperationContext* txn,
 */
 void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
     const char* localSources = "local.sources";
-    OldClientContext ctx(txn, localSources);
+    OldClientContext ctx(txn, localSources, false);
     SourceVector old = v;
     v.clear();
 
@@ -782,7 +782,7 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
                       << "' did not complete, now resyncing." << endl;
             }
             save(txn);
-            OldClientContext ctx(txn, ns);
+            OldClientContext ctx(txn, ns, false);
             nClonedThisPass++;
             resync(txn, ctx.db()->name());
             addDbNextPass.erase(clientName);
@@ -1379,7 +1379,7 @@ void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
                 BSONObjBuilder b;
                 b.append(_id);
                 BSONObj result;
-                OldClientContext ctx(&txn, ns);
+                OldClientContext ctx(&txn, ns, false);
                 if (Helpers::findById(&txn, ctx.db(), ns, b.done(), result))
                     _dummy_z += result.objsize();  // touch
             }
