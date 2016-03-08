@@ -53,6 +53,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -60,6 +61,12 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_win32.h"
+#include "mongo/util/stringutils.h"
+#include "mongo/util/text.h"
+
+#ifndef _WIN32
+extern char** environ;
+#endif
 
 namespace mongo {
 
@@ -215,7 +222,7 @@ void ProgramOutputMultiplexer::clear() {
     _buffer.str("");
 }
 
-ProgramRunner::ProgramRunner(const BSONObj& args) {
+ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
     verify(!args.isEmpty());
 
     string program(args.firstElement().valuestrsafe());
@@ -252,6 +259,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args) {
 
     _port = -1;
 
+    // Parse individual arguments into _argv
     BSONObjIterator j(args);
     j.next();  // skip program name (handled above)
     while (j.more()) {
@@ -274,6 +282,50 @@ ProgramRunner::ProgramRunner(const BSONObj& args) {
         }
         _argv.push_back(str);
     }
+
+    // Load explicitly set environment key value pairs into _envp.
+    for (const BSONElement& e : env) {
+        // Environment variable values must be strings
+        verify(e.type() == mongo::String);
+
+        _envp.emplace(std::string(e.fieldName()), std::string(e.valuestr()));
+    }
+
+// Import this process' environment into _envp, for all keys that have not already been set.
+// We need to do this so that the child process has all the PATH and locale variables, unless
+// we explicitly override them.
+#ifdef _WIN32
+    wchar_t* processEnv = GetEnvironmentStringsW();
+    ON_BLOCK_EXIT([](wchar_t* toFree) {
+        if (toFree)
+            FreeEnvironmentStringsW(toFree);
+    }, processEnv);
+
+    // Windows' GetEnvironmentStringsW returns a NULL terminated array of NULL separated
+    // <key>=<value> pairs.
+    while (processEnv && *processEnv) {
+        std::wstring envKeyValue(processEnv);
+        size_t splitPoint = envKeyValue.find('=');
+        invariant(splitPoint != std::wstring::npos);
+        std::string envKey = toUtf8String(envKeyValue.substr(0, splitPoint));
+        std::string envValue = toUtf8String(envKeyValue.substr(splitPoint + 1));
+        _envp.emplace(std::move(envKey), std::move(envValue));
+        processEnv += envKeyValue.size() + 1;
+    }
+#else
+    // environ is a POSIX defined array of char*s. Each char* in the array is a <key>=<value>\0
+    // pair.
+    char** environEntry = environ;
+    while (*environEntry) {
+        std::string envKeyValue(*environEntry);
+        size_t splitPoint = envKeyValue.find('=');
+        invariant(splitPoint != std::string::npos);
+        std::string envKey = envKeyValue.substr(0, splitPoint);
+        std::string envValue = envKeyValue.substr(splitPoint + 1);
+        _envp.emplace(std::move(envKey), std::move(envValue));
+        ++environEntry;
+    }
+#endif
 
     if (!isMongodProgram && !isMongosProgram && program != "mongobridge")
         _port = 0;
@@ -381,14 +433,47 @@ boost::filesystem::path ProgramRunner::findProgram(const string& prog) {
     }
 #endif
 
+    // Check if the binary exists in the current working directory
     boost::filesystem::path t = boost::filesystem::current_path() / p;
-    if (boost::filesystem::exists(t))
+    if (boost::filesystem::exists(t)) {
         return t;
+    }
 
-    return p;  // not found; might find via system path
+#ifndef _WIN32
+    // On POSIX, we need to manually resolve the $PATH variable, to try and find the binary in the
+    // filesystem.
+    const char* cpath = getenv("PATH");
+    if (!cpath) {
+        // PATH was unset, so path search is implementation defined
+        return t;
+    }
+
+    std::string path(cpath);
+    std::vector<std::string> pathEntries;
+
+    // PATH entries are separated by colons. Per POSIX 2013, there is no way to escape a colon in
+    // an entry.
+    splitStringDelim(path, &pathEntries, ':');
+
+    for (const std::string& pathEntry : pathEntries) {
+        boost::filesystem::path potentialBinary = boost::filesystem::path(pathEntry) / p;
+        if (boost::filesystem::exists(potentialBinary) &&
+            boost::filesystem::is_regular_file(potentialBinary) &&
+            access(potentialBinary.c_str(), X_OK) == 0) {
+            return potentialBinary;
+        }
+    }
+#endif
+
+    return p;
 }
 
 void ProgramRunner::launchProcess(int child_stdout) {
+    std::vector<std::string> envStrings;
+    for (const auto& envKeyValue : _envp) {
+        envStrings.emplace_back(envKeyValue.first + '=' + envKeyValue.second);
+    }
+
 #ifdef _WIN32
     stringstream ss;
     for (unsigned i = 0; i < _argv.size(); i++) {
@@ -410,11 +495,44 @@ void ProgramRunner::launchProcess(int child_stdout) {
 
     string args = ss.str();
 
+    // Construct the environment block which the new process will use.
     std::unique_ptr<TCHAR[]> args_tchar(new TCHAR[args.size() + 1]);
     size_t i;
     for (i = 0; i < args.size(); i++)
         args_tchar[i] = args[i];
     args_tchar[i] = 0;
+
+    // An environment block is a NULL terminated array of NULL terminated WCHAR strings. The
+    // strings are of the form "name=value\0". Because the strings are variable length, we must
+    // precompute the size of the array before we may allocate it.
+    size_t environmentBlockSize = 0;
+    std::vector<std::wstring> nativeEnvStrings;
+
+    // Compute the size of the environment block, in characters. Note that we have to count
+    // wchar_t characters, which we'll actually be storing in the block later, rather than UTF8
+    // characters we have in _envp and need to convert.
+    for (const std::string& envKeyValue : envStrings) {
+        std::wstring nativeKeyValue = toNativeString(envKeyValue.c_str());
+        environmentBlockSize += (nativeKeyValue.size() + 1);
+        nativeEnvStrings.emplace_back(std::move(nativeKeyValue));
+    }
+
+    // Reserve space for the final NULL character which terminates the environment block
+    environmentBlockSize += 1;
+
+    auto lpEnvironment = stdx::make_unique<wchar_t[]>(environmentBlockSize);
+    size_t environmentOffset = 0;
+    for (const std::wstring& envKeyValue : nativeEnvStrings) {
+        // Ensure there is enough room to write the string, the string's NULL byte, and the block's
+        // NULL byte
+        invariant(environmentOffset + envKeyValue.size() + 1 + 1 <= environmentBlockSize);
+        wcscpy_s(
+            lpEnvironment.get() + environmentOffset, envKeyValue.size() + 1, envKeyValue.c_str());
+        environmentOffset += envKeyValue.size();
+        std::memset(lpEnvironment.get() + environmentOffset, 0, sizeof(wchar_t));
+        environmentOffset += 1;
+    }
+    std::memset(lpEnvironment.get() + environmentOffset, 0, sizeof(wchar_t));
 
     HANDLE h = (HANDLE)_get_osfhandle(child_stdout);
     verify(h != INVALID_HANDLE_VALUE);
@@ -430,8 +548,19 @@ void ProgramRunner::launchProcess(int child_stdout) {
     PROCESS_INFORMATION pi;
     ZeroMemory(&pi, sizeof(pi));
 
-    bool success =
-        CreateProcess(NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi) != 0;
+    DWORD dwCreationFlags = 0;
+    dwCreationFlags |= CREATE_UNICODE_ENVIRONMENT;
+
+    bool success = CreateProcessW(nullptr,
+                                  args_tchar.get(),
+                                  nullptr,
+                                  nullptr,
+                                  true,
+                                  dwCreationFlags,
+                                  lpEnvironment.get(),
+                                  nullptr,
+                                  &si,
+                                  &pi) != 0;
     if (!success) {
         LPSTR lpMsgBuf = 0;
         DWORD dw = GetLastError();
@@ -456,18 +585,19 @@ void ProgramRunner::launchProcess(int child_stdout) {
 
 #else
 
-    unique_ptr<const char* []> argvStorage(new const char* [_argv.size() + 1]);
-    const char** argv = argvStorage.get();
-    for (unsigned i = 0; i < _argv.size(); i++) {
-        argv[i] = _argv[i].c_str();
-    }
-    argv[_argv.size()] = 0;
-    std::string execErrMsg = str::stream() << "Unable to start program " << argv[0];
+    std::string execErrMsg = str::stream() << "Unable to start program " << _argv[0];
+    auto constCharStorageMaker = [](const std::vector<std::string>& in) {
+        std::vector<const char*> out;
+        std::transform(in.begin(),
+                       in.end(),
+                       std::back_inserter(out),
+                       [](const std::string& x) { return x.c_str(); });
+        out.push_back(nullptr);
+        return out;
+    };
 
-    unique_ptr<const char* []> envStorage(new const char* [2]);
-    const char** env = envStorage.get();
-    env[0] = NULL;
-    env[1] = NULL;
+    std::vector<const char*> argvStorage = constCharStorageMaker(_argv);
+    std::vector<const char*> envpStorage = constCharStorageMaker(envStrings);
 
     pid_t nativePid = fork();
     _pid = ProcessId::fromNative(nativePid);
@@ -494,9 +624,9 @@ void ProgramRunner::launchProcess(int child_stdout) {
             _exit(-1);  // do not pass go, do not call atexit handlers
         }
 
-        // NOTE execve is async signal safe, but it is not clear that execvp is async
-        // signal safe.
-        execvp(argv[0], const_cast<char**>(argv));
+        execve(argvStorage[0],
+               const_cast<char**>(argvStorage.data()),
+               const_cast<char**>(envpStorage.data()));
 
         // Async signal unsafe code reporting a terminal error condition.
         perror(execErrMsg.c_str());
@@ -582,9 +712,33 @@ BSONObj WaitProgram(const BSONObj& a, void* data) {
     return BSON(string("") << exit_code);
 }
 
+// This function starts a program. In its input array it accepts either all commandline tokens
+// which will be executed, or a single Object which must have a field named "args" which contains
+// an array with all commandline tokens. The Object may have a field named "env" which contains an
+// object of Key Value pairs which will be loaded into the environment of the spawned process.
 BSONObj StartMongoProgram(const BSONObj& a, void* data) {
     _nokillop = true;
-    ProgramRunner r(a);
+    BSONObj args = a;
+    BSONObj env{};
+    BSONElement firstElement = args.firstElement();
+
+    if (firstElement.ok() && firstElement.isABSONObj()) {
+        BSONObj subobj = firstElement.Obj();
+        BSONElement argsElem = subobj["args"];
+        BSONElement envElem = subobj["env"];
+        uassert(40098,
+                "If StartMongoProgram is called with a BSONObj, "
+                "it must contain an 'args' subobject." +
+                    args.toString(),
+                argsElem.ok() && argsElem.isABSONObj());
+
+        args = argsElem.Obj();
+        if (envElem.ok() && envElem.isABSONObj()) {
+            env = envElem.Obj();
+        }
+    }
+
+    ProgramRunner r(args, env);
     r.start();
     stdx::thread t(r);
     t.detach();
@@ -592,7 +746,8 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
 }
 
 BSONObj RunMongoProgram(const BSONObj& a, void* data) {
-    ProgramRunner r(a);
+    BSONObj env{};
+    ProgramRunner r(a, env);
     r.start();
     stdx::thread t(r);
     t.detach();
@@ -603,7 +758,8 @@ BSONObj RunMongoProgram(const BSONObj& a, void* data) {
 }
 
 BSONObj RunProgram(const BSONObj& a, void* data) {
-    ProgramRunner r(a);
+    BSONObj env{};
+    ProgramRunner r(a, env);
     r.start();
     stdx::thread t(r);
     t.detach();

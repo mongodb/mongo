@@ -164,6 +164,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
     MongoRunner.logicalOptions = {
         runId: true,
+        env: true,
         pathOpts: true,
         remember: true,
         noRemember: true,
@@ -625,6 +626,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.runMongod = function(opts) {
 
         opts = opts || {};
+        var env = undefined;
         var useHostName = true;
         var runId = null;
         var waitForConnect = true;
@@ -641,6 +643,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             } else {
                 useHostName = true;  // Default to true
             }
+            env = opts.env;
             runId = opts.runId;
             waitForConnect = opts.waitForConnect;
 
@@ -654,7 +657,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             opts = MongoRunner.arrOptions("mongod", opts);
         }
 
-        var mongod = MongoRunner._startWithArgs(opts, waitForConnect);
+        var mongod = MongoRunner._startWithArgs(opts, env, waitForConnect);
         if (!mongod) {
             return null;
         }
@@ -674,6 +677,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.runMongos = function(opts) {
         opts = opts || {};
 
+        var env = undefined;
         var useHostName = false;
         var runId = null;
         var waitForConnect = true;
@@ -686,11 +690,12 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             useHostName = opts.useHostName || opts.useHostname;
             runId = opts.runId;
             waitForConnect = opts.waitForConnect;
+            env = opts.env;
 
             opts = MongoRunner.arrOptions("mongos", opts);
         }
 
-        var mongos = MongoRunner._startWithArgs(opts, waitForConnect);
+        var mongos = MongoRunner._startWithArgs(opts, env, waitForConnect);
         if (!mongos) {
             return null;
         }
@@ -950,12 +955,17 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      *     returns connection to process on success;
      *     otherwise returns null if we fail to connect.
      */
-    MongoRunner._startWithArgs = function(argArray, waitForConnect) {
+    MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
         // TODO: Make there only be one codepath for starting mongo processes
 
         argArray = appendSetParameterArgs(argArray);
         var port = _parsePort.apply(null, argArray);
-        var pid = _startMongoProgram.apply(null, argArray);
+        var pid = -1;
+        if (env === undefined) {
+            pid = _startMongoProgram.apply(null, argArray);
+        } else {
+            pid = _startMongoProgram({args: argArray, env: env});
+        }
 
         if (!waitForConnect) {
             return {
