@@ -90,7 +90,7 @@ static int
 run_ops(int dbs)
 {
 	WT_ITEM data;
-	int db, db_set, i, key, ret;
+	int db, db_set, i, key;
 	uint8_t buf[MAX_VAL];
 
 	memset(buf, 0, sizeof(buf));
