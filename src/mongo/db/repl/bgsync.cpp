@@ -199,6 +199,7 @@ void BackgroundSync::producerThread() {
             std::string msg(str::stream() << "sync producer problem: " << e.toString());
             error() << msg;
             _replCoord->setMyHeartbeatMessage(msg);
+            sleepmillis(100);  // sleep a bit to keep from hammering this thread with temp. errors.
         } catch (const std::exception& e2) {
             severe() << "sync producer exception: " << e2.what();
             fassertFailed(28546);
