@@ -60,7 +60,6 @@ dbtest = env.Program(
         'chunktests.cpp',
         'clienttests.cpp',
         'commandtests.cpp',
-        'config_server_fixture.cpp',
         'counttests.cpp',
         'dbhelper_tests.cpp',
         'dbtests.cpp',

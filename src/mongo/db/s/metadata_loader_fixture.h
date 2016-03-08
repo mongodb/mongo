@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/s/metadata_loader.h"
 #include "mongo/platform/basic.h"
@@ -47,12 +45,7 @@ public:
     ~MetadataLoaderFixture();
 
 protected:
-    static const std::string CONFIG_HOST_PORT;
-
     void setUp() override;
-
-    void expectFindOnConfigSendErrorCode(ErrorCodes::Error code);
-    void expectFindOnConfigSendBSONObjVector(std::vector<BSONObj> obj);
 
     void expectFindOnConfigSendCollectionDefault();
     void expectFindOnConfigSendChunksDefault();

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/s/sharding_test_fixture.h"
 
 namespace mongo {
@@ -39,6 +41,11 @@ class CatalogManagerReplSetTestFixture : public ShardingTestFixture {
 public:
     CatalogManagerReplSetTestFixture();
     ~CatalogManagerReplSetTestFixture();
-};
 
+protected:
+    static const std::string CONFIG_HOST_PORT;
+
+    void expectFindOnConfigSendErrorCode(ErrorCodes::Error code);
+    void expectFindOnConfigSendBSONObjVector(std::vector<BSONObj> obj);
+};
 }  // namespace mongo

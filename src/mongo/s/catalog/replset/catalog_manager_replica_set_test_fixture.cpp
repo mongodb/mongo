@@ -28,12 +28,38 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 
 namespace mongo {
 
+using executor::RemoteCommandRequest;
+
+using std::string;
+
+const string CatalogManagerReplSetTestFixture::CONFIG_HOST_PORT{"$dummy_config:27017"};
+
 CatalogManagerReplSetTestFixture::CatalogManagerReplSetTestFixture() = default;
 
 CatalogManagerReplSetTestFixture::~CatalogManagerReplSetTestFixture() = default;
+
+void CatalogManagerReplSetTestFixture::expectFindOnConfigSendErrorCode(ErrorCodes::Error code) {
+    onCommand([&, code](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, HostAndPort(CONFIG_HOST_PORT));
+        ASSERT_EQ(request.dbname, "config");
+        BSONObjBuilder responseBuilder;
+        Command::appendCommandStatus(responseBuilder, Status(code, ""));
+        return responseBuilder.obj();
+    });
+}
+
+void CatalogManagerReplSetTestFixture::expectFindOnConfigSendBSONObjVector(
+    std::vector<BSONObj> obj) {
+    onFindCommand([&, obj](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, HostAndPort(CONFIG_HOST_PORT));
+        ASSERT_EQ(request.dbname, "config");
+        return obj;
+    });
+}
 
 }  // namespace mongo

@@ -41,7 +41,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/s/catalog/catalog_manager.h"

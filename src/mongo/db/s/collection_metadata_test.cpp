@@ -27,9 +27,14 @@
  */
 
 #include "mongo/base/status.h"
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/metadata_loader_fixture.h"
+#include "mongo/db/s/metadata_loader.h"
+#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
@@ -42,17 +47,21 @@ using std::vector;
 
 using executor::RemoteCommandResponse;
 
-class NoChunkFixture : public MetadataLoaderFixture {
+class NoChunkFixture : public CatalogManagerReplSetTestFixture {
 protected:
     void setUp() {
-        MetadataLoaderFixture::setUp();
+        CatalogManagerReplSetTestFixture::setUp();
+        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        configTargeter()->setFindHostReturnValue(configHost);
+
+        OID epoch = OID::gen();
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(_epoch);
+        collType.setEpoch(epoch);
         ASSERT_OK(collType.validate());
 
         // Need a chunk on another shard, otherwise the chunks are invalid in general and we
@@ -62,7 +71,7 @@ protected:
         chunkType.setShard("shard0001");
         chunkType.setMin(BSON("a" << MINKEY));
         chunkType.setMax(BSON("a" << MAXKEY));
-        chunkType.setVersion(ChunkVersion(1, 0, _epoch));
+        chunkType.setVersion(ChunkVersion(1, 0, epoch));
         chunkType.setName(OID::gen().toString());
         ASSERT_OK(chunkType.validate());
         std::vector<BSONObj> chunksToSend{chunkType.toBSON()};
@@ -91,6 +100,7 @@ protected:
 
 private:
     CollectionMetadata _metadata;
+    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 TEST_F(NoChunkFixture, BasicBelongsToMe) {
@@ -426,26 +436,30 @@ TEST_F(NoChunkFixture, PendingOrphanedDataRanges) {
  * Fixture with single chunk containing:
  * [10->20)
  */
-class SingleChunkFixture : public MetadataLoaderFixture {
+class SingleChunkFixture : public CatalogManagerReplSetTestFixture {
 protected:
     void setUp() {
-        MetadataLoaderFixture::setUp();
+        CatalogManagerReplSetTestFixture::setUp();
+        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        configTargeter()->setFindHostReturnValue(configHost);
 
-        ChunkVersion chunkVersion = ChunkVersion(1, 0, _epoch);
+        OID epoch = OID::gen();
+
+        ChunkVersion chunkVersion = ChunkVersion(1, 0, epoch);
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(_epoch);
+        collType.setEpoch(epoch);
 
         BSONObj fooSingle = BSON(
             ChunkType::name("test.foo-a_10")
             << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 10))
             << ChunkType::max(BSON("a" << 20))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(_epoch) << ChunkType::shard("shard0000"));
+            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000"));
         std::vector<BSONObj> chunksToSend{fooSingle};
 
         auto future = launchAsync([this] {
@@ -471,6 +485,7 @@ protected:
 
 private:
     CollectionMetadata _metadata;
+    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 TEST_F(SingleChunkFixture, BasicBelongsToMe) {
@@ -737,26 +752,30 @@ TEST_F(SingleChunkFixture, ChunkOrphanedDataRanges) {
  * Fixture with single chunk containing:
  * [(min, min)->(max, max))
  */
-class SingleChunkMinMaxCompoundKeyFixture : public MetadataLoaderFixture {
+class SingleChunkMinMaxCompoundKeyFixture : public CatalogManagerReplSetTestFixture {
 protected:
     void setUp() {
-        MetadataLoaderFixture::setUp();
+        CatalogManagerReplSetTestFixture::setUp();
+        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        configTargeter()->setFindHostReturnValue(configHost);
 
-        ChunkVersion chunkVersion = ChunkVersion(1, 0, _epoch);
+        OID epoch = OID::gen();
+
+        ChunkVersion chunkVersion = ChunkVersion(1, 0, epoch);
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(_epoch);
+        collType.setEpoch(epoch);
 
         BSONObj fooSingle = BSON(
             ChunkType::name("test.foo-a_MinKey")
             << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << MINKEY << "b" << MINKEY))
             << ChunkType::max(BSON("a" << MAXKEY << "b" << MAXKEY))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(_epoch) << ChunkType::shard("shard0000"));
+            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000"));
         std::vector<BSONObj> chunksToSend{fooSingle};
 
         auto future = launchAsync([this] {
@@ -782,6 +801,7 @@ protected:
 
 private:
     CollectionMetadata _metadata;
+    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 // Note: no tests for single key belongsToMe because they are not allowed
@@ -798,19 +818,23 @@ TEST_F(SingleChunkMinMaxCompoundKeyFixture, CompoudKeyBelongsToMe) {
  * Fixture with chunks:
  * [(10, 0)->(20, 0)), [(30, 0)->(40, 0))
  */
-class TwoChunksWithGapCompoundKeyFixture : public MetadataLoaderFixture {
+class TwoChunksWithGapCompoundKeyFixture : public CatalogManagerReplSetTestFixture {
 protected:
     void setUp() {
-        MetadataLoaderFixture::setUp();
+        CatalogManagerReplSetTestFixture::setUp();
+        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        configTargeter()->setFindHostReturnValue(configHost);
 
-        ChunkVersion chunkVersion = ChunkVersion(1, 0, _epoch);
+        OID epoch = OID::gen();
+
+        ChunkVersion chunkVersion = ChunkVersion(1, 0, epoch);
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(_epoch);
+        collType.setEpoch(epoch);
 
         std::vector<BSONObj> chunksToSend;
         chunksToSend.push_back(BSON(
@@ -818,13 +842,13 @@ protected:
             << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 10 << "b" << 0))
             << ChunkType::max(BSON("a" << 20 << "b" << 0))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(_epoch) << ChunkType::shard("shard0000")));
+            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000")));
         chunksToSend.push_back(BSON(
             ChunkType::name("test.foo-a_10")
             << ChunkType::ns("test.foo") << ChunkType::min(BSON("a" << 30 << "b" << 0))
             << ChunkType::max(BSON("a" << 40 << "b" << 0))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(chunkVersion.toLong()))
-            << ChunkType::DEPRECATED_epoch(_epoch) << ChunkType::shard("shard0000")));
+            << ChunkType::DEPRECATED_epoch(epoch) << ChunkType::shard("shard0000")));
 
         auto future = launchAsync([this] {
             MetadataLoader loader;
@@ -849,6 +873,7 @@ protected:
 
 private:
     CollectionMetadata _metadata;
+    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 TEST_F(TwoChunksWithGapCompoundKeyFixture, ClonePlusBasic) {
@@ -1041,21 +1066,25 @@ TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapAndPendingOrphanedDataRanges)
  * Fixture with chunk containing:
  * [min->10) , [10->20) , <gap> , [30->max)
  */
-class ThreeChunkWithRangeGapFixture : public MetadataLoaderFixture {
+class ThreeChunkWithRangeGapFixture : public CatalogManagerReplSetTestFixture {
 protected:
     void setUp() {
-        MetadataLoaderFixture::setUp();
+        CatalogManagerReplSetTestFixture::setUp();
+        getMessagingPort()->setRemote(HostAndPort("FakeRemoteClient:34567"));
+        configTargeter()->setFindHostReturnValue(configHost);
+
+        OID epoch = OID::gen();
 
         CollectionType collType;
         collType.setNs(NamespaceString{"x.y"});
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        collType.setEpoch(_epoch);
+        collType.setEpoch(epoch);
 
         std::vector<BSONObj> chunksToSend;
         {
-            ChunkVersion version(1, 1, _epoch);
+            ChunkVersion version(1, 1, epoch);
             chunksToSend.push_back(BSON(
                 ChunkType::name("x.y-a_MinKey")
                 << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << MINKEY))
@@ -1065,7 +1094,7 @@ protected:
         }
 
         {
-            ChunkVersion version(1, 3, _epoch);
+            ChunkVersion version(1, 3, epoch);
             chunksToSend.push_back(BSON(
                 ChunkType::name("x.y-a_10")
                 << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << 10))
@@ -1075,7 +1104,7 @@ protected:
         }
 
         {
-            ChunkVersion version(1, 2, _epoch);
+            ChunkVersion version(1, 2, epoch);
             chunksToSend.push_back(BSON(
                 ChunkType::name("x.y-a_30")
                 << ChunkType::ns("x.y") << ChunkType::min(BSON("a" << 30))
@@ -1107,6 +1136,7 @@ protected:
 
 private:
     CollectionMetadata _metadata;
+    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 TEST_F(ThreeChunkWithRangeGapFixture, ShardOwnsDoc) {

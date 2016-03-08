@@ -42,8 +42,6 @@ using std::vector;
 
 using executor::RemoteCommandRequest;
 
-const string MetadataLoaderFixture::CONFIG_HOST_PORT{"$dummy_config:27017"};
-
 MetadataLoaderFixture::MetadataLoaderFixture() = default;
 MetadataLoaderFixture::~MetadataLoaderFixture() = default;
 
@@ -54,24 +52,6 @@ void MetadataLoaderFixture::setUp() {
     _epoch = OID::gen();
     _maxCollVersion = ChunkVersion(1, 0, _epoch);
     _loader.reset(new MetadataLoader);
-}
-
-void MetadataLoaderFixture::expectFindOnConfigSendErrorCode(ErrorCodes::Error code) {
-    onCommand([&, code](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort(CONFIG_HOST_PORT));
-        ASSERT_EQ(request.dbname, "config");
-        BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder, Status(code, ""));
-        return responseBuilder.obj();
-    });
-}
-
-void MetadataLoaderFixture::expectFindOnConfigSendBSONObjVector(std::vector<BSONObj> obj) {
-    onFindCommand([&, obj](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort(CONFIG_HOST_PORT));
-        ASSERT_EQ(request.dbname, "config");
-        return obj;
-    });
 }
 
 void MetadataLoaderFixture::expectFindOnConfigSendCollectionDefault() {
