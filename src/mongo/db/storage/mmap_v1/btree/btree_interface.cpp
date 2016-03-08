@@ -98,7 +98,7 @@ public:
     virtual void fullValidate(OperationContext* txn,
                               bool full,
                               long long* numKeysOut,
-                              BSONObjBuilder* output) const {
+                              ValidateResults* fullResults) const {
         *numKeysOut = _btree->fullValidate(txn, NULL, false, false, 0);
     }
 

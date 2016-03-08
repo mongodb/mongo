@@ -166,7 +166,10 @@ public:
      * Currently wasserts that the index is invalid.  This could/should be changed in
      * the future to return a Status.
      */
-    Status validate(OperationContext* txn, bool full, int64_t* numKeys, BSONObjBuilder* output);
+    Status validate(OperationContext* txn,
+                    bool full,
+                    int64_t* numKeys,
+                    ValidateResults* fullResults);
 
     /**
      * Add custom statistics about this index to BSON object builder, for display.

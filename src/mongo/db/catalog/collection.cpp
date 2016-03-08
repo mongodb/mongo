@@ -1000,24 +1000,36 @@ Status Collection::validate(OperationContext* txn,
                 IndexAccessMethod* iam = _indexCatalog.getIndex(descriptor);
                 invariant(iam);
 
-                std::unique_ptr<BSONObjBuilder> bob(
-                    indexDetails.get() ? new BSONObjBuilder(indexDetails->subobjStart(
-                                             descriptor->indexNamespace()))
-                                       : NULL);
+                ValidateResults curIndexResults;
 
                 int64_t keys;
-                iam->validate(txn, full, &keys, bob.get());
+                iam->validate(txn, full, &keys, &curIndexResults);
                 indexes.appendNumber(descriptor->indexNamespace(), static_cast<long long>(keys));
 
                 validateIndexKeyCount(
-                    txn, *descriptor, keys, _recordStore->numRecords(txn), results);
+                    txn, *descriptor, keys, _recordStore->numRecords(txn), &curIndexResults);
 
-                if (bob) {
-                    BSONObj obj = bob->done();
-                    BSONElement valid = obj["valid"];
-                    if (valid.ok() && !valid.trueValue()) {
-                        results->valid = false;
+                if (indexDetails.get()) {
+                    BSONObjBuilder bob(indexDetails->subobjStart(descriptor->indexNamespace()));
+                    bob.appendBool("valid", curIndexResults.valid);
+
+                    if (!curIndexResults.warnings.empty()) {
+                        bob.append("warnings", curIndexResults.warnings);
                     }
+
+                    if (!curIndexResults.errors.empty()) {
+                        bob.append("errors", curIndexResults.errors);
+                    }
+                }
+
+                if (!curIndexResults.valid) {
+                    results->warnings.insert(results->warnings.end(),
+                                             curIndexResults.warnings.begin(),
+                                             curIndexResults.warnings.end());
+                    results->errors.insert(results->errors.end(),
+                                           curIndexResults.errors.begin(),
+                                           curIndexResults.errors.end());
+                    results->valid = false;
                 }
                 idxn++;
             }

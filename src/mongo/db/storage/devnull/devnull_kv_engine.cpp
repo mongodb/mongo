@@ -211,7 +211,7 @@ public:
     virtual void fullValidate(OperationContext* txn,
                               bool full,
                               long long* numKeysOut,
-                              BSONObjBuilder* output) const {}
+                              ValidateResults* fullResults) const {}
 
     virtual bool appendCustomStats(OperationContext* txn,
                                    BSONObjBuilder* output,

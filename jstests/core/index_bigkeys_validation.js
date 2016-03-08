@@ -17,6 +17,9 @@
     assert.commandWorked(res);
     assert(res.valid, tojson(res));
 
+    // Verify that the top level response object is consistent with the index-specific one.
+    assert.eq(res.valid, res.indexDetails[coll.getFullName() + '.$_id_'].valid);
+
     // Change failIndexKeyTooLong back to the default value.
     assert.commandWorked(db.adminCommand({setParameter: 1, failIndexKeyTooLong: true}));
 
@@ -25,6 +28,9 @@
     res = coll.validate({full: true, scandata: true});
     assert.commandWorked(res);
     assert.eq(res.valid, false, tojson(res));
+
+    // Verify that the top level response object is consistent with the index-specific one.
+    assert.eq(res.valid, res.indexDetails[coll.getFullName() + '.$_id_'].valid);
 
     // Explicitly drop the collection to avoid failures in post-test hooks that run dbHash and
     // validate commands.

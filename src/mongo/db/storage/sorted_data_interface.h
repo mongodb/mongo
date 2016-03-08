@@ -42,6 +42,7 @@ namespace mongo {
 class BSONObjBuilder;
 class BucketDeletionNotification;
 class SortedDataBuilderInterface;
+struct ValidateResults;
 
 /**
  * This interface is a work in progress.  Notes below:
@@ -142,7 +143,7 @@ public:
     virtual void fullValidate(OperationContext* txn,
                               bool full,
                               long long* numKeysOut,
-                              BSONObjBuilder* output) const = 0;
+                              ValidateResults* fullResults) const = 0;
 
     virtual bool appendCustomStats(OperationContext* txn,
                                    BSONObjBuilder* output,

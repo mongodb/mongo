@@ -73,6 +73,17 @@ protected:
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());
 
+        if (_full) {
+            BSONObj outputObj = output.done();
+
+            bool allIndexesValid = true;
+            for (auto elem : outputObj["indexDetails"].Obj()) {
+                BSONObj indexDetail(elem.value());
+                allIndexesValid = indexDetail["valid"].boolean() ? allIndexesValid : false;
+            }
+            ASSERT_EQ(results.valid, allIndexesValid);
+        }
+
         return results.valid;
     }
 

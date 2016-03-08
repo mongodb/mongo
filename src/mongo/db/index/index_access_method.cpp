@@ -250,10 +250,9 @@ RecordId IndexAccessMethod::findSingle(OperationContext* txn, const BSONObj& key
 Status IndexAccessMethod::validate(OperationContext* txn,
                                    bool full,
                                    int64_t* numKeys,
-                                   BSONObjBuilder* output) {
-    // XXX: long long vs int64_t
+                                   ValidateResults* fullResults) {
     long long keys = 0;
-    _newInterface->fullValidate(txn, full, &keys, output);
+    _newInterface->fullValidate(txn, full, &keys, fullResults);
     *numKeys = keys;
     return Status::OK();
 }
