@@ -52,18 +52,18 @@ static const char * const uri = "table:main";
     "statistics=(fast),statistics_log=(wait=5),"
 #define	WT_CONFIG0						\
     WTOPEN_CFG_COMMON						\
-    "transaction_sync=(enabled=false)"			
+    "transaction_sync=(enabled=false)"
 #define	WT_CONFIG1						\
     WTOPEN_CFG_COMMON						\
-    "transaction_sync=(enabled,method=none)"			
+    "transaction_sync=(enabled,method=none)"
 #define	WT_CONFIG2						\
     WTOPEN_CFG_COMMON						\
-    "transaction_sync=(enabled,method=fsync)"			
+    "transaction_sync=(enabled,method=fsync)"
 
 #define	MAX_CPU	10.0
 #define	MAX_DBS	10
 #define	MAX_IDLE_TIME	30
-#define IDLE_INCR	5
+#define	IDLE_INCR	5
 
 #define	MAX_KV	100
 #define	MAX_VAL	128

@@ -758,6 +758,8 @@ majorp
 malloc
 marshall
 marshalled
+maxcpu
+maxdbs
 mbll
 mbss
 mem
