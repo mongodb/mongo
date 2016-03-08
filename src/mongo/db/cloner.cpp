@@ -119,9 +119,8 @@ struct Cloner::Fun {
     void operator()(DBClientCursorBatchIterator& i) {
         invariant(from_collection.coll() != "system.indexes");
 
-        // XXX: can probably take dblock instead
         scoped_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_X));
-        scoped_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(txn->lockState()));
+        scoped_ptr<Lock::DBLock> dbWriteLock(new Lock::DBLock(txn->lockState(), _dbName, MODE_X));
         uassert(ErrorCodes::NotMaster,
                 str::stream() << "Not primary while cloning collection " << from_collection.ns()
                               << " to " << to_collection.ns(),
@@ -174,12 +173,12 @@ struct Cloner::Fun {
 
                 if (_mayYield) {
                     scopedXact.reset();
-                    globalWriteLock.reset();
+                    dbWriteLock.reset();
 
                     txn->getCurOp()->yielded();
 
                     scopedXact.reset(new ScopedTransaction(txn, MODE_X));
-                    globalWriteLock.reset(new Lock::GlobalWrite(txn->lockState()));
+                    dbWriteLock.reset(new Lock::DBLock(txn->lockState(), _dbName, MODE_X));
 
                     // Check if everything is still all right.
                     if (logForRepl) {
