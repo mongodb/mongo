@@ -2,7 +2,6 @@ selector:
   js_test:
     roots:
     - jstests/sharding/*.js
-    - jstests/sharding/replset_config/*.js
     exclude_files:
 
 executor:

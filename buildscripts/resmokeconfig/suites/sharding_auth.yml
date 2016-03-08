@@ -7,11 +7,9 @@ selector:
   js_test:
     roots:
     - jstests/sharding/*.js
-    - jstests/sharding/replset_config/*.js
     exclude_files:
     # Skip any tests that run with auth explicitly.
     - jstests/sharding/*[aA]uth*.js
-    - jstests/sharding/replset_config/*[aA]uth*.js
     # Skip these additional tests when running with auth enabled.
     - jstests/sharding/copydb_from_mongos.js  # SERVER-13080
     - jstests/sharding/parallel.js
