@@ -13,7 +13,6 @@ rules:
   no-dupe-keys: 2
   no-duplicate-case: 2
   no-empty-character-class: 2
-  no-empty-label: 2
   no-empty-pattern: 2
   no-ex-assign: 2
   no-extra-boolean-cast: 2
@@ -21,6 +20,7 @@ rules:
   no-fallthrough: 2
   no-func-assign: 2
   no-invalid-regexp: 2
+  no-labels: 2
   no-negated-in-lhs: 2
   no-obj-calls: 2
   no-octal-escape: 2
