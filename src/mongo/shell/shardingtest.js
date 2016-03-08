@@ -666,7 +666,7 @@ var ShardingTest = function(params) {
             assert(nodes[i].indexOf(':') >= 0);
         }
         return true;
-    }
+    };
 
     /*
      * Checks if connString is in the format of a CSRS connection string.
@@ -687,7 +687,7 @@ var ShardingTest = function(params) {
             assert(nodes[i].indexOf(':') >= 0);
         }
         return true;
-    }
+    };
 
     /**
      * Kills the mongos with index n.
