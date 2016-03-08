@@ -128,10 +128,7 @@ public:
         if (!results.valid) {
             result.append("advice",
                           "A corrupt namespace has been detected. See "
-                          "http://dochub.mongodb.org/core/data-recovery for recovery steps. Note "
-                          "that validation failures may also result from running a server with the "
-                          "failIndexKeyTooLong parameter set to false and later disabling the "
-                          "parameter.");
+                          "http://dochub.mongodb.org/core/data-recovery for recovery steps.");
         }
 
         return true;

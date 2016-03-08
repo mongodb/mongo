@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include <third_party/murmurhash3/MurmurHash3.h>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
@@ -37,6 +39,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
@@ -56,9 +59,11 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 #include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
 #include "mongo/util/log.h"
@@ -95,6 +100,8 @@ using std::string;
 using std::vector;
 
 using logger::LogComponent;
+
+static const int IndexKeyMaxSize = 1024;  // this goes away with SERVER-3372
 
 std::string CompactOptions::toString() const {
     std::stringstream ss;
@@ -897,11 +904,10 @@ Status Collection::setValidationAction(OperationContext* txn, StringData newActi
     return Status::OK();
 }
 
-
 namespace {
-class MyValidateAdaptor : public ValidateAdaptor {
+class RecordDataValidateAdaptor : public ValidateAdaptor {
 public:
-    virtual ~MyValidateAdaptor() {}
+    virtual ~RecordDataValidateAdaptor() {}
 
     virtual Status validate(const RecordData& record, size_t* dataSize) {
         BSONObj obj = record.toBson();
@@ -912,48 +918,212 @@ public:
     }
 };
 
-void validateIndexKeyCount(OperationContext* txn,
-                           const IndexDescriptor& idx,
-                           int64_t numIdxKeys,
-                           int64_t numRecs,
-                           ValidateResults* results) {
-    if (idx.isIdIndex() && numIdxKeys != numRecs) {
-        string msg = str::stream() << "number of _id index entries (" << numIdxKeys
-                                   << ") does not match the number of documents (" << numRecs
-                                   << ")";
+using IndexKeyCountMap = std::unordered_map<uint32_t, uint64_t>;
+using ValidateResultsMap = std::map<std::string, ValidateResults>;
 
-        if (!failIndexKeyTooLong && (numIdxKeys < numRecs)) {
-            results->warnings.push_back(msg);
-        } else {
-            results->errors.push_back(msg);
-            results->valid = false;
-        }
+class IndexValidator {
+public:
+    IndexValidator(bool full) : _full(full), _ikc(new IndexKeyCountMap()) {}
 
-        return;  // Avoid failing the next two checks, they just add redundant/confusing messages
-    }
-    if (!idx.isMultikey(txn) && numIdxKeys > numRecs) {
-        string err = str::stream() << "index " << idx.indexName()
-                                   << " is not multi-key, but has more entries (" << numIdxKeys
-                                   << ") than documents (" << numRecs << ")";
-        results->errors.push_back(err);
-        results->valid = false;
-    }
-    //  If an access method name is given, the index may be a full text, geo or special
-    //  index plugin with different semantics.
-    if (!idx.isSparse() && !idx.isPartial() && idx.getAccessMethodName() == "" &&
-        numIdxKeys < numRecs) {
-        string msg = str::stream() << "index " << idx.indexName()
-                                   << " is not sparse or partial, but has fewer entries ("
-                                   << numIdxKeys << ") than documents (" << numRecs << ")";
+    /**
+     * Create one hash map of all entries for all indexes in a collection.
+     * This ensures that we only need to do one collection scan when validating
+     * a document against all the indexes that point to it.
+     */
+    void cacheIndexInfo(OperationContext* txn,
+                        const IndexAccessMethod* iam,
+                        const IndexDescriptor* descriptor,
+                        long long numKeys) {
+        _keyCounts[descriptor->indexNamespace()] = numKeys;
 
-        if (!failIndexKeyTooLong) {
-            results->warnings.push_back(msg);
-        } else {
-            results->errors.push_back(msg);
-            results->valid = false;
+        if (_full) {
+            const auto& key = descriptor->keyPattern();
+            const bool forward = key.firstElement().number() >= 0;
+            std::unique_ptr<SortedDataInterface::Cursor> cursor = iam->newCursor(txn, forward);
+            cursor->setEndPosition(kMaxBSONKey, true);
+            auto indexEntry = cursor->seek(kMinBSONKey, true);
+            while (indexEntry) {
+                uint32_t keyHash = hashIndexEntry(indexEntry->key, indexEntry->loc);
+                (*_ikc)[keyHash]++;
+                indexEntry = cursor->next();
+            }
         }
     }
-}
+
+    void validateIndexes(OperationContext* txn,
+                         RecordStore* rs,
+                         IndexCatalog& indexCatalog,
+                         ValidateResultsMap& indexDetailNsResultsMap,
+                         ValidateResults* globalResults) {
+        if (!indexCatalog.haveAnyIndexes()) {
+            return;
+        }
+        auto documentCursor = rs->getCursor(txn, true);
+        // Only used to determine if any index validation failed in this function,
+        // doesn't include any indexes that have already been marked as invalid.
+        bool allIndexesValid = true;
+
+        if (_full) {
+            while (const auto& document = documentCursor->next()) {
+                IndexCatalog::IndexIterator i = indexCatalog.getIndexIterator(txn, false);
+                RecordId documentRecordId = document->id;
+
+                while (i.more()) {
+                    const IndexDescriptor* descriptor = i.next();
+                    string indexNs = descriptor->indexNamespace();
+                    ValidateResults& results = indexDetailNsResultsMap[indexNs];
+                    if (!results.valid) {
+                        // No point doing additional validation if the index is already invalid.
+                        continue;
+                    }
+
+                    IndexAccessMethod* iam = indexCatalog.getIndex(descriptor);
+                    invariant(iam);
+
+                    BSONObjSet documentKeySet;
+                    iam->getKeys(document->data.toBson(), &documentKeySet);
+
+                    if (documentKeySet.size() > 1) {
+                        if (!descriptor->isMultikey(txn)) {
+                            string msg = str::stream() << "Index " << descriptor->indexName()
+                                                       << " is not multi-key but has more than one"
+                                                       << " key in one or more document(s)";
+                            results.errors.push_back(msg);
+                            results.valid = false;
+                        }
+                    }
+
+                    for (const auto& key : documentKeySet) {
+                        if (key.objsize() >= IndexKeyMaxSize) {
+                            // Index keys >= 1024 bytes are not indexed.
+                            _longKeys[indexNs]++;
+                            continue;
+                        }
+                        uint32_t indexEntryHash = hashIndexEntry(key, documentRecordId);
+                        if (_ikc->find(indexEntryHash) != _ikc->end()) {
+                            (*_ikc)[indexEntryHash]--;
+
+                            dassert((*_ikc)[indexEntryHash] >= 0);
+                            if ((*_ikc)[indexEntryHash] == 0) {
+                                _ikc->erase(indexEntryHash);
+                            }
+                        } else if (descriptor->isPartial()) {
+                            // Partial indexes are treated as regular indexes in
+                            // IndexAccessMethod::getKeys, so documents whose
+                            // field(s) don't match the partial expression are
+                            // still returned.
+                            continue;
+                        } else {
+                            allIndexesValid = false;
+                            results.valid = false;
+                        }
+                    }
+                }
+            }
+
+            if (!_ikc->empty()) {
+                allIndexesValid = false;
+                for (auto& it : indexDetailNsResultsMap) {
+                    // Marking all indexes as invalid since we don't know which one failed.
+                    ValidateResults& r = it.second;
+                    r.valid = false;
+                }
+            }
+        }
+
+        // Validate Index Key Count.
+        if (allIndexesValid) {
+            IndexCatalog::IndexIterator i = indexCatalog.getIndexIterator(txn, false);
+            while (i.more()) {
+                IndexDescriptor* descriptor = i.next();
+                ValidateResults& results = indexDetailNsResultsMap[descriptor->indexNamespace()];
+
+                if (results.valid) {
+                    validateIndexKeyCount(txn, descriptor, rs->numRecords(txn), &results);
+                }
+                allIndexesValid = results.valid ? allIndexesValid : false;
+            }
+        }
+
+        if (!allIndexesValid) {
+            string msg = "One or more indexes contain invalid index entries.";
+            globalResults->errors.push_back(msg);
+        }
+    }
+
+private:
+    bool _full;
+    std::unique_ptr<IndexKeyCountMap> _ikc;
+    std::map<string, long long> _longKeys;
+    std::map<string, long long> _keyCounts;
+
+    void validateIndexKeyCount(OperationContext* txn,
+                               IndexDescriptor* idx,
+                               int64_t numRecs,
+                               ValidateResults* results) {
+        string indexNs = idx->indexNamespace();
+        long long numIndexedKeys = _keyCounts[indexNs];
+        long long numLongKeys = _longKeys[indexNs];
+        auto totalKeys = numLongKeys + numIndexedKeys;
+
+        bool hasTooFewKeys = false;
+        if (idx->isIdIndex() && totalKeys != numRecs) {
+            hasTooFewKeys = totalKeys < numRecs ? true : hasTooFewKeys;
+            string msg = str::stream() << "number of _id index entries (" << numIndexedKeys
+                                       << ") does not match the number of documents in the index ("
+                                       << numRecs - numLongKeys << ")";
+            if (!failIndexKeyTooLong && !_full && (numIndexedKeys < numRecs)) {
+                results->warnings.push_back(msg);
+            } else {
+                results->errors.push_back(msg);
+                results->valid = false;
+            }
+        }
+
+        if (results->valid && !idx->isMultikey(txn) && totalKeys > numRecs) {
+            string err = str::stream()
+                << "index " << idx->indexName() << " is not multi-key, but has more entries ("
+                << numIndexedKeys << ") than documents in the index (" << numRecs - numLongKeys
+                << ")";
+            results->errors.push_back(err);
+            results->valid = false;
+        }
+        // Ensure normal indexes have at least as many keys as the number of documents in the
+        // collection.
+        if (results->valid && !idx->isSparse() && !idx->isPartial() && !idx->isIdIndex() &&
+            idx->getAccessMethodName() == "" && totalKeys < numRecs) {
+            hasTooFewKeys = true;
+            string msg = str::stream() << "index " << idx->indexName()
+                                       << " is not sparse or partial, but has fewer entries ("
+                                       << numIndexedKeys << ") than documents in the index ("
+                                       << numRecs - numLongKeys << ")";
+            if (!failIndexKeyTooLong && !_full) {
+                results->warnings.push_back(msg);
+            } else {
+                results->errors.push_back(msg);
+                results->valid = false;
+            }
+        }
+
+        if (!_full && hasTooFewKeys) {
+            string warning = str::stream()
+                << "index " << idx->indexName()
+                << " has fewer keys than records. This may be the result of currently or "
+                   "previously running the server with the failIndexKeyTooLong parameter set to "
+                   "false. Please re-run the validate command with {full: true}";
+            results->warnings.push_back(warning);
+        }
+    }
+
+    uint32_t hashIndexEntry(const BSONObj& key, RecordId& loc) {
+        uint32_t hash;
+        KeyString ks(key, Ordering::make(BSONObj()), loc);
+        MurmurHash3_x86_32(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize(), 0, &hash);
+        MurmurHash3_x86_32(ks.getBuffer(), ks.getSize(), hash, &hash);
+        // Take the first 25 bits to conserve memory.
+        return hash >> 7;
+    }
+};
 }  // namespace
 
 Status Collection::validate(OperationContext* txn,
@@ -963,25 +1133,19 @@ Status Collection::validate(OperationContext* txn,
                             BSONObjBuilder* output) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
 
-    MyValidateAdaptor adaptor;
+    RecordDataValidateAdaptor adaptor;
     Status status = _recordStore->validate(txn, full, scanData, &adaptor, results, output);
     if (!status.isOK())
         return status;
 
     {  // indexes
-        if (!failIndexKeyTooLong) {
-            string warning =
-                "The server is configured with the failIndexKeyTooLong parameter set to false. "
-                "Validation failures that result from having fewer index entries than documents "
-                "have been downgraded from errors to warnings";
-            results->warnings.push_back(warning);
-        }
-        output->append("nIndexes", _indexCatalog.numIndexesReady(txn));
         int idxn = 0;
         try {
             // Only applicable when 'full' validation is requested.
             std::unique_ptr<BSONObjBuilder> indexDetails(full ? new BSONObjBuilder() : NULL);
-            BSONObjBuilder indexes;  // not using subObjStart to be exception safe
+            std::unique_ptr<IndexValidator> indexValidator(new IndexValidator(full));
+            ValidateResultsMap indexDetailNsResultsMap;
+            BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe
 
             IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(txn, false);
             while (i.more()) {
@@ -992,46 +1156,56 @@ Status Collection::validate(OperationContext* txn,
                 invariant(iam);
 
                 ValidateResults curIndexResults;
+                int64_t numKeys;
+                iam->validate(txn, full, &numKeys, &curIndexResults);
+                keysPerIndex.appendNumber(descriptor->indexNamespace(),
+                                          static_cast<long long>(numKeys));
 
-                int64_t keys;
-                iam->validate(txn, full, &keys, &curIndexResults);
-                indexes.appendNumber(descriptor->indexNamespace(), static_cast<long long>(keys));
-
-                validateIndexKeyCount(
-                    txn, *descriptor, keys, _recordStore->numRecords(txn), &curIndexResults);
-
-                if (indexDetails.get()) {
-                    BSONObjBuilder bob(indexDetails->subobjStart(descriptor->indexNamespace()));
-                    bob.appendBool("valid", curIndexResults.valid);
-
-                    if (!curIndexResults.warnings.empty()) {
-                        bob.append("warnings", curIndexResults.warnings);
-                    }
-
-                    if (!curIndexResults.errors.empty()) {
-                        bob.append("errors", curIndexResults.errors);
-                    }
+                indexDetailNsResultsMap[descriptor->indexNamespace()] = curIndexResults;
+                if (curIndexResults.valid) {
+                    indexValidator->cacheIndexInfo(txn, iam, descriptor, numKeys);
                 }
 
-                if (!curIndexResults.valid) {
-                    results->warnings.insert(results->warnings.end(),
-                                             curIndexResults.warnings.begin(),
-                                             curIndexResults.warnings.end());
-                    results->errors.insert(results->errors.end(),
-                                           curIndexResults.errors.begin(),
-                                           curIndexResults.errors.end());
-                    results->valid = false;
-                }
                 idxn++;
             }
 
-            output->append("keysPerIndex", indexes.done());
+            indexValidator->validateIndexes(
+                txn, _recordStore, _indexCatalog, indexDetailNsResultsMap, results);
+
+            for (auto& it : indexDetailNsResultsMap) {
+                std::string indexNs = it.first;
+                ValidateResults& vr = it.second;
+
+                if (indexDetails.get()) {
+                    BSONObjBuilder bob(indexDetails->subobjStart(indexNs));
+                    bob.appendBool("valid", vr.valid);
+
+                    if (!vr.warnings.empty()) {
+                        bob.append("warnings", vr.warnings);
+                    }
+
+                    if (!vr.errors.empty()) {
+                        bob.append("errors", vr.errors);
+                    }
+                }
+
+                results->warnings.insert(
+                    results->warnings.end(), vr.warnings.begin(), vr.warnings.end());
+                results->errors.insert(results->errors.end(), vr.errors.begin(), vr.errors.end());
+
+                if (!vr.valid) {
+                    results->valid = false;
+                }
+            }
+
+            output->append("nIndexes", _indexCatalog.numIndexesReady(txn));
+            output->append("keysPerIndex", keysPerIndex.done());
             if (indexDetails.get()) {
                 output->append("indexDetails", indexDetails->done());
             }
-        } catch (DBException& exc) {
+        } catch (DBException& e) {
             string err = str::stream() << "exception during index validate idxn "
-                                       << BSONObjBuilder::numStr(idxn) << ": " << exc.toString();
+                                       << BSONObjBuilder::numStr(idxn) << ": " << e.toString();
             results->errors.push_back(err);
             results->valid = false;
         }
