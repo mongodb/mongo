@@ -52,5 +52,13 @@ OplogEntry::OplogEntry(const BSONObj& rawInput) : raw(rawInput.getOwned()) {
     }
 }
 
+std::string OplogEntry::toString() const {
+    return raw.toString();
+}
+
+std::ostream& operator<<(std::ostream& s, const OplogEntry& o) {
+    return s << o.toString();
+}
+
 }  // namespace repl
 }  // namespace mongo

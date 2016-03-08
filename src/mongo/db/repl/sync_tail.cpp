@@ -1014,8 +1014,6 @@ static void initializeWriterThread() {
 
 // This free function is used by the writer threads to apply each op
 void multiSyncApply(const std::vector<OplogEntry>& ops, SyncTail* st) {
-    using OplogEntry = OplogEntry;
-
     std::vector<OplogEntry> oplogEntries(ops.begin(), ops.end());
     std::vector<OplogEntry*> oplogEntryPointers(oplogEntries.size());
     for (size_t i = 0; i < oplogEntries.size(); i++) {

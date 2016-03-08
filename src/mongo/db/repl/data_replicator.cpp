@@ -1031,7 +1031,7 @@ Operations DataReplicator::_getNextApplierBatch_inlock() {
     Operations ops;
     BSONObj op;
     while (_oplogBuffer.tryPop(op)) {
-        ops.push_back(op);
+        ops.push_back(OplogEntry(op));
     }
     return ops;
 }
@@ -1080,9 +1080,9 @@ void DataReplicator::_handleFailedApplyBatch(const TimestampStatus& ts, const Op
 void DataReplicator::_scheduleApplyAfterFetch(const Operations& ops) {
     ++_initialSyncState->fetchedMissingDocs;
     // TODO: check collection.isCapped, like SyncTail::getMissingDoc
-    const BSONObj failedOplogEntry = *ops.begin();
+    const BSONObj failedOplogEntry = ops.begin()->raw;
     const BSONElement missingIdElem = failedOplogEntry.getFieldDotted("o2._id");
-    const NamespaceString nss(ops.begin()->getField("ns").str());
+    const NamespaceString nss(ops.begin()->ns);
     const BSONObj query = BSON("find" << nss.coll() << "filter" << missingIdElem.wrap());
     _tmpFetcher.reset(new QueryFetcher(_exec,
                                        _syncSource,

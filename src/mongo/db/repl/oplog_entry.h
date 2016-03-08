@@ -47,6 +47,9 @@ struct OplogEntry {
     // This member is not parsed from the BSON and is instead populated by fillWriterVectors.
     bool isForCappedCollection = false;
 
+    std::string toString() const;
+
+
     BSONObj raw;  // Owned.
 
     StringData ns = "";
@@ -56,6 +59,12 @@ struct OplogEntry {
     BSONElement o;
     BSONElement o2;
 };
+
+std::ostream& operator<<(std::ostream& s, const OplogEntry& o);
+
+inline bool operator==(const OplogEntry& lhs, const OplogEntry& rhs) {
+    return lhs.raw == rhs.raw;
+}
 
 }  // namespace repl
 }  // namespace mongo

@@ -102,7 +102,7 @@ public:
      * clear/reset state
      */
     void reset() {
-        _applierFn = [](OperationContext*, const BSONObj&) -> Status { return Status::OK(); };
+        _applierFn = [](OperationContext*, const OplogEntry&) -> Status { return Status::OK(); };
         _rollbackFn = [](OperationContext*, const OpTime&, const HostAndPort&)
                           -> Status { return Status::OK(); };
         _setMyLastOptime = [this](const OpTime& opTime) { _myLastOpTime = opTime; };
@@ -181,7 +181,7 @@ protected:
         launchExecutorThread();
         DataReplicatorOptions options;
         options.initialSyncRetryWait = Milliseconds(0);
-        options.applierFn = [this](OperationContext* txn, const BSONObj& operation) {
+        options.applierFn = [this](OperationContext* txn, const OplogEntry& operation) {
             return _applierFn(txn, operation);
         };
         options.rollbackFn = [this](OperationContext* txn,
@@ -455,7 +455,7 @@ TEST_F(InitialSyncTest, Complete) {
 TEST_F(InitialSyncTest, MissingDocOnApplyCompletes) {
     DataReplicatorOptions opts;
     int applyCounter{0};
-    _applierFn = [&](OperationContext* txn, const BSONObj& op) {
+    _applierFn = [&](OperationContext* txn, const OplogEntry& op) {
         if (++applyCounter == 1) {
             return Status(ErrorCodes::NoMatchingDocument, "failed: missing doc.");
         }
@@ -869,9 +869,9 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
     unittest::Barrier barrier(2U);
     Timestamp lastTimestampApplied;
     BSONObj operationApplied;
-    _applierFn = [&](OperationContext* txn, const BSONObj& op) {
+    _applierFn = [&](OperationContext* txn, const OplogEntry& op) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
-        operationApplied = op;
+        operationApplied = op.raw;
         barrier.countDownAndWait();
         return Status::OK();
     };
@@ -950,9 +950,9 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
     unittest::Barrier barrier(2U);
     Timestamp lastTimestampApplied;
     BSONObj operationApplied;
-    _applierFn = [&](OperationContext* txn, const BSONObj& op) {
+    _applierFn = [&](OperationContext* txn, const OplogEntry& op) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
-        operationApplied = op;
+        operationApplied = op.raw;
         barrier.countDownAndWait();
         return Status::OK();
     };

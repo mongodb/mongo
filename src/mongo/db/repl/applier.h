@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
@@ -52,7 +53,7 @@ public:
     /**
      * Operations sorted by timestamp in ascending order.
      */
-    using Operations = std::vector<BSONObj>;
+    using Operations = std::vector<OplogEntry>;
 
     /**
      * Callback function to report final status of applying operations along with
@@ -67,7 +68,7 @@ public:
      * would have the same outcome as calling SyncTail::syncApply() ('convertUpdatesToUpserts'
      * value will be embedded in the function implementation).
      */
-    using ApplyOperationFn = stdx::function<Status(OperationContext*, const BSONObj&)>;
+    using ApplyOperationFn = stdx::function<Status(OperationContext*, const OplogEntry&)>;
 
     /**
      * Creates Applier in inactive state.

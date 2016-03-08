@@ -673,6 +673,7 @@ env.Library(
     target='applier',
     source=[
         'applier.cpp',
+        'oplog_entry.cpp',
     ],
     LIBDEPS=[
         'replication_executor',

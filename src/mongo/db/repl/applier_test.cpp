@@ -67,9 +67,9 @@ protected:
 void ApplierTest::setUp() {
     ReplicationExecutorTest::setUp();
     launchExecutorThread();
-    auto apply = [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); };
+    auto apply = [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); };
     _applier.reset(new Applier(&getReplExecutor(),
-                               {BSON("ts" << Timestamp(Seconds(123), 0))},
+                               {OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))},
                                apply,
                                [this](const StatusWith<Timestamp>&, const Operations&) {
                                    if (_barrier.get()) {
@@ -89,8 +89,8 @@ Applier* ApplierTest::getApplier() const {
 }
 
 TEST_F(ApplierTest, InvalidConstruction) {
-    const Operations operations{BSON("ts" << Timestamp(Seconds(123), 0))};
-    auto apply = [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); };
+    const Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+    auto apply = [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); };
     auto callback = [](const StatusWith<Timestamp>& status, const Operations& operations) {};
 
     // Null executor.
@@ -102,12 +102,12 @@ TEST_F(ApplierTest, InvalidConstruction) {
         Applier(&getReplExecutor(), {}, apply, callback), UserException, ErrorCodes::BadValue);
 
     // Last operation missing timestamp field.
-    ASSERT_THROWS_CODE(Applier(&getReplExecutor(), {BSONObj()}, apply, callback),
+    ASSERT_THROWS_CODE(Applier(&getReplExecutor(), {OplogEntry(BSONObj())}, apply, callback),
                        UserException,
                        ErrorCodes::FailedToParse);
 
     // "ts" field in last operation not a timestamp.
-    ASSERT_THROWS_CODE(Applier(&getReplExecutor(), {BSON("ts" << 99)}, apply, callback),
+    ASSERT_THROWS_CODE(Applier(&getReplExecutor(), {OplogEntry(BSON("ts" << 99))}, apply, callback),
                        UserException,
                        ErrorCodes::TypeMismatch);
 
@@ -174,14 +174,14 @@ TEST_F(ApplierTest, CancelBeforeStartingDBWork) {
     getReplExecutor().scheduleDBWork([&](const CallbackData& cbd) {
         barrier.countDownAndWait();  // generation 0
     });
-    const BSONObj operation = BSON("ts" << Timestamp(Seconds(123), 0));
+    const OplogEntry operation(BSON("ts" << Timestamp(Seconds(123), 0)));
     stdx::mutex mutex;
     StatusWith<Timestamp> result = getDetectableErrorStatus();
     Applier::Operations operations;
     _applier.reset(
         new Applier(&getReplExecutor(),
                     {operation},
-                    [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
+                    [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); },
                     [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
                         stdx::lock_guard<stdx::mutex> lock(mutex);
                         result = theResult;
@@ -213,14 +213,14 @@ TEST_F(ApplierTest, DestroyBeforeStartingDBWork) {
         // Give the main thread a head start in invoking the applier destructor.
         sleepmillis(1);
     });
-    const BSONObj operation = BSON("ts" << Timestamp(Seconds(123), 0));
+    const OplogEntry operation(BSON("ts" << Timestamp(Seconds(123), 0)));
     stdx::mutex mutex;
     StatusWith<Timestamp> result = getDetectableErrorStatus();
     Applier::Operations operations;
     _applier.reset(
         new Applier(&getReplExecutor(),
                     {operation},
-                    [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
+                    [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); },
                     [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
                         stdx::lock_guard<stdx::mutex> lock(mutex);
                         result = theResult;
@@ -254,8 +254,8 @@ TEST_F(ApplierTest, WaitForCompletion) {
     Applier::Operations operations;
     _applier.reset(
         new Applier(&getReplExecutor(),
-                    {BSON("ts" << timestamp)},
-                    [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
+                    {OplogEntry(BSON("ts" << timestamp))},
+                    [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); },
                     [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
                         stdx::lock_guard<stdx::mutex> lock(mutex);
                         result = theResult;
@@ -280,8 +280,8 @@ TEST_F(ApplierTest, DestroyShouldBlockUntilInactive) {
     Applier::Operations operations;
     _applier.reset(
         new Applier(&getReplExecutor(),
-                    {BSON("ts" << timestamp)},
-                    [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
+                    {OplogEntry(BSON("ts" << timestamp))},
+                    [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); },
                     [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
                         stdx::lock_guard<stdx::mutex> lock(mutex);
                         result = theResult;
@@ -302,15 +302,15 @@ TEST_F(ApplierTest, DestroyShouldBlockUntilInactive) {
 TEST_F(ApplierTest, ApplyOperationSuccessful) {
     // Bogus operations codes.
     Applier::Operations operationsToApply{
-        BSON("op"
-             << "a"
-             << "ts" << Timestamp(Seconds(123), 0)),
-        BSON("op"
-             << "b"
-             << "ts" << Timestamp(Seconds(456), 0)),
-        BSON("op"
-             << "c"
-             << "ts" << Timestamp(Seconds(789), 0)),
+        OplogEntry(BSON("op"
+                        << "a"
+                        << "ts" << Timestamp(Seconds(123), 0))),
+        OplogEntry(BSON("op"
+                        << "b"
+                        << "ts" << Timestamp(Seconds(456), 0))),
+        OplogEntry(BSON("op"
+                        << "c"
+                        << "ts" << Timestamp(Seconds(789), 0))),
     };
     stdx::mutex mutex;
     StatusWith<Timestamp> result = getDetectableErrorStatus();
@@ -318,7 +318,7 @@ TEST_F(ApplierTest, ApplyOperationSuccessful) {
     bool isLockBatchWriter = false;
     Applier::Operations operationsApplied;
     Applier::Operations operationsOnCompletion;
-    auto apply = [&](OperationContext* txn, const BSONObj& operation) {
+    auto apply = [&](OperationContext* txn, const OplogEntry& operation) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         areWritesReplicationOnOperationContext = txn->writesAreReplicated();
         isLockBatchWriter = txn->lockState()->isBatchWriter();
@@ -343,28 +343,28 @@ TEST_F(ApplierTest, ApplyOperationSuccessful) {
     ASSERT_EQUALS(operationsToApply[1], operationsApplied[1]);
     ASSERT_EQUALS(operationsToApply[2], operationsApplied[2]);
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(operationsToApply[2]["ts"].timestamp(), result.getValue());
+    ASSERT_EQUALS(operationsToApply[2].raw["ts"].timestamp(), result.getValue());
     ASSERT_TRUE(operationsOnCompletion.empty());
 }
 
 void ApplierTest::_testApplyOperationFailed(size_t opIndex, stdx::function<Status()> fail) {
     // Bogus operations codes.
     Applier::Operations operationsToApply{
-        BSON("op"
-             << "a"
-             << "ts" << Timestamp(Seconds(123), 0)),
-        BSON("op"
-             << "b"
-             << "ts" << Timestamp(Seconds(456), 0)),
-        BSON("op"
-             << "c"
-             << "ts" << Timestamp(Seconds(789), 0)),
+        OplogEntry(BSON("op"
+                        << "a"
+                        << "ts" << Timestamp(Seconds(123), 0))),
+        OplogEntry(BSON("op"
+                        << "b"
+                        << "ts" << Timestamp(Seconds(456), 0))),
+        OplogEntry(BSON("op"
+                        << "c"
+                        << "ts" << Timestamp(Seconds(789), 0))),
     };
     stdx::mutex mutex;
     StatusWith<Timestamp> result = getDetectableErrorStatus();
     Applier::Operations operationsApplied;
     Applier::Operations operationsOnCompletion;
-    auto apply = [&](OperationContext* txn, const BSONObj& operation) {
+    auto apply = [&](OperationContext* txn, const OplogEntry& operation) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         if (operationsApplied.size() == opIndex) {
             return fail();
@@ -443,7 +443,7 @@ TEST_F(ApplyUntilAndPauseTest, EmptyOperations) {
     auto result = applyUntilAndPause(
         &getReplExecutor(),
         {},
-        [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
+        [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); },
         Timestamp(Seconds(123), 0),
         [] {},
         [](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {});
@@ -454,9 +454,10 @@ TEST_F(ApplyUntilAndPauseTest, NoOperationsInRange) {
     auto result = applyUntilAndPause(
         &getReplExecutor(),
         {
-         BSON("ts" << Timestamp(Seconds(456), 0)), BSON("ts" << Timestamp(Seconds(789), 0)),
+         OplogEntry(BSON("ts" << Timestamp(Seconds(456), 0))),
+         OplogEntry(BSON("ts" << Timestamp(Seconds(789), 0))),
         },
-        [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
+        [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); },
         Timestamp(Seconds(123), 0),
         [] {},
         [](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {});
@@ -466,8 +467,8 @@ TEST_F(ApplyUntilAndPauseTest, NoOperationsInRange) {
 TEST_F(ApplyUntilAndPauseTest, OperationMissingTimestampField) {
     auto result = applyUntilAndPause(
         &getReplExecutor(),
-        {BSONObj()},
-        [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
+        {OplogEntry(BSONObj())},
+        [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); },
         Timestamp(Seconds(123), 0),
         [] {},
         [](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {});
@@ -476,12 +477,12 @@ TEST_F(ApplyUntilAndPauseTest, OperationMissingTimestampField) {
 
 TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseSingleOperation) {
     Timestamp ts(Seconds(123), 0);
-    const Operations operationsToApply{BSON("ts" << ts)};
+    const Operations operationsToApply{OplogEntry(BSON("ts" << ts))};
     stdx::mutex mutex;
     StatusWith<Timestamp> completionResult = getDetectableErrorStatus();
     bool pauseCalled = false;
     Applier::Operations operationsOnCompletion;
-    auto apply = [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); };
+    auto apply = [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); };
     auto pause = [&] {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         pauseCalled = true;
@@ -513,12 +514,12 @@ TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseSingleOperation) {
 
 TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseSingleOperationTimestampNotInOperations) {
     Timestamp ts(Seconds(123), 0);
-    const Operations operationsToApply{BSON("ts" << ts)};
+    const Operations operationsToApply{OplogEntry(BSON("ts" << ts))};
     stdx::mutex mutex;
     StatusWith<Timestamp> completionResult = getDetectableErrorStatus();
     bool pauseCalled = false;
     Applier::Operations operationsOnCompletion;
-    auto apply = [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); };
+    auto apply = [](OperationContext* txn, const OplogEntry& operation) { return Status::OK(); };
     auto pause = [&] {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         pauseCalled = true;
@@ -551,12 +552,12 @@ TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseSingleOperationTimestampNotInOp
 
 TEST_F(ApplyUntilAndPauseTest, ApplyUntilAndPauseSingleOperationAppliedFailed) {
     Timestamp ts(Seconds(123), 0);
-    const Operations operationsToApply{BSON("ts" << ts)};
+    const Operations operationsToApply{OplogEntry(BSON("ts" << ts))};
     stdx::mutex mutex;
     StatusWith<Timestamp> completionResult = getDetectableErrorStatus();
     bool pauseCalled = false;
     Applier::Operations operationsOnCompletion;
-    auto apply = [](OperationContext* txn, const BSONObj& operation) {
+    auto apply = [](OperationContext* txn, const OplogEntry& operation) {
         return Status(ErrorCodes::OperationFailed, "");
     };
     auto pause = [&] {
@@ -591,22 +592,22 @@ void _testApplyUntilAndPauseDiscardOperations(ReplicationExecutor* executor,
                                               const Timestamp& ts,
                                               bool expectedPauseCalled) {
     Applier::Operations operationsToApply{
-        BSON("op"
-             << "a"
-             << "ts" << Timestamp(Seconds(123), 0)),
-        BSON("op"
-             << "b"
-             << "ts" << Timestamp(Seconds(456), 0)),
-        BSON("op"
-             << "c"
-             << "ts" << Timestamp(Seconds(789), 0)),
+        OplogEntry(BSON("op"
+                        << "a"
+                        << "ts" << Timestamp(Seconds(123), 0))),
+        OplogEntry(BSON("op"
+                        << "b"
+                        << "ts" << Timestamp(Seconds(456), 0))),
+        OplogEntry(BSON("op"
+                        << "c"
+                        << "ts" << Timestamp(Seconds(789), 0))),
     };
     stdx::mutex mutex;
     StatusWith<Timestamp> completionResult = ApplyUntilAndPauseTest::getDetectableErrorStatus();
     bool pauseCalled = false;
     Applier::Operations operationsApplied;
     Applier::Operations operationsOnCompletion;
-    auto apply = [&](OperationContext* txn, const BSONObj& operation) {
+    auto apply = [&](OperationContext* txn, const OplogEntry& operation) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         operationsApplied.push_back(operation);
         return Status::OK();

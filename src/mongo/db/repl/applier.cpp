@@ -52,11 +52,11 @@ Applier::Applier(ReplicationExecutor* executor,
     uassert(ErrorCodes::BadValue, "null replication executor", executor);
     uassert(ErrorCodes::BadValue, "empty list of operations", !operations.empty());
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "last operation missing 'ts' field: " << operations.back(),
-            operations.back().hasField("ts"));
+            str::stream() << "last operation missing 'ts' field: " << operations.back().raw,
+            operations.back().raw.hasField("ts"));
     uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "'ts' in last operation not a timestamp: " << operations.back(),
-            BSONType::bsonTimestamp == operations.back().getField("ts").type());
+            str::stream() << "'ts' in last operation not a timestamp: " << operations.back().raw,
+            BSONType::bsonTimestamp == operations.back().raw.getField("ts").type());
     uassert(ErrorCodes::BadValue, "apply operation function cannot be null", applyOperation);
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
 }
@@ -152,7 +152,7 @@ void Applier::_callback(const ReplicationExecutor::CallbackArgs& cbd) {
             return;
         }
     }
-    _finishCallback(_operations.back().getField("ts").timestamp(), Operations());
+    _finishCallback(_operations.back().raw.getField("ts").timestamp(), Operations());
 }
 
 void Applier::_finishCallback(const StatusWith<Timestamp>& result, const Operations& operations) {
@@ -184,16 +184,16 @@ StatusWith<std::pair<std::unique_ptr<Applier>, Applier::Operations>> applyUntilA
     const PauseDataReplicatorFn& pauseDataReplicator,
     const Applier::CallbackFn& onCompletion) {
     try {
-        auto comp = [](const BSONObj& left, const BSONObj& right) {
+        auto comp = [](const OplogEntry& left, const OplogEntry& right) {
             uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "Operation missing 'ts' field': " << left,
-                    left.hasField("ts"));
+                    str::stream() << "Operation missing 'ts' field': " << left.raw,
+                    left.raw.hasField("ts"));
             uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "Operation missing 'ts' field': " << right,
-                    right.hasField("ts"));
-            return left["ts"].timestamp() < right["ts"].timestamp();
+                    str::stream() << "Operation missing 'ts' field': " << right.raw,
+                    right.raw.hasField("ts"));
+            return left.raw["ts"].timestamp() < right.raw["ts"].timestamp();
         };
-        auto wrapped = BSON("ts" << lastTimestampToApply);
+        auto wrapped = OplogEntry(BSON("ts" << lastTimestampToApply));
         auto i = std::lower_bound(operations.cbegin(), operations.cend(), wrapped, comp);
         bool found = i != operations.cend() && !comp(wrapped, *i);
         auto j = found ? i + 1 : i;
