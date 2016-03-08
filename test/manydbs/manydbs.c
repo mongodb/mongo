@@ -173,7 +173,7 @@ main(int argc, char *argv[])
 	argc -= __wt_optind;
 	argv += __wt_optind;
 	/*
-	 * Adjust the max cpu in relation to the number of databases, unless
+	 * Adjust the maxcpu in relation to the number of databases, unless
 	 * the user set it explicitly.  If we're doing operations add in
 	 * another 10%.
 	 */
