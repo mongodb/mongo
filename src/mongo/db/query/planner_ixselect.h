@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+class CollatorInterface;
+
 /**
  * Methods for determining what fields and predicates can use indices.
  */
@@ -67,7 +69,10 @@ public:
      *              {field: "2d"} can only be used with some geo predicates.
      *              {field: "2dsphere"} can only be used with some other geo predicates.
      */
-    static bool compatible(const BSONElement& elt, const IndexEntry& index, MatchExpression* node);
+    static bool compatible(const BSONElement& elt,
+                           const IndexEntry& index,
+                           MatchExpression* node,
+                           const CollatorInterface* collator);
 
     /**
      * Determine how useful all of our relevant 'indices' are to all predicates in the subtree
@@ -86,7 +91,8 @@ public:
      */
     static void rateIndices(MatchExpression* node,
                             std::string prefix,
-                            const std::vector<IndexEntry>& indices);
+                            const std::vector<IndexEntry>& indices,
+                            const CollatorInterface* collator);
 
     /**
      * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
