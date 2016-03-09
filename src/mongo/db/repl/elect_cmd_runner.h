@@ -90,20 +90,15 @@ public:
      *
      * Returned handle can be used to schedule a callback when the process is complete.
      */
-    StatusWith<ReplicationExecutor::EventHandle> start(
-        ReplicationExecutor* executor,
-        const ReplicaSetConfig& currentConfig,
-        int selfIndex,
-        const std::vector<HostAndPort>& targets,
-        const stdx::function<void()>& onCompletion = stdx::function<void()>());
+    StatusWith<ReplicationExecutor::EventHandle> start(ReplicationExecutor* executor,
+                                                       const ReplicaSetConfig& currentConfig,
+                                                       int selfIndex,
+                                                       const std::vector<HostAndPort>& targets);
 
     /**
-     * Informs the ElectCmdRunner to cancel further processing.  The "executor"
-     * argument must point to the same executor passed to "start()".
-     *
-     * Like start(), this method must run in the executor context.
+     * Informs the ElectCmdRunner to cancel further processing.
      */
-    void cancel(ReplicationExecutor* executor);
+    void cancel();
 
     /**
      * Returns the number of received votes.  Only valid to call after

@@ -116,25 +116,18 @@ public:
      * in currentConfig, with the intention of determining whether the current node
      * is freshest.
      * evh can be used to schedule a callback when the process is complete.
-     * This function must be run in the executor, as it must be synchronous with the command
-     * callbacks that it schedules.
      * If this function returns Status::OK(), evh is then guaranteed to be signaled.
      **/
-    StatusWith<ReplicationExecutor::EventHandle> start(
-        ReplicationExecutor* executor,
-        const Timestamp& lastOpTimeApplied,
-        const ReplicaSetConfig& currentConfig,
-        int selfIndex,
-        const std::vector<HostAndPort>& targets,
-        const stdx::function<void()>& onCompletion = stdx::function<void()>());
+    StatusWith<ReplicationExecutor::EventHandle> start(ReplicationExecutor* executor,
+                                                       const Timestamp& lastOpTimeApplied,
+                                                       const ReplicaSetConfig& currentConfig,
+                                                       int selfIndex,
+                                                       const std::vector<HostAndPort>& targets);
 
     /**
-     * Informs the freshness checker to cancel further processing.  The "executor"
-     * argument must point to the same executor passed to "start()".
-     *
-     * Like start(), this method must run in the executor context.
+     * Informs the freshness checker to cancel further processing.
      */
-    void cancel(ReplicationExecutor* executor);
+    void cancel();
 
     /**
      * Returns true if cancel() was called on this instance.

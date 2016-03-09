@@ -42,59 +42,63 @@ namespace mongo {
 namespace repl {
 
 using executor::RemoteCommandRequest;
+using LockGuard = stdx::lock_guard<stdx::mutex>;
+using CallbackHandle = ReplicationExecutor::CallbackHandle;
+using EventHandle = ReplicationExecutor::EventHandle;
+using RemoteCommandCallbackArgs = ReplicationExecutor::RemoteCommandCallbackArgs;
+using RemoteCommandCallbackFn = ReplicationExecutor::RemoteCommandCallbackFn;
 
-ScatterGatherRunner::ScatterGatherRunner(ScatterGatherAlgorithm* algorithm)
-    : _algorithm(algorithm), _started(false) {}
+ScatterGatherRunner::ScatterGatherRunner(ScatterGatherAlgorithm* algorithm,
+                                         ReplicationExecutor* executor)
+    : _executor(executor), _impl(std::make_shared<RunnerImpl>(algorithm, executor)) {}
 
-ScatterGatherRunner::~ScatterGatherRunner() {}
-
-static void startTrampoline(const ReplicationExecutor::CallbackArgs& cbData,
-                            ScatterGatherRunner* runner,
-                            StatusWith<ReplicationExecutor::EventHandle>* result) {
-    // TODO: remove static cast once ScatterGatherRunner is designed to work with a generic
-    // TaskExecutor.
-    ReplicationExecutor* executor = static_cast<ReplicationExecutor*>(cbData.executor);
-    *result = runner->start(executor);
-}
-
-Status ScatterGatherRunner::run(ReplicationExecutor* executor) {
-    StatusWith<ReplicationExecutor::EventHandle> finishEvh(ErrorCodes::InternalError, "Not set");
-    StatusWith<ReplicationExecutor::CallbackHandle> startCBH = executor->scheduleWork(
-        stdx::bind(startTrampoline, stdx::placeholders::_1, this, &finishEvh));
-    if (!startCBH.isOK()) {
-        return startCBH.getStatus();
-    }
-    executor->wait(startCBH.getValue());
+Status ScatterGatherRunner::run() {
+    auto finishEvh = start();
     if (!finishEvh.isOK()) {
         return finishEvh.getStatus();
     }
-    executor->waitForEvent(finishEvh.getValue());
+    _executor->waitForEvent(finishEvh.getValue());
     return Status::OK();
 }
 
-StatusWith<ReplicationExecutor::EventHandle> ScatterGatherRunner::start(
-    ReplicationExecutor* executor, const stdx::function<void()>& onCompletion) {
+StatusWith<EventHandle> ScatterGatherRunner::start() {
+    // Callback has a shared pointer to the RunnerImpl, so it's always safe to
+    // access the RunnerImpl.
+    std::shared_ptr<RunnerImpl>& impl = _impl;
+    auto cb = [impl](const RemoteCommandCallbackArgs& cbData) { impl->processResponse(cbData); };
+    return _impl->start(cb);
+}
+
+void ScatterGatherRunner::cancel() {
+    _impl->cancel();
+}
+
+/**
+ * Scatter gather runner implementation.
+ */
+ScatterGatherRunner::RunnerImpl::RunnerImpl(ScatterGatherAlgorithm* algorithm,
+                                            ReplicationExecutor* executor)
+    : _executor(executor), _algorithm(algorithm) {}
+
+StatusWith<EventHandle> ScatterGatherRunner::RunnerImpl::start(
+    const RemoteCommandCallbackFn processResponseCB) {
+    LockGuard lk(_mutex);
+
     invariant(!_started);
     _started = true;
-    _actualResponses = 0;
-    _onCompletion = onCompletion;
-    StatusWith<ReplicationExecutor::EventHandle> evh = executor->makeEvent();
+    StatusWith<EventHandle> evh = _executor->makeEvent();
     if (!evh.isOK()) {
         return evh;
     }
     _sufficientResponsesReceived = evh.getValue();
-    ScopeGuard earlyReturnGuard =
-        MakeGuard(&ScatterGatherRunner::_signalSufficientResponsesReceived, this, executor);
-
-    const ReplicationExecutor::RemoteCommandCallbackFn cb =
-        stdx::bind(&ScatterGatherRunner::_processResponse, stdx::placeholders::_1, this);
+    ScopeGuard earlyReturnGuard = MakeGuard(&RunnerImpl::_signalSufficientResponsesReceived, this);
 
     std::vector<RemoteCommandRequest> requests = _algorithm->getRequests();
     for (size_t i = 0; i < requests.size(); ++i) {
-        const StatusWith<ReplicationExecutor::CallbackHandle> cbh =
-            executor->scheduleRemoteCommand(requests[i], cb);
+        const StatusWith<CallbackHandle> cbh =
+            _executor->scheduleRemoteCommand(requests[i], processResponseCB);
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return StatusWith<ReplicationExecutor::EventHandle>(cbh.getStatus());
+            return StatusWith<EventHandle>(cbh.getStatus());
         }
         fassert(18743, cbh.getStatus());
         _callbacks.push_back(cbh.getValue());
@@ -102,50 +106,47 @@ StatusWith<ReplicationExecutor::EventHandle> ScatterGatherRunner::start(
 
     if (_callbacks.empty() || _algorithm->hasReceivedSufficientResponses()) {
         invariant(_algorithm->hasReceivedSufficientResponses());
-        _signalSufficientResponsesReceived(executor);
+        _signalSufficientResponsesReceived();
     }
 
     earlyReturnGuard.Dismiss();
     return evh;
 }
 
-void ScatterGatherRunner::cancel(ReplicationExecutor* executor) {
+void ScatterGatherRunner::RunnerImpl::cancel() {
+    LockGuard lk(_mutex);
+
     invariant(_started);
-    _signalSufficientResponsesReceived(executor);
+    _signalSufficientResponsesReceived();
 }
 
-void ScatterGatherRunner::_processResponse(
-    const ReplicationExecutor::RemoteCommandCallbackArgs& cbData, ScatterGatherRunner* runner) {
-    // It is possible that the ScatterGatherRunner has already gone out of scope, if the
-    // response indicates the callback was canceled.  In that case, do not access any members
-    // of "runner" and return immediately.
+void ScatterGatherRunner::RunnerImpl::processResponse(
+    const ReplicationExecutor::RemoteCommandCallbackArgs& cbData) {
     if (cbData.response.getStatus() == ErrorCodes::CallbackCanceled) {
         return;
     }
+    LockGuard lk(_mutex);
+    if (!_sufficientResponsesReceived.isValid()) {
+        // We've received sufficient responses and it's not safe to access the algorithm any more.
+        return;
+    }
 
-    ++runner->_actualResponses;
-    runner->_algorithm->processResponse(cbData.request, cbData.response);
-    if (runner->_algorithm->hasReceivedSufficientResponses()) {
-        // TODO: remove static cast once ScatterGatherRunner is designed to work with a generic
-        // TaskExecutor.
-        ReplicationExecutor* executor = static_cast<ReplicationExecutor*>(cbData.executor);
-        runner->_signalSufficientResponsesReceived(executor);
+    ++_actualResponses;
+    _algorithm->processResponse(cbData.request, cbData.response);
+    if (_algorithm->hasReceivedSufficientResponses()) {
+        _signalSufficientResponsesReceived();
     } else {
-        invariant(runner->_actualResponses < runner->_callbacks.size());
+        invariant(_actualResponses < _callbacks.size());
     }
 }
 
-void ScatterGatherRunner::_signalSufficientResponsesReceived(ReplicationExecutor* executor) {
+void ScatterGatherRunner::RunnerImpl::_signalSufficientResponsesReceived() {
     if (_sufficientResponsesReceived.isValid()) {
         std::for_each(_callbacks.begin(),
                       _callbacks.end(),
-                      stdx::bind(&ReplicationExecutor::cancel, executor, stdx::placeholders::_1));
-        const ReplicationExecutor::EventHandle h = _sufficientResponsesReceived;
-        _sufficientResponsesReceived = ReplicationExecutor::EventHandle();
-        if (_onCompletion) {
-            _onCompletion();
-        }
-        executor->signalEvent(h);
+                      stdx::bind(&ReplicationExecutor::cancel, _executor, stdx::placeholders::_1));
+        _executor->signalEvent(_sufficientResponsesReceived);
+        _sufficientResponsesReceived = EventHandle();
     }
 }
 

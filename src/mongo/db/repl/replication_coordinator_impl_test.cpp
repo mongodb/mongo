@@ -1692,6 +1692,7 @@ TEST_F(StepDownTest,
 
     // Make a secondary actually catch up
     enterNetwork();
+    getNet()->runUntil(getNet()->now() + Milliseconds(1000));
     ASSERT(getNet()->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
     RemoteCommandRequest request = noi->getRequest();
@@ -1750,6 +1751,7 @@ TEST_F(StepDownTest,
 
     // Secondary has not caught up on first round of heartbeats.
     enterNetwork();
+    getNet()->runUntil(getNet()->now() + Milliseconds(1000));
     ASSERT(getNet()->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
     RemoteCommandRequest request = noi->getRequest();
@@ -4218,11 +4220,11 @@ TEST_F(ReplCoordTest, WaitForMemberState) {
     replCoord->setMyLastDurableOpTime(OpTime(Timestamp(1, 0), 0));
     ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
 
-    // Successful dry run election increases term.
-    ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());
-
     // Single node cluster - this node should start election on setFollowerMode() completion.
     replCoord->waitForElectionFinish_forTest();
+
+    // Successful dry run election increases term.
+    ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());
 
     auto timeout = Milliseconds(1);
     ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));
@@ -4253,11 +4255,11 @@ TEST_F(ReplCoordTest, WaitForDrainFinish) {
     replCoord->setMyLastDurableOpTime(OpTime(Timestamp(1, 0), 0));
     ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
 
-    // Successful dry run election increases term.
-    ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());
-
     // Single node cluster - this node should start election on setFollowerMode() completion.
     replCoord->waitForElectionFinish_forTest();
+
+    // Successful dry run election increases term.
+    ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());
 
     auto timeout = Milliseconds(1);
     ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));

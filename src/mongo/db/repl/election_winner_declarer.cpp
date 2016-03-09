@@ -105,13 +105,13 @@ StatusWith<ReplicationExecutor::EventHandle> ElectionWinnerDeclarer::start(
     const std::vector<HostAndPort>& targets,
     const stdx::function<void()>& onCompletion) {
     _algorithm.reset(new Algorithm(setName, winnerId, term, targets));
-    _runner.reset(new ScatterGatherRunner(_algorithm.get()));
-    return _runner->start(executor, onCompletion);
+    _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
+    return _runner->start();
 }
 
-void ElectionWinnerDeclarer::cancel(ReplicationExecutor* executor) {
+void ElectionWinnerDeclarer::cancel() {
     _isCanceled = true;
-    _runner->cancel(executor);
+    _runner->cancel();
 }
 
 Status ElectionWinnerDeclarer::getStatus() const {

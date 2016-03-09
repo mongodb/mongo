@@ -822,8 +822,7 @@ TEST_F(TopoCoordTest, NodeReturnsNotSecondaryWhenSyncFromIsRunPriorToHavingAConf
     BSONObjBuilder response;
 
     // if we do not have an index in the config, we should get ErrorCodes::NotSecondary
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h1"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h1"), ourOpTime, &response, &result);
     ASSERT_EQUALS(ErrorCodes::NotSecondary, result);
     ASSERT_EQUALS("Removed and uninitialized nodes do not sync", result.reason());
 }
@@ -847,8 +846,7 @@ TEST_F(TopoCoordTest, NodeReturnsNotSecondaryWhenSyncFromIsRunAgainstArbiter) {
                                                   << "h1"))),
                  0);
 
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h1"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h1"), ourOpTime, &response, &result);
     ASSERT_EQUALS(ErrorCodes::NotSecondary, result);
     ASSERT_EQUALS("arbiters don't sync", result.reason());
 }
@@ -884,8 +882,7 @@ TEST_F(TopoCoordTest, NodeReturnsNotSecondaryWhenSyncFromIsRunAgainstPrimary) {
     makeSelfPrimary();
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
     getTopoCoord()._setCurrentPrimaryForTest(0);
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h3"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h3"), ourOpTime, &response, &result);
     ASSERT_EQUALS(ErrorCodes::NotSecondary, result);
     ASSERT_EQUALS("primaries don't sync", result.reason());
     ASSERT_EQUALS("h3:27017", response.obj()["syncFromRequested"].String());
@@ -919,7 +916,7 @@ TEST_F(TopoCoordTest, NodeReturnsNodeNotFoundWhenSyncFromRequestsANodeNotInConfi
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("fakemember"), ourOpTime, &response, &result);
+        HostAndPort("fakemember"), ourOpTime, &response, &result);
     ASSERT_EQUALS(ErrorCodes::NodeNotFound, result);
     ASSERT_EQUALS("Could not find member \"fakemember:27017\" in replica set", result.reason());
 }
@@ -952,8 +949,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsSelf) {
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     // Try to sync from self
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("hself"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("hself"), ourOpTime, &response, &result);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
     ASSERT_EQUALS("I cannot sync from myself", result.reason());
 }
@@ -987,8 +983,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsArbiter) {
 
 
     // Try to sync from an arbiter
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h1"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h1"), ourOpTime, &response, &result);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
     ASSERT_EQUALS("Cannot sync from \"h1:27017\" because it is an arbiter", result.reason());
 }
@@ -1021,8 +1016,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbui
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     // Try to sync from a node that doesn't build indexes
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h2"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h2"), ourOpTime, &response, &result);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
     ASSERT_EQUALS("Cannot sync from \"h2:27017\" because it does not build indexes",
                   result.reason());
@@ -1058,8 +1052,7 @@ TEST_F(TopoCoordTest, NodeReturnsHostUnreachableWhenSyncFromRequestsADownNode) {
     // Try to sync from a member that is down
     receiveDownHeartbeat(HostAndPort("h4"), "rs0", OpTime());
 
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h4"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h4"), ourOpTime, &response, &result);
     ASSERT_EQUALS(ErrorCodes::HostUnreachable, result);
     ASSERT_EQUALS("I cannot reach the requested member: h4:27017", result.reason());
 }
@@ -1095,8 +1088,7 @@ TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAStaleNode) {
     heartbeatFromMember(
         HostAndPort("h5"), "rs0", MemberState::RS_SECONDARY, staleOpTime, Milliseconds(100));
 
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h5"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h5"), ourOpTime, &response, &result);
     ASSERT_OK(result);
     ASSERT_EQUALS("requested member \"h5:27017\" is more than 10 seconds behind us",
                   response.obj()["warning"].String());
@@ -1135,8 +1127,7 @@ TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAValidNode) {
     heartbeatFromMember(
         HostAndPort("h6"), "rs0", MemberState::RS_SECONDARY, ourOpTime, Milliseconds(100));
 
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h6"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h6"), ourOpTime, &response, &result);
     ASSERT_OK(result);
     BSONObj responseObj = response.obj();
     ASSERT_FALSE(responseObj.hasField("warning"));
@@ -1176,8 +1167,7 @@ TEST_F(TopoCoordTest,
         HostAndPort("h6"), "rs0", MemberState::RS_SECONDARY, ourOpTime, Milliseconds(100));
 
     // node goes down between forceSync and chooseNewSyncSource
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h6"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h6"), ourOpTime, &response, &result);
     BSONObj responseObj = response.obj();
     ASSERT_FALSE(responseObj.hasField("warning"));
     receiveDownHeartbeat(HostAndPort("h6"), "rs0", OpTime());
@@ -1215,8 +1205,7 @@ TEST_F(TopoCoordTest, NodeReturnsUnauthorizedWhenSyncFromRequestsANodeWeAreNotAu
     // Try to sync from a member that is unauth'd
     receiveDownHeartbeat(HostAndPort("h5"), "rs0", OpTime(), ErrorCodes::Unauthorized);
 
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h5"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h5"), ourOpTime, &response, &result);
     ASSERT_NOT_OK(result);
     ASSERT_EQUALS(ErrorCodes::Unauthorized, result.code());
     ASSERT_EQUALS("not authorized to communicate with h5:27017", result.reason());
@@ -1238,8 +1227,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenAskedToSyncFromANonVoterAsAVo
                      "]}"),
                  0);
 
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h2"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h2"), ourOpTime, &response, &result);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
     ASSERT_EQUALS("Cannot sync from \"h2:27017\" because it is not a voter", result.reason());
 }
@@ -1277,8 +1265,7 @@ TEST_F(TopoCoordTest,
     heartbeatFromMember(
         HostAndPort("h5"), "rs0", MemberState::RS_SECONDARY, ourOpTime, Milliseconds(100));
 
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h5"), ourOpTime, &response, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h5"), ourOpTime, &response, &result);
     ASSERT_OK(result);
     BSONObj responseObj = response.obj();
     ASSERT_FALSE(responseObj.hasField("warning"));
@@ -1290,8 +1277,7 @@ TEST_F(TopoCoordTest,
         HostAndPort("h6"), "rs0", MemberState::RS_SECONDARY, ourOpTime, Milliseconds(100));
 
     // Sync successfully from another up-to-date member.
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("h6"), ourOpTime, &response2, &result);
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h6"), ourOpTime, &response2, &result);
     BSONObj response2Obj = response2.obj();
     ASSERT_FALSE(response2Obj.hasField("warning"));
     ASSERT_EQUALS(HostAndPort("h5").toString(), response2Obj["prevSyncTarget"].String());
@@ -1365,7 +1351,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     BSONObjBuilder statusBuilder;
     Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
     getTopoCoord().prepareStatusResponse(
-        cbData(),
         TopologyCoordinator::ReplSetStatusArgs{
             curTime,
             static_cast<unsigned>(durationCount<Seconds>(uptimeSecs)),
@@ -1481,7 +1466,6 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhe
     BSONObjBuilder statusBuilder;
     Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
     getTopoCoord().prepareStatusResponse(
-        cbData(),
         TopologyCoordinator::ReplSetStatusArgs{
             curTime,
             static_cast<unsigned>(durationCount<Seconds>(uptimeSecs)),
@@ -1516,42 +1500,6 @@ TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeHalfElectionTimeoutWhenArbiter) 
                                                 OpTime(Timestamp(0, 0), 0));
     Date_t expected(now() + Milliseconds(2500));
     ASSERT_EQUALS(expected, action.getNextHeartbeatStartDate());
-}
-
-class ShutdownInProgressTest : public TopoCoordTest {
-public:
-    ShutdownInProgressTest()
-        : ourCbData(NULL,
-                    ReplicationExecutor::CallbackHandle(),
-                    Status(ErrorCodes::CallbackCanceled, "")) {}
-
-    virtual ReplicationExecutor::CallbackArgs cbData() {
-        return ourCbData;
-    }
-
-private:
-    ReplicationExecutor::CallbackArgs ourCbData;
-};
-
-TEST_F(ShutdownInProgressTest, NodeReturnsShutdownInProgressWhenSyncFromCallbackCanceled) {
-    Status result = Status::OK();
-    BSONObjBuilder response;
-    getTopoCoord().prepareSyncFromResponse(
-        cbData(), HostAndPort("host2:27017"), OpTime(), &response, &result);
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
-    ASSERT_TRUE(response.obj().isEmpty());
-}
-
-TEST_F(ShutdownInProgressTest, NodeReturnsShutDownInProgressWhenGetReplSetStatusCallbackCanceled) {
-    Status result = Status::OK();
-    BSONObjBuilder response;
-    getTopoCoord().prepareStatusResponse(
-        cbData(),
-        TopologyCoordinator::ReplSetStatusArgs{Date_t(), 0, OpTime(), OpTime(), OpTime(), OpTime()},
-        &response,
-        &result);
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
-    ASSERT_TRUE(response.obj().isEmpty());
 }
 
 class PrepareHeartbeatResponseV1Test : public TopoCoordTest {
@@ -4051,7 +3999,6 @@ public:
         BSONObjBuilder statusBuilder;
         Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
         getTopoCoord().prepareStatusResponse(
-            cbData(),
             TopologyCoordinator::ReplSetStatusArgs{_firstRequestDate + Milliseconds(4000),
                                                    10,
                                                    OpTime(Timestamp(100, 0), 0),
@@ -4135,7 +4082,6 @@ public:
         BSONObjBuilder statusBuilder;
         Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
         getTopoCoord().prepareStatusResponse(
-            cbData(),
             TopologyCoordinator::ReplSetStatusArgs{firstRequestDate() + Seconds(4),
                                                    10,
                                                    OpTime(Timestamp(100, 0), 0),
@@ -4184,7 +4130,6 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, NodeDoesNotRetryHeartbeatsAfterFailing
     BSONObjBuilder statusBuilder;
     Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
     getTopoCoord().prepareStatusResponse(
-        cbData(),
         TopologyCoordinator::ReplSetStatusArgs{firstRequestDate() + Milliseconds(4900),
                                                10,
                                                OpTime(Timestamp(100, 0), 0),
@@ -4245,7 +4190,6 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
     BSONObjBuilder statusBuilder;
     Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
     getTopoCoord().prepareStatusResponse(
-        cbData(),
         TopologyCoordinator::ReplSetStatusArgs{firstRequestDate() + Milliseconds(7000),
                                                600,
                                                OpTime(Timestamp(100, 0), 0),

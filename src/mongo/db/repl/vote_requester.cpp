@@ -141,22 +141,20 @@ unordered_set<HostAndPort> VoteRequester::Algorithm::getResponders() const {
 VoteRequester::VoteRequester() : _isCanceled(false) {}
 VoteRequester::~VoteRequester() {}
 
-StatusWith<ReplicationExecutor::EventHandle> VoteRequester::start(
-    ReplicationExecutor* executor,
-    const ReplicaSetConfig& rsConfig,
-    long long candidateIndex,
-    long long term,
-    bool dryRun,
-    OpTime lastDurableOpTime,
-    const stdx::function<void()>& onCompletion) {
+StatusWith<ReplicationExecutor::EventHandle> VoteRequester::start(ReplicationExecutor* executor,
+                                                                  const ReplicaSetConfig& rsConfig,
+                                                                  long long candidateIndex,
+                                                                  long long term,
+                                                                  bool dryRun,
+                                                                  OpTime lastDurableOpTime) {
     _algorithm.reset(new Algorithm(rsConfig, candidateIndex, term, dryRun, lastDurableOpTime));
-    _runner.reset(new ScatterGatherRunner(_algorithm.get()));
-    return _runner->start(executor, onCompletion);
+    _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
+    return _runner->start();
 }
 
-void VoteRequester::cancel(ReplicationExecutor* executor) {
+void VoteRequester::cancel() {
     _isCanceled = true;
-    _runner->cancel(executor);
+    _runner->cancel();
 }
 
 VoteRequester::Result VoteRequester::getResult() const {

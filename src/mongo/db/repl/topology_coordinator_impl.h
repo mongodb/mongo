@@ -164,8 +164,7 @@ public:
     virtual void setElectionSleepUntil(Date_t newTime);
     virtual void setFollowerMode(MemberState::MS newMode);
     virtual void adjustMaintenanceCountBy(int inc);
-    virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackArgs& data,
-                                         const HostAndPort& target,
+    virtual void prepareSyncFromResponse(const HostAndPort& target,
                                          const OpTime& lastOpApplied,
                                          BSONObjBuilder* response,
                                          Status* result);
@@ -191,8 +190,7 @@ public:
                                               const OpTime& lastOpApplied,
                                               const OpTime& lastOpDurable,
                                               ReplSetHeartbeatResponse* response);
-    virtual void prepareStatusResponse(const ReplicationExecutor::CallbackArgs& data,
-                                       const ReplSetStatusArgs& rsStatusArgs,
+    virtual void prepareStatusResponse(const ReplSetStatusArgs& rsStatusArgs,
                                        BSONObjBuilder* response,
                                        Status* result);
     virtual void fillIsMasterForReplSet(IsMasterResponse* response);

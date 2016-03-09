@@ -350,16 +350,10 @@ void TopologyCoordinatorImpl::clearSyncSourceBlacklist() {
     _syncSourceBlacklist.clear();
 }
 
-void TopologyCoordinatorImpl::prepareSyncFromResponse(const ReplicationExecutor::CallbackArgs& data,
-                                                      const HostAndPort& target,
+void TopologyCoordinatorImpl::prepareSyncFromResponse(const HostAndPort& target,
                                                       const OpTime& lastOpApplied,
                                                       BSONObjBuilder* response,
                                                       Status* result) {
-    if (data.status == ErrorCodes::CallbackCanceled) {
-        *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
-        return;
-    }
-
     response->append("syncFromRequested", target.toString());
 
     if (_selfIndex == -1) {
@@ -1507,15 +1501,9 @@ const MemberConfig* TopologyCoordinatorImpl::_currentPrimaryMember() const {
     return &(_rsConfig.getMemberAt(_currentPrimaryIndex));
 }
 
-void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::CallbackArgs& data,
-                                                    const ReplSetStatusArgs& rsStatusArgs,
+void TopologyCoordinatorImpl::prepareStatusResponse(const ReplSetStatusArgs& rsStatusArgs,
                                                     BSONObjBuilder* response,
                                                     Status* result) {
-    if (data.status == ErrorCodes::CallbackCanceled) {
-        *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
-        return;
-    }
-
     // output for each member
     vector<BSONObj> membersOut;
     const MemberState myState = getMemberState();

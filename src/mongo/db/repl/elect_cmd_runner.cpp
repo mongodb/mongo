@@ -131,16 +131,15 @@ StatusWith<ReplicationExecutor::EventHandle> ElectCmdRunner::start(
     ReplicationExecutor* executor,
     const ReplicaSetConfig& currentConfig,
     int selfIndex,
-    const std::vector<HostAndPort>& targets,
-    const stdx::function<void()>& onCompletion) {
+    const std::vector<HostAndPort>& targets) {
     _algorithm.reset(new Algorithm(currentConfig, selfIndex, targets, OID::gen()));
-    _runner.reset(new ScatterGatherRunner(_algorithm.get()));
-    return _runner->start(executor, onCompletion);
+    _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
+    return _runner->start();
 }
 
-void ElectCmdRunner::cancel(ReplicationExecutor* executor) {
+void ElectCmdRunner::cancel() {
     _isCanceled = true;
-    _runner->cancel(executor);
+    _runner->cancel();
 }
 
 int ElectCmdRunner::getReceivedVotes() const {

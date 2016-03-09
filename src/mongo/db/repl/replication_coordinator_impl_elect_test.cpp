@@ -547,6 +547,10 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringFresh
 
     BSONObjBuilder result;
     ASSERT_OK(getReplCoord()->processReplSetReconfig(&txn, config, &result));
+    // Wait until election cancels.
+    net->enterNetwork();
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
     ASSERT(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
 }
 
@@ -583,6 +587,10 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringElect
 
     BSONObjBuilder result;
     ASSERT_OK(getReplCoord()->processReplSetReconfig(&txn, config, &result));
+    // Wait until election cancels.
+    getNet()->enterNetwork();
+    getNet()->runReadyNetworkOperations();
+    getNet()->exitNetwork();
     ASSERT(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
 }
 

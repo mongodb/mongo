@@ -208,17 +208,16 @@ StatusWith<ReplicationExecutor::EventHandle> FreshnessChecker::start(
     const Timestamp& lastOpTimeApplied,
     const ReplicaSetConfig& currentConfig,
     int selfIndex,
-    const std::vector<HostAndPort>& targets,
-    const stdx::function<void()>& onCompletion) {
+    const std::vector<HostAndPort>& targets) {
     _originalConfigVersion = currentConfig.getConfigVersion();
     _algorithm.reset(new Algorithm(lastOpTimeApplied, currentConfig, selfIndex, targets));
-    _runner.reset(new ScatterGatherRunner(_algorithm.get()));
-    return _runner->start(executor, onCompletion);
+    _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
+    return _runner->start();
 }
 
-void FreshnessChecker::cancel(ReplicationExecutor* executor) {
+void FreshnessChecker::cancel() {
     _isCanceled = true;
-    _runner->cancel(executor);
+    _runner->cancel();
 }
 
 }  // namespace repl

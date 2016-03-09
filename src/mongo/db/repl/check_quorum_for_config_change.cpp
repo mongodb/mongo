@@ -282,8 +282,8 @@ Status checkQuorumGeneral(ReplicationExecutor* executor,
                           const ReplicaSetConfig& rsConfig,
                           const int myIndex) {
     QuorumChecker checker(&rsConfig, myIndex);
-    ScatterGatherRunner runner(&checker);
-    Status status = runner.run(executor);
+    ScatterGatherRunner runner(&checker, executor);
+    Status status = runner.run();
     if (!status.isOK()) {
         return status;
     }

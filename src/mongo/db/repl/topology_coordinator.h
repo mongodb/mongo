@@ -208,8 +208,7 @@ public:
     ////////////////////////////////////////////////////////////
 
     // produces a reply to a replSetSyncFrom command
-    virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackArgs& data,
-                                         const HostAndPort& target,
+    virtual void prepareSyncFromResponse(const HostAndPort& target,
                                          const OpTime& lastOpApplied,
                                          BSONObjBuilder* response,
                                          Status* result) = 0;
@@ -254,8 +253,7 @@ public:
     };
 
     // produce a reply to a status request
-    virtual void prepareStatusResponse(const ReplicationExecutor::CallbackArgs& data,
-                                       const ReplSetStatusArgs& rsStatusArgs,
+    virtual void prepareStatusResponse(const ReplSetStatusArgs& rsStatusArgs,
                                        BSONObjBuilder* response,
                                        Status* result) = 0;
 

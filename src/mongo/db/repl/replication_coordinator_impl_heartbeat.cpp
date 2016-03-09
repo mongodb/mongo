@@ -44,6 +44,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/repl/vote_requester.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/functional.h"
@@ -67,6 +68,8 @@ using executor::RemoteCommandRequest;
 void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackArgs cbData,
                                                     const HostAndPort& target,
                                                     int targetIndex) {
+    LockGuard topoLock(_topoMutex);
+
     _untrackHeartbeatHandle(cbData.myHandle);
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
@@ -113,6 +116,8 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget(const HostAndPort& t
 
 void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     const ReplicationExecutor::RemoteCommandCallbackArgs& cbData, int targetIndex) {
+    LockGuard topoLock(_topoMutex);
+
     // remove handle from queued heartbeats
     _untrackHeartbeatHandle(cbData.myHandle);
 
@@ -320,6 +325,9 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
+
+    LockGuard topoLock(_topoMutex);
+
     invariant(cbData.txn);
     // TODO Add invariant that we've got global shared or global exclusive lock, when supported
     // by lock manager.
@@ -360,9 +368,9 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConf
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
     if (_freshnessChecker) {
-        _freshnessChecker->cancel(&_replExecutor);
+        _freshnessChecker->cancel();
         if (_electCmdRunner) {
-            _electCmdRunner->cancel(&_replExecutor);
+            _electCmdRunner->cancel();
         }
         _replExecutor.onEvent(
             _electionFinishedEvent,
@@ -383,6 +391,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled(
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
+
+    LockGuard topoLock(_topoMutex);
     fassert(18911, cbData.status);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_inShutdown) {
@@ -452,7 +462,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         }
     }
 
-    const stdx::function<void(const ReplicationExecutor::CallbackArgs&)> reconfigFinishFn(
+    const CallbackFn reconfigFinishFn(
         stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
                    this,
                    stdx::placeholders::_1,
@@ -481,6 +491,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         return;
     }
 
+    LockGuard topoLock(_topoMutex);
+
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
@@ -498,6 +510,28 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
                        stdx::placeholders::_1,
                        newConfig,
                        myIndex));
+        return;
+    }
+
+    // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
+    if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+        if (isV1ElectionProtocol()) {
+            invariant(_voteRequester);
+            _voteRequester->cancel();
+        } else {
+            invariant(_freshnessChecker);
+            _freshnessChecker->cancel();
+            if (_electCmdRunner) {
+                _electCmdRunner->cancel();
+            }
+        }
+        // Wait for the election to complete and the node's Role to be set to follower.
+        _replExecutor.onEvent(_electionFinishedEvent,
+                              stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
+                                         this,
+                                         stdx::placeholders::_1,
+                                         newConfig,
+                                         myIndex));
         return;
     }
 
@@ -524,8 +558,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // If we do not have an index, we should pass -1 as our index to avoid falsely adding ourself to
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
-    const PostMemberStateUpdateAction action =
-        _setCurrentRSConfig_inlock(cbData, newConfig, myIndexValue);
+    const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndexValue);
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
@@ -558,14 +591,12 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
     }
 }
 
-void ReplicationCoordinatorImpl::_restartHeartbeats_inlock(
-    const ReplicationExecutor::CallbackArgs& cbData) {
+void ReplicationCoordinatorImpl::_restartHeartbeats_inlock() {
     _cancelHeartbeats_inlock();
-    _startHeartbeats_inlock(cbData);
+    _startHeartbeats_inlock();
 }
 
-void ReplicationCoordinatorImpl::_startHeartbeats_inlock(
-    const ReplicationExecutor::CallbackArgs& cbData) {
+void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
     const Date_t now = _replExecutor.now();
     _seedList.clear();
     for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
@@ -579,12 +610,13 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock(
             slaveInfo.lastUpdate = _replExecutor.now();
             slaveInfo.down = false;
         }
-        _scheduleNextLivenessUpdate_inlock(cbData);
+        _scheduleNextLivenessUpdate_inlock();
     }
 }
 
 void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     const ReplicationExecutor::CallbackArgs& cbData) {
+    LockGuard topoLock(_topoMutex);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     // Only reset the callback handle if it matches, otherwise more will be coming through
     if (cbData.myHandle == _handleLivenessTimeoutCbh) {
@@ -628,20 +660,10 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
             }
         }
     }
-    _scheduleNextLivenessUpdate_inlock(cbData);
+    _scheduleNextLivenessUpdate_inlock();
 }
 
-void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate(
-    const ReplicationExecutor::CallbackArgs& cbData) {
-    if (cbData.status == ErrorCodes::CallbackCanceled)
-        return;
-
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _scheduleNextLivenessUpdate_inlock(cbData);
-}
-
-void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock(
-    const ReplicationExecutor::CallbackArgs& cbData) {
+void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
     if (!isV1ElectionProtocol()) {
         return;
     }
@@ -678,15 +700,14 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock(
     auto nextTimeout = earliestDate + _rsConfig.getElectionTimeoutPeriod();
     if (nextTimeout > _replExecutor.now()) {
         LOG(3) << "scheduling next check at " << nextTimeout;
-        auto cbh = _replExecutor.scheduleWorkAt(
-            nextTimeout,
-            stdx::bind(
-                &ReplicationCoordinatorImpl::_handleLivenessTimeout, this, stdx::placeholders::_1));
-        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        auto cbh = _scheduleWorkAt(nextTimeout,
+                                   stdx::bind(&ReplicationCoordinatorImpl::_handleLivenessTimeout,
+                                              this,
+                                              stdx::placeholders::_1));
+        if (!cbh) {
             return;
         }
-        fassert(22002, cbh.getStatus());
-        _handleLivenessTimeoutCbh = cbh.getValue();
+        _handleLivenessTimeoutCbh = cbh;
         _earliestMemberId = earliestMemberId;
     }
 }
@@ -698,8 +719,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleLivenessUpdate_inlock(int u
     if (_handleLivenessTimeoutCbh.isValid()) {
         _replExecutor.cancel(_handleLivenessTimeoutCbh);
     }
-    _replExecutor.scheduleWork(stdx::bind(
-        &ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate, this, stdx::placeholders::_1));
+    _scheduleNextLivenessUpdate_inlock();
 }
 
 void ReplicationCoordinatorImpl::_cancelPriorityTakeover_inlock() {
@@ -748,6 +768,8 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
 }
 
 void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTakeOver) {
+    LockGuard topoLock(_topoMutex);
+
     if (!isV1ElectionProtocol()) {
         return;
     }

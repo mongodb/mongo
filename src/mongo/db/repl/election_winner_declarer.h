@@ -90,8 +90,6 @@ public:
      * in currentConfig, with the intention of alerting them of a new primary.
      *
      * evh can be used to schedule a callback when the process is complete.
-     * This function must be run in the executor, as it must be synchronous with the command
-     * callbacks that it schedules.
      * If this function returns Status::OK(), evh is then guaranteed to be signaled.
      **/
     StatusWith<ReplicationExecutor::EventHandle> start(
@@ -103,12 +101,9 @@ public:
         const stdx::function<void()>& onCompletion = stdx::function<void()>());
 
     /**
-     * Informs the ElectionWinnerDeclarer to cancel further processing.  The "executor"
-     * argument must point to the same executor passed to "start()".
-     *
-     * Like start(), this method must run in the executor context.
+     * Informs the ElectionWinnerDeclarer to cancel further processing.
      */
-    void cancel(ReplicationExecutor* executor);
+    void cancel();
 
     /**
      * Returns a Status from the ElectionWinnerDeclarer::algorithm which indicates what
