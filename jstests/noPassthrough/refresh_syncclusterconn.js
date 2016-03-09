@@ -14,14 +14,14 @@ var mongoC = MongoRunner.runMongod({});
 var mongoSCC = new Mongo(mongoA.host + "," + mongoB.host + "," + mongoC.host);
 
 MongoRunner.stopMongod(mongoA);
-MongoRunner.runMongod({ restart: mongoA.runId });
+MongoRunner.runMongod({restart: mongoA.runId});
 
 try {
-    mongoSCC.getCollection("foo.bar").insert({ x : 1});
-    assert(false , "must throw an insert exception");
+    mongoSCC.getCollection("foo.bar").insert({x: 1});
+    assert(false, "must throw an insert exception");
 } catch (e) {
     printjson(e);
 }
 
-mongoSCC.getCollection("foo.bar").insert({ blah : "blah" });
+mongoSCC.getCollection("foo.bar").insert({blah: "blah"});
 assert.eq(null, mongoSCC.getDB("foo").getLastError());

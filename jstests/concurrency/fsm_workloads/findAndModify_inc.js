@@ -22,14 +22,13 @@ var $config = (function() {
         },
 
         update: function update(db, collName) {
-            var updateDoc = { $inc: {} };
+            var updateDoc = {
+                $inc: {}
+            };
             updateDoc.$inc[this.fieldName] = 1;
 
-            var res = db.runCommand({
-                findAndModify: collName,
-                query: { _id: 'findAndModify_inc' },
-                update: updateDoc
-            });
+            var res = db.runCommand(
+                {findAndModify: collName, query: {_id: 'findAndModify_inc'}, update: updateDoc});
             assertAlways.commandWorked(res);
 
             // If the document was invalidated during a yield, then we wouldn't have modified it.
@@ -64,13 +63,13 @@ var $config = (function() {
     };
 
     var transitions = {
-        init: { update: 1 },
-        update: { find: 1 },
-        find: { update: 1 }
+        init: {update: 1},
+        update: {find: 1},
+        find: {update: 1}
     };
 
     function setup(db, collName, cluster) {
-        db[collName].insert({ _id: 'findAndModify_inc' });
+        db[collName].insert({_id: 'findAndModify_inc'});
     }
 
     return {

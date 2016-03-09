@@ -17,8 +17,8 @@ load('jstests/aggregation/extras/utils.js');
 
     // Helper for testing that op results in error with code errorCode.
     function testError(op, errorCode) {
-      var pipeline = [{$project: {_id: 0, result: op}}];
-      assertErrorCode(coll, pipeline, errorCode);
+        var pipeline = [{$project: {_id: 0, result: op}}];
+        assertErrorCode(coll, pipeline, errorCode);
     }
 
     // Valid input: Numeric arg >= 0, null, or NaN.

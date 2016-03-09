@@ -10,13 +10,12 @@
  * @tags: [requires_persistence]
  */
 
-
 load("jstests/replsets/rslib.js");
 var name = "initialsync3";
 var host = getHostName();
 
 print("Start set with three nodes");
-var replTest = new ReplSetTest( {name: name, nodes: 3} );
+var replTest = new ReplSetTest({name: name, nodes: 3});
 var nodes = replTest.startSet();
 replTest.initiate({
     _id: name,
@@ -30,7 +29,7 @@ replTest.initiate({
 var master = replTest.getPrimary();
 
 print("Initial sync");
-master.getDB("foo").bar.baz.insert({x:1});
+master.getDB("foo").bar.baz.insert({x: 1});
 replTest.awaitReplication();
 
 replTest.stop(0);
@@ -41,7 +40,7 @@ replTest.start(1);
 
 print("make sure 1 does not become a secondary (because it cannot clone from 2)");
 sleep(10000);
-var result = nodes[1].getDB("admin").runCommand({isMaster : 1});
+var result = nodes[1].getDB("admin").runCommand({isMaster: 1});
 assert(!result.ismaster, tojson(result));
 assert(!result.secondary, tojson(result));
 
@@ -52,7 +51,7 @@ master = replTest.getPrimary();
 
 print("now 1 should be able to initial sync");
 assert.soon(function() {
-    var result = nodes[1].getDB("admin").runCommand({isMaster : 1});
+    var result = nodes[1].getDB("admin").runCommand({isMaster: 1});
     printjson(result);
     return result.secondary;
 });

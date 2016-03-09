@@ -7,15 +7,15 @@
     t.drop();
     var pre = db.serverStatus().metrics.cursor.open.total;
 
-    for (var i=1; i<=5; i++) {
-        t.save( { a : i } );
+    for (var i = 1; i <= 5; i++) {
+        t.save({a: i});
     }
 
     var c = t.find().limit(3);
-    while(c.hasNext()) {
+    while (c.hasNext()) {
         var v = c.next();
     }
 
-    assert.eq(pre,db.serverStatus().metrics.cursor.open.total);
+    assert.eq(pre, db.serverStatus().metrics.cursor.open.total);
     t.drop();
 }());

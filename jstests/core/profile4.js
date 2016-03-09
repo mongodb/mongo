@@ -30,7 +30,7 @@ try {
     // Clear the profiling collection.
     db.setProfilingLevel(0);
     db.system.profile.drop();
-    assert.eq(0 , profileCursor().count());
+    assert.eq(0, profileCursor().count());
 
     // Enable profiling. It will be disabled again at the end of the test, or if the test fails.
     db.setProfilingLevel(2);
@@ -93,7 +93,9 @@ try {
     // For queries with a lot of stats data, the execution stats in the profile is replaced by
     // the plan summary.
     var orClauses = 32;
-    var bigOrQuery = { $or: [] };
+    var bigOrQuery = {
+        $or: []
+    };
     for (var i = 0; i < orClauses; ++i) {
         var indexSpec = {};
         indexSpec["a" + i] = 1;
@@ -107,15 +109,15 @@ try {
     // Confirm "cursorExhausted" not set when cursor is open.
     coll.drop();
     coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]);
-    coll.find().batchSize(2).next(); // Query performed leaving open cursor
+    coll.find().batchSize(2).next();  // Query performed leaving open cursor
     lastOp = getLastOp();
     assert.eq(lastOp.op, "query");
     assert(!("cursorExhausted" in lastOp));
 
     var cursor = coll.find().batchSize(2);
-    cursor.next(); // Perform initial query and consume first of 2 docs returned.
-    cursor.next(); // Consume second of 2 docs from initial query.
-    cursor.next(); // getMore performed, leaving open cursor.
+    cursor.next();  // Perform initial query and consume first of 2 docs returned.
+    cursor.next();  // Consume second of 2 docs from initial query.
+    cursor.next();  // getMore performed, leaving open cursor.
     lastOp = getLastOp();
     assert.eq(lastOp.op, "getmore");
     assert(!("cursorExhausted" in lastOp));
@@ -235,12 +237,9 @@ try {
     assert.eq(lastOp.ndeleted, 1);
 
     // Update with {upsert: true} as findAndModify.
-    assert.eq({_id: 2, a: 2, b: 1}, coll.findAndModify({
-        query: {_id: 2, a: 2},
-        update: {$inc: {b: 1}},
-        upsert: true,
-        new: true
-    }));
+    assert.eq({_id: 2, a: 2, b: 1},
+              coll.findAndModify(
+                  {query: {_id: 2, a: 2}, update: {$inc: {b: 1}}, upsert: true, new: true}));
     lastOp = getLastOp();
     assert.eq(lastOp.op, "command");
     assert.eq(lastOp.ns, coll.getFullName());
@@ -256,10 +255,7 @@ try {
     assert.eq(lastOp.upsert, true);
 
     // Idhack update as findAndModify.
-    assert.eq({_id: 2, a: 2, b: 1}, coll.findAndModify({
-        query: {_id: 2},
-        update: {$inc: {b: 1}}
-    }));
+    assert.eq({_id: 2, a: 2, b: 1}, coll.findAndModify({query: {_id: 2}, update: {$inc: {b: 1}}}));
     lastOp = getLastOp();
     assert.eq(lastOp.keysExamined, 1);
     assert.eq(lastOp.docsExamined, 1);
@@ -267,11 +263,8 @@ try {
     assert.eq(lastOp.nModified, 1);
 
     // Update as findAndModify with projection.
-    assert.eq({a: 2}, coll.findAndModify({
-        query: {a: 2},
-        update: {$inc: {b: 1}},
-        fields: {_id: 0, a: 1}
-    }));
+    assert.eq({a: 2},
+              coll.findAndModify({query: {a: 2}, update: {$inc: {b: 1}}, fields: {_id: 0, a: 1}}));
     lastOp = getLastOp();
     assert.eq(lastOp.op, "command");
     assert.eq(lastOp.ns, coll.getFullName());
@@ -285,11 +278,7 @@ try {
     assert.eq(lastOp.nModified, 1);
 
     // Delete as findAndModify with projection.
-    assert.eq({a: 2}, coll.findAndModify({
-        query: {a: 2},
-        remove: true,
-        fields: {_id: 0, a: 1}
-    }));
+    assert.eq({a: 2}, coll.findAndModify({query: {a: 2}, remove: true, fields: {_id: 0, a: 1}}));
     lastOp = getLastOp();
     assert.eq(lastOp.op, "command");
     assert.eq(lastOp.ns, coll.getFullName());
@@ -308,7 +297,8 @@ try {
     // Update
     coll.update({a: 2}, {$inc: {b: 1}});
     lastOp = getLastOp();
-    assert.eq(lastOp.op, "update");    assert.eq(lastOp.ns, coll.getFullName());
+    assert.eq(lastOp.op, "update");
+    assert.eq(lastOp.ns, coll.getFullName());
     assert.eq(lastOp.query, {a: 2});
     assert.eq(lastOp.updateobj, {$inc: {b: 1}});
     assert.eq(lastOp.keysExamined, 0);
@@ -331,8 +321,7 @@ try {
 
     db.setProfilingLevel(0);
     db.system.profile.drop();
-}
-finally {
+} finally {
     db.setProfilingLevel(0);
     db = stddb;
 }

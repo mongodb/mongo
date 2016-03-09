@@ -7,45 +7,46 @@
 // 5. Once a write is blocked, restart replication on the SECONDARY.
 // 6. Wait for PRIMARY to StepDown.
 
-(function () {
+(function() {
     "use strict";
     var name = "stepDownWithLongWait";
     var replSet = new ReplSetTest({name: name, nodes: 3});
     var nodes = replSet.nodeList();
     replSet.startSet();
-    replSet.initiate({"_id" : name,
-                      "members" : [
-                          {"_id" : 0, "host" : nodes[0], "priority" : 3},
-                          {"_id" : 1, "host" : nodes[1]},
-                          {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]});
+    replSet.initiate({
+        "_id": name,
+        "members": [
+            {"_id": 0, "host": nodes[0], "priority": 3},
+            {"_id": 1, "host": nodes[1]},
+            {"_id": 2, "host": nodes[2], "arbiterOnly": true}
+        ]
+    });
 
     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
     var primary = replSet.getPrimary();
 
     var secondary = replSet.getSecondary();
     jsTestLog('Disable replication on the SECONDARY ' + secondary.host);
-    assert.commandWorked(
-        secondary.getDB('admin').runCommand(
-            {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}
-        ),
-        'Failed to configure rsSyncApplyStop failpoint.'
-    );
+    assert.commandWorked(secondary.getDB('admin').runCommand(
+                             {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
+                         'Failed to configure rsSyncApplyStop failpoint.');
 
     jsTestLog("do a write then ask the PRIMARY to stepdown");
-    var options = {writeConcern: {w: 1, wtimeout: 60000}};
+    var options = {
+        writeConcern: {w: 1, wtimeout: 60000}
+    };
     assert.writeOK(primary.getDB(name).foo.insert({x: 1}, options));
     var stepDownSecs = 60;
     var secondaryCatchUpPeriodSecs = 60;
-    var stepDownCmd = "db.getSiblingDB('admin').runCommand({" +
-        "replSetStepDown: " + stepDownSecs + ", " +
-        "secondaryCatchUpPeriodSecs: " + secondaryCatchUpPeriodSecs +
-    "});";
+    var stepDownCmd = "db.getSiblingDB('admin').runCommand({" + "replSetStepDown: " + stepDownSecs +
+        ", " + "secondaryCatchUpPeriodSecs: " + secondaryCatchUpPeriodSecs + "});";
     var stepDowner = startParallelShell(stepDownCmd, primary.port);
 
     assert.soon(function() {
         var res = primary.getDB('admin').currentOp(true);
         for (var entry in res.inprog) {
-            if (res.inprog[entry]["query"] && res.inprog[entry]["query"]["replSetStepDown"] === 60){
+            if (res.inprog[entry]["query"] &&
+                res.inprog[entry]["query"]["replSetStepDown"] === 60) {
                 return true;
             }
         }
@@ -60,8 +61,7 @@
             var res = db.getSiblingDB("stepDownWithLongWait").foo.update({}, {$inc: {x: 1}});
             jsTestLog('Unexpected successful update operation on the primary during step down: ' +
                       tojson(res));
-        }
-        catch (e) {
+        } catch (e) {
             // Not important what error we get back. The client will probably be disconnected by
             // the primary with a "error doing query: failed" message.
             jsTestLog('Update operation returned with result: ' + tojson(e));
@@ -81,11 +81,8 @@
 
     jsTestLog('Enable replication on the SECONDARY ' + secondary.host);
     assert.commandWorked(
-        secondary.getDB('admin').runCommand(
-            {configureFailPoint: 'rsSyncApplyStop', mode: 'off'}
-        ),
-        'Failed to disable rsSyncApplyStop failpoint.'
-    );
+        secondary.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
+        'Failed to disable rsSyncApplyStop failpoint.');
 
     jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");
     replSet.waitForState(primary, ReplSetTest.State.SECONDARY, secondaryCatchUpPeriodSecs * 1000);

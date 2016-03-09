@@ -19,7 +19,7 @@
  */
 load("jstests/replsets/rslib.js");
 
-(function () {
+(function() {
     "use strict";
     // helper function for verifying contents at the end of the test
     var checkFinalResults = function(db) {
@@ -32,15 +32,17 @@ load("jstests/replsets/rslib.js");
         assert.eq(8, x[4].q);
     };
 
-    var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3, oplogSize: 1, useBridge: true });
+    var replTest = new ReplSetTest({name: 'unicomplex', nodes: 3, oplogSize: 1, useBridge: true});
     var nodes = replTest.nodeList();
 
     var conns = replTest.startSet();
-    var r = replTest.initiate({ "_id": "unicomplex",
+    var r = replTest.initiate({
+        "_id": "unicomplex",
         "members": [
-                             { "_id": 0, "host": nodes[0], "priority": 3 },
-                             { "_id": 1, "host": nodes[1] },
-                             { "_id": 2, "host": nodes[2], arbiterOnly: true}]
+            {"_id": 0, "host": nodes[0], "priority": 3},
+            {"_id": 1, "host": nodes[1]},
+            {"_id": 2, "host": nodes[2], arbiterOnly: true}
+        ]
     });
 
     // Make sure we have a master
@@ -63,18 +65,18 @@ load("jstests/replsets/rslib.js");
     if (new Date() % 2 == 0) {
         jsTest.log("ROLLING OPLOG AS PART OF TEST (we only do this sometimes)");
         var pass = 1;
-        var first = a.getSisterDB("local").oplog.rs.find().sort({ $natural: 1 }).limit(1)[0];
-        a.roll.insert({ x: 1 });
+        var first = a.getSisterDB("local").oplog.rs.find().sort({$natural: 1}).limit(1)[0];
+        a.roll.insert({x: 1});
         while (1) {
             var bulk = a.roll.initializeUnorderedBulkOp();
             for (var i = 0; i < 1000; i++) {
-                bulk.find({}).update({ $inc: { x: 1 }});
+                bulk.find({}).update({$inc: {x: 1}});
             }
-            // unlikely secondary isn't keeping up, but let's avoid possible intermittent 
+            // unlikely secondary isn't keeping up, but let's avoid possible intermittent
             // issues with that.
-            assert.writeOK(bulk.execute({ w: 2 }));
+            assert.writeOK(bulk.execute({w: 2}));
 
-            var op = a.getSisterDB("local").oplog.rs.find().sort({ $natural: 1 }).limit(1)[0];
+            var op = a.getSisterDB("local").oplog.rs.find().sort({$natural: 1}).limit(1)[0];
             if (tojson(op.h) != tojson(first.h)) {
                 printjson(op);
                 printjson(first);
@@ -83,14 +85,13 @@ load("jstests/replsets/rslib.js");
             pass++;
         }
         jsTest.log("PASSES FOR OPLOG ROLL: " + pass);
-    }
-    else {
+    } else {
         jsTest.log("NO ROLL");
     }
 
-    assert.writeOK(a.bar.insert({ q: 1, a: "foo" }));
-    assert.writeOK(a.bar.insert({ q: 2, a: "foo", x: 1 }));
-    assert.writeOK(a.bar.insert({ q: 3, bb: 9, a: "foo" }, { writeConcern: { w: 2 } }));
+    assert.writeOK(a.bar.insert({q: 1, a: "foo"}));
+    assert.writeOK(a.bar.insert({q: 2, a: "foo", x: 1}));
+    assert.writeOK(a.bar.insert({q: 3, bb: 9, a: "foo"}, {writeConcern: {w: 2}}));
 
     assert.eq(a.bar.count(), 3, "a.count");
     assert.eq(b.bar.count(), 3, "b.count");
@@ -99,11 +100,17 @@ load("jstests/replsets/rslib.js");
     conns[0].disconnect(conns[2]);
 
     // Wait for election and drain mode to finish on node 1.
-    assert.soon(function () { try { return B.isMaster().ismaster; } catch(e) { return false; } });
+    assert.soon(function() {
+        try {
+            return B.isMaster().ismaster;
+        } catch (e) {
+            return false;
+        }
+    });
 
     // These 97 documents will be rolled back eventually.
     for (var i = 4; i <= 100; i++) {
-        assert.writeOK(b.bar.insert({ q: i }));
+        assert.writeOK(b.bar.insert({q: i}));
     }
     assert.eq(100, b.bar.count(), "u.count");
 
@@ -113,13 +120,25 @@ load("jstests/replsets/rslib.js");
     conns[0].reconnect(conns[2]);
 
     jsTest.log("*************** B ****************");
-    assert.soon(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
+    assert.soon(function() {
+        try {
+            return !B.isMaster().ismaster;
+        } catch (e) {
+            return false;
+        }
+    });
     jsTest.log("*************** A ****************");
-    assert.soon(function () { try { return A.isMaster().ismaster; } catch(e) { return false; } });
+    assert.soon(function() {
+        try {
+            return A.isMaster().ismaster;
+        } catch (e) {
+            return false;
+        }
+    });
 
     assert(a.bar.count() == 3, "t is 3");
-    assert.writeOK(a.bar.insert({ q: 7 }));
-    assert.writeOK(a.bar.insert({ q: 8 }));
+    assert.writeOK(a.bar.insert({q: 7}));
+    assert.writeOK(a.bar.insert({q: 8}));
 
     // A is 1 2 3 7 8
     // B is 1 2 3 4 5 6 ... 100
@@ -138,8 +157,10 @@ load("jstests/replsets/rslib.js");
     var connectionsCreatedOnPrimaryAfterRollback = a.serverStatus().connections.totalCreated;
     var connectionsCreatedOnPrimaryDuringRollback =
         connectionsCreatedOnPrimaryAfterRollback - connectionsCreatedOnPrimaryBeforeRollback;
-    jsTest.log('connections created during rollback = ' + connectionsCreatedOnPrimaryDuringRollback);
-    assert.lt(connectionsCreatedOnPrimaryDuringRollback, 50,
+    jsTest.log('connections created during rollback = ' +
+               connectionsCreatedOnPrimaryDuringRollback);
+    assert.lt(connectionsCreatedOnPrimaryDuringRollback,
+              50,
               'excessive number of connections made by secondary to primary during rollback');
 
     replTest.stopSet(15);

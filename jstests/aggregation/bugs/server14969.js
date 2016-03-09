@@ -4,7 +4,7 @@ var docsPerBatch = 3;
 coll.drop();
 
 // Initialize collection with eight 1M documents, and index on field "a".
-var longString = new Array(1024*1024).join('x');
+var longString = new Array(1024 * 1024).join('x');
 for (var i = 0; i < 100; ++i) {
     assert.writeOK(coll.insert({a: 1, bigField: longString}));
 }
@@ -18,15 +18,15 @@ for (var i = 0; i < docsPerBatch; ++i) {
 }
 
 // Drop index "a".
-assert.commandWorked(coll.dropIndex({a:1}));
+assert.commandWorked(coll.dropIndex({a: 1}));
 
 // Issue a getmore against agg cursor.  Note that it is not defined whether the server continues to
 // generate further results for the cursor.
 try {
     cursor.hasNext();
     cursor.next();
+} catch (e) {
 }
-catch (e) {} 
 
 // Verify that the server hasn't crashed.
 assert.commandWorked(db.adminCommand({ping: 1}));

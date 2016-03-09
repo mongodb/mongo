@@ -31,11 +31,8 @@
     assert.gt(yieldCount, (nDocsToInsert / worksPerYield) - 2);
 
     // A multi-update shouldn't yield if it has $isolated.
-    explain = coll.explain('executionStats').update(
-        {$isolated: true},
-        {$inc: {counter: 1}},
-        {multi: true}
-    );
+    explain = coll.explain('executionStats')
+                  .update({$isolated: true}, {$inc: {counter: 1}}, {multi: true});
     assert.commandWorked(explain);
     yieldCount = explain.executionStats.executionStages.saveState;
     assert.eq(yieldCount, 0, 'yielded during $isolated multi-update');

@@ -2,11 +2,11 @@
  * Test which configures various configs (hidden/priorities/no-chaining) that replExec queues
  * stay at reasonable/stable levels after repeated reconfigs/stepdowns
  */
-(function () {
+(function() {
     "use strict";
     var numNodes = 5;
     var maxQueueSizeExpected = 11;
-    var replTest = new ReplSetTest({ name: 'testSet', nodes: numNodes });
+    var replTest = new ReplSetTest({name: 'testSet', nodes: numNodes});
     var nodes = replTest.startSet();
     replTest.initiate();
 
@@ -53,15 +53,14 @@
                 return false;
             }
             return true;
-        }, "queues too high", 13 * 1000 /*13 secs*/); // what we are looking for has a 10s timeout.
+        }, "queues too high", 13 * 1000 /*13 secs*/);  // what we are looking for has a 10s timeout.
     };
 
     var reconfig = function(newConfig) {
         newConfig.version += 1;
         try {
             assert.commandWorked(replTest.getPrimary().adminCommand({replSetReconfig: newConfig}));
-        }
-        catch (e) {
+        } catch (e) {
             if (tojson(e).indexOf("error doing query: failed") < 0) {
                 throw e;
             }
@@ -77,7 +76,7 @@
     c.members[2].priority = 0;
     reconfig(c);
 
-    for(var i=0;i<50;i++) {
+    for (var i = 0; i < 50; i++) {
         reconfig(c);
         testQueues();
     }
@@ -89,7 +88,7 @@
     c.members[4].priority = 1000;
     reconfig(c);
 
-    for(var i=0;i<50;i++) {
+    for (var i = 0; i < 50; i++) {
         reconfig(c);
         testQueues();
     }

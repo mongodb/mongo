@@ -9,14 +9,14 @@
 
     var testCases = [
         {
-            partialFilterExpression: 'not an object',
+          partialFilterExpression: 'not an object',
         },
         {
-            partialFilterExpression: {field: {$regex: 'not a supported operator'}},
+          partialFilterExpression: {field: {$regex: 'not a supported operator'}},
         },
         {
-            partialFilterExpression: {field: 'cannot be combined with sparse=true'},
-            sparse: true,
+          partialFilterExpression: {field: 'cannot be combined with sparse=true'},
+          sparse: true,
         },
     ];
 
@@ -36,8 +36,8 @@
         // Start the old version.
         var oldVersionOptions = Object.extend({binVersion: '3.0'}, defaultOptions);
         var conn = MongoRunner.runMongod(oldVersionOptions);
-        assert.neq(null, conn, 'mongod was unable to start up with options ' +
-                   tojson(oldVersionOptions));
+        assert.neq(
+            null, conn, 'mongod was unable to start up with options ' + tojson(oldVersionOptions));
 
         // Use write commands in order to make assertions about the success of operations based on
         // the response from the server.
@@ -48,18 +48,17 @@
 
         // Start the newest version.
         conn = MongoRunner.runMongod(defaultOptions);
-        assert.eq(null, conn, 'mongod should not have been able to start up when an index with' +
-                  ' options ' + tojson(indexOptions) + ' exists');
+        assert.eq(null,
+                  conn,
+                  'mongod should not have been able to start up when an index with' +
+                      ' options ' + tojson(indexOptions) + ' exists');
     });
 
     // Create a replica set with a primary running 3.0 and a secondary running the latest version.
     // The secondary should terminate when the command to build an invalid partial index replicates.
     testCases.forEach(function(indexOptions) {
         var replSetName = 'partial_index_replset';
-        var nodes = [
-            {binVersion: '3.0'},
-            {binVersion: 'latest'},
-        ];
+        var nodes = [{binVersion: '3.0'}, {binVersion: 'latest'}, ];
 
         var rst = new ReplSetTest({name: replSetName, nodes: nodes});
 
@@ -85,16 +84,18 @@
 
         // Verify that the secondary running the latest version terminates when the command to build
         // an invalid partial index replicates.
-        assert.soon(function() {
-            try {
-                secondaryLatest.getDB('test').runCommand({ping: 1});
-            } catch (e) {
-                return true;
-            }
-            return false;
-        }, 'secondary should have terminated due to request to build an invalid partial index' +
-           ' with options ' + tojson(indexOptions));
+        assert.soon(
+            function() {
+                try {
+                    secondaryLatest.getDB('test').runCommand({ping: 1});
+                } catch (e) {
+                    return true;
+                }
+                return false;
+            },
+            'secondary should have terminated due to request to build an invalid partial index' +
+                ' with options ' + tojson(indexOptions));
 
-        rst.stopSet(undefined, undefined, { allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] });
+        rst.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
     });
 })();

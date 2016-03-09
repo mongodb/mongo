@@ -10,8 +10,8 @@ load("jstests/libs/analyze_plan.js");
     coll.drop();
 
     assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: {$lte: 1.5}}}));
-    assert.writeOK(coll.insert({x: 5, a: 2})); // Not in index.
-    assert.writeOK(coll.insert({x: 6, a: 1})); // In index.
+    assert.writeOK(coll.insert({x: 5, a: 2}));  // Not in index.
+    assert.writeOK(coll.insert({x: 6, a: 1}));  // In index.
 
     //
     // Verify basic functionality with find().
@@ -65,14 +65,14 @@ load("jstests/libs/analyze_plan.js");
     //
 
     // findAndModify operation that should use index.
-    explain = coll.explain('executionStats').findAndModify({query: {x: {$gt: 1}, a: 1},
-                                                            update: {$inc: {x: 1}}});
+    explain = coll.explain('executionStats')
+                  .findAndModify({query: {x: {$gt: 1}, a: 1}, update: {$inc: {x: 1}}});
     assert.eq(1, explain.executionStats.nReturned);
     assert(isIxscan(explain.queryPlanner.winningPlan));
 
     // findAndModify operation that should not use index.
-    explain = coll.explain('executionStats').findAndModify({query: {x: {$gt: 1}, a: 2},
-                                                            update: {$inc: {x: 1}}});
+    explain = coll.explain('executionStats')
+                  .findAndModify({query: {x: {$gt: 1}, a: 2}, update: {$inc: {x: 1}}});
     assert.eq(1, explain.executionStats.nReturned);
     assert(isCollscan(explain.queryPlanner.winningPlan));
 })();

@@ -20,11 +20,11 @@ var $config = (function() {
         },
 
         scanGT: function scanGT(db, collName) {
-            db[collName].find({ _id: { $gt: this.start } }).itcount();
+            db[collName].find({_id: {$gt: this.start}}).itcount();
         },
 
         scanLTE: function scanLTE(db, collName) {
-            db[collName].find({ _id: { $lte: this.start } }).itcount();
+            db[collName].find({_id: {$lte: this.start}}).itcount();
         },
     };
 
@@ -39,9 +39,9 @@ var $config = (function() {
     //
     // All state functions should appear as keys within 'transitions'.
     var transitions = {
-        init:    { scanGT: 0.5, scanLTE: 0.5 },
-        scanGT:  { scanGT: 0.8, scanLTE: 0.2 },
-        scanLTE: { scanGT: 0.2, scanLTE: 0.8 }
+        init: {scanGT: 0.5, scanLTE: 0.5},
+        scanGT: {scanGT: 0.8, scanLTE: 0.2},
+        scanLTE: {scanGT: 0.2, scanLTE: 0.8}
     };
 
     // 'setup' is run once by the parent thread after the cluster has
@@ -52,7 +52,7 @@ var $config = (function() {
         // Workloads should NOT drop the collection db[collName], as
         // doing so is handled by runner.js before 'setup' is called.
         for (var i = 0; i < 1000; ++i) {
-            db[collName].insert({ _id: i });
+            db[collName].insert({_id: i});
         }
 
         cluster.executeOnMongodNodes(function(db) {
@@ -68,17 +68,18 @@ var $config = (function() {
     // is destroyed, but after the worker threads have been reaped.
     // The 'this' argument is bound as '$config.data'. 'cluster' is provided
     // to allow execution against all mongos and mongod nodes.
-    function teardown(db, collName, cluster) {}
+    function teardown(db, collName, cluster) {
+    }
 
     return {
         threadCount: 5,
         iterations: 10,
-        startState: 'init',        // optional, default 'init'
+        startState: 'init',  // optional, default 'init'
         states: states,
         transitions: transitions,
-        setup: setup,              // optional, default empty function
-        teardown: teardown,        // optional, default empty function
-        data: data                 // optional, default empty object
+        setup: setup,  // optional, default empty function
+        teardown: teardown,  // optional, default empty function
+        data: data  // optional, default empty object
     };
 
 })();

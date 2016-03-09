@@ -24,7 +24,10 @@
 
     // If there is only one document, we should get that document.
     var paddingStr = "abcdefghijklmnopqrstuvwxyz";
-    var firstDoc = {_id: 0, paddingStr: paddingStr};
+    var firstDoc = {
+        _id: 0,
+        paddingStr: paddingStr
+    };
     assert.writeOK(coll.insert(firstDoc));
     assert.eq([firstDoc], coll.aggregate([{$sample: {size: 1}}]).toArray());
     assert.eq([firstDoc], coll.aggregate([{$sample: {size: 10}}]).toArray());

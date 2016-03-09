@@ -1,25 +1,26 @@
 t = db.jstests_evald;
 t.drop();
 
-function debug( x ) {
-//    printjson( x );
+function debug(x) {
+    //    printjson( x );
 }
 
-for( i = 0; i < 10; ++i ) {
-    t.save( {i:i} );
+for (i = 0; i < 10; ++i) {
+    t.save({i: i});
 }
 
-function op( ev, where ) {
+function op(ev, where) {
     p = db.currentOp().inprog;
-    debug( p );
-    for ( var i in p ) {
-        var o = p[ i ];
-        if ( where ) {
-            if ( o.active && o.query && o.query.query && o.query.query.$where && o.ns == "test.jstests_evald" ) {
+    debug(p);
+    for (var i in p) {
+        var o = p[i];
+        if (where) {
+            if (o.active && o.query && o.query.query && o.query.query.$where &&
+                o.ns == "test.jstests_evald") {
                 return o.opid;
             }
         } else {
-            if ( o.active && o.query && o.query.$eval && o.query.$eval == ev ) {
+            if (o.active && o.query && o.query.$eval && o.query.$eval == ev) {
                 return o.opid;
             }
         }
@@ -27,31 +28,34 @@ function op( ev, where ) {
     return -1;
 }
 
-function doIt( ev, wait, where ) {
+function doIt(ev, wait, where) {
     var awaitShell;
 
-    if ( where ) {
-        awaitShell = startParallelShell( ev );
+    if (where) {
+        awaitShell = startParallelShell(ev);
     } else {
-        awaitShell = startParallelShell( "db.eval( '" + ev + "' )" );
+        awaitShell = startParallelShell("db.eval( '" + ev + "' )");
     }
 
     o = null;
-    assert.soon( function() { o = op( ev, where ); return o != -1; } );
+    assert.soon(function() {
+        o = op(ev, where);
+        return o != -1;
+    });
 
-    if ( wait ) {
-        sleep( 2000 );
+    if (wait) {
+        sleep(2000);
     }
 
-    debug( "going to kill" );
+    debug("going to kill");
 
-    db.killOp( o );
+    db.killOp(o);
 
-    debug( "sent kill" );
+    debug("sent kill");
 
     var exitCode = awaitShell({checkExitSuccess: false});
-    assert.neq(0, exitCode,
-               "expected shell to exit abnormally due to JS execution being terminated");
+    assert.neq(
+        0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");
 }
 
 // nested scope with nested invoke()
@@ -75,24 +79,18 @@ doIt("while(1) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); 
 // try/catch with tight-loop kill tests.
 // native callback with nested invoke(), drop JS exceptions
 doIt("while(1) {                                  " +
-     "   for(var i = 0; i < 10000; ++i) {;}       " +
-     "   try {                                    " +
-     "      db.jstests_evald.count({i:10});       " +
-     "   } catch (e) {}                           " +
-     "}", true );
+         "   for(var i = 0; i < 10000; ++i) {;}       " +
+         "   try {                                    " +
+         "      db.jstests_evald.count({i:10});       " +
+         "   } catch (e) {}                           " + "}",
+     true);
 
 // native callback, drop JS exceptions
-doIt("while(1) {            " +
-     "  try {               " +
-     "      while(1) {      " +
-     "          sleep(1);   " +
-     "      }               " +
-     "  } catch (e) {}      " +
-     "}", true );
+doIt("while(1) {            " + "  try {               " + "      while(1) {      " +
+         "          sleep(1);   " + "      }               " + "  } catch (e) {}      " + "}",
+     true);
 
 // no native callback and drop JS exceptions
-doIt("while(1) {              " +
-     "   try {                " +
-     "       while(1) {;}     " +
-     "   } catch (e) {}       " +
-     "}", true );
+doIt("while(1) {              " + "   try {                " + "       while(1) {;}     " +
+         "   } catch (e) {}       " + "}",
+     true);

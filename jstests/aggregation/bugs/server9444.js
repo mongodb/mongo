@@ -3,19 +3,19 @@
 var t = db.server9444;
 t.drop();
 
-var sharded = (typeof(RUNNING_IN_SHARDED_AGG_TEST) != 'undefined'); // see end of testshard1.js
+var sharded = (typeof(RUNNING_IN_SHARDED_AGG_TEST) != 'undefined');  // see end of testshard1.js
 if (sharded) {
-    db.adminCommand( { shardcollection : t.getFullName(), key : { "_id" : 'hashed' } } );
+    db.adminCommand({shardcollection: t.getFullName(), key: {"_id": 'hashed'}});
 }
 
 var memoryLimitMB = sharded ? 200 : 100;
 
 function loadData() {
-    var bigStr = Array(1024*1024 + 1).toString(); // 1MB of ','
+    var bigStr = Array(1024 * 1024 + 1).toString();  // 1MB of ','
     for (var i = 0; i < memoryLimitMB + 1; i++)
         t.insert({_id: i, bigStr: i + bigStr, random: Math.random()});
 
-    assert.gt(t.stats().size, memoryLimitMB * 1024*1024);
+    assert.gt(t.stats().size, memoryLimitMB * 1024 * 1024);
 }
 loadData();
 
@@ -37,7 +37,7 @@ function test(pipeline, outOfMemoryCode) {
 
     // ensure we work when allowDiskUse === true
     var res = t.aggregate(pipeline, {allowDiskUse: true});
-    assert.eq(res.itcount(), t.count()); // all tests output one doc per input doc
+    assert.eq(res.itcount(), t.count());  // all tests output one doc per input doc
 }
 
 var groupCode = 16945;
@@ -48,16 +48,16 @@ test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], groupCode);
 
 // sorting with _id would use index which doesn't require extsort
 test([{$sort: {random: 1}}], sortCode);
-test([{$sort: {bigStr: 1}}], sortCode); // big key and value
+test([{$sort: {bigStr: 1}}], sortCode);  // big key and value
 
 // make sure sort + large limit won't crash the server (SERVER-10136)
-test([{$sort: {bigStr: 1}}, {$limit:1000*1000*1000}], sortLimitCode);
+test([{$sort: {bigStr: 1}}, {$limit: 1000 * 1000 * 1000}], sortLimitCode);
 
 // test combining two extSorts in both same and different orders
-test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id:1}}], groupCode);
-test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id:-1}}], groupCode);
-test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {random:1}}], groupCode);
-test([{$sort: {random:1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], sortCode);
+test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id: 1}}], groupCode);
+test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {_id: -1}}], groupCode);
+test([{$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}, {$sort: {random: 1}}], groupCode);
+test([{$sort: {random: 1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], sortCode);
 
 var origDB = db;
 if (sharded) {
@@ -74,4 +74,3 @@ if (sharded) {
     sh.startBalancer();
     db = origDB;
 }
-

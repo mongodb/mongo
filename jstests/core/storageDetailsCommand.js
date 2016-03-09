@@ -12,7 +12,6 @@ for (var i = 0; i < 3000; ++i) {
 function test() {
     var result = t.diskStorageStats({numberOfSlices: 100});
 
-
     if (result["code"] === COMMAND_NOT_FOUND_CODE) {
         print("storageDetails command not available: skipping");
         return;

@@ -11,9 +11,9 @@
 
 assertEntryMatches = function(array, regex) {
     var found = false;
-    for (i=0; i<array.length; i++) {
+    for (i = 0; i < array.length; i++) {
         if (regex.test(array[i])) {
-             found = true;
+            found = true;
         }
     }
     assert(found,
@@ -22,23 +22,23 @@ assertEntryMatches = function(array, regex) {
 // Part 1
 var t = db.ttl1;
 t.drop();
-t.runCommand( "create", { flags : 0 } );
+t.runCommand("create", {flags: 0});
 var now = (new Date()).getTime();
 
-for (i=0; i<24; i++) {
+for (i = 0; i < 24; i++) {
     var past = new Date(now - (3600 * 1000 * i));
     t.insert({x: past, y: past, z: past});
 }
-t.insert( { a : 1 } );     //no x value
-t.insert( { x: null } );   //non-date value
-t.insert( { x : true } );  //non-date value
-t.insert( { x : "yo" } );  //non-date value
-t.insert( { x : 3 } );     //non-date value
-t.insert( { x : /foo/ } ); //non-date value
+t.insert({a: 1});  // no x value
+t.insert({x: null});  // non-date value
+t.insert({x: true});  // non-date value
+t.insert({x: "yo"});  // non-date value
+t.insert({x: 3});  // non-date value
+t.insert({x: /foo/});  // non-date value
 
-assert.eq( 30 , t.count() );
+assert.eq(30, t.count());
 
-t.ensureIndex( { z : 1 } , { expireAfterSeconds : "20000" } );
+t.ensureIndex({z: 1}, {expireAfterSeconds: "20000"});
 
 sleep(70 * 1000);
 
@@ -51,33 +51,29 @@ var msg = RegExp("ttl indexes require the expireAfterSeconds" +
 assertEntryMatches(log, msg);
 
 // Part 2
-t.ensureIndex( { x : 1 } , { expireAfterSeconds : 20000 } );
+t.ensureIndex({x: 1}, {expireAfterSeconds: 20000});
 
-assert.soon(
-    function() {
-        return t.count() < 30;
-    }, "TTL index on x didn't delete" , 70 * 1000);
+assert.soon(function() {
+    return t.count() < 30;
+}, "TTL index on x didn't delete", 70 * 1000);
 
 // We know the TTL thread has started deleting. Wait a few seconds to give it a chance to finish.
-assert.soon(
-    function() {
-        return t.find( { x : { $lt : new Date( now - ( 20000 * 1000 ) ) } } ).count() === 0;
-   }, "TTL index on x didn't finish deleting", 5 * 1000);
-assert.eq( 12 , t.count() );
+assert.soon(function() {
+    return t.find({x: {$lt: new Date(now - (20000 * 1000))}}).count() === 0;
+}, "TTL index on x didn't finish deleting", 5 * 1000);
+assert.eq(12, t.count());
 
-assert.lte( 18, db.serverStatus().metrics.ttl.deletedDocuments );
-assert.lte( 1, db.serverStatus().metrics.ttl.passes );
+assert.lte(18, db.serverStatus().metrics.ttl.deletedDocuments);
+assert.lte(1, db.serverStatus().metrics.ttl.passes);
 
 // Part 3
-t.ensureIndex( { y : 1 } , { expireAfterSeconds : 10000 } );
+t.ensureIndex({y: 1}, {expireAfterSeconds: 10000});
 
-assert.soon(
-    function() {
-        return t.count() < 12;
-    }, "TTL index on y didn't delete" , 70 * 1000);
+assert.soon(function() {
+    return t.count() < 12;
+}, "TTL index on y didn't delete", 70 * 1000);
 
-assert.soon(
-    function() {
-        return t.find( { y : { $lt : new Date( now - ( 10000 * 1000 ) ) } } ).count() === 0;
-    }, "TTL index on y didn't finish deleting", 5 * 1000);
-assert.eq( 9 , t.count() );
+assert.soon(function() {
+    return t.find({y: {$lt: new Date(now - (10000 * 1000))}}).count() === 0;
+}, "TTL index on y didn't finish deleting", 5 * 1000);
+assert.eq(9, t.count());

@@ -10,17 +10,19 @@
  *
  * Attempts to force a collection scan by not creating an index.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/findAndModify_update.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_workloads/findAndModify_update.js');  // for $config
 
-var $config = extendWorkload($config, function($config, $super) {
+var $config = extendWorkload($config,
+                             function($config, $super) {
 
-    // Do not create the { tid: 1, value: 1 } index so that a collection
-    // scan is performed for the query and sort operations.
-    $config.setup = function setup(db, collName, cluster) { };
+                                 // Do not create the { tid: 1, value: 1 } index so that a
+                                 // collection
+                                 // scan is performed for the query and sort operations.
+                                 $config.setup = function setup(db, collName, cluster) {};
 
-    // Remove the shardKey so that a collection scan is performed
-    delete $config.data.shardKey;
+                                 // Remove the shardKey so that a collection scan is performed
+                                 delete $config.data.shardKey;
 
-    return $config;
-});
+                                 return $config;
+                             });

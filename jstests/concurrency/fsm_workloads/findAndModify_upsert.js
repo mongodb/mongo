@@ -12,7 +12,7 @@ var $config = (function() {
 
     var data = {
         sort: false,
-        shardKey: { tid: 1 }
+        shardKey: {tid: 1}
     };
 
     var states = (function() {
@@ -41,13 +41,15 @@ var $config = (function() {
             var updatedValue = this.iter++;
 
             // Use a query specification that does not match any existing documents
-            var query = { _id: new ObjectId(), tid: this.tid };
+            var query = {
+                _id: new ObjectId(),
+                tid: this.tid
+            };
 
             var cmdObj = {
                 findandmodify: db[collName].getName(),
                 query: query,
-                update: { $setOnInsert: { values: [updatedValue] } },
-                new: true,
+                update: {$setOnInsert: {values: [updatedValue]}}, new: true,
                 upsert: true
             };
 
@@ -74,9 +76,8 @@ var $config = (function() {
 
             var cmdObj = {
                 findandmodify: db[collName].getName(),
-                query: { tid: this.tid },
-                update: { $push: { values: updatedValue } },
-                new: true,
+                query: {tid: this.tid},
+                update: {$push: {values: updatedValue}}, new: true,
                 upsert: false
             };
 
@@ -111,9 +112,9 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { upsert: 0.1, update: 0.9 },
-        upsert: { upsert: 0.1, update: 0.9 },
-        update: { upsert: 0.1, update: 0.9 }
+        init: {upsert: 0.1, update: 0.9},
+        upsert: {upsert: 0.1, update: 0.9},
+        update: {upsert: 0.1, update: 0.9}
     };
 
     return {

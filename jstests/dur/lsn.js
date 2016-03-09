@@ -14,10 +14,10 @@ function howLongSecs() {
 }
 
 function log(str) {
-    if(str)
-        print("\n" + testname+" step " + step++ + " " + str);
+    if (str)
+        print("\n" + testname + " step " + step++ + " " + str);
     else
-        print(testname+" step " + step++);
+        print(testname + " step " + step++);
 }
 
 function verify() {
@@ -25,14 +25,16 @@ function verify() {
     var d = conn.getDB("test");
     var mycount = d.foo.count();
     print("count:" + mycount);
-    assert(mycount>2, "count wrong");
+    assert(mycount > 2, "count wrong");
 }
 
-// if you do inserts here, you will want to set _id.  otherwise they won't match on different 
+// if you do inserts here, you will want to set _id.  otherwise they won't match on different
 // runs so we can't do a binary diff of the resulting files to check they are consistent.
 function work() {
     log("work");
-    x = 'x'; while(x.length < 1024) x+=x;
+    x = 'x';
+    while (x.length < 1024)
+        x += x;
     var d = conn.getDB("test");
     d.foo.drop();
     d.foo.insert({});
@@ -45,13 +47,13 @@ function work() {
         MaxTime = 90;
     }
     while (1) {
-        d.foo.insert({ _id: j, z: x });
-        d.foo.update({ _id: j }, { $inc: { a: 1} });
+        d.foo.insert({_id: j, z: x});
+        d.foo.update({_id: j}, {$inc: {a: 1}});
         if (j % 25 == 0)
-            d.foo.remove({ _id: j });
+            d.foo.remove({_id: j});
         j++;
-        if( j % 3 == 0 )
-            d.foo.update({ _id: j }, { $inc: { a: 1} }, true);
+        if (j % 3 == 0)
+            d.foo.update({_id: j}, {$inc: {a: 1}}, true);
         if (j % 10000 == 0)
             print(j);
         if (howLongSecs() > MaxTime)
@@ -59,12 +61,13 @@ function work() {
     }
 
     verify();
-    d.runCommand({ getLastError: 1, fsync: 1 });
+    d.runCommand({getLastError: 1, fsync: 1});
 }
 
-if( debugging ) {
+if (debugging) {
     // mongod already running in debugger
-    print("DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN mongo --nodb FOR REGULAR TEST BEHAVIOR");
+    print(
+        "DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN mongo --nodb FOR REGULAR TEST BEHAVIOR");
     conn = db.getMongo();
     work();
     sleep(30000);
@@ -72,31 +75,35 @@ if( debugging ) {
 }
 
 // directories
-var path2 = MongoRunner.dataPath + testname+"dur";
+var path2 = MongoRunner.dataPath + testname + "dur";
 
 // run mongod with a short --syncdelay to make LSN writing sooner
 log("run mongod --journal and a short --syncdelay");
-conn = MongoRunner.runMongod({dbpath: path2,
-                              syncdelay: 2,
-                              journal: "",
-                              smallfiles: "",
-                              journalOptions: 8 /*DurParanoid*/,
-                              master: "",
-                              oplogSize: 64});
+conn = MongoRunner.runMongod({
+    dbpath: path2,
+    syncdelay: 2,
+    journal: "",
+    smallfiles: "",
+    journalOptions: 8 /*DurParanoid*/,
+    master: "",
+    oplogSize: 64
+});
 work();
 
 log("wait a while for a sync and an lsn write");
-sleep(14); // wait for lsn write
+sleep(14);  // wait for lsn write
 
 log("kill mongod -9");
-MongoRunner.stopMongod(conn, /*signal*/9);
+MongoRunner.stopMongod(conn, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 
 // check that there is an lsn file
 {
     var files = listFiles(path2 + "/journal/");
-    assert(files.some(function (f) { return f.name.indexOf("lsn") >= 0; }),
+    assert(files.some(function(f) {
+        return f.name.indexOf("lsn") >= 0;
+    }),
            "lsn.js FAIL no lsn file found after kill, yet one is expected");
 }
 /*assert.soon(
@@ -109,28 +116,31 @@ MongoRunner.stopMongod(conn, /*signal*/9);
 
 // restart and recover
 log("restart mongod, recover, verify");
-conn = MongoRunner.runMongod({restart:true,
-                              cleanData: false,
-                              dbpath: path2,
-                              journal: "",
-                              smallfiles: "",
-                              journalOptions: 24,
-                              master: "",
-                              oplogSize: 64});
+conn = MongoRunner.runMongod({
+    restart: true,
+    cleanData: false,
+    dbpath: path2,
+    journal: "",
+    smallfiles: "",
+    journalOptions: 24,
+    master: "",
+    oplogSize: 64
+});
 verify();
 
-// idea here is to verify (in a simplistic way) that we are in a good state to do further ops after recovery
+// idea here is to verify (in a simplistic way) that we are in a good state to do further ops after
+// recovery
 log("add data after recovery");
 {
     var d = conn.getDB("test");
-    d.xyz.insert({ x: 1 });
-    d.xyz.insert({ x: 1 });
-    d.xyz.insert({ x: 1 });
-    d.xyz.update({}, { $set: { x: "aaaaaaaaaaaa"} });
+    d.xyz.insert({x: 1});
+    d.xyz.insert({x: 1});
+    d.xyz.insert({x: 1});
+    d.xyz.update({}, {$set: {x: "aaaaaaaaaaaa"}});
     d.xyz.reIndex();
     d.xyz.drop();
     sleep(1);
-    d.xyz.insert({ x: 1 });
+    d.xyz.insert({x: 1});
 }
 
 log("stop mongod " + conn.port);

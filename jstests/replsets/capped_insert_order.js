@@ -20,7 +20,7 @@
     var slaveColl = slaveDb[collectionName];
 
     // Making a large capped collection to ensure that every document fits.
-    masterDb.createCollection(collectionName, {capped: true, size: 1024*1024});
+    masterDb.createCollection(collectionName, {capped: true, size: 1024 * 1024});
 
     // Insert 1000 docs with _id from 0 to 999 inclusive.
     const nDocuments = 1000;

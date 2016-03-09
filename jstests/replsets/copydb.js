@@ -27,14 +27,16 @@
     assert.commandWorked(primarySourceDB.foo.ensureIndex({a: 1}),
                          'failed to create index in source collection on primary');
 
-    assert.eq(1, primarySourceDB.foo.find().itcount(),
+    assert.eq(1,
+              primarySourceDB.foo.find().itcount(),
               'incorrect number of documents in source collection on primary before copy');
-    assert.eq(0, primaryTargetDB.foo.find().itcount(),
+    assert.eq(0,
+              primaryTargetDB.foo.find().itcount(),
               'target collection on primary should be empty before copy');
 
-    assert.commandWorked(primarySourceDB.copyDatabase(primarySourceDB.getName(),
-                                                      primaryTargetDB.getName()),
-                         'failed to copy database');
+    assert.commandWorked(
+        primarySourceDB.copyDatabase(primarySourceDB.getName(), primaryTargetDB.getName()),
+        'failed to copy database');
 
     assert.eq(primarySourceDB.foo.find().itcount(),
               primaryTargetDB.foo.find().itcount(),

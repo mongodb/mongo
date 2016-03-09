@@ -7,10 +7,11 @@
 
     jsTestLog("Setting up initial data set with the last stable version of mongod");
 
-    var toolTest = new ToolTest('transitioning_to_and_from_WT', {
-        binVersion: MongoRunner.getBinVersionFor("last-stable"),
-        storageEngine: "mmapv1",
-    });
+    var toolTest = new ToolTest('transitioning_to_and_from_WT',
+                                {
+                                  binVersion: MongoRunner.getBinVersionFor("last-stable"),
+                                  storageEngine: "mmapv1",
+                                });
 
     toolTest.dbpath = toolTest.root + "/original/";
     resetDbpath(toolTest.dbpath);
@@ -54,62 +55,62 @@
     var modes = [
         // to the latest version with wiredTiger
         {
-            binVersion: "latest",
-            storageEngine: "wiredTiger",
+          binVersion: "latest",
+          storageEngine: "wiredTiger",
         },
         // back to the last stable version with mmapv1
         {
-            binVersion: "last-stable",
-            storageEngine: "mmapv1",
+          binVersion: "last-stable",
+          storageEngine: "mmapv1",
         },
         // to the latest version with mmapv1
         {
-            binVersion: "latest",
-            storageEngine: "mmapv1",
+          binVersion: "latest",
+          storageEngine: "mmapv1",
         },
         // to latest version with wiredTiger
         {
-            binVersion: "latest",
-            storageEngine: "wiredTiger",
+          binVersion: "latest",
+          storageEngine: "wiredTiger",
         },
         // back to the latest version with mmapv1
         {
-            binVersion: "latest",
-            storageEngine: "mmapv1",
+          binVersion: "latest",
+          storageEngine: "mmapv1",
         },
         // to the last stable version with mmapv1 and directory per db
         {
-            binVersion: "last-stable",
-            storageEngine: "mmapv1",
-            directoryperdb: "",
+          binVersion: "last-stable",
+          storageEngine: "mmapv1",
+          directoryperdb: "",
         },
         // to the latest version with wiredTiger
         {
-            binVersion: "latest",
-            storageEngine: "wiredTiger",
+          binVersion: "latest",
+          storageEngine: "wiredTiger",
         },
         // back to the last stable version with mmapv1 and directory per db
         {
-            binVersion: "last-stable",
-            storageEngine: "mmapv1",
-            directoryperdb: "",
+          binVersion: "last-stable",
+          storageEngine: "mmapv1",
+          directoryperdb: "",
         },
         // to latest version with mmapv1 and directory per db
         {
-            binVersion: "latest",
-            storageEngine: "mmapv1",
-            directoryperdb: "",
+          binVersion: "latest",
+          storageEngine: "mmapv1",
+          directoryperdb: "",
         },
         // to the latest with wiredTiger
         {
-            binVersion: "latest",
-            storageEngine: "wiredTiger",
+          binVersion: "latest",
+          storageEngine: "wiredTiger",
         },
         // back to latest version with mmapv1 and directory per db
         {
-            binVersion: "latest",
-            storageEngine: "mmapv1",
-            directoryperdb: "",
+          binVersion: "latest",
+          storageEngine: "mmapv1",
+          directoryperdb: "",
         },
     ];
 
@@ -129,8 +130,8 @@
 
         // set up new node configuration info
         toolTest.options.binVersion = MongoRunner.getBinVersionFor(entry.binVersion);
-        toolTest.dbpath = toolTest.root + "/" + idx + "-" + entry.binVersion + "-"
-                          + entry.storageEngine + "/";
+        toolTest.dbpath =
+            toolTest.root + "/" + idx + "-" + entry.binVersion + "-" + entry.storageEngine + "/";
 
         if (entry.hasOwnProperty("storageEngine")) {
             toolTest.options.storageEngine = entry.storageEngine;

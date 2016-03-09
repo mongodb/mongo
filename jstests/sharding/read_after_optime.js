@@ -36,24 +36,17 @@
     var pingIntervalSeconds = 10;
     var timeoutResult = assert.commandFailedWithCode(
         runFindCommand(new Timestamp(lastOp.ts.getTime() + pingIntervalSeconds * 5, 0)),
-        ErrorCodes.ExceededTimeLimit
-    );
+        ErrorCodes.ExceededTimeLimit);
     assert.gt(timeoutResult.waitedMS, 500);
 
     var msg = 'Command on database local timed out waiting for read concern to be satisfied.';
-    assert.soon(
-        function() {
-            var logMessages =
-                assert.commandWorked(primaryConn.adminCommand({getLog: 'global'})).log;
-            for (var i = 0; i < logMessages.length; i++) {
-                if (logMessages[i].indexOf(msg) != -1) {
-                    return true;
-                }
+    assert.soon(function() {
+        var logMessages = assert.commandWorked(primaryConn.adminCommand({getLog: 'global'})).log;
+        for (var i = 0; i < logMessages.length; i++) {
+            if (logMessages[i].indexOf(msg) != -1) {
+                return true;
             }
-            return false;
-        },
-        'Did not see any log entries containing the following message: ' + msg,
-        60000,
-        300
-    );
+        }
+        return false;
+    }, 'Did not see any log entries containing the following message: ' + msg, 60000, 300);
 })();

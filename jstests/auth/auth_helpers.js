@@ -3,33 +3,33 @@
 // This test requires users to persist across a restart.
 // @tags: [requires_persistence]
 
-var conn = MongoRunner.runMongod({ smallfiles: ""});
+var conn = MongoRunner.runMongod({smallfiles: ""});
 
 var mechanisms, hasCR, hasCramMd5;
 
 var admin = conn.getDB('admin');
 // In order to test MONGODB-CR we need to "reset" the authSchemaVersion to
 // 26Final "3" or else the user won't get MONGODB-CR credentials.
-admin.system.version.save({ "_id" : "authSchema", "currentVersion" : 3 });
-admin.createUser({user:'andy', pwd: 'a', roles: jsTest.adminUserRoles});
+admin.system.version.save({"_id": "authSchema", "currentVersion": 3});
+admin.createUser({user: 'andy', pwd: 'a', roles: jsTest.adminUserRoles});
 admin.auth({user: 'andy', pwd: 'a'});
 
 // Attempt to start with CRAM-MD5 enabled
 // If this fails the build only supports default auth mechanisms
 MongoRunner.stopMongod(conn);
-var restartedConn = MongoRunner.runMongod({ 
-                        auth: "",
-                        restart: conn,
-                        setParameter: "authenticationMechanisms=SCRAM-SHA-1,MONGODB-CR,CRAM-MD5"});
+var restartedConn = MongoRunner.runMongod({
+    auth: "",
+    restart: conn,
+    setParameter: "authenticationMechanisms=SCRAM-SHA-1,MONGODB-CR,CRAM-MD5"
+});
 if (restartedConn != null) {
-    mechanisms = [ "SCRAM-SHA-1", "MONGODB-CR", "CRAM-MD5" ];
+    mechanisms = ["SCRAM-SHA-1", "MONGODB-CR", "CRAM-MD5"];
     hasCR = true;
     hasCramMd5 = true;
     print("test info: Enabling non-default authentication mechanisms.");
-}
-else {
-    restartedConn = MongoRunner.runMongod({ restart: conn });
-    mechanisms = [ "SCRAM-SHA-1", "MONGODB-CR" ];
+} else {
+    restartedConn = MongoRunner.runMongod({restart: conn});
+    mechanisms = ["SCRAM-SHA-1", "MONGODB-CR"];
     hasCR = true;
     hasCramMd5 = false;
     print("test info: Using only default password authentication mechanisms.");

@@ -8,7 +8,7 @@
  * field. Asserts that the field has the correct value based on the number
  * of increments performed.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 
 var $config = (function() {
 
@@ -25,10 +25,12 @@ var $config = (function() {
         },
 
         update: function update(db, collName) {
-            var updateDoc = { $inc: {} };
+            var updateDoc = {
+                $inc: {}
+            };
             updateDoc.$inc[this.fieldName] = 1;
 
-            var res = db[collName].update({ _id: this.id }, updateDoc);
+            var res = db[collName].update({_id: this.id}, updateDoc);
             assertAlways.eq(0, res.nUpserted, tojson(res));
 
             if (isMongod(db) && !isMMAPv1(db)) {
@@ -38,8 +40,7 @@ var $config = (function() {
                 if (db.getMongo().writeMode() === 'commands') {
                     assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
                 }
-            }
-            else {
+            } else {
                 // Zero matches are possible for MMAP v1 because the update will skip a document
                 // that was invalidated during a yield.
                 assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
@@ -70,13 +71,15 @@ var $config = (function() {
     };
 
     var transitions = {
-        init: { update: 1 },
-        update: { find: 1 },
-        find: { update: 1 }
+        init: {update: 1},
+        update: {find: 1},
+        find: {update: 1}
     };
 
     function setup(db, collName, cluster) {
-        var doc = { _id: this.id };
+        var doc = {
+            _id: this.id
+        };
 
         // Pre-populate the fields we need to avoid size change for capped collections.
         for (var i = 0; i < this.threadCount; ++i) {

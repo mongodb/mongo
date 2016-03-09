@@ -4,7 +4,7 @@
 var cluster = new ShardingTest({shards: 2});
 
 // Run the connPoolStats command
-stats = cluster.s.getDB("admin").runCommand({connPoolStats : 1});
+stats = cluster.s.getDB("admin").runCommand({connPoolStats: 1});
 
 // Validate output
 printjson(stats);

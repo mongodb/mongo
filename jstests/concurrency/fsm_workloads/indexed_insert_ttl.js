@@ -12,27 +12,26 @@ var $config = (function() {
 
     var states = {
         init: function init(db, collName) {
-            var res = db[collName].insert({ indexed_insert_ttl: new ISODate(), first: true });
+            var res = db[collName].insert({indexed_insert_ttl: new ISODate(), first: true});
             assertAlways.writeOK(res);
             assertWhenOwnColl.eq(1, res.nInserted, tojson(res));
         },
 
         insert: function insert(db, collName) {
-            var res = db[collName].insert({ indexed_insert_ttl: new ISODate() });
+            var res = db[collName].insert({indexed_insert_ttl: new ISODate()});
             assertAlways.writeOK(res);
             assertWhenOwnColl.eq(1, res.nInserted, tojson(res));
         }
     };
 
     var transitions = {
-        init: { insert: 1 },
-        insert: { insert: 1 }
+        init: {insert: 1},
+        insert: {insert: 1}
     };
 
     function setup(db, collName, cluster) {
-        var res = db[collName].ensureIndex(
-            { indexed_insert_ttl: 1 },
-            { expireAfterSeconds: this.ttlSeconds });
+        var res = db[collName].ensureIndex({indexed_insert_ttl: 1},
+                                           {expireAfterSeconds: this.ttlSeconds});
         assertAlways.commandWorked(res);
     }
 
@@ -48,7 +47,7 @@ var $config = (function() {
 
         assertWhenOwnColl.soon(function checkTTLCount() {
             // All initial documents should be removed by the end of the workload.
-            var count = db[collName].find({ first: true }).itcount();
+            var count = db[collName].find({first: true}).itcount();
             return count === 0;
         }, 'Expected oldest documents with TTL fields to be removed', timeoutMS);
     }
@@ -59,10 +58,7 @@ var $config = (function() {
         states: states,
         transitions: transitions,
         setup: setup,
-        data: {
-            ttlSeconds: 5,
-            ttlIndexExists: true
-        },
+        data: {ttlSeconds: 5, ttlIndexExists: true},
         teardown: teardown
     };
 })();

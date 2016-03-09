@@ -1,7 +1,7 @@
 load("jstests/replsets/rslib.js");
 
 var name = 'slavedelay3';
-var replTest = new ReplSetTest({ name: name, nodes: 3, useBridge: true });
+var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
 var nodes = replTest.startSet();
 var config = replTest.getReplSetConfig();
 // ensure member 0 is primary
@@ -24,21 +24,21 @@ for (var i in slaveConns) {
 
 waitForAllMembers(master);
 
-
-
 replTest.awaitReplication();
 nodes[0].disconnect(nodes[2]);
 
-master.foo.insert({x:1});
+master.foo.insert({x: 1});
 
 assert.commandWorked(nodes[1].getDB("admin").runCommand({"replSetSyncFrom": nodes[0].host}));
 var res;
 assert.soon(function() {
     res = nodes[1].getDB("admin").runCommand({"replSetGetStatus": 1});
     return res.syncingTo === nodes[0].host;
-}, "node 4 failed to start chaining: "+ tojson(res));
+}, "node 4 failed to start chaining: " + tojson(res));
 
 // make sure the record still appears in the remote slave
-assert.soon( function() { return slave[1].foo.findOne() != null; } );
+assert.soon(function() {
+    return slave[1].foo.findOne() != null;
+});
 
 replTest.stopSet();

@@ -55,7 +55,9 @@
     assert.eq(7, cursor.next()["_id"]);
 
     // Tailable with negative limit is an error.
-    assert.throws(function() { t.find().addOption(2).limit(-100).next(); });
+    assert.throws(function() {
+        t.find().addOption(2).limit(-100).next();
+    });
 
     // Tests that a tailable cursor over an empty capped collection produces a dead cursor, intended
     // to be run on both mongod and mongos. For SERVER-20720.

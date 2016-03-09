@@ -18,9 +18,20 @@ var RandomOps = {
     verbose: false,
     // 'Random' documents will have various combinations of these names mapping to these values
     fieldNames: ["a", "b", "c", "longerName", "numbered10", "dashed-name"],
-    fieldValues: [ true, false, 0, 44, -123, "", "String", [], [false, "x"],
-        ["array", 1, {doc: true}, new Date().getTime()], {},
-        {embedded: "document", weird: ["values", 0, false]}, new Date().getTime()
+    fieldValues: [
+        true,
+        false,
+        0,
+        44,
+        -123,
+        "",
+        "String",
+        [],
+        [false, "x"],
+        ["array", 1, {doc: true}, new Date().getTime()],
+        {},
+        {embedded: "document", weird: ["values", 0, false]},
+        new Date().getTime()
     ],
 
     /*
@@ -35,7 +46,7 @@ var RandomOps = {
         while (x === 1.0) {  // Would be out of bounds
             x = Random.rand();
         }
-        var i = Math.floor(x*a.length);
+        var i = Math.floor(x * a.length);
         return a[i];
     },
 
@@ -45,7 +56,7 @@ var RandomOps = {
      */
     randomNewDoc: function() {
         var doc = {};
-        for (var i = 0; i < Random.randInt(0,this.fieldNames.length); i++) {
+        for (var i = 0; i < Random.randInt(0, this.fieldNames.length); i++) {
             doc[this.randomChoice(this.fieldNames)] = this.randomChoice(this.fieldValues);
         }
         return doc;
@@ -72,7 +83,9 @@ var RandomOps = {
      */
     getRandomExistingCollection: function(conn) {
         var dbs = this.getCreatedDatabases(conn);
-        if (dbs.length === 0) { return null; }
+        if (dbs.length === 0) {
+            return null;
+        }
         var dbName = this.randomChoice(dbs);
         var db = conn.getDB(dbName);
         if (db.getCollectionNames().length <= 1) {
@@ -89,7 +102,7 @@ var RandomOps = {
         try {
             var randIndex = Random.randInt(0, collection.find().count());
             return collection.find().sort({$natural: 1}).skip(randIndex).limit(1)[0];
-        } catch(e) {
+        } catch (e) {
             return undefined;
         }
     },
@@ -111,7 +124,9 @@ var RandomOps = {
                 }
             }
         }
-        if (matched.length === 0) { return null; }
+        if (matched.length === 0) {
+            return null;
+        }
         return this.randomChoice(matched);
     },
 
@@ -140,11 +155,12 @@ var RandomOps = {
             printjson(doc);
             print("With write concern: " + writeConcern + " and journal: " + journal);
         }
-        var result = conn.getDB(db)[coll].insert(doc,
-                                                 {writeConcern: {w: writeConcern},
-                                                  journal: journal});
+        var result =
+            conn.getDB(db)[coll].insert(doc, {writeConcern: {w: writeConcern}, journal: journal});
         assert.eq(result.ok, 1);
-        if (this.verbose) { print("done."); }
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -168,10 +184,14 @@ var RandomOps = {
         }
         try {
             coll.remove(doc);
-        } catch(e) {
-            if (this.verbose) { print("Caught exception in remove: " + e); }
+        } catch (e) {
+            if (this.verbose) {
+                print("Caught exception in remove: " + e);
+            }
         }
-        if (this.verbose) { print("done."); }
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -191,7 +211,9 @@ var RandomOps = {
         }
 
         var field = this.randomChoice(this.fieldNames);
-        var updateDoc = {$set: {}};
+        var updateDoc = {
+            $set: {}
+        };
         updateDoc.$set[field] = this.randomChoice(this.fieldValues);
         if (this.verbose) {
             print("Updating:");
@@ -202,10 +224,14 @@ var RandomOps = {
         // If multithreaded, doc might not exist anymore.
         try {
             coll.update(doc, updateDoc);
-        } catch(e) {
-            if (this.verbose) { print("Caught exception in update: " + e); }
+        } catch (e) {
+            if (this.verbose) {
+                print("Caught exception in update: " + e);
+            }
         }
-        if (this.verbose) { print("done."); }
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     //////////////////////////////////////////////////////////////////////////////////
@@ -217,15 +243,18 @@ var RandomOps = {
      */
     renameCollection: function(conn) {
         var coll = this.getRandomExistingCollection(conn);
-        if (coll === null) { return null; }
+        if (coll === null) {
+            return null;
+        }
         var newName = coll.getDB() + "." + new ObjectId().str;
         if (this.verbose) {
             print("renaming collection " + coll.getFullName() + " to " + newName);
         }
         assert.commandWorked(
-            conn.getDB("admin").runCommand({renameCollection: coll.getFullName(), to: newName})
-        );
-        if (this.verbose) { print("done."); }
+            conn.getDB("admin").runCommand({renameCollection: coll.getFullName(), to: newName}));
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -233,15 +262,17 @@ var RandomOps = {
      */
     dropDatabase: function(conn) {
         var dbs = this.getCreatedDatabases(conn);
-        if (dbs.length === 0) { return null; }
+        if (dbs.length === 0) {
+            return null;
+        }
         var dbName = this.randomChoice(dbs);
         if (this.verbose) {
             print("Dropping database " + dbName);
         }
-        assert.commandWorked(
-            conn.getDB(dbName).runCommand({dropDatabase: 1})
-        );
-        if (this.verbose) { print("done."); }
+        assert.commandWorked(conn.getDB(dbName).runCommand({dropDatabase: 1}));
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -249,14 +280,16 @@ var RandomOps = {
      */
     dropCollection: function(conn) {
         var coll = this.getRandomExistingCollection(conn);
-        if (coll === null) { return null; }
+        if (coll === null) {
+            return null;
+        }
         if (this.verbose) {
             print("Dropping collection " + coll.getFullName());
         }
-        assert.commandWorked(
-            conn.getDB(coll.getDB()).runCommand({drop: coll.getName()})
-        );
-        if (this.verbose) { print("done."); }
+        assert.commandWorked(conn.getDB(coll.getDB()).runCommand({drop: coll.getName()}));
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -264,14 +297,18 @@ var RandomOps = {
      */
     createIndex: function(conn) {
         var coll = this.getRandomExistingCollection(conn);
-        if (coll === null) { return null; }
+        if (coll === null) {
+            return null;
+        }
         var index = {};
         index[this.randomChoice(this.fieldNames)] = this.randomChoice([-1, 1]);
         if (this.verbose) {
             print("Adding index " + tojsononeline(index) + " to " + coll.getFullName());
         }
         coll.ensureIndex(index);
-        if (this.verbose) { print("done."); }
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -279,7 +316,9 @@ var RandomOps = {
      */
     dropIndex: function(conn) {
         var coll = this.getRandomExistingCollection(conn);
-        if (coll === null) { return null; }
+        if (coll === null) {
+            return null;
+        }
         var index = this.randomChoice(coll.getIndices());
         if (index.name === "_id_") {
             return null;  // Don't drop that one.
@@ -287,10 +326,10 @@ var RandomOps = {
         if (this.verbose) {
             print("Dropping index " + tojsononeline(index.key) + " from " + coll.getFullName());
         }
-        assert.commandWorked(
-            coll.dropIndex(index.name)
-        );
-        if (this.verbose) { print("done."); }
+        assert.commandWorked(coll.dropIndex(index.name));
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -298,14 +337,18 @@ var RandomOps = {
      */
     collMod: function(conn) {
         var coll = this.getRandomExistingCollection(conn);
-        if (coll === null) { return null; }
+        if (coll === null) {
+            return null;
+        }
         var toggle = !coll.stats().userFlags;
         if (this.verbose) {
             print("Modifying usePowerOf2Sizes to " + toggle + " on collection " +
                   coll.getFullName());
         }
         conn.getDB(coll.getDB()).runCommand({collMod: coll.getName(), usePowerOf2Sizes: toggle});
-        if (this.verbose) { print("done."); }
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -316,14 +359,16 @@ var RandomOps = {
             return conn.getDB(dbName)[coll].isCapped();
         };
         var coll = this.getRandomCollectionWFilter(conn, isCapped);
-        if (coll === null) { return null; }
+        if (coll === null) {
+            return null;
+        }
         if (this.verbose) {
             print("Emptying capped collection: " + coll.getFullName());
         }
-        assert.commandWorked(
-            conn.getDB(coll.getDB()).runCommand({emptycapped: coll.getName()})
-        );
-        if (this.verbose) { print("done."); }
+        assert.commandWorked(conn.getDB(coll.getDB()).runCommand({emptycapped: coll.getName()}));
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -331,7 +376,9 @@ var RandomOps = {
      */
     applyOps: function(conn) {
         // Check if there are any valid collections to choose from.
-        if (this.getRandomExistingCollection(conn) === null) { return null; }
+        if (this.getRandomExistingCollection(conn) === null) {
+            return null;
+        }
         var ops = [];
         // Insert between 1 and 10 things.
         for (var i = 0; i < Random.randInt(1, 10); i++) {
@@ -346,10 +393,10 @@ var RandomOps = {
             print("Applying the following ops: ");
             printjson(ops);
         }
-        assert.commandWorked(
-            conn.getDB("admin").runCommand({applyOps: ops})
-        );
-        if (this.verbose) { print("done."); }
+        assert.commandWorked(conn.getDB("admin").runCommand({applyOps: ops}));
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -357,16 +404,18 @@ var RandomOps = {
      */
     createCollection: function(conn) {
         var dbs = this.getCreatedDatabases(conn);
-        if (dbs.length === 0) { return null; }
+        if (dbs.length === 0) {
+            return null;
+        }
         var dbName = this.randomChoice(dbs);
         var newName = new ObjectId().str;
         if (this.verbose) {
             print("Creating new collection: " + "dbName" + "." + newName);
         }
-        assert.commandWorked(
-            conn.getDB(dbName).runCommand({create: newName})
-        );
-        if (this.verbose) { print("done."); }
+        assert.commandWorked(conn.getDB(dbName).runCommand({create: newName}));
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -377,14 +426,18 @@ var RandomOps = {
             return conn.getDB(dbName)[coll].isCapped();
         };
         var coll = this.getRandomCollectionWFilter(conn, isNotCapped);
-        if (coll === null) { return null; }
+        if (coll === null) {
+            return null;
+        }
         if (this.verbose) {
             print("Converting " + coll.getFullName() + " to a capped collection.");
         }
         assert.commandWorked(
-            conn.getDB(coll.getDB()).runCommand({convertToCapped: coll.getName(), size: 1024*1024})
-        );
-        if (this.verbose) { print("done."); }
+            conn.getDB(coll.getDB())
+                .runCommand({convertToCapped: coll.getName(), size: 1024 * 1024}));
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     appendOplogNote: function(conn) {
@@ -393,9 +446,10 @@ var RandomOps = {
             print("Appending oplog note: " + note);
         }
         assert.commandWorked(
-            conn.getDB("admin").runCommand({appendOplogNote: note, data: {some: 'doc'}})
-        );
-        if (this.verbose) { print("done."); }
+            conn.getDB("admin").runCommand({appendOplogNote: note, data: {some: 'doc'}}));
+        if (this.verbose) {
+            print("done.");
+        }
     },
 
     /*
@@ -483,33 +537,32 @@ function assertDBsEq(db1, db2) {
         // We don't expect the entire local collection to be the same, not even the oplog, since
         // it's a capped collection.
         return;
-    }
-    else if (hash1.md5 != hash2.md5) {
+    } else if (hash1.md5 != hash2.md5) {
         for (var i = 0; i < Math.min(collNames1.length, collNames2.length); i++) {
             var collName = collNames1[i];
             if (hash1.collections[collName] !== hash2.collections[collName]) {
                 if (db1[collName].stats().capped) {
                     if (!db2[collName].stats().capped) {
                         success = false;
-                        diffText += "\n" + collName + " is capped on " + host1 + " but not on " +
-                                     host2;
-                    }
-                    else {
+                        diffText +=
+                            "\n" + collName + " is capped on " + host1 + " but not on " + host2;
+                    } else {
                         // Skip capped collections. They are not expected to be the same from host
                         // to host.
                         continue;
                     }
-                }
-                else {
+                } else {
                     success = false;
-                    diffText += "\n" + collName + " differs: " +
-                                getCollectionDiff(db1, db2, collName);
+                    diffText +=
+                        "\n" + collName + " differs: " + getCollectionDiff(db1, db2, collName);
                 }
             }
         }
     }
-    assert.eq(success, true, "Database " + db1.getName() + " differs on " + host1 + " and " +
-              host2 + "\nCollections: " + collNames1 + " vs. " + collNames2 + "\n" + diffText);
+    assert.eq(success,
+              true,
+              "Database " + db1.getName() + " differs on " + host1 + " and " + host2 +
+                  "\nCollections: " + collNames1 + " vs. " + collNames2 + "\n" + diffText);
 }
 
 /*
@@ -535,9 +588,20 @@ function assertSameData(primary, conns) {
  */
 function startCmds(randomOps, host) {
     var ops = [
-        "insert", "remove", "update", "renameCollection", "dropDatabase",
-        "dropCollection", "createIndex", "dropIndex", "collMod", "emptyCapped", "applyOps",
-        "createCollection", "convertToCapped", "appendOplogNote"
+        "insert",
+        "remove",
+        "update",
+        "renameCollection",
+        "dropDatabase",
+        "dropCollection",
+        "createIndex",
+        "dropIndex",
+        "collMod",
+        "emptyCapped",
+        "applyOps",
+        "createCollection",
+        "convertToCapped",
+        "appendOplogNote"
     ];
     var m = new Mongo(host);
     var numOps = 200;
@@ -593,9 +657,10 @@ function doMultiThreadedWork(primary, numThreads) {
     // Create a replica set with 2 nodes of each of the types below, plus one arbiter.
     var oldVersion = "last-stable";
     var newVersion = "latest";
-    var setups = [{binVersion: newVersion, storageEngine: 'mmapv1'},
-                  {binVersion: newVersion, storageEngine: 'wiredTiger'},
-                  {binVersion: oldVersion}
+    var setups = [
+        {binVersion: newVersion, storageEngine: 'mmapv1'},
+        {binVersion: newVersion, storageEngine: 'wiredTiger'},
+        {binVersion: oldVersion}
     ];
     var nodes = {};
     var node = 0;
@@ -606,14 +671,18 @@ function doMultiThreadedWork(primary, numThreads) {
         nodes["n" + node] = setups[i];
         node++;
     }
-    nodes["n" + 2 * setups.length] = {arbiter: true};
+    nodes["n" + 2 * setups.length] = {
+        arbiter: true
+    };
     var replTest = new ReplSetTest({nodes: nodes, name: name});
     var conns = replTest.startSet();
 
     var config = replTest.getReplSetConfig();
     // Make sure everyone is syncing from the primary, to ensure we have all combinations of
     // primary/secondary syncing.
-    config.settings = {chainingAllowed: false};
+    config.settings = {
+        chainingAllowed: false
+    };
     config.protocolVersion = 0;
     replTest.initiate(config);
     // Ensure all are synced.
@@ -624,32 +693,31 @@ function doMultiThreadedWork(primary, numThreads) {
 
     // Keep track of the indices of different types of primaries.
     // We'll rotate to get a primary of each type.
-    var possiblePrimaries = [0,2,4];
+    var possiblePrimaries = [0, 2, 4];
     var highestPriority = 2;
     while (possiblePrimaries.length > 0) {
         config = primary.getDB("local").system.replset.findOne();
         var primaryIndex = RandomOps.randomChoice(possiblePrimaries);
-        print("TRANSITIONING to " + tojsononeline(setups[primaryIndex/2]) + " as primary");
+        print("TRANSITIONING to " + tojsononeline(setups[primaryIndex / 2]) + " as primary");
         // Remove chosen type from future choices.
         removeFromArray(primaryIndex, possiblePrimaries);
         config.members[primaryIndex].priority = highestPriority;
         if (config.version === undefined) {
             config.version = 2;
-        }
-        else {
+        } else {
             config.version++;
         }
         highestPriority++;
         printjson(config);
         try {
             primary.getDB("admin").runCommand({replSetReconfig: config});
-        }
-        catch(e) {
+        } catch (e) {
             // Expected to fail, as we'll have to reconnect.
         }
-        replTest.awaitReplication(60000); // 2 times the election period.
+        replTest.awaitReplication(60000);  // 2 times the election period.
         assert.soon(primaryChanged(conns, replTest, primaryIndex),
-                    "waiting for higher priority primary to be elected", 100000);
+                    "waiting for higher priority primary to be elected",
+                    100000);
         print("New primary elected, doing a bunch of work");
         primary = replTest.getPrimary();
         doMultiThreadedWork(primary, 10);

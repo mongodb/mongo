@@ -13,7 +13,7 @@ var $config = (function() {
         init: function init(db, collName) {
             this.numDocs = 200;
             for (var i = 0; i < this.numDocs; ++i) {
-                db[collName].insert({ tid: this.tid, rand: Random.rand() });
+                db[collName].insert({tid: this.tid, rand: Random.rand()});
             }
         },
 
@@ -22,28 +22,22 @@ var $config = (function() {
             var low = Random.rand();
             var high = low + 0.05 * Random.rand();
 
-            var res = db[collName].remove({
-                tid: this.tid,
-                rand: { $gte: low, $lte: high }
-            });
+            var res = db[collName].remove({tid: this.tid, rand: {$gte: low, $lte: high}});
             assertAlways.gte(res.nRemoved, 0);
             assertAlways.lte(res.nRemoved, this.numDocs);
             this.numDocs -= res.nRemoved;
         },
 
         count: function count(db, collName) {
-            var numDocs = db[collName].find({ tid: this.tid }).itcount();
+            var numDocs = db[collName].find({tid: this.tid}).itcount();
             assertWhenOwnColl.eq(this.numDocs, numDocs);
         }
     };
 
     var transitions = {
-        init: { count: 1 },
-        count: { remove: 1 },
-        remove: {
-            remove: 0.825,
-            count: 0.125
-        }
+        init: {count: 1},
+        count: {remove: 1},
+        remove: {remove: 0.825, count: 0.125}
     };
 
     return {

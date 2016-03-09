@@ -28,11 +28,7 @@
         jsTest.log(tojson(arg));
     }
 
-    var replTest = new ReplSetTest(
-        {
-            name : "oplog_truncated_on_recovery",
-            nodes : 1
-        });
+    var replTest = new ReplSetTest({name: "oplog_truncated_on_recovery", nodes: 1});
 
     var nodes = replTest.startSet();
     replTest.initiate();
@@ -42,22 +38,12 @@
     var minvalidColl = localDB["replset.minvalid"];
 
     // Write op
-    log(assert.writeOK(testDB.foo.save(
-        {
-            _id : 1,
-            a : 1
-        },
-        {
-            writeConcern :
-                {
-                    w : 1
-                }
-        })));
+    log(assert.writeOK(testDB.foo.save({_id: 1, a: 1}, {writeConcern: {w: 1}})));
 
     // Set minvalid to something far in the future for the current primary, to simulate recovery.
     // Note: This is so far in the future (5 days) that it will never become secondary.
-    var farFutureTS = new Timestamp(Math.floor(new Date().getTime() / 1000)
-                                    + (60 * 60 * 24 * 5 /* in five days */), 0);
+    var farFutureTS = new Timestamp(
+        Math.floor(new Date().getTime() / 1000) + (60 * 60 * 24 * 5 /* in five days */), 0);
     var rsgs = assert.commandWorked(localDB.adminCommand("replSetGetStatus"));
     log(rsgs);
     var primaryOpTime = rsgs.members[0].optime;
@@ -69,31 +55,15 @@
     // We do an update in case there is a minvalid document on the primary already.
     // If the doc doesn't exist then upsert:true will create it, and the writeConcern ensures
     // that update returns details of the write, like whether an update or insert was performed.
-    log(assert.writeOK(minvalidColl.update(
-        {},
-        {
-            ts : farFutureTS,
-            t : NumberLong(-1),
-            begin : primaryOpTime
-        },
-        {
-            upsert : true,
-            writeConcern :
-                {
-                    w : 1
-                }
-        })));
+    log(assert.writeOK(
+        minvalidColl.update({},
+                            {ts: farFutureTS, t: NumberLong(-1), begin: primaryOpTime},
+                            {upsert: true, writeConcern: {w: 1}})));
 
     // Insert a diverged oplog entry that will be truncated after restart.
     var divergedTS = new Timestamp(primaryOpTime.ts.t, primaryOpTime.ts.i + 1);
     log(assert.writeOK(localDB.oplog.rs.insert(
-        {
-            _id : 0,
-            ts : divergedTS,
-            op : "n",
-            h: NumberLong(0),
-            t : NumberLong(-1)
-        })));
+        {_id: 0, ts: divergedTS, op: "n", h: NumberLong(0), t: NumberLong(-1)})));
     log(localDB.oplog.rs.find().toArray());
     log(assert.commandWorked(localDB.adminCommand("replSetGetStatus")));
     log("restart primary");
@@ -104,18 +74,14 @@
         var mv;
         try {
             mv = minvalidColl.findOne();
-        }
-        catch (e) {
+        } catch (e) {
             return false;
         }
-        var msg = "ts !=, " + farFutureTS + "(" + tsToDate(farFutureTS) + "), mv:" + tojson(mv)
-                  + " - " + tsToDate(mv.ts);
+        var msg = "ts !=, " + farFutureTS + "(" + tsToDate(farFutureTS) + "), mv:" + tojson(mv) +
+            " - " + tsToDate(mv.ts);
         assert.eq(farFutureTS, mv.ts, msg);
 
-        var lastTS = localDB.oplog.rs.find().sort(
-            {
-                $natural : -1
-            }).limit(-1).next().ts;
+        var lastTS = localDB.oplog.rs.find().sort({$natural: -1}).limit(-1).next().ts;
         log(localDB.oplog.rs.find().toArray());
         assert.eq(primaryOpTime.ts, lastTS);
         return true;

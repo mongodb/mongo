@@ -43,7 +43,8 @@
     // Update the next matching doc so that it no longer matches.
     assert.writeOK(t.update({_id: 3}, {$set: {a: "nomatch"}}));
 
-    // Either the cursor should skip the result that no longer matches, or we should get back the old
+    // Either the cursor should skip the result that no longer matches, or we should get back the
+    // old
     // version of the doc.
     assert(!cursor.hasNext() || cursor.next()["a"] === "bar");
 
@@ -55,7 +56,7 @@
     assert.writeOK(t.insert({a: 2, b: 3}));
     assert.writeOK(t.insert({a: 2, b: 4}));
 
-    cursor = t.find({a: {$in: [1,2]}}).sort({b: 1}).batchSize(2);
+    cursor = t.find({a: {$in: [1, 2]}}).sort({b: 1}).batchSize(2);
     cursor.next();
     cursor.next();
 
@@ -72,13 +73,14 @@
     assert.writeOK(t.insert({a: 2, b: 3}));
     assert.writeOK(t.insert({a: 2, b: 4}));
 
-    cursor = t.find({a: {$in: [1,2]}}).sort({b: 1}).batchSize(2);
+    cursor = t.find({a: {$in: [1, 2]}}).sort({b: 1}).batchSize(2);
     cursor.next();
     cursor.next();
 
     assert.writeOK(t.update({a: 2, b: 3}, {$set: {a: 6}}));
 
-    // Either the cursor should skip the result that no longer matches, or we should get back the old
+    // Either the cursor should skip the result that no longer matches, or we should get back the
+    // old
     // version of the doc.
     assert(cursor.hasNext());
     assert(cursor.next()["a"] === 2);
@@ -198,7 +200,7 @@
     t.insert({a: 3, b: 3});
     t.insert({a: 2, b: 1});
 
-    cursor = t.find({a: {$in: [1,2,3]}}).sort({b: 1}).batchSize(2);
+    cursor = t.find({a: {$in: [1, 2, 3]}}).sort({b: 1}).batchSize(2);
     cursor.next();
     cursor.next();
 
@@ -215,7 +217,7 @@
     t.insert({a: 3, b: 3});
     t.insert({a: 2, b: 1});
 
-    cursor = t.find({a: {$in: [1,2,3]}}).sort({b: 1}).batchSize(2);
+    cursor = t.find({a: {$in: [1, 2, 3]}}).sort({b: 1}).batchSize(2);
     cursor.next();
     cursor.next();
 

@@ -7,7 +7,7 @@
  * The collection has an index for each field, and a compound index for all fields.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 
 var $config = (function() {
 
@@ -34,9 +34,15 @@ var $config = (function() {
         var push = Random.rand() > 0.2;
 
         var updateDoc = {};
-        updateDoc[set ? '$set' : '$unset'] = { x: x };
-        updateDoc[push ? '$push' : '$pull'] = { y: y };
-        updateDoc.$inc = { z: z };
+        updateDoc[set ? '$set' : '$unset'] = {
+            x: x
+        };
+        updateDoc[push ? '$push' : '$pull'] = {
+            y: y
+        };
+        updateDoc.$inc = {
+            z: z
+        };
 
         return updateDoc;
     }
@@ -47,32 +53,29 @@ var $config = (function() {
             var updateDoc = makeRandomUpdateDoc();
 
             // apply this update
-            var query = makeQuery({
-                multi: this.multi,
-                isolated: this.isolated,
-                numDocs: this.numDocs
-            });
-            var res = db[collName].update(query, updateDoc, { multi: this.multi });
+            var query =
+                makeQuery({multi: this.multi, isolated: this.isolated, numDocs: this.numDocs});
+            var res = db[collName].update(query, updateDoc, {multi: this.multi});
             this.assertResult(res, db, collName, query);
         }
     };
 
     var transitions = {
-        update: { update: 1 }
+        update: {update: 1}
     };
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].ensureIndex({ x: 1 }));
-        assertAlways.commandWorked(db[collName].ensureIndex({ y: 1 }));
-        assertAlways.commandWorked(db[collName].ensureIndex({ z: 1 }));
-        assertAlways.commandWorked(db[collName].ensureIndex({ x: 1, y: 1, z: 1 }));
+        assertAlways.commandWorked(db[collName].ensureIndex({x: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({y: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({z: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({x: 1, y: 1, z: 1}));
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 3);
         assertAlways.gt(this.numDocs, 0, 'numDocs should be a positive number');
 
         for (var i = 0; i < this.numDocs; ++i) {
-            var res = db[collName].insert({ _id: i });
+            var res = db[collName].insert({_id: i});
             assertWhenOwnColl.writeOK(res);
             assertWhenOwnColl.eq(1, res.nInserted);
         }
@@ -95,8 +98,7 @@ var $config = (function() {
                     if (db.getMongo().writeMode() === 'commands') {
                         assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
                     }
-                }
-                else {
+                } else {
                     // Zero matches are possible for MMAP v1 because the update will skip a document
                     // that was invalidated during a yield.
                     assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));

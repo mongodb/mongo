@@ -8,13 +8,14 @@
     var dbpath = mongod.dbpath;
 
     // ensure dbpath gets set up.
-    assert.writeOK(mongod.getDB("foo").x.insert({x:1}));
+    assert.writeOK(mongod.getDB("foo").x.insert({x: 1}));
 
     assert(!mongod.getDB("admin").isMaster().readOnly);
     assert(!mongod.getDB("admin").serverStatus().storageEngine.readOnly);
     MongoRunner.stopMongod(mongod);
 
-    mongod = MongoRunner.runMongod({storageEngine: "mmapv1", readOnly: "", dbpath: dbpath, noCleanData: true});
+    mongod = MongoRunner.runMongod(
+        {storageEngine: "mmapv1", readOnly: "", dbpath: dbpath, noCleanData: true});
     assert(mongod.getDB("admin").isMaster().readOnly);
     assert(mongod.getDB("admin").serverStatus().storageEngine.readOnly);
     MongoRunner.stopMongod(mongod);

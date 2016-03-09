@@ -1,7 +1,7 @@
 // test initial sync failing
 
 // try running as :
-// 
+//
 //   mongo --nodb two_initsync.js | tee out | grep -v ^m31
 //
 
@@ -15,10 +15,10 @@ function pause(s) {
     }
 }
 
-function deb(obj) { 
-    if( debugging ) {
+function deb(obj) {
+    if (debugging) {
         print("\n\n\n" + obj + "\n\n");
-    }  
+    }
 }
 
 w = 0;
@@ -27,7 +27,7 @@ function wait(f) {
     w++;
     var n = 0;
     while (!f()) {
-        if( n % 4 == 0 )
+        if (n % 4 == 0)
             print("twoinitsync waiting " + w);
         if (++n == 4) {
             print("" + f);
@@ -37,26 +37,29 @@ function wait(f) {
     }
 }
 
-doTest = function (signal) {
-    var replTest = new ReplSetTest({ name: 'testSet', nodes: 0 });
+doTest = function(signal) {
+    var replTest = new ReplSetTest({name: 'testSet', nodes: 0});
 
     var first = replTest.add();
 
     // Initiate replica set
-    assert.soon(function () {
-        var res = first.getDB("admin").runCommand({ replSetInitiate: null });
+    assert.soon(function() {
+        var res = first.getDB("admin").runCommand({replSetInitiate: null});
         return res['ok'] == 1;
     });
 
     // Get status
-    assert.soon(function () {
-        var result = first.getDB("admin").runCommand({ replSetGetStatus: true });
+    assert.soon(function() {
+        var result = first.getDB("admin").runCommand({replSetGetStatus: true});
         return result['ok'] == 1;
     });
 
     var a = replTest.getPrimary().getDB("two");
     for (var i = 0; i < 20000; i++)
-        a.coll.insert({ i: i, s: "a                                                                       b" });
+        a.coll.insert({
+            i: i,
+            s: "a                                                                       b"
+        });
 
     // Start a second node
     var second = replTest.add();
@@ -68,11 +71,13 @@ doTest = function (signal) {
     var b = second.getDB("admin");
 
     // attempt to interfere with the initial sync
-    b._adminCommand({ replSetTest: 1, forceInitialSyncFailure: 1 });
+    b._adminCommand({replSetTest: 1, forceInitialSyncFailure: 1});
 
     //    wait(function () { return a._adminCommand("replSetGetStatus").members.length == 2; });
 
-    wait(function () { return b.isMaster().secondary || b.isMaster().ismaster; });
+    wait(function() {
+        return b.isMaster().secondary || b.isMaster().ismaster;
+    });
 
     print("b.isMaster:");
     printjson(b.isMaster());
@@ -82,13 +87,16 @@ doTest = function (signal) {
     print("b.isMaster:");
     printjson(b.isMaster());
 
-    wait(function () { var c = b.getSisterDB("two").coll.count(); print(c); return c == 20000; });
+    wait(function() {
+        var c = b.getSisterDB("two").coll.count();
+        print(c);
+        return c == 20000;
+    });
 
     print("two_initsync.js SUCCESS");
 
     replTest.stopSet(signal);
 };
 
-
 print("two_initsync.js");
-doTest( 15 );
+doTest(15);

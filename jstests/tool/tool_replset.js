@@ -17,7 +17,7 @@
 (function() {
     "use strict";
 
-    var replTest = new ReplSetTest({ name: 'tool_replset', nodes: 2, oplogSize: 5 });
+    var replTest = new ReplSetTest({name: 'tool_replset', nodes: 2, oplogSize: 5});
     var nodes = replTest.startSet();
     var config = replTest.getReplSetConfig();
     config.members[0].priority = 3;
@@ -26,12 +26,12 @@
     var master = replTest.getPrimary();
     assert.eq(nodes[0], master, "incorrect master elected");
     for (var i = 0; i < 100; i++) {
-        assert.writeOK(master.getDB("foo").bar.insert({ a: i }));
+        assert.writeOK(master.getDB("foo").bar.insert({a: i}));
     }
     replTest.awaitReplication();
 
-    var replSetConnString = "tool_replset/127.0.0.1:" + replTest.ports[0] +
-                            ",127.0.0.1:" + replTest.ports[1];
+    var replSetConnString =
+        "tool_replset/127.0.0.1:" + replTest.ports[0] + ",127.0.0.1:" + replTest.ports[1];
 
     // Test with mongodump/mongorestore
     print("dump the db");
@@ -54,33 +54,44 @@
     // Test with mongoexport/mongoimport
     print("export the collection");
     var extFile = MongoRunner.dataDir + "/tool_replset/export";
-    runMongoProgram("mongoexport", "--host", replSetConnString, "--out", extFile,
-                    "-d", "foo", "-c", "bar");
+    runMongoProgram(
+        "mongoexport", "--host", replSetConnString, "--out", extFile, "-d", "foo", "-c", "bar");
 
     print("collection successfully exported, dropping now");
     master.getDB("foo").getCollection("bar").drop();
     replTest.awaitReplication();
 
     print("import the collection");
-    runMongoProgram("mongoimport", "--host", replSetConnString, "--file", extFile,
-                    "-d", "foo", "-c", "bar");
+    runMongoProgram(
+        "mongoimport", "--host", replSetConnString, "--file", extFile, "-d", "foo", "-c", "bar");
 
     var x = master.getDB("foo").getCollection("bar").count();
     assert.eq(x, 100, "mongoimport should have successfully imported the collection");
-    var doc = {_id: 5, x: 17};
-    var oplogEntry = {ts: new Timestamp(), "op": "i", "ns": "foo.bar", "o": doc, "v": NumberInt(2)};
+    var doc = {
+        _id: 5,
+        x: 17
+    };
+    var oplogEntry = {
+        ts: new Timestamp(),
+        "op": "i",
+        "ns": "foo.bar",
+        "o": doc,
+        "v": NumberInt(2)
+    };
     assert.writeOK(master.getDB("local").oplog.rs.insert(oplogEntry));
 
-    assert.eq(100, master.getDB("foo").getCollection("bar").count(), "count before running " +
-              "mongooplog was not 100 as expected");
+    assert.eq(100,
+              master.getDB("foo").getCollection("bar").count(),
+              "count before running " + "mongooplog was not 100 as expected");
 
-    runMongoProgram("mongooplog" , "--from", "127.0.0.1:" + replTest.ports[0],
-                                   "--host", replSetConnString);
+    runMongoProgram(
+        "mongooplog", "--from", "127.0.0.1:" + replTest.ports[0], "--host", replSetConnString);
 
     print("finished running mongooplog to replay the oplog");
 
-    assert.eq(101, master.getDB("foo").getCollection("bar").count(), "count after running " +
-              "mongooplog was not 101 as expected");
+    assert.eq(101,
+              master.getDB("foo").getCollection("bar").count(),
+              "count after running " + "mongooplog was not 101 as expected");
 
     print("all tests successful, stopping replica set");
 

@@ -14,7 +14,7 @@ var $config = (function() {
 
     var data = {
         numDocs: 1000,
-        maxTTL: 5000, // max time to live
+        maxTTL: 5000,  // max time to live
         ttlIndexExists: true
     };
 
@@ -22,12 +22,10 @@ var $config = (function() {
 
         function collMod(db, collName) {
             var newTTL = Random.randInt(this.maxTTL);
-            var res = db.runCommand({ collMod: this.threadCollName,
-                                      index: {
-                                          keyPattern: { createdAt: 1 },
-                                          expireAfterSeconds: newTTL
-                                      }
-                                    });
+            var res = db.runCommand({
+                collMod: this.threadCollName,
+                index: {keyPattern: {createdAt: 1}, expireAfterSeconds: newTTL}
+            });
             assertAlways.commandWorked(res);
             // only assert if new expireAfterSeconds differs from old one
             if (res.hasOwnProperty('expireAfterSeconds_new')) {
@@ -42,7 +40,7 @@ var $config = (function() {
     })();
 
     var transitions = {
-        collMod: { collMod: 1 }
+        collMod: {collMod: 1}
     };
 
     function setup(db, collName, cluster) {
@@ -50,7 +48,7 @@ var $config = (function() {
         this.threadCollName = this.threadCollName || collName;
         var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
         for (var i = 0; i < this.numDocs; ++i) {
-            bulk.insert({ createdAt: new Date() });
+            bulk.insert({createdAt: new Date()});
         }
 
         var res = bulk.execute();
@@ -58,8 +56,7 @@ var $config = (function() {
         assertAlways.eq(this.numDocs, res.nInserted);
 
         // create TTL index
-        res = db[this.threadCollName].ensureIndex({ createdAt: 1 },
-                                                  { expireAfterSeconds: 3600 });
+        res = db[this.threadCollName].ensureIndex({createdAt: 1}, {expireAfterSeconds: 3600});
         assertAlways.commandWorked(res);
     }
 

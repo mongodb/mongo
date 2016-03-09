@@ -7,8 +7,8 @@ conn.forceWriteMode(db.getMongo().writeMode());
 t = conn.getDB(db.getName()).insert2;
 t.drop();
 
-assert.isnull( t.findOne() , "A" );
-assert.writeError(t.insert( { z : 1 ,  $inc : { x : 1 } } , 0, true ));
-assert.isnull( t.findOne() , "B" );
+assert.isnull(t.findOne(), "A");
+assert.writeError(t.insert({z: 1, $inc: {x: 1}}, 0, true));
+assert.isnull(t.findOne(), "B");
 // Collection should not exist
-assert.commandFailed( t.stats() );
+assert.commandFailed(t.stats());

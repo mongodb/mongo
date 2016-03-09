@@ -22,9 +22,10 @@ var Cluster = function(options) {
         ];
 
         Object.keys(options).forEach(function(option) {
-            assert.contains(option, allowedKeys,
-                'invalid option: ' + tojson(option) +
-                '; valid options are: ' + tojson(allowedKeys));
+            assert.contains(option,
+                            allowedKeys,
+                            'invalid option: ' + tojson(option) + '; valid options are: ' +
+                                tojson(allowedKeys));
         });
 
         options.enableBalancer = options.enableBalancer || false;
@@ -83,10 +84,10 @@ var Cluster = function(options) {
         assert(options.teardownFunctions.mongos.every(f => (typeof f === 'function')),
                'Expected teardownFunctions.mongos to be an array of functions');
 
-        assert(!options.masterSlave || !options.replication, "Both 'masterSlave' and " +
-               "'replication' cannot be true");
-        assert(!options.masterSlave || !options.sharded, "Both 'masterSlave' and 'sharded' cannot" +
-               "be true");
+        assert(!options.masterSlave || !options.replication,
+               "Both 'masterSlave' and " + "'replication' cannot be true");
+        assert(!options.masterSlave || !options.sharded,
+               "Both 'masterSlave' and 'sharded' cannot" + "be true");
     }
 
     var conn;
@@ -123,7 +124,7 @@ var Cluster = function(options) {
                 shards: 2,
                 mongos: 2,
                 verbose: verbosityLevel,
-                other: { enableBalancer: options.enableBalancer }
+                other: {enableBalancer: options.enableBalancer}
             };
 
             // TODO: allow 'options' to specify an 'rs' config
@@ -144,7 +145,7 @@ var Cluster = function(options) {
 
             st = new ShardingTest(shardConfig);
 
-            conn = st.s; // mongos
+            conn = st.s;  // mongos
 
             this.teardown = function teardown() {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
@@ -185,7 +186,7 @@ var Cluster = function(options) {
                 nodes: replSetNodes,
                 // Increase the oplog size (in MB) to prevent rollover during write-heavy workloads
                 oplogSize: 1024,
-                nodeOptions: { verbose: verbosityLevel }
+                nodeOptions: {verbose: verbosityLevel}
             };
 
             var rst = new ReplSetTest(replSetConfig);
@@ -215,8 +216,8 @@ var Cluster = function(options) {
             var slave = rt.start(false);
             conn = master;
 
-            master.adminCommand({ setParameter: 1, logLevel: verbosityLevel });
-            slave.adminCommand({ setParameter: 1, logLevel: verbosityLevel });
+            master.adminCommand({setParameter: 1, logLevel: verbosityLevel});
+            slave.adminCommand({setParameter: 1, logLevel: verbosityLevel});
 
             this.teardown = function teardown() {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
@@ -226,9 +227,9 @@ var Cluster = function(options) {
 
             _conns.mongod = [master, slave];
 
-        } else { // standalone server
+        } else {  // standalone server
             conn = db.getMongo();
-            db.adminCommand({ setParameter: 1, logLevel: verbosityLevel });
+            db.adminCommand({setParameter: 1, logLevel: verbosityLevel});
 
             _conns.mongod = [conn];
         }
@@ -242,10 +243,9 @@ var Cluster = function(options) {
         }
     };
 
-
     this._addReplicaSetConns = function _addReplicaSetConns(rsTest) {
         _conns.mongod.push(rsTest.getPrimary());
-        rsTest.getSecondaries().forEach(function (secondaryConn) {
+        rsTest.getSecondaries().forEach(function(secondaryConn) {
             _conns.mongod.push(secondaryConn);
         });
     };
@@ -406,7 +406,7 @@ var Cluster = function(options) {
         // Use liveNodes.master instead of getPrimary() to avoid the detection of a new primary.
         var primary = rst.liveNodes.master;
 
-        var res = primary.adminCommand({ listDatabases: 1 });
+        var res = primary.adminCommand({listDatabases: 1});
         assert.commandWorked(res);
 
         res.databases.forEach(dbInfo => {
@@ -425,20 +425,23 @@ var Cluster = function(options) {
                 var primaryNumCollections = Object.keys(primaryDBHash.collections).length;
                 var secondaryNumCollections = Object.keys(secondaryDBHash.collections).length;
 
-                assert.eq(primaryNumCollections, secondaryNumCollections,
+                assert.eq(primaryNumCollections,
+                          secondaryNumCollections,
                           phase + ', the primary and secondary have a different number of' +
-                          ' collections: ' + tojson(dbHashes));
+                              ' collections: ' + tojson(dbHashes));
 
                 // Only compare the dbhashes of non-capped collections because capped collections
                 // are not necessarily truncated at the same points across replica set members.
-                var collNames = Object.keys(primaryDBHash.collections).filter(collName =>
-                    !primary.getDB(dbName)[collName].isCapped());
+                var collNames =
+                    Object.keys(primaryDBHash.collections)
+                        .filter(collName => !primary.getDB(dbName)[collName].isCapped());
 
                 collNames.forEach(collName => {
                     assert.eq(primaryDBHash.collections[collName],
                               secondaryDBHash.collections[collName],
                               phase + ', the primary and secondary have a different hash for the' +
-                              ' collection ' + dbName + '.' + collName + ': ' + tojson(dbHashes));
+                                  ' collection ' + dbName + '.' + collName + ': ' +
+                                  tojson(dbHashes));
                 });
 
                 if (collNames.length === primaryNumCollections) {
@@ -448,15 +451,14 @@ var Cluster = function(options) {
                     assert.eq(primaryDBHash.md5,
                               secondaryDBHash.md5,
                               phase + ', the primary and secondary have a different hash for the ' +
-                              dbName + ' database: ' + tojson(dbHashes));
+                                  dbName + ' database: ' + tojson(dbHashes));
                 }
             });
         });
     };
 
-    this.checkReplicationConsistency = function checkReplicationConsistency(dbBlacklist,
-                                                                            phase,
-                                                                            ttlIndexExists) {
+    this.checkReplicationConsistency = function checkReplicationConsistency(
+        dbBlacklist, phase, ttlIndexExists) {
         assert(initialized, 'cluster must be initialized first');
 
         if (!this.isReplication()) {
@@ -477,7 +479,7 @@ var Cluster = function(options) {
             if (shouldCheckDBHashes && ttlIndexExists) {
                 // Lock the primary to prevent the TTL monitor from deleting expired documents in
                 // the background while we are getting the dbhashes of the replica set members.
-                assert.commandWorked(primary.adminCommand({ fsync: 1, lock: 1 }),
+                assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
                                      phase + ', failed to lock the primary');
             }
 
@@ -486,14 +488,13 @@ var Cluster = function(options) {
 
             try {
                 // Get the latest optime from the primary.
-                var replSetStatus = primary.adminCommand({ replSetGetStatus: 1 });
-                assert.commandWorked(replSetStatus,
-                                     phase + ', error getting replication status');
+                var replSetStatus = primary.adminCommand({replSetGetStatus: 1});
+                assert.commandWorked(replSetStatus, phase + ', error getting replication status');
 
                 var primaryInfo = replSetStatus.members.find(memberInfo => memberInfo.self);
                 assert(primaryInfo !== undefined,
                        phase + ', failed to find self in replication status: ' +
-                       tojson(replSetStatus));
+                           tojson(replSetStatus));
 
                 // Wait for all previous workload operations to complete. We use the "getLastError"
                 // command rather than a replicated write because the primary is currently
@@ -516,12 +517,12 @@ var Cluster = function(options) {
             } finally {
                 if (shouldCheckDBHashes && ttlIndexExists) {
                     // Allow writes on the primary.
-                    res = primary.adminCommand({ fsyncUnlock: 1 });
+                    res = primary.adminCommand({fsyncUnlock: 1});
 
                     // Returning early would suppress the exception rethrown in the catch block.
                     if (!res.ok) {
                         msg = phase + ', failed to unlock the primary, which may cause this' +
-                              ' test to hang: ' + tojson(res);
+                            ' test to hang: ' + tojson(res);
                         if (activeException) {
                             jsTest.log(msg);
                         } else {
@@ -533,7 +534,7 @@ var Cluster = function(options) {
 
             var totalTime = Date.now() - startTime;
             jsTest.log('Finished consistency checks of replica set with ' + primary.host +
-                       ' as primary in ' + totalTime +  ' ms, ' + phase);
+                       ' as primary in ' + totalTime + ' ms, ' + phase);
         });
     };
 
@@ -546,11 +547,11 @@ var Cluster = function(options) {
 
         // We record the contents of the 'lockpings' and 'locks' collections to make it easier to
         // debug issues with distributed locks in the sharded cluster.
-        data.lockpings = configDB.lockpings.find({ ping: { $gte: clusterStartTime } }).toArray();
+        data.lockpings = configDB.lockpings.find({ping: {$gte: clusterStartTime}}).toArray();
 
         // We suppress some fields from the result set to reduce the amount of data recorded.
-        data.locks = configDB.locks.find({ when: { $gte: clusterStartTime } },
-                                         { process: 0, ts: 0 }).toArray();
+        data.locks =
+            configDB.locks.find({when: {$gte: clusterStartTime}}, {process: 0, ts: 0}).toArray();
 
         return data;
     };
@@ -561,7 +562,7 @@ var Cluster = function(options) {
 
         var data = {};
         st._configServers.forEach(config =>
-            (data[config.host] = this.recordConfigServerData(config)));
+                                      (data[config.host] = this.recordConfigServerData(config)));
 
         return data;
     };

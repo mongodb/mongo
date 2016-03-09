@@ -18,10 +18,12 @@ var $config = (function() {
         return {
             group: {
                 ns: collName,
-                initial: { bucketCount: 0, bucketSum: 0},
+                initial: {bucketCount: 0, bucketSum: 0},
                 $keyf: function $keyf(doc) {
                     // place doc.rand into appropriate bucket
-                    return { bucket: Math.floor(doc.rand * 10) + 1 };
+                    return {
+                        bucket: Math.floor(doc.rand * 10) + 1
+                    };
                 },
                 $reduce: function $reduce(curr, result) {
                     result.bucketCount++;
@@ -41,7 +43,7 @@ var $config = (function() {
         }, 0);
     }
 
-    var data =  {
+    var data = {
         numDocs: 1000,
         generateGroupCmdObj: generateGroupCmdObj,
         sumBucketCount: sumBucketCount
@@ -68,13 +70,13 @@ var $config = (function() {
     })();
 
     var transitions = {
-        group: { group: 1 }
+        group: {group: 1}
     };
 
     function setup(db, collName, cluster) {
         var bulk = db[collName].initializeUnorderedBulkOp();
         for (var i = 0; i < this.numDocs; ++i) {
-            bulk.insert({ rand: Random.rand() });
+            bulk.insert({rand: Random.rand()});
         }
         var res = bulk.execute();
         assertAlways.writeOK(res);

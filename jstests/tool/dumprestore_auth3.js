@@ -4,7 +4,9 @@
 
 // Runs the tool with the given name against the given mongod.
 function runTool(toolName, mongod, options) {
-    var opts = {host: mongod.host};
+    var opts = {
+        host: mongod.host
+    };
     Object.extend(opts, options);
     MongoRunner.runMongoTool(toolName, opts);
 }
@@ -19,13 +21,15 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     admindb.createUser({user: 'root', pwd: 'pass', roles: ['root']});
     admindb.createUser({user: 'backup', pwd: 'pass', roles: ['backup']});
     admindb.createUser({user: 'restore', pwd: 'pass', roles: ['restore']});
-    admindb.createRole({role: "dummyRole", roles: [], privileges:[]});
+    admindb.createRole({role: "dummyRole", roles: [], privileges: []});
     db.createUser({user: 'user', pwd: 'pass', roles: jsTest.basicUserRoles});
-    db.createRole({role: 'role', roles: [], privileges:[]});
+    db.createRole({role: 'role', roles: [], privileges: []});
     var backupActions = ['find'];
-    db.createRole({role: 'backupFooChester',
-       privileges: [{resource: {db: 'foo', collection: 'chester'}, actions: backupActions}],
-       roles: []});
+    db.createRole({
+        role: 'backupFooChester',
+        privileges: [{resource: {db: 'foo', collection: 'chester'}, actions: backupActions}],
+        roles: []
+    });
     db.createUser({user: 'backupFooChester', pwd: 'pass', roles: ['backupFooChester']});
 
     var userCount = db.getUsers().length;
@@ -35,7 +39,7 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     var systemUsersCount = admindb.system.users.count();
     var systemVersionCount = admindb.system.version.count();
 
-    db.bar.insert({a:1});
+    db.bar.insert({a: 1});
 
     assert.eq(1, db.bar.findOne().a);
     assert.eq(userCount, db.getUsers().length, "setup");
@@ -43,7 +47,7 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     assert.eq(adminUsersCount, admindb.getUsers().length, "setup3");
     assert.eq(adminRolesCount, admindb.getRoles().length, "setup4");
     assert.eq(systemUsersCount, admindb.system.users.count(), "setup5");
-    assert.eq(systemVersionCount, admindb.system.version.count(),"system version");
+    assert.eq(systemVersionCount, admindb.system.version.count(), "system version");
     assert.eq(1, admindb.system.users.count({user: "restore"}), "Restore user is missing");
     assert.eq(1, admindb.system.users.count({user: "backup"}), "Backup user is missing");
     var versionDoc = admindb.system.version.findOne();
@@ -60,21 +64,22 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     jsTestLog("Restore foo database from dump that doesn't contain user data ");
     // This test depends on W=0 to mask unique index violations.
     // This should be fixed once we implement TOOLS-341
-    runTool("mongorestore", 
-        mongod, 
-        {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: "", writeConcern: "0"}
-    );
+    runTool("mongorestore",
+            mongod,
+            {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: "", writeConcern: "0"});
 
     db = mongod.getDB('foo');
 
-    assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
+    assert.soon(function() {
+        return db.bar.findOne();
+    }, "no data after restore");
     assert.eq(1, db.bar.findOne().a);
     assert.eq(0, db.getUsers().length, "Restore created users somehow");
     assert.eq(0, db.getRoles().length, "Restore created roles somehow");
 
     // Re-create user data
     db.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
-    db.createRole({role: 'role', roles: [], privileges:[]});
+    db.createRole({role: 'role', roles: [], privileges: []});
     userCount = 1;
     rolesCount = 1;
 
@@ -98,25 +103,28 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo', writeConcern: "0"});
     db = mongod.getDB('foo');
 
-    assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
+    assert.soon(function() {
+        return db.bar.findOne();
+    }, "no data after restore");
     assert.eq(1, db.bar.findOne().a);
     assert.eq(0, db.getUsers().length, "Restored users even though it shouldn't have");
     assert.eq(0, db.getRoles().length, "Restored roles even though it shouldn't have");
 
     jsTestLog("Restore foo database *with* user data");
-    runTool("mongorestore", 
-        mongod, 
-        {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: "", writeConcern: "0"}
-    );
+    runTool("mongorestore",
+            mongod,
+            {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: "", writeConcern: "0"});
     db = mongod.getDB('foo');
     admindb = mongod.getDB('admin');
 
-    assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
+    assert.soon(function() {
+        return db.bar.findOne();
+    }, "no data after restore");
     assert.eq(1, db.bar.findOne().a);
     assert.eq(userCount, db.getUsers().length, "didn't restore users");
     assert.eq(rolesCount, db.getRoles().length, "didn't restore roles");
-    assert.eq(1, admindb.system.users.count({user: "restore", db: "admin"}), 
-        "Restore user is missing");
+    assert.eq(
+        1, admindb.system.users.count({user: "restore", db: "admin"}), "Restore user is missing");
     assert.docEq(versionDoc,
                  db.getSiblingDB('admin').system.version.findOne(),
                  "version doc was changed by restore");
@@ -125,18 +133,25 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     db.dropUser('user');
     db.createUser({user: 'user2', pwd: 'password2', roles: jsTest.basicUserRoles});
     db.dropRole('role');
-    db.createRole({role: 'role2', roles: [], privileges:[]});
+    db.createRole({role: 'role2', roles: [], privileges: []});
 
     jsTestLog("Restore foo database (and user data) with --drop so it overrides the changes made");
     // Restore with --drop to override the changes to user data
-    runTool("mongorestore", 
-        mongod,
-        {dir: dumpDir + "foo/", db: 'foo', drop: "", restoreDbUsersAndRoles: "", writeConcern: "0"}
-    );
+    runTool("mongorestore",
+            mongod,
+            {
+              dir: dumpDir + "foo/",
+              db: 'foo',
+              drop: "",
+              restoreDbUsersAndRoles: "",
+              writeConcern: "0"
+            });
     db = mongod.getDB('foo');
     admindb = mongod.getDB('admin');
 
-    assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
+    assert.soon(function() {
+        return db.bar.findOne();
+    }, "no data after restore");
     assert.eq(adminUsersCount, admindb.getUsers().length, "Admin users were dropped");
     assert.eq(adminRolesCount, admindb.getRoles().length, "Admin roles were dropped");
     assert.eq(1, db.bar.findOne().a);
@@ -147,7 +162,6 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     assert.docEq(versionDoc,
                  db.getSiblingDB('admin').system.version.findOne(),
                  "version doc was changed by restore");
-
 
     jsTestLog("Dump just the admin database.  User data should be dumped by default");
     // Make a user in another database to make sure it is properly captured
@@ -163,15 +177,16 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     db.getSiblingDB('admin').dropAllUsers();
 
     jsTestLog("Restore just the admin database. User data should be restored by default");
-    runTool("mongorestore", 
-        mongod, 
-        {dir: dumpDir + "admin/", db: 'admin', drop: "", writeConcern: "0"}
-    );
+    runTool("mongorestore",
+            mongod,
+            {dir: dumpDir + "admin/", db: 'admin', drop: "", writeConcern: "0"});
     db = mongod.getDB('foo');
     var otherdb = db.getSiblingDB('bar');
     var admindb = db.getSiblingDB('admin');
 
-    assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
+    assert.soon(function() {
+        return db.bar.findOne();
+    }, "no data after restore");
     assert.eq(1, db.bar.findOne().a);
     assert.eq(userCount, db.getUsers().length, "didn't restore users");
     assert.eq("user", db.getUser('user').user, "didn't restore user");
@@ -179,8 +194,8 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     assert.eq("role", db.getRole('role').role, "didn't restore role");
     assert.eq(1, otherdb.getUsers().length, "didn't restore users for bar database");
     assert.eq("user", otherdb.getUsers()[0].user, "didn't restore user for bar database");
-    assert.eq(adminUsersCount, admindb.getUsers().length, 
-        "didn't restore users for admin database");
+    assert.eq(
+        adminUsersCount, admindb.getUsers().length, "didn't restore users for admin database");
     assert.eq("user", admindb.getUser("user").user, "didn't restore user for admin database");
     assert.eq(6, admindb.system.users.count(), "has the wrong # of users for the whole server");
     assert.eq(2, admindb.system.roles.count(), "has the wrong # of roles for the whole server");
@@ -204,7 +219,9 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     runTool("mongorestore", mongod, {dir: dumpDir, writeConcern: "0"});
     db = mongod.getDB('foo');
 
-    assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
+    assert.soon(function() {
+        return db.bar.findOne();
+    }, "no data after restore");
     assert.eq(1, db.bar.findOne().a);
     assert.eq(1, db.getUsers().length, "didn't restore users");
     assert.eq(1, db.getRoles().length, "didn't restore roles");

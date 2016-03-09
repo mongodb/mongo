@@ -36,193 +36,177 @@
 
 (function() {
 
-var name = 'user_defined_roles_on_secondaries';
-var m0, m1;
+    var name = 'user_defined_roles_on_secondaries';
+    var m0, m1;
 
-function assertListContainsRole(list, role, msg) {
-    var i;
-    for (i = 0; i < list.length; ++i) {
-        if (list[i].role == role.role && list[i].db == role.db)
-            return;
+    function assertListContainsRole(list, role, msg) {
+        var i;
+        for (i = 0; i < list.length; ++i) {
+            if (list[i].role == role.role && list[i].db == role.db)
+                return;
+        }
+        doassert("Could not find value " + tojson(val) + " in " +
+                 tojson(list)(msg ? ": " + msg : ""));
     }
-    doassert("Could not find value " + tojson(val) + " in " + tojson(list)
-            (msg ? ": " + msg : ""));
-}
 
-//
-// Create a 1-node replicaset and add two roles, inheriting the built-in read role on db1.
-//
-//     read
-//    /    \
+    //
+    // Create a 1-node replicaset and add two roles, inheriting the built-in read role on db1.
+    //
+    //     read
+    //    /    \
 //  r1      r2
-//
-var rstest = new ReplSetTest({
-    name: name,
-    nodes: 1,
-    nodeOptions: {}
-});
+    //
+    var rstest = new ReplSetTest({name: name, nodes: 1, nodeOptions: {}});
 
-rstest.startSet();
-rstest.initiate();
+    rstest.startSet();
+    rstest.initiate();
 
-m0 = rstest.nodes[0];
+    m0 = rstest.nodes[0];
 
-m0.getDB("db1").createRole({
-    role: "r1",
-    roles: [ "read" ],
-    privileges: [
-        { resource: { db: "db1", collection: "system.users" }, actions: [ "find" ] }
-    ]
-});
+    m0.getDB("db1").createRole({
+        role: "r1",
+        roles: ["read"],
+        privileges: [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}]
+    });
 
-m0.getDB("db1").createRole({
-    role: "r2",
-    roles: [ "read" ],
-    privileges: [
-        { resource: { db: "db1", collection: "log" }, actions: [ "insert" ] }
-    ]
-});
+    m0.getDB("db1").createRole({
+        role: "r2",
+        roles: ["read"],
+        privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}]
+    });
 
-//
-// Add a second node to the set, and add a third role, dependent on the first two.
-//
-//     read
-//    /    \
+    //
+    // Add a second node to the set, and add a third role, dependent on the first two.
+    //
+    //     read
+    //    /    \
 //  r1      r2
-//    \    /
-//      r3
-//
-rstest.add();
-rstest.reInitiate();
+    //    \    /
+    //      r3
+    //
+    rstest.add();
+    rstest.reInitiate();
 
-rstest.getPrimary().getDB("db1").createRole({
-    role: "r3",
-    roles: [ "r1", "r2" ],
-    privileges: [
-        { resource: { db: "db1", collection: "log" }, actions: [ "update" ] }
-    ]
-}, { w: 2 });
+    rstest.getPrimary().getDB("db1").createRole(
+        {
+          role: "r3",
+          roles: ["r1", "r2"],
+          privileges: [{resource: {db: "db1", collection: "log"}, actions: ["update"]}]
+        },
+        {w: 2});
 
-// Verify that both members of the set see the same role graph.
-rstest.nodes.forEach(function (node) {
-    var role = node.getDB("db1").getRole("r3");
-    assert.eq(2, role.roles.length, node);
-    assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);
-    assertListContainsRole(role.roles, {role: "r2", db: "db1"}, node);
-    assert.eq(3, role.inheritedRoles.length, node);
-    assertListContainsRole(role.inheritedRoles, {role: "r1", db: "db1"}, node);
-    assertListContainsRole(role.inheritedRoles, {role: "r2", db: "db1"}, node);
-    assertListContainsRole(role.inheritedRoles, {role: "read", db: "db1"}, node);
-});
+    // Verify that both members of the set see the same role graph.
+    rstest.nodes.forEach(function(node) {
+        var role = node.getDB("db1").getRole("r3");
+        assert.eq(2, role.roles.length, node);
+        assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);
+        assertListContainsRole(role.roles, {role: "r2", db: "db1"}, node);
+        assert.eq(3, role.inheritedRoles.length, node);
+        assertListContainsRole(role.inheritedRoles, {role: "r1", db: "db1"}, node);
+        assertListContainsRole(role.inheritedRoles, {role: "r2", db: "db1"}, node);
+        assertListContainsRole(role.inheritedRoles, {role: "read", db: "db1"}, node);
+    });
 
-// Verify that updating roles propagates.
-rstest.getPrimary().getDB("db1").revokeRolesFromRole("r1", [ "read" ], { w: 2 });
-rstest.getPrimary().getDB("db1").grantRolesToRole("r1", [ "dbAdmin" ], { w: 2 });
-rstest.nodes.forEach(function (node) {
-    var role = node.getDB("db1").getRole("r1");
-    assert.eq(1, role.roles.length, node);
-    assertListContainsRole(role.roles, { role: "dbAdmin", db: "db1" });
-});
+    // Verify that updating roles propagates.
+    rstest.getPrimary().getDB("db1").revokeRolesFromRole("r1", ["read"], {w: 2});
+    rstest.getPrimary().getDB("db1").grantRolesToRole("r1", ["dbAdmin"], {w: 2});
+    rstest.nodes.forEach(function(node) {
+        var role = node.getDB("db1").getRole("r1");
+        assert.eq(1, role.roles.length, node);
+        assertListContainsRole(role.roles, {role: "dbAdmin", db: "db1"});
+    });
 
-// Verify that dropping roles propagates.
-rstest.getPrimary().getDB("db1").dropRole("r2", { w: 2});
-rstest.nodes.forEach(function (node) {
-    assert.eq(null, node.getDB("db1").getRole("r2"));
-    var role = node.getDB("db1").getRole("r3");
-    assert.eq(1, role.roles.length, node);
-    assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);
-    assert.eq(2, role.inheritedRoles.length, node);
-    assertListContainsRole(role.inheritedRoles, {role: "r1", db: "db1"}, node);
-    assertListContainsRole(role.inheritedRoles, {role: "dbAdmin", db: "db1"}, node);
-});
+    // Verify that dropping roles propagates.
+    rstest.getPrimary().getDB("db1").dropRole("r2", {w: 2});
+    rstest.nodes.forEach(function(node) {
+        assert.eq(null, node.getDB("db1").getRole("r2"));
+        var role = node.getDB("db1").getRole("r3");
+        assert.eq(1, role.roles.length, node);
+        assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);
+        assert.eq(2, role.inheritedRoles.length, node);
+        assertListContainsRole(role.inheritedRoles, {role: "r1", db: "db1"}, node);
+        assertListContainsRole(role.inheritedRoles, {role: "dbAdmin", db: "db1"}, node);
+    });
 
-// Verify that dropping the admin database propagates.
-assert.commandWorked(rstest.getPrimary().getDB("admin").dropDatabase());
-assert.commandWorked(rstest.getPrimary().getDB("admin").getLastErrorObj(2));
-rstest.nodes.forEach(function (node) {
-    var roles = node.getDB("db1").getRoles();
-    assert.eq(0, roles.length, node);
-});
+    // Verify that dropping the admin database propagates.
+    assert.commandWorked(rstest.getPrimary().getDB("admin").dropDatabase());
+    assert.commandWorked(rstest.getPrimary().getDB("admin").getLastErrorObj(2));
+    rstest.nodes.forEach(function(node) {
+        var roles = node.getDB("db1").getRoles();
+        assert.eq(0, roles.length, node);
+    });
 
-// Verify that applyOps commands propagate.
-// NOTE: This section of the test depends on the oplog and roles schemas.
-assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand({ applyOps: [
-    {
-        op: "c",
-        ns: "admin.$cmd",
-        o: { create: "system.roles" }
-    },
-    {
-        op: "i",
-        ns: "admin.system.roles",
-        o: {
-            _id: "db1.s1",
-            role: "s1",
-            db: "db1",
-            roles: [ { role: "read", db: "db1" } ],
-            privileges: [ { resource: { db: "db1", collection: "system.users" },
-                            actions: [ "find" ] } ] }
-    },
-    {
-        op: "i",
-        ns: "admin.system.roles",
-        o: {
-            _id: "db1.s2",
-            role: "s2",
-            db: "db1",
-            roles: [ { role: "read", db: "db1" } ],
-            privileges: [ { resource: { db: "db1", collection: "log" },
-                            actions: [ "insert" ] } ] }
-    },
-    {
-        op: "c",
-        ns: "admin.$cmd",
-        o: { dropDatabase: 1 }
-    },
-    {
-        op: "c",
-        ns: "admin.$cmd",
-        o: { create: "system.roles" }
-    },
-    {
-        op: "i",
-        ns: "admin.system.roles",
-        o: {
-            _id: "db1.t1",
-            role: "t1",
-            db: "db1",
-            roles: [ { role: "read", db: "db1" } ],
-            privileges: [ { resource: { db: "db1", collection: "system.users" },
-                            actions: [ "find" ] } ] }
-    },
-    {
-        op: "i",
-        ns: "admin.system.roles",
-        o: {
-            _id: "db1.t2",
-            role: "t2",
-            db: "db1",
-            roles: [ ],
-            privileges: [ { resource: { db: "db1", collection: "log" },
-                            actions: [ "insert" ] } ] }
-    },
-    {
-        op: "u",
-        ns: "admin.system.roles",
-        o: { $set: { roles: [ { role: "readWrite", db: "db1" } ] } },
-        o2: { _id: "db1.t2" }
-    }
-] }));
+    // Verify that applyOps commands propagate.
+    // NOTE: This section of the test depends on the oplog and roles schemas.
+    assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand({
+        applyOps: [
+            {op: "c", ns: "admin.$cmd", o: {create: "system.roles"}},
+            {
+              op: "i",
+              ns: "admin.system.roles",
+              o: {
+                  _id: "db1.s1",
+                  role: "s1",
+                  db: "db1",
+                  roles: [{role: "read", db: "db1"}],
+                  privileges:
+                      [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}]
+              }
+            },
+            {
+              op: "i",
+              ns: "admin.system.roles",
+              o: {
+                  _id: "db1.s2",
+                  role: "s2",
+                  db: "db1",
+                  roles: [{role: "read", db: "db1"}],
+                  privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}]
+              }
+            },
+            {op: "c", ns: "admin.$cmd", o: {dropDatabase: 1}},
+            {op: "c", ns: "admin.$cmd", o: {create: "system.roles"}},
+            {
+              op: "i",
+              ns: "admin.system.roles",
+              o: {
+                  _id: "db1.t1",
+                  role: "t1",
+                  db: "db1",
+                  roles: [{role: "read", db: "db1"}],
+                  privileges:
+                      [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}]
+              }
+            },
+            {
+              op: "i",
+              ns: "admin.system.roles",
+              o: {
+                  _id: "db1.t2",
+                  role: "t2",
+                  db: "db1",
+                  roles: [],
+                  privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}]
+              }
+            },
+            {
+              op: "u",
+              ns: "admin.system.roles",
+              o: {$set: {roles: [{role: "readWrite", db: "db1"}]}},
+              o2: {_id: "db1.t2"}
+            }
+        ]
+    }));
 
-assert.commandWorked(rstest.getPrimary().getDB("admin").getLastErrorObj(2));
-rstest.nodes.forEach(function (node) {
-    var role = node.getDB("db1").getRole("t1");
-    assert.eq(1, role.roles.length, node);
-    assertListContainsRole(role.roles, {role: "read", db: "db1"}, node);
+    assert.commandWorked(rstest.getPrimary().getDB("admin").getLastErrorObj(2));
+    rstest.nodes.forEach(function(node) {
+        var role = node.getDB("db1").getRole("t1");
+        assert.eq(1, role.roles.length, node);
+        assertListContainsRole(role.roles, {role: "read", db: "db1"}, node);
 
-    var role = node.getDB("db1").getRole("t2");
-    assert.eq(1, role.roles.length, node);
-    assertListContainsRole(role.roles, {role: "readWrite", db: "db1"}, node);
-});
+        var role = node.getDB("db1").getRole("t2");
+        assert.eq(1, role.roles.length, node);
+        assertListContainsRole(role.roles, {role: "readWrite", db: "db1"}, node);
+    });
 
 }());

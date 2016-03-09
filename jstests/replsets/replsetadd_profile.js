@@ -8,8 +8,7 @@
 // the only node is running at a profiling level of 2.
 var collectionName = 'jstests_replsetadd_profile';
 
-var replTest = new ReplSetTest({name: 'ReplSetAddProfileTestSet',
-                                nodes: [{profile: 2}]});
+var replTest = new ReplSetTest({name: 'ReplSetAddProfileTestSet', nodes: [{profile: 2}]});
 replTest.startSet();
 replTest.initiate();
 var master = replTest.getPrimary();
@@ -25,8 +24,9 @@ replTest.waitForState(replTest.nodes[1], ReplSetTest.State.SECONDARY, 60 * 1000)
 replTest.awaitReplication();
 
 var newNodeCollection = newNode.getDB('test').getCollection(collectionName);
-assert.eq(1, newNodeCollection.find({a: 1}).itcount(),
+assert.eq(1,
+          newNodeCollection.find({a: 1}).itcount(),
           'expect documents to be present in slave after replication');
 
 var signal = 15;
-replTest.stopSet( signal );
+replTest.stopSet(signal);

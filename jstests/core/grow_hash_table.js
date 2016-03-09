@@ -11,9 +11,13 @@ var testDB = db.getSiblingDB('grow_hash_table');
 var doTest = function(count) {
     print('Testing with count of ' + count);
     testDB.dropDatabase();
-    var id = { data: 1 };
-    var doc = { _id: id };
-    var projection = { };
+    var id = {
+        data: 1
+    };
+    var doc = {
+        _id: id
+    };
+    var projection = {};
 
     // Create a document and a projection with fields r1, r2, r3 ...
     for (var i = 1; i <= count; ++i) {
@@ -27,11 +31,10 @@ var doTest = function(count) {
 
     // Try to read the document using a large projection
     try {
-        var findCount = testDB.collection.find({ _id: id }, projection).itcount();
+        var findCount = testDB.collection.find({_id: id}, projection).itcount();
         assert(findCount == 1,
                'Failed to find single stored document, find().itcount() == ' + findCount);
-    }
-    catch (e) {
+    } catch (e) {
         testDB.dropDatabase();
         doassert('Test FAILED!  Caught exception ' + tojsononeline(e));
     }

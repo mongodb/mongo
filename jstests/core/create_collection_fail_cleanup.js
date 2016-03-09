@@ -9,8 +9,7 @@ assert(dbTest.getCollectionNames().length == 0);
 var res = dbTest.createCollection("broken", {capped: true, size: -1});
 assert.eq(false, res.ok);
 
-dbTest.getCollectionNames().forEach(
-    function(collName) {
-        print(collName);
-        assert(collName != 'broken');
-    });
+dbTest.getCollectionNames().forEach(function(collName) {
+    print(collName);
+    assert(collName != 'broken');
+});

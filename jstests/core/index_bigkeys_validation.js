@@ -6,7 +6,7 @@
     var coll = db.longindex;
     coll.drop();
 
-    var longVal = new Array(1025).join('x'); // Keys >= 1024 bytes cannot be indexed.
+    var longVal = new Array(1025).join('x');  // Keys >= 1024 bytes cannot be indexed.
 
     assert.commandWorked(db.adminCommand({setParameter: 1, failIndexKeyTooLong: false}));
 

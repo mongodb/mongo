@@ -11,9 +11,11 @@
     assert.writeOK(coll.insert({}));
 
     // Enable a failpoint that causes plan executors to be killed immediately.
-    assert.commandWorked(coll.getDB().adminCommand({configureFailPoint: "planExecutorAlwaysDead",
-                                                    namespace: coll.getFullName(),
-                                                    mode: "alwaysOn"}));
+    assert.commandWorked(coll.getDB().adminCommand({
+        configureFailPoint: "planExecutorAlwaysDead",
+        namespace: coll.getFullName(),
+        mode: "alwaysOn"
+    }));
 
     var res;
 
@@ -48,30 +50,40 @@
     assert(res.errmsg.indexOf("hit planExecutorAlwaysDead fail point") > -1);
 
     // Build geo index.
-    assert.commandWorked(coll.getDB().adminCommand({configureFailPoint: "planExecutorAlwaysDead",
-                                                    namespace: coll.getFullName(),
-                                                    mode: "off"}));
+    assert.commandWorked(coll.getDB().adminCommand({
+        configureFailPoint: "planExecutorAlwaysDead",
+        namespace: coll.getFullName(),
+        mode: "off"
+    }));
     assert.commandWorked(coll.createIndex({geoField: "2dsphere"}));
-    assert.commandWorked(coll.getDB().adminCommand({configureFailPoint: "planExecutorAlwaysDead",
-                                                    namespace: coll.getFullName(),
-                                                    mode: "alwaysOn"}));
+    assert.commandWorked(coll.getDB().adminCommand({
+        configureFailPoint: "planExecutorAlwaysDead",
+        namespace: coll.getFullName(),
+        mode: "alwaysOn"
+    }));
 
     // geoNear command errors if plan executor is killed.
-    res = db.runCommand({geoNear: collName, 
-                         near: {type: "Point", coordinates: [0,0]}, spherical: true});
+    res = db.runCommand(
+        {geoNear: collName, near: {type: "Point", coordinates: [0, 0]}, spherical: true});
     assert.commandFailed(res);
     assert(res.errmsg.indexOf("hit planExecutorAlwaysDead fail point") > -1);
 
     // group command errors if plan executor is killed.
-    res = db.runCommand({group: {ns: coll.getFullName(), 
-                                 key: "_id", 
-                                 $reduce: function (curr, result) {}, 
-                                 initial: {}}});
+    res = db.runCommand({
+        group: {
+            ns: coll.getFullName(),
+            key: "_id",
+            $reduce: function(curr, result) {},
+            initial: {}
+        }
+    });
     assert.commandFailed(res);
     assert(res.errmsg.indexOf("hit planExecutorAlwaysDead fail point") > -1);
 
     // find throws if plan executor is killed.
-    res = assert.throws(function() { coll.find().itcount(); });
+    res = assert.throws(function() {
+        coll.find().itcount();
+    });
     assert(res.message.indexOf("hit planExecutorAlwaysDead fail point") > -1);
 
     // update errors if plan executor is killed.

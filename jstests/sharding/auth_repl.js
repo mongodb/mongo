@@ -1,5 +1,5 @@
-var replTest = new ReplSetTest({ nodes: 3, useHostName : false, keyFile: 'jstests/libs/key1' });
-replTest.startSet({ oplogSize: 10 });
+var replTest = new ReplSetTest({nodes: 3, useHostName: false, keyFile: 'jstests/libs/key1'});
+replTest.startSet({oplogSize: 10});
 replTest.initiate();
 replTest.awaitSecondaryNodes();
 
@@ -33,7 +33,7 @@ priTestDB.createUser({user: 'a', pwd: 'a', roles: jsTest.basicUserRoles},
 assert.eq(1, testDB.auth('a', 'a'));
 
 jsTest.log('Sending an authorized query that should be ok');
-assert.writeOK(testColl.insert({ x: 1 }, { writeConcern: { w: nodeCount }}));
+assert.writeOK(testColl.insert({x: 1}, {writeConcern: {w: nodeCount}}));
 
 conn.setSlaveOk(true);
 doc = testColl.findOne();
@@ -114,10 +114,10 @@ for (var x = 0; x < nodeCount; x++) {
     }
 }
 
-assert(secNodeIdx >= 0); // test sanity check
+assert(secNodeIdx >= 0);  // test sanity check
 
 // Kill the cached secondary
-replTest.stop(secNodeIdx, 15, { auth: { user: 'user', pwd: 'user' }});
+replTest.stop(secNodeIdx, 15, {auth: {user: 'user', pwd: 'user'}});
 
 assert(testDB.logout().ok);
 
@@ -129,4 +129,3 @@ queryToSecShouldFail();
 queryToPriShouldFail();
 
 replTest.stopSet();
-

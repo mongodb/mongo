@@ -19,15 +19,11 @@
 
     // The config servers must support readConcern: majority to be run as a replica set, so
     // explicitly set storage engine to wiredTiger.
-    c1 = MongoRunner.runMongod({
-        configsvr: "",
-        port: 27019,
-        replSet: "csrs",
-        storageEngine: "wiredTiger"
-    });
+    c1 = MongoRunner.runMongod(
+        {configsvr: "", port: 27019, replSet: "csrs", storageEngine: "wiredTiger"});
     assert.commandWorked(c1.adminCommand("replSetInitiate"));
     c2 = MongoRunner.runMongod({configsvr: "", storageEngine: "wiredTiger"});
     c3 = MongoRunner.runMongod({configsvr: "", storageEngine: "wiredTiger"});
 
-    assert(MongoRunner.runMongos({configdb: "csrs/" + getHostPart(c1.host) }));
+    assert(MongoRunner.runMongos({configdb: "csrs/" + getHostPart(c1.host)}));
 }());

@@ -8,17 +8,18 @@
     var dbPath = MongoRunner.dataPath + baseName + "/";
 
     // Start a MongoD just to get a lockfile in place.
-    var mongo1 = MongoRunner.runMongod({dbpath:  dbPath, waitForConnect: true});
+    var mongo1 = MongoRunner.runMongod({dbpath: dbPath, waitForConnect: true});
 
     try {
         clearRawMongoProgramOutput();
-        // Start another one which should fail to start as there is already a lockfile in its dbpath.
+        // Start another one which should fail to start as there is already a lockfile in its
+        // dbpath.
         var mongo2 = null;
         try {
             // Can't use assert.throws as behavior is different on Windows/Linux.
-            mongo2 = MongoRunner.runMongod({dbpath:  dbPath,
-                                            noCleanData: true});
-        } catch (ex) {}
+            mongo2 = MongoRunner.runMongod({dbpath: dbPath, noCleanData: true});
+        } catch (ex) {
+        }
         // We should have failed to start.
         assert(mongo2 === null);
         assert.soon(() => {

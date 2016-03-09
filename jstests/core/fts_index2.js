@@ -11,6 +11,6 @@ assert.commandWorked(coll1.ensureIndex({"$**": "text"}));
 assert.eq(1, coll1.count({$text: {$search: "content"}}));
 
 // Rename within same database.
-assert.commandWorked(coll1.getDB().adminCommand({renameCollection: coll1.getFullName(),
-                                                 to: coll2.getFullName() }));
+assert.commandWorked(
+    coll1.getDB().adminCommand({renameCollection: coll1.getFullName(), to: coll2.getFullName()}));
 assert.eq(1, coll2.count({$text: {$search: "content"}}));

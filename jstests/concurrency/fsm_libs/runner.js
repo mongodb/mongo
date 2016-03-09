@@ -2,24 +2,22 @@
 
 load('jstests/concurrency/fsm_libs/assert.js');
 load('jstests/concurrency/fsm_libs/cluster.js');
-load('jstests/concurrency/fsm_libs/errors.js'); // for IterationEnd
+load('jstests/concurrency/fsm_libs/errors.js');  // for IterationEnd
 load('jstests/concurrency/fsm_libs/parse_config.js');
 load('jstests/concurrency/fsm_libs/thread_mgr.js');
-load('jstests/concurrency/fsm_utils/name_utils.js'); // for uniqueCollName and uniqueDBName
+load('jstests/concurrency/fsm_utils/name_utils.js');  // for uniqueCollName and uniqueDBName
 load('jstests/concurrency/fsm_utils/setup_teardown_functions.js');
 
 var runner = (function() {
 
     function validateExecutionMode(mode) {
-        var allowedKeys = [
-            'composed',
-            'parallel'
-        ];
+        var allowedKeys = ['composed', 'parallel'];
 
         Object.keys(mode).forEach(function(option) {
-            assert.contains(option, allowedKeys,
-                            'invalid option: ' + tojson(option) +
-                            '; valid options are: ' + tojson(allowedKeys));
+            assert.contains(option,
+                            allowedKeys,
+                            'invalid option: ' + tojson(option) + '; valid options are: ' +
+                                tojson(allowedKeys));
         });
 
         mode.composed = mode.composed || false;
@@ -35,12 +33,8 @@ var runner = (function() {
     }
 
     function validateExecutionOptions(mode, options) {
-        var allowedKeys = [
-            'backgroundWorkloads',
-            'dbNamePrefix',
-            'iterationMultiplier',
-            'threadMultiplier'
-        ];
+        var allowedKeys =
+            ['backgroundWorkloads', 'dbNamePrefix', 'iterationMultiplier', 'threadMultiplier'];
 
         if (mode.parallel || mode.composed) {
             allowedKeys.push('numSubsets');
@@ -52,14 +46,14 @@ var runner = (function() {
         }
 
         Object.keys(options).forEach(function(option) {
-            assert.contains(option, allowedKeys,
-                            'invalid option: ' + tojson(option) +
-                            '; valid options are: ' + tojson(allowedKeys));
+            assert.contains(option,
+                            allowedKeys,
+                            'invalid option: ' + tojson(option) + '; valid options are: ' +
+                                tojson(allowedKeys));
         });
 
         if (typeof options.subsetSize !== 'undefined') {
-            assert(Number.isInteger(options.subsetSize),
-                   'expected subset size to be an integer');
+            assert(Number.isInteger(options.subsetSize), 'expected subset size to be an integer');
             assert.gt(options.subsetSize, 1);
         }
 
@@ -86,35 +80,35 @@ var runner = (function() {
                'expected backgroundWorkloads to be an array');
 
         if (typeof options.dbNamePrefix !== 'undefined') {
-            assert.eq('string', typeof options.dbNamePrefix,
-                      'expected dbNamePrefix to be a string');
+            assert.eq(
+                'string', typeof options.dbNamePrefix, 'expected dbNamePrefix to be a string');
         }
 
         options.iterationMultiplier = options.iterationMultiplier || 1;
         assert(Number.isInteger(options.iterationMultiplier),
                'expected iterationMultiplier to be an integer');
-        assert.gte(options.iterationMultiplier, 1,
+        assert.gte(options.iterationMultiplier,
+                   1,
                    'expected iterationMultiplier to be greater than or equal to 1');
 
         options.threadMultiplier = options.threadMultiplier || 1;
         assert(Number.isInteger(options.threadMultiplier),
                'expected threadMultiplier to be an integer');
-        assert.gte(options.threadMultiplier, 1,
+        assert.gte(options.threadMultiplier,
+                   1,
                    'expected threadMultiplier to be greater than or equal to 1');
 
         return options;
     }
 
     function validateCleanupOptions(options) {
-        var allowedKeys = [
-            'dropDatabaseBlacklist',
-            'keepExistingDatabases'
-        ];
+        var allowedKeys = ['dropDatabaseBlacklist', 'keepExistingDatabases'];
 
         Object.keys(options).forEach(function(option) {
-            assert.contains(option, allowedKeys,
-                            'invalid option: ' + tojson(option) +
-                            '; valid options are: ' + tojson(allowedKeys));
+            assert.contains(option,
+                            allowedKeys,
+                            'invalid option: ' + tojson(option) + '; valid options are: ' +
+                                tojson(allowedKeys));
         });
 
         if (typeof options.dropDatabaseBlacklist !== 'undefined') {
@@ -123,7 +117,8 @@ var runner = (function() {
         }
 
         if (typeof options.keepExistingDatabases !== 'undefined') {
-            assert.eq('boolean', typeof options.keepExistingDatabases,
+            assert.eq('boolean',
+                      typeof options.keepExistingDatabases,
                       'expected keepExistingDatabases to be a boolean');
         }
 
@@ -139,9 +134,9 @@ var runner = (function() {
      * executed simultaneously, followed by workloads #2 and #3 together.
      */
     function scheduleWorkloads(workloads, executionMode, executionOptions) {
-        if (!executionMode.composed && !executionMode.parallel) { // serial execution
+        if (!executionMode.composed && !executionMode.parallel) {  // serial execution
             return Array.shuffle(workloads).map(function(workload) {
-                return [workload]; // run each workload by itself
+                return [workload];  // run each workload by itself
             });
         }
 
@@ -159,7 +154,7 @@ var runner = (function() {
             numSubsets = Math.ceil(2.5 * workloads.length / subsetSize);
         }
 
-        workloads = workloads.slice(0); // copy
+        workloads = workloads.slice(0);  // copy
         workloads = Array.shuffle(workloads);
 
         var start = 0;
@@ -196,9 +191,8 @@ var runner = (function() {
 
         workloads.forEach(function(workload) {
             // Workloads cannot have a shardKey if sameCollection is specified
-            if (clusterOptions.sameCollection &&
-                    cluster.isSharded() &&
-                    context[workload].config.data.shardKey) {
+            if (clusterOptions.sameCollection && cluster.isSharded() &&
+                context[workload].config.data.shardKey) {
                 throw new Error('cannot specify a shardKey with sameCollection option');
             }
             if (firstWorkload || !clusterOptions.sameCollection) {
@@ -211,7 +205,9 @@ var runner = (function() {
                 myDB[collName].drop();
 
                 if (cluster.isSharded()) {
-                    var shardKey = context[workload].config.data.shardKey || { _id: 'hashed' };
+                    var shardKey = context[workload].config.data.shardKey || {
+                        _id: 'hashed'
+                    };
                     // TODO: allow workload config data to specify split
                     cluster.shardCollection(myDB[collName], shardKey, false);
                 }
@@ -288,9 +284,11 @@ var runner = (function() {
             });
 
             return uniqueStackTraces.map(function(value, i) {
-                return { value: value,
-                         freq: associatedTids[i].size,
-                         tids: Array.from(associatedTids[i]) };
+                return {
+                    value: value,
+                    freq: associatedTids[i].size,
+                    tids: Array.from(associatedTids[i])
+                };
             });
         }
 
@@ -314,25 +312,25 @@ var runner = (function() {
             // Special case message when threads all have the same trace
             if (numUniqueTraces === 1) {
                 return pluralize('thread', stackTraces.length) + ' threw\n\n' +
-                       indent(uniqueTraces[0].value, 8);
+                    indent(uniqueTraces[0].value, 8);
             }
 
             var summary = pluralize('exception', stackTraces.length) + ' were thrown, ' +
-                          numUniqueTraces + ' of which were unique:\n\n';
+                numUniqueTraces + ' of which were unique:\n\n';
 
-            return summary + uniqueTraces.map(function(obj) {
-                var line = pluralize('thread', obj.freq) +
-                                     ' with tids ' + JSON.stringify(obj.tids) +
-                                     ' threw\n';
-                return indent(line + obj.value, 8);
-            }).join('\n\n');
+            return summary +
+                uniqueTraces.map(function(obj) {
+                    var line = pluralize('thread', obj.freq) + ' with tids ' +
+                        JSON.stringify(obj.tids) + ' threw\n';
+                    return indent(line + obj.value, 8);
+                }).join('\n\n');
         }
 
         if (workerErrs.length > 0) {
             var err = new Error(prepareMsg(workerErrs) + '\n');
 
             // Avoid having any stack traces omitted from the logs
-            var maxLogLine = 10 * 1024; // 10KB
+            var maxLogLine = 10 * 1024;  // 10KB
 
             // Check if the combined length of the error message and the stack traces
             // exceeds the maximum line-length the shell will log.
@@ -366,20 +364,16 @@ var runner = (function() {
         // This property must be enumerable because of SERVER-21338, which prevents
         // objects with non-enumerable properties from being serialized properly in
         // ScopedThreads.
-        Object.defineProperty(config.data, 'iterations', {
-            enumerable: true,
-            value: config.iterations
-        });
+        Object.defineProperty(
+            config.data, 'iterations', {enumerable: true, value: config.iterations});
     }
 
     function setThreadCount(config) {
         // This property must be enumerable because of SERVER-21338, which prevents
         // objects with non-enumerable properties from being serialized properly in
         // ScopedThreads.
-        Object.defineProperty(config.data, 'threadCount', {
-            enumerable: true,
-            value: config.threadCount
-        });
+        Object.defineProperty(
+            config.data, 'threadCount', {enumerable: true, value: config.threadCount});
     }
 
     function useDropDistLockFailPoint(cluster, clusterOptions) {
@@ -396,9 +390,11 @@ var runner = (function() {
 
     function loadWorkloadContext(workloads, context, executionOptions, applyMultipliers) {
         workloads.forEach(function(workload) {
-            load(workload); // for $config
+            load(workload);  // for $config
             assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
-            context[workload] = { config: parseConfig($config) };
+            context[workload] = {
+                config: parseConfig($config)
+            };
             if (applyMultipliers) {
                 context[workload].config.iterations *= executionOptions.iterationMultiplier;
                 context[workload].config.threadCount *= executionOptions.threadMultiplier;
@@ -422,8 +418,8 @@ var runner = (function() {
         jsTest.log('End of schedule');
     }
 
-    function cleanupWorkload(workload, context, cluster, errors, header, dbHashBlacklist,
-                             ttlIndexExists) {
+    function cleanupWorkload(
+        workload, context, cluster, errors, header, dbHashBlacklist, ttlIndexExists) {
         // Returns true if the workload's teardown succeeds and false if the workload's
         // teardown fails.
 
@@ -433,8 +429,8 @@ var runner = (function() {
             var phase = 'before workload ' + workload + ' teardown';
             cluster.checkReplicationConsistency(dbHashBlacklist, phase, ttlIndexExists);
         } catch (e) {
-            errors.push(new WorkloadFailure(e.toString(), e.stack, 'main',
-                                            header + ' checking consistency on secondaries'));
+            errors.push(new WorkloadFailure(
+                e.toString(), e.stack, 'main', header + ' checking consistency on secondaries'));
             return false;
         }
 
@@ -472,12 +468,20 @@ var runner = (function() {
         }
     }
 
-    function runWorkloadGroup(threadMgr, workloads, context, cluster, clusterOptions, executionMode,
-                              executionOptions, errors, maxAllowedThreads, dbHashBlacklist,
+    function runWorkloadGroup(threadMgr,
+                              workloads,
+                              context,
+                              cluster,
+                              clusterOptions,
+                              executionMode,
+                              executionOptions,
+                              errors,
+                              maxAllowedThreads,
+                              dbHashBlacklist,
                               configServerData) {
         var cleanup = [];
         var teardownFailed = false;
-        var startTime = Date.now(); // Initialize in case setupWorkload fails below.
+        var startTime = Date.now();  // Initialize in case setupWorkload fails below.
         var totalTime;
         var ttlIndexExists;
 
@@ -512,9 +516,9 @@ var runner = (function() {
             } finally {
                 // Threads must be joined before destruction, so do this
                 // even in the presence of exceptions.
-                errors.push(...threadMgr.joinAll().map(e =>
-                    new WorkloadFailure(e.err, e.stack, e.tid,
-                                        'Foreground ' + e.workloads.join(' '))));
+                errors.push(... threadMgr.joinAll().map(
+                    e => new WorkloadFailure(
+                        e.err, e.stack, e.tid, 'Foreground ' + e.workloads.join(' '))));
             }
         } finally {
             // Checking that the data is consistent across the primary and secondaries requires
@@ -522,19 +526,22 @@ var runner = (function() {
             // primary due to the TTL monitor. If none of the workloads actually created any TTL
             // indexes (and we dropped the data of any previous workloads), then don't expend any
             // additional effort in trying to handle that case.
-            ttlIndexExists = workloads.some(workload =>
-                context[workload].config.data.ttlIndexExists);
+            ttlIndexExists =
+                workloads.some(workload => context[workload].config.data.ttlIndexExists);
 
             // Call each foreground workload's teardown function. After all teardowns have completed
             // check if any of them failed.
-            var cleanupResults = cleanup.map(workload =>
-                cleanupWorkload(workload, context, cluster, errors,
-                                'Foreground', dbHashBlacklist, ttlIndexExists));
+            var cleanupResults = cleanup.map(workload => cleanupWorkload(workload,
+                                                                         context,
+                                                                         cluster,
+                                                                         errors,
+                                                                         'Foreground',
+                                                                         dbHashBlacklist,
+                                                                         ttlIndexExists));
             teardownFailed = cleanupResults.some(success => (success === false));
 
             totalTime = Date.now() - startTime;
-            jsTest.log('Workload(s) completed in ' + totalTime + ' ms: ' +
-                        workloads.join(' '));
+            jsTest.log('Workload(s) completed in ' + totalTime + ' ms: ' + workloads.join(' '));
 
             recordConfigServerData(cluster, workloads, configServerData, errors);
         }
@@ -552,25 +559,21 @@ var runner = (function() {
         ttlIndexExists = false;
 
         // Ensure that all operations replicated correctly to the secondaries.
-        cluster.checkReplicationConsistency(dbHashBlacklist,
-                                            'after workload-group teardown and data clean-up',
-                                            ttlIndexExists);
+        cluster.checkReplicationConsistency(
+            dbHashBlacklist, 'after workload-group teardown and data clean-up', ttlIndexExists);
     }
 
-    function runWorkloads(workloads,
-                          clusterOptions,
-                          executionMode,
-                          executionOptions,
-                          cleanupOptions) {
+    function runWorkloads(
+        workloads, clusterOptions, executionMode, executionOptions, cleanupOptions) {
         assert.gt(workloads.length, 0, 'need at least one workload to run');
 
         executionMode = validateExecutionMode(executionMode);
-        Object.freeze(executionMode); // immutable after validation (and normalization)
+        Object.freeze(executionMode);  // immutable after validation (and normalization)
 
         validateExecutionOptions(executionMode, executionOptions);
-        Object.freeze(executionOptions); // immutable after validation (and normalization)
+        Object.freeze(executionOptions);  // immutable after validation (and normalization)
 
-        Object.freeze(cleanupOptions); // immutable prior to validation
+        Object.freeze(cleanupOptions);  // immutable prior to validation
         validateCleanupOptions(cleanupOptions);
 
         if (executionMode.composed) {
@@ -599,8 +602,7 @@ var runner = (function() {
 
         var bgContext = {};
         var bgWorkloads = executionOptions.backgroundWorkloads;
-        loadWorkloadContext(bgWorkloads, bgContext, executionOptions,
-                            false /* applyMultipliers */);
+        loadWorkloadContext(bgWorkloads, bgContext, executionOptions, false /* applyMultipliers */);
         var bgThreadMgr = new ThreadManager(clusterOptions);
 
         var cluster = new Cluster(clusterOptions);
@@ -619,8 +621,8 @@ var runner = (function() {
         var dbHashBlacklist = ['local'];
 
         if (cleanupOptions.dropDatabaseBlacklist) {
-            dbBlacklist.push(...cleanupOptions.dropDatabaseBlacklist);
-            dbHashBlacklist.push(...cleanupOptions.dropDatabaseBlacklist);
+            dbBlacklist.push(... cleanupOptions.dropDatabaseBlacklist);
+            dbHashBlacklist.push(... cleanupOptions.dropDatabaseBlacklist);
         }
         if (!cleanupOptions.keepExistingDatabases) {
             dropAllDatabases(cluster.getDB('test'), dbBlacklist);
@@ -661,7 +663,7 @@ var runner = (function() {
 
                 schedule.forEach(function(workloads) {
                     // Check if any background workloads have failed.
-                    if (bgThreadMgr.checkForErrors()){
+                    if (bgThreadMgr.checkForErrors()) {
                         var msg = 'Background workload failed before all foreground workloads ran';
                         throw new IterationEnd(msg);
                     }
@@ -677,16 +679,24 @@ var runner = (function() {
                     });
 
                     // Run the next group of workloads in the schedule.
-                    runWorkloadGroup(threadMgr, workloads, groupContext, cluster, clusterOptions,
-                                     executionMode, executionOptions, errors, maxAllowedThreads,
-                                     dbHashBlacklist, configServerData);
+                    runWorkloadGroup(threadMgr,
+                                     workloads,
+                                     groupContext,
+                                     cluster,
+                                     clusterOptions,
+                                     executionMode,
+                                     executionOptions,
+                                     errors,
+                                     maxAllowedThreads,
+                                     dbHashBlacklist,
+                                     configServerData);
                 });
             } finally {
                 // Set a flag so background threads know to terminate.
                 bgThreadMgr.markAllForTermination();
-                errors.push(...bgThreadMgr.joinAll().map(e =>
-                    new WorkloadFailure(e.err, e.stack, e.tid,
-                                        'Background ' + e.workloads.join(' '))));
+                errors.push(... bgThreadMgr.joinAll().map(
+                    e => new WorkloadFailure(
+                        e.err, e.stack, e.tid, 'Background ' + e.workloads.join(' '))));
             }
         } finally {
             try {
@@ -695,13 +705,17 @@ var runner = (function() {
                 // primary due to the TTL monitor. If none of the workloads actually created any TTL
                 // indexes (and we dropped the data of any previous workloads), then don't expend
                 // any additional effort in trying to handle that case.
-                var ttlIndexExists = bgWorkloads.some(bgWorkload =>
-                    bgContext[bgWorkload].config.data.ttlIndexExists);
+                var ttlIndexExists = bgWorkloads.some(
+                    bgWorkload => bgContext[bgWorkload].config.data.ttlIndexExists);
 
                 // Call each background workload's teardown function.
-                bgCleanup.forEach(bgWorkload => cleanupWorkload(bgWorkload, bgContext, cluster,
-                                                                errors, 'Background',
-                                                                dbHashBlacklist, ttlIndexExists));
+                bgCleanup.forEach(bgWorkload => cleanupWorkload(bgWorkload,
+                                                                bgContext,
+                                                                cluster,
+                                                                errors,
+                                                                'Background',
+                                                                dbHashBlacklist,
+                                                                ttlIndexExists));
                 // TODO: Call cleanupWorkloadData() on background workloads here if no background
                 // workload teardown functions fail.
 
@@ -736,11 +750,8 @@ var runner = (function() {
             executionOptions = executionOptions || {};
             cleanupOptions = cleanupOptions || {};
 
-            runWorkloads(workloads,
-                         clusterOptions,
-                         { parallel: true },
-                         executionOptions,
-                         cleanupOptions);
+            runWorkloads(
+                workloads, clusterOptions, {parallel: true}, executionOptions, cleanupOptions);
         },
 
         composed: function composed(workloads, clusterOptions, executionOptions, cleanupOptions) {
@@ -748,11 +759,8 @@ var runner = (function() {
             executionOptions = executionOptions || {};
             cleanupOptions = cleanupOptions || {};
 
-            runWorkloads(workloads,
-                         clusterOptions,
-                         { composed: true },
-                         executionOptions,
-                         cleanupOptions);
+            runWorkloads(
+                workloads, clusterOptions, {composed: true}, executionOptions, cleanupOptions);
         }
     };
 

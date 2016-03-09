@@ -19,129 +19,151 @@
 t = db.jstests_index13;
 t.drop();
 
-function assertConsistentResults( query ) {
-    assert.eq( t.find( query ).hint( { $natural:1 } ).sort( { _id:1 } ).toArray(),
-               t.find( query ).hint( index ).sort( { _id:1 } ).toArray() );
+function assertConsistentResults(query) {
+    assert.eq(t.find(query).hint({$natural: 1}).sort({_id: 1}).toArray(),
+              t.find(query).hint(index).sort({_id: 1}).toArray());
 }
 
-function assertResults( query ) {
-    explain = t.find( query ).hint( index ).explain();
+function assertResults(query) {
+    explain = t.find(query).hint(index).explain();
     // printjson( explain ); // debug
-    assertConsistentResults( query );
+    assertConsistentResults(query);
 }
 
 // Cases with single dotted index fied names.
-index = { 'a.b':1, 'a.c':1 };
-t.ensureIndex( index );
-t.save( { a:[ { b:1 }, { c:1 } ] } );
-t.save( { a:[ { b:1, c:1 } ] } );
-assert.eq( 2, t.count() );
+index = {
+    'a.b': 1,
+    'a.c': 1
+};
+t.ensureIndex(index);
+t.save({a: [{b: 1}, {c: 1}]});
+t.save({a: [{b: 1, c: 1}]});
+assert.eq(2, t.count());
 // Without $elemMatch.
-assertResults( { 'a.b':1, 'a.c':1 } );
+assertResults({'a.b': 1, 'a.c': 1});
 // With $elemMatch.
-assertResults( { a:{ $elemMatch:{ b:1, c:1 } } } );
+assertResults({a: {$elemMatch: {b: 1, c: 1}}});
 
 // Without shared $elemMatch.
-assertResults( { 'a.b':1, a:{ $elemMatch:{ c:1 } } } );
+assertResults({'a.b': 1, a: {$elemMatch: {c: 1}}});
 // Two different $elemMatch expressions.
-assertResults( { $and:[ { a:{ $elemMatch:{ b:1 } } },
-                        { a:{ $elemMatch:{ c:1 } } } ] } );
-
+assertResults({$and: [{a: {$elemMatch: {b: 1}}}, {a: {$elemMatch: {c: 1}}}]});
 
 // Cases relating to parse order and inclusion of intersected ranges.
-assertResults( { 'a.b':1, a:{ $elemMatch:{ b:{ $gt:0 }, c:1 } } } );
-assertResults( { a:{ $elemMatch:{ b:1, c:1 } }, 'a.b':1 } );
-assertResults( { 'a.c':1, a:{ $elemMatch:{ b:1, c:1 } } } );
-assertResults( { a:{ $elemMatch:{ b:1, c:1 } }, 'a.b':{ $gt:0 } } );
+assertResults({'a.b': 1, a: {$elemMatch: {b: {$gt: 0}, c: 1}}});
+assertResults({a: {$elemMatch: {b: 1, c: 1}}, 'a.b': 1});
+assertResults({'a.c': 1, a: {$elemMatch: {b: 1, c: 1}}});
+assertResults({a: {$elemMatch: {b: 1, c: 1}}, 'a.b': {$gt: 0}});
 
 // Cases with $elemMatch on multiple fields.
 t.remove({});
-index = { 'a.b':1, 'a.c':1, 'd.e':1, 'd.f':1 };
-t.ensureIndex( index );
-t.insert( { a:[ { b:1 }, { c:1 } ], d: { e:1, f:1 } } );
-t.insert( { a:[ { b:1, c:1 } ], d: { e:1, f:1 }  } );
-t.insert( { a:{ b:1, c:1 }, d:[ { e:1, f:1 } ] } );
-t.insert( { a:{ b:1, c:1 }, d:[ { e:1 }, { f:1 } ] } );
+index = {
+    'a.b': 1,
+    'a.c': 1,
+    'd.e': 1,
+    'd.f': 1
+};
+t.ensureIndex(index);
+t.insert({a: [{b: 1}, {c: 1}], d: {e: 1, f: 1}});
+t.insert({a: [{b: 1, c: 1}], d: {e: 1, f: 1}});
+t.insert({a: {b: 1, c: 1}, d: [{e: 1, f: 1}]});
+t.insert({a: {b: 1, c: 1}, d: [{e: 1}, {f: 1}]});
 
-assert.eq( 4, t.count() );
+assert.eq(4, t.count());
 
 // Without $elemMatch.
-assertResults( { 'a.b':1, 'a.c':1, 'd.e':1, 'd.f':1 } );
+assertResults({'a.b': 1, 'a.c': 1, 'd.e': 1, 'd.f': 1});
 // With $elemMatch.
-assertResults( { a:{ $elemMatch:{ b:1, c:1 } }, 'd': { $elemMatch:{ e:1, f:1 } } } );
-assertResults( { a:{ $elemMatch:{ b:1, c:1 } }, 'd.e': 1, 'd.f' : 1 } );
-assertResults( { 'a.b': 1, 'a.c' : 1, 'd': { $elemMatch:{ e:1, f:1 } } } );
-
+assertResults({a: {$elemMatch: {b: 1, c: 1}}, 'd': {$elemMatch: {e: 1, f: 1}}});
+assertResults({a: {$elemMatch: {b: 1, c: 1}}, 'd.e': 1, 'd.f': 1});
+assertResults({'a.b': 1, 'a.c': 1, 'd': {$elemMatch: {e: 1, f: 1}}});
 
 // Cases with nested $elemMatch.
 t.remove({});
-index = { 'a.b.c':1, 'a.b.d' :1 };
-t.ensureIndex( index );
-t.insert( { a:[ { b: [ { c : 1, d : 1 } ] } ] } ) ;
-t.insert( { a:[ { b: [ { c : 1 } , { d : 1 } ] } ] } ) ;
-assert.eq( 2, t.count() );
+index = {
+    'a.b.c': 1,
+    'a.b.d': 1
+};
+t.ensureIndex(index);
+t.insert({a: [{b: [{c: 1, d: 1}]}]});
+t.insert({a: [{b: [{c: 1}, {d: 1}]}]});
+assert.eq(2, t.count());
 // Without $elemMatch.
-assertResults( { 'a.b.c':1, 'a.b.d':1 } );
+assertResults({'a.b.c': 1, 'a.b.d': 1});
 // With $elemMatch.
-assertResults( { "a" : { $elemMatch : { "b" : { $elemMatch : { c : 1, d : 1 } } } } } );
+assertResults({"a": {$elemMatch: {"b": {$elemMatch: {c: 1, d: 1}}}}});
 
 // Cases with double dotted index field names.
 t.drop();
-index = { 'a.b.x':1, 'a.b.y':1 };
-t.ensureIndex( index );
-t.save( { a:{ b:{ x:1, y:1 } } } );
-t.save( { a:[ { b:{ x:1 } }, { b:{ y:1 } } ] } );
-t.save( { a:[ { b:[ { x:1 }, { y:1 } ] } ] } );
-t.save( { a:[ { b:[ { x:1, y:1 } ] } ] } );
-assert.eq( 4, t.count() );
+index = {
+    'a.b.x': 1,
+    'a.b.y': 1
+};
+t.ensureIndex(index);
+t.save({a: {b: {x: 1, y: 1}}});
+t.save({a: [{b: {x: 1}}, {b: {y: 1}}]});
+t.save({a: [{b: [{x: 1}, {y: 1}]}]});
+t.save({a: [{b: [{x: 1, y: 1}]}]});
+assert.eq(4, t.count());
 
 // No $elemMatch.
-assertResults( { 'a.b.x':1, 'a.b.y':1 } );
+assertResults({'a.b.x': 1, 'a.b.y': 1});
 // $elemMatch with dotted children.
-assertResults( { a:{ $elemMatch:{ 'b.x':1, 'b.y':1 } } } );
+assertResults({a: {$elemMatch: {'b.x': 1, 'b.y': 1}}});
 // $elemMatch with undotted children.
-assertResults( { 'a.b':{ $elemMatch:{ x:1, y:1 } } } );
+assertResults({'a.b': {$elemMatch: {x: 1, y: 1}}});
 
 // Cases where a field is indexed along with its children.
 t.dropIndexes();
-index = { 'a':1, 'a.b.x':1, 'a.b.y':1 };
-t.ensureIndex( index );
+index = {
+    'a': 1,
+    'a.b.x': 1,
+    'a.b.y': 1
+};
+t.ensureIndex(index);
 
 // With $ne.
-assertResults( { a:{ $ne:4 }, 'a.b':{ $elemMatch:{ x:1, y:1 } } } );
+assertResults({a: {$ne: 4}, 'a.b': {$elemMatch: {x: 1, y: 1}}});
 
 // No constraint on a prior parent field.
-assertResults( { 'a.b':{ $elemMatch:{ x:1, y:1 } } } );
+assertResults({'a.b': {$elemMatch: {x: 1, y: 1}}});
 
 // Cases with double dotted index field names branching to different fields at each dot.
 t.drop();
-index = { 'a.b.c':1, 'a.e.f':1, 'a.b.d':1, 'a.e.g':1 };
-t.ensureIndex( index );
-t.save( { a:{ b:{ c:1, d:1 }, e:{ f:1, g:1 } } } );
-t.save( { a:[ { b:{ c:1 }, e:{ f:1 } }, { b:{ d:1 }, e:{ g:1 } } ] } );
-t.save( { a:[ { b:{ c:1 } }, { e:{ f:1 } }, { b:{ d:1 } }, { e:{ g:1 } } ] } );
-t.save( { a:[ { b:[ { c:1 }, { d:1 } ] }, { e:[ { f:1 }, { g:1 } ] } ] } );
-t.save( { a:[ { b:[ { c:[ 1 ] }, { d:[ 1 ] } ] }, { e:[ { f:[ 1 ] }, { g:[ 1 ] } ] } ] } );
-t.save( { a:[ { b:[ { c:1, d:1 } ] }, { e:[ { f:1 }, { g:1 } ] } ] } );
-t.save( { a:[ { b:[ { c:1, d:1 } ] }, { e:[ { f:1, g:1 } ] } ] } );
-assert.eq( 7, t.count() );
+index = {
+    'a.b.c': 1,
+    'a.e.f': 1,
+    'a.b.d': 1,
+    'a.e.g': 1
+};
+t.ensureIndex(index);
+t.save({a: {b: {c: 1, d: 1}, e: {f: 1, g: 1}}});
+t.save({a: [{b: {c: 1}, e: {f: 1}}, {b: {d: 1}, e: {g: 1}}]});
+t.save({a: [{b: {c: 1}}, {e: {f: 1}}, {b: {d: 1}}, {e: {g: 1}}]});
+t.save({a: [{b: [{c: 1}, {d: 1}]}, {e: [{f: 1}, {g: 1}]}]});
+t.save({a: [{b: [{c: [1]}, {d: [1]}]}, {e: [{f: [1]}, {g: [1]}]}]});
+t.save({a: [{b: [{c: 1, d: 1}]}, {e: [{f: 1}, {g: 1}]}]});
+t.save({a: [{b: [{c: 1, d: 1}]}, {e: [{f: 1, g: 1}]}]});
+assert.eq(7, t.count());
 
 // Constraint on a prior cousin field.
-assertResults( { 'a.b':{ $elemMatch:{ c:1, d:1 } },
-                 'a.e':{ $elemMatch:{ f:1, g:1 } } } );
+assertResults({'a.b': {$elemMatch: {c: 1, d: 1}}, 'a.e': {$elemMatch: {f: 1, g: 1}}});
 
 // Different constraint on a prior cousin field.
-assertResults( { 'a.b':{ $elemMatch:{ d:1 } },
-                 'a.e':{ $elemMatch:{ f:1, g:1 } } } );
-
+assertResults({'a.b': {$elemMatch: {d: 1}}, 'a.e': {$elemMatch: {f: 1, g: 1}}});
 
 // Cases with double dotted index field names branching to different fields at each dot, and the
 // same field name strings after the second dot.
 t.drop();
-index = { 'a.b.c':1, 'a.e.c':1, 'a.b.d':1, 'a.e.d':1 };
-t.ensureIndex( index );
-t.save( { a:[ { b:[ { c:1, d:1 } ] }, { e:[ { c:1, d:1 } ] } ] } );
-assert.eq( 1, t.count() );
+index = {
+    'a.b.c': 1,
+    'a.e.c': 1,
+    'a.b.d': 1,
+    'a.e.d': 1
+};
+t.ensureIndex(index);
+t.save({a: [{b: [{c: 1, d: 1}]}, {e: [{c: 1, d: 1}]}]});
+assert.eq(1, t.count());
 
 // Constraint on a prior cousin field with the same field names.
-assertResults( { 'a.b':{ $elemMatch:{ c:1, d:1 } }, 'a.e':{ $elemMatch:{ c:1, d:1 } } } );
+assertResults({'a.b': {$elemMatch: {c: 1, d: 1}}, 'a.e': {$elemMatch: {c: 1, d: 1}}});

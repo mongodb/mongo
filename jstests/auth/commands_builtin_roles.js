@@ -52,30 +52,23 @@ function testProperAuthorization(conn, t, testcase, r) {
 
     if (testcase.roles[r.role]) {
         if (res.ok == 0 && res.code == authErrCode) {
-            out = "expected authorization success" +
-                  " but received " + tojson(res) + 
-                  " on db " + testcase.runOnDb +
-                  " with role " + r.key;
-        }
-        else if (res.ok == 0 && !testcase.expectFail && res.code != commandNotSupportedCode) {
+            out = "expected authorization success" + " but received " + tojson(res) + " on db " +
+                testcase.runOnDb + " with role " + r.key;
+        } else if (res.ok == 0 && !testcase.expectFail && res.code != commandNotSupportedCode) {
             // don't error if the test failed with code commandNotSupported since
             // some storage engines (e.g wiredTiger) don't support some commands (e.g. touch)
-            out = "command failed with " + tojson(res) +
-                  " on db " + testcase.runOnDb +
-                  " with role " + r.key;
+            out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb +
+                " with role " + r.key;
         }
         // test can provide a function that will run if
         // the command completed successfully
         else if (testcase.onSuccess) {
             testcase.onSuccess(res);
         }
-    }
-    else {
+    } else {
         if (res.ok == 1 || (res.ok == 0 && res.code != authErrCode)) {
-            out = "expected authorization failure" +
-                  " but received result " + tojson(res) +
-                  " on db " + testcase.runOnDb +
-                  " with role " + r.key;
+            out = "expected authorization failure" + " but received result " + tojson(res) +
+                " on db " + testcase.runOnDb + " with role " + r.key;
         }
     }
 
@@ -105,11 +98,7 @@ function runOneTest(conn, t) {
 
 function createUsers(conn) {
     var adminDb = conn.getDB(adminDbName);
-    adminDb.createUser({
-        user: "admin",
-        pwd: "password",
-        roles: ["__system"]
-    });
+    adminDb.createUser({user: "admin", pwd: "password", roles: ["__system"]});
 
     assert(adminDb.auth("admin", "password"));
     for (var i = 0; i < roles.length; i++) {
@@ -138,15 +127,16 @@ function checkForNonExistentRoles() {
                         break;
                     }
                 }
-                assert(roleExists, "Role " + role + " found in test: " + test.testname +
-                       ", but doesn't exist in roles array");
+                assert(roleExists,
+                       "Role " + role + " found in test: " + test.testname +
+                           ", but doesn't exist in roles array");
             }
         }
     }
-}    
+}
 
 var opts = {
-    auth:"",
+    auth: "",
     enableExperimentalStorageDetailsCmd: ""
 };
 var impls = {
@@ -162,12 +152,7 @@ authCommandsLib.runTests(conn, impls);
 MongoRunner.stopMongod(conn);
 
 // run all tests sharded
-conn = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    keyFile: "jstests/libs/key1",
-    other: { shardOptions: opts }
-});
+conn = new ShardingTest(
+    {shards: 2, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: opts}});
 authCommandsLib.runTests(conn, impls);
 conn.stop();
-

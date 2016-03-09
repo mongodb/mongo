@@ -1,7 +1,7 @@
 load('jstests/readonly/lib/read_only_test.js');
 
 runReadOnlyTest(function() {
-    'use strict' ;
+    'use strict';
     return {
         name: 'count',
 
@@ -28,9 +28,9 @@ runReadOnlyTest(function() {
             assert.writeOK(bulk.execute());
         },
         exec: function(readableCollection) {
-            assert.eq(readableCollection.find({x: {$lt : 10}}).count(), this.countLt10);
-            assert.eq(readableCollection.find({x: {$eq : 35}}).count(), this.countEq35);
-            assert.eq(readableCollection.find({x: {$gte : 10}}).count(), this.countGte10);
+            assert.eq(readableCollection.find({x: {$lt: 10}}).count(), this.countLt10);
+            assert.eq(readableCollection.find({x: {$eq: 35}}).count(), this.countEq35);
+            assert.eq(readableCollection.find({x: {$gte: 10}}).count(), this.countGte10);
             assert.eq(readableCollection.count(), this.count);
         }
     };

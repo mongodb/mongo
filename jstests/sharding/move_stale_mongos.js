@@ -16,9 +16,8 @@ var curShardIndex = 0;
 for (var i = 0; i < 100; i += 10) {
     assert.commandWorked(st.s0.getDB('admin').runCommand({split: testNs, middle: {_id: i}}));
     var nextShardIndex = (curShardIndex + 1) % shards.length;
-    assert.commandWorked(st.s1.getDB('admin').runCommand({moveChunk: testNs,
-                                                          find: {_id: i + 5},
-                                                          to: shards[nextShardIndex]}));
+    assert.commandWorked(st.s1.getDB('admin').runCommand(
+        {moveChunk: testNs, find: {_id: i + 5}, to: shards[nextShardIndex]}));
     curShardIndex = nextShardIndex;
 }
 

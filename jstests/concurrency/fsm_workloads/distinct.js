@@ -7,14 +7,14 @@
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = (function() {
 
     var data = {
         numDocs: 1000,
         prefix: 'distinct_fsm',
-        shardKey: { i: 1 }
+        shardKey: {i: 1}
     };
 
     var states = (function() {
@@ -23,12 +23,12 @@ var $config = (function() {
             this.threadCollName = this.prefix + '_' + this.tid;
             var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
             for (var i = 0; i < this.numDocs; ++i) {
-                bulk.insert({ i: i });
+                bulk.insert({i: i});
             }
             var res = bulk.execute();
             assertAlways.writeOK(res);
             assertAlways.eq(this.numDocs, res.nInserted);
-            assertAlways.commandWorked(db[this.threadCollName].ensureIndex({ i: 1 }));
+            assertAlways.commandWorked(db[this.threadCollName].ensureIndex({i: 1}));
         }
 
         function distinct(db, collName) {
@@ -43,8 +43,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { distinct: 1 },
-        distinct: { distinct: 1 }
+        init: {distinct: 1},
+        distinct: {distinct: 1}
     };
 
     function teardown(db, collName, cluster) {

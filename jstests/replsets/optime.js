@@ -17,9 +17,9 @@ function timestampCompare(o1, o2) {
 }
 
 function optimesAreEqual(replTest) {
-    var prevStatus = replTest.nodes[0].getDB('admin').serverStatus({oplog:true}).oplog;
+    var prevStatus = replTest.nodes[0].getDB('admin').serverStatus({oplog: true}).oplog;
     for (var i = 1; i < replTest.nodes.length; i++) {
-        var status = replTest.nodes[i].getDB('admin').serverStatus({oplog:true}).oplog;
+        var status = replTest.nodes[i].getDB('admin').serverStatus({oplog: true}).oplog;
         if (timestampCompare(prevStatus.latestOptime, status.latestOptime) != 0) {
             return false;
         }
@@ -28,7 +28,7 @@ function optimesAreEqual(replTest) {
     return true;
 }
 
-var replTest = new ReplSetTest( { name : "replStatus" , nodes: 3, oplogSize: 1 } );
+var replTest = new ReplSetTest({name: "replStatus", nodes: 3, oplogSize: 1});
 
 replTest.startSet();
 replTest.initiate();
@@ -38,27 +38,31 @@ replTest.awaitSecondaryNodes();
 
 // Check initial optimes
 assert(optimesAreEqual(replTest));
-var initialInfo = master.getDB('admin').serverStatus({oplog:true}).oplog;
+var initialInfo = master.getDB('admin').serverStatus({oplog: true}).oplog;
 
 // Do an insert to increment optime, but without rolling the oplog
 // latestOptime should be updated, but earliestOptime should be unchanged
-var options = { writeConcern: { w: replTest.nodes.length }};
-assert.writeOK(master.getDB('test').foo.insert({ a: 1 }, options));
+var options = {
+    writeConcern: {w: replTest.nodes.length}
+};
+assert.writeOK(master.getDB('test').foo.insert({a: 1}, options));
 assert(optimesAreEqual(replTest));
 
-var info = master.getDB('admin').serverStatus({oplog:true}).oplog;
+var info = master.getDB('admin').serverStatus({oplog: true}).oplog;
 assert.gt(timestampCompare(info.latestOptime, initialInfo.latestOptime), 0);
 assert.eq(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0);
 
 // Insert some large documents to force the oplog to roll over
-var largeString = new Array(1024*10).toString();
+var largeString = new Array(1024 * 10).toString();
 for (var i = 0; i < 2000; i++) {
-    master.getDB('test').foo.insert({ largeString: largeString }, options);
+    master.getDB('test').foo.insert({largeString: largeString}, options);
 }
-assert.soon(function() { return optimesAreEqual(replTest); } );
+assert.soon(function() {
+    return optimesAreEqual(replTest);
+});
 
 // Test that earliestOptime was updated
-info = master.getDB('admin').serverStatus({oplog:true}).oplog;
+info = master.getDB('admin').serverStatus({oplog: true}).oplog;
 assert.gt(timestampCompare(info.latestOptime, initialInfo.latestOptime), 0);
 assert.gt(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0);
 

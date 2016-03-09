@@ -9,7 +9,7 @@
 // TODO: Add support for overriding batch sizes in DBCommandCursor.prototype._runGetMoreCommand.
 // TODO: Add support for overriding batch sizes in the bulk API.
 
-(function () {
+(function() {
     'use strict';
 
     // Save a reference to the original find method in the IIFE's scope.

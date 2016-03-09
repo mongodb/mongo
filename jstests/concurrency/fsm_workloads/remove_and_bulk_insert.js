@@ -27,8 +27,8 @@ var $config = (function() {
     };
 
     var transitions = {
-        insert: { insert: 0.5, remove: 0.5 },
-        remove: { insert: 0.5, remove: 0.5 }
+        insert: {insert: 0.5, remove: 0.5},
+        remove: {insert: 0.5, remove: 0.5}
     };
 
     return {

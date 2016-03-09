@@ -12,7 +12,9 @@
     st.stopBalancer();
 
     var testDB = st.s.getDB('test');
-    var shardKey = {a: 1};
+    var shardKey = {
+        a: 1
+    };
 
     // Create a collection with an index on the intended shard key.
     var shardedColl = testDB.getCollection(collName);
@@ -25,33 +27,21 @@
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
     var res = testDB.adminCommand({movePrimary: testDB.getName(), to: 'shard0000'});
     assert(res.ok || res.errmsg == "it is already the primary");
-    assert.commandWorked(testDB.adminCommand({
-        shardCollection: shardedColl.getFullName(),
-        key: shardKey
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}));
 
     // Split and move the chunks so that
     //   chunk { "a" : { "$minKey" : 1 } } -->> { "a" : 10 }                is on shard0000
     //   chunk { "a" : 10 }                -->> { "a" : { "$maxKey" : 1 } } is on shard0001
-    assert.commandWorked(testDB.adminCommand({
-        split: shardedColl.getFullName(),
-        middle: {a: 10}
-    }));
-    assert.commandWorked(testDB.adminCommand({
-        moveChunk: shardedColl.getFullName(),
-        find: {a: 10},
-        to: 'shard0001'
-    }));
+    assert.commandWorked(testDB.adminCommand({split: shardedColl.getFullName(), middle: {a: 10}}));
+    assert.commandWorked(testDB.adminCommand(
+        {moveChunk: shardedColl.getFullName(), find: {a: 10}, to: 'shard0001'}));
 
     var res;
 
     // Queries that do not involve the shard key are invalid.
     res = testDB.runCommand({
-        explain: {
-            findAndModify: collName,
-            query: {b: 1},
-            remove: true
-        },
+        explain: {findAndModify: collName, query: {b: 1}, remove: true},
         verbosity: 'queryPlanner'
     });
     assert.commandFailed(res);
@@ -82,12 +72,7 @@
 
     // Test that the explain command is routed to "shard0000" when targeting the lower chunk range.
     res = testDB.runCommand({
-        explain: {
-            findAndModify: collName,
-            query: {a: 0},
-            update: {$inc: {b: 7}},
-            upsert: true
-        },
+        explain: {findAndModify: collName, query: {a: 0}, update: {$inc: {b: 7}}, upsert: true},
         verbosity: 'queryPlanner'
     });
     assert.commandWorked(res);
@@ -95,11 +80,7 @@
 
     // Test that the explain command is routed to "shard0001" when targeting the higher chunk range.
     res = testDB.runCommand({
-        explain: {
-            findAndModify: collName,
-            query: {a: 20, c: 5},
-            remove: true
-        },
+        explain: {findAndModify: collName, query: {a: 20, c: 5}, remove: true},
         verbosity: 'executionStats'
     });
     assert.commandWorked(res);

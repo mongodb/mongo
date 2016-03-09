@@ -8,21 +8,17 @@
 
 // This test requires users to persist across a restart.
 // @tags: [requires_persistence]
-(function () {
+(function() {
     'use strict';
 
     var name = 'disallow_adding_initialized_node2';
-    var replSetA = new ReplSetTest({name: name, nodes: [
-        {rsConfig: {_id: 10}},
-        {rsConfig: {_id: 11, arbiterOnly: true}},
-    ]});
-    replSetA.startSet({dbpath : "$set-A-$node"});
+    var replSetA = new ReplSetTest(
+        {name: name, nodes: [{rsConfig: {_id: 10}}, {rsConfig: {_id: 11, arbiterOnly: true}}, ]});
+    replSetA.startSet({dbpath: "$set-A-$node"});
     replSetA.initiate();
 
-    var replSetB = new ReplSetTest({name: name, nodes: [
-        {rsConfig: {_id: 20}},
-    ]});
-    replSetB.startSet({dbpath : "$set-B-$node"});
+    var replSetB = new ReplSetTest({name: name, nodes: [{rsConfig: {_id: 20}}, ]});
+    replSetB.startSet({dbpath: "$set-B-$node"});
     replSetB.initiate();
 
     var primaryA = replSetA.getPrimary();
@@ -46,7 +42,7 @@
     assert.commandWorked(primaryA.adminCommand({replSetReconfig: configA}));
 
     jsTestLog("Restarting B's primary " + primaryB.host);
-    primaryB = replSetB.start(0, {dbpath : "$set-B-$node", restart: true});
+    primaryB = replSetB.start(0, {dbpath: "$set-B-$node", restart: true});
 
     var newPrimaryA = replSetA.getPrimary();
     var newPrimaryB = replSetB.getPrimary();
@@ -67,11 +63,9 @@
             return false;
         }, 'Did not see a log entry containing the following message: ' + msg, 10000, 1000);
     };
-    var msgA =
-        "replica set IDs do not match, ours: " + configA.settings.replicaSetId +
+    var msgA = "replica set IDs do not match, ours: " + configA.settings.replicaSetId +
         "; remote node's: " + configB.settings.replicaSetId;
-    var msgB =
-        "replica set IDs do not match, ours: " + configB.settings.replicaSetId +
+    var msgB = "replica set IDs do not match, ours: " + configB.settings.replicaSetId +
         "; remote node's: " + configA.settings.replicaSetId;
     checkLog(primaryA, msgA);
     checkLog(primaryB, msgB);

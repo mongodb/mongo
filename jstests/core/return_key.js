@@ -58,19 +58,25 @@ load("jstests/libs/analyze_plan.js");
     assert(isIndexOnly(explain.queryPlanner.winningPlan));
 
     // Unlike other projections, sortKey meta-projection can co-exist with returnKey.
-    results = coll.find({}, {c: {$meta: 'sortKey'}})
-                  .hint({a: 1}).sort({a: -1}).returnKey().toArray();
+    results =
+        coll.find({}, {c: {$meta: 'sortKey'}}).hint({a: 1}).sort({a: -1}).returnKey().toArray();
     assert.eq(results, [{a: 3, c: {'': 3}}, {a: 2, c: {'': 2}}, {a: 1, c: {'': 1}}]);
 
     // returnKey with sortKey $meta where there is an in-memory sort.
-    results = coll.find({}, {c: {$meta: 'sortKey'}})
-                  .hint({a: 1}).sort({b: 1}).returnKey().toArray();
+    results =
+        coll.find({}, {c: {$meta: 'sortKey'}}).hint({a: 1}).sort({b: 1}).returnKey().toArray();
     assert.eq(results, [{a: 3, c: {'': 1}}, {a: 2, c: {'': 2}}, {a: 1, c: {'': 3}}]);
 
     // returnKey with multiple sortKey $meta projections.
     results = coll.find({}, {c: {$meta: 'sortKey'}, d: {$meta: 'sortKey'}})
-                  .hint({a: 1}).sort({b: 1}).returnKey().toArray();
-    assert.eq(results, [{a: 3, c: {'': 1}, d: {'': 1}},
-                        {a: 2, c: {'': 2}, d: {'': 2}},
-                        {a: 1, c: {'': 3}, d: {'': 3}}]);
+                  .hint({a: 1})
+                  .sort({b: 1})
+                  .returnKey()
+                  .toArray();
+    assert.eq(results,
+              [
+                {a: 3, c: {'': 1}, d: {'': 1}},
+                {a: 2, c: {'': 2}, d: {'': 2}},
+                {a: 1, c: {'': 3}, d: {'': 3}}
+              ]);
 })();

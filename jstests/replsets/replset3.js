@@ -1,10 +1,10 @@
-var doTest = function (signal) {
+var doTest = function(signal) {
     "use strict";
     // Test replica set step down
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
-    var replTest = new ReplSetTest({ name: 'testSet', nodes: 3 });
+    var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 
     // call startSet() to start each mongod in the replica set
     // this returns a list of nodes
@@ -19,7 +19,7 @@ var doTest = function (signal) {
 
     // Write some data to master
     // NOTE: this test fails unless we write some data.
-    master.getDB("foo").foo.insert({ a: 1 }, { writeConcern: { w: 3, wtimeout: 20000 }});
+    master.getDB("foo").foo.insert({a: 1}, {writeConcern: {w: 3, wtimeout: 20000}});
 
     var phase = 1;
 
@@ -27,7 +27,7 @@ var doTest = function (signal) {
 
     // Step down master.  Note: this may close our connection!
     try {
-        master.getDB("admin").runCommand({ replSetStepDown: true, force: 1 });
+        master.getDB("admin").runCommand({replSetStepDown: true, force: 1});
     } catch (err) {
         print("caught: " + err + " on stepdown");
     }
@@ -36,9 +36,8 @@ var doTest = function (signal) {
 
     try {
         var new_master = replTest.getPrimary();
-    }
-    catch (err) {
-        throw ("Could not elect new master before timeout.");
+    } catch (err) {
+        throw("Could not elect new master before timeout.");
     }
 
     print(phase++);
@@ -48,25 +47,27 @@ var doTest = function (signal) {
     print(phase++);
 
     // Make sure that slaves are still up
-    var result = new_master.getDB("admin").runCommand({ replSetGetStatus: 1 });
+    var result = new_master.getDB("admin").runCommand({replSetGetStatus: 1});
     assert(result['ok'] == 1, "Could not verify that slaves were still up:" + result);
 
     print(phase++);
 
     var slaves = replTest.liveNodes.slaves;
-    assert.soon(function () {
+    assert.soon(function() {
         try {
-            var res = slaves[0].getDB("admin").runCommand({ replSetGetStatus: 1 });
-        } catch (err) { }
+            var res = slaves[0].getDB("admin").runCommand({replSetGetStatus: 1});
+        } catch (err) {
+        }
         return res.myState == 2;
     }, "Slave 0 state not ready.");
 
     print(phase++);
 
-    assert.soon(function () {
+    assert.soon(function() {
         try {
-            var res = slaves[1].getDB("admin").runCommand({ replSetGetStatus: 1 });
-        } catch (err) { }
+            var res = slaves[1].getDB("admin").runCommand({replSetGetStatus: 1});
+        } catch (err) {
+        }
         return res.myState == 2;
     }, "Slave 1 state not ready.");
 
@@ -75,4 +76,4 @@ var doTest = function (signal) {
     replTest.stopSet(15);
 };
 
-doTest( 15 );
+doTest(15);

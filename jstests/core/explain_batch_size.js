@@ -8,12 +8,12 @@ t = db.explain_batch_size;
 t.drop();
 
 var n = 3;
-for (i=0; i<n; i++) {
-    t.save( { x : i } );
+for (i = 0; i < n; i++) {
+    t.save({x: i});
 }
 
 var q = {};
 
-assert.eq( n , t.find( q ).count() , "A" );
-assert.eq( n , t.find( q ).itcount() , "B" );
-assert.eq( n , t.find( q ).batchSize(1).explain("executionStats").executionStats.nReturned , "C" );
+assert.eq(n, t.find(q).count(), "A");
+assert.eq(n, t.find(q).itcount(), "B");
+assert.eq(n, t.find(q).batchSize(1).explain("executionStats").executionStats.nReturned, "C");

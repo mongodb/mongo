@@ -1,4 +1,4 @@
-/* 
+/*
    test durability
 */
 
@@ -9,7 +9,9 @@ var conn = null;
 
 function checkNoJournalFiles(path, pass) {
     var files = listFiles(path);
-    if (files.some(function (f) { return f.name.indexOf("prealloc") < 0; })) {
+    if (files.some(function(f) {
+            return f.name.indexOf("prealloc") < 0;
+        })) {
         if (pass == null) {
             // wait a bit longer for mongod to potentially finish if it is still running.
             sleep(10000);
@@ -44,31 +46,32 @@ function runDiff(a, b) {
 
 function log(str) {
     print();
-    if(str)
-        print(testname+" step " + step++ + " " + str);
+    if (str)
+        print(testname + " step " + step++ + " " + str);
     else
-        print(testname+" step " + step++);
+        print(testname + " step " + step++);
 }
 
-// if you do inserts here, you will want to set _id.  otherwise they won't match on different 
+// if you do inserts here, you will want to set _id.  otherwise they won't match on different
 // runs so we can't do a binary diff of the resulting files to check they are consistent.
 function work() {
     log("work");
     var d = conn.getDB("test");
-    d.foo.insert({ _id: 3, x: 22 });
-    d.foo.insert({ _id: 4, x: 22 });
-    d.a.insert({ _id: 3, x: 22, y: [1, 2, 3] });
-    d.a.insert({ _id: 4, x: 22, y: [1, 2, 3] });
-    d.a.update({ _id: 4 }, { $inc: { x: 1} });
+    d.foo.insert({_id: 3, x: 22});
+    d.foo.insert({_id: 4, x: 22});
+    d.a.insert({_id: 3, x: 22, y: [1, 2, 3]});
+    d.a.insert({_id: 4, x: 22, y: [1, 2, 3]});
+    d.a.update({_id: 4}, {$inc: {x: 1}});
 
-    // try building an index.  however, be careful as object id's in system.indexes would vary, so we do it manually:
-    d.system.indexes.insert({ _id: 99, ns: "test.a", key: { x: 1 }, name: "x_1" });
+    // try building an index.  however, be careful as object id's in system.indexes would vary, so
+    // we do it manually:
+    d.system.indexes.insert({_id: 99, ns: "test.a", key: {x: 1}, name: "x_1"});
 
     log("endwork");
     return d;
 }
 
-function verify() { 
+function verify() {
     log("verify test.foo.count == 2");
     var d = conn.getDB("test");
     var ct = d.foo.count();
@@ -78,7 +81,7 @@ function verify() {
     }
 }
 
-if( debugging ) { 
+if (debugging) {
     // mongod already running in debugger
     conn = db.getMongo();
     work();
@@ -89,8 +92,8 @@ if( debugging ) {
 log();
 
 // directories
-var path1 = MongoRunner.dataPath + testname+"nodur";
-var path2 = MongoRunner.dataPath + testname+"dur";
+var path1 = MongoRunner.dataPath + testname + "nodur";
+var path2 = MongoRunner.dataPath + testname + "dur";
 
 // non-durable version
 log("run mongod without journaling");
@@ -104,22 +107,24 @@ conn = MongoRunner.runMongod({dbpath: path2, journal: "", smallfiles: "", journa
 work();
 
 // wait for group commit.
-printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
+printjson(conn.getDB('admin').runCommand({getlasterror: 1, fsync: 1}));
 
 // kill the process hard
 log("kill 9");
-MongoRunner.stopMongod(conn.port, /*signal*/9);
+MongoRunner.stopMongod(conn.port, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 
 // restart and recover
 log("restart mongod --journal and recover");
-conn = MongoRunner.runMongod({restart: true,
-                              cleanData: false,
-                              dbpath: path2,
-                              journal: "",
-                              smallfiles: "",
-                              journalOptions: 8});
+conn = MongoRunner.runMongod({
+    restart: true,
+    cleanData: false,
+    dbpath: path2,
+    journal: "",
+    smallfiles: "",
+    journalOptions: 8
+});
 verify();
 
 log("stop mongod");
@@ -151,4 +156,3 @@ assert(diff == "", "error test.0 files differ");
 log("check data matches done");
 
 print(testname + " SUCCESS");
-

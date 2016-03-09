@@ -5,13 +5,13 @@
 var coll = db.getCollection("gle_example");
 coll.drop();
 
-coll.insert({ hello : "world" });
-assert.eq( null, coll.getDB().getLastError() );
+coll.insert({hello: "world"});
+assert.eq(null, coll.getDB().getLastError());
 
 // Error on insert.
 coll.drop();
-coll.insert({ _id: 1 });
-coll.insert({ _id: 1 });
+coll.insert({_id: 1});
+coll.insert({_id: 1});
 var gle = db.getLastErrorObj();
 assert.neq(null, gle.err);
 
@@ -22,8 +22,7 @@ assert.eq(null, gle.err);
 
 // Error on upsert.
 coll.drop();
-coll.insert({ _id: 1 });
-coll.update({ y: 1 }, { _id: 1 }, true);
+coll.insert({_id: 1});
+coll.update({y: 1}, {_id: 1}, true);
 gle = db.getLastErrorObj();
 assert.neq(null, gle.err);
-

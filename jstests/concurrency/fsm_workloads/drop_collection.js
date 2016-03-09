@@ -38,8 +38,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { createAndDrop: 1 },
-        createAndDrop: { createAndDrop: 1 }
+        init: {createAndDrop: 1},
+        createAndDrop: {createAndDrop: 1}
     };
 
     return {

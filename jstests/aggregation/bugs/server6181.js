@@ -3,10 +3,10 @@
 c = db.c;
 c.drop();
 
-c.save( { a:2 } );
+c.save({a: 2});
 
-res = c.aggregate( { $project:{ _id:'$a' } } );
-assert.eq(res.toArray(), [{_id:2}]);
+res = c.aggregate({$project: {_id: '$a'}});
+assert.eq(res.toArray(), [{_id: 2}]);
 
-res = c.aggregate( { $project:{ _id:{$add: [1, '$a']} } } );
-assert.eq(res.toArray(), [{_id:3}]);
+res = c.aggregate({$project: {_id: {$add: [1, '$a']}}});
+assert.eq(res.toArray(), [{_id: 3}]);

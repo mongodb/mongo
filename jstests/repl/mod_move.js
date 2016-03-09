@@ -2,23 +2,23 @@
 // test repl basics
 // data on master/slave is the same
 
-var rt = new ReplTest( "mod_move" );
+var rt = new ReplTest("mod_move");
 
-m = rt.start( true , { oplogSize : 50 } );
+m = rt.start(true, {oplogSize: 50});
 
-am = m.getDB( "foo" );
+am = m.getDB("foo");
 
-function check( note ){
+function check(note) {
     var start = new Date();
-    var x,y;
-    while ( (new Date()).getTime() - start.getTime() < 5 * 60 * 1000 ){
-        x = am.runCommand( "dbhash" );
-        y = as.runCommand( "dbhash" );
-        if ( x.md5 == y.md5 )
+    var x, y;
+    while ((new Date()).getTime() - start.getTime() < 5 * 60 * 1000) {
+        x = am.runCommand("dbhash");
+        y = as.runCommand("dbhash");
+        if (x.md5 == y.md5)
             return;
-        sleep( 200 );
+        sleep(200);
     }
-    assert.eq( x.md5 , y.md5 , note );
+    assert.eq(x.md5, y.md5, note);
 }
 
 // insert a lot of 'big' docs
@@ -29,30 +29,30 @@ N = BIG * 2;
 
 var bulk = am.a.initializeUnorderedBulkOp();
 for (var i = 0; i < BIG; i++) {
-    bulk.insert({ _id: i, s: 1, x: 1 });
+    bulk.insert({_id: i, s: 1, x: 1});
 }
 for (; i < N; i++) {
-    bulk.insert({ _id: i, s: 1 });
+    bulk.insert({_id: i, s: 1});
 }
 for (i = 0; i < BIG; i++) {
-    bulk.find({ _id: i }).remove();
+    bulk.find({_id: i}).remove();
 }
 assert.writeOK(bulk.execute());
-assert.eq( BIG , am.a.count() );
+assert.eq(BIG, am.a.count());
 
-if ( am.serverStatus().storageEngine.name == "mmapv1" ) {
-    assert.eq( 1 , am.a.stats().paddingFactor , "A2"  );
+if (am.serverStatus().storageEngine.name == "mmapv1") {
+    assert.eq(1, am.a.stats().paddingFactor, "A2");
 }
 
 // start slave
-s = rt.start( false );
-as = s.getDB( "foo" );
+s = rt.start(false);
+as = s.getDB("foo");
 bulk = am.a.initializeUnorderedBulkOp();
 for (i = N - 1; i >= BIG; i--) {
-    bulk.find({ _id: i }).update({ $set: { x: 1 }});
+    bulk.find({_id: i}).update({$set: {x: 1}});
 }
 assert.writeOK(bulk.execute());
 
-check( "B" );
+check("B");
 
 rt.stop();

@@ -15,7 +15,7 @@
 t = db.jstests_killop;
 t.drop();
 
-t.save( {x:1} );
+t.save({x: 1});
 
 /**
  * This function filters for the operations that we're looking for, based on their state and
@@ -24,42 +24,53 @@ t.save( {x:1} );
 function ops() {
     p = db.currentOp().inprog;
     ids = [];
-    for ( var i in p ) {
-        var o = p[ i ];
-        // We *can't* check for ns, b/c it's not guaranteed to be there unless the query is active, which 
-        // it may not be in our polling cycle - particularly b/c we sleep every second in both the query and
+    for (var i in p) {
+        var o = p[i];
+        // We *can't* check for ns, b/c it's not guaranteed to be there unless the query is active,
+        // which
+        // it may not be in our polling cycle - particularly b/c we sleep every second in both the
+        // query and
         // the assert
-        if ( ( o.active || o.waitingForLock ) && o.query && o.query.query && o.query.query.$where && o.query.count == "jstests_killop" ) {
-            ids.push( o.opid );
+        if ((o.active || o.waitingForLock) && o.query && o.query.query && o.query.query.$where &&
+            o.query.count == "jstests_killop") {
+            ids.push(o.opid);
         }
     }
     return ids;
 }
 
 jsTestLog("Starting long-running $where operation");
-var s1 = startParallelShell(
-    "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )" );
-var s2 = startParallelShell(
-    "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )" );
+var s1 =
+    startParallelShell("db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )");
+var s2 =
+    startParallelShell("db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )");
 
 jsTestLog("Finding ops in currentOp() output");
 o = [];
-assert.soon(function() { o = ops(); return o.length == 2; },
-            { toString: function () { return tojson(db.currentOp().inprog); } },
-           10000);
+assert.soon(
+    function() {
+        o = ops();
+        return o.length == 2;
+    },
+    {
+      toString: function() {
+          return tojson(db.currentOp().inprog);
+      }
+    },
+    10000);
 start = new Date();
 jsTestLog("Killing ops");
-db.killOp( o[ 0 ] );
-db.killOp( o[ 1 ] );
+db.killOp(o[0]);
+db.killOp(o[1]);
 
 jsTestLog("Waiting for ops to terminate");
 [s1, s2].forEach(function(awaitShell) {
     var exitCode = awaitShell({checkExitSuccess: false});
-    assert.neq(0, exitCode,
-               "expected shell to exit abnormally due to JS execution being terminated");
+    assert.neq(
+        0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");
 });
 
 // don't want to pass if timeout killed the js function.
 var end = new Date();
 var diff = end - start;
-assert.lt( diff, 30000, "Start: " + start + "; end: " + end + "; diff: " + diff);
+assert.lt(diff, 30000, "Start: " + start + "; end: " + end + "; diff: " + diff);

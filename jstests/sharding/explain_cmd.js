@@ -23,10 +23,8 @@ db.adminCommand({shardCollection: collSharded.getFullName(), key: {a: 1}});
 for (var i = 1; i <= 2; i++) {
     assert.commandWorked(db.adminCommand({split: collSharded.getFullName(), middle: {a: i}}));
 
-    var shardName = "shard000" + (i-1);
-    printjson(db.adminCommand({moveChunk: collSharded.getFullName(),
-                               find: {a: i},
-                               to: shardName}));
+    var shardName = "shard000" + (i - 1);
+    printjson(db.adminCommand({moveChunk: collSharded.getFullName(), find: {a: i}, to: shardName}));
 }
 
 // Put data on each shard.
@@ -40,13 +38,8 @@ st.printShardingStatus();
 assert.eq(3, collSharded.count({b: 1}));
 
 // Explain the scatter-gather count.
-explain = db.runCommand({
-    explain: {
-        count: collSharded.getName(),
-        query: {b: 1}
-    },
-    verbosity: "allPlansExecution"
-});
+explain = db.runCommand(
+    {explain: {count: collSharded.getName(), query: {b: 1}}, verbosity: "allPlansExecution"});
 
 // Validate some basic properties of the result.
 printjson(explain);
@@ -58,10 +51,7 @@ assert.eq(2, explain.executionStats.executionStages.shards.length);
 
 // An explain of a command that doesn't exist should fail gracefully.
 explain = db.runCommand({
-    explain: {
-        nonexistent: collSharded.getName(),
-        query: {b: 1}
-    },
+    explain: {nonexistent: collSharded.getName(), query: {b: 1}},
     verbosity: "allPlansExecution"
 });
 printjson(explain);
@@ -86,8 +76,8 @@ explain = db.runCommand({
             ns: collUnsharded.getName(),
             key: "a",
             cond: "b",
-            $reduce: function (curr, result) { },
-            initial: { }
+            $reduce: function(curr, result) {},
+            initial: {}
         }
     },
     verbosity: "allPlansExecution"
@@ -109,8 +99,8 @@ explain = db.runCommand({
             ns: collSharded.getName(),
             key: "a",
             cond: "b",
-            $reduce: function (curr, result) { },
-            initial: { }
+            $reduce: function(curr, result) {},
+            initial: {}
         }
     },
     verbosity: "allPlansExecution"
@@ -122,12 +112,7 @@ assert.commandFailed(explain);
 
 // Explain a delete operation and verify that it hits all shards without the shard key
 explain = db.runCommand({
-    explain: {
-        delete: collSharded.getName(),
-        deletes: [
-            {q: {b: 1}, limit: 0}
-        ]
-    },
+    explain: {delete: collSharded.getName(), deletes: [{q: {b: 1}, limit: 0}]},
     verbosity: "allPlansExecution"
 });
 assert.commandWorked(explain, tojson(explain));
@@ -140,12 +125,7 @@ assert.eq(3, collSharded.count({b: 1}));
 
 // Explain a delete operation and verify that it hits only one shard with the shard key
 explain = db.runCommand({
-    explain: {
-        delete: collSharded.getName(),
-        deletes: [
-            {q: {a: 1}, limit: 0}
-        ]
-    },
+    explain: {delete: collSharded.getName(), deletes: [{q: {a: 1}, limit: 0}]},
     verbosity: "allPlansExecution"
 });
 assert.commandWorked(explain, tojson(explain));
@@ -156,23 +136,15 @@ assert.eq(3, collSharded.count({b: 1}));
 // Check that we fail gracefully if we try to do an explain of a write batch that has more
 // than one operation in it.
 explain = db.runCommand({
-    explain: {
-        delete: collSharded.getName(),
-        deletes: [
-            {q: {a: 1}, limit: 1},
-            {q: {a: 2}, limit: 1}
-        ]
-    },
+    explain:
+        {delete: collSharded.getName(), deletes: [{q: {a: 1}, limit: 1}, {q: {a: 2}, limit: 1}]},
     verbosity: "allPlansExecution"
 });
 assert.commandFailed(explain, tojson(explain));
 
 // Explain a multi upsert operation and verify that it hits all shards
 explain = db.runCommand({
-    explain: {
-        update: collSharded.getName(),
-        updates: [{q: {}, u: {$set: {b: 10}}, multi: true}]
-    },
+    explain: {update: collSharded.getName(), updates: [{q: {}, u: {$set: {b: 10}}, multi: true}]},
     verbosity: "allPlansExecution"
 });
 assert.commandWorked(explain, tojson(explain));
@@ -186,10 +158,7 @@ assert.eq(0, collSharded.count({b: 10}));
 
 // Explain an upsert operation and verify that it hits only a single shard
 explain = db.runCommand({
-    explain: {
-        update: collSharded.getName(),
-        updates: [{q: {a: 10}, u: {a: 10}, upsert: true}]
-    },
+    explain: {update: collSharded.getName(), updates: [{q: {a: 10}, u: {a: 10}, upsert: true}]},
     verbosity: "allPlansExecution"
 });
 assert.commandWorked(explain, tojson(explain));
@@ -199,11 +168,7 @@ assert.eq(0, collSharded.count({a: 10}));
 
 // Explain an upsert operation which cannot be targeted, ensure an error is thrown
 explain = db.runCommand({
-    explain: {
-        update: collSharded.getName(),
-        updates: [{q: {b: 10}, u: {b: 10}, upsert: true}]
-    },
+    explain: {update: collSharded.getName(), updates: [{q: {b: 10}, u: {b: 10}, upsert: true}]},
     verbosity: "allPlansExecution"
 });
 assert.commandFailed(explain, tojson(explain));
-

@@ -8,14 +8,8 @@ coll.insert({a: 2});
 
 var query = "{\"a\": {\"$gt\": 1} }";
 assert(!MongoRunner.runMongoTool(
-  "mongodump",
-  {
-    "host": "127.0.0.1:" + mongod.port,
-    "db": "spaces",
-    "collection": "coll",
-    "query": query
-  }
-));
+    "mongodump",
+    {"host": "127.0.0.1:" + mongod.port, "db": "spaces", "collection": "coll", "query": query}));
 
 MongoRunner.stopMongod(mongod);
 

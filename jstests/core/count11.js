@@ -5,8 +5,12 @@ var t = db.count11;
 
 t.drop();
 
-var validQuery = {a: 1};
-var invalidQuery = {a: {$invalid: 1}};
+var validQuery = {
+    a: 1
+};
+var invalidQuery = {
+    a: {$invalid: 1}
+};
 
 // Query non-existing collection with empty query.
 assert.eq(0, t.find().count());
@@ -16,11 +20,15 @@ assert.eq(0, t.find().itcount());
 // Returns 0 on valid syntax query.
 // Fails on invalid syntax query.
 assert.eq(0, t.find(validQuery).count());
-assert.throws(function() { t.find(invalidQuery).count(); });
+assert.throws(function() {
+    t.find(invalidQuery).count();
+});
 
 // Query existing collection.
 // Returns 0 on valid syntax query.
 // Fails on invalid syntax query.
 assert.commandWorked(db.createCollection(t.getName()));
 assert.eq(0, t.find(validQuery).count());
-assert.throws(function() { t.find(invalidQuery).count(); });
+assert.throws(function() {
+    t.find(invalidQuery).count();
+});

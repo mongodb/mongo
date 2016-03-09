@@ -32,7 +32,7 @@ var $config = (function() {
 
             var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
             for (var i = 0; i < (this.tid + 1) * 200; i++) {
-                bulk.insert({ i: i, rand: Random.rand() });
+                bulk.insert({i: i, rand: Random.rand()});
             }
 
             var res = bulk.execute();
@@ -58,7 +58,7 @@ var $config = (function() {
             var indexKeys = db[this.threadCollName].getIndexKeys();
             assertWhenOwnDB.eq(1, indexKeys.length);
             assertWhenOwnDB(function() {
-                assertWhenOwnDB.docEq({ _id: 1 }, indexKeys[0]);
+                assertWhenOwnDB.docEq({_id: 1}, indexKeys[0]);
             });
         }
 
@@ -69,8 +69,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { convertToCapped: 1 },
-        convertToCapped: { convertToCapped: 1 }
+        init: {convertToCapped: 1},
+        convertToCapped: {convertToCapped: 1}
     };
 
     function setup(db, collName, cluster) {

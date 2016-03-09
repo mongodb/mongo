@@ -8,25 +8,21 @@
  * for each thread.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isEphemeral
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
 
 var $config = (function() {
     var data = {
         nDocumentsToInsert: 1000,
-        nIndexes: 3 + 1, // The number of indexes created in createIndexes + 1 for { _id: 1 }
-        prefix: 'compact' // Use filename for prefix because filename is assumed unique
+        nIndexes: 3 + 1,  // The number of indexes created in createIndexes + 1 for { _id: 1 }
+        prefix: 'compact'  // Use filename for prefix because filename is assumed unique
     };
 
     var states = (function() {
         function insertDocuments(db, collName) {
             var bulk = db[collName].initializeUnorderedBulkOp();
             for (var i = 0; i < this.nDocumentsToInsert; ++i) {
-                bulk.insert({ 
-                    a: Random.randInt(10),
-                    b: Random.randInt(10),
-                    c: Random.randInt(10)
-                });
+                bulk.insert({a: Random.randInt(10), b: Random.randInt(10), c: Random.randInt(10)});
             }
             var res = bulk.execute();
             assertAlways.writeOK(res);
@@ -35,20 +31,20 @@ var $config = (function() {
 
         function createIndexes(db, collName) {
             // The number of indexes created here is also stored in data.nIndexes
-            var aResult = db[collName].ensureIndex({ a: 1 });
+            var aResult = db[collName].ensureIndex({a: 1});
             assertAlways.commandWorked(aResult);
 
-            var bResult = db[collName].ensureIndex({ b: 1 });
+            var bResult = db[collName].ensureIndex({b: 1});
             assertAlways.commandWorked(bResult);
 
-            var cResult = db[collName].ensureIndex({ c: 1 });
+            var cResult = db[collName].ensureIndex({c: 1});
             assertAlways.commandWorked(cResult);
         }
 
         // This method is independent of collectionSetup to allow it to be overridden in
         // workloads that extend this one
         function init(db, collName) {
-            this.threadCollName = this.prefix + '_' + this.tid; 
+            this.threadCollName = this.prefix + '_' + this.tid;
         }
 
         function collectionSetup(db, collName) {
@@ -57,11 +53,8 @@ var $config = (function() {
         }
 
         function compact(db, collName) {
-            var res = db.runCommand({
-                compact: this.threadCollName,
-                paddingFactor: 1.0,
-                force: true
-            });
+            var res =
+                db.runCommand({compact: this.threadCollName, paddingFactor: 1.0, force: true});
             if (!isEphemeral(db)) {
                 assertAlways.commandWorked(res);
             } else {
@@ -71,8 +64,10 @@ var $config = (function() {
 
         function query(db, collName) {
             var count = db[this.threadCollName].find().itcount();
-            assertWhenOwnColl.eq(count, this.nDocumentsToInsert, 'number of documents in ' +
-                                 'collection should not change following a compact');
+            assertWhenOwnColl.eq(count,
+                                 this.nDocumentsToInsert,
+                                 'number of documents in ' +
+                                     'collection should not change following a compact');
             var indexesCount = db[this.threadCollName].getIndexes().length;
             assertWhenOwnColl.eq(indexesCount, this.nIndexes);
         }
@@ -86,10 +81,10 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init:            { collectionSetup: 1 },
-        collectionSetup: { compact: 0.5, query: 0.5 },
-        compact:         { compact: 0.5, query: 0.5 },
-        query:           { compact: 0.5, query: 0.5 }
+        init: {collectionSetup: 1},
+        collectionSetup: {compact: 0.5, query: 0.5},
+        compact: {compact: 0.5, query: 0.5},
+        query: {compact: 0.5, query: 0.5}
     };
 
     var teardown = function teardown(db, collName, cluster) {

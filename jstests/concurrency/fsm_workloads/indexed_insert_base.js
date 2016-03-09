@@ -18,7 +18,7 @@ var $config = (function() {
             }
 
             var order = ixSpec[field];
-            if (order !== 1 && order !== -1) { // e.g. '2d' or '2dsphere'
+            if (order !== 1 && order !== -1) {  // e.g. '2d' or '2dsphere'
                 order = 1;
             }
 
@@ -43,14 +43,16 @@ var $config = (function() {
 
         find: function find(db, collName) {
             // collection scan
-            var count = db[collName].find(this.getDoc()).sort({ $natural: 1 }).itcount();
+            var count = db[collName].find(this.getDoc()).sort({$natural: 1}).itcount();
             assertWhenOwnColl.eq(count, this.nInserted);
 
             // Use hint() to force an index scan, but only when an appropriate index exists.
             // We can only use hint() when the index exists and we know that the collection
             // is not being potentially modified by other workloads.
             var ownColl = false;
-            assertWhenOwnColl(function() { ownColl = true; });
+            assertWhenOwnColl(function() {
+                ownColl = true;
+            });
             if (this.indexExists && ownColl) {
                 count = db[collName].find(this.getDoc()).hint(this.getIndexSpec()).itcount();
                 assertWhenOwnColl.eq(count, this.nInserted);
@@ -68,9 +70,9 @@ var $config = (function() {
     };
 
     var transitions = {
-        init: { insert: 1 },
-        insert: { find: 1 },
-        find: { insert: 1 }
+        init: {insert: 1},
+        insert: {find: 1},
+        find: {insert: 1}
     };
 
     function setup(db, collName, cluster) {
@@ -96,7 +98,7 @@ var $config = (function() {
                 return doc;
             },
             indexedField: 'x',
-            shardKey: { x: 1 },
+            shardKey: {x: 1},
             docsPerInsert: 1
         },
         setup: setup

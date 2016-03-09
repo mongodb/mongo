@@ -1,6 +1,6 @@
 // dumprestore_helpers.js
 
-load( './jstests/multiVersion/libs/verify_collection_data.js' );
+load('./jstests/multiVersion/libs/verify_collection_data.js');
 
 // Given a "test spec" object, runs the specified test.
 //
@@ -28,7 +28,6 @@ load( './jstests/multiVersion/libs/verify_collection_data.js' );
 //     - "mongos" - Do the dump or restore by connecting to a sharded cluster
 //
 function multiVersionDumpRestoreTest(configObj) {
-
     // First sanity check the arguments in our configObj
     var requiredKeys = [
         'serverSourceVersion',
@@ -52,25 +51,24 @@ function multiVersionDumpRestoreTest(configObj) {
     resetDbpath(configObj.testDbpath);
     if (configObj.dumpType === "mongos") {
         var shardingTestConfig = {
-            sync: true, // Mixed version clusters can't use replsets for config servers
-            name : testBaseName + "_sharded_source",
-            mongos : [{ binVersion : configObj.serverSourceVersion }],
-            shards : [{ binVersion : configObj.serverSourceVersion }],
-            config : [{ binVersion : configObj.serverSourceVersion }]
+            sync: true,  // Mixed version clusters can't use replsets for config servers
+            name: testBaseName + "_sharded_source",
+            mongos: [{binVersion: configObj.serverSourceVersion}],
+            shards: [{binVersion: configObj.serverSourceVersion}],
+            config: [{binVersion: configObj.serverSourceVersion}]
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         var serverSource = shardingTest.s;
-    }
-    else {
-        var serverSource = MongoRunner.runMongod({ binVersion : configObj.serverSourceVersion,
-                                                   dbpath : configObj.testDbpath });
+    } else {
+        var serverSource = MongoRunner.runMongod(
+            {binVersion: configObj.serverSourceVersion, dbpath: configObj.testDbpath});
     }
     var sourceDB = serverSource.getDB(testBaseName);
 
     // Create generators to create collections with our seed data
     // Testing with both a capped collection and a normal collection
-    var cappedCollGen = new CollectionDataGenerator({ "capped" : true });
-    var collGen = new CollectionDataGenerator({ "capped" : false });
+    var cappedCollGen = new CollectionDataGenerator({"capped": true});
+    var collGen = new CollectionDataGenerator({"capped": false});
 
     // Create collections using the different generators
     var sourceCollCapped = createCollectionWithData(sourceDB, "cappedColl", cappedCollGen);
@@ -84,43 +82,53 @@ function multiVersionDumpRestoreTest(configObj) {
 
     // Dump using the specified version of mongodump from the running mongod or mongos instance.
     if (configObj.dumpType === "mongod") {
-        MongoRunner.runMongoTool("mongodump", { out : configObj.dumpDir,
-                                                binVersion : configObj.mongoDumpVersion,
-                                                host : serverSource.host,
-                                                db : testBaseName });
+        MongoRunner.runMongoTool("mongodump",
+                                 {
+                                   out: configObj.dumpDir,
+                                   binVersion: configObj.mongoDumpVersion,
+                                   host: serverSource.host,
+                                   db: testBaseName
+                                 });
         MongoRunner.stopMongod(serverSource.port);
-    }
-    else { /* "mongos" */
-        MongoRunner.runMongoTool("mongodump", { out : configObj.dumpDir,
-                                                binVersion : configObj.mongoDumpVersion,
-                                                host : serverSource.host,
-                                                db : testBaseName });
+    } else { /* "mongos" */
+        MongoRunner.runMongoTool("mongodump",
+                                 {
+                                   out: configObj.dumpDir,
+                                   binVersion: configObj.mongoDumpVersion,
+                                   host: serverSource.host,
+                                   db: testBaseName
+                                 });
         shardingTest.stop();
     }
 
     // Restore using the specified version of mongorestore
     if (configObj.restoreType === "mongod") {
-        var serverDest = MongoRunner.runMongod({ binVersion : configObj.serverDestVersion });
+        var serverDest = MongoRunner.runMongod({binVersion: configObj.serverDestVersion});
 
-        MongoRunner.runMongoTool("mongorestore", { dir : configObj.dumpDir + "/" + testBaseName,
-                                                   binVersion : configObj.mongoRestoreVersion,
-                                                   host : serverDest.host,
-                                                   db : testBaseName });
-    }
-    else { /* "mongos" */
+        MongoRunner.runMongoTool("mongorestore",
+                                 {
+                                   dir: configObj.dumpDir + "/" + testBaseName,
+                                   binVersion: configObj.mongoRestoreVersion,
+                                   host: serverDest.host,
+                                   db: testBaseName
+                                 });
+    } else { /* "mongos" */
         var shardingTestConfig = {
-            sync: true, // Mixed version clusters can't use replsets for config servers
-            name : testBaseName + "_sharded_dest",
-            mongos : [{ binVersion : configObj.serverDestVersion }],
-            shards : [{ binVersion : configObj.serverDestVersion }],
-            config : [{ binVersion : configObj.serverDestVersion }]
+            sync: true,  // Mixed version clusters can't use replsets for config servers
+            name: testBaseName + "_sharded_dest",
+            mongos: [{binVersion: configObj.serverDestVersion}],
+            shards: [{binVersion: configObj.serverDestVersion}],
+            config: [{binVersion: configObj.serverDestVersion}]
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         serverDest = shardingTest.s;
-        MongoRunner.runMongoTool("mongorestore", { dir : configObj.dumpDir + "/" + testBaseName,
-                                                   binVersion : configObj.mongoRestoreVersion,
-                                                   host : serverDest.host,
-                                                   db : testBaseName });
+        MongoRunner.runMongoTool("mongorestore",
+                                 {
+                                   dir: configObj.dumpDir + "/" + testBaseName,
+                                   binVersion: configObj.mongoRestoreVersion,
+                                   host: serverDest.host,
+                                   db: testBaseName
+                                 });
     }
 
     var destDB = serverDest.getDB(testBaseName);
@@ -141,8 +149,7 @@ function multiVersionDumpRestoreTest(configObj) {
 
     if (configObj.restoreType === "mongos") {
         shardingTest.stop();
-    }
-    else {
+    } else {
         MongoRunner.stopMongod(serverDest.port);
     }
 }
@@ -164,9 +171,7 @@ function multiVersionDumpRestoreTest(configObj) {
 // { "a" : 0, "b" : 3 }
 // { "a" : 1, "b" : 3 }
 function getPermutationIterator(permsObj) {
-
     function getAllPermutations(permsObj) {
-
         // Split our permutations object into "first" and "rest"
         var gotFirst = false;
         var firstKey;
@@ -176,8 +181,7 @@ function getPermutationIterator(permsObj) {
             if (permsObj.hasOwnProperty(key)) {
                 if (gotFirst) {
                     restObj[key] = permsObj[key];
-                }
-                else {
+                } else {
                     firstKey = key;
                     firstValues = permsObj[key];
                     gotFirst = true;
@@ -209,10 +213,10 @@ function getPermutationIterator(permsObj) {
     var currentPermutation = 0;
 
     return {
-        "next" : function () {
+        "next": function() {
             return allPermutations[currentPermutation++];
         },
-        "hasNext" : function () {
+        "hasNext": function() {
             return currentPermutation < allPermutations.length;
         }
     };

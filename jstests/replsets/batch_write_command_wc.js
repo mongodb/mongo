@@ -13,8 +13,8 @@ jsTest.log("Starting no journal/repl set tests...");
 
 // Start a single-node replica set with no journal
 // Allows testing immediate write concern failures and wc application failures
-var rst = new ReplSetTest({ nodes : 2 });
-rst.startSet({ nojournal : "" });
+var rst = new ReplSetTest({nodes: 2});
+rst.startSet({nojournal: ""});
 rst.initiate();
 var mongod = rst.getPrimary();
 var coll = mongod.getCollection("test.batch_write_command_wc");
@@ -22,9 +22,8 @@ var coll = mongod.getCollection("test.batch_write_command_wc");
 //
 // Basic insert, default WC
 coll.remove({});
-printjson( request = {insert : coll.getName(),
-                      documents: [{a:1}]});
-printjson( result = coll.runCommand(request) );
+printjson(request = {insert: coll.getName(), documents: [{a: 1}]});
+printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(1, coll.count());
@@ -32,10 +31,8 @@ assert.eq(1, coll.count());
 //
 // Basic insert, majority WC
 coll.remove({});
-printjson( request = {insert : coll.getName(),
-                      documents: [{a:1}],
-                      writeConcern: {w: 'majority'}});
-printjson( result = coll.runCommand(request) );
+printjson(request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {w: 'majority'}});
+printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(1, coll.count());
@@ -43,10 +40,8 @@ assert.eq(1, coll.count());
 //
 // Basic insert,  w:2 WC
 coll.remove({});
-printjson( request = {insert : coll.getName(),
-                      documents: [{a:1}],
-                      writeConcern: {w:2}});
-printjson( result = coll.runCommand(request) );
+printjson(request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {w: 2}});
+printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(1, coll.count());
@@ -54,20 +49,17 @@ assert.eq(1, coll.count());
 //
 // Basic insert, immediate nojournal error
 coll.remove({});
-printjson( request = {insert : coll.getName(),
-                      documents: [{a:1}],
-                      writeConcern: {j:true}});
-printjson( result = coll.runCommand(request) );
+printjson(request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {j: true}});
+printjson(result = coll.runCommand(request));
 assert(!result.ok);
 assert.eq(0, coll.count());
 
 //
 // Basic insert, timeout wc error
 coll.remove({});
-printjson( request = {insert : coll.getName(),
-                      documents: [{a:1}],
-                      writeConcern: {w:3, wtimeout: 1}});
-printjson( result = coll.runCommand(request) );
+printjson(
+    request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {w: 3, wtimeout: 1}});
+printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
 assert(result.writeConcernError);
@@ -77,10 +69,8 @@ assert.eq(1, coll.count());
 //
 // Basic insert, wmode wc error
 coll.remove({});
-printjson( request = {insert : coll.getName(),
-                      documents: [{a:1}],
-                      writeConcern: {w: 'invalid'}});
-printjson( result = coll.runCommand(request) );
+printjson(request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {w: 'invalid'}});
+printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
 assert(result.writeConcernError);
@@ -89,10 +79,12 @@ assert.eq(1, coll.count());
 //
 // Two ordered inserts, write error and wc error both reported
 coll.remove({});
-printjson( request = {insert : coll.getName(),
-                      documents: [{a:1},{$invalid:'doc'}],
-                      writeConcern: {w: 'invalid'}});
-printjson( result = coll.runCommand(request) );
+printjson(request = {
+    insert: coll.getName(),
+    documents: [{a: 1}, {$invalid: 'doc'}],
+    writeConcern: {w: 'invalid'}
+});
+printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(result.writeErrors.length, 1);
@@ -103,11 +95,13 @@ assert.eq(1, coll.count());
 //
 // Two unordered inserts, write error and wc error reported
 coll.remove({});
-printjson( request = {insert : coll.getName(),
-                      documents: [{a:1},{$invalid:'doc'}],
-                      writeConcern: {w: 'invalid'},
-                      ordered: false});
-printjson( result = coll.runCommand(request) );
+printjson(request = {
+    insert: coll.getName(),
+    documents: [{a: 1}, {$invalid: 'doc'}],
+    writeConcern: {w: 'invalid'},
+    ordered: false
+});
+printjson(result = coll.runCommand(request));
 assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(result.writeErrors.length, 1);
@@ -118,10 +112,12 @@ assert.eq(1, coll.count());
 //
 // Write error with empty writeConcern object.
 coll.remove({});
-request = { insert: coll.getName(),
-            documents: [{ _id: 1 }, { _id: 1 }],
-            writeConcern: {},
-            ordered: false };
+request = {
+    insert: coll.getName(),
+    documents: [{_id: 1}, {_id: 1}],
+    writeConcern: {},
+    ordered: false
+};
 result = coll.runCommand(request);
 assert(result.ok);
 assert.eq(1, result.n);
@@ -133,10 +129,12 @@ assert.eq(1, coll.count());
 //
 // Write error with unspecified w.
 coll.remove({});
-request = { insert: coll.getName(),
-            documents: [{ _id: 1 }, { _id: 1 }],
-            writeConcern: { wTimeout: 1 },
-            ordered: false };
+request = {
+    insert: coll.getName(),
+    documents: [{_id: 1}, {_id: 1}],
+    writeConcern: {wTimeout: 1},
+    ordered: false
+};
 result = coll.runCommand(request);
 assert(result.ok);
 assert.eq(1, result.n);
@@ -147,4 +145,3 @@ assert.eq(1, coll.count());
 
 jsTest.log("DONE no journal/repl tests");
 rst.stopSet();
-

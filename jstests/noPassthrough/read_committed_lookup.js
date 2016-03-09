@@ -61,7 +61,9 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     }
 
     // Seed matching data.
-    var majorityWriteConcernObj = {writeConcern: {w: "majority", wtimeout: 60*1000}};
+    var majorityWriteConcernObj = {
+        writeConcern: {w: "majority", wtimeout: 60 * 1000}
+    };
     var localId = db.local.insertOne({foreignKey: "x"}, majorityWriteConcernObj).insertedId;
     var foreignId = db.foreign.insertOne({matchedField: "x"}, majorityWriteConcernObj).insertedId;
 
@@ -71,34 +73,28 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
         aggregate: "local",
         pipeline: [
             {
-                $lookup: {
-                    from: "foreign",
-                    localField: "foreignKey",
-                    foreignField: "matchedField",
-                    as: "match",
-                }
+              $lookup: {
+                  from: "foreign",
+                  localField: "foreignKey",
+                  foreignField: "matchedField",
+                  as: "match",
+              }
             },
         ],
         readConcern: {
             level: "majority",
         }
     };
-    var expectedMatchedResult = [
-        {
-            _id: localId,
-            foreignKey: "x",
-            match: [
-                {_id: foreignId, matchedField: "x"},
-            ],
-        }
-    ];
-    var expectedUnmatchedResult = [
-        {
-            _id: localId,
-            foreignKey: "x",
-            match: [],
-        }
-    ];
+    var expectedMatchedResult = [{
+        _id: localId,
+        foreignKey: "x",
+        match: [{_id: foreignId, matchedField: "x"}, ],
+    }];
+    var expectedUnmatchedResult = [{
+        _id: localId,
+        foreignKey: "x",
+        match: [],
+    }];
     var result = db.runCommand(aggCmdObj).result;
     assert.eq(result, expectedMatchedResult);
 

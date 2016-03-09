@@ -4,8 +4,7 @@
 function checkedReInitiate(rst) {
     try {
         rst.reInitiate();
-    }
-    catch (e) {
+    } catch (e) {
         // reInitiate can throw because it tries to run an ismaster command on
         // all secondaries, including the new one that may have already aborted
         var errMsg = tojson(e);
@@ -49,10 +48,12 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     var assertFn = function() {
         return rawMongoProgramOutput().match(msg);
     };
-    assert.soon(assertFn, 'Initial sync should have aborted due to an invalid or unsupported' +
-                          ' authSchema version: ' + tojson(schema), 60000);
+    assert.soon(assertFn,
+                'Initial sync should have aborted due to an invalid or unsupported' +
+                    ' authSchema version: ' + tojson(schema),
+                60000);
 
-    rst.stopSet(undefined, undefined, { allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] });
+    rst.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
 }
 
 function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
@@ -81,10 +82,12 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
         return rawMongoProgramOutput().match(msg);
     };
 
-    assert.soon(assertFn, 'Initial sync should have aborted due to an existing user document and' +
-                          ' a missing auth schema', 60000);
+    assert.soon(assertFn,
+                'Initial sync should have aborted due to an existing user document and' +
+                    ' a missing auth schema',
+                60000);
 
-    rst.stopSet(undefined, undefined, { allowedExitCodes: [ MongoRunner.EXIT_ABRUPT ] });
+    rst.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
 }
 
 testInitialSyncAbortsWithUnsupportedAuthSchema({_id: 'authSchema'});

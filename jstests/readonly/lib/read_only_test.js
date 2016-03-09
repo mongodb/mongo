@@ -17,7 +17,6 @@ function makeDirectoryWritable(dir) {
 }
 
 function runReadOnlyTest(test) {
-
     printjson(test);
 
     assert.eq(typeof(test.exec), 'function');
@@ -40,10 +39,8 @@ function runReadOnlyTest(test) {
     makeDirectoryReadOnly(dbpath);
 
     try {
-        var readOnlyOptions = Object.extend(options,
-                                            {readOnly: '',
-                                             dbpath: dbpath,
-                                             noCleanData: true});
+        var readOnlyOptions =
+            Object.extend(options, {readOnly: '', dbpath: dbpath, noCleanData: true});
 
         var readOnlyMongod = MongoRunner.runMongod(readOnlyOptions);
 
@@ -59,13 +56,13 @@ function runReadOnlyTest(test) {
     }
 }
 
-function* cycleN(arr, N) {
+function * cycleN(arr, N) {
     for (var i = 0; i < N; ++i) {
         yield arr[i % arr.length];
     }
 }
 
-function* zip2(iter1, iter2)  {
+function * zip2(iter1, iter2) {
     var n1 = iter1.next();
     var n2 = iter2.next();
     while (!n1.done || !n2.done) {

@@ -1,6 +1,6 @@
 'use strict';
 
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
 
 /**
  * yield.js
@@ -31,9 +31,9 @@ var $config = (function() {
                 doc = cursor.next();
                 assertAlways(verifier(doc, prevDoc),
                              'Verifier failed!\nQuery: ' + tojson(cursor._query) + '\n' +
-                             'Query plan: ' + tojson(cursor.explain()) + '\n' +
-                             'Previous doc: ' + tojson(prevDoc) + '\n' +
-                             'This doc: ' + tojson(doc));
+                                 'Query plan: ' + tojson(cursor.explain()) + '\n' +
+                                 'Previous doc: ' + tojson(prevDoc) + '\n' +
+                                 'This doc: ' + tojson(doc));
             }
             assertAlways.eq(cursor.itcount(), 0);
         },
@@ -44,7 +44,9 @@ var $config = (function() {
          */
         genUpdateDoc: function genUpdateDoc() {
             var newVal = Random.randInt(this.nDocs);
-            return { $set: { a: newVal } };
+            return {
+                $set: {a: newVal}
+            };
         }
     };
 
@@ -54,7 +56,7 @@ var $config = (function() {
          */
         update: function update(db, collName) {
             var id = Random.randInt(this.nDocs);
-            var randDoc = db[collName].findOne({ _id: id });
+            var randDoc = db[collName].findOne({_id: id});
             if (randDoc === null) {
                 return;
             }
@@ -68,9 +70,9 @@ var $config = (function() {
          */
         remove: function remove(db, collName) {
             var id = Random.randInt(this.nDocs);
-            var doc = db[collName].findOne({ _id: id });
+            var doc = db[collName].findOne({_id: id});
             if (doc !== null) {
-                var res = db[collName].remove({ _id: id });
+                var res = db[collName].remove({_id: id});
                 assertAlways.writeOK(res);
                 if (res.nRemoved > 0) {
                     assertAlways.writeOK(db[collName].insert(doc));
@@ -84,8 +86,7 @@ var $config = (function() {
          */
         query: function collScan(db, collName) {
             var nMatches = 100;
-            var cursor = db[collName].find({ a: { $lt: nMatches } })
-                                     .batchSize(this.batchSize);
+            var cursor = db[collName].find({a: {$lt: nMatches}}).batchSize(this.batchSize);
             var collScanVerifier = function collScanVerifier(doc, prevDoc) {
                 return doc.a < nMatches;
             };
@@ -110,9 +111,9 @@ var $config = (function() {
      *
      */
     var transitions = {
-        update: { update: 0.334, remove: 0.333, query: 0.333 },
-        remove: { update: 0.333, remove: 0.334, query: 0.333 },
-        query:  { update: 0.333, remove: 0.333, query: 0.334 }
+        update: {update: 0.334, remove: 0.333, query: 0.333},
+        remove: {update: 0.333, remove: 0.334, query: 0.333},
+        query: {update: 0.333, remove: 0.333, query: 0.334}
     };
 
     /*
@@ -126,18 +127,15 @@ var $config = (function() {
 
         cluster.executeOnMongodNodes(function enableFailPoint(db) {
             assertAlways.commandWorked(
-                db.adminCommand({ configureFailPoint: 'recordNeedsFetchFail', mode: 'alwaysOn' })
-            );
+                db.adminCommand({configureFailPoint: 'recordNeedsFetchFail', mode: 'alwaysOn'}));
         });
 
         // Lower the following parameters to force even more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
             assertAlways.commandWorked(
-                db.adminCommand({ setParameter: 1, internalQueryExecYieldIterations: 5 })
-            );
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}));
             assertAlways.commandWorked(
-                db.adminCommand({ setParameter: 1, internalQueryExecYieldPeriodMS: 1 })
-            );
+                db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}));
         });
         // Set up some data to query.
         var N = this.nDocs;
@@ -145,9 +143,8 @@ var $config = (function() {
         for (var i = 0; i < N; i++) {
             // Give each doc some word of text
             var word = this.words[i % this.words.length];
-            bulk.find({ _id: i }).upsert().updateOne(
-                { $set: { a: i, b: N - i, c: i, d: N - i, yield_text: word } }
-            );
+            bulk.find({_id: i}).upsert().updateOne(
+                {$set: {a: i, b: N - i, c: i, d: N - i, yield_text: word}});
         }
         assertAlways.writeOK(bulk.execute());
     }
@@ -158,16 +155,13 @@ var $config = (function() {
     function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function disableFailPoint(db) {
             assertAlways.commandWorked(
-                db.adminCommand({ configureFailPoint: 'recordNeedsFetchFail', mode: 'off' })
-            );
+                db.adminCommand({configureFailPoint: 'recordNeedsFetchFail', mode: 'off'}));
         });
         cluster.executeOnMongodNodes(function resetYieldParams(db) {
             assertAlways.commandWorked(
-                db.adminCommand({ setParameter: 1, internalQueryExecYieldIterations: 128 })
-            );
+                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 128}));
             assertAlways.commandWorked(
-                db.adminCommand({ setParameter: 1, internalQueryExecYieldPeriodMS: 10 })
-            );
+                db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 10}));
         });
     }
 

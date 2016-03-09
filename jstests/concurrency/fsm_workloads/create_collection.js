@@ -5,7 +5,7 @@
  *
  * Repeatedly creates a collection.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
 
 var $config = (function() {
 
@@ -40,8 +40,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { create: 1 },
-        create: { create: 1 }
+        init: {create: 1},
+        create: {create: 1}
     };
 
     function teardown(db, collName, cluster) {

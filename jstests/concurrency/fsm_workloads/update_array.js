@@ -9,7 +9,7 @@
  * though other threads in the workload may be modifying the array between the
  * update and the find, because thread ids are unique.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 
 var $config = (function() {
 
@@ -26,8 +26,7 @@ var $config = (function() {
                 if (db.getMongo().writeMode() === 'commands') {
                     assertWhenOwnColl.contains(res.nModified, nModifiedPossibilities, tojson(res));
                 }
-            }
-            else {
+            } else {
                 // Zero matches are possible for MMAP v1 because the update will skip a document
                 // that was invalidated during a yield.
                 assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
@@ -38,13 +37,13 @@ var $config = (function() {
         }
 
         function doPush(db, collName, docIndex, value) {
-            var res = db[collName].update({ _id: docIndex }, { $push: { arr: value } });
+            var res = db[collName].update({_id: docIndex}, {$push: {arr: value}});
 
             // assert the update reported success
             assertUpdateSuccess(db, res, [1]);
 
             // find the doc and make sure it was updated
-            var doc = db[collName].findOne({ _id: docIndex });
+            var doc = db[collName].findOne({_id: docIndex});
             assertWhenOwnColl(function() {
                 assertWhenOwnColl.neq(null, doc);
                 assertWhenOwnColl(doc.hasOwnProperty('arr'),
@@ -54,21 +53,22 @@ var $config = (function() {
                 // anything. The $push operator always modifies the matched document, so if we
                 // matched something, then we must have updated it.
                 if (res.nMatched > 0) {
-                    assertWhenOwnColl.contains(value, doc.arr,
+                    assertWhenOwnColl.contains(value,
+                                               doc.arr,
                                                "doc.arr doesn't contain value (" + value +
-                                               ') after $push: ' + tojson(doc.arr));
+                                                   ') after $push: ' + tojson(doc.arr));
                 }
             });
         }
 
         function doPull(db, collName, docIndex, value) {
-            var res = db[collName].update({ _id: docIndex }, { $pull: { arr: value } });
+            var res = db[collName].update({_id: docIndex}, {$pull: {arr: value}});
 
             // assert the update reported success
             assertUpdateSuccess(db, res, [0, 1]);
 
             // find the doc and make sure it was updated
-            var doc = db[collName].findOne({ _id: docIndex });
+            var doc = db[collName].findOne({_id: docIndex});
             assertWhenOwnColl(function() {
                 assertWhenOwnColl.neq(null, doc);
 
@@ -77,9 +77,10 @@ var $config = (function() {
                 // removed all occurrences of 'value' from the array (meaning that there should be
                 // none left).
                 if (res.nMatched > 0) {
-                    assertWhenOwnColl.eq(-1, doc.arr.indexOf(value),
+                    assertWhenOwnColl.eq(-1,
+                                         doc.arr.indexOf(value),
                                          'doc.arr contains removed value (' + value +
-                                         ') after $pull: ' + tojson(doc.arr));
+                                             ') after $pull: ' + tojson(doc.arr));
                 }
             });
         }
@@ -103,21 +104,15 @@ var $config = (function() {
     })();
 
     var transitions = {
-        push: {
-            push: 0.8,
-            pull: 0.2
-        },
-        pull: {
-            push: 0.8,
-            pull: 0.2
-        }
+        push: {push: 0.8, pull: 0.2},
+        pull: {push: 0.8, pull: 0.2}
     };
 
     function setup(db, collName, cluster) {
         // index on 'arr', the field being updated
-        assertAlways.commandWorked(db[collName].ensureIndex({ arr: 1 }));
+        assertAlways.commandWorked(db[collName].ensureIndex({arr: 1}));
         for (var i = 0; i < this.numDocs; ++i) {
-            var res = db[collName].insert({ _id: i, arr: [] });
+            var res = db[collName].insert({_id: i, arr: []});
             assertWhenOwnColl.writeOK(res);
             assertWhenOwnColl.eq(1, res.nInserted);
         }
@@ -129,9 +124,7 @@ var $config = (function() {
         startState: 'push',
         states: states,
         transitions: transitions,
-        data: {
-            numDocs: 10
-        },
+        data: {numDocs: 10},
         setup: setup
     };
 

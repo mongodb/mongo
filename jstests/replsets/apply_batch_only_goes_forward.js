@@ -35,7 +35,10 @@
     var sLocal = slave.getDB("local");
     var sMinvalid = sLocal["replset.minvalid"];
     var stepDownSecs = 30;
-    var stepDownCmd = {replSetStepDown: stepDownSecs, force: true};
+    var stepDownCmd = {
+        replSetStepDown: stepDownSecs,
+        force: true
+    };
 
     // Write op
     assert.writeOK(mTest.foo.save({}, {writeConcern: {w: 3}}));
@@ -44,21 +47,20 @@
 
     // Set minvalid to something far in the future for the current primary, to simulate recovery.
     // Note: This is so far in the future (5 days) that it will never become secondary.
-    var farFutureTS = new Timestamp(Math.floor(new Date().getTime()/1000) +
-                                               (60 * 60 * 24 * 5 /* in five days*/), 0);
+    var farFutureTS = new Timestamp(
+        Math.floor(new Date().getTime() / 1000) + (60 * 60 * 24 * 5 /* in five days*/), 0);
     var rsgs = assert.commandWorked(mLocal.adminCommand("replSetGetStatus"));
-    var primaryOpTime = rsgs.members.filter( function (member) {
-                                                        return member.self;}
-                                            )[0].optime;
+    var primaryOpTime = rsgs.members.filter(function(member) {
+        return member.self;
+    })[0].optime;
     jsTest.log("future TS: " + tojson(farFutureTS) + ", date:" + tsToDate(farFutureTS));
     // We do an update in case there is a minvalid document on the primary already.
     // If the doc doesn't exist then upsert:true will create it, and the writeConcern ensures
     // that update returns details of the write, like whether an update or insert was performed.
-    printjson(assert.writeOK(mMinvalid.update({},
-                                              { ts: farFutureTS,
-                                                t: NumberLong(-1),
-                                                begin: primaryOpTime},
-                                              { upsert: true, writeConcern: {w: 1}})));
+    printjson(
+        assert.writeOK(mMinvalid.update({},
+                                        {ts: farFutureTS, t: NumberLong(-1), begin: primaryOpTime},
+                                        {upsert: true, writeConcern: {w: 1}})));
 
     jsTest.log("restart primary");
     replTest.restart(master);
@@ -70,9 +72,13 @@
 
     assert.soon(function() {
         var mv;
-        try {mv = mMinvalid.findOne();} catch (e) { return false; }
-        var msg =  "ts !=, " + farFutureTS +
-                   "(" + tsToDate(farFutureTS) + "), mv:" + tojson(mv) + " - " + tsToDate(mv.ts);
+        try {
+            mv = mMinvalid.findOne();
+        } catch (e) {
+            return false;
+        }
+        var msg = "ts !=, " + farFutureTS + "(" + tsToDate(farFutureTS) + "), mv:" + tojson(mv) +
+            " - " + tsToDate(mv.ts);
         assert.eq(farFutureTS, mv.ts, msg);
         return true;
     });

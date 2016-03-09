@@ -16,7 +16,9 @@ var blacklist = [
     // is slow and the composer doesn't honor iteration counts:
     'remove_single_document_eval_nolock.js',
     'update_simple_eval_nolock.js',
-].map(function(file) { return dir + '/' + file; });
+].map(function(file) {
+    return dir + '/' + file;
+});
 
 // SERVER-16196 re-enable executing workloads
 // runCompositionOfWorkloads(ls(dir).filter(function(file) {

@@ -15,9 +15,10 @@
     t.insert({a: new Array(1024 * 1024 - 1105).join('a')});
 
     // do not use cursor form, since it has a different workaroud for this issue.
-    assert.commandFailed(
-        db.runCommand({aggregate: t.getName(),
-                      pipeline: [{$match: {}}, {$group: {_id: null, arr: {$push: {a: '$a'}}}}]}));
+    assert.commandFailed(db.runCommand({
+        aggregate: t.getName(),
+        pipeline: [{$match: {}}, {$group: {_id: null, arr: {$push: {a: '$a'}}}}]
+    }));
 
     // Make sure the server is still up.
     assert.commandWorked(db.runCommand('ping'));

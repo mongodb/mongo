@@ -3,4 +3,4 @@ load('jstests/aggregation/extras/utils.js');
 
 db.server6198.drop();
 
-assertErrorCode(db.server6198, {$group:{_id:null, "bar.baz": {$addToSet: "$foo"}}}, 16414);
+assertErrorCode(db.server6198, {$group: {_id: null, "bar.baz": {$addToSet: "$foo"}}}, 16414);

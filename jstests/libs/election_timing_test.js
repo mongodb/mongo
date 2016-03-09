@@ -11,11 +11,7 @@ var ElectionTimingTest = function(opts) {
 
     // The config is set to two electable nodes since we use waitForMemberState
     // to wait for the electable secondary to become primary.
-    this.nodes = opts.nodes || [
-        {},
-        {},
-        {rsConfig: {arbiterOnly: true}}
-    ];
+    this.nodes = opts.nodes || [{}, {}, {rsConfig: {arbiterOnly: true}}];
 
     // The name of the replica set and of the collection.
     this.name = opts.name || "election_timing";
@@ -52,10 +48,14 @@ var ElectionTimingTest = function(opts) {
 ElectionTimingTest.prototype._runTimingTest = function() {
     for (var run = 0; run < this.testRuns; run++) {
         var collectionName = "test." + this.name;
-        var cycleData = {testRun: run, results: []};
+        var cycleData = {
+            testRun: run,
+            results: []
+        };
 
         jsTestLog("Starting ReplSetTest for test " + this.name + " run: " + run);
-        this.rst = new ReplSetTest({name: this.name, nodes: this.nodes, nodeOptions: {verbose:""}});
+        this.rst =
+            new ReplSetTest({name: this.name, nodes: this.nodes, nodeOptions: {verbose: ""}});
         this.rst.startSet();
 
         // Get the replset config and apply the settings object.
@@ -87,9 +87,7 @@ ElectionTimingTest.prototype._runTimingTest = function() {
 
         var coll = primary.getCollection(collectionName);
         for (var i = 0; i < 100; i++) {
-            assert.writeOK(coll.insert({_id: i,
-                                        x: i * 3,
-                                        arbitraryStr: "this is a string"}));
+            assert.writeOK(coll.insert({_id: i, x: i * 3, arbitraryStr: "this is a string"}));
         }
 
         // Run the election tests on this ReplSetTest instance.
@@ -123,10 +121,8 @@ ElectionTimingTest.prototype._runTimingTest = function() {
             } catch (e) {
                 // If we didn"t find a primary, save the error, break so this
                 // ReplSetTest is stopped. We can"t continue from a flaky state.
-                this.testErrors.push({testRun: run,
-                                      cycle: cycle,
-                                      status: "new primary not elected",
-                                      error: e});
+                this.testErrors.push(
+                    {testRun: run, cycle: cycle, status: "new primary not elected", error: e});
                 break;
             }
 
@@ -140,16 +136,17 @@ ElectionTimingTest.prototype._runTimingTest = function() {
             assert.neq(undefined, newElectionId, "isMaster() failed to return a valid electionId");
 
             if (bsonWoCompare(oldElectionId, newElectionId) !== 0) {
-                this.testErrors.push({testRun: run,
-                                      cycle: cycle,
-                                      status: "electionId not changed, no election was triggered"});
+                this.testErrors.push({
+                    testRun: run,
+                    cycle: cycle,
+                    status: "electionId not changed, no election was triggered"
+                });
                 break;
             }
 
             if (primary.host === newPrimary.host) {
-                this.testErrors.push({testRun: run,
-                                      cycle: cycle,
-                                      status: "Previous primary was re-elected"});
+                this.testErrors.push(
+                    {testRun: run, cycle: cycle, status: "Previous primary was re-elected"});
                 break;
             }
 
@@ -160,10 +157,8 @@ ElectionTimingTest.prototype._runTimingTest = function() {
                 try {
                     this.testReset();
                 } catch (e) {
-                    this.testErrors.push({testRun: run,
-                                          cycle: cycle,
-                                          status: "testReset() failed",
-                                          error: e});
+                    this.testErrors.push(
+                        {testRun: run, cycle: cycle, status: "testReset() failed", error: e});
                     break;
                 }
             }
@@ -192,14 +187,12 @@ ElectionTimingTest.prototype.stepDownPrimaryReset = function() {
 };
 
 ElectionTimingTest.prototype.waitForNewPrimary = function(rst, secondary) {
-    assert.commandWorked(
-        secondary.adminCommand({
-            replSetTest: 1,
-            waitForMemberState: ReplSetTest.State.PRIMARY,
-            timeoutMillis: 60 * 1000
-        }),
-        "node " + secondary.host + " failed to become primary"
-    );
+    assert.commandWorked(secondary.adminCommand({
+        replSetTest: 1,
+        waitForMemberState: ReplSetTest.State.PRIMARY,
+        timeoutMillis: 60 * 1000
+    }),
+                         "node " + secondary.host + " failed to become primary");
 };
 
 /**
@@ -227,8 +220,7 @@ ElectionTimingTest.calculateElectionTimeoutLimitMillis = function(primary) {
     var assertSoonIntervalMillis = 200;  // from assert.js
     var applierDrainWaitMillis = 1000;  // from SyncTail::tryPopAndWaitForMore()
     var electionTimeoutLimitMillis =
-        (1 + electionTimeoutOffsetLimitFraction) * electionTimeoutMillis +
-        applierDrainWaitMillis +
+        (1 + electionTimeoutOffsetLimitFraction) * electionTimeoutMillis + applierDrainWaitMillis +
         assertSoonIntervalMillis;
     return electionTimeoutLimitMillis;
 };

@@ -5,8 +5,14 @@
 t = db.geo_s2nearcorrect;
 t.drop();
 
-longline = { "type" : "LineString", "coordinates": [ [0,0], [179, 89]]};
+longline = {
+    "type": "LineString",
+    "coordinates": [[0, 0], [179, 89]]
+};
 t.insert({geo: longline});
 t.ensureIndex({geo: "2dsphere"});
-origin = { "type" : "Point", "coordinates": [ 45, 45] };
-assert.eq(1, t.find({ "geo" : { "$near" : { "$geometry" : origin, $maxDistance: 20000000} } }).count());
+origin = {
+    "type": "Point",
+    "coordinates": [45, 45]
+};
+assert.eq(1, t.find({"geo": {"$near": {"$geometry": origin, $maxDistance: 20000000}}}).count());

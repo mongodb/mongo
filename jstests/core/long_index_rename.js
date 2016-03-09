@@ -7,11 +7,15 @@ t = db.long_index_rename;
 t.drop();
 
 for (i = 1; i < 10; i++) {
-    t.save({a:i});
+    t.save({a: i});
 }
 
-t.createIndex({a:1}, {name: "aaa"});
-var result = t.createIndex({a:1}, {name: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"});
-assert( !result.ok );
-assert( result.errmsg.indexOf( "too long" ) >= 0 );
+t.createIndex({a: 1}, {name: "aaa"});
+var result = t.createIndex(
+    {a: 1},
+    {
+      name: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    });
+assert(!result.ok);
+assert(result.errmsg.indexOf("too long") >= 0);

@@ -5,134 +5,140 @@
 load('./jstests/multiVersion/libs/verify_versions.js');
 
 (function() {
-"use strict";
-// Check our latest versions
-//var versionsToCheck = [ "last-stable", "latest" ];
-//var versionsToCheckMongos = [ "last-stable" ];
-// TODO put this back when SERVER-22761 is resolved
-                       
-var versionsToCheck = [ "latest" ];
-var versionsToCheckMongos = [ "latest" ];
+    "use strict";
+    // Check our latest versions
+    // var versionsToCheck = [ "last-stable", "latest" ];
+    // var versionsToCheckMongos = [ "last-stable" ];
+    // TODO put this back when SERVER-22761 is resolved
 
-jsTest.log( "Testing legacy versions..." );
+    var versionsToCheck = ["latest"];
+    var versionsToCheckMongos = ["latest"];
 
-for( var i = 0; i < versionsToCheck.length; i++ ){
+    jsTest.log("Testing legacy versions...");
 
-    var version = versionsToCheck[ i ];
-    
-    // Set up a cluster
-    
-    var st = new ShardingTest({ shards : 2, 
-                                mongos : 2,
-                                other : { 
-                                    mongosOptions : { binVersion : version },
-                                    configOptions : { binVersion : version },
-                                    shardOptions : { binVersion : version }
-                                } });
-    
-    var shards = [ st.shard0, st.shard1 ];
-    var mongoses = [ st.s0, st.s1 ];
-    var configs = [ st.config0 ];
-    
-    // Make sure the started versions are actually the correct versions
-    for( var j = 0; j < shards.length; j++ ) assert.binVersion( shards[j], version );
-    for( j = 0; j < mongoses.length; j++ ) assert.binVersion( mongoses[j], version );
-    for( j = 0; j < configs.length; j++ ) assert.binVersion( configs[j], version );
-    
+    for (var i = 0; i < versionsToCheck.length; i++) {
+        var version = versionsToCheck[i];
+
+        // Set up a cluster
+
+        var st = new ShardingTest({
+            shards: 2,
+            mongos: 2,
+            other: {
+                mongosOptions: {binVersion: version},
+                configOptions: {binVersion: version},
+                shardOptions: {binVersion: version}
+            }
+        });
+
+        var shards = [st.shard0, st.shard1];
+        var mongoses = [st.s0, st.s1];
+        var configs = [st.config0];
+
+        // Make sure the started versions are actually the correct versions
+        for (var j = 0; j < shards.length; j++)
+            assert.binVersion(shards[j], version);
+        for (j = 0; j < mongoses.length; j++)
+            assert.binVersion(mongoses[j], version);
+        for (j = 0; j < configs.length; j++)
+            assert.binVersion(configs[j], version);
+
+        st.stop();
+    }
+
+    jsTest.log("Testing mixed versions...");
+
+    // Set up a multi-version cluster
+
+    st = new ShardingTest({
+        shards: 2,
+        mongos: 2,
+        other: {
+            mongosOptions: {binVersion: versionsToCheckMongos},
+            configOptions: {binVersion: versionsToCheck},
+            shardOptions: {binVersion: versionsToCheck}
+
+        }
+    });
+
+    shards = [st.shard0, st.shard1];
+    mongoses = [st.s0, st.s1];
+    configs = [st.config0, st.config1, st.config2];
+
+    // Make sure we have hosts of all the different versions
+    var versionsFound = [];
+    for (j = 0; j < shards.length; j++)
+        versionsFound.push(shards[j].getBinVersion());
+
+    assert.allBinVersions(versionsToCheck, versionsFound);
+
+    versionsFound = [];
+    for (j = 0; j < mongoses.length; j++)
+        versionsFound.push(mongoses[j].getBinVersion());
+
+    assert.allBinVersions(versionsToCheckMongos, versionsFound);
+
+    versionsFound = [];
+    for (j = 0; j < configs.length; j++)
+        versionsFound.push(configs[j].getBinVersion());
+
+    assert.allBinVersions(versionsToCheck, versionsFound);
+
     st.stop();
-}
 
-jsTest.log( "Testing mixed versions..." );
-        
-// Set up a multi-version cluster
+    jsTest.log("Testing mixed versions with replica sets...");
 
-st = new ShardingTest({ shards : 2,
-                            mongos : 2,
-                            other : {
-                                mongosOptions : { binVersion : versionsToCheckMongos },
-                                configOptions : { binVersion : versionsToCheck },
-                                shardOptions : { binVersion : versionsToCheck }
+    // Set up a multi-version cluster w/ replica sets
 
-                            } });
-    
-shards = [ st.shard0, st.shard1 ];
-mongoses = [ st.s0, st.s1 ];
-configs = [ st.config0, st.config1, st.config2 ];
+    st = new ShardingTest({
+        shards: 2,
+        mongos: 2,
+        other: {
+            // Replica set shards
+            rs: true,
 
-// Make sure we have hosts of all the different versions
-var versionsFound = [];
-for ( j = 0; j < shards.length; j++ ) 
-    versionsFound.push( shards[j].getBinVersion() );
+            mongosOptions: {binVersion: versionsToCheckMongos},
+            configOptions: {binVersion: versionsToCheck},
+            rsOptions: {binVersion: versionsToCheck, protocolVersion: 0}
+        }
+    });
 
-assert.allBinVersions( versionsToCheck, versionsFound );
+    var nodesA = st.rs0.nodes;
+    var nodesB = st.rs1.nodes;
+    mongoses = [st.s0, st.s1];
+    configs = [st.config0, st.config1, st.config2];
 
-versionsFound = [];
-for ( j = 0; j < mongoses.length; j++ ) 
-    versionsFound.push( mongoses[j].getBinVersion() );
+    var getVersion = function(mongo) {
+        var result = mongo.getDB("admin").runCommand({serverStatus: 1});
+        return result.version;
+    };
 
-assert.allBinVersions( versionsToCheckMongos, versionsFound );
-    
-versionsFound = [];
-for ( j = 0; j < configs.length; j++ ) 
-    versionsFound.push( configs[j].getBinVersion() );
-    
-assert.allBinVersions( versionsToCheck, versionsFound );
-    
-st.stop();
+    // Make sure we have hosts of all the different versions
+    versionsFound = [];
+    for (j = 0; j < nodesA.length; j++)
+        versionsFound.push(nodesA[j].getBinVersion());
 
+    assert.allBinVersions(versionsToCheck, versionsFound);
 
-jsTest.log( "Testing mixed versions with replica sets..." );
-        
-// Set up a multi-version cluster w/ replica sets
+    versionsFound = [];
+    for (j = 0; j < nodesB.length; j++)
+        versionsFound.push(nodesB[j].getBinVersion());
 
-st = new ShardingTest({ shards : 2,
-                            mongos : 2,
-                            other : {
-                                // Replica set shards
-                                rs : true,
-                                
-                                mongosOptions : { binVersion : versionsToCheckMongos },
-                                configOptions : { binVersion : versionsToCheck },
-                                rsOptions : { binVersion : versionsToCheck, protocolVersion: 0 }
-                            } });
-    
-var nodesA = st.rs0.nodes;
-var nodesB = st.rs1.nodes;
-mongoses = [ st.s0, st.s1 ];
-configs = [ st.config0, st.config1, st.config2 ];
+    assert.allBinVersions(versionsToCheck, versionsFound);
 
-var getVersion = function( mongo ){
-    var result = mongo.getDB( "admin" ).runCommand({ serverStatus : 1 });
-    return result.version;
-};
+    versionsFound = [];
+    for (j = 0; j < mongoses.length; j++)
+        versionsFound.push(mongoses[j].getBinVersion());
 
-// Make sure we have hosts of all the different versions
-versionsFound = [];
-for ( j = 0; j < nodesA.length; j++ ) 
-    versionsFound.push( nodesA[j].getBinVersion() );
+    assert.allBinVersions(versionsToCheckMongos, versionsFound);
 
-assert.allBinVersions( versionsToCheck, versionsFound );
+    versionsFound = [];
+    for (j = 0; j < configs.length; j++)
+        versionsFound.push(configs[j].getBinVersion());
 
-versionsFound = [];
-for ( j = 0; j < nodesB.length; j++ ) 
-    versionsFound.push( nodesB[j].getBinVersion() );
+    assert.allBinVersions(versionsToCheck, versionsFound);
 
-assert.allBinVersions( versionsToCheck, versionsFound );
+    jsTest.log("DONE!");
 
-versionsFound = [];
-for ( j = 0; j < mongoses.length; j++ )
-    versionsFound.push( mongoses[j].getBinVersion() );
-
-assert.allBinVersions( versionsToCheckMongos, versionsFound );
-
-versionsFound = [];
-for ( j = 0; j < configs.length; j++ )
-    versionsFound.push( configs[j].getBinVersion() );
-
-assert.allBinVersions( versionsToCheck, versionsFound );
-
-jsTest.log("DONE!");
-   
-st.stop();
+    st.stop();
 })();
-

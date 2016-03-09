@@ -3,18 +3,21 @@
 // Start replica set. Ensure that highest priority node becomes primary eventually.
 // Shut down the primary and confirm that the next highest priority node becomes primary.
 // Repeat until 3 nodes are left standing.
-(function () {
+(function() {
     'use strict';
     load('jstests/replsets/rslib.js');
 
     var name = 'priority_takeover_cascading_priorities';
-    var replSet = new ReplSetTest({name: name, nodes: [
-        {rsConfig: {priority: 5}},
-        {rsConfig: {priority: 4}},
-        {rsConfig: {priority: 3}},
-        {rsConfig: {priority: 2}},
-        {rsConfig: {priority: 1}},
-    ]});
+    var replSet = new ReplSetTest({
+        name: name,
+        nodes: [
+            {rsConfig: {priority: 5}},
+            {rsConfig: {priority: 4}},
+            {rsConfig: {priority: 3}},
+            {rsConfig: {priority: 2}},
+            {rsConfig: {priority: 1}},
+        ]
+    });
     replSet.startSet();
     replSet.initiate();
 
@@ -27,8 +30,7 @@
                 waitForMemberState: ReplSetTest.State.PRIMARY,
                 timeoutMillis: 60 * 1000,
             }),
-            'node ' + i + ' ' + replSet.nodes[i].host + ' failed to become primary'
-        );
+            'node ' + i + ' ' + replSet.nodes[i].host + ' failed to become primary');
     };
 
     waitForPrimary(0);

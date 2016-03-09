@@ -8,12 +8,12 @@
  * a document move by growing the size of the inserted document using
  * the $set and $mul update operators.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 
 var $config = (function() {
 
     var data = {
-        shardKey: { tid: 1 },
+        shardKey: {tid: 1},
     };
 
     var states = (function() {
@@ -30,7 +30,11 @@ var $config = (function() {
         function makeDoc(tid) {
             // Use 32-bit integer for representing 'length' property
             // to ensure $mul does integer multiplication
-            var doc = { _id: new ObjectId(), tid: tid, length: new NumberInt(1) };
+            var doc = {
+                _id: new ObjectId(),
+                tid: tid,
+                length: new NumberInt(1)
+            };
             doc[uniqueFieldName] = makeStringOfLength(doc.length);
             return doc;
         }
@@ -53,11 +57,12 @@ var $config = (function() {
             }
 
             // Get the DiskLoc of the document before its potential move
-            var before = db[collName].find({ tid: this.tid })
-                                     .showDiskLoc()
-                                     .sort({ length: 1 }) // fetch document of smallest size
-                                     .limit(1)
-                                     .next();
+            var before = db[collName]
+                             .find({tid: this.tid})
+                             .showDiskLoc()
+                             .sort({length: 1})  // fetch document of smallest size
+                             .limit(1)
+                             .next();
 
             // Increase the length of the 'findAndModify_update_grow' string
             // to double the size of the overall document
@@ -65,15 +70,17 @@ var $config = (function() {
             var updatedLength = factor * this.length;
             var updatedValue = makeStringOfLength(updatedLength);
 
-            var update = { $set: {}, $mul: { length: factor } };
+            var update = {
+                $set: {},
+                $mul: {length: factor}
+            };
             update.$set[uniqueFieldName] = updatedValue;
 
             var res = db.runCommand({
                 findandmodify: db[collName].getName(),
-                query: { tid: this.tid },
-                sort: { length: 1 }, // fetch document of smallest size
-                update: update,
-                new: true
+                query: {tid: this.tid},
+                sort: {length: 1},  // fetch document of smallest size
+                update: update, new: true
             });
             assertAlways.commandWorked(res);
 
@@ -92,14 +99,14 @@ var $config = (function() {
             this.bsonsize = Object.bsonsize(doc);
 
             // Get the DiskLoc of the document after its potential move
-            var after = db[collName].find({ _id: before._id }).showDiskLoc().next();
+            var after = db[collName].find({_id: before._id}).showDiskLoc().next();
 
             if (isMongod(db) && isMMAPv1(db)) {
                 // Since the document has at least doubled in size, and the default
                 // allocation strategy of mmapv1 is to use power of two sizes, the
                 // document will have always moved
-                assertWhenOwnColl.neq(before.$recordId, after.$recordId,
-                                      'document should have moved');
+                assertWhenOwnColl.neq(
+                    before.$recordId, after.$recordId, 'document should have moved');
             }
         }
 
@@ -111,8 +118,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        insert: { findAndModify: 1 },
-        findAndModify: { findAndModify: 1 }
+        insert: {findAndModify: 1},
+        findAndModify: {findAndModify: 1}
     };
 
     return {

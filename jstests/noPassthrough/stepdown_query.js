@@ -28,13 +28,15 @@
         // network errors, we run a dummy operation here to force the shell to reconnect.
         try {
             conn.getDB("admin").runCommand("ping");
+        } catch (e) {
         }
-        catch (e) {}
 
         // Even though our connection doesn't have slaveOk set, we should still be able to iterate
         // our cursor and kill our cursor.
         assert(cursor.hasNext());
-        assert.doesNotThrow(function() { cursor.close(); });
+        assert.doesNotThrow(function() {
+            cursor.close();
+        });
     }
 
     // Test querying a replica set primary directly.

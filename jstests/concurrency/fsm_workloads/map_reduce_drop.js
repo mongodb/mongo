@@ -60,7 +60,7 @@ var $config = (function() {
             // iterations and threads in this workload.
             var bulk = mapReduceDB[collName].initializeUnorderedBulkOp();
             for (var i = 0; i < this.numDocs; ++i) {
-                bulk.insert({ key: Random.randInt(10000) });
+                bulk.insert({key: Random.randInt(10000)});
             }
             var res = bulk.execute();
             assertAlways.writeOK(res);
@@ -74,8 +74,7 @@ var $config = (function() {
 
             try {
                 mapReduceDB[collName].mapReduce(this.mapper, this.reducer, options);
-            }
-            catch (e) {
+            } catch (e) {
                 // Ignore all mapReduce exceptions.  This workload is only concerned
                 // with verifying server availability.
             }
@@ -90,9 +89,9 @@ var $config = (function() {
     })();
 
     var transitions = {
-        dropColl: { mapReduce: 1 },
-        dropDB: { mapReduce: 1 },
-        mapReduce: { mapReduce: 0.7, dropDB: 0.05, dropColl: 0.25 }
+        dropColl: {mapReduce: 1},
+        dropDB: {mapReduce: 1},
+        mapReduce: {mapReduce: 0.7, dropDB: 0.05, dropColl: 0.25}
     };
 
     function teardown(db, collName, cluster) {

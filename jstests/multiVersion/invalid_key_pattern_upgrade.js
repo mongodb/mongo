@@ -8,11 +8,7 @@
 (function() {
     'use strict';
 
-    var testCases = [
-        {a: 0},
-        {a: NaN},
-        {a: true},
-    ];
+    var testCases = [{a: 0}, {a: NaN}, {a: true}, ];
 
     // The mongod should not start up when an index with an invalid key pattern exists.
     testCases.forEach(function(indexKeyPattern) {
@@ -30,8 +26,8 @@
         // Start the old version.
         var oldVersionOptions = Object.extend({binVersion: '3.2'}, defaultOptions);
         var conn = MongoRunner.runMongod(oldVersionOptions);
-        assert.neq(null, conn, 'mongod was unable to start up with options ' +
-                   tojson(oldVersionOptions));
+        assert.neq(
+            null, conn, 'mongod was unable to start up with options ' + tojson(oldVersionOptions));
 
         // Use write commands in order to make assertions about the success of operations based on
         // the response from the server.
@@ -42,8 +38,10 @@
 
         // Start the newest version.
         conn = MongoRunner.runMongod(defaultOptions);
-        assert.eq(null, conn, 'mongod should not have been able to start up when an index with' +
-                  ' an invalid key pattern' + tojson(indexKeyPattern) + ' exists');
+        assert.eq(null,
+                  conn,
+                  'mongod should not have been able to start up when an index with' +
+                      ' an invalid key pattern' + tojson(indexKeyPattern) + ' exists');
     });
 
     // Create a replica set with a primary running 3.2 and a secondary running the latest version.
@@ -51,10 +49,7 @@
     // replicates.
     testCases.forEach(function(indexKeyPattern) {
         var replSetName = 'invalid_key_pattern_replset';
-        var nodes = [
-            {binVersion: '3.2'},
-            {binVersion: 'latest'},
-        ];
+        var nodes = [{binVersion: '3.2'}, {binVersion: 'latest'}, ];
 
         var rst = new ReplSetTest({name: replSetName, nodes: nodes});
 
@@ -80,15 +75,17 @@
 
         // Verify that the secondary running the latest version terminates when the command to build
         // an index with an invalid key pattern replicates.
-        assert.soon(function() {
-            try {
-                secondaryLatest.getDB('test').runCommand({ping: 1});
-            } catch (e) {
-                return true;
-            }
-            return false;
-        }, 'secondary should have terminated due to request to build an index with an invalid key' +
-           ' pattern ' + tojson(indexKeyPattern));
+        assert.soon(
+            function() {
+                try {
+                    secondaryLatest.getDB('test').runCommand({ping: 1});
+                } catch (e) {
+                    return true;
+                }
+                return false;
+            },
+            'secondary should have terminated due to request to build an index with an invalid key' +
+                ' pattern ' + tojson(indexKeyPattern));
 
         rst.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
     });

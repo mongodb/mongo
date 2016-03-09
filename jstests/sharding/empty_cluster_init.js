@@ -1,13 +1,11 @@
 //
 // Tests initialization of an empty cluster with multiple mongoses.
-// Starts a bunch of mongoses in parallel, and ensures that there's only a single config 
+// Starts a bunch of mongoses in parallel, and ensures that there's only a single config
 // version initialization.
 //
 
-var configRS = new ReplSetTest({ name: "configRS", nodes: 3, useHostName: true });
-configRS.startSet({ configsvr: '',
-                    journal: "",
-                    storageEngine: 'wiredTiger' });
+var configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
+configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
 var replConfig = configRS.getReplSetConfig();
 replConfig.configsvr = true;
 configRS.initiate(replConfig);
@@ -20,9 +18,8 @@ jsTest.log("Starting first set of mongoses in parallel...");
 
 var mongoses = [];
 for (var i = 0; i < 3; i++) {
-    var mongos = MongoRunner.runMongos({ binVersion: "latest",
-                                         configdb: configRS.getURL(),
-                                         waitForConnect : false });
+    var mongos = MongoRunner.runMongos(
+        {binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
     mongoses.push(mongos);
 }
 
@@ -33,13 +30,12 @@ assert.soon(function() {
     try {
         mongosConn = new Mongo(mongoses[0].host);
         return true;
-    }
-    catch (e) {
+    } catch (e) {
         print("Waiting for connect...");
         printjson(e);
         return false;
     }
-}, "Mongos " + mongoses[0].host + " did not start.", 5 * 60 * 1000 );
+}, "Mongos " + mongoses[0].host + " did not start.", 5 * 60 * 1000);
 
 var version = mongosConn.getCollection("config.version").findOne();
 
@@ -50,9 +46,8 @@ var version = mongosConn.getCollection("config.version").findOne();
 jsTest.log("Starting second set of mongoses...");
 
 for (var i = 0; i < 3; i++) {
-    var mongos = MongoRunner.runMongos({ binVersion: "latest",
-                                         configdb: configRS.getURL(),
-                                         waitForConnect: false });
+    var mongos = MongoRunner.runMongos(
+        {binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
     mongoses.push(mongos);
 }
 
@@ -61,8 +56,7 @@ assert.soon(function() {
     try {
         mongosConn = new Mongo(mongoses[mongoses.length - 1].host);
         return true;
-    }
-    catch (e) {
+    } catch (e) {
         print("Waiting for connect...");
         printjson(e);
         return false;
@@ -84,8 +78,7 @@ assert(version.clusterId);
 assert.eq(undefined, version.excluding);
 
 var oplog = configRS.getPrimary().getDB('local').oplog.rs;
-var updates = oplog.find({ ns: "config.version" }).toArray();
+var updates = oplog.find({ns: "config.version"}).toArray();
 assert.eq(1, updates.length, 'ops to config.version: ' + tojson(updates));
 
 configRS.stopSet(15);
-

@@ -1,4 +1,4 @@
-(function(){
+(function() {
     "use strict";
 
     // SERVER-8246 Min/MaxKey should be comparable

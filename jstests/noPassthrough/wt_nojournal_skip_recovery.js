@@ -83,9 +83,10 @@
 
     var count = conn.getDB('test').nojournal.count({journaled: {$exists: true}});
     assert.lte(90, count, 'missing documents that were present in the last checkpoint');
-    assert.gte(90, count,
+    assert.gte(90,
+               count,
                'journaled write operations since the last checkpoint should not have been' +
-               ' replayed');
+                   ' replayed');
 
     MongoRunner.stopMongod(conn);
 })();

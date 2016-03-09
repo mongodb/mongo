@@ -10,7 +10,7 @@ assert.commandWorked(res);
 res = coll.insert({content: "some data"});
 assert.writeOK(res);
 
-var explain = coll.find({$text:{$search: "\"a\" -b -\"c\""}}).explain(true);
+var explain = coll.find({$text: {$search: "\"a\" -b -\"c\""}}).explain(true);
 var stage = explain.executionStats.executionStages;
 if ("SINGLE_SHARD" === stage.stage) {
     stage = stage.shards[0].executionStages;

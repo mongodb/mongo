@@ -71,7 +71,9 @@ coll.drop();
 
 res = coll.ensureIndex({geo: "2dsphere"});
 assert.commandWorked(res);
-var specObj = coll.getIndexes().filter( function(z){ return z.name == "geo_2dsphere"; } )[0];
+var specObj = coll.getIndexes().filter(function(z) {
+    return z.name == "geo_2dsphere";
+})[0];
 assert.eq(3, specObj["2dsphereIndexVersion"]);
 coll.drop();
 
@@ -104,38 +106,78 @@ coll.drop();
 // Test compatibility of various GeoJSON objects with both 2dsphere index versions.
 //
 
-var pointDoc = {geo: {type: "Point", coordinates: [40, 5]}};
-var lineStringDoc = {geo: {type: "LineString", coordinates: [[40, 5], [41, 6]]}};
-var polygonDoc = {geo: {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}};
-var multiPointDoc = {geo: {type: "MultiPoint",
-                           coordinates: [[-73.9580, 40.8003], [-73.9498, 40.7968],
-                                         [-73.9737, 40.7648], [-73.9814, 40.7681]]}};
-var multiLineStringDoc = {geo: {type: "MultiLineString",
-                                coordinates: [[[-73.96943, 40.78519], [-73.96082, 40.78095]],
-                                              [[-73.96415, 40.79229], [-73.95544, 40.78854]],
-                                              [[-73.97162, 40.78205], [-73.96374, 40.77715]],
-                                              [[-73.97880, 40.77247], [-73.97036, 40.76811]]]}};
-var multiPolygonDoc = {geo: {type: "MultiPolygon",
-                             coordinates: [[[[-73.958, 40.8003], [-73.9498, 40.7968],
-                                             [-73.9737, 40.7648], [-73.9814, 40.7681],
-                                             [-73.958, 40.8003]]],
-                                           [[[-73.958, 40.8003], [-73.9498, 40.7968],
-                                             [-73.9737, 40.7648], [-73.958, 40.8003]]]]}};
-var geometryCollectionDoc = {geo: {type: "GeometryCollection",
-                                   geometries: [{type: "MultiPoint",
-                                                 coordinates: [[-73.9580, 40.8003],
-                                                               [-73.9498, 40.7968],
-                                                               [-73.9737, 40.7648],
-                                                               [-73.9814, 40.7681]]},
-                                                {type: "MultiLineString",
-                                                 coordinates: [[[-73.96943, 40.78519],
-                                                                [-73.96082, 40.78095]],
-                                                               [[-73.96415, 40.79229],
-                                                                [-73.95544, 40.78854]],
-                                                               [[-73.97162, 40.78205],
-                                                                [-73.96374, 40.77715]],
-                                                               [[-73.97880, 40.77247],
-                                                                [-73.97036, 40.76811]]]}]}};
+var pointDoc = {
+    geo: {type: "Point", coordinates: [40, 5]}
+};
+var lineStringDoc = {
+    geo: {type: "LineString", coordinates: [[40, 5], [41, 6]]}
+};
+var polygonDoc = {
+    geo: {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}
+};
+var multiPointDoc = {
+    geo: {
+        type: "MultiPoint",
+        coordinates:
+            [[-73.9580, 40.8003], [-73.9498, 40.7968], [-73.9737, 40.7648], [-73.9814, 40.7681]]
+    }
+};
+var multiLineStringDoc = {
+    geo: {
+        type: "MultiLineString",
+        coordinates: [
+            [[-73.96943, 40.78519], [-73.96082, 40.78095]],
+            [[-73.96415, 40.79229], [-73.95544, 40.78854]],
+            [[-73.97162, 40.78205], [-73.96374, 40.77715]],
+            [[-73.97880, 40.77247], [-73.97036, 40.76811]]
+        ]
+    }
+};
+var multiPolygonDoc = {
+    geo: {
+        type: "MultiPolygon",
+        coordinates: [
+            [[
+               [-73.958, 40.8003],
+               [-73.9498, 40.7968],
+               [-73.9737, 40.7648],
+               [-73.9814, 40.7681],
+               [-73.958, 40.8003]
+            ]],
+            [[
+               [-73.958, 40.8003],
+               [-73.9498, 40.7968],
+               [-73.9737, 40.7648],
+               [-73.958, 40.8003]
+            ]]
+        ]
+    }
+};
+var geometryCollectionDoc = {
+    geo: {
+        type: "GeometryCollection",
+        geometries: [
+            {
+              type: "MultiPoint",
+              coordinates: [
+                  [-73.9580, 40.8003],
+                  [-73.9498, 40.7968],
+                  [-73.9737, 40.7648],
+                  [-73.9814, 40.7681]
+              ]
+            },
+            {
+              type: "MultiLineString",
+              coordinates: [
+                  [[-73.96943, 40.78519], [-73.96082, 40.78095]],
+                  [[-73.96415, 40.79229], [-73.95544, 40.78854]],
+                  [[-73.97162, 40.78205], [-73.96374, 40.77715]],
+                  [[-73.97880, 40.77247], [-73.97036, 40.76811]]
+              ]
+            }
+        ]
+    }
+};
 
 // {2dsphereIndexVersion: 2} indexes allow all supported GeoJSON objects.
 res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2});

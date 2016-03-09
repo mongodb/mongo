@@ -9,12 +9,7 @@ db.aggtype.insert({key: NumberInt(42), value: 11});
 db.aggtype.insert({key: NumberLong(42), value: 13});
 db.aggtype.insert({key: 42, value: 6});
 
-var at = db.aggtype.aggregate(
-    {$group: {
-        _id: "$key",
-        s: {$sum: "$value"}
-    }}
-).toArray();
+var at = db.aggtype.aggregate({$group: {_id: "$key", s: {$sum: "$value"}}}).toArray();
 
 assert(at[0].s == 30, 'server5209 failed');
 assert(at[1].s == 30, 'server5209 failed');

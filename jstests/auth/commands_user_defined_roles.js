@@ -23,10 +23,8 @@ function testProperAuthorization(conn, t, testcase) {
     authCommandsLib.setup(conn, t, runOnDb);
 
     adminDb.auth("admin", "password");
-    assert.commandWorked(adminDb.runCommand({
-        updateRole: testRole,
-        privileges: testcase.privileges
-    }));
+    assert.commandWorked(
+        adminDb.runCommand({updateRole: testRole, privileges: testcase.privileges}));
     adminDb.logout();
 
     assert(adminDb.auth(testUser, "password"));
@@ -36,15 +34,11 @@ function testProperAuthorization(conn, t, testcase) {
     if (!testcase.expectFail && res.ok != 1 && res.code != commandNotSupportedCode) {
         // don't error if the test failed with code commandNotSupported since
         // some storage engines (e.g wiredTiger) don't support some commands (e.g. touch)
-        out = "command failed with " + tojson(res) +
-              " on db " + testcase.runOnDb +
-              " with privileges " + tojson(testcase.privileges);
-    }
-    else if (testcase.expectFail && res.code == authErrCode) {
-        out = "expected authorization success" +
-              " but received " + tojson(res) +
-              " on db " + testcase.runOnDb +
-              " with privileges " + tojson(testcase.privileges);
+        out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb +
+            " with privileges " + tojson(testcase.privileges);
+    } else if (testcase.expectFail && res.code == authErrCode) {
+        out = "expected authorization success" + " but received " + tojson(res) + " on db " +
+            testcase.runOnDb + " with privileges " + tojson(testcase.privileges);
     }
 
     firstDb.logout();
@@ -62,10 +56,7 @@ function testInsufficientPrivileges(conn, t, testcase, privileges) {
     authCommandsLib.setup(conn, t, runOnDb);
 
     adminDb.auth("admin", "password");
-    assert.commandWorked(adminDb.runCommand({
-        updateRole: testRole,
-        privileges: privileges
-    }));
+    assert.commandWorked(adminDb.runCommand({updateRole: testRole, privileges: privileges}));
     adminDb.logout();
 
     assert(adminDb.auth(testUser, "password"));
@@ -73,9 +64,8 @@ function testInsufficientPrivileges(conn, t, testcase, privileges) {
     var res = runOnDb.runCommand(t.command);
 
     if (res.ok == 1 || res.code != authErrCode) {
-        out = "expected authorization failure " +
-              " but received " + tojson(res) +
-              " with privileges " + tojson(privileges);
+        out = "expected authorization failure " + " but received " + tojson(res) +
+            " with privileges " + tojson(privileges);
     }
 
     firstDb.logout();
@@ -105,15 +95,17 @@ function runOneTest(conn, t) {
             continue;
         }
 
-        if ((privileges.length == 1 && privileges[0].actions.length > 1)
-            || privileges.length > 1) {
+        if ((privileges.length == 1 && privileges[0].actions.length > 1) || privileges.length > 1) {
             for (var j = 0; j < privileges.length; j++) {
                 var p = privileges[j];
                 var resource = p.resource;
                 var actions = p.actions;
 
                 for (var k = 0; k < actions.length; k++) {
-                    var privDoc = { resource: resource, actions: [actions[k]] };
+                    var privDoc = {
+                        resource: resource,
+                        actions: [actions[k]]
+                    };
                     msg = testInsufficientPrivileges(conn, t, testcase, [privDoc]);
                     if (msg) {
                         failures.push(t.testname + ": " + msg);
@@ -154,30 +146,19 @@ function runOneTest(conn, t) {
 function createUsers(conn) {
     var adminDb = conn.getDB(adminDbName);
     var firstDb = conn.getDB(firstDbName);
-    adminDb.createUser({
-        user: "admin",
-        pwd: "password",
-        roles: ["__system"]
-    });
+    adminDb.createUser({user: "admin", pwd: "password", roles: ["__system"]});
 
     assert(adminDb.auth("admin", "password"));
 
-    assert.commandWorked(adminDb.runCommand({
-        createRole: testRole,
-        privileges: [ ],
-        roles: [ ]
-    }));
-    assert.commandWorked(adminDb.runCommand({
-        createUser: testUser,
-        pwd: "password",
-        roles: [ { role: testRole, db: adminDbName } ]
-    }));
+    assert.commandWorked(adminDb.runCommand({createRole: testRole, privileges: [], roles: []}));
+    assert.commandWorked(adminDb.runCommand(
+        {createUser: testUser, pwd: "password", roles: [{role: testRole, db: adminDbName}]}));
 
     adminDb.logout();
 }
 
 var opts = {
-    auth:"",
+    auth: "",
     enableExperimentalStorageDetailsCmd: ""
 };
 var impls = {
@@ -191,12 +172,7 @@ authCommandsLib.runTests(conn, impls);
 MongoRunner.stopMongod(conn);
 
 // run all tests sharded
-conn = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    keyFile: "jstests/libs/key1",
-    other: { shardOptions: opts }
-});
+conn = new ShardingTest(
+    {shards: 2, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: opts}});
 authCommandsLib.runTests(conn, impls);
 conn.stop();
-

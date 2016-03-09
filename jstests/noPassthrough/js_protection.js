@@ -11,57 +11,70 @@
  */
 
 (function() {
-"use strict";
+    "use strict";
 
-var testServer = MongoRunner.runMongod({setParameter: 'javascriptProtection=true'});
-var db = testServer.getDB("test");
-var t = db.foo;
-var funcToStore = function(x) { return x + 1; };
+    var testServer = MongoRunner.runMongod({setParameter: 'javascriptProtection=true'});
+    var db = testServer.getDB("test");
+    var t = db.foo;
+    var funcToStore = function(x) {
+        return x + 1;
+    };
 
-function assertMongoClientCorrect() {
-    var mongo = runMongoProgram("mongo",
-                                "--port", testServer.port,
-                                "--enableJavaScriptProtection",
-                                "--eval",
-    // stored functions in objects
-        "var x = db.foo.findOne({'_id' : 0});" +
-        "assert.neq(typeof x.foo, 'function');" +
-    // retain db.loadServerScripts() functionality
-        "db.loadServerScripts();" +
-        "assert.eq(stored_func(4), 5);" +
+    function assertMongoClientCorrect() {
+        var mongo = runMongoProgram("mongo",
+                                    "--port",
+                                    testServer.port,
+                                    "--enableJavaScriptProtection",
+                                    "--eval",
+                                    // stored functions in objects
+                                    "var x = db.foo.findOne({'_id' : 0});" +
+                                        "assert.neq(typeof x.foo, 'function');" +
+                                        // retain db.loadServerScripts() functionality
+                                        "db.loadServerScripts();" +
+                                        "assert.eq(stored_func(4), 5);" +
 
-        "print(\"completed gracefully\");"
-    );
+                                        "print(\"completed gracefully\");");
 
-    var mongoOutput = rawMongoProgramOutput();
-    assert(!mongoOutput.match(/assert failed/));
-    assert(mongoOutput.match(/completed gracefully/));
-}
+        var mongoOutput = rawMongoProgramOutput();
+        assert(!mongoOutput.match(/assert failed/));
+        assert(mongoOutput.match(/completed gracefully/));
+    }
 
-function assertNoStoredWhere() {
-    t.insertOne({name: 'testdoc', val : 0, y : 0});
-    t.update( { $where : "stored_func(this.val) == 1" },
-              { $set : { y : 100 } } , false , true );
+    function assertNoStoredWhere() {
+        t.insertOne({name: 'testdoc', val: 0, y: 0});
+        t.update({$where: "stored_func(this.val) == 1"}, {$set: {y: 100}}, false, true);
 
-    var x = t.findOne({name: 'testdoc'});
-    assert.eq(x.y, 0);
+        var x = t.findOne({name: 'testdoc'});
+        assert.eq(x.y, 0);
 
-    t.update( { $where : function() { return this.val == 0;} } ,
-              { $set : { y : 100 } } , false , true );
+        t.update(
+            {
+              $where: function() {
+                  return this.val == 0;
+              }
+            },
+            {$set: {y: 100}},
+            false,
+            true);
 
-    x = t.findOne({name: 'testdoc'});
-    assert.eq(x.y, 100);
-}
+        x = t.findOne({name: 'testdoc'});
+        assert.eq(x.y, 100);
+    }
 
-/**
- *  ACTUAL TEST
- */
+    /**
+     *  ACTUAL TEST
+     */
 
-db.system.js.save( { _id : "stored_func" , value : funcToStore } );
-t.insertOne({'_id': 0, 'myFunc': function() { return 'tesval'; } });
+    db.system.js.save({_id: "stored_func", value: funcToStore});
+    t.insertOne({
+        '_id': 0,
+        'myFunc': function() {
+            return 'tesval';
+        }
+    });
 
-assertMongoClientCorrect();
-assertNoStoredWhere();
+    assertMongoClientCorrect();
+    assertNoStoredWhere();
 
-MongoRunner.stopMongod(testServer);
+    MongoRunner.stopMongod(testServer);
 })();

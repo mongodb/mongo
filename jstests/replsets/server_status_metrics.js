@@ -21,7 +21,7 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     assert(ss.metrics.repl.buffer.maxSizeBytes >= 0, "maxSize (bytes) missing");
 
     assert(ss.metrics.repl.preload.docs.num >= 0, "preload.docs num  missing");
-    assert(ss.metrics.repl.preload.docs.totalMillis  >= 0, "preload.docs time missing");
+    assert(ss.metrics.repl.preload.docs.totalMillis >= 0, "preload.docs time missing");
     assert(ss.metrics.repl.preload.docs.num >= 0, "preload.indexes num missing");
     assert(ss.metrics.repl.preload.indexes.totalMillis >= 0, "preload.indexes time missing");
 
@@ -30,7 +30,7 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     assert.eq(ss.metrics.repl.apply.ops, opCount + offset, "wrong number of applied ops");
 }
 
-var rt = new ReplSetTest( { name : "server_status_metrics" , nodes: 2, oplogSize: 100 } );
+var rt = new ReplSetTest({name: "server_status_metrics", nodes: 2, oplogSize: 100});
 rt.startSet();
 rt.initiate();
 
@@ -41,24 +41,28 @@ var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
 assert.commandWorked(testDB.createCollection('a'));
-assert.writeOK(testDB.b.insert({}, { writeConcern: { w: 2 }}));
+assert.writeOK(testDB.b.insert({}, {writeConcern: {w: 2}}));
 
 var ss = secondary.getDB("test").serverStatus();
 var secondaryBaseOplogInserts = ss.metrics.repl.apply.ops;
 
-//add test docs
+// add test docs
 var bulk = testDB.a.initializeUnorderedBulkOp();
-for(x = 0; x < 1000; x++) {
+for (x = 0; x < 1000; x++) {
     bulk.insert({});
 }
-assert.writeOK(bulk.execute({ w: 2 }));
+assert.writeOK(bulk.execute({w: 2}));
 
-testSecondaryMetrics(secondary, 1000, secondaryBaseOplogInserts );
+testSecondaryMetrics(secondary, 1000, secondaryBaseOplogInserts);
 
-var options = { writeConcern: { w: 2 }, multi: true, upsert: true };
-assert.writeOK(testDB.a.update({}, { $set: { d: new Date() }}, options));
+var options = {
+    writeConcern: {w: 2},
+    multi: true,
+    upsert: true
+};
+assert.writeOK(testDB.a.update({}, {$set: {d: new Date()}}, options));
 
-testSecondaryMetrics(secondary, 2000, secondaryBaseOplogInserts );
+testSecondaryMetrics(secondary, 2000, secondaryBaseOplogInserts);
 
 // Test getLastError.wtime and that it only records stats for w > 1, see SERVER-9005
 var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis;
@@ -66,20 +70,20 @@ var startNum = testDB.serverStatus().metrics.getLastError.wtime.num;
 
 printjson(primary.getDB("test").serverStatus().metrics);
 
-assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: 1, wtimeout: 5000 }}));
+assert.writeOK(testDB.a.insert({x: 1}, {writeConcern: {w: 1, wtimeout: 5000}}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: -11, wtimeout: 5000 }}));
+assert.writeOK(testDB.a.insert({x: 1}, {writeConcern: {w: -11, wtimeout: 5000}}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: 2, wtimeout: 5000 }}));
+assert.writeOK(testDB.a.insert({x: 1}, {writeConcern: {w: 2, wtimeout: 5000}}));
 assert(testDB.serverStatus().metrics.getLastError.wtime.totalMillis >= startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 1);
 
 // Write will fail because there are only 2 nodes
-assert.writeError(testDB.a.insert({ x: 1 }, { writeConcern: { w: 3, wtimeout: 50 }}));
+assert.writeError(testDB.a.insert({x: 1}, {writeConcern: {w: 3, wtimeout: 50}}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 2);
 
 printjson(primary.getDB("test").serverStatus().metrics);

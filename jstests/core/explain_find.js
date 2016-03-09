@@ -10,25 +10,14 @@ for (var i = 0; i < 10; i++) {
     t.insert({_id: i, a: i});
 }
 
-var explain = db.runCommand({
-    explain: {
-        find: collName,
-        filter: {a: {$lte: 2}}
-    },
-    verbosity: "executionStats"
-});
+var explain = db.runCommand(
+    {explain: {find: collName, filter: {a: {$lte: 2}}}, verbosity: "executionStats"});
 printjson(explain);
 assert.commandWorked(explain);
 assert.eq(3, explain.executionStats.nReturned);
 
-explain = db.runCommand({
-    explain: {
-        find: collName,
-        min: {a: 4},
-        max: {a: 6}
-    },
-    verbosity: "executionStats"
-});
+explain = db.runCommand(
+    {explain: {find: collName, min: {a: 4}, max: {a: 6}}, verbosity: "executionStats"});
 printjson(explain);
 assert.commandWorked(explain);
 assert.eq(2, explain.executionStats.nReturned);

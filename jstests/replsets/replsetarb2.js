@@ -3,16 +3,18 @@
 (function() {
     "use strict";
 
-    var replTest = new ReplSetTest( {name: 'unicomplex', nodes: 3} );
+    var replTest = new ReplSetTest({name: 'unicomplex', nodes: 3});
     var nodes = replTest.nodeList();
 
     var conns = replTest.startSet();
-    var r = replTest.initiate({"_id" : "unicomplex",
-                               "members" : [
-                                   {"_id" : 0, "host" : nodes[0]},
-                                   {"_id" : 1, "host" : nodes[1], "arbiterOnly" : true, "votes": 1},
-                                   {"_id" : 2, "host" : nodes[2]}
-                                ]});
+    var r = replTest.initiate({
+        "_id": "unicomplex",
+        "members": [
+            {"_id": 0, "host": nodes[0]},
+            {"_id": 1, "host": nodes[1], "arbiterOnly": true, "votes": 1},
+            {"_id": 2, "host": nodes[2]}
+        ]
+    });
 
     // Make sure we have a master
     var master = replTest.getPrimary();
@@ -24,7 +26,7 @@
         return res.myState === 7;
     }, "Aribiter failed to initialize.");
 
-    var result = conns[1].getDB("admin").runCommand({isMaster : 1});
+    var result = conns[1].getDB("admin").runCommand({isMaster: 1});
     assert(result.arbiterOnly);
     assert(!result.passive);
 

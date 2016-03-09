@@ -15,8 +15,7 @@ function assertExecError(explain) {
     var execStats = explain.executionStats;
     if (execStats.executionStages.stage == "SINGLE_SHARD") {
         errorObj = execStats.executionStages.shards[0];
-    }
-    else {
+    } else {
         errorObj = execStats;
     }
 
@@ -34,8 +33,7 @@ function assertExecSuccess(explain) {
     var execStats = explain.executionStats;
     if (execStats.executionStages.stage == "SINGLE_SHARD") {
         errorObj = execStats.executionStages.shards[0];
-    }
-    else {
+    } else {
         errorObj = execStats;
     }
 
@@ -63,11 +61,7 @@ assert.throws(function() {
 
 // Explain of this query should succeed at query planner verbosity.
 result = db.runCommand({
-    explain: {
-        find: t.getName(),
-        filter: {a: {$exists: true}},
-        sort: {b: 1}
-    },
+    explain: {find: t.getName(), filter: {a: {$exists: true}}, sort: {b: 1}},
     verbosity: "queryPlanner"
 });
 assert.commandWorked(result);
@@ -76,11 +70,7 @@ assert("queryPlanner" in result);
 // Explaining the same query at execution stats verbosity should succeed, but indicate that the
 // underlying operation failed.
 result = db.runCommand({
-    explain: {
-        find: t.getName(),
-        filter: {a: {$exists: true}},
-        sort: {b: 1}
-    },
+    explain: {find: t.getName(), filter: {a: {$exists: true}}, sort: {b: 1}},
     verbosity: "executionStats"
 });
 assert.commandWorked(result);
@@ -90,11 +80,7 @@ assertExecError(result);
 
 // The underlying operation should also report a failure at allPlansExecution verbosity.
 result = db.runCommand({
-    explain: {
-        find: t.getName(),
-        filter: {a: {$exists: true}},
-        sort: {b: 1}
-    },
+    explain: {find: t.getName(), filter: {a: {$exists: true}}, sort: {b: 1}},
     verbosity: "allPlansExecution"
 });
 assert.commandWorked(result);
@@ -115,22 +101,14 @@ assert.eq(40, t.find({c: {$lt: 40}}).sort({b: 1}).itcount());
 // The explain should succeed at all verbosity levels because the query itself succeeds.
 // First test "queryPlanner" verbosity.
 result = db.runCommand({
-    explain: {
-        find: t.getName(),
-        filter: {c: {$lt: 40}},
-        sort: {b: 1}
-    },
+    explain: {find: t.getName(), filter: {c: {$lt: 40}}, sort: {b: 1}},
     verbosity: "queryPlanner"
 });
 assert.commandWorked(result);
 assert("queryPlanner" in result);
 
 result = db.runCommand({
-    explain: {
-        find: t.getName(),
-        filter: {c: {$lt: 40}},
-        sort: {b: 1}
-    },
+    explain: {find: t.getName(), filter: {c: {$lt: 40}}, sort: {b: 1}},
     verbosity: "executionStats"
 });
 assert.commandWorked(result);
@@ -140,11 +118,7 @@ assertExecSuccess(result);
 
 // We expect allPlansExecution verbosity to show execution stats for both candidate plans.
 result = db.runCommand({
-    explain: {
-        find: t.getName(),
-        filter: {c: {$lt: 40}},
-        sort: {b: 1}
-    },
+    explain: {find: t.getName(), filter: {c: {$lt: 40}}, sort: {b: 1}},
     verbosity: "allPlansExecution"
 });
 assert.commandWorked(result);

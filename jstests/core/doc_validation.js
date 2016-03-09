@@ -34,14 +34,12 @@
     // Drop will assert on failure.
     coll.drop();
 
-
     // Check that we can only update documents that pass validation.
 
     // Set up valid and invalid docs then set validator.
     assert.writeOK(coll.insert({_id: 'valid1', a: 1}));
     assert.writeOK(coll.insert({_id: 'invalid2', b: 1}));
-    assert.commandWorked(db.runCommand({"collMod": collName,
-                                        "validator" : {a: {$exists: true}}}));
+    assert.commandWorked(db.runCommand({"collMod": collName, "validator": {a: {$exists: true}}}));
 
     // Updates affecting fields not included in validator document
     // on a conforming document.
@@ -65,19 +63,17 @@
 
     coll.drop();
 
-
     // Verify can't make a conforming doc fail validation,
     // but can update non-conforming doc to pass validation.
     assert.writeOK(coll.insert({_id: 'valid1', a: 1}));
     assert.writeOK(coll.insert({_id: 'invalid2', b: 1}));
-    assert.commandWorked(db.runCommand({"collMod": collName,
-                                        "validator" : {a: {$exists: true}}}));
+    assert.commandWorked(db.runCommand({"collMod": collName, "validator": {a: {$exists: true}}}));
 
     assertFailsValidation(coll.update({_id: 'valid1'}, {$unset: {a: 1}}));
     assert.writeOK(coll.update({_id: 'invalid2'}, {$set: {a: 1}}));
 
     // Modify collection to remove validator statement
-    assert.commandWorked(db.runCommand({"collMod": collName, "validator" : {}}));
+    assert.commandWorked(db.runCommand({"collMod": collName, "validator": {}}));
 
     // Verify no validation applied to updates.
     assert.writeOK(coll.update({_id: 'valid1'}, {$set: {z: 1}}));

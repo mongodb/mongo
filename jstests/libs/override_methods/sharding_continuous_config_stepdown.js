@@ -8,202 +8,223 @@ load('jstests/libs/parallelTester.js');
 load("jstests/replsets/rslib.js");
 
 (function() {
-'use strict';
+    'use strict';
 
-// Preserve the original ReplSetTest and ShardingTest constructors, because we are overriding them
-var originalReplSetTest = ReplSetTest;
-var originalShardingTest = ShardingTest;
-
-/**
- * Overrides the ReplSetTest constructor to start the continuous config server stepdown thread.
- */
-ReplSetTest = function ReplSetTestWithContinuousPrimaryStepdown() {
-    // Construct the original object
-    originalReplSetTest.apply(this, arguments);
+    // Preserve the original ReplSetTest and ShardingTest constructors, because we are overriding
+    // them
+    var originalReplSetTest = ReplSetTest;
+    var originalShardingTest = ShardingTest;
 
     /**
-     * This function is intended to be called in a separate thread and it continuously steps down
-     * the current primary for a number of attempts.
-     *
-     * @param {string} seedNode The connection string of a node from which to discover the primary
-     *                          of the replica set.
-     * @param {CountDownLatch} stopCounter Object, which can be used to stop the thread.
-     *
-     * @return Object with the following fields:
-     *      ok {integer}: 0 if it failed, 1 if it succeeded.
-     *      error {string}: Only present if ok == 0. Contains the cause for the error.
-     *      stack {string}: Only present if ok == 0. Contains the stack at the time of the error.
+     * Overrides the ReplSetTest constructor to start the continuous config server stepdown thread.
      */
-    function _continuousPrimaryStepdownFn(seedNode, stopCounter) {
-        'use strict';
+    ReplSetTest = function ReplSetTestWithContinuousPrimaryStepdown() {
+        // Construct the original object
+        originalReplSetTest.apply(this, arguments);
 
-        var stepdownDelaySeconds = 10;
+        /**
+         * This function is intended to be called in a separate thread and it continuously steps
+         *down
+         * the current primary for a number of attempts.
+         *
+         * @param {string} seedNode The connection string of a node from which to discover the
+         *primary
+         *                          of the replica set.
+         * @param {CountDownLatch} stopCounter Object, which can be used to stop the thread.
+         *
+         * @return Object with the following fields:
+         *      ok {integer}: 0 if it failed, 1 if it succeeded.
+         *      error {string}: Only present if ok == 0. Contains the cause for the error.
+         *      stack {string}: Only present if ok == 0. Contains the stack at the time of the
+         *error.
+         */
+        function _continuousPrimaryStepdownFn(seedNode, stopCounter) {
+            'use strict';
 
-        print('*** Continuous stepdown thread running with seed node ' + seedNode);
+            var stepdownDelaySeconds = 10;
 
-        // The config primary may unexpectedly step down during startup if under heavy load and
-        // too slowly processing heartbeats. When it steps down, it closes all of its connections.
-        // This can happen during the call to new ReplSetTest, so in order to account for this and
-        // make the tests stable, retry discovery of the replica set's configuration once
-        // (SERVER-22794).
-        var replSet;
-        var networkErrorRetries = 1;
-        while (networkErrorRetries >= 0) {
-            try {
-                replSet = new ReplSetTest(seedNode);
-                break;
-            } catch (e) {
-                if ( ((networkErrorRetries--) > 0) &&
-                     (e.toString().indexOf("network error") > -1) ) {
-                    print("Error: " + e.toString() + "\nStacktrace: " + e.stack);
-                    print("Stepdown thread's config server connection was closed, retrying.");
-                } else {
-                    print('*** Continuous stepdown thread failed to connect to the ' +
-                          'config server: ' + tojson(e));
-                    return { ok: 0, error: e.toString(), stack: e.stack };
+            print('*** Continuous stepdown thread running with seed node ' + seedNode);
+
+            // The config primary may unexpectedly step down during startup if under heavy load and
+            // too slowly processing heartbeats. When it steps down, it closes all of its
+            // connections.
+            // This can happen during the call to new ReplSetTest, so in order to account for this
+            // and
+            // make the tests stable, retry discovery of the replica set's configuration once
+            // (SERVER-22794).
+            var replSet;
+            var networkErrorRetries = 1;
+            while (networkErrorRetries >= 0) {
+                try {
+                    replSet = new ReplSetTest(seedNode);
+                    break;
+                } catch (e) {
+                    if (((networkErrorRetries--) > 0) &&
+                        (e.toString().indexOf("network error") > -1)) {
+                        print("Error: " + e.toString() + "\nStacktrace: " + e.stack);
+                        print("Stepdown thread's config server connection was closed, retrying.");
+                    } else {
+                        print('*** Continuous stepdown thread failed to connect to the ' +
+                              'config server: ' + tojson(e));
+                        return {
+                            ok: 0,
+                            error: e.toString(),
+                            stack: e.stack
+                        };
+                    }
                 }
             }
+
+            try {
+                var primary = replSet.getPrimary();
+
+                while (stopCounter.getCount() > 0) {
+                    print('*** Stepping down ' + primary);
+
+                    assert.throws(function() {
+                        var result = primary.adminCommand(
+                            {replSetStepDown: stepdownDelaySeconds, force: true});
+                        print('replSetStepDown command did not throw and returned: ' +
+                              tojson(result));
+
+                        // The call to replSetStepDown should never succeed
+                        assert.commandWorked(result);
+                    });
+
+                    // Wait for primary to get elected and allow the test to make some progress
+                    // before
+                    // attempting another stepdown.
+                    if (stopCounter.getCount() > 0)
+                        primary = replSet.getPrimary();
+
+                    if (stopCounter.getCount() > 0)
+                        sleep(8000);
+                }
+
+                print('*** Continuous stepdown thread completed successfully');
+                return {
+                    ok: 1
+                };
+            } catch (e) {
+                print('*** Continuous stepdown thread caught exception: ' + tojson(e));
+                return {
+                    ok: 0,
+                    error: e.toString(),
+                    stack: e.stack
+                };
+            }
         }
 
-        try {
-            var primary = replSet.getPrimary();
+        // Preserve the original stopSet method, because we are overriding it to stop the continuous
+        // stepdown thread.
+        var _originalStartSetFn = this.startSet;
+        var _originalStopSetFn = this.stopSet;
 
-            while (stopCounter.getCount() > 0) {
-                print('*** Stepping down ' + primary);
+        // These two manage the scoped failover thread
+        var _scopedPrimaryStepdownThread;
+        var _scopedPrimaryStepdownThreadStopCounter;
 
-                assert.throws(function() {
-                    var result = primary.adminCommand({
-                        replSetStepDown: stepdownDelaySeconds,
-                        force: true });
-                    print('replSetStepDown command did not throw and returned: ' + tojson(result));
+        /**
+         * Overrides the startSet call so we can increase the logging verbosity
+         */
+        this.startSet = function(options) {
+            if (!options) {
+                options = {};
+            }
+            options.verbose = 2;
+            return _originalStartSetFn.call(this, options);
+        };
 
-                    // The call to replSetStepDown should never succeed
-                    assert.commandWorked(result);
-                });
+        /**
+         * Overrides the stopSet call so it terminates the failover thread.
+         */
+        this.stopSet = function() {
+            this.stopContinuousFailover();
+            _originalStopSetFn.apply(this, arguments);
+        };
 
-                // Wait for primary to get elected and allow the test to make some progress before
-                // attempting another stepdown.
-                if (stopCounter.getCount() > 0)
-                    primary = replSet.getPrimary();
-
-                if (stopCounter.getCount() > 0)
-                    sleep(8000);
+        /**
+         * Spawns a thread to invoke continuousPrimaryStepdownFn. See its comments for more
+         * information.
+         */
+        this.startContinuousFailover = function() {
+            if (_scopedPrimaryStepdownThread) {
+                throw new Error('Continuous failover thread is already active');
             }
 
-            print('*** Continuous stepdown thread completed successfully');
-            return { ok: 1 };
-        }
-        catch (e) {
-            print('*** Continuous stepdown thread caught exception: ' + tojson(e));
-            return { ok: 0, error: e.toString(), stack: e.stack };
-        }
-    }
+            _scopedPrimaryStepdownThreadStopCounter = new CountDownLatch(1);
+            _scopedPrimaryStepdownThread =
+                new ScopedThread(_continuousPrimaryStepdownFn,
+                                 this.nodes[0].host,
+                                 _scopedPrimaryStepdownThreadStopCounter);
+            _scopedPrimaryStepdownThread.start();
+        };
 
-    // Preserve the original stopSet method, because we are overriding it to stop the continuous
-    // stepdown thread.
-    var _originalStartSetFn = this.startSet;
-    var _originalStopSetFn = this.stopSet;
+        /**
+         * Blocking method, which tells the thread running continuousPrimaryStepdownFn to stop and
+         * waits
+         * for it to terminate.
+         */
+        this.stopContinuousFailover = function() {
+            if (!_scopedPrimaryStepdownThread) {
+                return;
+            }
 
-    // These two manage the scoped failover thread
-    var _scopedPrimaryStepdownThread;
-    var _scopedPrimaryStepdownThreadStopCounter;
+            _scopedPrimaryStepdownThreadStopCounter.countDown();
+            _scopedPrimaryStepdownThreadStopCounter = null;
 
-    /**
-     * Overrides the startSet call so we can increase the logging verbosity
-     */
-    this.startSet = function(options) {
-        if (!options) {
-            options = {};
-        }
-        options.verbose = 2;
-        return _originalStartSetFn.call(this, options);
+            _scopedPrimaryStepdownThread.join();
+
+            var retVal = _scopedPrimaryStepdownThread.returnData();
+            _scopedPrimaryStepdownThread = null;
+
+            return assert.commandWorked(retVal);
+        };
     };
 
-    /**
-     * Overrides the stopSet call so it terminates the failover thread.
-     */
-    this.stopSet = function() {
-        this.stopContinuousFailover();
-        _originalStopSetFn.apply(this, arguments);
-    };
+    Object.extend(ReplSetTest, originalReplSetTest);
 
     /**
-     * Spawns a thread to invoke continuousPrimaryStepdownFn. See its comments for more information.
+     * Overrides the ShardingTest constructor to start the continuous config server stepdown thread.
      */
-    this.startContinuousFailover = function() {
-        if (_scopedPrimaryStepdownThread) {
-            throw new Error('Continuous failover thread is already active');
+    ShardingTest = function ShardingTestWithContinuousConfigPrimaryStepdown() {
+        if (!arguments[0].other) {
+            arguments[0].other = {};
+        }
+        arguments[0].verbose = 2;
+
+        // Set electionTimeoutMillis to 5 seconds, from 10, so that chunk migrations don't
+        // time out because of the CSRS primary being down so often for so long.
+        arguments[0].configReplSetTestOptions = Object.merge(arguments[0].configReplSetTestOptions,
+                                                             {
+                                                               settings: {
+                                                                   electionTimeoutMillis: 5000,
+                                                               },
+                                                             });
+
+        // Construct the original object
+        originalShardingTest.apply(this, arguments);
+
+        if (!this.configRS) {
+            throw new Error('Continuous config server step down only available with CSRS');
         }
 
-        _scopedPrimaryStepdownThreadStopCounter = new CountDownLatch(1);
-        _scopedPrimaryStepdownThread = new ScopedThread(_continuousPrimaryStepdownFn,
-                                                        this.nodes[0].host,
-                                                        _scopedPrimaryStepdownThreadStopCounter);
-        _scopedPrimaryStepdownThread.start();
+        /**
+         * This method is disabled because it runs aggregation, which doesn't handle config server
+         * stepdown correctly.
+         */
+        this.printShardingStatus = function() {
+
+        };
+
+        assert.eq(this.configRS.getReplSetConfigFromNode().settings.electionTimeoutMillis,
+                  5000,
+                  "Failed to set the electionTimeoutMillis to 5000 milliseconds");
+
+        // Start the continuous config server stepdown thread
+        this.configRS.startContinuousFailover();
     };
 
-    /**
-     * Blocking method, which tells the thread running continuousPrimaryStepdownFn to stop and waits
-     * for it to terminate.
-     */
-    this.stopContinuousFailover = function() {
-        if (!_scopedPrimaryStepdownThread) {
-            return;
-        }
-
-        _scopedPrimaryStepdownThreadStopCounter.countDown();
-        _scopedPrimaryStepdownThreadStopCounter = null;
-
-        _scopedPrimaryStepdownThread.join();
-
-        var retVal = _scopedPrimaryStepdownThread.returnData();
-        _scopedPrimaryStepdownThread = null;
-
-        return assert.commandWorked(retVal);
-    };
-};
-
-Object.extend(ReplSetTest, originalReplSetTest);
-
-/**
- * Overrides the ShardingTest constructor to start the continuous config server stepdown thread.
- */
-ShardingTest = function ShardingTestWithContinuousConfigPrimaryStepdown() {
-    if (!arguments[0].other) {
-        arguments[0].other = {};
-    }
-    arguments[0].verbose = 2;
-
-    // Set electionTimeoutMillis to 5 seconds, from 10, so that chunk migrations don't
-    // time out because of the CSRS primary being down so often for so long.
-    arguments[0].configReplSetTestOptions = Object.merge(arguments[0].configReplSetTestOptions, {
-        settings: {
-            electionTimeoutMillis: 5000,
-        },
-    });
-
-    // Construct the original object
-    originalShardingTest.apply(this, arguments);
-
-    if (!this.configRS) {
-        throw new Error('Continuous config server step down only available with CSRS');
-    }
-
-    /**
-     * This method is disabled because it runs aggregation, which doesn't handle config server
-     * stepdown correctly.
-     */
-    this.printShardingStatus = function() {
-
-    };
-
-    assert.eq(this.configRS.getReplSetConfigFromNode().settings.electionTimeoutMillis, 5000,
-        "Failed to set the electionTimeoutMillis to 5000 milliseconds");
-
-    // Start the continuous config server stepdown thread
-    this.configRS.startContinuousFailover();
-};
-
-Object.extend(ShardingTest, originalShardingTest);
+    Object.extend(ShardingTest, originalShardingTest);
 
 })();

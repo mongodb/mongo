@@ -45,11 +45,8 @@
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 10);
-    cmdRes = db.runCommand({
-        getMore: cmdRes.cursor.id,
-        collection: collName,
-        batchSize: NumberInt(5)
-    });
+    cmdRes =
+        db.runCommand({getMore: cmdRes.cursor.id, collection: collName, batchSize: NumberInt(5)});
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.nextBatch.length, 5);
@@ -60,11 +57,8 @@
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 0);
-    cmdRes = db.runCommand({
-        getMore: cmdRes.cursor.id,
-        collection: collName,
-        batchSize: NumberInt(5)
-    });
+    cmdRes =
+        db.runCommand({getMore: cmdRes.cursor.id, collection: collName, batchSize: NumberInt(5)});
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.nextBatch.length, 5);
@@ -75,11 +69,8 @@
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 10);
-    cmdRes = db.runCommand({
-        getMore: cmdRes.cursor.id,
-        collection: collName,
-        batchSize: NumberInt(11)
-    });
+    cmdRes =
+        db.runCommand({getMore: cmdRes.cursor.id, collection: collName, batchSize: NumberInt(11)});
     assert.eq(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.nextBatch.length, 10);

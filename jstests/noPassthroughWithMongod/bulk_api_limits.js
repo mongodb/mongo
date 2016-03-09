@@ -17,7 +17,7 @@ var executeTestsUnordered = function() {
     // Create unique index
     coll.dropIndexes();
     coll.remove({});
-    coll.ensureIndex({a : 1}, {unique : true});
+    coll.ensureIndex({a: 1}, {unique: true});
 
     /**
      * Fail during batch construction due to single document > maxBSONSize
@@ -25,18 +25,19 @@ var executeTestsUnordered = function() {
     // Set up a giant string to blow through the max message size
     var hugeString = "";
     // Create it bigger than 16MB
-    for(var i = 0; i < (1024 * 1100); i++) {
+    for (var i = 0; i < (1024 * 1100); i++) {
         hugeString = hugeString + "1234567890123456";
     }
 
     // Set up the batch
     var batch = coll.initializeUnorderedBulkOp();
-    batch.insert({b:1, a:1});
+    batch.insert({b: 1, a: 1});
     // Should fail on insert due to string being to big
     try {
         batch.insert({string: hugeString});
         assert(false);
-    } catch(err) {}
+    } catch (err) {
+    }
 
     // Create unique index
     coll.dropIndexes();
@@ -48,18 +49,18 @@ var executeTestsUnordered = function() {
     // Set up a giant string to blow through the max message size
     var hugeString = "";
     // Create 4 MB strings to test splitting
-    for(var i = 0; i < (1024 * 256); i++) {
+    for (var i = 0; i < (1024 * 256); i++) {
         hugeString = hugeString + "1234567890123456";
     }
 
     // Insert the string a couple of times, should force split into multiple batches
     var batch = coll.initializeUnorderedBulkOp();
-    batch.insert({a:1, b: hugeString});
-    batch.insert({a:2, b: hugeString});
-    batch.insert({a:3, b: hugeString});
-    batch.insert({a:4, b: hugeString});
-    batch.insert({a:5, b: hugeString});
-    batch.insert({a:6, b: hugeString});
+    batch.insert({a: 1, b: hugeString});
+    batch.insert({a: 2, b: hugeString});
+    batch.insert({a: 3, b: hugeString});
+    batch.insert({a: 4, b: hugeString});
+    batch.insert({a: 5, b: hugeString});
+    batch.insert({a: 6, b: hugeString});
     var result = batch.execute();
     printjson(JSON.stringify(result));
 
@@ -81,18 +82,19 @@ var executeTestsOrdered = function() {
     // Set up a giant string to blow through the max message size
     var hugeString = "";
     // Create it bigger than 16MB
-    for(var i = 0; i < (1024 * 1100); i++) {
+    for (var i = 0; i < (1024 * 1100); i++) {
         hugeString = hugeString + "1234567890123456";
     }
 
     // Set up the batch
     var batch = coll.initializeOrderedBulkOp();
-    batch.insert({b:1, a:1});
+    batch.insert({b: 1, a: 1});
     // Should fail on insert due to string being to big
     try {
         batch.insert({string: hugeString});
         assert(false);
-    } catch(err) {}
+    } catch (err) {
+    }
 
     // Create unique index
     coll.dropIndexes();
@@ -104,18 +106,18 @@ var executeTestsOrdered = function() {
     // Set up a giant string to blow through the max message size
     var hugeString = "";
     // Create 4 MB strings to test splitting
-    for(var i = 0; i < (1024 * 256); i++) {
+    for (var i = 0; i < (1024 * 256); i++) {
         hugeString = hugeString + "1234567890123456";
     }
 
     // Insert the string a couple of times, should force split into multiple batches
     var batch = coll.initializeOrderedBulkOp();
-    batch.insert({a:1, b: hugeString});
-    batch.insert({a:2, b: hugeString});
-    batch.insert({a:3, b: hugeString});
-    batch.insert({a:4, b: hugeString});
-    batch.insert({a:5, b: hugeString});
-    batch.insert({a:6, b: hugeString});
+    batch.insert({a: 1, b: hugeString});
+    batch.insert({a: 2, b: hugeString});
+    batch.insert({a: 3, b: hugeString});
+    batch.insert({a: 4, b: hugeString});
+    batch.insert({a: 5, b: hugeString});
+    batch.insert({a: 6, b: hugeString});
     var result = batch.execute();
 
     // Basic properties check
@@ -127,14 +129,14 @@ var executeTestsOrdered = function() {
     coll.remove({});
 };
 
-var buildVersion = parseInt(db.runCommand({buildInfo:1}).versionArray.slice(0, 3).join(""), 10);
+var buildVersion = parseInt(db.runCommand({buildInfo: 1}).versionArray.slice(0, 3).join(""), 10);
 // Save the existing useWriteCommands function
 var _useWriteCommands = coll.getMongo().useWriteCommands;
 
 //
 // Only execute write command tests if we have > 2.5.5 otherwise
 // execute the down converted version
-if(buildVersion >= 255) {
+if (buildVersion >= 255) {
     // Force the use of useWriteCommands
     coll._mongo.useWriteCommands = function() {
         return true;

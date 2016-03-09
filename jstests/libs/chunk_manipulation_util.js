@@ -2,7 +2,7 @@
 // Utilities for testing chunk manipulation: moveChunk, mergeChunks, etc.
 //
 
-load( './jstests/libs/test_background_ops.js' );
+load('./jstests/libs/test_background_ops.js');
 
 //
 // Start a background moveChunk.
@@ -19,31 +19,18 @@ load( './jstests/libs/test_background_ops.js' );
 // Returns a join function; call it to wait for moveChunk to complete.
 //
 
-function moveChunkParallel(
-    staticMongod,
-    mongosURL,
-    findCriteria,
-    bounds,
-    ns,
-    toShardId) {
-
+function moveChunkParallel(staticMongod, mongosURL, findCriteria, bounds, ns, toShardId) {
     assert((findCriteria || bounds) && !(findCriteria && bounds),
            'Specify either findCriteria or bounds, but not both.');
 
-    function runMoveChunk(
-        mongosURL,
-        findCriteria,
-        bounds,
-        ns,
-        toShardId) {
-
+    function runMoveChunk(mongosURL, findCriteria, bounds, ns, toShardId) {
         assert(mongosURL && ns && toShardId, 'Missing arguments.');
         assert((findCriteria || bounds) && !(findCriteria && bounds),
                'Specify either findCriteria or bounds, but not both.');
 
-        var mongos = new Mongo( mongosURL ),
-            admin = mongos.getDB( 'admin' ),
-            cmd = { moveChunk : ns };
+        var mongos = new Mongo(mongosURL), admin = mongos.getDB('admin'), cmd = {
+            moveChunk: ns
+        };
 
         if (findCriteria) {
             cmd.find = findCriteria;
@@ -56,14 +43,13 @@ function moveChunkParallel(
 
         printjson(cmd);
         var result = admin.runCommand(cmd);
-        printjson( result );
-        assert( result.ok );
+        printjson(result);
+        assert(result.ok);
     }
 
     // Return the join function.
     return startParallelOps(
-        staticMongod, runMoveChunk,
-        [ mongosURL, findCriteria, bounds, ns, toShardId ] );
+        staticMongod, runMoveChunk, [mongosURL, findCriteria, bounds, ns, toShardId]);
 }
 
 // moveChunk starts at step 0 and proceeds to 1 (it has *finished* parsing
@@ -77,10 +63,9 @@ var moveChunkStepNames = {
     done: 6
 };
 
-function numberToName( names, stepNumber ) {
-    for ( var name in names) {
-        if ( names.hasOwnProperty(name)
-                && names[name] == stepNumber ) {
+function numberToName(names, stepNumber) {
+    for (var name in names) {
+        if (names.hasOwnProperty(name) && names[name] == stepNumber) {
             return name;
         }
     }
@@ -91,60 +76,59 @@ function numberToName( names, stepNumber ) {
 //
 // Configure a failpoint to make moveChunk hang at a step.
 //
-function pauseMoveChunkAtStep( shardConnection, stepNumber ) {
-    configureMoveChunkFailPoint( shardConnection, stepNumber, 'alwaysOn' );
+function pauseMoveChunkAtStep(shardConnection, stepNumber) {
+    configureMoveChunkFailPoint(shardConnection, stepNumber, 'alwaysOn');
 }
 
 //
 // Allow moveChunk to proceed past a step.
 //
-function unpauseMoveChunkAtStep( shardConnection, stepNumber ) {
-    configureMoveChunkFailPoint( shardConnection, stepNumber, 'off' );
+function unpauseMoveChunkAtStep(shardConnection, stepNumber) {
+    configureMoveChunkFailPoint(shardConnection, stepNumber, 'off');
 }
 
-function proceedToMoveChunkStep( shardConnection, stepNumber ) {
-    jsTest.log( 'moveChunk proceeding from step "'
-                + numberToName( moveChunkStepNames, stepNumber - 1 )
-                + '" to "' + numberToName( moveChunkStepNames, stepNumber )
-                + '".' );
+function proceedToMoveChunkStep(shardConnection, stepNumber) {
+    jsTest.log('moveChunk proceeding from step "' +
+               numberToName(moveChunkStepNames, stepNumber - 1) + '" to "' +
+               numberToName(moveChunkStepNames, stepNumber) + '".');
 
-    pauseMoveChunkAtStep( shardConnection, stepNumber );
-    unpauseMoveChunkAtStep( shardConnection, stepNumber - 1 );
-    waitForMoveChunkStep( shardConnection, stepNumber );
+    pauseMoveChunkAtStep(shardConnection, stepNumber);
+    unpauseMoveChunkAtStep(shardConnection, stepNumber - 1);
+    waitForMoveChunkStep(shardConnection, stepNumber);
 }
 
-
-function configureMoveChunkFailPoint( shardConnection, stepNumber, mode ) {
-    assert.between(migrateStepNames.copiedIndexes, stepNumber,
-                   migrateStepNames.done, "incorrect stepNumber", true);
-    var admin = shardConnection.getDB( 'admin' );
-    admin.runCommand({ configureFailPoint: 'moveChunkHangAtStep' + stepNumber,
-                       mode: mode });
+function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
+    assert.between(migrateStepNames.copiedIndexes,
+                   stepNumber,
+                   migrateStepNames.done,
+                   "incorrect stepNumber",
+                   true);
+    var admin = shardConnection.getDB('admin');
+    admin.runCommand({configureFailPoint: 'moveChunkHangAtStep' + stepNumber, mode: mode});
 }
 
 //
 // Wait for moveChunk to reach a step (1 through 6). Assumes only one moveChunk
 // is in mongos's currentOp.
 //
-function waitForMoveChunkStep( shardConnection, stepNumber ) {
-    var searchString = 'step ' + stepNumber,
-        admin = shardConnection.getDB( 'admin' );
+function waitForMoveChunkStep(shardConnection, stepNumber) {
+    var searchString = 'step ' + stepNumber, admin = shardConnection.getDB('admin');
 
-    assert.between(migrateStepNames.copiedIndexes, stepNumber,
-                   migrateStepNames.done, "incorrect stepNumber", true);
+    assert.between(migrateStepNames.copiedIndexes,
+                   stepNumber,
+                   migrateStepNames.done,
+                   "incorrect stepNumber",
+                   true);
 
-    var msg = (
-        'moveChunk on ' + shardConnection.shardName
-        + ' never reached step "'
-        + numberToName( moveChunkStepNames, stepNumber )
-        + '".');
+    var msg = ('moveChunk on ' + shardConnection.shardName + ' never reached step "' +
+               numberToName(moveChunkStepNames, stepNumber) + '".');
 
-    assert.soon( function() {
+    assert.soon(function() {
         var in_progress = admin.currentOp().inprog;
-        for ( var i = 0; i < in_progress.length; ++i ) {
+        for (var i = 0; i < in_progress.length; ++i) {
             var op = in_progress[i];
-            if ( op.query && op.query.moveChunk ) {
-                return op.msg && op.msg.startsWith( searchString );
+            if (op.query && op.query.moveChunk) {
+                return op.msg && op.msg.startsWith(searchString);
             }
         }
 
@@ -164,61 +148,61 @@ var migrateStepNames = {
 //
 // Configure a failpoint to make migration thread hang at a step (1 through 5).
 //
-function pauseMigrateAtStep( shardConnection, stepNumber ) {
-    configureMigrateFailPoint( shardConnection, stepNumber, 'alwaysOn' );
+function pauseMigrateAtStep(shardConnection, stepNumber) {
+    configureMigrateFailPoint(shardConnection, stepNumber, 'alwaysOn');
 }
 
 //
 // Allow _recvChunkStart to proceed past a step.
 //
-function unpauseMigrateAtStep( shardConnection, stepNumber ) {
-    configureMigrateFailPoint( shardConnection, stepNumber, 'off' );
+function unpauseMigrateAtStep(shardConnection, stepNumber) {
+    configureMigrateFailPoint(shardConnection, stepNumber, 'off');
 }
 
-function proceedToMigrateStep( shardConnection, stepNumber ) {
-    jsTest.log( 'Migration thread proceeding from step "'
-                + numberToName( migrateStepNames, stepNumber - 1 )
-                + '" to "' + numberToName( migrateStepNames, stepNumber )
-                + '".');
+function proceedToMigrateStep(shardConnection, stepNumber) {
+    jsTest.log('Migration thread proceeding from step "' +
+               numberToName(migrateStepNames, stepNumber - 1) + '" to "' +
+               numberToName(migrateStepNames, stepNumber) + '".');
 
-    pauseMigrateAtStep( shardConnection, stepNumber );
-    unpauseMigrateAtStep( shardConnection, stepNumber - 1 );
-    waitForMigrateStep( shardConnection, stepNumber );
+    pauseMigrateAtStep(shardConnection, stepNumber);
+    unpauseMigrateAtStep(shardConnection, stepNumber - 1);
+    waitForMigrateStep(shardConnection, stepNumber);
 }
 
-function configureMigrateFailPoint( shardConnection, stepNumber, mode ) {
-    assert.between( migrateStepNames.copiedIndexes, stepNumber,
-                   migrateStepNames.done, "incorrect stepNumber", true);
+function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
+    assert.between(migrateStepNames.copiedIndexes,
+                   stepNumber,
+                   migrateStepNames.done,
+                   "incorrect stepNumber",
+                   true);
 
-    var admin = shardConnection.getDB( 'admin' );
-    admin.runCommand({ configureFailPoint: 'migrateThreadHangAtStep' + stepNumber,
-                       mode: mode });
+    var admin = shardConnection.getDB('admin');
+    admin.runCommand({configureFailPoint: 'migrateThreadHangAtStep' + stepNumber, mode: mode});
 }
 
 //
 // Wait for moveChunk to reach a step (1 through 6).
 //
-function waitForMigrateStep( shardConnection, stepNumber ) {
-    var searchString = 'step ' + stepNumber,
-        admin = shardConnection.getDB( 'admin' );
+function waitForMigrateStep(shardConnection, stepNumber) {
+    var searchString = 'step ' + stepNumber, admin = shardConnection.getDB('admin');
 
-    assert.between(migrateStepNames.copiedIndexes, stepNumber,
-                   migrateStepNames.done, "incorrect stepNumber", true);
+    assert.between(migrateStepNames.copiedIndexes,
+                   stepNumber,
+                   migrateStepNames.done,
+                   "incorrect stepNumber",
+                   true);
 
-    var msg = (
-        'Migrate thread on ' + shardConnection.shardName
-        + ' never reached step "'
-        + numberToName( migrateStepNames, stepNumber )
-        + '".');
+    var msg = ('Migrate thread on ' + shardConnection.shardName + ' never reached step "' +
+               numberToName(migrateStepNames, stepNumber) + '".');
 
-    assert.soon( function() {
+    assert.soon(function() {
         // verbose = True so we see the migration thread.
         var in_progress = admin.currentOp(true).inprog;
-        for ( var i = 0; i < in_progress.length; ++i ) {
+        for (var i = 0; i < in_progress.length; ++i) {
             var op = in_progress[i];
-            if ( op.desc && op.desc === 'migrateThread' ) {
+            if (op.desc && op.desc === 'migrateThread') {
                 if (op.hasOwnProperty('msg')) {
-                    return op.msg.startsWith( searchString );
+                    return op.msg.startsWith(searchString);
                 } else {
                     return false;
                 }

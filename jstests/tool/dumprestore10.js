@@ -10,7 +10,7 @@ function step(msg) {
 
 step();
 
-var replTest = new ReplSetTest( {name: name, nodes: 2} );
+var replTest = new ReplSetTest({name: name, nodes: 2});
 var nodes = replTest.startSet();
 replTest.initiate();
 var master = replTest.getPrimary();
@@ -20,7 +20,7 @@ var total = 1000;
     step("store data");
     var foo = master.getDB("foo");
     for (i = 0; i < total; i++) {
-        foo.bar.insert({ x: i, y: "abc" });
+        foo.bar.insert({x: i, y: "abc"});
     }
 }
 
@@ -33,8 +33,7 @@ step("mongodump from replset");
 
 var data = MongoRunner.dataDir + "/dumprestore10-dump1/";
 
-runMongoProgram( "mongodump", "--host", "127.0.0.1:"+master.port, "--out", data );
-
+runMongoProgram("mongodump", "--host", "127.0.0.1:" + master.port, "--out", data);
 
 {
     step("remove data after dumping");
@@ -48,7 +47,8 @@ runMongoProgram( "mongodump", "--host", "127.0.0.1:"+master.port, "--out", data 
 
 step("try mongorestore with write concern");
 
-runMongoProgram( "mongorestore", "--writeConcern", "2", "--host", "127.0.0.1:"+master.port, "--dir", data );
+runMongoProgram(
+    "mongorestore", "--writeConcern", "2", "--host", "127.0.0.1:" + master.port, "--dir", data);
 
 var x = 0;
 

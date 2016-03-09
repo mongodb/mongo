@@ -6,8 +6,7 @@ runReadOnlyTest(function() {
     return {
         name: 'server_status',
 
-        load: function(writableCollection) {
-        },
+        load: function(writableCollection) {},
         exec: function(readableCollection) {
             assert.commandWorked(readableCollection.getDB().serverStatus());
         }
