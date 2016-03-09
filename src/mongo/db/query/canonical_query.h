@@ -205,6 +205,14 @@ public:
         return _hasNoopExtensions;
     }
 
+    /**
+     * Returns true if the query this CanonicalQuery was parsed from included a $isolated/$atomic
+     * operator.
+     */
+    bool isIsolated() const {
+        return _isIsolated;
+    }
+
 private:
     // You must go through canonicalize to create a CanonicalQuery.
     CanonicalQuery() {}
@@ -224,6 +232,8 @@ private:
     std::unique_ptr<ParsedProjection> _proj;
 
     bool _hasNoopExtensions = false;
+
+    bool _isIsolated;
 };
 
 }  // namespace mongo

@@ -327,8 +327,8 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
                 if (!topLevel)
                     return {Status(ErrorCodes::BadValue,
                                    "$atomic/$isolated has to be at the top level")};
-                if (e.trueValue())
-                    root->add(new AtomicMatchExpression());
+                // Don't do anything with the expression; CanonicalQuery::init() will look through
+                // the BSONObj again for a $atomic/$isolated.
             } else if (mongoutils::str::equals("where", rest)) {
                 StatusWithMatchExpression s = _extensionsCallback->parseWhere(e);
                 if (!s.isOK())

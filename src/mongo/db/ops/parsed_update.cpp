@@ -129,9 +129,8 @@ bool ParsedUpdate::canYield() const {
 }
 
 bool ParsedUpdate::isIsolated() const {
-    return _canonicalQuery.get()
-        ? QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC)
-        : LiteParsedQuery::isQueryIsolated(_request->getQuery());
+    return _canonicalQuery.get() ? _canonicalQuery->isIsolated()
+                                 : LiteParsedQuery::isQueryIsolated(_request->getQuery());
 }
 
 bool ParsedUpdate::hasParsedQuery() const {

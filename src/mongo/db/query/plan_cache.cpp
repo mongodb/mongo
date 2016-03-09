@@ -144,9 +144,6 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::WHERE:
             return "wh";
             break;
-        case MatchExpression::ATOMIC:
-            return "at";
-            break;
         case MatchExpression::ALWAYS_FALSE:
             return "af";
             break;

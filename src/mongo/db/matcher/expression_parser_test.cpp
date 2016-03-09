@@ -63,7 +63,7 @@ TEST(MatchExpressionParserTest, Multiple1) {
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 4)));
 }
 
-TEST(AtomicMatchExpressionTest, Simple1) {
+TEST(AtomicMatchExpressionTest, AtomicOperator1) {
     BSONObj query = BSON("x" << 5 << "$atomic" << BSON("$gt" << 5 << "$lt" << 8));
     StatusWithMatchExpression result =
         MatchExpressionParser::parse(query, ExtensionsCallbackDisallowExtensions());

@@ -315,6 +315,7 @@ Status CanonicalQuery::init(LiteParsedQuery* lpq,
     _pq.reset(lpq);
 
     _hasNoopExtensions = extensionsCallback.hasNoopExtensions();
+    _isIsolated = LiteParsedQuery::isQueryIsolated(lpq->getFilter());
 
     // Normalize, sort and validate tree.
     root = normalizeTree(root);

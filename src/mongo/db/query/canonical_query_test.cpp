@@ -554,6 +554,29 @@ std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
 }
 
 /**
+ * Test that CanonicalQuery::isIsolated() returns correctly.
+ */
+TEST(CanonicalQueryTest, IsIsolatedReturnsTrueWithIsolated) {
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$isolated: 1, x: 3}");
+    ASSERT_TRUE(cq->isIsolated());
+}
+
+TEST(CanonicalQueryTest, IsIsolatedReturnsTrueWithAtomic) {
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$atomic: 1, x: 3}");
+    ASSERT_TRUE(cq->isIsolated());
+}
+
+TEST(CanonicalQueryTest, IsIsolatedReturnsFalseWithIsolated) {
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$isolated: 0, x: 3}");
+    ASSERT_FALSE(cq->isIsolated());
+}
+
+TEST(CanonicalQueryTest, IsIsolatedReturnsFalseWithAtomic) {
+    unique_ptr<CanonicalQuery> cq = canonicalize("{$atomic: 0, x: 3}");
+    ASSERT_FALSE(cq->isIsolated());
+}
+
+/**
  * Test function for CanonicalQuery::normalize.
  */
 void testNormalizeQuery(const char* queryStr, const char* expectedExprStr) {

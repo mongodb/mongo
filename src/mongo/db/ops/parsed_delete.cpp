@@ -113,9 +113,8 @@ bool ParsedDelete::canYield() const {
 }
 
 bool ParsedDelete::isIsolated() const {
-    return _canonicalQuery.get()
-        ? QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC)
-        : LiteParsedQuery::isQueryIsolated(_request->getQuery());
+    return _canonicalQuery.get() ? _canonicalQuery->isIsolated()
+                                 : LiteParsedQuery::isQueryIsolated(_request->getQuery());
 }
 
 bool ParsedDelete::hasParsedQuery() const {

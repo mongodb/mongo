@@ -212,6 +212,34 @@ TEST(LiteParsedQueryTest, AllowTailableWithNaturalSort) {
     ASSERT_EQ(result.getValue()->getSort(), BSON("$natural" << 1));
 }
 
+TEST(LiteParsedQueryTest, IsIsolatedReturnsTrueWithIsolated) {
+    auto result = LiteParsedQuery::makeAsFindCmd(testns,
+                                                 BSON("$isolated" << 1));
+
+    ASSERT_TRUE(LiteParsedQuery::isQueryIsolated(result->getFilter()));
+}
+
+TEST(LiteParsedQueryTest, IsIsolatedReturnsTrueWithAtomic) {
+    auto result = LiteParsedQuery::makeAsFindCmd(testns,
+                                                 BSON("$atomic" << 1));
+
+    ASSERT_TRUE(LiteParsedQuery::isQueryIsolated(result->getFilter()));
+}
+
+TEST(LiteParsedQueryTest, IsIsolatedReturnsFalseWithIsolated) {
+    auto result = LiteParsedQuery::makeAsFindCmd(testns,
+                                                 BSON("$isolated" << false));
+
+    ASSERT_FALSE(LiteParsedQuery::isQueryIsolated(result->getFilter()));
+}
+
+TEST(LiteParsedQueryTest, IsIsolatedReturnsFalseWithAtomic) {
+    auto result = LiteParsedQuery::makeAsFindCmd(testns,
+                                                 BSON("$atomic" << false));
+
+    ASSERT_FALSE(LiteParsedQuery::isQueryIsolated(result->getFilter()));
+}
+
 // Helper function which returns the Status of creating a LiteParsedQuery object with the given
 // parameters.
 void assertLiteParsedQuerySuccess(const BSONObj& query, const BSONObj& proj, const BSONObj& sort) {

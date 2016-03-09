@@ -85,7 +85,6 @@ public:
         WHERE,
 
         // things that maybe shouldn't even be nodes
-        ATOMIC,
         ALWAYS_FALSE,
 
         // Things that we parse but cannot be answered without an index.
@@ -247,35 +246,6 @@ protected:
 private:
     MatchType _matchType;
     std::unique_ptr<TagData> _tagData;
-};
-
-/**
- * this isn't really an expression, but a hint to other things
- * not sure where to put it in the end
- */
-class AtomicMatchExpression : public MatchExpression {
-public:
-    AtomicMatchExpression() : MatchExpression(ATOMIC) {}
-
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const {
-        return true;
-    }
-
-    virtual bool matchesSingleElement(const BSONElement& e) const {
-        return true;
-    }
-
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        return stdx::make_unique<AtomicMatchExpression>();
-    }
-
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
-
-    virtual void toBSON(BSONObjBuilder* out) const;
-
-    virtual bool equivalent(const MatchExpression* other) const {
-        return other->matchType() == ATOMIC;
-    }
 };
 
 class FalseMatchExpression : public MatchExpression {

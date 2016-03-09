@@ -55,16 +55,6 @@ bool MatchExpression::matchesBSON(const BSONObj& doc, MatchDetails* details) con
     return matches(&mydoc, details);
 }
 
-
-void AtomicMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
-    debug << "$atomic\n";
-}
-
-void AtomicMatchExpression::toBSON(BSONObjBuilder* out) const {
-    out->append("$isolated", 1);
-}
-
 void FalseMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
     debug << "$false\n";
