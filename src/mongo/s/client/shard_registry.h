@@ -125,9 +125,7 @@ public:
         return _network;
     }
 
-    ConnectionString getConfigServerConnectionString() const {
-        return _configServerCS;
-    }
+    ConnectionString getConfigServerConnectionString() const;
 
     /**
      * Reloads the ShardRegistry based on the contents of the config server's config.shards

@@ -177,6 +177,11 @@ ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targe
 
 ShardRegistry::~ShardRegistry() = default;
 
+ConnectionString ShardRegistry::getConfigServerConnectionString() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _configServerCS;
+}
+
 void ShardRegistry::updateConfigServerConnectionString(ConnectionString configServerCS) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _updateConfigServerConnectionString_inlock(std::move(configServerCS));
