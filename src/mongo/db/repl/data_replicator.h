@@ -110,11 +110,18 @@ struct DataReplicatorOptions {
     /** Function to sets this node into a specific follower mode. */
     using SetFollowerModeFn = stdx::function<bool(const MemberState&)>;
 
+    /** Function to get this node's slaveDelay. */
+    using GetSlaveDelayFn = stdx::function<Seconds()>;
+
     // Error and retry values
     Milliseconds syncSourceRetryWait{1000};
     Milliseconds initialSyncRetryWait{1000};
     Seconds blacklistSyncSourcePenaltyForNetworkConnectionError{10};
     Minutes blacklistSyncSourcePenaltyForOplogStartMissing{10};
+
+    // Batching settings.
+    size_t replBatchLimitBytes = 512 * 1024 * 1024;
+    size_t replBatchLimitOperations = 5000;
 
     // Replication settings
     NamespaceString localOplogNS = NamespaceString("local.oplog.rs");
@@ -131,6 +138,7 @@ struct DataReplicatorOptions {
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
     SetFollowerModeFn setFollowerMode;
+    GetSlaveDelayFn getSlaveDelay;
     SyncSourceSelector* syncSourceSelector = nullptr;
 
     std::string toString() const {
@@ -230,7 +238,7 @@ private:
     Timestamp _applyUntil(Timestamp);
     void _pauseApplier();
 
-    Operations _getNextApplierBatch_inlock();
+    StatusWith<Operations> _getNextApplierBatch_inlock();
     void _onApplyBatchFinish(const CallbackArgs&,
                              const TimestampStatus&,
                              const Operations&,

@@ -105,7 +105,6 @@ using std::vector;
 namespace repl {
 std::string rsOplogName = "local.oplog.rs";
 std::string masterSlaveOplogName = "local.oplog.$main";
-int OPLOG_VERSION = 2;
 
 MONGO_FP_DECLARE(disableSnapshotting);
 
@@ -292,7 +291,7 @@ unique_ptr<OplogDocWriter> _logOpWriter(OperationContext* txn,
     if (optime.getTerm() != -1)
         b.append("t", optime.getTerm());
     b.append("h", hashNew);
-    b.append("v", OPLOG_VERSION);
+    b.append("v", OplogEntry::kOplogVersion);
     b.append("op", opstr);
     b.append("ns", nss.ns());
     if (fromMigrate)

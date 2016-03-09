@@ -206,10 +206,16 @@ env.Library(
 )
 
 env.Library(
+    target='oplog_entry',
+    source=[
+            'oplog_entry.cpp',
+    ],
+)
+
+env.Library(
     target='sync_tail',
     source=[
         'sync_tail.cpp',
-        'oplog_entry.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
@@ -217,6 +223,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'oplog_entry',
         'repl_coordinator_global',
     ],
     LIBDEPS_TAGS=[
@@ -673,9 +680,9 @@ env.Library(
     target='applier',
     source=[
         'applier.cpp',
-        'oplog_entry.cpp',
     ],
     LIBDEPS=[
+        'oplog_entry',
         'replication_executor',
     ],
 )

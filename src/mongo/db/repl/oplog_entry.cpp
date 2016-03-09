@@ -32,8 +32,12 @@
 
 #include "mongo/db/repl/oplog_entry.h"
 
+#include "mongo/db/namespace_string.h"
+
 namespace mongo {
 namespace repl {
+
+const int OplogEntry::kOplogVersion = 2;
 
 OplogEntry::OplogEntry(const BSONObj& rawInput) : raw(rawInput.getOwned()) {
     for (auto elem : raw) {
@@ -44,12 +48,34 @@ OplogEntry::OplogEntry(const BSONObj& rawInput) : raw(rawInput.getOwned()) {
             opType = elem.valuestrsafe();
         } else if (name == "o2") {
             o2 = elem;
+        } else if (name == "ts") {
+            ts = elem;
         } else if (name == "v") {
             version = elem;
         } else if (name == "o") {
             o = elem;
         }
     }
+}
+
+bool OplogEntry::isCommand() const {
+    return opType[0] == 'c';
+}
+
+bool OplogEntry::hasNamespace() const {
+    return !ns.empty();
+}
+
+int OplogEntry::getVersion() const {
+    return version.eoo() ? 1 : version.Int();
+}
+
+Seconds OplogEntry::getTimestampSecs() const {
+    return Seconds(ts.timestamp().getSecs());
+}
+
+StringData OplogEntry::getCollectionName() const {
+    return nsToCollectionSubstring(ns);
 }
 
 std::string OplogEntry::toString() const {

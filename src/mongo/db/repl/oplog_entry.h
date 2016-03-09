@@ -32,6 +32,7 @@
 
 namespace mongo {
 namespace repl {
+
 /**
  * A parsed oplog entry.
  *
@@ -42,13 +43,20 @@ namespace repl {
  * All StringData members are guaranteed to be NUL terminated.
  */
 struct OplogEntry {
+    // Current oplog version, should be the value of the v field in all oplog entries.
+    static const int kOplogVersion;
+
     explicit OplogEntry(const BSONObj& raw);
 
     // This member is not parsed from the BSON and is instead populated by fillWriterVectors.
     bool isForCappedCollection = false;
 
+    bool isCommand() const;
+    bool hasNamespace() const;
+    int getVersion() const;
+    Seconds getTimestampSecs() const;
+    StringData getCollectionName() const;
     std::string toString() const;
-
 
     BSONObj raw;  // Owned.
 
@@ -58,6 +66,7 @@ struct OplogEntry {
     BSONElement version;
     BSONElement o;
     BSONElement o2;
+    BSONElement ts;
 };
 
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o);

@@ -882,8 +882,8 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn, SyncTail::OpQueue* op
     else
         curVersion = entry.version.Int();
 
-    if (curVersion != OPLOG_VERSION) {
-        severe() << "expected oplog version " << OPLOG_VERSION << " but found version "
+    if (curVersion != OplogEntry::kOplogVersion) {
+        severe() << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
                  << curVersion << " in oplog entry: " << op;
         fassertFailedNoTrace(18820);
     }

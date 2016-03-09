@@ -65,6 +65,7 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -194,7 +195,9 @@ DataReplicatorOptions createDataReplicatorOptions(ReplicationCoordinator* replCo
         [replCoord](const OpTime& opTime) { replCoord->setMyLastAppliedOpTime(opTime); };
     options.setFollowerMode =
         [replCoord](const MemberState& newState) { return replCoord->setFollowerMode(newState); };
+    options.getSlaveDelay = [replCoord]() { return replCoord->getSlaveDelaySecs(); };
     options.syncSourceSelector = replCoord;
+    options.replBatchLimitBytes = dur::UncommittedBytesLimit;
     return options;
 }
 }  // namespace
