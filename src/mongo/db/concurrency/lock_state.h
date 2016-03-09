@@ -252,8 +252,6 @@ public:
         return _batchWriter;
     }
 
-    virtual bool hasStrongLocks() const;
-
 private:
     bool _batchWriter;
 };

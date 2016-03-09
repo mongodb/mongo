@@ -822,24 +822,6 @@ LockMode LockerImpl<IsForMMAPV1>::_getModeForMMAPV1FlushLock() const {
     }
 }
 
-template <bool IsForMMAPV1>
-bool LockerImpl<IsForMMAPV1>::hasStrongLocks() const {
-    if (!isLocked())
-        return false;
-
-    stdx::lock_guard<SpinLock> lk(_lock);
-    LockRequestsMap::ConstIterator it = _requests.begin();
-    while (!it.finished()) {
-        if (it->mode == MODE_X || it->mode == MODE_S) {
-            return true;
-        }
-
-        it.next();
-    }
-
-    return false;
-}
-
 
 //
 // Auto classes

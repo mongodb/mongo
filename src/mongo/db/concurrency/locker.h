@@ -304,12 +304,6 @@ public:
     virtual void setIsBatchWriter(bool newValue) = 0;
     virtual bool isBatchWriter() const = 0;
 
-    /**
-     * A string lock is MODE_X or MODE_S.
-     * These are incompatible with other locks and therefore are strong.
-     */
-    virtual bool hasStrongLocks() const = 0;
-
 protected:
     Locker() {}
 };

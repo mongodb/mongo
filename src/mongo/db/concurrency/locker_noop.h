@@ -167,10 +167,6 @@ public:
     virtual bool isBatchWriter() const {
         invariant(false);
     }
-
-    virtual bool hasStrongLocks() const {
-        return false;
-    }
 };
 
 }  // namespace mongo
