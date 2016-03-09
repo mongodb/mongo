@@ -446,7 +446,7 @@ Value ExpressionAllElementsTrue::evaluateInternal(Variables* vars) const {
     uassert(17040,
             str::stream() << getOpName() << "'s argument must be an array, but is "
                           << typeName(arr.getType()),
-            arr.getType() == Array);
+            arr.isArray());
     const vector<Value>& array = arr.getArray();
     for (vector<Value>::const_iterator it = array.begin(); it != array.end(); ++it) {
         if (!it->coerceToBool()) {
@@ -540,7 +540,7 @@ Value ExpressionAnyElementTrue::evaluateInternal(Variables* vars) const {
     uassert(17041,
             str::stream() << getOpName() << "'s argument must be an array, but is "
                           << typeName(arr.getType()),
-            arr.getType() == Array);
+            arr.isArray());
     const vector<Value>& array = arr.getArray();
     for (vector<Value>::const_iterator it = array.begin(); it != array.end(); ++it) {
         if (it->coerceToBool()) {
@@ -594,7 +594,7 @@ Value ExpressionArrayElemAt::evaluateInternal(Variables* vars) const {
     uassert(28689,
             str::stream() << getOpName() << "'s first argument must be an array, but is "
                           << typeName(array.getType()),
-            array.getType() == Array);
+            array.isArray());
     uassert(28690,
             str::stream() << getOpName() << "'s second argument must be a numeric value,"
                           << " but is " << typeName(indexArg.getType()),
@@ -815,7 +815,7 @@ Value ExpressionConcatArrays::evaluateInternal(Variables* vars) const {
         uassert(28664,
                 str::stream() << "$concatArrays only supports arrays, not "
                               << typeName(val.getType()),
-                val.getType() == Array);
+                val.isArray());
 
         const auto& subValues = val.getArray();
         values.insert(values.end(), subValues.begin(), subValues.end());
@@ -1502,7 +1502,7 @@ void ExpressionFieldPath::addDependencies(DepsTracker* deps, vector<string>* pat
 }
 
 Value ExpressionFieldPath::evaluatePathArray(size_t index, const Value& input) const {
-    dassert(input.getType() == Array);
+    dassert(input.isArray());
 
     // Check for remaining path in each element of array
     vector<Value> result;
@@ -1644,7 +1644,7 @@ Value ExpressionFilter::evaluateInternal(Variables* vars) const {
     uassert(28651,
             str::stream() << "input to $filter must be an array not "
                           << typeName(inputVal.getType()),
-            inputVal.getType() == Array);
+            inputVal.isArray());
 
     const vector<Value>& input = inputVal.getArray();
 
@@ -1847,7 +1847,7 @@ Value ExpressionMap::evaluateInternal(Variables* vars) const {
 
     uassert(16883,
             str::stream() << "input to $map must be an array not " << typeName(inputVal.getType()),
-            inputVal.getType() == Array);
+            inputVal.isArray());
 
     const vector<Value>& input = inputVal.getArray();
 
@@ -2499,6 +2499,34 @@ const char* ExpressionPow::getOpName() const {
     return "$pow";
 }
 
+/* ------------------------ ExpressionReverseArray ------------------------ */
+
+Value ExpressionReverseArray::evaluateInternal(Variables* vars) const {
+    Value input(vpOperand[0]->evaluateInternal(vars));
+
+    if (input.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(34435,
+            str::stream() << "The argument to $reverseArray must be an array, but was of type: "
+                          << typeName(input.getType()),
+            input.isArray());
+
+    if (input.getArrayLength() < 2) {
+        return input;
+    }
+
+    std::vector<Value> array = input.getArray();
+    std::reverse(array.begin(), array.end());
+    return Value(array);
+}
+
+REGISTER_EXPRESSION(reverseArray, ExpressionReverseArray::parse);
+const char* ExpressionReverseArray::getOpName() const {
+    return "$reverseArray";
+}
+
 /* ------------------------- ExpressionSecond ----------------------------- */
 
 Value ExpressionSecond::evaluateInternal(Variables* vars) const {
@@ -2531,11 +2559,11 @@ Value ExpressionSetDifference::evaluateInternal(Variables* vars) const {
     uassert(17048,
             str::stream() << "both operands of $setDifference must be arrays. First "
                           << "argument is of type: " << typeName(lhs.getType()),
-            lhs.getType() == Array);
+            lhs.isArray());
     uassert(17049,
             str::stream() << "both operands of $setDifference must be arrays. Second "
                           << "argument is of type: " << typeName(rhs.getType()),
-            rhs.getType() == Array);
+            rhs.isArray());
 
     ValueSet rhsSet = arrayToSet(rhs);
     const vector<Value>& lhsArray = lhs.getArray();
@@ -2573,7 +2601,7 @@ Value ExpressionSetEquals::evaluateInternal(Variables* vars) const {
         uassert(17044,
                 str::stream() << "All operands of $setEquals must be arrays. One "
                               << "argument is of type: " << typeName(nextEntry.getType()),
-                nextEntry.getType() == Array);
+                nextEntry.isArray());
 
         if (i == 0) {
             lhs.insert(nextEntry.getArray().begin(), nextEntry.getArray().end());
@@ -2605,7 +2633,7 @@ Value ExpressionSetIntersection::evaluateInternal(Variables* vars) const {
         uassert(17047,
                 str::stream() << "All operands of $setIntersection must be arrays. One "
                               << "argument is of type: " << typeName(nextEntry.getType()),
-                nextEntry.getType() == Array);
+                nextEntry.isArray());
 
         if (i == 0) {
             currentIntersection.insert(nextEntry.getArray().begin(), nextEntry.getArray().end());
@@ -2660,11 +2688,11 @@ Value ExpressionSetIsSubset::evaluateInternal(Variables* vars) const {
     uassert(17046,
             str::stream() << "both operands of $setIsSubset must be arrays. First "
                           << "argument is of type: " << typeName(lhs.getType()),
-            lhs.getType() == Array);
+            lhs.isArray());
     uassert(17042,
             str::stream() << "both operands of $setIsSubset must be arrays. Second "
                           << "argument is of type: " << typeName(rhs.getType()),
-            rhs.getType() == Array);
+            rhs.isArray());
 
     return setIsSubsetHelper(lhs.getArray(), arrayToSet(rhs));
 }
@@ -2689,7 +2717,7 @@ public:
         uassert(17310,
                 str::stream() << "both operands of $setIsSubset must be arrays. First "
                               << "argument is of type: " << typeName(lhs.getType()),
-                lhs.getType() == Array);
+                lhs.isArray());
 
         return setIsSubsetHelper(lhs.getArray(), _cachedRhsSet);
     }
@@ -2711,7 +2739,7 @@ intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
         uassert(17311,
                 str::stream() << "both operands of $setIsSubset must be arrays. Second "
                               << "argument is of type: " << typeName(rhs.getType()),
-                rhs.getType() == Array);
+                rhs.isArray());
 
         return new Optimized(arrayToSet(rhs), vpOperand);
     }
@@ -2736,7 +2764,7 @@ Value ExpressionSetUnion::evaluateInternal(Variables* vars) const {
         uassert(17043,
                 str::stream() << "All operands of $setUnion must be arrays. One argument"
                               << " is of type: " << typeName(newEntries.getType()),
-                newEntries.getType() == Array);
+                newEntries.isArray());
 
         unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
     }
@@ -2752,7 +2780,7 @@ const char* ExpressionSetUnion::getOpName() const {
 
 Value ExpressionIsArray::evaluateInternal(Variables* vars) const {
     Value argument = vpOperand[0]->evaluateInternal(vars);
-    return Value(argument.getType() == Array);
+    return Value(argument.isArray());
 }
 
 REGISTER_EXPRESSION(isArray, ExpressionIsArray::parse);
@@ -2776,7 +2804,7 @@ Value ExpressionSlice::evaluateInternal(Variables* vars) const {
     uassert(28724,
             str::stream() << "First argument to $slice must be an array, but is"
                           << " of type: " << typeName(arrayVal.getType()),
-            arrayVal.getType() == Array);
+            arrayVal.isArray());
     uassert(28725,
             str::stream() << "Second argument to $slice must be a numeric value,"
                           << " but is of type: " << typeName(arg2.getType()),
@@ -2854,7 +2882,7 @@ Value ExpressionSize::evaluateInternal(Variables* vars) const {
     uassert(17124,
             str::stream() << "The argument to $size must be an array, but was of type: "
                           << typeName(array.getType()),
-            array.getType() == Array);
+            array.isArray());
     return Value::createIntOrLong(array.getArray().size());
 }
 

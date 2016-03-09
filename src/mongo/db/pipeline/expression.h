@@ -1201,6 +1201,13 @@ public:
 };
 
 
+class ExpressionReverseArray final : public ExpressionFixedArity<ExpressionReverseArray, 1> {
+public:
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+};
+
+
 class ExpressionSlice final : public ExpressionRangedArity<ExpressionSlice, 2, 3> {
 public:
     Value evaluateInternal(Variables* vars) const final;

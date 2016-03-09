@@ -137,6 +137,13 @@ public:
     }
 
     /**
+     * Return true if the Value is an array.
+     */
+    bool isArray() const {
+        return _storage.type == Array;
+    }
+
+    /**
      * Returns true if this value is a numeric type that can be represented as a 32-bit integer,
      * and false otherwise.
      */

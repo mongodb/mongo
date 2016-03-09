@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/config.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
@@ -754,6 +755,28 @@ TEST_F(ExpressionFloorTest, FloatArg) {
 
 TEST_F(ExpressionFloorTest, NullArg) {
     assertEvaluates(Value(BSONNULL), Value(BSONNULL));
+}
+
+/* ------------------------ ExpressionReverseArray -------------------- */
+
+TEST(ExpressionReverseArrayTest, ReversesNormalArray) {
+    assertExpectedResults("$reverseArray",
+                          {{{Value(BSON_ARRAY(1 << 2 << 3))}, Value(BSON_ARRAY(3 << 2 << 1))}});
+}
+
+TEST(ExpressionReverseArrayTest, ReversesEmptyArray) {
+    assertExpectedResults("$reverseArray",
+                          {{{Value(std::vector<Value>())}, Value(std::vector<Value>())}});
+}
+
+TEST(ExpressionReverseArrayTest, ReversesOneElementArray) {
+    assertExpectedResults("$reverseArray", {{{Value(BSON_ARRAY(1))}, Value(BSON_ARRAY(1))}});
+}
+
+TEST(ExpressionReverseArrayTest, ReturnsNullWithNullishInput) {
+    assertExpectedResults(
+        "$reverseArray",
+        {{{Value(BSONNULL)}, Value(BSONNULL)}, {{Value(BSONUndefined)}, Value(BSONNULL)}});
 }
 
 /* ------------------------- ExpressionTrunc -------------------------- */
