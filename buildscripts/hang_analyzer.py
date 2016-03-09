@@ -261,7 +261,7 @@ class GDBDumper(object):
 
     def __find_debugger(self):
         """Finds the installed debugger"""
-        return find_program('gdb', ['/usr/bin'])
+        return find_program('gdb', ['/opt/mongodbtoolchain/bin', '/usr/bin'])
 
     def dump_info(self, pid, process_name, stream):
         dbg = self.__find_debugger()
