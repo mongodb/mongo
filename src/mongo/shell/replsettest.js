@@ -4,11 +4,11 @@
  * {@link #awaitSecondaryNodes} to block till the  set is fully operational).
  * Note that some of the replica start up parameters are not passed here,
  * but to the #startSet method.
- * 
+ *
  * @param {Object|string} opts If this value is a string, it specifies the connection string for
  *      a MongoD host to be used for recreating a ReplSetTest from. Otherwise, if it is an object,
  *      it must have the following contents:
- * 
+ *
  *   {
  *     name {string}: name of this replica set. Default: 'testReplSet'
  *     host {string}: name of the host machine. Hostname will be used
@@ -25,10 +25,10 @@
  *          If object has a special "rsConfig" field then those options will be used for each
  *          replica set member config options when used to initialize the replica set, or
  *          building the config with getReplSetConfig()
- * 
+ *
  *        Format for Array:
  *           An array of replica member option Object. @see MongoRunner.runMongod
- * 
+ *
  *        Note: For both formats, a special boolean property 'arbiter' can be
  *          specified to denote a member is an arbiter.
  *
@@ -36,13 +36,13 @@
  *           formats to configure the options for the mongobridge corresponding to that node. These
  *           options are merged with the opts.bridgeOptions options, where the node-specific options
  *           take precedence.
- * 
+ *
  *     nodeOptions {Object}: Options to apply to all nodes in the replica set.
  *        Format for Object:
  *          { cmdline-param-with-no-arg : "",
  *            param-with-arg : arg }
- *        This turns into "mongod --cmdline-param-with-no-arg --param-with-arg arg" 
- *  
+ *        This turns into "mongod --cmdline-param-with-no-arg --param-with-arg arg"
+ *
  *     oplogSize {number}: Default: 40
  *     useSeedList {boolean}: Use the connection string format of this set
  *        as the replica set name (overrides the name property). Default: false
@@ -60,7 +60,7 @@
  *        Example:
  *              settings: { chainingAllowed: false, ... }
  *   }
- * 
+ *
  * Member variables:
  *  nodes {Array.<Mongo>} - connection to replica set members
  */
@@ -75,7 +75,10 @@ var ReplSetTest = function(opts) {
     var self = this;
 
     // Replica set health states
-    var Health = { UP: 1, DOWN: 0 };
+    var Health = {
+        UP: 1,
+        DOWN: 0
+    };
 
     var _alldbpaths;
     var _configSettings;
@@ -92,14 +95,17 @@ var ReplSetTest = function(opts) {
      * Populates a reference to all reachable nodes.
      */
     function _clearLiveNodes() {
-        self.liveNodes = { master: null, slaves: [] };
+        self.liveNodes = {
+            master: null,
+            slaves: []
+        };
     }
-    
+
     /**
      * Returns the config document reported from the specified connection.
      */
     function _replSetGetConfig(conn) {
-        return assert.commandWorked(conn.adminCommand({ replSetGetConfig: 1 })).config;
+        return assert.commandWorked(conn.adminCommand({replSetGetConfig: 1})).config;
     }
 
     /**
@@ -111,16 +117,14 @@ var ReplSetTest = function(opts) {
 
         self.nodes.forEach(function(node) {
             try {
-                var n = node.getDB('admin').runCommand({ ismaster: 1 });
+                var n = node.getDB('admin').runCommand({ismaster: 1});
                 if (n.ismaster == true) {
                     self.liveNodes.master = node;
-                }
-                else {
+                } else {
                     node.setSlaveOk();
                     self.liveNodes.slaves.push(node);
                 }
-            }
-            catch (err) {
+            } catch (err) {
                 print("ReplSetTest Could not call ismaster on node " + node + ": " + tojson(err));
             }
         });
@@ -130,7 +134,7 @@ var ReplSetTest = function(opts) {
 
     /**
      * Wait for a rs indicator to go to a particular state or states.
-     * 
+     *
      * @param node is a single node or list of nodes, by id or conn
      * @param states is a single state or list of states
      * @param ind is the indicator specified
@@ -139,7 +143,7 @@ var ReplSetTest = function(opts) {
     function _waitForIndicator(node, states, ind, timeout) {
         if (node.length) {
             var nodes = node;
-            for(var i = 0; i < nodes.length; i++) {
+            for (var i = 0; i < nodes.length; i++) {
                 if (states.length)
                     _waitForIndicator(nodes[i], states[i], ind, timeout);
                 else
@@ -175,10 +179,11 @@ var ReplSetTest = function(opts) {
                 }
 
                 // Try again to load connection
-                if (!conn) return false;
+                if (!conn)
+                    return false;
 
                 var getStatusFunc = function() {
-                    status = conn.getDB('admin').runCommand({ replSetGetStatus: 1 });
+                    status = conn.getDB('admin').runCommand({replSetGetStatus: 1});
                 };
 
                 if (self.keyFile) {
@@ -187,8 +192,7 @@ var ReplSetTest = function(opts) {
                 } else {
                     getStatusFunc();
                 }
-            }
-            catch (ex) {
+            } catch (ex) {
                 print("ReplSetTest waitForIndicator could not get status: " + tojson(ex));
                 return false;
             }
@@ -196,8 +200,8 @@ var ReplSetTest = function(opts) {
             var printStatus = false;
             if (lastTime == null || (currTime = new Date().getTime()) - (1000 * 5) > lastTime) {
                 if (lastTime == null) {
-                    print("ReplSetTest waitForIndicator Initial status (timeout : "
-                          + timeout + ") :");
+                    print("ReplSetTest waitForIndicator Initial status (timeout : " + timeout +
+                          ") :");
                 }
 
                 printjson(status);
@@ -209,22 +213,22 @@ var ReplSetTest = function(opts) {
                 return false;
             }
 
-            for(var i = 0; i < status.members.length; i++) {
+            for (var i = 0; i < status.members.length; i++) {
                 if (printStatus) {
-                    print("Status for : " + status.members[i].name + ", checking " +
-                            node.host + "/" + node.name);
+                    print("Status for : " + status.members[i].name + ", checking " + node.host +
+                          "/" + node.name);
                 }
 
                 if (status.members[i].name == node.host || status.members[i].name == node.name) {
-                    for(var j = 0; j < states.length; j++) {
+                    for (var j = 0; j < states.length; j++) {
                         if (printStatus) {
                             print("Status -- " + " current state: " + status.members[i][ind] +
-                                    ",  target state : " + states[j]);
+                                  ",  target state : " + states[j]);
                         }
 
                         if (typeof(states[j]) != "number") {
-                            throw new Error("State was not an number -- type:" +
-                                            typeof(states[j]) + ", value:" + states[j]);
+                            throw new Error("State was not an number -- type:" + typeof(states[j]) +
+                                            ", value:" + states[j]);
                         }
                         if (status.members[i][ind] == states[j]) {
                             return true;
@@ -243,7 +247,7 @@ var ReplSetTest = function(opts) {
 
     /**
      * Wait for a health indicator to go to a particular state or states.
-     * 
+     *
      * @param node is a single node or list of nodes, by id or conn
      * @param state is a single state or list of states. ReplSetTest.Health.DOWN can
      *     only be used in cases when there is a primary available or slave[0] can
@@ -258,7 +262,7 @@ var ReplSetTest = function(opts) {
      */
     function _getLastOpTime(conn) {
         var replSetStatus =
-            assert.commandWorked(conn.getDB("admin").runCommand({ replSetGetStatus: 1 }));
+            assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
         var connStatus = replSetStatus.members.filter(m => m.self)[0];
         if (!connStatus.optime) {
             // Must be an ARBITER
@@ -274,7 +278,7 @@ var ReplSetTest = function(opts) {
      */
     this.nodeList = function() {
         var list = [];
-        for(var i=0; i<this.ports.length; i++) {
+        for (var i = 0; i < this.ports.length; i++) {
             list.push(this.host + ":" + this.ports[i]);
         }
 
@@ -286,14 +290,14 @@ var ReplSetTest = function(opts) {
             return parseInt(node);
         }
 
-        for(var i = 0; i < this.nodes.length; i++) {
+        for (var i = 0; i < this.nodes.length; i++) {
             if (this.nodes[i] == node) {
                 return i;
             }
         }
 
         if (node instanceof ObjectId) {
-            for(i = 0; i < this.nodes.length; i++) {
+            for (i = 0; i < this.nodes.length; i++) {
                 if (this.nodes[i].runId == node) {
                     return i;
                 }
@@ -366,7 +370,7 @@ var ReplSetTest = function(opts) {
     this.getURL = function() {
         var hosts = [];
 
-        for(var i = 0; i < this.ports.length; i++) {
+        for (var i = 0; i < this.ports.length; i++) {
             hosts.push(this.host + ":" + this.ports[i]);
         }
 
@@ -377,7 +381,7 @@ var ReplSetTest = function(opts) {
         print("ReplSetTest starting set");
 
         var nodes = [];
-        for(var n = 0 ; n < this.ports.length; n++) {
+        for (var n = 0; n < this.ports.length; n++) {
             nodes.push(this.start(n, options));
         }
 
@@ -399,8 +403,8 @@ var ReplSetTest = function(opts) {
             var len = slaves.length;
             var ready = true;
 
-            for(var i = 0; i < len; i++) {
-                var isMaster = slaves[i].getDB("admin").runCommand({ ismaster: 1 });
+            for (var i = 0; i < len; i++) {
+                var isMaster = slaves[i].getDB("admin").runCommand({ismaster: 1});
                 var arbiter = (isMaster.arbiterOnly == undefined ? false : isMaster.arbiterOnly);
                 ready = ready && (isMaster.secondary || arbiter);
             }
@@ -437,7 +441,7 @@ var ReplSetTest = function(opts) {
     this.getSecondaries = function(timeout) {
         var master = this.getPrimary(timeout);
         var secs = [];
-        for(var i = 0; i < this.nodes.length; i++) {
+        for (var i = 0; i < this.nodes.length; i++) {
             if (this.nodes[i] != master) {
                 secs.push(this.nodes[i]);
             }
@@ -456,7 +460,7 @@ var ReplSetTest = function(opts) {
             master = this.liveNodes.slaves[0];
         }
 
-        return master.getDB("admin").runCommand({ replSetGetStatus: 1 });
+        return master.getDB("admin").runCommand({replSetGetStatus: 1});
     };
 
     /**
@@ -492,12 +496,13 @@ var ReplSetTest = function(opts) {
     };
 
     this.initiate = function(cfg, initCmd, timeout) {
-        var master  = this.nodes[0].getDB("admin");
-        var config  = cfg || this.getReplSetConfig();
-        var cmd     = {};
-        var cmdKey  = initCmd || 'replSetInitiate';
+        var master = this.nodes[0].getDB("admin");
+        var config = cfg || this.getReplSetConfig();
+        var cmd = {};
+        var cmdKey = initCmd || 'replSetInitiate';
         timeout = timeout || 120000;
-        if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
+        if (jsTestOptions().useLegacyReplicationProtocol &&
+            !config.hasOwnProperty("protocolVersion")) {
             config.protocolVersion = 0;
         }
         cmd[cmdKey] = config;
@@ -528,13 +533,13 @@ var ReplSetTest = function(opts) {
         var newVersion = this.getConfigFromPrimary().version + 1;
         config.version = newVersion;
 
-        if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
+        if (jsTestOptions().useLegacyReplicationProtocol &&
+            !config.hasOwnProperty("protocolVersion")) {
             config.protocolVersion = 0;
         }
         try {
             assert.commandWorked(this.getPrimary().adminCommand({replSetReconfig: config}));
-        }
-        catch (e) {
+        } catch (e) {
             if (tojson(e).indexOf("error doing query: failed") < 0) {
                 throw e;
             }
@@ -549,35 +554,45 @@ var ReplSetTest = function(opts) {
     this.awaitLastOpCommitted = function() {
         var rst = this;
         var master = rst.getPrimary();
-        var lastOp = master.getDB('local').oplog.rs.find().sort({ $natural: -1 }).limit(1).next();
+        var lastOp = master.getDB('local').oplog.rs.find().sort({$natural: -1}).limit(1).next();
 
         var opTime;
         var filter;
         if (this.getReplSetConfig().protocolVersion === 1) {
-            opTime = {ts: lastOp.ts, t: lastOp.t};
+            opTime = {
+                ts: lastOp.ts,
+                t: lastOp.t
+            };
             filter = opTime;
         } else {
-            opTime = {ts: lastOp.ts, t: -1};
-            filter = {ts: lastOp.ts};
+            opTime = {
+                ts: lastOp.ts,
+                t: -1
+            };
+            filter = {
+                ts: lastOp.ts
+            };
         }
 
-        print("Waiting for op with OpTime " + tojson(opTime) + " to be committed on all secondaries");
+        print("Waiting for op with OpTime " + tojson(opTime) +
+              " to be committed on all secondaries");
 
         assert.soon(function() {
             for (var i = 0; i < rst.nodes.length; i++) {
                 var node = rst.nodes[i];
 
                 // Continue if we're connected to an arbiter
-                var res = assert.commandWorked(node.adminCommand({ replSetGetStatus: 1 }));
+                var res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
                 if (res.myState == ReplSetTest.State.ARBITER) {
                     continue;
                 }
 
-                res = node.getDB('local').runCommand({find: 'oplog.rs',
-                                                      filter: filter,
-                                                      readConcern: {level: "majority",
-                                                                    afterOpTime: opTime},
-                                                      maxTimeMS: 1000});
+                res = node.getDB('local').runCommand({
+                    find: 'oplog.rs',
+                    filter: filter,
+                    readConcern: {level: "majority", afterOpTime: opTime},
+                    maxTimeMS: 1000
+                });
                 if (!res.ok) {
                     printjson(res);
                     return false;
@@ -606,8 +621,7 @@ var ReplSetTest = function(opts) {
             assert.soon(function() {
                 try {
                     masterLatestOpTime = _getLastOpTime(master);
-                }
-                catch(e) {
+                } catch (e) {
                     print("ReplSetTest caught exception " + e);
                     return false;
                 }
@@ -618,7 +632,8 @@ var ReplSetTest = function(opts) {
 
         awaitLastOpTimeWrittenFn();
 
-        // get the latest config version from master. if there is a problem, grab master and try again
+        // get the latest config version from master. if there is a problem, grab master and try
+        // again
         var configVersion;
         var masterOpTime;
         var masterName;
@@ -628,41 +643,41 @@ var ReplSetTest = function(opts) {
             master = this.getPrimary();
             configVersion = this.getConfigFromPrimary().version;
             masterOpTime = _getLastOpTime(master);
-            masterName = master.toString().substr(14); // strip "connection to "
-        }
-        catch (e) {
+            masterName = master.toString().substr(14);  // strip "connection to "
+        } catch (e) {
             master = this.getPrimary();
             configVersion = this.getConfigFromPrimary().version;
             masterOpTime = _getLastOpTime(master);
-            masterName = master.toString().substr(14); // strip "connection to "
+            masterName = master.toString().substr(14);  // strip "connection to "
         }
 
         print("ReplSetTest awaitReplication: starting: timestamp for primary, " + masterName +
-                ", is " + tojson(masterLatestOpTime) +
-                ", last oplog entry is " + tojsononeline(masterOpTime));
+              ", is " + tojson(masterLatestOpTime) + ", last oplog entry is " +
+              tojsononeline(masterOpTime));
 
         assert.soon(function() {
-             try {
+            try {
                 print("ReplSetTest awaitReplication: checking secondaries against timestamp " +
                       tojson(masterLatestOpTime));
                 var secondaryCount = 0;
                 for (var i = 0; i < self.liveNodes.slaves.length; i++) {
                     var slave = self.liveNodes.slaves[i];
-                    var slaveName = slave.toString().substr(14); // strip "connection to "
+                    var slaveName = slave.toString().substr(14);  // strip "connection to "
 
                     var slaveConfigVersion =
                         slave.getDB("local")['system.replset'].findOne().version;
 
                     if (configVersion != slaveConfigVersion) {
-                        print("ReplSetTest awaitReplication: secondary #" + secondaryCount +
-                              ", " + slaveName + ", has config version #" + slaveConfigVersion +
+                        print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
+                              slaveName + ", has config version #" + slaveConfigVersion +
                               ", but expected config version #" + configVersion);
 
                         if (slaveConfigVersion > configVersion) {
                             master = this.getPrimary();
-                            configVersion = master.getDB("local")['system.replset'].findOne().version;
+                            configVersion =
+                                master.getDB("local")['system.replset'].findOne().version;
                             masterOpTime = _getLastOpTime(master);
-                            masterName = master.toString().substr(14); // strip "connection to "
+                            masterName = master.toString().substr(14);  // strip "connection to "
 
                             print("ReplSetTest awaitReplication: timestamp for primary, " +
                                   masterName + ", is " + tojson(masterLatestOpTime) +
@@ -673,19 +688,20 @@ var ReplSetTest = function(opts) {
                     }
 
                     // Continue if we're connected to an arbiter
-                    var res = assert.commandWorked(slave.adminCommand({ replSetGetStatus: 1 }));
+                    var res = assert.commandWorked(slave.adminCommand({replSetGetStatus: 1}));
                     if (res.myState == ReplSetTest.State.ARBITER) {
                         continue;
                     }
 
                     ++secondaryCount;
-                    print("ReplSetTest awaitReplication: checking secondary #" +
-                          secondaryCount + ": " + slaveName);
+                    print("ReplSetTest awaitReplication: checking secondary #" + secondaryCount +
+                          ": " + slaveName);
 
                     slave.getDB("admin").getMongo().setSlaveOk();
 
                     var ts = _getLastOpTime(slave);
-                    if (masterLatestOpTime.t < ts.t || (masterLatestOpTime.t == ts.t && masterLatestOpTime.i < ts.i)) {
+                    if (masterLatestOpTime.t < ts.t ||
+                        (masterLatestOpTime.t == ts.t && masterLatestOpTime.i < ts.i)) {
                         masterLatestOpTime = _getLastOpTime(master);
                         print("ReplSetTest awaitReplication: timestamp for " + slaveName +
                               " is newer, resetting latest to " + tojson(masterLatestOpTime));
@@ -696,20 +712,19 @@ var ReplSetTest = function(opts) {
                         print("ReplSetTest awaitReplication: timestamp for secondary #" +
                               secondaryCount + ", " + slaveName + ", is " + tojson(ts) +
                               " but latest is " + tojson(masterLatestOpTime));
-                        print("ReplSetTest awaitReplication: secondary #" +
-                              secondaryCount + ", " + slaveName + ", is NOT synced");
+                        print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
+                              slaveName + ", is NOT synced");
                         return false;
                     }
 
-                    print("ReplSetTest awaitReplication: secondary #" +
-                          secondaryCount + ", " + slaveName + ", is synced");
+                    print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
+                          slaveName + ", is synced");
                 }
 
                 print("ReplSetTest awaitReplication: finished: all " + secondaryCount +
                       " secondaries synced at timestamp " + tojson(masterLatestOpTime));
                 return true;
-            }
-            catch (e) {
+            } catch (e) {
                 print("ReplSetTest awaitReplication: caught exception " + e + ';\n' + e.stack);
 
                 // We might have a new master now
@@ -727,14 +742,16 @@ var ReplSetTest = function(opts) {
         this.getPrimary();
         var res = {};
         res.master = this.liveNodes.master.getDB(db).runCommand("dbhash");
-        res.slaves = this.liveNodes.slaves.map(function(z) { return z.getDB(db).runCommand("dbhash"); });
+        res.slaves = this.liveNodes.slaves.map(function(z) {
+            return z.getDB(db).runCommand("dbhash");
+        });
         return res;
     };
 
     /**
      * Starts up a server.  Options are saved by default for subsequent starts.
-     * 
-     * 
+     *
+     *
      * Options { remember : true } re-applies the saved options from a prior start.
      * Options { noRemember : true } ignores the current properties.
      * Options { appendOptions : true } appends the current options to those remembered.
@@ -742,46 +759,47 @@ var ReplSetTest = function(opts) {
      *
      * @param {int|conn|[int|conn]} n array or single server number (0, 1, 2, ...) or conn
      * @param {object} [options]
-     * @param {boolean} [restart] If false, the data directory will be cleared 
+     * @param {boolean} [restart] If false, the data directory will be cleared
      *   before the server starts.  Default: false.
-     * 
+     *
      */
     this.start = function(n, options, restart, wait) {
         if (n.length) {
             var nodes = n;
             var started = [];
-            
-            for(var i = 0; i < nodes.length; i++) {
+
+            for (var i = 0; i < nodes.length; i++) {
                 if (this.start(nodes[i], Object.merge({}, options), restart, wait)) {
                     started.push(nodes[i]);
                 }
             }
-            
+
             return started;
         }
 
         // TODO: should we do something special if we don't currently know about this node?
         n = this.getNodeId(n);
-        
+
         print("ReplSetTest n is : " + n);
-        
-        var defaults = { useHostName : this.useHostName,
-                         oplogSize : this.oplogSize, 
-                         keyFile : this.keyFile, 
-                         port : _useBridge ? _unbridgedPorts[n] : this.ports[n],
-                         noprealloc : "",
-                         smallfiles : "",
-                         replSet : this.useSeedList ? this.getURL() : this.name,
-                         dbpath : "$set-$node" };
+
+        var defaults = {
+            useHostName: this.useHostName,
+            oplogSize: this.oplogSize,
+            keyFile: this.keyFile,
+            port: _useBridge ? _unbridgedPorts[n] : this.ports[n],
+            noprealloc: "",
+            smallfiles: "",
+            replSet: this.useSeedList ? this.getURL() : this.name,
+            dbpath: "$set-$node"
+        };
 
         //
-        // Note : this replaces the binVersion of the shared startSet() options the first time 
+        // Note : this replaces the binVersion of the shared startSet() options the first time
         // through, so the full set is guaranteed to have different versions if size > 1.  If using
         // start() independently, independent version choices will be made
         //
         if (options && options.binVersion) {
-            options.binVersion = 
-                MongoRunner.versionIterator(options.binVersion);
+            options.binVersion = MongoRunner.versionIterator(options.binVersion);
         }
 
         options = Object.merge(defaults, options);
@@ -790,9 +808,12 @@ var ReplSetTest = function(opts) {
 
         options.restart = options.restart || restart;
 
-        var pathOpts = { node : n, set : this.name };
+        var pathOpts = {
+            node: n,
+            set: this.name
+        };
         options.pathOpts = Object.merge(options.pathOpts || {}, pathOpts);
-        
+
         if (tojson(options) != tojson({}))
             printjson(options);
 
@@ -800,13 +821,15 @@ var ReplSetTest = function(opts) {
 
         if (_useBridge) {
             var bridgeOptions = Object.merge(_bridgeOptions, options.bridgeOptions || {});
-            bridgeOptions = Object.merge(bridgeOptions, {
-                hostName: this.host,
-                port: this.ports[n],
-                // The mongod processes identify themselves to mongobridge as host:port, where the
-                // host is the actual hostname of the machine and not localhost.
-                dest: getHostName() + ":" + _unbridgedPorts[n],
-            });
+            bridgeOptions = Object.merge(
+                bridgeOptions,
+                {
+                  hostName: this.host,
+                  port: this.ports[n],
+                  // The mongod processes identify themselves to mongobridge as host:port, where the
+                  // host is the actual hostname of the machine and not localhost.
+                  dest: getHostName() + ":" + _unbridgedPorts[n],
+                });
 
             this.nodes[n] = new MongoBridge(bridgeOptions);
         }
@@ -825,16 +848,18 @@ var ReplSetTest = function(opts) {
         } else {
             this.nodes[n] = conn;
         }
-        
+
         // Add replica set specific attributes.
         this.nodes[n].nodeId = n;
-                
+
         printjson(this.nodes);
-            
+
         wait = wait || false;
-        if (! wait.toFixed) {
-            if (wait) wait = 0;
-            else wait = -1;
+        if (!wait.toFixed) {
+            if (wait)
+                wait = 0;
+            else
+                wait = -1;
         }
 
         if (wait >= 0) {
@@ -847,12 +872,12 @@ var ReplSetTest = function(opts) {
 
     /**
      * Restarts a db without clearing the data directory by default.  If the server is not
-     * stopped first, this function will not work.  
-     * 
+     * stopped first, this function will not work.
+     *
      * Option { startClean : true } forces clearing the data directory.
      * Option { auth : Object } object that contains the auth details for admin credentials.
      *   Should contain the fields 'user' and 'pwd'
-     * 
+     *
      * @param {int|conn|[int|conn]} n array or single server number (0, 1, 2, ...) or conn
      */
     this.restart = function(n, options, signal, wait) {
@@ -861,14 +886,14 @@ var ReplSetTest = function(opts) {
             wait = signal;
             signal = undefined;
         }
-        
+
         this.stop(n, signal, options);
 
         var started = this.start(n, options, true, wait);
 
         if (jsTestOptions().keyFile) {
             if (started.length) {
-                 // if n was an array of conns, start will return an array of connections
+                // if n was an array of conns, start will return an array of connections
                 for (var i = 0; i < started.length; i++) {
                     jsTest.authenticate(started[i]);
                 }
@@ -896,29 +921,29 @@ var ReplSetTest = function(opts) {
         // Flatten array of nodes to stop
         if (n.length) {
             var nodes = n;
-            
+
             var stopped = [];
-            for(var i = 0; i < nodes.length; i++) {
+            for (var i = 0; i < nodes.length; i++) {
                 if (this.stop(nodes[i], signal, opts))
                     stopped.push(nodes[i]);
             }
-            
+
             return stopped;
         }
-        
+
         // Can specify wait as second parameter, if using default signal
         if (signal == true || signal == false) {
             signal = undefined;
         }
-        
+
         n = this.getNodeId(n);
 
         var port = _useBridge ? _unbridgedPorts[n] : this.ports[n];
         print('ReplSetTest stop *** Shutting down mongod in port ' + port + ' ***');
         var ret = MongoRunner.stopMongod(port, signal, opts);
 
-        print('ReplSetTest stop *** Mongod in port ' + port +
-              ' shutdown with code (' + ret + ') ***');
+        print('ReplSetTest stop *** Mongod in port ' + port + ' shutdown with code (' + ret +
+              ') ***');
 
         if (_useBridge) {
             this.nodes[n].stop();
@@ -935,15 +960,17 @@ var ReplSetTest = function(opts) {
      * @param {Object} opts @see MongoRunner.stopMongod
      */
     this.stopSet = function(signal, forRestart, opts) {
-        for(var i=0; i < this.ports.length; i++) {
+        for (var i = 0; i < this.ports.length; i++) {
             this.stop(i, signal, opts);
         }
 
-        if (forRestart) { return; }
+        if (forRestart) {
+            return;
+        }
 
         if (_alldbpaths) {
             print("ReplSetTest stopSet deleting all dbpaths");
-            for(var i = 0; i < _alldbpaths.length; i++) {
+            for (var i = 0; i < _alldbpaths.length; i++) {
                 resetDbpath(_alldbpaths[i]);
             }
         }
@@ -958,46 +985,48 @@ var ReplSetTest = function(opts) {
      */
     this.ensureOplogsMatch = function() {
         var OplogReader = function(mongo) {
-                this.next = function() {
-                    if (!this.cursor)
-                        throw Error("reader is not open!");
+            this.next = function() {
+                if (!this.cursor)
+                    throw Error("reader is not open!");
 
-                    var nextDoc = this.cursor.next();
-                    if (nextDoc)
-                        this.lastDoc = nextDoc;
-                    return nextDoc;
+                var nextDoc = this.cursor.next();
+                if (nextDoc)
+                    this.lastDoc = nextDoc;
+                return nextDoc;
+            };
+
+            this.getLastDoc = function() {
+                if (this.lastDoc)
+                    return this.lastDoc;
+                return this.next();
+            };
+
+            this.hasNext = function() {
+                if (!this.cursor)
+                    throw Error("reader is not open!");
+                return this.cursor.hasNext();
+            };
+
+            this.query = function(ts) {
+                var coll = this.getOplogColl();
+                var query = {
+                    "ts": {"$gte": ts ? ts : new Timestamp()}
                 };
-                
-                this.getLastDoc = function() {
-                    if (this.lastDoc)
-                        return this.lastDoc;
-                    return this.next();
-                };
-                
-                this.hasNext = function() {
-                    if (!this.cursor)
-                        throw Error("reader is not open!");
-                    return this.cursor.hasNext();
-                };
-                
-                this.query = function(ts) {
-                    var coll = this.getOplogColl();
-                    var query = {"ts": {"$gte": ts ? ts : new Timestamp()}};
-                    this.cursor = coll.find(query).sort({$natural:1});
-                    this.cursor.addOption(DBQuery.Option.oplogReplay);
-                };
-                
-                this.getFirstDoc = function() {
-                    return this.getOplogColl().find().sort({$natural:1}).limit(-1).next();
-                };
-                
-                this.getOplogColl = function () {
-                    return this.mongo.getDB("local")["oplog.rs"];
-                };
-                
-                this.lastDoc = null;
-                this.cursor = null;
-                this.mongo = mongo;
+                this.cursor = coll.find(query).sort({$natural: 1});
+                this.cursor.addOption(DBQuery.Option.oplogReplay);
+            };
+
+            this.getFirstDoc = function() {
+                return this.getOplogColl().find().sort({$natural: 1}).limit(-1).next();
+            };
+
+            this.getOplogColl = function() {
+                return this.mongo.getDB("local")["oplog.rs"];
+            };
+
+            this.lastDoc = null;
+            this.cursor = null;
+            this.mongo = mongo;
         };
 
         if (this.nodes.length && this.nodes.length > 1) {
@@ -1013,7 +1042,7 @@ var ReplSetTest = function(opts) {
                 }
             }
 
-            // start all oplogReaders at the same place. 
+            // start all oplogReaders at the same place.
             for (i = 0; i < rsSize; i++) {
                 readers[i].query(largestTS);
             }
@@ -1021,18 +1050,16 @@ var ReplSetTest = function(opts) {
             var firstReader = readers[0];
             while (firstReader.hasNext()) {
                 var ts = firstReader.next().ts;
-                for(i = 1; i < rsSize; i++) {
-                    assert.eq(ts, 
-                              readers[i].next().ts,
-                              " non-matching ts for node: " + readers[i].mongo);
+                for (i = 1; i < rsSize; i++) {
+                    assert.eq(
+                        ts, readers[i].next().ts, " non-matching ts for node: " + readers[i].mongo);
                 }
             }
 
             // ensure no other node has more oplog
             for (i = 1; i < rsSize; i++) {
-                assert.eq(false,
-                          readers[i].hasNext(),
-                          "" + readers[i] + " shouldn't have more oplog.");
+                assert.eq(
+                    false, readers[i].hasNext(), "" + readers[i] + " shouldn't have more oplog.");
             }
         }
     };
@@ -1068,11 +1095,11 @@ var ReplSetTest = function(opts) {
      * Constructor, which initializes the ReplSetTest object by starting new instances.
      */
     function _constructStartNewInstances(opts) {
-        self.name  = opts.name || "testReplSet";
+        self.name = opts.name || "testReplSet";
         print('Starting new replica set ' + self.name);
 
         self.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
-        self.host  = self.useHostName ? (opts.host || getHostName()) : 'localhost';
+        self.host = self.useHostName ? (opts.host || getHostName()) : 'localhost';
         self.oplogSize = opts.oplogSize || 40;
         self.useSeedList = opts.useSeedList || false;
         self.keyFile = opts.keyFile;
@@ -1090,9 +1117,9 @@ var ReplSetTest = function(opts) {
 
         if (isObject(opts.nodes)) {
             var len = 0;
-            for(var i in opts.nodes) {
-                var options = self.nodeOptions["n" + len] = Object.merge(opts.nodeOptions,
-                                                                           opts.nodes[i]);
+            for (var i in opts.nodes) {
+                var options = self.nodeOptions["n" + len] =
+                    Object.merge(opts.nodeOptions, opts.nodes[i]);
                 if (i.startsWith("a")) {
                     options.arbiter = true;
                 }
@@ -1101,15 +1128,13 @@ var ReplSetTest = function(opts) {
             }
 
             numNodes = len;
-        }
-        else if (Array.isArray(opts.nodes)) {
-            for(var i = 0; i < opts.nodes.length; i++) {
+        } else if (Array.isArray(opts.nodes)) {
+            for (var i = 0; i < opts.nodes.length; i++) {
                 self.nodeOptions["n" + i] = Object.merge(opts.nodeOptions, opts.nodes[i]);
             }
 
             numNodes = opts.nodes.length;
-        }
-        else {
+        } else {
             for (var i = 0; i < opts.nodes; i++) {
                 self.nodeOptions["n" + i] = opts.nodeOptions;
             }
@@ -1140,8 +1165,7 @@ var ReplSetTest = function(opts) {
 
     if (typeof opts === 'string' || opts instanceof String) {
         _constructFromExistingSeedNode(opts);
-    }
-    else {
+    } else {
         _constructStartNewInstances(opts);
     }
 };
@@ -1168,7 +1192,7 @@ ReplSetTest.State = {
 ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
     var hostCount = host.length;
     if (hostCount) {
-        for(var i = 0; i < hostCount; i++) {
+        for (var i = 0; i < hostCount; i++) {
             ReplSetTest.awaitRSClientHosts(conn, host[i], hostOk, rs);
         }
 
@@ -1177,9 +1201,14 @@ ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
 
     timeout = timeout || 60000;
 
-    if (hostOk == undefined) hostOk = { ok: true };
-    if (host.host) host = host.host;
-    if (rs) rs = rs.name;
+    if (hostOk == undefined)
+        hostOk = {
+            ok: true
+        };
+    if (host.host)
+        host = host.host;
+    if (rs)
+        rs = rs.name;
 
     print("Awaiting " + host + " to be " + tojson(hostOk) + " for " + conn + " (rs: " + rs + ")");
 
@@ -1192,22 +1221,23 @@ ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
         }
 
         for (var rsName in rsClientHosts) {
-            if (rs && rs != rsName) continue;
+            if (rs && rs != rsName)
+                continue;
 
             for (var i = 0; i < rsClientHosts[rsName].hosts.length; i++) {
                 var clientHost = rsClientHosts[rsName].hosts[i];
-                if (clientHost.addr != host) continue;
+                if (clientHost.addr != host)
+                    continue;
 
                 // Check that *all* host properties are set correctly
                 var propOk = true;
-                for(var prop in hostOk) {
+                for (var prop in hostOk) {
                     if (isObject(hostOk[prop])) {
                         if (!friendlyEqual(hostOk[prop], clientHost[prop])) {
                             propOk = false;
                             break;
                         }
-                    }
-                    else if (clientHost[prop] != hostOk[prop]) {
+                    } else if (clientHost[prop] != hostOk[prop]) {
                         propOk = false;
                         break;
                     }
@@ -1220,7 +1250,5 @@ ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
         }
 
         return false;
-    },
-    'timed out waiting for replica set client to recognize hosts',
-    timeout);  
+    }, 'timed out waiting for replica set client to recognize hosts', timeout);
 };

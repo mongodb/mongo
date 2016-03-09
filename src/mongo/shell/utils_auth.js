@@ -10,7 +10,7 @@ var authutil;
     authutil.logout = function(conn, dbname) {
         var i;
         if (null == conn.length) {
-            conn = [ conn ];
+            conn = [conn];
         }
         for (i = 0; i < conn.length; ++i) {
             conn[i].getDB(dbname).logout();
@@ -26,40 +26,38 @@ var authutil;
     authutil.assertAuthenticate = function(conns, dbName, authParams) {
         var conn, i, ex, ex2;
         if (conns.length == null)
-            conns = [ conns ];
+            conns = [conns];
 
         try {
             for (i = 0; i < conns.length; ++i) {
                 conn = conns[i];
                 assert(conn.getDB(dbName).auth(authParams),
                        "Failed to authenticate " + conn + " to " + dbName + " using parameters " +
-                       tojson(authParams));
+                           tojson(authParams));
             }
-        }
-        catch (ex) {
+        } catch (ex) {
             try {
                 authutil.logout(conns, dbName);
-            }
-            catch (ex2) {
+            } catch (ex2) {
             }
             throw ex;
         }
     };
 
-     /**
-     * Authenticates all connections in "conns" using "authParams" on database "dbName".
-     * Raises in exception if any of the authentications succeed.
-     */
+    /**
+    * Authenticates all connections in "conns" using "authParams" on database "dbName".
+    * Raises in exception if any of the authentications succeed.
+    */
     authutil.assertAuthenticateFails = function(conns, dbName, authParams) {
         var conn, i;
         if (conns.length == null)
-            conns = [ conns ];
+            conns = [conns];
 
         for (i = 0; i < conns.length; ++i) {
             conn = conns[i];
             assert(!conn.getDB(dbName).auth(authParams),
                    "Unexpectedly authenticated " + conn + " to " + dbName + " using parameters " +
-                   tojson(authParams));
+                       tojson(authParams));
         }
     };
 
@@ -69,22 +67,22 @@ var authutil;
      */
     authutil.asCluster = function(conn, keyfile, action) {
         var ex;
-        authutil.assertAuthenticate(conn, 'local', {
-            user: '__system',
-            mechanism: 'SCRAM-SHA-1',
-            pwd: cat(keyfile).replace(/[\011-\015\040]/g, '')
-        });
+        authutil.assertAuthenticate(conn,
+                                    'local',
+                                    {
+                                      user: '__system',
+                                      mechanism: 'SCRAM-SHA-1',
+                                      pwd: cat(keyfile).replace(/[\011-\015\040]/g, '')
+                                    });
 
         try {
             return action();
-        }
-        finally {
+        } finally {
             try {
                 authutil.logout(conn, 'local');
-            }
-            catch (ex) {
+            } catch (ex) {
             }
         }
     };
 
- }());
+}());

@@ -36,11 +36,7 @@ function MongoBridge(options) {
 
     // Start the mongobridge on port 'this.port' routing network traffic to 'this.dest'.
     var args = ['mongobridge', '--port', this.port, '--dest', this.dest];
-    var keysToSkip = [
-        'dest',
-        'hostName',
-        'port',
-    ];
+    var keysToSkip = ['dest', 'hostName', 'port', ];
 
     // Append any command line arguments that are optional for mongobridge.
     Object.keys(options).forEach(function(key) {
@@ -99,12 +95,14 @@ function MongoBridge(options) {
         // connection object that is equivalent to its 'host' property. Certain functions in
         // ReplSetTest and ShardingTest use the 'name' property instead of the 'host' property, so
         // we define it here for consistency.
-        Object.defineProperty(userConn, 'name', {
-            enumerable: true,
-            get: function() {
-                return this.host;
-            },
-        });
+        Object.defineProperty(userConn,
+                              'name',
+                              {
+                                enumerable: true,
+                                get: function() {
+                                    return this.host;
+                                },
+                              });
 
         controlConn = new Mongo(hostName + ':' + this.port);
     };
@@ -191,8 +189,9 @@ function MongoBridge(options) {
 
         bridges.forEach(bridge => {
             var res = runBridgeCommand(controlConn, 'acceptConnectionsFrom', {host: bridge.dest});
-            assert.commandWorked(res, 'failed to configure the mongobridge listening on port ' +
-                                 this.port + ' to accept new connections from ' + bridge.dest);
+            assert.commandWorked(res,
+                                 'failed to configure the mongobridge listening on port ' +
+                                     this.port + ' to accept new connections from ' + bridge.dest);
         });
     };
 
@@ -210,8 +209,9 @@ function MongoBridge(options) {
 
         bridges.forEach(bridge => {
             var res = runBridgeCommand(controlConn, 'rejectConnectionsFrom', {host: bridge.dest});
-            assert.commandWorked(res, 'failed to configure the mongobridge listening on port ' +
-                                 this.port + ' to hang up connections from ' + bridge.dest);
+            assert.commandWorked(res,
+                                 'failed to configure the mongobridge listening on port ' +
+                                     this.port + ' to hang up connections from ' + bridge.dest);
         });
     };
 
@@ -229,13 +229,16 @@ function MongoBridge(options) {
         bridges.forEach(throwErrorIfNotMongoBridgeInstance);
 
         bridges.forEach(bridge => {
-            var res = runBridgeCommand(controlConn, 'delayMessagesFrom', {
-                host: bridge.dest,
-                delay: delay,
-            });
-            assert.commandWorked(res, 'failed to configure the mongobridge listening on port ' +
-                                 this.port + ' to delay messages from ' + bridge.dest + ' by ' +
-                                 delay + ' milliseconds');
+            var res = runBridgeCommand(controlConn,
+                                       'delayMessagesFrom',
+                                       {
+                                         host: bridge.dest,
+                                         delay: delay,
+                                       });
+            assert.commandWorked(res,
+                                 'failed to configure the mongobridge listening on port ' +
+                                     this.port + ' to delay messages from ' + bridge.dest + ' by ' +
+                                     delay + ' milliseconds');
         });
     };
 
@@ -253,40 +256,48 @@ function MongoBridge(options) {
         bridges.forEach(throwErrorIfNotMongoBridgeInstance);
 
         bridges.forEach(bridge => {
-            var res = runBridgeCommand(controlConn, 'discardMessagesFrom', {
-                host: bridge.dest,
-                loss: lossProbability,
-            });
-            assert.commandWorked(res, 'failed to configure the mongobridge listening on port ' +
-                                 this.port + ' to discard messages from ' + bridge.dest +
-                                 ' with probability ' + lossProbability);
+            var res = runBridgeCommand(controlConn,
+                                       'discardMessagesFrom',
+                                       {
+                                         host: bridge.dest,
+                                         loss: lossProbability,
+                                       });
+            assert.commandWorked(res,
+                                 'failed to configure the mongobridge listening on port ' +
+                                     this.port + ' to discard messages from ' + bridge.dest +
+                                     ' with probability ' + lossProbability);
         });
     };
 
     // Use a Proxy to "extend" the underlying connection object. The C++ functions, e.g.
     // runCommand(), require that they are called on the Mongo instance itself and so typical
     // prototypical inheritance isn't possible.
-    return new Proxy(this, {
-        get: function get(target, property, receiver) {
-            // If the property is defined on the MongoBridge instance itself, then return it.
-            // Otherwise, get the value of the property from the Mongo instance.
-            if (target.hasOwnProperty(property)) {
-                return target[property];
-            }
-            var value = userConn[property];
-            if (typeof value === 'function') {
-                return value.bind(userConn);
-            }
-            return value;
-        },
+    return new Proxy(this,
+                     {
+                       get: function get(target, property, receiver) {
+                           // If the property is defined on the MongoBridge instance itself, then
+                           // return it.
+                           // Otherwise, get the value of the property from the Mongo instance.
+                           if (target.hasOwnProperty(property)) {
+                               return target[property];
+                           }
+                           var value = userConn[property];
+                           if (typeof value === 'function') {
+                               return value.bind(userConn);
+                           }
+                           return value;
+                       },
 
-        set: function set(target, property, value, receiver) {
-            // Delegate setting the value of any property to the Mongo instance so that it can be
-            // accessed in functions acting on the Mongo instance directly instead of this Proxy.
-            // For example, the "slaveOk" property needs to be set on the Mongo instance in order
-            // for the query options bit to be set correctly.
-            userConn[property] = value;
-            return true;
-        },
-    });
+                       set: function set(target, property, value, receiver) {
+                           // Delegate setting the value of any property to the Mongo instance so
+                           // that it can be
+                           // accessed in functions acting on the Mongo instance directly instead of
+                           // this Proxy.
+                           // For example, the "slaveOk" property needs to be set on the Mongo
+                           // instance in order
+                           // for the query options bit to be set correctly.
+                           userConn[property] = value;
+                           return true;
+                       },
+                     });
 }

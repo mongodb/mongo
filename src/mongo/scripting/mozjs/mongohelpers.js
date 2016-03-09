@@ -32,11 +32,11 @@
 // this dictionary will be removed from the global scope.
 exportToMongoHelpers = {
     // This function accepts an expression or function body and returns a function definition
-   'functionExpressionParser': function functionExpressionParser(fnSrc) {
+    'functionExpressionParser': function functionExpressionParser(fnSrc) {
         var parseTree;
         try {
             parseTree = this.Reflect.parse(fnSrc);
-        } catch(e) {
+        } catch (e) {
             if (e == 'SyntaxError: function statement requires a name') {
                 return fnSrc;
             } else if (e == 'SyntaxError: return not in function') {
@@ -59,8 +59,7 @@ exportToMongoHelpers = {
                 prevExprEnd = parseTree.body[lastStatement - 1].loc.end;
                 if (prevExprEnd.line != loc.line) {
                     prevExprEnd = 0;
-                }
-                else {
+                } else {
                     prevExprEnd = prevExprEnd.column;
                 }
             }
@@ -73,7 +72,7 @@ exportToMongoHelpers = {
             // The parser has a weird behavior where sometimes if you have an expression like
             // ((x == 5)), it says that the expression string is "x == 5))", so we may need to
             // adjust where we prepend "return".
-            while(col >= prevExprEnd) {
+            while (col >= prevExprEnd) {
                 var modLine = origLine.substr(0, col) + "return " + origLine.substr(col);
                 lines[loc.line - 1] = modLine;
                 fnSrc = '{ ' + lines.join('\n') + ' }';
@@ -87,7 +86,7 @@ exportToMongoHelpers = {
             }
 
             return "function() " + fnSrc;
-        } else if(lastStatementType == 'FunctionDeclaration') {
+        } else if (lastStatementType == 'FunctionDeclaration') {
             return fnSrc;
         } else {
             return 'function() { ' + fnSrc + ' }';
