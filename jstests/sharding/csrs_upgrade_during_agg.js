@@ -15,12 +15,12 @@ load("jstests/libs/csrs_upgrade_util.js");
     coordinator.setupSCCCCluster();
 
     jsTest.log("Inserting initial data");
-    var res = coordinator.getMongos(0).adminCommand({split: coordinator.getShardedCollectionName(),
-                                                     middle: {_id: 0}});
+    var res = coordinator.getMongos(0)
+                  .adminCommand({split: coordinator.getShardedCollectionName(), middle: {_id: 0}});
     assert.commandWorked(res);
     assert.commandWorked(coordinator.getMongos(0).adminCommand({
         moveChunk: coordinator.getShardedCollectionName(),
-        find: { _id: 0 },
+        find: {_id: 0},
         to: coordinator.getShardName(1)
     }));
 
@@ -28,10 +28,10 @@ load("jstests/libs/csrs_upgrade_util.js");
     for (var i = -1000; i < 1000; i++) {
         inserts.push({_id: i, num: Math.abs(i) % 4});
     }
-    assert.writeOK(coordinator.getShardedCollection().insert(inserts,
-                                                             {writeConcern: {w: 'majority'}}));
-    assert.writeOK(coordinator.getUnshardedCollection().insert(inserts,
-                                                               {writeConcern: {w: 'majority'}}));
+    assert.writeOK(
+        coordinator.getShardedCollection().insert(inserts, {writeConcern: {w: 'majority'}}));
+    assert.writeOK(
+        coordinator.getUnshardedCollection().insert(inserts, {writeConcern: {w: 'majority'}}));
 
     coordinator.restartFirstConfigAsReplSet();
     coordinator.startNewCSRSNodes();
@@ -39,39 +39,38 @@ load("jstests/libs/csrs_upgrade_util.js");
 
     jsTest.log("Starting aggregation ops in the background");
 
-    var joinParallelShell = startParallelShell(
-        function() {
-            db = db.getSiblingDB('csrs_upgrade_during_agg');
-            for (var i = 0; i < 2000; i++) {
-                if (i % 100 == 0) {
-                    print("Performing aggregation iteration: " + i);
-                }
-                // Force mongos to reload chunk distribution from the config servers.
-                assert.commandWorked(db.adminCommand('flushRouterConfig'));
-
-                // One aggregate that returns a cursor
-                var cursor = db.unsharded.aggregate([{$group: {_id: "$num"}}, {$sort: {_id: 1}}]);
-                for (var j = 0; j < 4; j++) {
-                    assert.eq(j, cursor.next()._id);
-                }
-                assert(!cursor.hasNext());
-
-                // One aggregate that outputs to a collection
-                db.sharded.aggregate([{$group: {_id: "$num"}}, {$sort: {_id: 1}}, {$out: "out"}]);
+    var joinParallelShell = startParallelShell(function() {
+        db = db.getSiblingDB('csrs_upgrade_during_agg');
+        for (var i = 0; i < 2000; i++) {
+            if (i % 100 == 0) {
+                print("Performing aggregation iteration: " + i);
             }
+            // Force mongos to reload chunk distribution from the config servers.
+            assert.commandWorked(db.adminCommand('flushRouterConfig'));
 
-            // Signal to main test thread that parallel shell is finished running.
-            assert.writeOK(db.signal.insert({finished: true}));
+            // One aggregate that returns a cursor
+            var cursor = db.unsharded.aggregate([{$group: {_id: "$num"}}, {$sort: {_id: 1}}]);
+            for (var j = 0; j < 4; j++) {
+                assert.eq(j, cursor.next()._id);
+            }
+            assert(!cursor.hasNext());
 
-            jsTestLog("Finished performing aggregation ops in parallel shell");
-        }, coordinator.getMongos(0).port);
+            // One aggregate that outputs to a collection
+            db.sharded.aggregate([{$group: {_id: "$num"}}, {$sort: {_id: 1}}, {$out: "out"}]);
+        }
+
+        // Signal to main test thread that parallel shell is finished running.
+        assert.writeOK(db.signal.insert({finished: true}));
+
+        jsTestLog("Finished performing aggregation ops in parallel shell");
+    }, coordinator.getMongos(0).port);
 
     var outputColl = coordinator.getMongos(0).getDB(coordinator.getTestDBName()).out;
 
     // Wait for parallel shell to start doing aggregate ops.
     assert.soon(function() {
-                    return outputColl.findOne();
-                });
+        return outputColl.findOne();
+    });
 
     coordinator.shutdownOneSCCCNode();
     coordinator.allowAllCSRSNodesToVote();

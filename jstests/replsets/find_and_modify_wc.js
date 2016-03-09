@@ -5,8 +5,8 @@
     'use strict';
 
     var nodeCount = 3;
-    var rst = new ReplSetTest({ nodes: nodeCount });
-    rst.startSet({ nojournal: "" });
+    var rst = new ReplSetTest({nodes: nodeCount});
+    rst.startSet({nojournal: ""});
     rst.initiate();
 
     var primary = rst.getPrimary();
@@ -16,20 +16,19 @@
     // insert some documents
     var docs = [];
     for (var i = 1; i <= 5; ++i) {
-        docs.push({ i: i, j: 2*i });
+        docs.push({i: i, j: 2 * i});
     }
-    var res = coll.runCommand({ insert: coll.getName(),
-                                documents: docs,
-                                writeConcern: { w: nodeCount } });
+    var res =
+        coll.runCommand({insert: coll.getName(), documents: docs, writeConcern: {w: nodeCount}});
     assert(res.ok);
     assert.eq(5, coll.count());
 
     // use for updates in subsequent runCommand calls
     var reqUpdate = {
         findAndModify: coll.getName(),
-        query: { i: 3 },
-        update: { $inc: { j: 1 } },
-        writeConcern: { w: 'majority' }
+        query: {i: 3},
+        update: {$inc: {j: 1}},
+        writeConcern: {w: 'majority'}
     };
 
     // Verify findAndModify returns old document new: false
@@ -50,22 +49,15 @@
     assert(!res.writeConcernError);
 
     // Verify findAndModify remove works
-    res = coll.runCommand({
-        findAndModify: coll.getName(),
-        sort: { i: 1 },
-        remove: true,
-        writeConcern: { w: nodeCount }
-    });
+    res = coll.runCommand(
+        {findAndModify: coll.getName(), sort: {i: 1}, remove: true, writeConcern: {w: nodeCount}});
     assert.eq(res.value.i, 1);
     assert.eq(coll.count(), 4);
     assert(!res.writeConcernError);
 
     // Verify findAndModify returns writeConcernError
     // when given invalid writeConcerns
-    [
-        { w: 'invalid' },
-        { w: nodeCount + 1 }
-    ].forEach(function(wc) {
+    [{w: 'invalid'}, {w: nodeCount + 1}].forEach(function(wc) {
         reqUpdate.writeConcern = wc;
         res = coll.runCommand(reqUpdate);
 

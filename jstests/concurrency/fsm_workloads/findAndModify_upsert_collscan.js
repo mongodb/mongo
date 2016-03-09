@@ -10,12 +10,15 @@
  *
  * Forces 'sort' to perform a collection scan by using $natural.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/findAndModify_upsert.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_workloads/findAndModify_upsert.js');  // for $config
 
-var $config = extendWorkload($config, function($config, $super) {
+var $config = extendWorkload($config,
+                             function($config, $super) {
 
-    $config.data.sort = { $natural: 1 };
+                                 $config.data.sort = {
+                                     $natural: 1
+                                 };
 
-    return $config;
-});
+                                 return $config;
+                             });

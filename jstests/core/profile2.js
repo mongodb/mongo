@@ -10,7 +10,7 @@ assert.commandWorked(coll.getDB().runCommand({profile: 2}));
 
 var str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 var hugeStr = str;
-while (hugeStr.length < 2*1024*1024){
+while (hugeStr.length < 2 * 1024 * 1024) {
     hugeStr += str;
 }
 
@@ -39,7 +39,7 @@ assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('query'));
 assert.eq('string', typeof(result.query));
-assert(result.query.match(/^{ a: "a+\.\.\." }$/)); // String value is truncated.
+assert(result.query.match(/^{ a: "a+\.\.\." }$/));  // String value is truncated.
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.getDB().system.profile.drop();
@@ -54,7 +54,7 @@ assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('updateobj'));
 assert.eq('string', typeof(result.updateobj));
-assert(result.updateobj.match(/^{ a: "a+\.\.\." }$/)); // String value is truncated.
+assert(result.updateobj.match(/^{ a: "a+\.\.\." }$/));  // String value is truncated.
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.getDB().system.profile.drop();

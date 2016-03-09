@@ -24,7 +24,7 @@ var $config = (function() {
 
             var bulk = db[collName].initializeUnorderedBulkOp();
             for (var i = 0; i < this.numDocs; ++i) {
-                bulk.insert({ i: i % this.modulus, tid: this.tid });
+                bulk.insert({i: i % this.modulus, tid: this.tid});
             }
             var res = bulk.execute();
             assertAlways.writeOK(res);
@@ -32,8 +32,7 @@ var $config = (function() {
         }
 
         function distinct(db, collName) {
-            assertWhenOwnColl.eq(this.modulus,
-                                 db[collName].distinct('i', { tid: this.tid }).length);
+            assertWhenOwnColl.eq(this.modulus, db[collName].distinct('i', {tid: this.tid}).length);
         }
 
         return {
@@ -44,8 +43,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { distinct: 1 },
-        distinct: { distinct: 1 }
+        init: {distinct: 1},
+        distinct: {distinct: 1}
     };
 
     return {

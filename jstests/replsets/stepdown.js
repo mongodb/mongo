@@ -14,24 +14,9 @@ var errorWasDueToConnectionFailure = function(error) {
 };
 
 var replTest = new ReplSetTest({
-    name : 'testSet',
-    nodes : {
-        "n0" : {
-            rsConfig : {
-                priority : 2
-            }
-        },
-        "n1" : {},
-        "n2" : {
-            rsConfig : {
-                votes : 1,
-                priority : 0
-            }
-        }
-    },
-    nodeOptions : {
-        verbose : 1
-    }
+    name: 'testSet',
+    nodes: {"n0": {rsConfig: {priority: 2}}, "n1": {}, "n2": {rsConfig: {votes: 1, priority: 0}}},
+    nodeOptions: {verbose: 1}
 });
 var nodes = replTest.startSet();
 replTest.initiate();
@@ -40,13 +25,13 @@ var master = replTest.getPrimary();
 
 // do a write
 print("\ndo a write");
-assert.writeOK(master.getDB("foo").bar.insert({x:1}));
+assert.writeOK(master.getDB("foo").bar.insert({x: 1}));
 replTest.awaitReplication();
 
 // lock secondaries
 print("\nlock secondaries");
 replTest.liveNodes.slaves.forEach(function(slave) {
-    printjson(assert.commandWorked(slave.getDB("admin").runCommand({fsync : 1, lock : 1})));
+    printjson(assert.commandWorked(slave.getDB("admin").runCommand({fsync: 1, lock: 1})));
 });
 
 print("\nwaiting several seconds before stepdown");
@@ -55,7 +40,7 @@ sleep(2000);
 
 for (var i = 0; i < 11; i++) {
     // do another write
-    assert.writeOK(master.getDB("foo").bar.insert({x:i}));
+    assert.writeOK(master.getDB("foo").bar.insert({x: i}));
     sleep(1000);
 }
 
@@ -66,10 +51,10 @@ printjson(assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown
 
 print("\n do stepdown that should work");
 assert.throws(function() {
-    assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown:50, force:true}));
+    assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown: 50, force: true}));
 });
 
-var r2 = assert.commandWorked(master.getDB("admin").runCommand({ismaster : 1}));
+var r2 = assert.commandWorked(master.getDB("admin").runCommand({ismaster: 1}));
 assert.eq(r2.ismaster, false);
 assert.eq(r2.secondary, true);
 
@@ -79,7 +64,7 @@ replTest.liveNodes.slaves.forEach(function(slave) {
 });
 
 print("\nreset stepped down time");
-assert.commandWorked(master.getDB("admin").runCommand({replSetFreeze:0}));
+assert.commandWorked(master.getDB("admin").runCommand({replSetFreeze: 0}));
 master = replTest.getPrimary();
 
 print("\nawait");
@@ -99,12 +84,11 @@ assert.soon(function() {
 
 master = replTest.getPrimary();
 var firstMaster = master;
-print("\nmaster is now "+firstMaster);
+print("\nmaster is now " + firstMaster);
 
 try {
-    assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown : 100, force : true}));
-}
-catch (e) {
+    assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown: 100, force: true}));
+} catch (e) {
     // ignore errors due to connection failures as we expect the master to close connections
     // on stepdown
     if (!errorWasDueToConnectionFailure(e)) {
@@ -128,17 +112,15 @@ master = replTest.liveNodes.master;
 var slave = replTest.liveNodes.slaves[0];
 
 try {
-    slave.adminCommand({shutdown :1});
-}
-catch (e) {
+    slave.adminCommand({shutdown: 1});
+} catch (e) {
     print(e);
 }
-
 
 master = replTest.getPrimary();
 assert.soon(function() {
     try {
-        var result = master.getDB("admin").runCommand({replSetGetStatus:1});
+        var result = master.getDB("admin").runCommand({replSetGetStatus: 1});
         for (var i in result.members) {
             if (result.members[i].self) {
                 continue;
@@ -146,21 +128,19 @@ assert.soon(function() {
 
             return result.members[i].health == 0;
         }
-    }
-    catch (e) {
+    } catch (e) {
         print("error getting status from master: " + e);
         master = replTest.getPrimary();
         return false;
     }
 }, 'make sure master knows that slave is down before proceeding');
 
+print("\nrunning shutdown without force on master: " + master);
 
-print("\nrunning shutdown without force on master: "+master);
-
-// this should fail because the master can't reach an up-to-date secondary (because the only 
+// this should fail because the master can't reach an up-to-date secondary (because the only
 // secondary is down)
 var now = new Date();
-assert.commandFailed(master.getDB("admin").runCommand({shutdown : 1, timeoutSecs : 3}));
+assert.commandFailed(master.getDB("admin").runCommand({shutdown: 1, timeoutSecs: 3}));
 // on windows, javascript and the server perceive time differently, to compensate here we use 2750ms
 assert.gte((new Date()) - now, 2750);
 
@@ -168,20 +148,18 @@ print("\nsend shutdown command");
 
 var currentMaster = replTest.getPrimary();
 try {
-    printjson(currentMaster.getDB("admin").runCommand({shutdown : 1, force : true}));
-}
-catch (e) {
+    printjson(currentMaster.getDB("admin").runCommand({shutdown: 1, force: true}));
+} catch (e) {
     if (!errorWasDueToConnectionFailure(e)) {
         throw e;
     }
 }
 
-print("checking "+currentMaster+" is actually shutting down");
+print("checking " + currentMaster + " is actually shutting down");
 assert.soon(function() {
     try {
         currentMaster.findOne();
-    }
-    catch(e) {
+    } catch (e) {
         return true;
     }
     return false;

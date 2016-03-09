@@ -16,7 +16,6 @@
  * "jstests/libs/ca.pem").
  */
 function SSLTest(serverOpts, clientOpts) {
-
     var canonicalServerOpts = function(userProvidedOpts) {
         var canonical = Object.extend({}, userProvidedOpts || {});
 
@@ -51,14 +50,14 @@ SSLTest.prototype.defaultSSLClientOptions = {
     "ssl": "",
     "sslPEMKeyFile": "jstests/libs/client.pem",
     "sslAllowInvalidCertificates": "",
-    "eval": ";" // prevent the shell from entering interactive mode
+    "eval": ";"  // prevent the shell from entering interactive mode
 };
 
 /**
  * The default shell arguments for a shell without SSL enabled.
  */
 SSLTest.prototype.noSSLClientOptions = {
-    eval: ";" // prevent the shell from entering interactive mode
+    eval: ";"  // prevent the shell from entering interactive mode
 };
 
 /**
@@ -75,8 +74,7 @@ SSLTest.prototype.connectWorked = function() {
     var serverPID = _startMongoProgram.apply(null, serverArgv);
     try {
         assert.soon(function() {
-            return checkProgram(serverPID) &&
-                   (0 === _runMongoProgram.apply(null, clientArgv));
+            return checkProgram(serverPID) && (0 === _runMongoProgram.apply(null, clientArgv));
         }, "connect failed", connectTimeoutMillis);
     } catch (ex) {
         return false;

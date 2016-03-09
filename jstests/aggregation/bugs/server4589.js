@@ -9,7 +9,7 @@ load('jstests/aggregation/extras/utils.js');
     var coll = db.agg_array_elem_at_expr;
     coll.drop();
 
-    assert.writeOK(coll.insert({a: [1,2,3,4,5]}));
+    assert.writeOK(coll.insert({a: [1, 2, 3, 4, 5]}));
 
     // Normal indexing.
     var pipeline = [{$project: {_id: 0, x: {$arrayElemAt: ['$a', 2]}}}];

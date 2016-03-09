@@ -12,7 +12,8 @@
         var explain = coll.find(query).explain("executionStats");
         assert(isCollscan(explain.queryPlanner.winningPlan),
                "expected bit test query plan to be COLLSCAN");
-        assert.eq(count, explain.executionStats.nReturned,
+        assert.eq(count,
+                  explain.executionStats.nReturned,
                   "bit test query not returning correct documents");
     }
 
@@ -95,7 +96,7 @@
 
     // Tests with array of bit positions.
     var allPositions = [];
-    for (var i = 0; i < 64; i ++) {
+    for (var i = 0; i < 64; i++) {
         allPositions.push(i);
     }
     assertQueryCorrect({a: {$bitsAllSet: []}}, 3);
@@ -143,8 +144,14 @@
     assertQueryCorrect({a: {$bitsAnyClear: BinData(0, "////////////////////////////")}}, 3);
 
     // Tests with multiple predicates.
-    assertQueryCorrect({a: {$bitsAllSet: BinData(0, "AANgAAAAAAAAAAAAAAAAAAAAAAAA"),
-                            $bitsAllClear: BinData(0, "//yf////////////////////////")}}, 1);
+    assertQueryCorrect(
+        {
+          a: {
+              $bitsAllSet: BinData(0, "AANgAAAAAAAAAAAAAAAAAAAAAAAA"),
+              $bitsAllClear: BinData(0, "//yf////////////////////////")
+          }
+        },
+        1);
 
     coll.drop();
 })();

@@ -8,23 +8,19 @@
     testDb.dropDatabase();
 
     // Database does not exist here
-    var res = testDb.runCommand({cloneCollectionAsCapped: 'foo',
-                                 toCollection: 'bar',
-                                 size: 1024});
+    var res = testDb.runCommand({cloneCollectionAsCapped: 'foo', toCollection: 'bar', size: 1024});
     assert.eq(res.ok, 0, "cloning a nonexistent collection to capped should not have worked");
     var isSharded = (db.isMaster().msg == "isdbgrid");
 
-    assert.eq(res.errmsg,
-              isSharded ? "no such cmd: cloneCollectionAsCapped"
-                        : "database " + dbname + " not found",
-              "converting a nonexistent to capped failed but for the wrong reason");
+    assert.eq(
+        res.errmsg,
+        isSharded ? "no such cmd: cloneCollectionAsCapped" : "database " + dbname + " not found",
+        "converting a nonexistent to capped failed but for the wrong reason");
 
     // Database exists, but collection doesn't
     testDb.coll.insert({});
 
-    var res = testDb.runCommand({cloneCollectionAsCapped: 'foo',
-                                 toCollection: 'bar',
-                                 size: 1024});
+    var res = testDb.runCommand({cloneCollectionAsCapped: 'foo', toCollection: 'bar', size: 1024});
     assert.eq(res.ok, 0, "cloning a nonexistent collection to capped should not have worked");
     assert.eq(res.errmsg,
               isSharded ? "no such cmd: cloneCollectionAsCapped"

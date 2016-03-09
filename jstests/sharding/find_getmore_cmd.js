@@ -28,11 +28,8 @@
     st.ensurePrimaryShard(db.getName(), "shard0000");
     db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
     assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
-    assert.commandWorked(db.adminCommand({
-        moveChunk: coll.getFullName(),
-        find: {_id: 1},
-        to: "shard0001"
-    }));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: "shard0001"}));
 
     // Find with no options.
     cmdRes = db.runCommand({find: coll.getName()});
@@ -131,11 +128,8 @@
     // User projection on $sortKey is illegal.
     cmdRes = db.runCommand({find: coll.getName(), projection: {$sortKey: 1}, sort: {_id: 1}});
     assert.commandFailed(cmdRes);
-    cmdRes = db.runCommand({
-        find: coll.getName(),
-        projection: {$sortKey: {$meta: 'sortKey'}},
-        sort: {_id: 1}
-    });
+    cmdRes = db.runCommand(
+        {find: coll.getName(), projection: {$sortKey: {$meta: 'sortKey'}}, sort: {_id: 1}});
     assert.commandFailed(cmdRes);
 
     // User should be able to issue a sortKey meta-projection, as long as it's not on the reserved

@@ -7,34 +7,34 @@
  */
 
 function writeDataAndRestart(doFsync) {
-
     jsTestLog("add some data");
-    for (var i=0; i<100; i++) {
-        conn.getDB(name).foo.insert({x:i});
+    for (var i = 0; i < 100; i++) {
+        conn.getDB(name).foo.insert({x: i});
     }
 
     if (doFsync) {
         jsTestLog("run fsync on the node");
-        assert.commandWorked(conn.getDB("admin").runCommand({fsync : 1}));
+        assert.commandWorked(conn.getDB("admin").runCommand({fsync: 1}));
     }
 
     jsTestLog("kill -9");
     MongoRunner.stopMongod(conn, /*signal*/ 9);
 
     jsTestLog("restart node");
-    conn = MongoRunner.runMongod({restart: true,
-                                  port: conn.port,
-                                  cleanData: false,
-                                  storageEngine: "wiredTiger",
-                                  nojournal: ""});
+    conn = MongoRunner.runMongod({
+        restart: true,
+        port: conn.port,
+        cleanData: false,
+        storageEngine: "wiredTiger",
+        nojournal: ""
+    });
     return conn;
 }
 
 // This test can only be run if the storageEngine is wiredTiger
 if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
     jsTestLog("Skipping test because storageEngine is not wiredTiger");
-}
-else {
+} else {
     var name = "wt_nojournal_fsync";
 
     jsTestLog("run mongod without journaling");

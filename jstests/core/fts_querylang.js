@@ -23,18 +23,25 @@ assert.neq(results[0]._id, 2);
 assert.neq(results[1]._id, 2);
 
 // Test sort with basic text query.
-results = t.find({$text: {$search: "textual content -irrelevant"}}).sort({unindexedField: 1}).toArray();
+results =
+    t.find({$text: {$search: "textual content -irrelevant"}}).sort({unindexedField: 1}).toArray();
 assert.eq(results.length, 2);
 assert.eq(results[0]._id, 0);
 assert.eq(results[1]._id, 1);
 
 // Test skip with basic text query.
-results = t.find({$text: {$search: "textual content -irrelevant"}}).sort({unindexedField: 1}).skip(1).toArray();
+results = t.find({$text: {$search: "textual content -irrelevant"}})
+              .sort({unindexedField: 1})
+              .skip(1)
+              .toArray();
 assert.eq(results.length, 1);
 assert.eq(results[0]._id, 1);
 
 // Test limit with basic text query.
-results = t.find({$text: {$search: "textual content -irrelevant"}}).sort({unindexedField: 1}).limit(1).toArray();
+results = t.find({$text: {$search: "textual content -irrelevant"}})
+              .sort({unindexedField: 1})
+              .limit(1)
+              .toArray();
 assert.eq(results.length, 1);
 assert.eq(results[0]._id, 0);
 
@@ -44,19 +51,17 @@ assert.eq(results[0]._id, 0);
 // framework.
 
 // Test $and of basic text query with indexed expression.
-results = t.find({$text: {$search: "content -irrelevant"},
-                  _id: 1}).toArray();
+results = t.find({$text: {$search: "content -irrelevant"}, _id: 1}).toArray();
 assert.eq(results.length, 1);
 assert.eq(results[0]._id, 1);
 
 // Test $and of basic text query with indexed expression, and bad language
 assert.throws(function() {
-    t.find({$text: {$search: "content -irrelevant", $language: "spanglish"}, _id: 1})
-    .itcount();});
+    t.find({$text: {$search: "content -irrelevant", $language: "spanglish"}, _id: 1}).itcount();
+});
 
 // Test $and of basic text query with unindexed expression.
-results = t.find({$text: {$search: "content -irrelevant"},
-                  unindexedField: 1}).toArray();
+results = t.find({$text: {$search: "content -irrelevant"}, unindexedField: 1}).toArray();
 assert.eq(results.length, 1);
 assert.eq(results[0]._id, 1);
 
@@ -70,14 +75,15 @@ cursor = t.find({$text: {$search: "contents", $language: "EN"}});
 assert.eq(true, cursor.hasNext());
 
 cursor = t.find({$text: {$search: "contents", $language: "spanglish"}});
-assert.throws(function() { cursor.next(); });
+assert.throws(function() {
+    cursor.next();
+});
 
 // TODO Test $and of basic text query with geo expression.
 
 // Test update with $text.
 t.update({$text: {$search: "textual content -irrelevant"}}, {$set: {b: 1}}, {multi: true});
-assert.eq(2, t.find({b: 1}).itcount(),
-          'incorrect number of documents updated');
+assert.eq(2, t.find({b: 1}).itcount(), 'incorrect number of documents updated');
 
 // TODO Test remove with $text, once it is enabled with the new query framework.
 

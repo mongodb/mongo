@@ -1,6 +1,6 @@
 // Tests the output of db.getReplicationInfo() and tests db.printSlaveReplicationInfo().
 
-(function () {
+(function() {
     "use strict";
     var name = "getReplicationInfo";
     var replSet = new ReplSetTest({name: name, nodes: 3, oplogSize: 50});
@@ -10,7 +10,7 @@
 
     var primary = replSet.getPrimary();
     for (var i = 0; i < 100; i++) {
-        primary.getDB('test').foo.insert({a:i});
+        primary.getDB('test').foo.insert({a: i});
     }
     replSet.awaitReplication();
 
@@ -28,8 +28,8 @@
 
     // calling this function with and without a primary, should provide sufficient code coverage
     // to catch any JS errors
-    var mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();",
-                                   primary.port);
+    var mongo =
+        startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
     mongo();
     assert.soon(function() {
         return rawMongoProgramOutput().match("behind the primary");
@@ -42,11 +42,11 @@
     }
     try {
         primary.getDB('admin').runCommand({replSetStepDown: 120, force: true});
+    } catch (e) {
     }
-    catch (e) {}
 
-    mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();",
-                               primary.port);
+    mongo =
+        startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
     mongo();
     assert.soon(function() {
         return rawMongoProgramOutput().match("behind the freshest");

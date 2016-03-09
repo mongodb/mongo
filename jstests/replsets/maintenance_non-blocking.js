@@ -1,7 +1,7 @@
 // This test ensures that the replSetMaintenance command will not block, nor block-on, a db write
 doTest = function() {
     "use strict";
-    var replTest = new ReplSetTest( {name: 'testSet', nodes: 2} );
+    var replTest = new ReplSetTest({name: 'testSet', nodes: 2});
     var nodes = replTest.startSet();
     replTest.initiate();
 
@@ -29,7 +29,7 @@ doTest = function() {
     var ismaster = assert.commandWorked(sColl.runCommand("ismaster"));
     assert.eq(false, ismaster.ismaster);
     assert.eq(false, ismaster.secondary);
-    
+
     print("******* writing to primary ************* ");
     assert.writeOK(mColl.save({_id: -1}));
     printjson(sDB.currentOp());

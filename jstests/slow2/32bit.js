@@ -7,10 +7,9 @@ var forceSeedToBe = null;
 
 if (forceSeedToBe) {
     print("\n32bit.js WARNING FORCING A SPECIFIC SEED");
-    print("seed="+ forceSeedToBe);
+    print("seed=" + forceSeedToBe);
     Random.srand(forceSeedToBe);
-}
-else {
+} else {
     Random.setRandomSeed();
 }
 
@@ -18,7 +17,7 @@ function f() {
     'use strict';
 
     var pass = 1;
-    var mydb = db.getSisterDB( "test_32bit" );
+    var mydb = db.getSisterDB("test_32bit");
     var t = mydb.colltest_32bit;
 
     mydb.dropDatabase();
@@ -30,16 +29,16 @@ function f() {
         print("32bit.js PASS #" + pass);
         pass++;
 
-        t.insert({x:1});
-        t.ensureIndex({a:1});
-        t.ensureIndex({b:1}, true);
-        t.ensureIndex({x:1});
+        t.insert({x: 1});
+        t.ensureIndex({a: 1});
+        t.ensureIndex({b: 1}, true);
+        t.ensureIndex({x: 1});
         if (Random.rand() < 0.3) {
-            t.ensureIndex({c:1});
+            t.ensureIndex({c: 1});
         }
-        t.ensureIndex({d:1});
-        t.ensureIndex({e:1});
-        t.ensureIndex({f:1});
+        t.ensureIndex({d: 1});
+        t.ensureIndex({e: 1});
+        t.ensureIndex({f: 1});
 
         // create 448 byte string
         var big = 'a                          b';
@@ -70,34 +69,43 @@ function f() {
                 cc = null;
             }
 
-            var res = t.insert({ a: a, b: b, c: cc, d: d, f: f });
+            var res = t.insert({a: a, b: b, c: cc, d: d, f: f});
             if (res.hasWriteError()) {
                 // Presumably we have mmap error on 32 bit. try a few more manipulations
                 // attempting to break things.
-                t.insert({a:33,b:44,c:55,d:66,f:66});
-                t.insert({a:33,b:44000,c:55,d:66});
-                t.insert({a:33,b:440000,c:55});
-                t.insert({a:33,b:4400000});
-                t.update({a:20},{'$set':{c:'abc'}});
-                t.update({a:21},{'$set':{c:'aadsfbc'}});
-                t.update({a:22},{'$set':{c:'c'}});
-                t.update({a:23},{'$set':{b:cc}});
-                t.remove({a:22});
+                t.insert({a: 33, b: 44, c: 55, d: 66, f: 66});
+                t.insert({a: 33, b: 44000, c: 55, d: 66});
+                t.insert({a: 33, b: 440000, c: 55});
+                t.insert({a: 33, b: 4400000});
+                t.update({a: 20}, {'$set': {c: 'abc'}});
+                t.update({a: 21}, {'$set': {c: 'aadsfbc'}});
+                t.update({a: 22}, {'$set': {c: 'c'}});
+                t.update({a: 23}, {'$set': {b: cc}});
+                t.remove({a: 22});
                 break;
             }
 
             if (Random.rand() < 0.01) {
-                t.remove({a:a});
-                t.remove({b:Random.rand()});
-                t.insert({e:1});
-                t.insert({f:'aaaaaaaaaa'});
+                t.remove({a: a});
+                t.remove({b: Random.rand()});
+                t.insert({e: 1});
+                t.insert({f: 'aaaaaaaaaa'});
 
-                if (Random.rand() < 0.00001) { print("remove cc"); t.remove({c:cc}); }
-                if (Random.rand() < 0.0001) { print("update cc"); t.update({c:cc},{'$set':{c:1}},false,true); }
-                if (Random.rand() < 0.00001) { print("remove e"); t.remove({e:1}); }
+                if (Random.rand() < 0.00001) {
+                    print("remove cc");
+                    t.remove({c: cc});
+                }
+                if (Random.rand() < 0.0001) {
+                    print("update cc");
+                    t.update({c: cc}, {'$set': {c: 1}}, false, true);
+                }
+                if (Random.rand() < 0.00001) {
+                    print("remove e");
+                    t.remove({e: 1});
+                }
             }
             if (a == 20000) {
-                var delta_ms = (new Date())-start;
+                var delta_ms = (new Date()) - start;
                 // 2MM / 20000 = 100.  1000ms/sec.
                 var eta_secs = delta_ms * (100 / 1000);
                 print("32bit.js eta_secs:" + eta_secs);
@@ -124,7 +132,7 @@ function f() {
             print("32bit.js FAIL validating");
             print(res.result);
             printjson(res);
-            //mydb.dropDatabase();
+            // mydb.dropDatabase();
             throw Error("fail validating 32bit.js");
         }
 

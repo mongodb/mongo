@@ -5,37 +5,27 @@
 
 // helper to ensure two nodes are at the same place in the oplog
 var waitForSameOplogPosition = function(db1, db2, errmsg) {
-    assert.soon(
-        function() {
-            var last1 = db1.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1)
-                .next();
-            var last2 = db2.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1)
-                .next();
-            jsTest.log("primary: " + tojson(last1) + " secondary: " + tojson(last2));
+    assert.soon(function() {
+        var last1 = db1.getSisterDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+        var last2 = db2.getSisterDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+        jsTest.log("primary: " + tojson(last1) + " secondary: " + tojson(last2));
 
-            return ((last1.ts.t === last2.ts.t) && (last1.ts.i === last2.ts.i));
-        },
-        errmsg
-    );
+        return ((last1.ts.t === last2.ts.t) && (last1.ts.i === last2.ts.i));
+    }, errmsg);
 };
 
 // start set
 var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
 replSet.startSet();
-replSet.initiate(
-    {
-        _id:'testSet',
-        members:
-        [
-            {_id: 0, host: getHostName()+":"+replSet.ports[0]},
-            {_id: 1, host: getHostName()+":"+replSet.ports[1], priority: 0},
-            {_id: 2, host: getHostName()+":"+replSet.ports[2], priority: 0}
-        ],
-        settings: {
-            chainingAllowed: false
-        }
-    }
-);
+replSet.initiate({
+    _id: 'testSet',
+    members: [
+        {_id: 0, host: getHostName() + ":" + replSet.ports[0]},
+        {_id: 1, host: getHostName() + ":" + replSet.ports[1], priority: 0},
+        {_id: 2, host: getHostName() + ":" + replSet.ports[2], priority: 0}
+    ],
+    settings: {chainingAllowed: false}
+});
 
 // set up common points of access
 var master = replSet.getPrimary();
@@ -46,12 +36,12 @@ var member2 = replSet.nodes[1].getDB("admin");
 var member3 = replSet.nodes[2].getDB("admin");
 
 // Do an initial write
-master.getDB("foo").bar.insert({x:1});
+master.getDB("foo").bar.insert({x: 1});
 replSet.awaitReplication();
 
 jsTest.log("Make sure 2 & 3 are syncing from the primary");
-member2.adminCommand({replSetSyncFrom : getHostName()+":"+replSet.ports[0]});
-member3.adminCommand({replSetSyncFrom : getHostName()+":"+replSet.ports[0]});
+member2.adminCommand({replSetSyncFrom: getHostName() + ":" + replSet.ports[0]});
+member3.adminCommand({replSetSyncFrom: getHostName() + ":" + replSet.ports[0]});
 
 jsTest.log("Stop 2's replication");
 member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
@@ -69,7 +59,7 @@ jsTest.log("Stop 3's replication");
 member3.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 // logLevel 3 will allow us to see each op the secondary pulls from the primary so that we can
 // determine whether or not all ops are actually being pulled
-member3.runCommand({setParameter: 1, logLevel:3});
+member3.runCommand({setParameter: 1, logLevel: 3});
 
 jsTest.log("Start 2's replication");
 member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
@@ -92,7 +82,7 @@ for (var i = 50; i < 75; i++) {
 }
 var primaryCollectionSize = primary.bar.find().itcount();
 jsTest.log("primary collection size: " + primaryCollectionSize);
-var last = primary.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next();
+var last = primary.getSisterDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
 
 jsTest.log("waiting a bit for the secondaries to get the write");
 sleep(10000);
@@ -105,43 +95,40 @@ replSet.stop(0);
 // which would check for 30 seconds that node 3 didn't try to sync from 2
 sleep(30 * 1000);
 jsTest.log("3 should not attempt to sync from 2, as it cannot clear its buffer");
-var syncingTo = member3.adminCommand({replSetGetStatus:1}).syncingTo;
-assert(syncingTo !== getHostName()+":"+replSet.ports[1], "node 3 is syncing from node 2 :(");
+var syncingTo = member3.adminCommand({replSetGetStatus: 1}).syncingTo;
+assert(syncingTo !== getHostName() + ":" + replSet.ports[1], "node 3 is syncing from node 2 :(");
 
 jsTest.log("Pause 3's bgsync thread");
 var rsBgSyncProduceResult3 =
-        member3.runCommand({configureFailPoint: 'rsBgSyncProduce', mode: 'alwaysOn'});
+    member3.runCommand({configureFailPoint: 'rsBgSyncProduce', mode: 'alwaysOn'});
 assert.eq(1, rsBgSyncProduceResult3.ok, "member 3 rsBgSyncProduce admin command failed");
 
 // count documents in member 3
-assert.eq(26, member3.getSisterDB("foo").bar.find().itcount(),
+assert.eq(26,
+          member3.getSisterDB("foo").bar.find().itcount(),
           "collection size incorrect on node 3 before applying ops 25-75");
 
 jsTest.log("Allow 3 to apply ops 25-75");
 var rsSyncApplyStopResult3 =
-        member3.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+    member3.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
 assert.eq(1, rsSyncApplyStopResult3.ok, "member 3 rsSyncApplyStop admin command failed");
 
-assert.soon(
-    function() {
-        var last3 = member3.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1)
-            .next();
-        jsTest.log("primary: " + tojson(last, '', true) + " secondary: " + tojson(last3, '', true));
-        jsTest.log("member 3 collection size: " + member3.getSisterDB("foo").bar.find().itcount());
-        jsTest.log("curop: ");
-        printjson(member3.getSisterDB("foo").currentOp(true));
-        return ((last.ts.t === last3.ts.t) && (last.ts.i === last3.ts.i));
-    },
-    "Replication member 3 did not apply ops 25-75"
-);
+assert.soon(function() {
+    var last3 = member3.getSisterDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+    jsTest.log("primary: " + tojson(last, '', true) + " secondary: " + tojson(last3, '', true));
+    jsTest.log("member 3 collection size: " + member3.getSisterDB("foo").bar.find().itcount());
+    jsTest.log("curop: ");
+    printjson(member3.getSisterDB("foo").currentOp(true));
+    return ((last.ts.t === last3.ts.t) && (last.ts.i === last3.ts.i));
+}, "Replication member 3 did not apply ops 25-75");
 
 jsTest.log("Start 3's bgsync thread");
 member3.runCommand({configureFailPoint: 'rsBgSyncProduce', mode: 'off'});
 
 jsTest.log("Node 3 shouldn't hit rollback");
-var end = (new Date()).getTime()+10000;
+var end = (new Date()).getTime() + 10000;
 while ((new Date()).getTime() < end) {
-    assert('ROLLBACK' !== member3.runCommand({replSetGetStatus:1}).members[2].stateStr);
+    assert('ROLLBACK' !== member3.runCommand({replSetGetStatus: 1}).members[2].stateStr);
     sleep(30);
 }
 

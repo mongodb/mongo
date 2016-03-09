@@ -5,13 +5,13 @@ var collName = "compactPreservePadding";
 var t = mydb.getCollection(collName);
 t.drop();
 
-// use larger keyname to avoid hitting an edge case with extents 
+// use larger keyname to avoid hitting an edge case with extents
 for (i = 0; i < 10000; i++) {
-    t.insert({useLargerKeyName:i});
+    t.insert({useLargerKeyName: i});
 }
 
 // remove half the entries
-t.remove({useLargerKeyName:{$mod:[2,0]}});
+t.remove({useLargerKeyName: {$mod: [2, 0]}});
 printjson(t.stats());
 originalSize = t.stats().size;
 originalStorage = t.stats().storageSize;

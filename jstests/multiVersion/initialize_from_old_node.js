@@ -1,5 +1,5 @@
 /*
- * This is a regression test for SERVER-16189, to make sure a replica set with both current and 
+ * This is a regression test for SERVER-16189, to make sure a replica set with both current and
  * prior version nodes can be initialized from the prior version node.
  */
 

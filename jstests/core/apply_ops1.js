@@ -57,9 +57,8 @@
 
     // Empty 'ns' field value in operation type other than 'n'.
     assert.commandFailed(
-      db.adminCommand({applyOps: [{op: 'c', ns: ''}]}),
-      'applyOps should fail on non-"n" operation type with empty "ns" field value'
-    );
+        db.adminCommand({applyOps: [{op: 'c', ns: ''}]}),
+        'applyOps should fail on non-"n" operation type with empty "ns" field value');
 
     // Missing 'o' field value in an operation of type 'i' on 'system.indexes' collection.
     assert.commandFailedWithCode(
@@ -75,93 +74,100 @@
 
     // Missing 'ns' field in index spec.
     assert.commandFailedWithCode(
-        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes', o: {
-            key: {a: 1},
-            name: 'a_1',
-        }}]}),
+        db.adminCommand({
+            applyOps: [{
+                op: 'i',
+                ns: db.getName() + '.system.indexes',
+                o: {
+                    key: {a: 1},
+                    name: 'a_1',
+                }
+            }]
+        }),
         ErrorCodes.NoSuchKey,
         'applyOps should fail on system.indexes insert operation with missing index namespace');
 
     // Non-string 'ns' field in index spec.
     assert.commandFailedWithCode(
-        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes', o: {
-            ns: 12345,
-            key: {a: 1},
-            name: 'a_1',
-        }}]}),
+        db.adminCommand({
+            applyOps: [{
+                op: 'i',
+                ns: db.getName() + '.system.indexes',
+                o: {
+                    ns: 12345,
+                    key: {a: 1},
+                    name: 'a_1',
+                }
+            }]
+        }),
         ErrorCodes.TypeMismatch,
         'applyOps should fail on system.indexes insert operation with non-string index namespace');
 
     // Invalid 'ns' field in index spec.
     assert.commandFailedWithCode(
-        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes', o: {
-            ns: 'invalid_namespace',
-            key: {a: 1},
-            name: 'a_1',
-        }}]}),
+        db.adminCommand({
+            applyOps: [{
+                op: 'i',
+                ns: db.getName() + '.system.indexes',
+                o: {
+                    ns: 'invalid_namespace',
+                    key: {a: 1},
+                    name: 'a_1',
+                }
+            }]
+        }),
         ErrorCodes.InvalidNamespace,
         'applyOps should fail on system.indexes insert operation with invalid index namespace');
 
     // Inconsistent database name in index spec namespace.
     assert.commandFailedWithCode(
-        db.adminCommand({applyOps: [{op: 'i', ns: db.getName() + '.system.indexes', o: {
-            ns: 'baddbprefix' + t.getFullName(),
-            key: {a: 1},
-            name: 'a_1',
-        }}]}),
+        db.adminCommand({
+            applyOps: [{
+                op: 'i',
+                ns: db.getName() + '.system.indexes',
+                o: {
+                    ns: 'baddbprefix' + t.getFullName(),
+                    key: {a: 1},
+                    name: 'a_1',
+                }
+            }]
+        }),
         ErrorCodes.InvalidNamespace,
         'applyOps should fail on system.indexes insert operation with index namespace containing ' +
-        'inconsistent database name');
+            'inconsistent database name');
 
     // Valid 'ns' field value in unknown operation type 'x'.
     assert.commandFailed(
-      db.adminCommand({applyOps: [{op: 'x', ns: t.getFullName()}]}),
-      'applyOps should fail on unknown operation type "x" with valid "ns" value'
-    );
+        db.adminCommand({applyOps: [{op: 'x', ns: t.getFullName()}]}),
+        'applyOps should fail on unknown operation type "x" with valid "ns" value');
 
-    assert.eq(0, t.find().count() , "Non-zero amount of documents in collection to start");
-    assert.commandFailed(db.adminCommand(
-      {applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}
-    ),
+    assert.eq(0, t.find().count(), "Non-zero amount of documents in collection to start");
+    assert.commandFailed(
+        db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}),
         "Applying an insert operation on a non-existent collection should fail");
 
     assert.commandWorked(db.createCollection(t.getName()));
-    var a = db.adminCommand(
-      {applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}
-    );
-    assert.eq(1, t.find().count() , "Valid insert failed");
+    var a = db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]});
+    assert.eq(1, t.find().count(), "Valid insert failed");
     assert.eq(true, a.results[0], "Bad result value for valid insert");
 
-    a = assert.commandWorked(db.adminCommand(
-            {applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}
-    ));
-    assert.eq(1, t.find().count() , "Duplicate insert failed");
+    a = assert.commandWorked(
+        db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));
+    assert.eq(1, t.find().count(), "Duplicate insert failed");
     assert.eq(true, a.results[0], "Bad result value for duplicate insert");
 
-    var o = {_id: 5, x: 17};
-    assert.eq(o , t.findOne() , "Mismatching document inserted.");
+    var o = {
+        _id: 5,
+        x: 17
+    };
+    assert.eq(o, t.findOne(), "Mismatching document inserted.");
 
-    var res = db.runCommand({applyOps: [
-        {op: "u", ns: t.getFullName(), o2: { _id : 5 }, o: {$inc: {x: 1}}},
-        {op: "u", ns: t.getFullName(), o2: { _id : 5 }, o: {$inc: {x: 1}}}
-    ]});
-
-    o.x++;
-    o.x++;
-
-    assert.eq(1, t.find().count(), "Updates increased number of documents");
-    assert.eq(o, t.findOne(), "Document doesn't match expected");
-    assert.eq(true, res.results[0], "Bad result value for valid update");
-    assert.eq(true, res.results[1], "Bad result value for valid update");
-
-    //preCondition fully matches
-    res = db.runCommand({applyOps:
-                            [
-                                {op: "u", ns: t.getFullName(), o2: {_id : 5}, o: {$inc: {x :1}}},
-                                {op: "u", ns: t.getFullName(), o2: {_id : 5}, o: {$inc: {x :1}}}
-                            ],
-                            preCondition: [{ns : t.getFullName(), q: {_id: 5}, res:{x: 19}}]
-                        });
+    var res = db.runCommand({
+        applyOps: [
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
+        ]
+    });
 
     o.x++;
     o.x++;
@@ -171,68 +177,95 @@
     assert.eq(true, res.results[0], "Bad result value for valid update");
     assert.eq(true, res.results[1], "Bad result value for valid update");
 
-    //preCondition doesn't match ns
-    res = db.runCommand({applyOps:
-                            [
-                                {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
-                                {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
-                            ],
-                            preCondition: [{ns: "foo.otherName", q: {_id: 5}, res: {x: 21}}]
-                        });
+    // preCondition fully matches
+    res = db.runCommand({
+        applyOps: [
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
+        ],
+        preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
+    });
+
+    o.x++;
+    o.x++;
+
+    assert.eq(1, t.find().count(), "Updates increased number of documents");
+    assert.eq(o, t.findOne(), "Document doesn't match expected");
+    assert.eq(true, res.results[0], "Bad result value for valid update");
+    assert.eq(true, res.results[1], "Bad result value for valid update");
+
+    // preCondition doesn't match ns
+    res = db.runCommand({
+        applyOps: [
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
+        ],
+        preCondition: [{ns: "foo.otherName", q: {_id: 5}, res: {x: 21}}]
+    });
 
     assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied");
 
-    //preCondition doesn't match query
-    res = db.runCommand({applyOps:
-                            [
-                                {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x : 1}}},
-                                {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x : 1}}}
-                            ],
-                            preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
-                        });
+    // preCondition doesn't match query
+    res = db.runCommand({
+        applyOps: [
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}}
+        ],
+        preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
+    });
 
     assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied");
 
-    res = db.runCommand({applyOps:
-                            [
-                                {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x : 1}}},
-                                {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$inc: {x : 1}}}
-                            ]
-                        });
+    res = db.runCommand({
+        applyOps: [
+            {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$inc: {x: 1}}},
+            {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$inc: {x: 1}}}
+        ]
+    });
 
     assert.eq(true, res.results[0], "Valid update failed");
     assert.eq(true, res.results[1], "Valid update failed");
 
     // Foreground index build.
     res = assert.commandWorked(db.adminCommand({
-        applyOps: [{"op": "i", "ns": db.getName() + ".system.indexes", "o": {
-            ns: t.getFullName(),
-            key: {a: 1},
-            name: "a_1",
-        }
-    }]}));
+        applyOps: [{
+            "op": "i",
+            "ns": db.getName() + ".system.indexes",
+            "o": {
+                ns: t.getFullName(),
+                key: {a: 1},
+                name: "a_1",
+            }
+        }]
+    }));
     assert.eq(1, res.applied, "Incorrect number of operations applied");
     assert.eq(true, res.results[0], "Foreground index creation failed");
     res = t.getIndexes();
-    assert.eq(
-        1,
-        res.filter(function(element, index, array) {return element.name == 'a_1';}).length,
-        'Foreground index not found in listIndexes result: ' + tojson(res));
+    assert.eq(1,
+              res.filter(function(element, index, array) {
+                  return element.name == 'a_1';
+              }).length,
+              'Foreground index not found in listIndexes result: ' + tojson(res));
 
     // Background indexes are created in the foreground when processed by applyOps.
     res = assert.commandWorked(db.adminCommand({
-        applyOps: [{"op": "i", "ns": db.getName() + ".system.indexes", "o": {
-            ns: t.getFullName(),
-            key: {b: 1},
-            name: "b_1",
-            background: true,
-        }
-    }]}));
+        applyOps: [{
+            "op": "i",
+            "ns": db.getName() + ".system.indexes",
+            "o": {
+                ns: t.getFullName(),
+                key: {b: 1},
+                name: "b_1",
+                background: true,
+            }
+        }]
+    }));
     assert.eq(1, res.applied, "Incorrect number of operations applied");
     assert.eq(true, res.results[0], "Background index creation failed");
     res = t.getIndexes();
-    assert.eq(
-        1,
-        res.filter(function(element, index, array) {return element.name == 'b_1';}).length,
-        'Background index not found in listIndexes result: ' + tojson(res));
+    assert.eq(1,
+              res.filter(function(element, index, array) {
+                  return element.name == 'b_1';
+              }).length,
+              'Background index not found in listIndexes result: ' + tojson(res));
 })();

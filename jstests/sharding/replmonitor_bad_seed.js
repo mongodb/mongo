@@ -13,16 +13,18 @@
  * was able to refresh before proceeding to check.
  */
 
-var rsOpt = { oplogSize: 10 };
-var st = new ShardingTest({ shards: 1, rs: rsOpt });
+var rsOpt = {
+    oplogSize: 10
+};
+var st = new ShardingTest({shards: 1, rs: rsOpt});
 var mongos = st.s;
 var replTest = st.rs0;
 
 var adminDB = mongos.getDB('admin');
-//adminDB.runCommand({ addShard: replTest.getURL() });
+// adminDB.runCommand({ addShard: replTest.getURL() });
 
-adminDB.runCommand({ enableSharding: 'test' });
-adminDB.runCommand({ shardCollection: 'test.user', key: { x: 1 }});
+adminDB.runCommand({enableSharding: 'test'});
+adminDB.runCommand({shardCollection: 'test.user', key: {x: 1}});
 
 /* The cluster now has the shard information. Then kill the replica set so
  * when mongos restarts and tries to create a ReplSetMonitor for that shard,
@@ -30,13 +32,13 @@ adminDB.runCommand({ shardCollection: 'test.user', key: { x: 1 }});
  */
 replTest.stopSet();
 st.restartMongos(0);
-mongos = st.s; // refresh mongos with the new one
+mongos = st.s;  // refresh mongos with the new one
 
 var coll = mongos.getDB('test').user;
 
 var verifyInsert = function() {
     var beforeCount = coll.find().count();
-    coll.insert({ x: 1 });
+    coll.insert({x: 1});
     var afterCount = coll.find().count();
 
     assert.eq(beforeCount + 1, afterCount);
@@ -45,15 +47,14 @@ var verifyInsert = function() {
 jsTest.log('Insert to a downed replSet');
 assert.throws(verifyInsert);
 
-replTest.startSet({ oplogSize: 10 });
+replTest.startSet({oplogSize: 10});
 replTest.initiate();
 replTest.awaitSecondaryNodes();
 
 jsTest.log('Insert to an online replSet');
 
 // Verify that the replSetMonitor can reach the restarted set.
-ReplSetTest.awaitRSClientHosts(mongos, replTest.nodes, { ok: true });
+ReplSetTest.awaitRSClientHosts(mongos, replTest.nodes, {ok: true});
 verifyInsert();
 
 st.stop();
-

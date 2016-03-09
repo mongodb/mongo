@@ -29,15 +29,8 @@ db.agg.insert({key: "yarn", value: 42});
 // As pipeline
 assertErrorCode(db.agg, [{}], 16435);
 // Start of pipeline
-assertErrorCode(db.agg, [{$project: {value: 1}}
-                        ,{}
-                        ], 16435);
+assertErrorCode(db.agg, [{$project: {value: 1}}, {}], 16435);
 // End of pipeline
-assertErrorCode(db.agg, [{}
-                        ,{$project: {value: 1}}
-                        ], 16435);
+assertErrorCode(db.agg, [{}, {$project: {value: 1}}], 16435);
 // Middle of pipeline
-assertErrorCode(db.agg, [{$project: {value: 1}}
-                        ,{}
-                        ,{$project: {value: 1}}
-                        ], 16435);
+assertErrorCode(db.agg, [{$project: {value: 1}}, {}, {$project: {value: 1}}], 16435);

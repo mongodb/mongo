@@ -38,8 +38,8 @@ t.insert({_id: 0, names: ["thomas", "alexandra"]});
 t.insert({_id: 1, names: "frank"});
 t.insert({_id: 2, names: "alice"});
 t.insert({_id: 3, names: ["dave"]});
-cursor = t.find({$or: [{names: "frank"}, {names: /^al(ice|ex)/},
-                       {names: {$elemMatch: {$eq: "thomas"}}}]});
+cursor = t.find(
+    {$or: [{names: "frank"}, {names: /^al(ice|ex)/}, {names: {$elemMatch: {$eq: "thomas"}}}]});
 assert.eq(3, cursor.itcount(), "case 3");
 
 // Case 4: Two INEXACT_FETCH.
@@ -48,8 +48,8 @@ t.ensureIndex({names: 1});
 t.insert({_id: 0, names: ["thomas", "alexandra"]});
 t.insert({_id: 1, names: ["frank", "alice"]});
 t.insert({_id: 2, names: "frank"});
-cursor = t.find({$or: [{names: {$elemMatch: {$eq: "alexandra"}}},
-                       {names: {$elemMatch: {$eq: "frank"}}}]});
+cursor = t.find(
+    {$or: [{names: {$elemMatch: {$eq: "alexandra"}}}, {names: {$elemMatch: {$eq: "frank"}}}]});
 assert.eq(2, cursor.itcount(), "case 4");
 
 // Case 5: Two indices. One has EXACT and INEXACT_COVERED. The other
@@ -62,8 +62,8 @@ t.insert({_id: 1, first: "john", last: "doe"});
 t.insert({_id: 2, first: "dave", last: "st"});
 t.insert({_id: 3, first: ["dave", "david"], last: "pasette"});
 t.insert({_id: 4, first: "joanna", last: ["smith", "doe"]});
-cursor = t.find({$or: [{first: "frank"}, {last: {$elemMatch: {$eq: "doe"}}},
-                       {first: /david/}, {last: "st"}]});
+cursor = t.find(
+    {$or: [{first: "frank"}, {last: {$elemMatch: {$eq: "doe"}}}, {first: /david/}, {last: "st"}]});
 assert.eq(4, cursor.itcount(), "case 5");
 
 // Case 6: Multikey with only EXACT predicates.
@@ -116,12 +116,32 @@ t.drop();
 t.ensureIndex({pre: 1, loc: "2dsphere"});
 t.insert({_id: 0, pre: 3, loc: {type: "Point", coordinates: [40, 5]}});
 t.insert({_id: 1, pre: 4, loc: {type: "Point", coordinates: [0, 0]}});
-cursor = t.find({$or: [{pre: 3, loc: {$geoWithin: {$geometry:
-                            {type: "Polygon",
-                             coordinates: [[[39,4], [41,4], [41,6], [39,6], [39,4]]]}}}},
-                       {pre: 4, loc: {$geoWithin: {$geometry:
-                            {type: "Polygon",
-                             coordinates: [[[-1,-1], [1,-1], [1,1], [-1,1], [-1,-1]]]}}}}]});
+cursor = t.find({
+    $or: [
+        {
+          pre: 3,
+          loc: {
+              $geoWithin: {
+                  $geometry: {
+                      type: "Polygon",
+                      coordinates: [[[39, 4], [41, 4], [41, 6], [39, 6], [39, 4]]]
+                  }
+              }
+          }
+        },
+        {
+          pre: 4,
+          loc: {
+              $geoWithin: {
+                  $geometry: {
+                      type: "Polygon",
+                      coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]
+                  }
+              }
+          }
+        }
+    ]
+});
 assert.eq(2, cursor.itcount(), "case 11");
 
 // Case 12: GEO with non-geo, same index, 2d.
@@ -129,12 +149,32 @@ t.drop();
 t.ensureIndex({pre: 1, loc: "2d"});
 t.insert({_id: 0, pre: 3, loc: {type: "Point", coordinates: [40, 5]}});
 t.insert({_id: 1, pre: 4, loc: {type: "Point", coordinates: [0, 0]}});
-cursor = t.find({$or: [{pre: 3, loc: {$geoWithin: {$geometry:
-                            {type: "Polygon",
-                             coordinates: [[[39,4], [41,4], [41,6], [39,6], [39,4]]]}}}},
-                       {pre: 4, loc: {$geoWithin: {$geometry:
-                            {type: "Polygon",
-                             coordinates: [[[-1,-1], [1,-1], [1,1], [-1,1], [-1,-1]]]}}}}]});
+cursor = t.find({
+    $or: [
+        {
+          pre: 3,
+          loc: {
+              $geoWithin: {
+                  $geometry: {
+                      type: "Polygon",
+                      coordinates: [[[39, 4], [41, 4], [41, 6], [39, 6], [39, 4]]]
+                  }
+              }
+          }
+        },
+        {
+          pre: 4,
+          loc: {
+              $geoWithin: {
+                  $geometry: {
+                      type: "Polygon",
+                      coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]
+                  }
+              }
+          }
+        }
+    ]
+});
 assert.eq(2, cursor.itcount(), "case 12");
 
 // Case 13: $elemMatch object.
@@ -142,8 +182,7 @@ t.drop();
 t.ensureIndex({"a.b": 1});
 t.insert({_id: 0, a: [{b: 1}, {b: 2}]});
 t.insert({_id: 1, a: [{b: 3}, {b: 4}]});
-cursor = t.find({$or: [{a: {$elemMatch: {b: {$lte: 1}}}},
-                       {a: {$elemMatch: {b: {$gte: 4}}}}]});
+cursor = t.find({$or: [{a: {$elemMatch: {b: {$lte: 1}}}}, {a: {$elemMatch: {b: {$gte: 4}}}}]});
 assert.eq(2, cursor.itcount(), "case 13");
 
 // Case 14: $elemMatch object, below an AND.
@@ -151,8 +190,8 @@ t.drop();
 t.ensureIndex({"a.b": 1});
 t.insert({_id: 0, a: [{b: 1}, {b: 2}]});
 t.insert({_id: 1, a: [{b: 2}, {b: 4}]});
-cursor = t.find({"a.b": 2, $or: [{a: {$elemMatch: {b: {$lte: 1}}}},
-                                 {a: {$elemMatch: {b: {$gte: 4}}}}]});
+cursor = t.find(
+    {"a.b": 2, $or: [{a: {$elemMatch: {b: {$lte: 1}}}}, {a: {$elemMatch: {b: {$gte: 4}}}}]});
 assert.eq(2, cursor.itcount(), "case 14");
 
 // Case 15: $or below $elemMatch.
@@ -196,8 +235,7 @@ t.ensureIndex({name: 1});
 t.insert({_id: 0, name: "thomas"});
 t.insert({_id: 1, name: "alexandra"});
 t.insert({_id: 2});
-cursor = t.find({$or: [{name: {$in: ["thomas", /^alexand(er|ra)/]}},
-                       {name: {$exists: false}}]});
+cursor = t.find({$or: [{name: {$in: ["thomas", /^alexand(er|ra)/]}}, {name: {$exists: false}}]});
 assert.eq(3, cursor.itcount(), "case 19");
 
 // Case 20: $in with EXACT, INEXACT_COVERED, and INEXACT_FETCH, two indices.
@@ -209,8 +247,8 @@ t.insert({_id: 1, a: "z", b: "z"});
 t.insert({_id: 2});
 t.insert({_id: 3, a: "w", b: "x"});
 t.insert({_id: 4, a: "l", b: "p"});
-cursor = t.find({$or: [{a: {$in: [/z/, /x/]}}, {a: "w"},
-                       {b: {$exists: false}}, {b: {$in: ["p"]}}]});
+cursor =
+    t.find({$or: [{a: {$in: [/z/, /x/]}}, {a: "w"}, {b: {$exists: false}}, {b: {$in: ["p"]}}]});
 assert.eq(5, cursor.itcount(), "case 19");
 
 // Case 21: two $geoWithin that collapse to a single GEO index scan.
@@ -218,10 +256,28 @@ t.drop();
 t.ensureIndex({loc: "2dsphere"});
 t.insert({_id: 0, loc: {type: "Point", coordinates: [40, 5]}});
 t.insert({_id: 1, loc: {type: "Point", coordinates: [0, 0]}});
-cursor = t.find({$or: [{loc: {$geoWithin: {$geometry:
-                            {type: "Polygon",
-                             coordinates: [[[39,4], [41,4], [41,6], [39,6], [39,4]]]}}}},
-                       {loc: {$geoWithin: {$geometry:
-                            {type: "Polygon",
-                             coordinates: [[[-1,-1], [1,-1], [1,1], [-1,1], [-1,-1]]]}}}}]});
+cursor = t.find({
+    $or: [
+        {
+          loc: {
+              $geoWithin: {
+                  $geometry: {
+                      type: "Polygon",
+                      coordinates: [[[39, 4], [41, 4], [41, 6], [39, 6], [39, 4]]]
+                  }
+              }
+          }
+        },
+        {
+          loc: {
+              $geoWithin: {
+                  $geometry: {
+                      type: "Polygon",
+                      coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]
+                  }
+              }
+          }
+        }
+    ]
+});
 assert.eq(2, cursor.itcount(), "case 21");

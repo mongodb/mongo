@@ -19,16 +19,14 @@
         assert.writeOK(coll.insert(inputDoc));
 
         // If preserveNullAndEmptyArrays is passed, we should get an output document.
-        var preservedResults = coll.aggregate(
-            [{$unwind: {path: unwindPath, preserveNullAndEmptyArrays: true}}]
-        ).toArray();
+        var preservedResults =
+            coll.aggregate([{$unwind: {path: unwindPath, preserveNullAndEmptyArrays: true}}])
+                .toArray();
         assert.eq(1, preservedResults.length, "$unwind returned the wrong number of results");
-        assert.eq(
-            preservedResults[0],
-            outputDoc,
-            "Unexpected result for an $unwind with preserveNullAndEmptyArrays " +
-                "(input was " + tojson(inputDoc) + ")"
-        );
+        assert.eq(preservedResults[0],
+                  outputDoc,
+                  "Unexpected result for an $unwind with preserveNullAndEmptyArrays " +
+                      "(input was " + tojson(inputDoc) + ")");
 
         // If not, we should get no outputs.
         var defaultResults = coll.aggregate([{$unwind: {path: unwindPath}}]).toArray();

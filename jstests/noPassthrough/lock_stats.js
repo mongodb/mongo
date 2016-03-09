@@ -16,8 +16,10 @@
         // Wait until we see somebody waiting to acquire the lock, defend against unset stats.
         assert.soon((function() {
             var stats = db.serverStatus().locks.Global;
-            if (!stats.acquireWaitCount || !stats.acquireWaitCount.W) return false;
-            if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W) return true;
+            if (!stats.acquireWaitCount || !stats.acquireWaitCount.W)
+                return false;
+            if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W)
+                return true;
             return stats.acquireWaitCount.W > startStats.acquireWaitCount.W;
         }));
 
@@ -34,23 +36,29 @@
 
         //  The server was just started, so initial stats may be missing.
         if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W) {
-            startStats.acquireWaitCount = { W :  0 };
+            startStats.acquireWaitCount = {
+                W: 0
+            };
         }
         if (!startStats.timeAcquiringMicros || !startStats.timeAcquiringMicros.W) {
-            startStats.timeAcquiringMicros = { W : 0 };
+            startStats.timeAcquiringMicros = {
+                W: 0
+            };
         }
 
         var acquireWaitCount = endStats.acquireWaitCount.W - startStats.acquireWaitCount.W;
-        var blockedMillis = Math.floor((endStats.timeAcquiringMicros.W -
-                                        startStats.timeAcquiringMicros.W) / 1000);
+        var blockedMillis =
+            Math.floor((endStats.timeAcquiringMicros.W - startStats.timeAcquiringMicros.W) / 1000);
 
         // Require that no other commands run (and maybe acquire locks) in parallel.
         assert.eq(acquireWaitCount, 1, "other commands ran in parallel, can't check timing");
         assert.gte(blockedMillis, minBlockedMillis, "reported time acquiring lock is too low");
         assert.lte(blockedMillis, maxBlockedMillis, "reported time acquiring lock is too high");
-        return({ blockedMillis: blockedMillis,
-                 minBlockedMillis: minBlockedMillis,
-                 maxBlockedMillis: maxBlockedMillis});
+        return ({
+            blockedMillis: blockedMillis,
+            minBlockedMillis: minBlockedMillis,
+            maxBlockedMillis: maxBlockedMillis
+        });
     }
 
     var conn = MongoRunner.runMongod();

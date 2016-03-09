@@ -24,7 +24,7 @@ var $config = (function() {
     };
 
     var transitions = {
-        status: { status: 1 }
+        status: {status: 1}
     };
 
     return {

@@ -1,13 +1,13 @@
 'use strict';
 
-load('jstests/libs/parallelTester.js'); // for ScopedThread and CountDownLatch
-load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread
+load('jstests/libs/parallelTester.js');  // for ScopedThread and CountDownLatch
+load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread
 
 /**
  * Helper for spawning and joining worker threads.
  */
 
-var ThreadManager = function(clusterOptions, executionMode = { composed: false }) {
+var ThreadManager = function(clusterOptions, executionMode = {composed: false}) {
     if (!(this instanceof ThreadManager)) {
         return new ThreadManager(clusterOptions, executionMode);
     }
@@ -28,12 +28,11 @@ var ThreadManager = function(clusterOptions, executionMode = { composed: false }
         };
 
         if (executionMode.composed) {
-            return new ScopedThread(guardedThreadFn, workerThread.composed,
-                                    workloads, args, options);
+            return new ScopedThread(
+                guardedThreadFn, workerThread.composed, workloads, args, options);
         }
 
-        return new ScopedThread(guardedThreadFn, workerThread.fsm,
-                                workloads, args, options);
+        return new ScopedThread(guardedThreadFn, workerThread.fsm, workloads, args, options);
     }
 
     var latch;
@@ -46,10 +45,11 @@ var ThreadManager = function(clusterOptions, executionMode = { composed: false }
     var _workloads, _context;
 
     this.init = function init(workloads, context, maxAllowedThreads) {
-        assert.eq('number', typeof maxAllowedThreads,
-                  'the maximum allowed threads must be a number');
+        assert.eq(
+            'number', typeof maxAllowedThreads, 'the maximum allowed threads must be a number');
         assert.gt(maxAllowedThreads, 0, 'the maximum allowed threads must be positive');
-        assert.eq(maxAllowedThreads, Math.floor(maxAllowedThreads),
+        assert.eq(maxAllowedThreads,
+                  Math.floor(maxAllowedThreads),
                   'the maximum allowed threads must be an integer');
 
         function computeNumThreads() {
@@ -71,7 +71,7 @@ var ThreadManager = function(clusterOptions, executionMode = { composed: false }
                 var config = context[workload].config;
                 var threadCount = config.threadCount;
                 threadCount = Math.floor(factor * threadCount);
-                threadCount = Math.max(1, threadCount); // ensure workload is executed
+                threadCount = Math.max(1, threadCount);  // ensure workload is executed
                 config.threadCount = threadCount;
             });
         }
@@ -82,8 +82,8 @@ var ThreadManager = function(clusterOptions, executionMode = { composed: false }
         errorLatch = new CountDownLatch(numThreads);
 
         var plural = numThreads === 1 ? '' : 's';
-        print('Using ' + numThreads + ' thread' + plural +
-              ' (requested ' + requestedNumThreads + ')');
+        print('Using ' + numThreads + ' thread' + plural + ' (requested ' + requestedNumThreads +
+              ')');
 
         _workloads = workloads;
         _context = context;
@@ -101,9 +101,9 @@ var ThreadManager = function(clusterOptions, executionMode = { composed: false }
         _workloads.forEach(function(workload) {
             var config = _context[workload].config;
             workloadData[workload] = config.data;
-            var workloads = [workload]; // worker thread only needs to load 'workload'
+            var workloads = [workload];  // worker thread only needs to load 'workload'
             if (executionMode.composed) {
-                workloads = _workloads; // worker thread needs to load all workloads
+                workloads = _workloads;  // worker thread needs to load all workloads
             }
 
             for (var i = 0; i < config.threadCount; ++i) {
@@ -116,7 +116,7 @@ var ThreadManager = function(clusterOptions, executionMode = { composed: false }
                     collName: _context[workload].collName,
                     cluster: cluster.getSerializedCluster(),
                     clusterOptions: clusterOptions,
-                    seed: Random.randInt(1e13), // contains range of Date.getTime()
+                    seed: Random.randInt(1e13),  // contains range of Date.getTime()
                     globalAssertLevel: globalAssertLevel,
                     errorLatch: errorLatch
                 };
@@ -197,7 +197,7 @@ var ThreadManager = function(clusterOptions, executionMode = { composed: false }
         // 'config' database for a document specifying { terminate: true }. If such a
         // document is found the background thread terminates.
         var coll = _context[_workloads[0]].db.getSiblingDB('config').fsm_background;
-        assert.writeOK(coll.update({ terminate: true }, { terminate: true }, { upsert: true }));
+        assert.writeOK(coll.update({terminate: true}, {terminate: true}, {upsert: true}));
 
     };
 };
@@ -208,21 +208,25 @@ var ThreadManager = function(clusterOptions, executionMode = { composed: false }
  */
 
 workerThread.fsm = function(workloads, args, options) {
-    load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread.main
-    load('jstests/concurrency/fsm_libs/fsm.js'); // for fsm.run
+    load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread.main
+    load('jstests/concurrency/fsm_libs/fsm.js');  // for fsm.run
 
-    return workerThread.main(workloads, args, function(configs) {
-        var workloads = Object.keys(configs);
-        assert.eq(1, workloads.length);
-        fsm.run(configs[workloads[0]]);
-    });
+    return workerThread.main(workloads,
+                             args,
+                             function(configs) {
+                                 var workloads = Object.keys(configs);
+                                 assert.eq(1, workloads.length);
+                                 fsm.run(configs[workloads[0]]);
+                             });
 };
 
 workerThread.composed = function(workloads, args, options) {
-    load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread.main
-    load('jstests/concurrency/fsm_libs/composer.js'); // for composer.run
+    load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread.main
+    load('jstests/concurrency/fsm_libs/composer.js');  // for composer.run
 
-    return workerThread.main(workloads, args, function(configs) {
-        composer.run(workloads, configs, options);
-    });
+    return workerThread.main(workloads,
+                             args,
+                             function(configs) {
+                                 composer.run(workloads, configs, options);
+                             });
 };

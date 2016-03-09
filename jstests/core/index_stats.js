@@ -78,10 +78,8 @@
     //
     // Confirm index stats tick on findAndModify() update.
     //
-    var res = db.runCommand({findAndModify: colName,
-                             query: {a: 1},
-                             update: {$set: {d: 1}},
-                             'new': true});
+    var res = db.runCommand(
+        {findAndModify: colName, query: {a: 1}, update: {$set: {d: 1}}, 'new': true});
     assert.commandWorked(res);
     countA++;
     assert.eq(countA, getUsageCount("a_1"));
@@ -89,9 +87,7 @@
     //
     // Confirm index stats tick on findAndModify() delete.
     //
-    res = db.runCommand({findAndModify: colName,
-                         query: {a: 2},
-                         remove: true});
+    res = db.runCommand({findAndModify: colName, query: {a: 2}, remove: true});
     assert.commandWorked(res);
     countA++;
     assert.eq(countA, getUsageCount("a_1"));
@@ -112,8 +108,7 @@
         var name = indexNameList[i];
         if (name === "a_1") {
             countA++;
-        }
-        else {
+        } else {
             assert(name === "b_1_c_1");
             countB++;
         }
@@ -137,11 +132,15 @@
     //
     // Confirm index stats tick on group().
     //
-    res = db.runCommand({group: {ns: colName,
-                         key: {b: 1, c: 1},
-                         cond: {b: {$gt: 0}},
-                         $reduce: function(curr, result) {},
-                         initial: {}}});
+    res = db.runCommand({
+        group: {
+            ns: colName,
+            key: {b: 1, c: 1},
+            cond: {b: {$gt: 0}},
+            $reduce: function(curr, result) {},
+            initial: {}
+        }
+    });
     assert.commandWorked(res);
     countB++;
     assert.eq(countB, getUsageCount("b_1_c_1"));
@@ -149,8 +148,7 @@
     //
     // Confirm index stats tick on aggregate w/ match.
     //
-    res = db.runCommand({aggregate: colName,
-                         pipeline: [{$match: {b: 1}}]});
+    res = db.runCommand({aggregate: colName, pipeline: [{$match: {b: 1}}]});
     assert.commandWorked(res);
     countB++;
     assert.eq(countB, getUsageCount("b_1_c_1"));
@@ -158,11 +156,17 @@
     //
     // Confirm index stats tick on mapReduce with query.
     //
-    res = db.runCommand({mapReduce: colName,
-                         map: function() {emit(this.b, this.c);},
-                         reduce: function(key, val) {return val;},
-                         query: {b: 2},
-                         out: {inline: true}});
+    res = db.runCommand({
+        mapReduce: colName,
+        map: function() {
+            emit(this.b, this.c);
+        },
+        reduce: function(key, val) {
+            return val;
+        },
+        query: {b: 2},
+        out: {inline: true}
+    });
     assert.commandWorked(res);
     countB++;
     assert.eq(countB, getUsageCount("b_1_c_1"));
@@ -206,5 +210,7 @@
     //
     // Confirm that retrieval fails if $indexStats is not in the first pipeline position.
     //
-    assert.throws(function() { col.aggregate([{$match: {}}, {$indexStats: {}}]); });
+    assert.throws(function() {
+        col.aggregate([{$match: {}}, {$indexStats: {}}]);
+    });
 })();

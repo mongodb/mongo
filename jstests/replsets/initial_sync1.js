@@ -20,8 +20,8 @@ print("1. Bring up set");
 // SERVER-7455, this test is called from ssl/auth_x509.js
 var x509_options1;
 var x509_options2;
-var replTest = new ReplSetTest({name: basename,
-                                nodes : {node0 : x509_options1, node1 : x509_options2}});
+var replTest =
+    new ReplSetTest({name: basename, nodes: {node0: x509_options1, node1: x509_options2}});
 
 var conns = replTest.startSet();
 replTest.initiate();
@@ -37,19 +37,16 @@ var local_s1 = slave1.getDB("local");
 print("2. Insert some data");
 var bulk = foo.bar.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
-  bulk.insert({ date: new Date(), x: i, str: "all the talk on the market" });
+    bulk.insert({date: new Date(), x: i, str: "all the talk on the market"});
 }
 assert.writeOK(bulk.execute());
-print("total in foo: "+foo.bar.count());
-
+print("total in foo: " + foo.bar.count());
 
 print("4. Make sure synced");
 replTest.awaitReplication();
 
-
 print("5. Freeze #2");
-admin_s1.runCommand({replSetFreeze:999999});
-
+admin_s1.runCommand({replSetFreeze: 999999});
 
 print("6. Bring up #3");
 var hostname = getHostName();
@@ -61,12 +58,11 @@ var admin_s2 = slave2.getDB("admin");
 
 var config = replTest.getReplSetConfig();
 config.version = 2;
-config.members.push({_id:2, host: slave2.host});
+config.members.push({_id: 2, host: slave2.host});
 try {
-  admin.runCommand({replSetReconfig:config});
-}
-catch(e) {
-  print(e);
+    admin.runCommand({replSetReconfig: config});
+} catch (e) {
+    print(e);
 }
 reconnect(slave1);
 reconnect(slave2);
@@ -78,16 +74,15 @@ wait(function() {
     printjson(config2);
     printjson(config3);
 
-    return config2.version == config.version &&
-      (config3 && config3.version == config.version);
-  });
+    return config2.version == config.version && (config3 && config3.version == config.version);
+});
 
-replTest.waitForState(
-    slave2, [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING], 60 * 1000);
+replTest.waitForState(slave2,
+                      [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING],
+                      60 * 1000);
 
 print("7. Kill the secondary in the middle of syncing");
 replTest.stop(slave1);
-
 
 print("8. Eventually the new node should become a secondary");
 print("if initial sync has started, this will cause it to fail and sleep for 5 minutes");
@@ -102,7 +97,7 @@ print("10. Insert some stuff");
 master = replTest.getPrimary();
 bulk = foo.bar.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
-  bulk.insert({ date: new Date(), x: i, str: "all the talk on the market" });
+    bulk.insert({date: new Date(), x: i, str: "all the talk on the market"});
 }
 assert.writeOK(bulk.execute());
 

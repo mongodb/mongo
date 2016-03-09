@@ -4,7 +4,10 @@
  */
 (function() {
     "use strict";
-    var defaultWriteConcern = {w: "majority", wtimeout: 60000};
+    var defaultWriteConcern = {
+        w: "majority",
+        wtimeout: 60000
+    };
 
     var originalStartParallelShell = startParallelShell;
     startParallelShell = function(jsCode, port, noConnect) {
@@ -58,19 +61,11 @@
 
         // These commands do writes but do not support a writeConcern argument. Emulate it with a
         // getLastError command.
-        var commandsToEmulateWriteConcern = [
-            "createIndexes",
-        ];
+        var commandsToEmulateWriteConcern = ["createIndexes", ];
 
         // These are reading commands that support majority readConcern.
-        var commandsToForceReadConcern = [
-            "count",
-            "distinct",
-            "find",
-            "geoNear",
-            "geoSearch",
-            "group",
-        ];
+        var commandsToForceReadConcern =
+            ["count", "distinct", "find", "geoNear", "geoSearch", "group", ];
 
         var forceWriteConcern = Array.contains(commandsToForceWriteConcern, cmdName);
         var emulateWriteConcern = Array.contains(commandsToEmulateWriteConcern, cmdName);
@@ -80,9 +75,7 @@
             // Aggregate can be either a read or a write depending on whether it has a $out stage.
             // $out is required to be the last stage of the pipeline.
             var stages = obj.pipeline;
-            var hasOut = stages &&
-                         (stages.length !== 0) &&
-                         ('$out' in stages[stages.length - 1]);
+            var hasOut = stages && (stages.length !== 0) && ('$out' in stages[stages.length - 1]);
             if (hasOut) {
                 emulateWriteConcern = true;
             } else {
@@ -93,16 +86,18 @@
         if (forceWriteConcern) {
             if (obj.hasOwnProperty("writeConcern")) {
                 jsTestLog("Warning: overriding existing writeConcern of: " +
-                           tojson(obj.writeConcern));
+                          tojson(obj.writeConcern));
             }
             obj.writeConcern = defaultWriteConcern;
 
         } else if (forceReadConcern) {
             if (obj.hasOwnProperty("readConcern")) {
                 jsTestLog("Warning: overriding existing readConcern of: " +
-                           tojson(obj.readConcern));
+                          tojson(obj.readConcern));
             }
-            obj.readConcern = {level: "majority"};
+            obj.readConcern = {
+                level: "majority"
+            };
         }
 
         var res = this.getMongo().runCommand(dbName, obj, options);
@@ -123,4 +118,3 @@
     };
 
 })();
-

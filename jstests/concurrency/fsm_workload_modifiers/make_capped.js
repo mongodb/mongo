@@ -14,14 +14,14 @@
  */
 
 function makeCapped($config, $super) {
-
     $config.setup = function setup(db, collName, cluster) {
         assertWhenOwnColl(function() {
             db[collName].drop();
-            assertAlways.commandWorked(db.createCollection(collName, {
-                capped: true,
-                size: 16384 // bytes
-            }));
+            assertAlways.commandWorked(db.createCollection(collName,
+                                                           {
+                                                             capped: true,
+                                                             size: 16384  // bytes
+                                                           }));
         });
 
         $super.setup.apply(this, arguments);

@@ -2,10 +2,10 @@
  * Simple test to ensure that an invalid reconfig fails, a valid one succeeds, and a reconfig won't
  * succeed without force if force is needed.
  */
-(function () {
+(function() {
     "use strict";
     var numNodes = 5;
-    var replTest = new ReplSetTest({ name: 'testSet', nodes: numNodes });
+    var replTest = new ReplSetTest({name: 'testSet', nodes: numNodes});
     var nodes = replTest.startSet();
     replTest.initiate();
 
@@ -23,10 +23,14 @@
 
     jsTestLog("Invalid reconfig");
     config.version++;
-    var badMember = {_id: numNodes, host: "localhost:12345", priority: "High"};
+    var badMember = {
+        _id: numNodes,
+        host: "localhost:12345",
+        priority: "High"
+    };
     config.members.push(badMember);
     var invalidConfigCode = 93;
-    assert.commandFailedWithCode(primary.adminCommand({replSetReconfig : config}),
+    assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
                                  invalidConfigCode);
 
     jsTestLog("No force when needed.");
@@ -35,8 +39,7 @@
     config.members[nodes.indexOf(secondary)].priority = 5;
     var admin = secondary.getDB("admin");
     var forceRequiredCode = 10107;
-    assert.commandFailedWithCode(admin.runCommand({replSetReconfig: config}),
-                                 forceRequiredCode);
+    assert.commandFailedWithCode(admin.runCommand({replSetReconfig: config}), forceRequiredCode);
 
     jsTestLog("Force when appropriate");
     assert.commandWorked(admin.runCommand({replSetReconfig: config, force: true}));

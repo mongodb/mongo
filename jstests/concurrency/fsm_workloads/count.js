@@ -23,7 +23,7 @@ var $config = (function() {
             return this.modulus * this.countPerNum;
         },
         getCount: function getCount(db, predicate) {
-            var query = Object.extend({ tid: this.tid }, predicate);
+            var query = Object.extend({tid: this.tid}, predicate);
             return db[this.threadCollName].count(query);
         }
     };
@@ -39,7 +39,7 @@ var $config = (function() {
 
             var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
             for (var i = 0; i < this.getNumDocs(); ++i) {
-                bulk.insert({ i: i % this.modulus, tid: this.tid });
+                bulk.insert({i: i % this.modulus, tid: this.tid});
             }
             var res = bulk.execute();
             assertAlways.writeOK(res);
@@ -50,7 +50,7 @@ var $config = (function() {
             assertWhenOwnColl.eq(this.getCount(db), this.getNumDocs());
 
             var num = Random.randInt(this.modulus);
-            assertWhenOwnColl.eq(this.getCount(db, { i: num }), this.countPerNum);
+            assertWhenOwnColl.eq(this.getCount(db, {i: num}), this.countPerNum);
         }
 
         return {
@@ -61,8 +61,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { count: 1 },
-        count: { count: 1 }
+        init: {count: 1},
+        count: {count: 1}
     };
 
     return {

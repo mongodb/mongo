@@ -5,149 +5,157 @@
 
 function expectState(rst, state) {
     assert.soon(function() {
-                    var status = rst.status();
-                    if (status.myState != state) {
-                        print("Waiting for state " + state +
-                              " in replSetGetStatus output: " + tojson(status));
-                    }
-                    return status.myState == state;
-                });
+        var status = rst.status();
+        if (status.myState != state) {
+            print("Waiting for state " + state + " in replSetGetStatus output: " + tojson(status));
+        }
+        return status.myState == state;
+    });
 }
 
 (function() {
-"use strict";
+    "use strict";
 
-(function() {
-// Test that node with --configsvr cmd line and configsvr in replset config goes
-// into REMOVED state if storage engine is not WiredTiger
-jsTestLog("configsvr in rs config and --configsvr cmd line, but mmapv1");
-var rst = new ReplSetTest({name: "configrs3", nodes: 1, nodeOptions: {configsvr: "",
-                                                                      journal: "",
-                                                                      storageEngine: "mmapv1"}});
+    (function() {
+        // Test that node with --configsvr cmd line and configsvr in replset config goes
+        // into REMOVED state if storage engine is not WiredTiger
+        jsTestLog("configsvr in rs config and --configsvr cmd line, but mmapv1");
+        var rst = new ReplSetTest({
+            name: "configrs3",
+            nodes: 1,
+            nodeOptions: {configsvr: "", journal: "", storageEngine: "mmapv1"}
+        });
 
-rst.startSet();
-var conf = rst.getReplSetConfig();
-conf.configsvr = true;
-try {
-    rst.nodes[0].adminCommand({replSetInitiate: conf});
-} catch (e) {
-    // expected since we close all connections after going into REMOVED
-}
-expectState(rst, ReplSetTest.State.REMOVED);
-rst.stopSet();
-})();
+        rst.startSet();
+        var conf = rst.getReplSetConfig();
+        conf.configsvr = true;
+        try {
+            rst.nodes[0].adminCommand({replSetInitiate: conf});
+        } catch (e) {
+            // expected since we close all connections after going into REMOVED
+        }
+        expectState(rst, ReplSetTest.State.REMOVED);
+        rst.stopSet();
+    })();
 
-(function() {
-// Test that node with --configsvr cmd line and configsvr in replset config does NOT go
-// into REMOVED state if storage engine is not WiredTiger but we're running in SCCC mode
-jsTestLog("configsvr in rs config and --configsvr cmd line, but mmapv1 with configSvrMode=sccc");
-var rst = new ReplSetTest({name: "configrs4", nodes: 1, nodeOptions: {configsvr: "",
-                                                                      journal: "",
-                                                                      storageEngine: "mmapv1",
-                                                                      configsvrMode: "sccc"}});
+    (function() {
+        // Test that node with --configsvr cmd line and configsvr in replset config does NOT go
+        // into REMOVED state if storage engine is not WiredTiger but we're running in SCCC mode
+        jsTestLog(
+            "configsvr in rs config and --configsvr cmd line, but mmapv1 with configSvrMode=sccc");
+        var rst = new ReplSetTest({
+            name: "configrs4",
+            nodes: 1,
+            nodeOptions:
+                {configsvr: "", journal: "", storageEngine: "mmapv1", configsvrMode: "sccc"}
+        });
 
-rst.startSet();
-var conf = rst.getReplSetConfig();
-conf.configsvr = true;
-assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
+        rst.startSet();
+        var conf = rst.getReplSetConfig();
+        conf.configsvr = true;
+        assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
-rst.getPrimary();
-expectState(rst, ReplSetTest.State.PRIMARY);
-rst.stopSet();
-})();
+        rst.getPrimary();
+        expectState(rst, ReplSetTest.State.PRIMARY);
+        rst.stopSet();
+    })();
 
-(function() {
-// Test that node with --configsvr cmd line and configsvr in replset config and using wiredTiger
-// does NOT go into REMOVED state.
-jsTestLog("configsvr in rs config and --configsvr cmd line, normal case");
-var rst = new ReplSetTest({name: "configrs5",
-                           nodes: 1,
-                           nodeOptions: {configsvr: "",
-                                         journal: "",
-                                         storageEngine: "wiredTiger"}});
+    (function() {
+        // Test that node with --configsvr cmd line and configsvr in replset config and using
+        // wiredTiger
+        // does NOT go into REMOVED state.
+        jsTestLog("configsvr in rs config and --configsvr cmd line, normal case");
+        var rst = new ReplSetTest({
+            name: "configrs5",
+            nodes: 1,
+            nodeOptions: {configsvr: "", journal: "", storageEngine: "wiredTiger"}
+        });
 
-rst.startSet();
-var conf = rst.getReplSetConfig();
-conf.configsvr = true;
-assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
+        rst.startSet();
+        var conf = rst.getReplSetConfig();
+        conf.configsvr = true;
+        assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
-rst.getPrimary();
-expectState(rst, ReplSetTest.State.PRIMARY);
+        rst.getPrimary();
+        expectState(rst, ReplSetTest.State.PRIMARY);
 
-var conf = rst.getPrimary().getDB('local').system.replset.findOne();
-assert(conf.configsvr, tojson(conf));
+        var conf = rst.getPrimary().getDB('local').system.replset.findOne();
+        assert(conf.configsvr, tojson(conf));
 
-rst.stopSet();
-})();
+        rst.stopSet();
+    })();
 
-(function() {
-// Test that node with --configsvr cmd line and initiated with an empty replset config
-// will result in configsvr:true getting automatically added to the config (SERVER-20247).
-jsTestLog("--configsvr cmd line, empty config to replSetInitiate");
-var rst = new ReplSetTest({name: "configrs6",
-                           nodes: 1,
-                           nodeOptions: {configsvr: "",
-                                         journal: "",
-                                         storageEngine: "wiredTiger"}});
+    (function() {
+        // Test that node with --configsvr cmd line and initiated with an empty replset config
+        // will result in configsvr:true getting automatically added to the config (SERVER-20247).
+        jsTestLog("--configsvr cmd line, empty config to replSetInitiate");
+        var rst = new ReplSetTest({
+            name: "configrs6",
+            nodes: 1,
+            nodeOptions: {configsvr: "", journal: "", storageEngine: "wiredTiger"}
+        });
 
-rst.startSet();
-assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: 1}));
+        rst.startSet();
+        assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: 1}));
 
-rst.getPrimary();
-expectState(rst, ReplSetTest.State.PRIMARY);
-rst.stopSet();
-})();
+        rst.getPrimary();
+        expectState(rst, ReplSetTest.State.PRIMARY);
+        rst.stopSet();
+    })();
 
-(function() {
-// Test that a set initialized without --configsvr but then restarted with --configsvr will fail to
-// start up and won't automatically add "configsvr" to the replset config (SERVER-21236).
-jsTestLog("set initiated without configsvr, restarted adding --configsvr cmd line");
-var rst = new ReplSetTest({name: "configrs7",
-                           nodes: 1,
-                           nodeOptions: {journal: "",
-                                         storageEngine: "wiredTiger"}});
+    (function() {
+        // Test that a set initialized without --configsvr but then restarted with --configsvr will
+        // fail to
+        // start up and won't automatically add "configsvr" to the replset config (SERVER-21236).
+        jsTestLog("set initiated without configsvr, restarted adding --configsvr cmd line");
+        var rst = new ReplSetTest({
+            name: "configrs7",
+            nodes: 1,
+            nodeOptions: {journal: "", storageEngine: "wiredTiger"}
+        });
 
-rst.startSet();
-var conf = rst.getReplSetConfig();
-assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
+        rst.startSet();
+        var conf = rst.getReplSetConfig();
+        assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
-rst.getPrimary();
-expectState(rst, ReplSetTest.State.PRIMARY);
-assert.throws(function() {
-                  rst.restart(0, {configsvr: ""});
-              });
+        rst.getPrimary();
+        expectState(rst, ReplSetTest.State.PRIMARY);
+        assert.throws(function() {
+            rst.restart(0, {configsvr: ""});
+        });
 
-rst.stopSet();
-})();
+        rst.stopSet();
+    })();
 
-(function() {
-// Test that a set initialized with --configsvr but then restarted without --configsvr will fail to
-// start up.
-jsTestLog("set initiated with configsvr, restarted without --configsvr cmd line");
-var rst = new ReplSetTest({name: "configrs8",
-                           nodes: 1,
-                           nodeOptions: {configsvr: "",
-                                         journal: "",
-                                         storageEngine: "wiredTiger"}});
+    (function() {
+        // Test that a set initialized with --configsvr but then restarted without --configsvr will
+        // fail to
+        // start up.
+        jsTestLog("set initiated with configsvr, restarted without --configsvr cmd line");
+        var rst = new ReplSetTest({
+            name: "configrs8",
+            nodes: 1,
+            nodeOptions: {configsvr: "", journal: "", storageEngine: "wiredTiger"}
+        });
 
-rst.startSet();
-var conf = rst.getReplSetConfig();
-conf.configsvr = true;
-assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
+        rst.startSet();
+        var conf = rst.getReplSetConfig();
+        conf.configsvr = true;
+        assert.commandWorked(rst.nodes[0].adminCommand({replSetInitiate: conf}));
 
-rst.getPrimary();
-expectState(rst, ReplSetTest.State.PRIMARY);
+        rst.getPrimary();
+        expectState(rst, ReplSetTest.State.PRIMARY);
 
-var node = rst.nodes[0];
-var options = node.savedOptions;
-delete options.configsvr;
-options.noCleanData = true;
+        var node = rst.nodes[0];
+        var options = node.savedOptions;
+        delete options.configsvr;
+        options.noCleanData = true;
 
-MongoRunner.stopMongod(node);
-var conn = MongoRunner.runMongod(options);
-assert.eq(null, conn, "Mongod should have failed to start, but didn't");
+        MongoRunner.stopMongod(node);
+        var conn = MongoRunner.runMongod(options);
+        assert.eq(null, conn, "Mongod should have failed to start, but didn't");
 
-rst.stopSet();
-})();
+        rst.stopSet();
+    })();
 
 })();

@@ -3,16 +3,16 @@
 t = db.jstests_inb;
 t.drop();
 
-function checkResults( query ) {
-    assert.eq( 4, t.count( query ) );
-    assert.eq( 4, t.find( query ).itcount() );
+function checkResults(query) {
+    assert.eq(4, t.count(query));
+    assert.eq(4, t.find(query).itcount());
 }
 
-t.ensureIndex( {x:1} );
-t.save( {x:'aa'} );
-t.save( {x:'ab'} );
-t.save( {x:'ac'} );
-t.save( {x:'ad'} );
+t.ensureIndex({x: 1});
+t.save({x: 'aa'});
+t.save({x: 'ab'});
+t.save({x: 'ac'});
+t.save({x: 'ad'});
 
-checkResults( {x:{$in:[/^a/,/^ab/]}} );
-checkResults( {x:{$in:[/^ab/,/^a/]}} );
+checkResults({x: {$in: [/^a/, /^ab/]}});
+checkResults({x: {$in: [/^ab/, /^a/]}});

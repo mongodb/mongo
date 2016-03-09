@@ -34,8 +34,12 @@
     assert.eq(coll.aggregate(pipeline).toArray(), [{d: ['foo']}]);
 
     // Nested arrays.
-    pipeline = [{$project: {_id: 0, d: {$setIntersection: [[[1, 'foo', 'bar']],
-                                                           [[1, {$toLower: 'FoO'}, '$b']]]}}}];
+    pipeline = [{
+        $project: {
+            _id: 0,
+            d: {$setIntersection: [[[1, 'foo', 'bar']], [[1, {$toLower: 'FoO'}, '$b']]]}
+        }
+    }];
     assert.eq(coll.aggregate(pipeline).toArray(), [{d: [[1, 'foo', 'bar']]}]);
 
     coll.drop();

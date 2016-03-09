@@ -55,7 +55,7 @@ var $config = (function() {
         function mapReduce(db, collName) {
             var options = {
                 finalize: this.finalizer,
-                out: { inline: 1 }
+                out: {inline: 1}
             };
 
             var res = db[collName].mapReduce(this.mapper, this.reducer, options);
@@ -70,8 +70,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { mapReduce: 1 },
-        mapReduce: { mapReduce: 1 }
+        init: {mapReduce: 1},
+        mapReduce: {mapReduce: 1}
     };
 
     function makeDoc(keyLimit, valueLimit) {

@@ -63,18 +63,21 @@
         function msg() {
             return "TTL monitor didn't run within " + timeoutSeconds + " seconds";
         },
-        timeoutSeconds * 1000
-    );
+        timeoutSeconds * 1000);
 
     for (var i = 0; i < numCollectionsToCreate; i++) {
         var coll = testDB["ttl" + i.zeroPad(width)];
         var count = coll.count();
         if (i % 3 === 1) {
-            assert.eq(1, count, "the TTL monitor shouldn't have removed expired documents from" +
-                      " the capped collection '" + coll.getFullName() + "'");
+            assert.eq(1,
+                      count,
+                      "the TTL monitor shouldn't have removed expired documents from" +
+                          " the capped collection '" + coll.getFullName() + "'");
         } else {
-            assert.eq(0, count, "the TTL monitor didn't removed expired documents from the" +
-                      " collection '" + coll.getFullName() + "'");
+            assert.eq(0,
+                      count,
+                      "the TTL monitor didn't removed expired documents from the" +
+                          " collection '" + coll.getFullName() + "'");
         }
     }
 

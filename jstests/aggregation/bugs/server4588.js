@@ -13,18 +13,11 @@
 
     // Without includeArrayIndex.
     var actualResults = coll.aggregate([{$unwind: {path: "$x"}}]).toArray();
-    var expectedResults = [
-        {_id: 3, x: 1},
-        {_id: 3, x: 2},
-        {_id: 3, x: 3},
-        {_id: 4, x: 5},
-    ];
+    var expectedResults = [{_id: 3, x: 1}, {_id: 3, x: 2}, {_id: 3, x: 3}, {_id: 4, x: 5}, ];
     assert.eq(expectedResults, actualResults, "Incorrect results for normal $unwind");
 
     // With includeArrayIndex, index inserted into a new field.
-    actualResults = coll.aggregate([
-        {$unwind: {path: "$x", includeArrayIndex: "index"}}
-    ]).toArray();
+    actualResults = coll.aggregate([{$unwind: {path: "$x", includeArrayIndex: "index"}}]).toArray();
     expectedResults = [
         {_id: 3, x: 1, index: NumberLong(0)},
         {_id: 3, x: 2, index: NumberLong(1)},
@@ -35,9 +28,9 @@
 
     // With both includeArrayIndex and preserveNullAndEmptyArrays.
     // TODO: update this test when SERVER-20168 is resolved.
-    actualResults = coll.aggregate([
-        {$unwind: {path: "$x", includeArrayIndex: "index", preserveNullAndEmptyArrays: true}}
-    ]).toArray();
+    actualResults = coll.aggregate([{
+        $unwind: {path: "$x", includeArrayIndex: "index", preserveNullAndEmptyArrays: true}
+    }]).toArray();
     expectedResults = [
         {_id: 0, index: null},
         {_id: 1, x: null, index: null},

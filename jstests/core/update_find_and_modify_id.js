@@ -2,7 +2,10 @@
 // an _id in the update document, as long as the _id will not be modified
 
 var t = db.jstests_server4516;
-var startingDoc = {_id: 1, a: 1};
+var startingDoc = {
+    _id: 1,
+    a: 1
+};
 
 function prepare() {
     t.drop();
@@ -32,7 +35,7 @@ function update_fails(updateDoc, qid) {
     assert.eq(t.findOne(), startingDoc);
 
     prepare();
-    assert.throws(function () {
+    assert.throws(function() {
         t.findAndModify({query: {_id: qid}, update: updateDoc, upsert: true});
     });
     assert.eq(t.count(), 1);

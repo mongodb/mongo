@@ -8,9 +8,11 @@ var newVersion = "latest";
 var oldVersion = "last-stable";
 
 var name = "replsetdowngrade";
-var nodes = {n1: {binVersion: newVersion},
-             n2: {binVersion: newVersion},
-             n3: {binVersion: newVersion}};
+var nodes = {
+    n1: {binVersion: newVersion},
+    n2: {binVersion: newVersion},
+    n3: {binVersion: newVersion}
+};
 
 var rst = new ReplSetTest({name: name, nodes: nodes, nodeOptions: {storageEngine: 'mmapv1'}});
 rst.startSet();
@@ -22,7 +24,7 @@ var primary = rst.getPrimary();
 var coll = "test.foo";
 
 jsTest.log("Inserting documents into collection.");
-for (var i=0; i<10; i++) {
+for (var i = 0; i < 10; i++) {
     primary.getCollection(coll).insert({_id: i, str: "hello world"});
 }
 
@@ -39,7 +41,7 @@ jsTest.log("Starting parallel operations during downgrade..");
 var joinFindInsert = startParallelOps(primary, insertDocuments, [rst.getURL(), coll]);
 
 jsTest.log("Downgrading replica set..");
-rst.upgradeSet({ binVersion: oldVersion });
+rst.upgradeSet({binVersion: oldVersion});
 jsTest.log("Downgrade complete.");
 
 primary = rst.getPrimary();

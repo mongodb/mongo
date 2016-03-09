@@ -8,31 +8,33 @@
  *
  * Uses an ordered, bulk operation to perform the inserts.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_base.js'); // for $config
+load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
 
-var $config = extendWorkload($config, function($config, $super) {
+var $config =
+    extendWorkload($config,
+                   function($config, $super) {
 
-    $config.data.indexedField = 'indexed_insert_ordered_bulk';
-    $config.data.shardKey = {};
-    $config.data.shardKey[$config.data.indexedField] = 1;
+                       $config.data.indexedField = 'indexed_insert_ordered_bulk';
+                       $config.data.shardKey = {};
+                       $config.data.shardKey[$config.data.indexedField] = 1;
 
-    $config.states.insert = function insert(db, collName) {
-        var doc = {};
-        doc[this.indexedField] = this.indexedValue;
+                       $config.states.insert = function insert(db, collName) {
+                           var doc = {};
+                           doc[this.indexedField] = this.indexedValue;
 
-        var bulk = db[collName].initializeOrderedBulkOp();
-        for (var i = 0; i < this.docsPerInsert; ++i) {
-            bulk.insert(doc);
-        }
-        var res = bulk.execute();
-        assertAlways.writeOK(res);
-        assertAlways.eq(this.docsPerInsert, res.nInserted, tojson(res));
+                           var bulk = db[collName].initializeOrderedBulkOp();
+                           for (var i = 0; i < this.docsPerInsert; ++i) {
+                               bulk.insert(doc);
+                           }
+                           var res = bulk.execute();
+                           assertAlways.writeOK(res);
+                           assertAlways.eq(this.docsPerInsert, res.nInserted, tojson(res));
 
-        this.nInserted += this.docsPerInsert;
-    };
+                           this.nInserted += this.docsPerInsert;
+                       };
 
-    $config.data.docsPerInsert = 15;
+                       $config.data.docsPerInsert = 15;
 
-    return $config;
-});
+                       return $config;
+                   });

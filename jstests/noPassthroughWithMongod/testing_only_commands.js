@@ -3,16 +3,18 @@
  * via the --enableTestCommands flag fail when that flag isn't provided.
  */
 
-var testOnlyCommands = ['_testDistLockWithSkew',
-                        '_skewClockCommand',
-                        'configureFailPoint',
-                        '_hashBSONElement',
-                        'replSetTest',
-                        'journalLatencyTest',
-                        'godinsert',
-                        'sleep',
-                        'captrunc',
-                        'emptycapped'];
+var testOnlyCommands = [
+    '_testDistLockWithSkew',
+    '_skewClockCommand',
+    'configureFailPoint',
+    '_hashBSONElement',
+    'replSetTest',
+    'journalLatencyTest',
+    'godinsert',
+    'sleep',
+    'captrunc',
+    'emptycapped'
+];
 
 var assertCmdNotFound = function(db, cmdName) {
     var res = db.runCommand(cmdName);
@@ -23,9 +25,10 @@ var assertCmdNotFound = function(db, cmdName) {
 var assertCmdFound = function(db, cmdName) {
     var res = db.runCommand(cmdName);
     if (!res.ok) {
-        assert.neq(59, res.code,
+        assert.neq(59,
+                   res.code,
                    'test command ' + cmdName + ' should either have succeeded or ' +
-                   'failed with an error code other than CommandNotFound(59)');
+                       'failed with an error code other than CommandNotFound(59)');
     }
 };
 

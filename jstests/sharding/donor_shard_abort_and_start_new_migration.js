@@ -28,164 +28,147 @@
 load('./jstests/libs/chunk_manipulation_util.js');
 
 (function() {
-"use strict";
+    "use strict";
 
-var staticMongodFoo = MongoRunner.runMongod({});  // For startParallelOps.
-var staticMongodBaz = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticMongodFoo = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticMongodBaz = MongoRunner.runMongod({});  // For startParallelOps.
 
-/**
- * Start up new sharded cluster, balancer defaults to off.
- */
+    /**
+     * Start up new sharded cluster, balancer defaults to off.
+     */
 
-var st = new ShardingTest({ shards : 3, mongos : 1 });
+    var st = new ShardingTest({shards: 3, mongos: 1});
 
-var mongos = st.s0,
-    admin = mongos.getDB('admin'),
-    shards = mongos.getCollection('config.shards').find().toArray(),
-    dbName = "testDB",
-    fooNS = dbName + ".foo",
-    fooColl = mongos.getCollection(fooNS),
-    bazNS = dbName + ".baz",
-    bazColl = mongos.getCollection(bazNS),
-    donor = st.shard0,
-    fooRecipient = st.shard1,
-    bazRecipient = st.shard2,
-    fooDonorColl = donor.getCollection(fooNS),
-    bazDonorColl = donor.getCollection(bazNS),
-    fooRecipientColl = fooRecipient.getCollection(fooNS),
-    bazRecipientColl = bazRecipient.getCollection(bazNS);
+    var mongos = st.s0, admin = mongos.getDB('admin'),
+        shards = mongos.getCollection('config.shards').find().toArray(), dbName = "testDB",
+        fooNS = dbName + ".foo", fooColl = mongos.getCollection(fooNS), bazNS = dbName + ".baz",
+        bazColl = mongos.getCollection(bazNS), donor = st.shard0, fooRecipient = st.shard1,
+        bazRecipient = st.shard2, fooDonorColl = donor.getCollection(fooNS),
+        bazDonorColl = donor.getCollection(bazNS),
+        fooRecipientColl = fooRecipient.getCollection(fooNS),
+        bazRecipientColl = bazRecipient.getCollection(bazNS);
 
-/**
- * Enable sharding on both collections, and split each collection into two chunks.
- */
+    /**
+     * Enable sharding on both collections, and split each collection into two chunks.
+     */
 
-// Two chunks
-// Donor:
-//      testDB.foo:     [0, 10) [10, 20)
-//      testDB.baz:     [0, 10) [10, 20)
-// Recipient:
-assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, shards[0]._id);
+    // Two chunks
+    // Donor:
+    //      testDB.foo:     [0, 10) [10, 20)
+    //      testDB.baz:     [0, 10) [10, 20)
+    // Recipient:
+    assert.commandWorked(admin.runCommand({enableSharding: dbName}));
+    st.ensurePrimaryShard(dbName, shards[0]._id);
 
-assert.commandWorked(admin.runCommand({shardCollection: fooNS, key: {a: 1}}));
-assert.commandWorked(admin.runCommand({split: fooNS, middle: {a: 10}}));
-assert.commandWorked(admin.runCommand({shardCollection: bazNS, key: {a: 1}}));
-assert.commandWorked(admin.runCommand({split: bazNS, middle: {a: 10}}));
+    assert.commandWorked(admin.runCommand({shardCollection: fooNS, key: {a: 1}}));
+    assert.commandWorked(admin.runCommand({split: fooNS, middle: {a: 10}}));
+    assert.commandWorked(admin.runCommand({shardCollection: bazNS, key: {a: 1}}));
+    assert.commandWorked(admin.runCommand({split: bazNS, middle: {a: 10}}));
 
-/**
- * Insert one document into each of the chunks in the testDB.baz and testDB.foo collections.
- */
+    /**
+     * Insert one document into each of the chunks in the testDB.baz and testDB.foo collections.
+     */
 
-assert.writeOK(fooColl.insert({a: 0}));
-assert.writeOK(fooColl.insert({a: 10}));
-assert.eq(0, fooRecipientColl.count());
-assert.eq(2, fooDonorColl.count());
-assert.eq(2, fooColl.count());
-assert.writeOK(bazColl.insert({a: 0}));
-assert.writeOK(bazColl.insert({a: 10}));
-assert.eq(0, bazRecipientColl.count());
-assert.eq(2, bazDonorColl.count());
-assert.eq(2, bazColl.count());
+    assert.writeOK(fooColl.insert({a: 0}));
+    assert.writeOK(fooColl.insert({a: 10}));
+    assert.eq(0, fooRecipientColl.count());
+    assert.eq(2, fooDonorColl.count());
+    assert.eq(2, fooColl.count());
+    assert.writeOK(bazColl.insert({a: 0}));
+    assert.writeOK(bazColl.insert({a: 10}));
+    assert.eq(0, bazRecipientColl.count());
+    assert.eq(2, bazDonorColl.count());
+    assert.eq(2, bazColl.count());
 
-/**
- * Set the failpoints. Both recipient shards will pause migration after cloning chunk
- * data from donor, and before checking transfer mods log on donor. Pause the donor shard
- * before it checks for interrupts to the migration.
- */
+    /**
+     * Set the failpoints. Both recipient shards will pause migration after cloning chunk
+     * data from donor, and before checking transfer mods log on donor. Pause the donor shard
+     * before it checks for interrupts to the migration.
+     */
 
-pauseMigrateAtStep(fooRecipient, migrateStepNames.cloned);
-pauseMigrateAtStep(bazRecipient, migrateStepNames.cloned);
-pauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
+    pauseMigrateAtStep(fooRecipient, migrateStepNames.cloned);
+    pauseMigrateAtStep(bazRecipient, migrateStepNames.cloned);
+    pauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
 
-/**
- * Start first moveChunk operation in the background: moving chunk [10, 20) in testDB.foo
- * from donor to fooRecipient. This will move one document, {a: 10}. Migration will pause
- * after cloning step (when it reaches the failpoint).
- */
+    /**
+     * Start first moveChunk operation in the background: moving chunk [10, 20) in testDB.foo
+     * from donor to fooRecipient. This will move one document, {a: 10}. Migration will pause
+     * after cloning step (when it reaches the failpoint).
+     */
 
-// Donor:   testDB.foo [10, 20) -> FooRecipient
-//      testDB.foo:     [0, 10)
-jsTest.log('Starting first migration of collection foo, pause after cloning...');
-var joinFooMoveChunk = moveChunkParallel(
-    staticMongodFoo,
-    st.s0.host,
-    {a: 10},
-    null,
-    fooColl.getFullName(),
-    shards[1]._id);
-waitForMigrateStep(fooRecipient, migrateStepNames.cloned);
+    // Donor:   testDB.foo [10, 20) -> FooRecipient
+    //      testDB.foo:     [0, 10)
+    jsTest.log('Starting first migration of collection foo, pause after cloning...');
+    var joinFooMoveChunk = moveChunkParallel(
+        staticMongodFoo, st.s0.host, {a: 10}, null, fooColl.getFullName(), shards[1]._id);
+    waitForMigrateStep(fooRecipient, migrateStepNames.cloned);
 
-/**
- * Abort the migration on the donor shard by finding and killing the operation by operation
- * ID. Release the donor shard failpoint so that the donor shard can discover the migration
- * has received a interrupt signal. The recipient shard, fooRecipient, which is currently
- * paused, will not yet be aware that the migration has been aborted.
- */
+    /**
+     * Abort the migration on the donor shard by finding and killing the operation by operation
+     * ID. Release the donor shard failpoint so that the donor shard can discover the migration
+     * has received a interrupt signal. The recipient shard, fooRecipient, which is currently
+     * paused, will not yet be aware that the migration has been aborted.
+     */
 
-jsTest.log('Abort donor shard migration of foo collection....');
-var inProgressOps = admin.currentOp().inprog;
-for (var op in inProgressOps) {
-    if (inProgressOps[op].query.moveChunk) {
-        admin.killOp(inProgressOps[op].opid);
-        jsTest.log("Killing migration with opid: " + inProgressOps[op].opid);
+    jsTest.log('Abort donor shard migration of foo collection....');
+    var inProgressOps = admin.currentOp().inprog;
+    for (var op in inProgressOps) {
+        if (inProgressOps[op].query.moveChunk) {
+            admin.killOp(inProgressOps[op].opid);
+            jsTest.log("Killing migration with opid: " + inProgressOps[op].opid);
+        }
     }
-}
-unpauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
-assert.throws(function() {
-    joinFooMoveChunk();
-});
+    unpauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
+    assert.throws(function() {
+        joinFooMoveChunk();
+    });
 
-/**
- * Start second moveChunk operation in the background: moving chunk [10, 20) in testDB.baz
- * from donor to bazRecipient. This will move one document, {a: 10}. Migration will pause
- * after the recipient cloning step (when it reaches the failpoint).
- */
+    /**
+     * Start second moveChunk operation in the background: moving chunk [10, 20) in testDB.baz
+     * from donor to bazRecipient. This will move one document, {a: 10}. Migration will pause
+     * after the recipient cloning step (when it reaches the failpoint).
+     */
 
-// Donor:   testDB.baz [10, 20) -> BazRecipient
-//      testDB.baz:     [0, 10)
-jsTest.log('Starting second migration of collection baz, pause after cloning...');
-var joinBazMoveChunk = moveChunkParallel(
-    staticMongodBaz,
-    st.s0.host,
-    {a: 10},
-    null,
-    bazColl.getFullName(),
-    shards[2]._id);
-waitForMigrateStep(bazRecipient, migrateStepNames.cloned);
+    // Donor:   testDB.baz [10, 20) -> BazRecipient
+    //      testDB.baz:     [0, 10)
+    jsTest.log('Starting second migration of collection baz, pause after cloning...');
+    var joinBazMoveChunk = moveChunkParallel(
+        staticMongodBaz, st.s0.host, {a: 10}, null, bazColl.getFullName(), shards[2]._id);
+    waitForMigrateStep(bazRecipient, migrateStepNames.cloned);
 
-/**
- * Insert documents into testDB.baz collection's currently migrating chunk with range
- * [10, 20) so as to populate the migration xfermods log.
- */
+    /**
+     * Insert documents into testDB.baz collection's currently migrating chunk with range
+     * [10, 20) so as to populate the migration xfermods log.
+     */
 
-jsTest.log("Inserting 2 docs into donor shard's testDB.baz collection " +
-    "in the range of the currently migrating chunk....");
-assert.writeOK(bazColl.insert({a: 11}));
-assert.writeOK(bazColl.insert({a: 12}));
-assert.eq(4, bazColl.count(), "Failed to insert documents into baz collection!");
+    jsTest.log("Inserting 2 docs into donor shard's testDB.baz collection " +
+               "in the range of the currently migrating chunk....");
+    assert.writeOK(bazColl.insert({a: 11}));
+    assert.writeOK(bazColl.insert({a: 12}));
+    assert.eq(4, bazColl.count(), "Failed to insert documents into baz collection!");
 
-/**
- * Unpause fooRecipient (disable failpoint) and finish first migration, which should fail.
- * FooRecipient will be attempting to access the donor shard's migration xfermods log,
- * which has documents but for a different migration. FooRecipient will fail to get retrieve
- * the documents, and abort the migration.
- */
+    /**
+     * Unpause fooRecipient (disable failpoint) and finish first migration, which should fail.
+     * FooRecipient will be attempting to access the donor shard's migration xfermods log,
+     * which has documents but for a different migration. FooRecipient will fail to get retrieve
+     * the documents, and abort the migration.
+     */
 
-jsTest.log('Finishing first migration, which should fail....');
-unpauseMigrateAtStep(fooRecipient, migrateStepNames.cloned);
+    jsTest.log('Finishing first migration, which should fail....');
+    unpauseMigrateAtStep(fooRecipient, migrateStepNames.cloned);
 
-/**
- * Unpause bazRecipient (disable failpoint) and finish second migration, which should
- * succeed normally.
- */
+    /**
+     * Unpause bazRecipient (disable failpoint) and finish second migration, which should
+     * succeed normally.
+     */
 
-jsTest.log('Finishing second migration, which should succeed....');
-unpauseMigrateAtStep(bazRecipient, migrateStepNames.cloned);
-joinBazMoveChunk();
-assert.eq(3, bazRecipientColl.count(), 'BazRecipient does not have 3 documents.');
-assert.eq(1, bazDonorColl.count(), 'Donor does not have 1 document in the baz collection.');
+    jsTest.log('Finishing second migration, which should succeed....');
+    unpauseMigrateAtStep(bazRecipient, migrateStepNames.cloned);
+    joinBazMoveChunk();
+    assert.eq(3, bazRecipientColl.count(), 'BazRecipient does not have 3 documents.');
+    assert.eq(1, bazDonorColl.count(), 'Donor does not have 1 document in the baz collection.');
 
-jsTest.log('DONE!');
-st.stop();
+    jsTest.log('DONE!');
+    st.stop();
 
 })();

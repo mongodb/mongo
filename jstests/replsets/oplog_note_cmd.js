@@ -6,7 +6,7 @@ rs.initiate();
 
 var primary = rs.getPrimary();
 var db = primary.getDB('admin');
-db.foo.insert({a:1});
+db.foo.insert({a: 1});
 
 // Make sure "optime" field gets updated
 var statusBefore = db.runCommand({replSetGetStatus: 1});

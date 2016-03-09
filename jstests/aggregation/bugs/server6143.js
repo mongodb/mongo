@@ -18,10 +18,7 @@ load('jstests/aggregation/extras/utils.js');
 db.s6143.drop();
 
 // Populate db
-db.s6143.save({a:null});
+db.s6143.save({a: null});
 
 // Aggregate using a date expression on a null value, assert error
-assertErrorCode(db.s6143,
-                { $project : {dateConvert : {$dayOfWeek:["$a"]}}},
-                16006);
-
+assertErrorCode(db.s6143, {$project: {dateConvert: {$dayOfWeek: ["$a"]}}}, 16006);

@@ -1,4 +1,4 @@
-(function(){
+(function() {
     "use strict";
 
     // SERVER-20332 make JS NumberLong more robust

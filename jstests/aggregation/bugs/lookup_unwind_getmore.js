@@ -31,17 +31,17 @@
         aggregate: 'source',
         pipeline: [
             {
-                $lookup: {
-                    from: 'dest',
-                    localField: 'local',
-                    foreignField: 'foreign',
-                    as: 'matches',
-                }
+              $lookup: {
+                  from: 'dest',
+                  localField: 'local',
+                  foreignField: 'foreign',
+                  as: 'matches',
+              }
             },
             {
-                $unwind: {
-                    path: '$matches',
-                },
+              $unwind: {
+                  path: '$matches',
+              },
             },
         ],
         cursor: {

@@ -14,31 +14,22 @@
     }
 
     // killCursors command should fail if the collection name is not a string.
-    cmdRes = db.runCommand({
-        killCursors: {foo: "bad collection param"},
-        cursors: [NumberLong(123), NumberLong(456)]
-    });
+    cmdRes = db.runCommand(
+        {killCursors: {foo: "bad collection param"}, cursors: [NumberLong(123), NumberLong(456)]});
     assert.commandFailedWithCode(cmdRes, ErrorCodes.FailedToParse);
 
     // killCursors command should fail if the cursors parameter is not an array.
-    cmdRes = db.runCommand({
-        killCursors: coll.getName(),
-        cursors: {a: NumberLong(123), b: NumberLong(456)}
-    });
+    cmdRes = db.runCommand(
+        {killCursors: coll.getName(), cursors: {a: NumberLong(123), b: NumberLong(456)}});
     assert.commandFailedWithCode(cmdRes, ErrorCodes.FailedToParse);
 
     // killCursors command should fail if the cursors parameter is an empty array.
-    cmdRes = db.runCommand({
-        killCursors: coll.getName(),
-        cursors: []
-    });
+    cmdRes = db.runCommand({killCursors: coll.getName(), cursors: []});
     assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue);
 
     // killCursors command should report cursors as not found if the collection does not exist.
-    cmdRes = db.runCommand({
-        killCursors: "non-existent-collection",
-        cursors: [NumberLong(123), NumberLong(456)]
-    });
+    cmdRes = db.runCommand(
+        {killCursors: "non-existent-collection", cursors: [NumberLong(123), NumberLong(456)]});
     assert.commandWorked(cmdRes);
     assert.eq(cmdRes.cursorsKilled, []);
     assert.eq(cmdRes.cursorsNotFound, [NumberLong(123), NumberLong(456)]);
@@ -46,10 +37,8 @@
     assert.eq(cmdRes.cursorsUnknown, []);
 
     // killCursors command should report non-existent cursors as "not found".
-    cmdRes = db.runCommand({
-        killCursors: coll.getName(),
-        cursors: [NumberLong(123), NumberLong(456)]
-    });
+    cmdRes =
+        db.runCommand({killCursors: coll.getName(), cursors: [NumberLong(123), NumberLong(456)]});
     assert.commandWorked(cmdRes);
     assert.eq(cmdRes.cursorsKilled, []);
     assert.eq(cmdRes.cursorsNotFound, [NumberLong(123), NumberLong(456)]);
@@ -62,10 +51,7 @@
     cursorId = cmdRes.cursor.id;
     assert.neq(cursorId, NumberLong(0));
 
-    cmdRes = db.runCommand({
-        killCursors: coll.getName(),
-        cursors: [NumberLong(123), cursorId]
-    });
+    cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [NumberLong(123), cursorId]});
     assert.commandWorked(cmdRes);
     assert.eq(cmdRes.cursorsKilled, [cursorId]);
     assert.eq(cmdRes.cursorsNotFound, [NumberLong(123)]);
@@ -78,10 +64,7 @@
     cursorId = cmdRes.cursor.id;
     assert.neq(cursorId, NumberLong(0));
 
-    cmdRes = db.runCommand({
-        killCursors: coll.getName(),
-        cursors: [NumberLong(123), cursorId]
-    });
+    cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [NumberLong(123), cursorId]});
     assert.commandWorked(cmdRes);
     assert.eq(cmdRes.cursorsKilled, [cursorId]);
     assert.eq(cmdRes.cursorsNotFound, [NumberLong(123)]);
@@ -95,10 +78,8 @@
     var cleanup;
     try {
         // Enable a failpoint to ensure that the cursor remains pinned.
-        assert.commandWorked(db.adminCommand({
-            configureFailPoint: failpointName,
-            mode: "alwaysOn"
-        }));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: failpointName, mode: "alwaysOn"}));
 
         cmdRes = db.runCommand({find: coll.getName(), batchSize: 2});
         assert.commandWorked(cmdRes);
@@ -110,8 +91,8 @@
         var isMongos = (cmdRes.msg === "isdbgrid");
 
         // Pin the cursor during a getMore.
-        var code = 'db.runCommand({getMore: ' + cursorId.toString() +
-                   ', collection: "' + coll.getName() + '"});';
+        var code = 'db.runCommand({getMore: ' + cursorId.toString() + ', collection: "' +
+            coll.getName() + '"});';
         cleanup = startParallelShell(code);
 
         // Sleep to make it more likely that the cursor will be pinned.
@@ -122,10 +103,7 @@
         //
         // Currently, pinned cursors that are targeted by a killCursors operation are kept alive on
         // mongod but are killed on mongos (see SERVER-21710).
-        cmdRes = db.runCommand({
-            killCursors: coll.getName(),
-            cursors: [NumberLong(123), cursorId]
-        });
+        cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [NumberLong(123), cursorId]});
         assert.commandWorked(cmdRes);
         assert.eq(cmdRes.cursorsNotFound, [NumberLong(123)]);
         assert.eq(cmdRes.cursorsUnknown, []);
@@ -133,15 +111,13 @@
         if (isMongos) {
             assert.eq(cmdRes.cursorsKilled, [cursorId]);
             assert.eq(cmdRes.cursorsAlive, []);
-        }
-        else {
+        } else {
             // If the cursor has already been pinned it will be left alive; otherwise it will be
             // killed.
             if (cmdRes.cursorsAlive.length === 1) {
                 assert.eq(cmdRes.cursorsKilled, []);
                 assert.eq(cmdRes.cursorsAlive, [cursorId]);
-            }
-            else {
+            } else {
                 assert.eq(cmdRes.cursorsKilled, [cursorId]);
                 assert.eq(cmdRes.cursorsAlive, []);
             }

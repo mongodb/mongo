@@ -4,13 +4,12 @@
 load('jstests/libs/parallelTester.js');
 
 function client1() {
-    for(var i = 0; i < 1000; i++) {
+    for (var i = 0; i < 1000; i++) {
         db.remove_during_mr.remove({rand: {$gte: Random.rand()}}, {justOne: true});
     }
 }
 
 function client2() {
-
     function mapper() {
         emit(this.key, 1);
     }
@@ -19,7 +18,7 @@ function client2() {
         return {};
     }
 
-    for(var i = 0; i < 1000; i++) {
+    for (var i = 0; i < 1000; i++) {
         var options = {
             out: {replace: 'bar'},
             sort: {_id: -1}

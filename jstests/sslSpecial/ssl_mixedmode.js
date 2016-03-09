@@ -6,17 +6,16 @@
 load("jstests/libs/ssl_test.js");
 
 function testCombination(sslMode, sslShell, shouldSucceed) {
+    var serverOptionOverrides = {
+        sslMode: sslMode
+    };
 
-    var serverOptionOverrides = {sslMode: sslMode};
-
-    var clientOptions = sslShell ?
-            SSLTest.prototype.defaultSSLClientOptions :
-            SSLTest.prototype.noSSLClientOptions;
+    var clientOptions =
+        sslShell ? SSLTest.prototype.defaultSSLClientOptions : SSLTest.prototype.noSSLClientOptions;
 
     var fixture = new SSLTest(serverOptionOverrides, clientOptions);
 
-    print("Trying sslMode: '" + sslMode +
-          "' with sslShell = " + sslShell +
+    print("Trying sslMode: '" + sslMode + "' with sslShell = " + sslShell +
           "; expect connection to " + (shouldSucceed ? "SUCCEED" : "FAIL"));
 
     assert.eq(shouldSucceed, fixture.connectWorked());

@@ -8,20 +8,12 @@ load("jstests/libs/ssl_test.js");
 
 var testUnrevoked = new SSLTest(
     // Server option overrides
-    {
-        sslMode: "requireSSL",
-        sslCRLFile: "jstests/libs/crl.pem"
-    }
-);
+    {sslMode: "requireSSL", sslCRLFile: "jstests/libs/crl.pem"});
 
 assert(testUnrevoked.connectWorked());
 
 var testRevoked = new SSLTest(
     // Server option overrides
-    {
-        sslMode: "requireSSL",
-        sslCRLFile: "jstests/libs/crl_expired.pem"
-    }
-);
+    {sslMode: "requireSSL", sslCRLFile: "jstests/libs/crl_expired.pem"});
 
 assert(!testRevoked.connectWorked());

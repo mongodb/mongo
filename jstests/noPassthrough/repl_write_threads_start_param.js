@@ -26,13 +26,13 @@
     mongo = MongoRunner.runMongod({setParameter: 'replWriterThreadCount=24'});
     assert.neq(null, mongo, "mongod failed to start with a suitable replWriterThreadCount value");
     assert(!rawMongoProgramOutput().match("replWriterThreadCount must be between 1 and 256"),
-            "despite accepting the replWriterThreadCount value, mongod logged an error");
+           "despite accepting the replWriterThreadCount value, mongod logged an error");
 
     // getParameter to confirm the value was set
     var result = mongo.getDB("admin").runCommand({getParameter: 1, replWriterThreadCount: 1});
     assert.eq(24, result.replWriterThreadCount, "replWriterThreadCount was not set internally");
 
     // setParameter to ensure it is not possible
-    assert.commandFailed(mongo.getDB("admin").runCommand({setParameter: 1,
-                                                          replWriterThreadCount: 1}));
+    assert.commandFailed(
+        mongo.getDB("admin").runCommand({setParameter: 1, replWriterThreadCount: 1}));
 }());

@@ -9,7 +9,11 @@
     t.drop();
     t.ensureIndex({a: 1});
     t.ensureIndex({b: 1});
-    for (var i = 0; i < 20; i++) { t.insert({b: i}); }
-    for (var i = 0; i < 20; i++) { t.find({b: 1}).sort({a: 1}).next(); }
+    for (var i = 0; i < 20; i++) {
+        t.insert({b: i});
+    }
+    for (var i = 0; i < 20; i++) {
+        t.find({b: 1}).sort({a: 1}).next();
+    }
 
 }());

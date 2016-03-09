@@ -8,41 +8,44 @@
  *    'CodeWScope'.
  */
 (function() {
-"use strict";
+    "use strict";
 
-var testServer = MongoRunner.runMongod({setParameter: 'javascriptProtection=true'}),
-    db = testServer.getDB("test"),
-    t = db.foo,
-    x;
+    var testServer = MongoRunner.runMongod({setParameter: 'javascriptProtection=true'}),
+        db = testServer.getDB("test"), t = db.foo, x;
 
-function makeRoundTrip() {
-    var mongo = runMongoProgram("mongo",
-                                "--port", testServer.port,
-                                "--enableJavaScriptProtection",
-                                "--eval",
-        "var x = db.foo.findOne({'_id' : 0});" +
-        "db.foo.insertOne({'_id': 1, myFunc: x.myFunc});" +
-        "print(\"completed gracefully\");"
-    );
+    function makeRoundTrip() {
+        var mongo = runMongoProgram("mongo",
+                                    "--port",
+                                    testServer.port,
+                                    "--enableJavaScriptProtection",
+                                    "--eval",
+                                    "var x = db.foo.findOne({'_id' : 0});" +
+                                        "db.foo.insertOne({'_id': 1, myFunc: x.myFunc});" +
+                                        "print(\"completed gracefully\");");
 
-    var mongoOutput = rawMongoProgramOutput();
-    assert(!mongoOutput.match(/assert failed/));
-    assert(mongoOutput.match(/completed gracefully/));
-}
+        var mongoOutput = rawMongoProgramOutput();
+        assert(!mongoOutput.match(/assert failed/));
+        assert(mongoOutput.match(/completed gracefully/));
+    }
 
-/**
- *  ACTUAL TEST
- */
+    /**
+     *  ACTUAL TEST
+     */
 
-t.insertOne({'_id': 0, 'myFunc': function() { return 'yes'; } });
+    t.insertOne({
+        '_id': 0,
+        'myFunc': function() {
+            return 'yes';
+        }
+    });
 
-makeRoundTrip();
+    makeRoundTrip();
 
-x = t.findOne({'_id': 1});
+    x = t.findOne({'_id': 1});
 
-if (!x.myFunc() == 'yes') {
-    assert(0);
-}
+    if (!x.myFunc() == 'yes') {
+        assert(0);
+    }
 
-MongoRunner.stopMongod(testServer);
+    MongoRunner.stopMongod(testServer);
 })();

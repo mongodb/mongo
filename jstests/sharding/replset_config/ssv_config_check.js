@@ -3,70 +3,70 @@
  * replica set name, but with a member list that is not strictly the same.
  */
 (function() {
-"use strict";
+    "use strict";
 
-var st = new ShardingTest({ shards: 1 });
+    var st = new ShardingTest({shards: 1});
 
-var testDB = st.s.getDB('test');
-testDB.adminCommand({ enableSharding: 'test' });
-testDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
+    var testDB = st.s.getDB('test');
+    testDB.adminCommand({enableSharding: 'test'});
+    testDB.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 
-// Initialize version on shard.
-testDB.user.insert({ x: 1 });
+    // Initialize version on shard.
+    testDB.user.insert({x: 1});
 
-var directConn = new Mongo(st.d0.host);
-var adminDB = directConn.getDB('admin');
+    var directConn = new Mongo(st.d0.host);
+    var adminDB = directConn.getDB('admin');
 
-var configStr = adminDB.runCommand({ getShardVersion: 'test.user' }).configServer;
-var alternateConfigStr = configStr.substring(0, configStr.lastIndexOf(','));
+    var configStr = adminDB.runCommand({getShardVersion: 'test.user'}).configServer;
+    var alternateConfigStr = configStr.substring(0, configStr.lastIndexOf(','));
 
-var shardDoc = st.s.getDB('config').shards.findOne();
+    var shardDoc = st.s.getDB('config').shards.findOne();
 
-assert.commandWorked(adminDB.runCommand({
-    setShardVersion: '',
-    init: true,
-    authoritative: true,
-    configdb: alternateConfigStr,
-    shard: shardDoc._id,
-    shardHost: shardDoc.host
-}));
+    assert.commandWorked(adminDB.runCommand({
+        setShardVersion: '',
+        init: true,
+        authoritative: true,
+        configdb: alternateConfigStr,
+        shard: shardDoc._id,
+        shardHost: shardDoc.host
+    }));
 
-assert.commandFailed(adminDB.runCommand({
-    setShardVersion: '',
-    init: true,
-    authoritative: true,
-    configdb: 'bad-rs/local:12,local:34',
-    shard: shardDoc._id,
-    shardHost: shardDoc.host
-}));
+    assert.commandFailed(adminDB.runCommand({
+        setShardVersion: '',
+        init: true,
+        authoritative: true,
+        configdb: 'bad-rs/local:12,local:34',
+        shard: shardDoc._id,
+        shardHost: shardDoc.host
+    }));
 
-var configAdmin = st.c0.getDB('admin');
-// Initialize internal config string.
-assert.commandWorked(configAdmin.runCommand({
-    setShardVersion: '',
-    init: true,
-    authoritative: true,
-    configdb: configStr,
-    shard: 'config'
-}));
+    var configAdmin = st.c0.getDB('admin');
+    // Initialize internal config string.
+    assert.commandWorked(configAdmin.runCommand({
+        setShardVersion: '',
+        init: true,
+        authoritative: true,
+        configdb: configStr,
+        shard: 'config'
+    }));
 
-// Passing configdb that does not match initialized value is not ok.
-assert.commandFailed(configAdmin.runCommand({
-    setShardVersion: '',
-    init: true,
-    authoritative: true,
-    configdb: 'bad-rs/local:12,local:34',
-    shard: 'config'
-}));
+    // Passing configdb that does not match initialized value is not ok.
+    assert.commandFailed(configAdmin.runCommand({
+        setShardVersion: '',
+        init: true,
+        authoritative: true,
+        configdb: 'bad-rs/local:12,local:34',
+        shard: 'config'
+    }));
 
-// Passing configdb that matches initialized value is ok.
-assert.commandWorked(configAdmin.runCommand({
-    setShardVersion: '',
-    init: true,
-    authoritative: true,
-    configdb: alternateConfigStr,
-    shard: 'config'
-}));
+    // Passing configdb that matches initialized value is ok.
+    assert.commandWorked(configAdmin.runCommand({
+        setShardVersion: '',
+        init: true,
+        authoritative: true,
+        configdb: alternateConfigStr,
+        shard: 'config'
+    }));
 
-st.stop();
+    st.stop();
 })();

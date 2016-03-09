@@ -7,7 +7,9 @@ var conn = null;
 
 function checkNoJournalFiles(path, pass) {
     var files = listFiles(path);
-    if (files.some(function (f) { return f.name.indexOf("prealloc") < 0; })) {
+    if (files.some(function(f) {
+            return f.name.indexOf("prealloc") < 0;
+        })) {
         if (pass == null) {
             // wait a bit longer for mongod to potentially finish if it is still running.
             sleep(10000);
@@ -42,33 +44,33 @@ function runDiff(a, b) {
 
 function log(str) {
     print();
-    if(str)
-        print(testname+" step " + step++ + " " + str);
+    if (str)
+        print(testname + " step " + step++ + " " + str);
     else
-        print(testname+" step " + step++);
+        print(testname + " step " + step++);
 }
 
 function verify() {
     log("verify");
     var d = conn.getDB("local");
-    var mycount = d.oplog.$main.find({ "o.z": 3 }).count();
+    var mycount = d.oplog.$main.find({"o.z": 3}).count();
     print(mycount);
     assert(mycount == 3, "oplog doesnt match");
 }
 
-// if you do inserts here, you will want to set _id.  otherwise they won't match on different 
+// if you do inserts here, you will want to set _id.  otherwise they won't match on different
 // runs so we can't do a binary diff of the resulting files to check they are consistent.
 function work() {
     log("work");
     var d = conn.getDB("test");
-    var q = conn.getDB("testq"); // use tewo db's to exercise JDbContext a bit.
-    d.foo.insert({ _id: 3, x: 22 });
-    d.foo.insert({ _id: 4, x: 22 });
-    q.foo.insert({ _id: 4, x: 22 });
-    d.a.insert({ _id: 3, x: 22, y: [1, 2, 3] });
-    q.a.insert({ _id: 3, x: 22, y: [1, 2, 3] });
-    d.a.insert({ _id: 4, x: 22, y: [1, 2, 3] });
-    d.a.update({ _id: 4 }, { $inc: { x: 1} });
+    var q = conn.getDB("testq");  // use tewo db's to exercise JDbContext a bit.
+    d.foo.insert({_id: 3, x: 22});
+    d.foo.insert({_id: 4, x: 22});
+    q.foo.insert({_id: 4, x: 22});
+    d.a.insert({_id: 3, x: 22, y: [1, 2, 3]});
+    q.a.insert({_id: 3, x: 22, y: [1, 2, 3]});
+    d.a.insert({_id: 4, x: 22, y: [1, 2, 3]});
+    d.a.update({_id: 4}, {$inc: {x: 1}});
     // OpCode_ObjCopy fires on larger operations so make one that isn't tiny
     var big = "axxxxxxxxxxxxxxb";
     big = big + big;
@@ -76,19 +78,20 @@ function work() {
     big = big + big;
     big = big + big;
     big = big + big;
-    d.foo.insert({ _id: 5, q: "aaaaa", b: big, z: 3 });
-    q.foo.insert({ _id: 5, q: "aaaaa", b: big, z: 3 });
-    d.foo.insert({ _id: 6, q: "aaaaa", b: big, z: 3 });
-    d.foo.update({ _id: 5 }, { $set: { z: 99} });
+    d.foo.insert({_id: 5, q: "aaaaa", b: big, z: 3});
+    q.foo.insert({_id: 5, q: "aaaaa", b: big, z: 3});
+    d.foo.insert({_id: 6, q: "aaaaa", b: big, z: 3});
+    d.foo.update({_id: 5}, {$set: {z: 99}});
 
     log("endwork");
 
     verify();
 }
 
-if( debugging ) {
+if (debugging) {
     // mongod already running in debugger
-    print("DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN mongo --nodb FOR REGULAR TEST BEHAVIOR");
+    print(
+        "DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN mongo --nodb FOR REGULAR TEST BEHAVIOR");
     conn = db.getMongo();
     work();
     sleep(30000);
@@ -98,43 +101,48 @@ if( debugging ) {
 log();
 
 // directories
-var path1 = MongoRunner.dataPath + testname+"nodur";
-var path2 = MongoRunner.dataPath + testname+"dur";
+var path1 = MongoRunner.dataPath + testname + "nodur";
+var path2 = MongoRunner.dataPath + testname + "dur";
 
 // non-durable version
 log();
-conn = MongoRunner.runMongod({dbpath: path1, nojournal: "", smallfiles: "", master: "", oplogSize: 64});
+conn = MongoRunner.runMongod(
+    {dbpath: path1, nojournal: "", smallfiles: "", master: "", oplogSize: 64});
 work();
 MongoRunner.stopMongod(conn);
 
 // durable version
 log();
-conn = MongoRunner.runMongod({dbpath: path2,
-                              journal: "",
-                              smallfiles: "",
-                              journalOptions: 8 /*DurParanoid*/,
-                              master: "",
-                              oplogSize: 64});
+conn = MongoRunner.runMongod({
+    dbpath: path2,
+    journal: "",
+    smallfiles: "",
+    journalOptions: 8 /*DurParanoid*/,
+    master: "",
+    oplogSize: 64
+});
 work();
 
 // wait for group commit.
-printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
+printjson(conn.getDB('admin').runCommand({getlasterror: 1, fsync: 1}));
 
 // kill the process hard
-MongoRunner.stopMongod(conn, /*signal*/9);
+MongoRunner.stopMongod(conn, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 
 // restart and recover
 log();
-conn = MongoRunner.runMongod({restart: true,
-                              cleanData: false,
-                              dbpath: path2,
-                              journal: "",
-                              smallfiles: "",
-                              journalOptions: 8,
-                              master: "",
-                              oplogSize: 64});
+conn = MongoRunner.runMongod({
+    restart: true,
+    cleanData: false,
+    dbpath: path2,
+    journal: "",
+    smallfiles: "",
+    journalOptions: 8,
+    master: "",
+    oplogSize: 64
+});
 verify();
 
 log("stop");

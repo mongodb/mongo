@@ -1,5 +1,5 @@
 // SERVER-18222: Add $isArray aggregation expression.
-(function (){
+(function() {
     'use strict';
     var coll = db.is_array_expr;
     coll.drop();
@@ -20,13 +20,8 @@
     assert.writeOK(coll.insert({_id: 10, x: ['0']}));
 
     // Project field is_array to represent whether the field x was an array.
-    var results = coll.aggregate([{$sort: {_id: 1}},
-                                  {
-                                      $project: {
-                                          isArray: {$isArray: '$x'}
-                                      }
-                                  },
-                                 ]).toArray();
+    var results =
+        coll.aggregate([{$sort: {_id: 1}}, {$project: {isArray: {$isArray: '$x'}}}, ]).toArray();
     var expectedResults = [
         {_id: 0, isArray: false},
         {_id: 1, isArray: false},

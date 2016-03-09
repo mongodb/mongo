@@ -64,15 +64,15 @@ load('jstests/aggregation/extras/utils.js');
 
     // $pow -- if either input is a double return a double.
     testOp({$pow: [10, 2]}, 100);
-    testOp({$pow: [1/2, -1]}, 2);
+    testOp({$pow: [1 / 2, -1]}, 2);
     testOp({$pow: [-2, 2]}, 4);
     testOp({$pow: [NumberInt("2"), 2]}, 4);
     testOp({$pow: [-2, NumberInt("2")]}, 4);
 
     // If exponent is negative and base not -1, 0, or 1, return a double.
-    testOp({$pow: [NumberLong("2"), NumberLong("-1")]}, 1/2);
-    testOp({$pow: [NumberInt("4"), NumberInt("-1")]}, 1/4);
-    testOp({$pow: [NumberInt("4"), NumberLong("-1")]}, 1/4);
+    testOp({$pow: [NumberLong("2"), NumberLong("-1")]}, 1 / 2);
+    testOp({$pow: [NumberInt("4"), NumberInt("-1")]}, 1 / 4);
+    testOp({$pow: [NumberInt("4"), NumberLong("-1")]}, 1 / 4);
     testOp({$pow: [NumberInt("1"), NumberLong("-2")]}, NumberLong("1"));
     testOp({$pow: [NumberInt("-1"), NumberLong("-2")]}, NumberLong("1"));
 
@@ -92,15 +92,15 @@ load('jstests/aggregation/extras/utils.js');
     testOp({$pow: [NumberInt("4"), NumberInt("2")]}, 16);
 
     // $exp always returns doubles, since e is a double.
-    testOp({$exp: [NumberInt("-1")]}, 1/Math.E);
+    testOp({$exp: [NumberInt("-1")]}, 1 / Math.E);
     testOp({$exp: [NumberLong("1")]}, Math.E);
     // Null input results in null.
     testOp({$pow: [null, 2]}, null);
-    testOp({$pow: [1/2, null]}, null);
+    testOp({$pow: [1 / 2, null]}, null);
     testOp({$exp: [null]}, null);
     // NaN input results in NaN.
     testOp({$pow: [NaN, 2]}, NaN);
-    testOp({$pow: [1/2, NaN]}, NaN);
+    testOp({$pow: [1 / 2, NaN]}, NaN);
     testOp({$exp: [NaN]}, NaN);
 
     // Invalid inputs - non-numeric/non-null types, or 0 to a negative exponent.

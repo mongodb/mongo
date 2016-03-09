@@ -7,7 +7,7 @@
  * command against it, specifying a different database name in the namespace.
  * Inserts documents into the "to" namespace and specifies dropTarget=true.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropDatabases
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropDatabases
 
 var $config = (function() {
 
@@ -80,8 +80,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { rename: 1 },
-        rename: { rename: 1 }
+        init: {rename: 1},
+        rename: {rename: 1}
     };
 
     function teardown(db, collName, cluster) {

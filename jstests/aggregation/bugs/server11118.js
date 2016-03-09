@@ -9,15 +9,9 @@ function testFormat(date, formatStr, expectedStr) {
     db.dates.drop();
     db.dates.insert({date: date});
 
-    var res = db.dates.aggregate([{$project: {
-        _id: 0,
-        formatted: {
-            $dateToString: {
-                format: formatStr,
-                date: "$date"
-            }
-        }
-    }}]).toArray();
+    var res = db.dates.aggregate([{
+        $project: {_id: 0, formatted: {$dateToString: {format: formatStr, date: "$date"}}}
+    }]).toArray();
 
     assert.eq(res[0].formatted, expectedStr);
 }
@@ -27,21 +21,16 @@ function testFormatError(formatObj, errCode) {
     db.dates.drop();
     db.dates.insert({tm: ISODate()});
 
-    assertErrorCode(db.dates, {$project: {
-        _id: 0,
-        formatted: {
-            $dateToString: formatObj
-    }}}, errCode);
+    assertErrorCode(db.dates, {$project: {_id: 0, formatted: {$dateToString: formatObj}}}, errCode);
 }
 
 // Used to verify that only date values are accepted for date parameter
 function testDateValueError(dateVal, errCode) {
-  db.dates.drop();
-  db.dates.insert({date: dateVal});
+    db.dates.drop();
+    db.dates.insert({date: dateVal});
 
-  assertErrorCode(db.dates, { $project:
-    { formatted: { $dateToString : { format: "%Y", date: "$date" }} }
-  }, errCode);
+    assertErrorCode(
+        db.dates, {$project: {formatted: {$dateToString: {format: "%Y", date: "$date"}}}}, errCode);
 }
 
 var now = ISODate();
@@ -50,16 +39,15 @@ var now = ISODate();
 testFormat(now,
            "%%-%Y-%m-%d-%H-%M-%S-%L",
            [
-               "%",
-               now.getUTCFullYear().zeroPad(4),
-               (now.getUTCMonth() + 1).zeroPad(2),
-               now.getUTCDate().zeroPad(2),
-               now.getUTCHours().zeroPad(2),
-               now.getUTCMinutes().zeroPad(2),
-               now.getUTCSeconds().zeroPad(2),
-               now.getUTCMilliseconds().zeroPad(3)
+             "%",
+             now.getUTCFullYear().zeroPad(4),
+             (now.getUTCMonth() + 1).zeroPad(2),
+             now.getUTCDate().zeroPad(2),
+             now.getUTCHours().zeroPad(2),
+             now.getUTCMinutes().zeroPad(2),
+             now.getUTCSeconds().zeroPad(2),
+             now.getUTCMilliseconds().zeroPad(3)
            ].join("-"));
-
 
 // Padding tests
 var padme = ISODate("2001-02-03T04:05:06.007Z");
@@ -77,16 +65,16 @@ testFormat(padme, "%L", padme.getUTCMilliseconds().zeroPad(3));
 testFormat(now,
            "%d%d***%d***%d**%d*%d",
            [
-               now.getUTCDate().zeroPad(2),
-               now.getUTCDate().zeroPad(2),
-               "***",
-               now.getUTCDate().zeroPad(2),
-               "***",
-               now.getUTCDate().zeroPad(2),
-               "**",
-               now.getUTCDate().zeroPad(2),
-               "*",
-               now.getUTCDate().zeroPad(2)
+             now.getUTCDate().zeroPad(2),
+             now.getUTCDate().zeroPad(2),
+             "***",
+             now.getUTCDate().zeroPad(2),
+             "***",
+             now.getUTCDate().zeroPad(2),
+             "**",
+             now.getUTCDate().zeroPad(2),
+             "*",
+             now.getUTCDate().zeroPad(2)
            ].join(""));
 
 // JS doesn't have equivalents of these format specifiers
@@ -105,17 +93,17 @@ testFormatError({format: "%Y", date: "$date", extra: "whyamIhere"}, 18534);
 testFormatError(["%Y", "$date"], 18629);
 
 // Use invalid modifier at middle of string
-testFormatError({format:"%Y-%q", date: "$date"}, 18536);
+testFormatError({format: "%Y-%q", date: "$date"}, 18536);
 
 // Odd number of percent signs at end
-testFormatError({format: "%U-%w-%j-%%%", date:"$date"}, 18535);
+testFormatError({format: "%U-%w-%j-%%%", date: "$date"}, 18535);
 
 // Odd number of percent signs at middle
 // will get interpreted as an invalid modifier since it will try to use '%A'
-testFormatError({format: "AAAAA%%%AAAAAA", date:"$date"}, 18536);
+testFormatError({format: "AAAAA%%%AAAAAA", date: "$date"}, 18536);
 
 // Format parameter not a string
-testFormatError({format: {iamalion: "roar"}, date:"$date"}, 18533);
+testFormatError({format: {iamalion: "roar"}, date: "$date"}, 18533);
 
 ///
 /// Additional Tests
@@ -126,7 +114,7 @@ var date = ISODate("1999-08-29");
 
 testFormat(date, "%%d", "%d");
 
-//A very long string of "%"s
+// A very long string of "%"s
 var longstr = Array(1000).join("%%");
 var halfstr = Array(1000).join("%");
 testFormat(date, longstr, halfstr);

@@ -1,16 +1,18 @@
 // FTDC test cases
 //
-(function () {
+(function() {
     'use strict';
-    var admin = db.getSiblingDB( "admin" );
+    var admin = db.getSiblingDB("admin");
 
     // Check the defaults are correct
     //
     function getparam(field) {
-        var q = { getParameter : 1 };
+        var q = {
+            getParameter: 1
+        };
         q[field] = 1;
 
-        var ret = admin.runCommand( q );
+        var ret = admin.runCommand(q);
         return ret[field];
     }
 
@@ -23,7 +25,7 @@
     assert.eq(getparam("diagnosticDataCollectionSamplesPerInterimUpdate"), 10);
 
     function setparam(obj) {
-        var ret = admin.runCommand( Object.extend({ setParameter : 1 }, obj));
+        var ret = admin.runCommand(Object.extend({setParameter: 1}, obj));
         return ret;
     }
 
@@ -55,4 +57,4 @@
     assert.commandWorked(setparam({"diagnosticDataCollectionPeriodMillis": 1000}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerChunk": 300}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 10}));
-}) ();
+})();

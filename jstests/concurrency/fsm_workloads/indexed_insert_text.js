@@ -28,13 +28,13 @@ var $config = (function() {
             if (Array.isArray(snippet)) {
                 snippet = snippet.join(' ');
             }
-            assertWhenOwnColl.gt(db[collName].find({ $text: { $search: snippet } }).itcount(), 0);
+            assertWhenOwnColl.gt(db[collName].find({$text: {$search: snippet}}).itcount(), 0);
         }
     };
 
     var transitions = {
-        init: { insert: 1 },
-        insert: { insert: 1 }
+        init: {insert: 1},
+        insert: {insert: 1}
     };
 
     function setup(db, collName, cluster) {

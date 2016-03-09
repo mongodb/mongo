@@ -20,7 +20,7 @@
     assert.eq(1, cursor.next()["_id"]);
 
     // Force a document move (on MMAP) while the query is yielded for a getMore.
-    var bigString = Array(1024*1024).toString();
+    var bigString = Array(1024 * 1024).toString();
     assert.writeOK(coll.update({_id: 1}, {$set: {padding: bigString}}));
 
     assert.eq(2, cursor.next()["_id"]);

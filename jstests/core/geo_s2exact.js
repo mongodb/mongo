@@ -10,12 +10,20 @@ function test(geometry) {
     t.dropIndex({geo: "2dsphere"});
 }
 
-pointA = { "type" : "Point", "coordinates": [ 40, 5 ] };
+pointA = {
+    "type": "Point",
+    "coordinates": [40, 5]
+};
 test(pointA);
 
-someline = { "type" : "LineString", "coordinates": [ [ 40, 5], [41, 6]]};
+someline = {
+    "type": "LineString",
+    "coordinates": [[40, 5], [41, 6]]
+};
 test(someline);
 
-somepoly = { "type" : "Polygon",
-             "coordinates" : [ [ [40,5], [40,6], [41,6], [41,5], [40,5]]]};
+somepoly = {
+    "type": "Polygon",
+    "coordinates": [[[40, 5], [40, 6], [41, 6], [41, 5], [40, 5]]]
+};
 test(somepoly);

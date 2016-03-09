@@ -11,10 +11,6 @@ var geoJSONPoint = {
     coordinates: [0, 0]
 };
 
-print(assert.throws(
-    function() {
-        t.findOne({
-             loc: {$near: {$geometry: geoJSONPoint}}});
-    },
-    [],
-    'querying 2d index with GeoJSON point.'));
+print(assert.throws(function() {
+    t.findOne({loc: {$near: {$geometry: geoJSONPoint}}});
+}, [], 'querying 2d index with GeoJSON point.'));

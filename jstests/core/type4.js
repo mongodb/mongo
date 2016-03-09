@@ -1,4 +1,4 @@
-(function(){
+(function() {
     "use strict";
 
     // Tests for SERVER-20080
@@ -13,16 +13,16 @@
 
     var oldReadMode = db.getMongo().readMode();
 
-    assert.throws(function(){
+    assert.throws(function() {
         (new _rand())();
     }, [], "invoke constructor on natively injected function");
 
-    assert.throws(function(){
-          var doc = db.test.findOne();
-          new doc();
+    assert.throws(function() {
+        var doc = db.test.findOne();
+        new doc();
     }, [], "invoke constructor on BSON");
 
-    assert.throws(function(){
+    assert.throws(function() {
         db.getMongo().forceReadMode("commands");
         var cursor = t.find();
         cursor.next();
@@ -30,7 +30,7 @@
         new cursor._cursor._cursorHandle();
     }, [], "invoke constructor on CursorHandle");
 
-    assert.throws(function(){
+    assert.throws(function() {
         db.getMongo().forceReadMode("legacy");
         var cursor = t.find();
         cursor.next();

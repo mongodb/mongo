@@ -8,7 +8,9 @@ var conn = null;
 
 function checkNoJournalFiles(path, pass) {
     var files = listFiles(path);
-    if (files.some(function (f) { return f.name.indexOf("prealloc") < 0; })) {
+    if (files.some(function(f) {
+            return f.name.indexOf("prealloc") < 0;
+        })) {
         if (pass == null) {
             // wait a bit longer for mongod to potentially finish if it is still running.
             sleep(10000);
@@ -48,22 +50,22 @@ function log(str) {
         print("\n" + testname + " step " + step++);
 }
 
-// if you do inserts here, you will want to set _id.  otherwise they won't match on different 
+// if you do inserts here, you will want to set _id.  otherwise they won't match on different
 // runs so we can't do a binary diff of the resulting files to check they are consistent.
 function work() {
     log("work (add data, drop database)");
 
     var e = conn.getDB("teste");
-    e.foo.insert({ _id: 99 });
+    e.foo.insert({_id: 99});
 
     var d = conn.getDB("test");
-    d.foo.insert({ _id: 3, x: 22 });
-    d.bar.insert({ _id: 3, x: 22 });
+    d.foo.insert({_id: 3, x: 22});
+    d.bar.insert({_id: 3, x: 22});
 
     d.dropDatabase();
 
     // assure writes applied in case we kill -9 on return from this function
-    assert.writeOK(d.foo.insert({ _id: 100 }, { writeConcern: { fsync: 1 }}));
+    assert.writeOK(d.foo.insert({_id: 100}, {writeConcern: {fsync: 1}}));
 }
 
 function verify() {
@@ -71,10 +73,10 @@ function verify() {
     var d = conn.getDB("test");
     var count = d.foo.count();
     if (count != 1) {
-	    print("going to fail, test.foo.count() != 1 in verify()"); 
-        sleep(10000); // easier to read the output this way
+        print("going to fail, test.foo.count() != 1 in verify()");
+        sleep(10000);  // easier to read the output this way
         print("\n\n\ndropdb.js FAIL test.foo.count() should be 1 but is : " + count);
-	    print(d.foo.count() + "\n\n\n");
+        print(d.foo.count() + "\n\n\n");
         assert(false);
     }
     assert(d.foo.findOne()._id == 100, "100");
@@ -86,11 +88,11 @@ function verify() {
     var testecount = teste.foo.count();
     if (testecount != 1) {
         print("going to fail, teste.foo.count() != 1 in verify()");
-        sleep(10000); // easier to read the output this way
+        sleep(10000);  // easier to read the output this way
         print("\n\n\ndropdb.js FAIL teste.foo.count() should be 1 but is : " + testecount);
         print("\n\n\n");
         assert(false);
-    } 
+    }
     print("teste.foo.count() = " + teste.foo.count());
     assert(teste.foo.findOne()._id == 99, "teste");
 }
@@ -123,7 +125,7 @@ verify();
 
 // kill the process hard
 log("kill 9");
-MongoRunner.stopMongod(conn.port, /*signal*/9);
+MongoRunner.stopMongod(conn.port, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 
@@ -133,12 +135,14 @@ removeFile(path2 + "/test.0");
 removeFile(path2 + "/lsn");
 
 log("restart and recover");
-conn = MongoRunner.runMongod({restart: true,
-                              cleanData: false,
-                              dbpath: path2,
-                              journal: "",
-                              smallfiles: "",
-                              journalOptions: 9});
+conn = MongoRunner.runMongod({
+    restart: true,
+    cleanData: false,
+    dbpath: path2,
+    journal: "",
+    smallfiles: "",
+    journalOptions: 9
+});
 
 log("verify after recovery");
 verify();
@@ -170,4 +174,3 @@ assert(diff == "", "error test.0 files differ");
 log("check data matches done");
 
 print(testname + " SUCCESS");
-

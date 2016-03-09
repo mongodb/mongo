@@ -7,25 +7,25 @@
 // expected number of times before stopping.
 //
 function cleanupOrphaned(shardConnection, ns, expectedIterations) {
-    var admin = shardConnection.getDB('admin'),
-        result = admin.runCommand({cleanupOrphaned: ns}),
+    var admin = shardConnection.getDB('admin'), result = admin.runCommand({cleanupOrphaned: ns}),
         iterations = 1;
 
-    if (!result.ok) { printjson(result); }
+    if (!result.ok) {
+        printjson(result);
+    }
     assert(result.ok);
     while (result.stoppedAtKey) {
-        result = admin.runCommand({
-            cleanupOrphaned: ns,
-            startingFromKey: result.stoppedAtKey
-        });
+        result = admin.runCommand({cleanupOrphaned: ns, startingFromKey: result.stoppedAtKey});
 
         assert(result.ok);
         ++iterations;
     }
 
-    assert.eq(iterations, expectedIterations, 'Expected to run ' +
-        'cleanupOrphaned' + expectedIterations + ' times, but it only ran ' +
-        iterations + ' times before stoppedAtKey was null.');
+    assert.eq(iterations,
+              expectedIterations,
+              'Expected to run ' +
+                  'cleanupOrphaned' + expectedIterations + ' times, but it only ran ' + iterations +
+                  ' times before stoppedAtKey was null.');
 }
 
 // Shards data from key range, then inserts orphan documents, runs cleanupOrphans
@@ -38,45 +38,32 @@ function cleanupOrphaned(shardConnection, ns, expectedIterations) {
 function testCleanupOrphaned(options) {
     var st = new ShardingTest({shards: 2, mongos: 2});
 
-    var mongos = st.s0,
-        admin = mongos.getDB('admin'),
+    var mongos = st.s0, admin = mongos.getDB('admin'),
         shards = mongos.getCollection('config.shards').find().toArray(),
         coll = mongos.getCollection('foo.bar'),
-        shard0Coll = st.shard0.getCollection(coll.getFullName()),
-        keys = options.keyGen(),
-        beginning = keys[0],
-        oneQuarter = keys[Math.round(keys.length / 4)],
+        shard0Coll = st.shard0.getCollection(coll.getFullName()), keys = options.keyGen(),
+        beginning = keys[0], oneQuarter = keys[Math.round(keys.length / 4)],
         middle = keys[Math.round(keys.length / 2)],
         threeQuarters = keys[Math.round(3 * keys.length / 4)];
 
-    assert.commandWorked(admin.runCommand({
-        enableSharding: coll.getDB().getName()
-    }));
+    assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}));
 
-    printjson( admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._id }) );
+    printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: shards[0]._id}));
 
-    assert.commandWorked(admin.runCommand({
-        shardCollection: coll.getFullName(),
-        key: options.shardKey
-    }));
+    assert.commandWorked(
+        admin.runCommand({shardCollection: coll.getFullName(), key: options.shardKey}));
 
     st.printShardingStatus();
 
     jsTest.log('Inserting some regular docs...');
 
-    assert.commandWorked(admin.runCommand({
-        split: coll.getFullName(),
-        middle: middle
-    }));
+    assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: middle}));
 
-    assert.commandWorked(admin.runCommand({
-        moveChunk: coll.getFullName(),
-        find: middle,
-        to: shards[1]._id,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: coll.getFullName(), find: middle, to: shards[1]._id, _waitForDelete: true}));
 
-    for (var i = 0; i < keys.length; i++) coll.insert(keys[i]);
+    for (var i = 0; i < keys.length; i++)
+        coll.insert(keys[i]);
     assert.eq(null, coll.getDB().getLastError());
 
     // Half of the data is on each shard:
@@ -105,10 +92,7 @@ function testCleanupOrphaned(options) {
 
     jsTest.log('Moving half the data out again (making a hole)...');
 
-    assert.commandWorked(admin.runCommand({
-        split: coll.getFullName(),
-        middle: oneQuarter
-    }));
+    assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: oneQuarter}));
 
     assert.commandWorked(admin.runCommand({
         moveChunk: coll.getFullName(),

@@ -8,7 +8,9 @@ coll.drop();
 assert.writeOK(coll.insert({_id: 0, a: "The Quick Brown Fox Jumps Over The Lazy Dog"}));
 assert.commandWorked(coll.ensureIndex({a: "text"}));
 
-assert.throws(function() { queryIDS(coll, "hello", null, {$caseSensitive: "invalid"}); });
+assert.throws(function() {
+    queryIDS(coll, "hello", null, {$caseSensitive: "invalid"});
+});
 
 assert.eq([0], queryIDS(coll, "The quick Brown", null, {$caseSensitive: true}));
 assert.eq([0], queryIDS(coll, "Jumped", null, {$caseSensitive: true}));

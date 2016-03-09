@@ -5,7 +5,7 @@
     'use strict';
 
     function checkForLogOpRollback(coll) {
-        var res = coll.runCommand({ getLog: 'global' });
+        var res = coll.runCommand({getLog: 'global'});
         assert.commandWorked(res);
 
         for (var i = res.log.length - 1; i >= 0; i--) {
@@ -30,15 +30,14 @@
 
         // must be in 'legacy' or 'compatibility' mode
         db.getMongo().forceWriteMode('compatibility');
-        var res = coll.insert({ _id: new Array(1025).join('x') });
+        var res = coll.insert({_id: new Array(1025).join('x')});
 
         assert(res.hasWriteError());
         // ErrorCodes::KeyTooLong == 17280
         assert.eq(17280, res.getWriteError().code);
 
         assert(checkForLogOpRollback(coll));
-    }
-    finally {
+    } finally {
         db.getMongo().forceWriteMode(prevWriteMode);
         db.setLogLevel(prevVerbosityLevel);
     }

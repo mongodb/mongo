@@ -3,15 +3,14 @@
  */
 
 function assertUsersAndRolesHaveRole(admin, role) {
-    admin.system.users.find().forEach( function(doc) {
-                                           assert.eq(1, doc.roles.length);
-                                           assert.eq(role, doc.roles[0].role);
-                                       });
-    admin.system.roles.find().forEach( function(doc) {
-                                           assert.eq(1, doc.roles.length);
-                                           assert.eq(role, doc.roles[0].role);
-                                       });
-
+    admin.system.users.find().forEach(function(doc) {
+        assert.eq(1, doc.roles.length);
+        assert.eq(role, doc.roles[0].role);
+    });
+    admin.system.roles.find().forEach(function(doc) {
+        assert.eq(1, doc.roles.length);
+        assert.eq(role, doc.roles[0].role);
+    });
 }
 function runTest(conn) {
     var db = conn.getDB('test');
@@ -25,8 +24,12 @@ function runTest(conn) {
 
     // Move the newly created users/roles to the temp collections to be used later by
     // _mergeAuthzCollections
-    admin.system.users.find().forEach(function (doc) { admin.tempusers.insert(doc); });
-    admin.system.roles.find().forEach(function (doc) { admin.temproles.insert(doc); });
+    admin.system.users.find().forEach(function(doc) {
+        admin.tempusers.insert(doc);
+    });
+    admin.system.roles.find().forEach(function(doc) {
+        admin.temproles.insert(doc);
+    });
 
     admin.system.users.remove({});
     admin.system.roles.remove({});
@@ -44,11 +47,13 @@ function runTest(conn) {
     assertUsersAndRolesHaveRole(admin, "readWrite");
 
     jsTestLog("Overriding existing system.users and system.roles collections");
-    assert.commandWorked(admin.runCommand({_mergeAuthzCollections: 1,
-                                           tempUsersCollection: 'admin.tempusers',
-                                           tempRolesCollection: 'admin.temproles',
-                                           db: "",
-                                           drop: true}));
+    assert.commandWorked(admin.runCommand({
+        _mergeAuthzCollections: 1,
+        tempUsersCollection: 'admin.tempusers',
+        tempRolesCollection: 'admin.temproles',
+        db: "",
+        drop: true
+    }));
 
     assert.eq(2, admin.system.users.count());
     assert.eq(2, admin.system.roles.count());
@@ -68,17 +73,17 @@ function runTest(conn) {
     assertUsersAndRolesHaveRole(admin, "read");
 
     jsTestLog("Adding users/roles from temp collections to the existing users/roles");
-    assert.commandWorked(admin.runCommand({_mergeAuthzCollections: 1,
-                                           tempUsersCollection: 'admin.tempusers',
-                                           tempRolesCollection: 'admin.temproles',
-                                           db: "",
-                                           drop: false}));
-
+    assert.commandWorked(admin.runCommand({
+        _mergeAuthzCollections: 1,
+        tempUsersCollection: 'admin.tempusers',
+        tempRolesCollection: 'admin.temproles',
+        db: "",
+        drop: false
+    }));
 
     assert.eq(4, admin.system.users.count());
     assert.eq(4, admin.system.roles.count());
     assertUsersAndRolesHaveRole(admin, "read");
-
 
     jsTestLog("Make sure adding duplicate users/roles fails to change anything if 'drop' is false");
 
@@ -96,11 +101,13 @@ function runTest(conn) {
     assertUsersAndRolesHaveRole(admin, "readWrite");
 
     // This should succeed but have no effect as every user/role it tries to restore already exists
-    assert.commandWorked(admin.runCommand({_mergeAuthzCollections: 1,
-                                           tempUsersCollection: 'admin.tempusers',
-                                           tempRolesCollection: 'admin.temproles',
-                                           db: "",
-                                           drop: false}));
+    assert.commandWorked(admin.runCommand({
+        _mergeAuthzCollections: 1,
+        tempUsersCollection: 'admin.tempusers',
+        tempRolesCollection: 'admin.temproles',
+        db: "",
+        drop: false
+    }));
 
     assert.eq(2, admin.system.users.count());
     assert.eq(2, admin.system.roles.count());
@@ -113,6 +120,6 @@ runTest(conn);
 MongoRunner.stopMongod(conn.port);
 
 jsTest.log('Test sharding');
-var st = new ShardingTest({ shards: 2, config: 3 });
+var st = new ShardingTest({shards: 2, config: 3});
 runTest(st.s);
 st.stop();

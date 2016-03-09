@@ -10,7 +10,7 @@
  *
  * Uses an ordered, bulk operation to perform the updates.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMMAPv1 and isMongod
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMMAPv1 and isMongod
 
 var $config = (function() {
 
@@ -20,12 +20,14 @@ var $config = (function() {
         },
 
         update: function update(db, collName) {
-            var updateDoc = { $inc: {} };
+            var updateDoc = {
+                $inc: {}
+            };
             updateDoc.$inc[this.fieldName] = 1;
 
             var bulk = db[collName].initializeOrderedBulkOp();
             for (var i = 0; i < this.docCount; ++i) {
-                bulk.find({ _id: i }).update(updateDoc);
+                bulk.find({_id: i}).update(updateDoc);
             }
             var result = bulk.execute();
             // TODO: this actually does assume that there are no unique indexes.
@@ -64,15 +66,15 @@ var $config = (function() {
     };
 
     var transitions = {
-        init: { update: 1 },
-        update: { find: 1 },
-        find: { update: 1 }
+        init: {update: 1},
+        update: {find: 1},
+        find: {update: 1}
     };
 
     function setup(db, collName, cluster) {
         this.count = 0;
         for (var i = 0; i < this.docCount; ++i) {
-            db[collName].insert({ _id: i });
+            db[collName].insert({_id: i});
         }
     }
 
@@ -82,9 +84,7 @@ var $config = (function() {
         states: states,
         transitions: transitions,
         setup: setup,
-        data: {
-            docCount: 15
-        }
+        data: {docCount: 15}
     };
 
 })();

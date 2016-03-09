@@ -23,7 +23,7 @@ var $config = (function() {
 
         var bulk = coll.initializeUnorderedBulkOp();
         for (var i = 0; i < 1000; ++i) {
-            bulk.insert({ a: 1, b: Random.rand() });
+            bulk.insert({a: 1, b: Random.rand()});
         }
         var res = bulk.execute();
         assertAlways.writeOK(res);
@@ -31,8 +31,8 @@ var $config = (function() {
         // Create two indexes to force plan caching: The {a: 1} index is
         // cached by the query planner because we query on a single value
         // of 'a' and a range of 'b' values.
-        assertAlways.commandWorked(coll.ensureIndex({ a: 1 }));
-        assertAlways.commandWorked(coll.ensureIndex({ b: 1 }));
+        assertAlways.commandWorked(coll.ensureIndex({a: 1}));
+        assertAlways.commandWorked(coll.ensureIndex({b: 1}));
     }
 
     var states = (function() {
@@ -41,7 +41,7 @@ var $config = (function() {
             var coll = db.getSiblingDB(this.dbName)[collName];
 
             var cmdObj = {
-                query: { a: 1, b: { $gt: Random.rand() } },
+                query: {a: 1, b: {$gt: Random.rand()}},
                 limit: Random.randInt(10)
             };
 
@@ -69,8 +69,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        count:  { count: 0.95, dropDB: 0.05 },
-        dropDB: { count: 0.95, dropDB: 0.05 }
+        count: {count: 0.95, dropDB: 0.05},
+        dropDB: {count: 0.95, dropDB: 0.05}
     };
 
     function setup(db, collName, cluster) {

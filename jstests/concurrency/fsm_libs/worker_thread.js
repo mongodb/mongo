@@ -1,8 +1,8 @@
 'use strict';
 
 load('jstests/concurrency/fsm_libs/assert.js');
-load('jstests/concurrency/fsm_libs/cluster.js'); // for Cluster.isStandalone
-load('jstests/concurrency/fsm_libs/parse_config.js'); // for parseConfig
+load('jstests/concurrency/fsm_libs/cluster.js');  // for Cluster.isStandalone
+load('jstests/concurrency/fsm_libs/parse_config.js');  // for parseConfig
 
 var workerThread = (function() {
 
@@ -40,8 +40,8 @@ var workerThread = (function() {
             }
 
             workloads.forEach(function(workload) {
-                load(workload); // for $config
-                var config = parseConfig($config); // to normalize
+                load(workload);  // for $config
+                var config = parseConfig($config);  // to normalize
 
                 // Copy any modifications that were made to $config.data
                 // during the setup function of the workload (see caveat
@@ -62,20 +62,21 @@ var workerThread = (function() {
                 // configurable, enumerable, and writable. To prevent workloads from changing
                 // the iterations and threadCount properties in their state functions, we redefine
                 // them here as non-configurable, non-enumerable, and non-writable.
-                Object.defineProperties(data, {
-                    'iterations': {
-                        configurable: false,
-                        enumerable: false,
-                        writable: false,
-                        value: data.iterations
-                    },
-                    'threadCount': {
-                        configurable: false,
-                        enumerable: false,
-                        writable: false,
-                        value: data.threadCount
-                    }
-                });
+                Object.defineProperties(data,
+                                        {
+                                          'iterations': {
+                                              configurable: false,
+                                              enumerable: false,
+                                              writable: false,
+                                              value: data.iterations
+                                          },
+                                          'threadCount': {
+                                              configurable: false,
+                                              enumerable: false,
+                                              writable: false,
+                                              value: data.threadCount
+                                          }
+                                        });
 
                 data.tid = args.tid;
                 configs[workload] = {
@@ -98,12 +99,14 @@ var workerThread = (function() {
             // an exception. Nothing prior to (and including) args.latch.countDown()
             // should be wrapped in a try/catch statement.
             try {
-                args.latch.await(); // wait for all threads to start
+                args.latch.await();  // wait for all threads to start
 
                 Random.setRandomSeed(args.seed);
                 run(configs);
-                return { ok: 1 };
-            } catch(e) {
+                return {
+                    ok: 1
+                };
+            } catch (e) {
                 args.errorLatch.countDown();
                 return {
                     ok: 0,

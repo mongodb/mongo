@@ -15,116 +15,105 @@
  *     upgradeMongos: <bool>, // defaults to true
  * }
  */
-ShardingTest.prototype.upgradeCluster = function( binVersion, options ){
-    
+ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
+
     options = options || {};
-    if( options.upgradeShards == undefined ) options.upgradeShards = true;
-    if( options.upgradeConfigs == undefined ) options.upgradeConfigs = true;
-    if( options.upgradeMongos == undefined ) options.upgradeMongos = true;
-    
-    if( options.upgradeMongos ){
-        
+    if (options.upgradeShards == undefined)
+        options.upgradeShards = true;
+    if (options.upgradeConfigs == undefined)
+        options.upgradeConfigs = true;
+    if (options.upgradeMongos == undefined)
+        options.upgradeMongos = true;
+
+    if (options.upgradeMongos) {
         // Upgrade all mongos hosts if specified
-        
+
         var numMongoses = this._mongos.length;
-        
-        for( var i = 0; i < numMongoses; i++ ){
-            
+
+        for (var i = 0; i < numMongoses; i++) {
             var mongos = this._mongos[i];
-            
-            MongoRunner.stopMongos( mongos );
-            
-            mongos = MongoRunner.runMongos({ restart : mongos,
-                                             binVersion : binVersion,
-                                             appendOptions : true });
-            
-            this[ "s" + i ] = this._mongos[i] = mongos;
-            if( i == 0 ) this.s = mongos;
+
+            MongoRunner.stopMongos(mongos);
+
+            mongos = MongoRunner.runMongos(
+                {restart: mongos, binVersion: binVersion, appendOptions: true});
+
+            this["s" + i] = this._mongos[i] = mongos;
+            if (i == 0)
+                this.s = mongos;
         }
-        
-        this.config = this.s.getDB( "config" );
-        this.admin = this.s.getDB( "admin" );
+
+        this.config = this.s.getDB("config");
+        this.admin = this.s.getDB("admin");
     }
-    
+
     var upgradedSingleShards = [];
-    
-    if( options.upgradeShards ){
-        
+
+    if (options.upgradeShards) {
         var numShards = this._connections.length;
-        
+
         // Upgrade shards
-        for( var i = 0; i < numShards; i++ ){
-            
-            if( this._rs && this._rs[i] ){
-                
+        for (var i = 0; i < numShards; i++) {
+            if (this._rs && this._rs[i]) {
                 // Upgrade replica set
                 var rst = this._rs[i].test;
-                
-                rst.upgradeSet({ binVersion: binVersion });
-            }
-            else {
-                
+
+                rst.upgradeSet({binVersion: binVersion});
+            } else {
                 // Upgrade shard
                 var shard = this._connections[i];
-                
-                MongoRunner.stopMongod( shard );
-                
-                shard = MongoRunner.runMongod({ restart : shard, 
-                                                binVersion : binVersion,
-                                                appendOptions : true });
-                    
-                upgradedSingleShards[ shard.host ] = shard;
-                
-                this[ "shard" + i ] = this[ "d" + i ] = this._connections[i] = shard;
-            }        
+
+                MongoRunner.stopMongod(shard);
+
+                shard = MongoRunner.runMongod(
+                    {restart: shard, binVersion: binVersion, appendOptions: true});
+
+                upgradedSingleShards[shard.host] = shard;
+
+                this["shard" + i] = this["d" + i] = this._connections[i] = shard;
+            }
         }
     }
-    
-    if( options.upgradeConfigs ){
-        
-        // Upgrade config servers if they aren't already upgraded shards 
+
+    if (options.upgradeConfigs) {
+        // Upgrade config servers if they aren't already upgraded shards
         var numConfigs = this._configServers.length;
-        
-        for( var i = 0; i < numConfigs; i++ ){
-            
+
+        for (var i = 0; i < numConfigs; i++) {
             var configSvr = this._configServers[i];
-            
-            if( configSvr.host in upgradedSingleShards ){
-                
-                configSvr = upgradedSingleShards[ configSvr.host ];
+
+            if (configSvr.host in upgradedSingleShards) {
+                configSvr = upgradedSingleShards[configSvr.host];
+            } else {
+                MongoRunner.stopMongod(configSvr);
+
+                configSvr = MongoRunner.runMongod(
+                    {restart: configSvr, binVersion: binVersion, appendOptions: true});
             }
-            else{
-                
-                MongoRunner.stopMongod( configSvr );
-                
-                configSvr = MongoRunner.runMongod({ restart : configSvr, 
-                                                    binVersion : binVersion,
-                                                    appendOptions : true });
-            }
-            
-            this[ "config" + i ] = this[ "c" + i ] = this._configServers[i] = configSvr;
+
+            this["config" + i] = this["c" + i] = this._configServers[i] = configSvr;
         }
     }
-    
+
 };
 
 ShardingTest.prototype.restartMongoses = function() {
-    
+
     var numMongoses = this._mongos.length;
-    
+
     for (var i = 0; i < numMongoses; i++) {
-        
         var mongos = this._mongos[i];
-        
+
         MongoRunner.stopMongos(mongos);
-        mongos = MongoRunner.runMongos({ restart : mongos });
-        
-        this[ "s" + i ] = this._mongos[i] = mongos;
-        if( i == 0 ) this.s = mongos;
+        mongos = MongoRunner.runMongos({restart: mongos});
+
+        this["s" + i] = this._mongos[i] = mongos;
+        if (i == 0)
+            this.s = mongos;
     }
-    
-    this.config = this.s.getDB( "config" );
-    this.admin = this.s.getDB( "admin" );
+
+    this.config = this.s.getDB("config");
+    this.admin = this.s.getDB("admin");
 };
 
 ShardingTest.prototype.getMongosAtVersion = function(binVersion) {
@@ -135,8 +124,7 @@ ShardingTest.prototype.getMongosAtVersion = function(binVersion) {
             if (version.indexOf(binVersion) == 0) {
                 return mongoses[i];
             }
-        }
-        catch (e) {
+        } catch (e) {
             printjson(e);
             print(mongoses[i]);
         }

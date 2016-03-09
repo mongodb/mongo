@@ -4,7 +4,7 @@
 var t = db.server9547;
 t.drop();
 
-for (var i=0; i<10; i++) {
+for (var i = 0; i < 10; i++) {
     t.save({a: i});
 }
 

@@ -24,25 +24,21 @@
     var collStats = db.runCommand({collStats: collNamePrefix + '.source'});
     assert.commandWorked(collStats);
 
-    assert.commandWorked(db.runCommand({
-        create: collNamePrefix + '.dest',
-        storageEngine: {
-            wiredTiger: {
-                configString: collStats.wiredTiger.creationString
-            }
-        }
-    }), 'unable to create collection using the creation string of another collection');
+    assert.commandWorked(
+        db.runCommand({
+            create: collNamePrefix + '.dest',
+            storageEngine: {wiredTiger: {configString: collStats.wiredTiger.creationString}}
+        }),
+        'unable to create collection using the creation string of another collection');
 
     assert.commandWorked(db.runCommand({
         createIndexes: collNamePrefix + '.dest',
         indexes: [{
             key: {b: 1},
             name: 'b_1',
-            storageEngine: {
-                wiredTiger: {
-                    configString: collStats.indexDetails.a_1.creationString
-                }
-            }
+            storageEngine:
+                {wiredTiger: {configString: collStats.indexDetails.a_1.creationString}}
         }]
-    }), 'unable to create index using the creation string of another index');
+    }),
+                         'unable to create index using the creation string of another index');
 })();

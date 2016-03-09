@@ -19,12 +19,13 @@
 
     // Test framework will append --storageEngine command line option if provided to smoke.py.
     var mongod = MongoRunner.runMongod({dbpath: dbpath, smallfiles: ""});
-    assert.neq(0, getMongodLockFileSize(dbpath),
+    assert.neq(0,
+               getMongodLockFileSize(dbpath),
                'mongod.lock should not be empty while server is running');
 
     MongoRunner.stopMongod(mongod);
 
     // mongod.lock must be empty after shutting server down.
-    assert.eq(0, getMongodLockFileSize(dbpath),
-              'mongod.lock not truncated after shutting server down');
+    assert.eq(
+        0, getMongodLockFileSize(dbpath), 'mongod.lock not truncated after shutting server down');
 }());

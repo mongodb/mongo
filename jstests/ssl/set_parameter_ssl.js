@@ -1,20 +1,16 @@
 // Test changing the --sslMode and --clusterAuthMode parameters using setParameter
 
 var SERVER_CERT = "jstests/libs/server.pem";
-var CA_CERT = "jstests/libs/ca.pem"; 
+var CA_CERT = "jstests/libs/ca.pem";
 
 function testSSLTransition(oldMode, newMode, shouldSucceed) {
-    var conn = MongoRunner.runMongod({
-        sslMode: oldMode,
-        sslPEMKeyFile: SERVER_CERT,
-        sslCAFile: CA_CERT
-    });
+    var conn =
+        MongoRunner.runMongod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
 
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
     adminDB.auth("root", "pwd");
-    var res = adminDB.runCommand({ "setParameter" : 1,
-                                   "sslMode" : newMode });
+    var res = adminDB.runCommand({"setParameter": 1, "sslMode": newMode});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
     MongoRunner.stopMongod(conn.port);
@@ -31,8 +27,7 @@ function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
     adminDB.auth("root", "pwd");
-    var res = adminDB.runCommand({ "setParameter" : 1,
-                                   "clusterAuthMode" : newMode });
+    var res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newMode});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
     MongoRunner.stopMongod(conn.port);

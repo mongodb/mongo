@@ -36,7 +36,7 @@ if (db.serverBuildInfo().bits == 32) {
         return latest;
     }
 
-    var stringSize = 1024*1024;
+    var stringSize = 1024 * 1024;
     var longString = new Array(stringSize).join("x");
 
     // Insert some data to create the first journal file.
@@ -51,11 +51,11 @@ if (db.serverBuildInfo().bits == 32) {
     while (firstJournalFileExists() && getLatestJournalFileNum() < maxJournalFiles) {
         db.foo.insert({_id: numInserted++, s: longString});
 
-        if (numInserted % 100 == 0){
+        if (numInserted % 100 == 0) {
             jsTestLog("numInserted: " + numInserted);
-            db.adminCommand({fsync:1});
+            db.adminCommand({fsync: 1});
             db.foo.remove({});
-            db.adminCommand({fsync:1});
+            db.adminCommand({fsync: 1});
         }
     }
 

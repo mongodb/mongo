@@ -16,4 +16,4 @@ mixedShardTest(preferSSL, allowSSL, true);
 mixedShardTest(allowSSL, preferSSL, true);
 
 print("=== Testing allowSSL/requireSSL cluster - SHOULD FAIL ===");
-mixedShardTest(requireSSL, allowSSL,  false);
+mixedShardTest(requireSSL, allowSSL, false);

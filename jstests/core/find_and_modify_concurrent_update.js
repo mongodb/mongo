@@ -13,15 +13,12 @@
         assert.writeOK(t.insert({_id: 1, a: 1, b: 1}));
 
         var join = startParallelShell(
-            "db.find_and_modify_concurrent.update({a: 1, b: 1}, {$inc: {a: 1}});"
-        );
+            "db.find_and_modify_concurrent.update({a: 1, b: 1}, {$inc: {a: 1}});");
 
         // Due to the sleep, we expect this find and modify to yield before updating the
         // document.
-        var res = t.findAndModify({
-            query: {a: 1, b: 1, $where: "sleep(100); return true;"},
-            update: {$inc: {a: 1}}
-        });
+        var res = t.findAndModify(
+            {query: {a: 1, b: 1, $where: "sleep(100); return true;"}, update: {$inc: {a: 1}}});
 
         join();
         var docs = t.find().toArray();

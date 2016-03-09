@@ -28,11 +28,17 @@ var contains = function(logLines, func) {
 // This test can only be run if the storageEngine is wiredTiger
 if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
     jsTestLog("Skipping test because storageEngine is not wiredTiger");
-}
-else {
+} else {
     var name = "wt_nojournal_repl";
-    var replTest = new ReplSetTest( {name: name, nodes: 3, oplogSize: 2,
-        nodeOptions: {nojournal: "", storageEngine: "wiredTiger",}  } );
+    var replTest = new ReplSetTest({
+        name: name,
+        nodes: 3,
+        oplogSize: 2,
+        nodeOptions: {
+            nojournal: "",
+            storageEngine: "wiredTiger",
+        }
+    });
     var nodes = replTest.startSet();
 
     // make sure node 0 becomes primary initially
@@ -44,21 +50,21 @@ else {
     var secondary1 = replTest.liveNodes.slaves[0];
 
     jsTestLog("add some data to collection foo");
-    for (var i=0; i<100; i++) {
-        masterDB.foo.insert({x:i});
+    for (var i = 0; i < 100; i++) {
+        masterDB.foo.insert({x: i});
     }
     replTest.awaitReplication();
     assert.eq(secondary1.getDB("test").foo.count(), 100);
 
     jsTestLog("run fsync on the secondary to ensure it remains after restart");
-    assert.commandWorked(secondary1.getDB("admin").runCommand({fsync : 1}));
+    assert.commandWorked(secondary1.getDB("admin").runCommand({fsync: 1}));
 
     jsTestLog("kill -9 secondary 1");
     MongoRunner.stopMongod(secondary1.port, /*signal*/ 9);
 
     jsTestLog("add some data to a new collection bar");
-    for (var i=0; i<100; i++) {
-        masterDB.bar.insert({x:i});
+    for (var i = 0; i < 100; i++) {
+        masterDB.bar.insert({x: i});
     }
 
     jsTestLog("restart secondary 1 and let it catch up");
@@ -66,10 +72,11 @@ else {
     replTest.awaitReplication();
 
     // Test that the restarted secondary did NOT do an initial sync by checking the log
-    var res = secondary1.adminCommand({getLog:"global"});
-    assert(!contains(res.log, function(v) {
-        return v.indexOf("initial sync") != -1;
-    }));
+    var res = secondary1.adminCommand({getLog: "global"});
+    assert(!contains(res.log,
+                     function(v) {
+                         return v.indexOf("initial sync") != -1;
+                     }));
 
     jsTestLog("check data is in both collections");
     assert.eq(secondary1.getDB("test").foo.count(), 100);

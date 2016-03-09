@@ -8,15 +8,15 @@
 
 (function() {
 
-// Setup fromDb with no auth
-var fromDb = MongoRunner.runMongod();
+    // Setup fromDb with no auth
+    var fromDb = MongoRunner.runMongod();
 
-// Setup toDb with auth
-var toDb = MongoRunner.runMongod({auth: ""});
-var admin = toDb.getDB("admin");
-admin.createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
-admin.auth("foo","bar");
+    // Setup toDb with auth
+    var toDb = MongoRunner.runMongod({auth: ""});
+    var admin = toDb.getDB("admin");
+    admin.createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
+    admin.auth("foo", "bar");
 
-admin.copyDatabase('test', 'test', fromDb.host);
+    admin.copyDatabase('test', 'test', fromDb.host);
 
 })();

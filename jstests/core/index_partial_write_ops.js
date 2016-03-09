@@ -5,13 +5,12 @@
     var isMongos = (db.runCommand("isMaster").msg === "isdbgrid");
     var coll = db.index_partial_write_ops;
 
-    var getNumKeys = function (idxName) {
+    var getNumKeys = function(idxName) {
         var res = assert.commandWorked(coll.validate(true));
         var kpi;
         if (isMongos) {
             kpi = res.raw[Object.getOwnPropertyNames(res.raw)[0]].keysPerIndex;
-        }
-        else {
+        } else {
             kpi = res.keysPerIndex;
         }
         return kpi[coll.getFullName() + ".$" + idxName];
@@ -22,8 +21,8 @@
     // Create partial index.
     assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: 1}}));
 
-    assert.writeOK(coll.insert({_id: 1, x: 5, a: 2, b: 1})); // Not in index.
-    assert.writeOK(coll.insert({_id: 2, x: 6, a: 1, b: 1})); // In index.
+    assert.writeOK(coll.insert({_id: 1, x: 5, a: 2, b: 1}));  // Not in index.
+    assert.writeOK(coll.insert({_id: 2, x: 6, a: 1, b: 1}));  // In index.
 
     assert.eq(1, getNumKeys("x_1"));
 

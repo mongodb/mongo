@@ -6,15 +6,18 @@
  * Repeatedly creates a capped collection. Also verifies that truncation
  * occurs once the collection reaches a certain size.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropCollections
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 
 var $config = (function() {
 
     // Returns a document of the form { _id: ObjectId(...), field: '...' }
     // with specified BSON size.
     function makeDocWithSize(targetSize) {
-        var doc = { _id: new ObjectId(), field: '' };
+        var doc = {
+            _id: new ObjectId(),
+            field: ''
+        };
 
         var size = Object.bsonsize(doc);
         assertAlways.gte(targetSize, size);
@@ -42,9 +45,11 @@ var $config = (function() {
     // Returns an array containing the _id fields of all the documents
     // in the collection, sorted according to their insertion order.
     function getObjectIds(db, collName) {
-        return db[collName].find({}, { _id: 1 }).map(function(doc) {
-            return doc._id;
-        });
+        return db[collName]
+            .find({}, {_id: 1})
+            .map(function(doc) {
+                return doc._id;
+            });
     }
 
     var data = {
@@ -67,7 +72,7 @@ var $config = (function() {
             // Truncation in MMAPv1 has well defined behavior.
             if (isMongod(db) && isMMAPv1(db)) {
                 ids.push(this.insert(db, myCollName, largeDocSize));
- 
+
                 // Insert a large document and verify that a truncation has occurred.
                 // There should be 1 document in the collection and it should always be
                 // the most recently inserted document.
@@ -124,7 +129,7 @@ var $config = (function() {
 
         var options = {
             capped: true,
-            size: 8192 // multiple of 256; larger than 4096 default
+            size: 8192  // multiple of 256; larger than 4096 default
         };
 
         function uniqueCollectionName(prefix, tid, num) {
@@ -151,8 +156,8 @@ var $config = (function() {
     })();
 
     var transitions = {
-        init: { create: 1 },
-        create: { create: 1 }
+        init: {create: 1},
+        create: {create: 1}
     };
 
     function teardown(db, collName, cluster) {

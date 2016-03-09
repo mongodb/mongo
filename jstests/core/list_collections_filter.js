@@ -67,16 +67,10 @@
     // Filter with $and and $in.
     testListCollections({name: {$in: ["lists", /.*_sets$/]}, options: {}},
                         ["lists", "ordered_sets", "unordered_sets"]);
-    testListCollections({$and: [
-                            {name: {$in: ["lists", /.*_sets$/]}},
-                            {name: "lists"},
-                            {options: {}},
-                        ]},
-                        ["lists"]);
-    testListCollections({$and: [
-                            {name: {$in: ["lists", /.*_sets$/]}},
-                            {name: "non-existent"},
-                            {options: {}},
-                        ]},
-                        []);
+    testListCollections(
+        {$and: [{name: {$in: ["lists", /.*_sets$/]}}, {name: "lists"}, {options: {}}, ]},
+        ["lists"]);
+    testListCollections(
+        {$and: [{name: {$in: ["lists", /.*_sets$/]}}, {name: "non-existent"}, {options: {}}, ]},
+        []);
 }());

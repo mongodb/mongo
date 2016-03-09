@@ -7,11 +7,11 @@
 testname = "a_quick";
 tst = {};
 
-tst.log = function (optional_msg) {
+tst.log = function(optional_msg) {
     print("\n\nstep " + ++this._step + " " + (optional_msg || ""));
 };
 
-tst.success = function () {
+tst.success = function() {
     print(testname + " SUCCESS");
 };
 
@@ -39,12 +39,14 @@ tst._step = 0;
 
 function checkNoJournalFiles(path, pass) {
     var files = listFiles(path);
-    if (files.some(function (f) { return f.name.indexOf("prealloc") < 0; })) {
+    if (files.some(function(f) {
+            return f.name.indexOf("prealloc") < 0;
+        })) {
         if (pass == null) {
             // wait a bit longer for mongod to potentially finish if it is still running.
             sleep(10000);
             return checkNoJournalFiles(path, 1);
-        }   
+        }
         print("\n\n\n");
         print("FAIL path:" + path);
         print("unexpected files:");
@@ -62,7 +64,7 @@ tst.log("start mongod without dur");
 var conn = MongoRunner.runMongod({dbpath: path1, nojournal: ""});
 tst.log("without dur work");
 var d = conn.getDB("test");
-assert.writeOK(d.foo.insert({ _id: 123 }));
+assert.writeOK(d.foo.insert({_id: 123}));
 tst.log("stop without dur");
 MongoRunner.stopMongod(conn);
 
@@ -71,9 +73,9 @@ tst.log("start mongod with dur");
 conn = MongoRunner.runMongod({dbpath: path2, journal: "", journalOptions: 8});
 tst.log("with dur work");
 d = conn.getDB("test");
-assert.writeOK(d.foo.insert({ _id: 123 }));
+assert.writeOK(d.foo.insert({_id: 123}));
 
-// we could actually do getlasterror fsync:1 now, but maybe this is agood 
+// we could actually do getlasterror fsync:1 now, but maybe this is agood
 // as it will assure that commits happen on a timely basis.  a bunch of the other dur/*js
 // tests use fsync
 tst.log("sleep a bit for a group commit");
@@ -81,7 +83,7 @@ sleep(8000);
 
 // kill the process hard
 tst.log("kill -9 mongod");
-MongoRunner.stopMongod(conn.port, /*signal*/9);
+MongoRunner.stopMongod(conn.port, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 
@@ -95,7 +97,9 @@ removeFile(path2 + "/journal/lsn");
 // with the file deleted, we MUST start from the beginning of the journal.
 // thus this check to be careful
 var files = listFiles(path2 + "/journal/");
-if (files.some(function (f) { return f.name.indexOf("lsn") >= 0; })) {
+if (files.some(function(f) {
+        return f.name.indexOf("lsn") >= 0;
+    })) {
     print("\n\n\n");
     print(path2);
     printjson(files);
@@ -104,11 +108,8 @@ if (files.some(function (f) { return f.name.indexOf("lsn") >= 0; })) {
 
 // restart and recover
 tst.log("restart and recover");
-conn = MongoRunner.runMongod({restart: true,
-                              cleanData: false,
-                              dbpath: path2,
-                              journal: "",
-                              journalOptions: 9});
+conn = MongoRunner.runMongod(
+    {restart: true, cleanData: false, dbpath: path2, journal: "", journalOptions: 9});
 tst.log("check data results");
 d = conn.getDB("test");
 
@@ -139,7 +140,7 @@ function showfiles() {
 }
 
 if (diff != "") {
-    showfiles();    
+    showfiles();
     assert(diff == "", "error test.ns files differ");
 }
 
@@ -152,4 +153,4 @@ if (diff != "") {
 
 assert(countOk, "a_quick.js document count after recovery was not the expected value");
 
-tst.success();   
+tst.success();

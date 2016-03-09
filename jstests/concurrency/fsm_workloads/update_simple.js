@@ -8,7 +8,7 @@
  *  - whether to $set or $unset its field
  *  - what value to $set the field to
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
 
 var $config = (function() {
 
@@ -23,19 +23,13 @@ var $config = (function() {
     };
 
     var transitions = {
-        set: {
-            set: 0.5,
-            unset: 0.5
-        },
-        unset: {
-            set: 0.5,
-            unset: 0.5
-        }
+        set: {set: 0.5, unset: 0.5},
+        unset: {set: 0.5, unset: 0.5}
     };
 
     function setup(db, collName, cluster) {
         // index on 'value', the field being updated
-        assertAlways.commandWorked(db[collName].ensureIndex({ value: 1 }));
+        assertAlways.commandWorked(db[collName].ensureIndex({value: 1}));
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 5);
@@ -44,7 +38,7 @@ var $config = (function() {
         for (var i = 0; i < this.numDocs; ++i) {
             // make sure the inserted docs have a 'value' field, so they won't need
             // to grow when this workload runs against a capped collection
-            var res = db[collName].insert({ _id: i, value: 0 });
+            var res = db[collName].insert({_id: i, value: 0});
             assertWhenOwnColl.writeOK(res);
             assertWhenOwnColl.eq(1, res.nInserted);
         }
@@ -65,8 +59,7 @@ var $config = (function() {
                     // For non-mmap storage engines we can have a strong assertion that exactly one
                     // doc will be modified.
                     assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
-                }
-                else {
+                } else {
                     // Zero matches are possible for MMAP v1 because the update will skip a document
                     // that was invalidated during a yield.
                     assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
@@ -85,9 +78,13 @@ var $config = (function() {
                 var value = Random.randInt(5);
 
                 var updater = {};
-                updater[set ? '$set' : '$unset'] = { value: value };
+                updater[set ? '$set' : '$unset'] = {
+                    value: value
+                };
 
-                var query = { _id: docIndex };
+                var query = {
+                    _id: docIndex
+                };
                 var res = this.doUpdate(db, collName, query, updater);
                 this.assertResult(db, res);
             },

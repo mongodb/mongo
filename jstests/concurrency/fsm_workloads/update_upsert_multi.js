@@ -16,11 +16,10 @@ var $config = (function() {
             var query, update, options;
             var res = db[collName].update(
                 // The counter ensures that the query will not match any existing document.
-                query = { tid: this.tid, i: this.counter++ },
-                update = { $inc: { n: 1 } },
-                options = { multi: true, upsert: true }
-            );
-            var debugDoc = tojson({ query: query, update: update, options: options, result: res });
+                query = {tid: this.tid, i: this.counter++},
+                update = {$inc: {n: 1}},
+                options = {multi: true, upsert: true});
+            var debugDoc = tojson({query: query, update: update, options: options, result: res});
             assertWhenOwnColl.eq(1, res.nUpserted, debugDoc);
             assertWhenOwnColl.eq(0, res.nMatched, debugDoc);
             if (db.getMongo().writeMode() === 'commands') {
@@ -32,10 +31,9 @@ var $config = (function() {
             var res = db[collName].update(
                 // This query will match an existing document, since the 'insert' state
                 // always runs first.
-                { tid: this.tid },
-                { $inc: { n: 1 } },
-                { multi: true, upsert: true }
-            );
+                {tid: this.tid},
+                {$inc: {n: 1}},
+                {multi: true, upsert: true});
 
             assertWhenOwnColl.eq(0, res.nUpserted, tojson(res));
             assertWhenOwnColl.lte(1, res.nMatched, tojson(res));
@@ -53,21 +51,24 @@ var $config = (function() {
             // because docs with lower i are newer, so they have had fewer
             // opportunities to have n incremented.)
             var prevN = Infinity;
-            db[collName].find({ tid: this.tid }).sort({ i: 1 }).forEach(function(doc) {
-                assertWhenOwnColl.gte(prevN, doc.n);
-                prevN = doc.n;
-            });
+            db[collName]
+                .find({tid: this.tid})
+                .sort({i: 1})
+                .forEach(function(doc) {
+                    assertWhenOwnColl.gte(prevN, doc.n);
+                    prevN = doc.n;
+                });
         }
     };
 
     var transitions = {
-        insert: { update: 0.875, assertConsistency: 0.125 },
-        update: { insert: 0.875, assertConsistency: 0.125 },
-        assertConsistency: { insert: 0.5, update: 0.5 }
+        insert: {update: 0.875, assertConsistency: 0.125},
+        update: {insert: 0.875, assertConsistency: 0.125},
+        assertConsistency: {insert: 0.5, update: 0.5}
     };
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].ensureIndex({ tid: 1, i: 1 }));
+        assertAlways.commandWorked(db[collName].ensureIndex({tid: 1, i: 1}));
     }
 
     return {
@@ -76,7 +77,7 @@ var $config = (function() {
         states: states,
         startState: 'insert',
         transitions: transitions,
-        data: { counter: 0 },
+        data: {counter: 0},
         setup: setup
     };
 

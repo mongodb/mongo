@@ -191,7 +191,7 @@ assert(!explainQuery.hasNext());
 
 // .forEach()
 var results = [];
-t.explain().find().forEach(function (res) {
+t.explain().find().forEach(function(res) {
     results.push(res);
 });
 assert.eq(1, results.length);
@@ -257,7 +257,7 @@ assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT_SCAN"));
 // .group()
 //
 
-explain = t.explain().group({key: "a", initial: {}, reduce: function() { } });
+explain = t.explain().group({key: "a", initial: {}, reduce: function() {}});
 assert.commandWorked(explain);
 
 //
@@ -393,8 +393,8 @@ assert.eq(1, explain.executionStats.totalDocsExamined);
 assert.eq(10, t.count());
 
 // findAndModify with upsert flag set that should do an insert.
-explain = t.explain("executionStats").findAndModify(
-    {query: {a: 15}, update: {$set: {b: 3}}, upsert: true});
+explain = t.explain("executionStats")
+              .findAndModify({query: {a: 15}, update: {$set: {b: 3}}, upsert: true});
 assert.commandWorked(explain);
 stage = explain.executionStats.executionStages;
 if ("SINGLE_SHARD" === stage.stage) {
@@ -435,7 +435,7 @@ assert.throws(function() {
 
 // Missing "initial" for explaining a group.
 assert.throws(function() {
-    t.explain().group({key: "a", reduce: function() { } });
+    t.explain().group({key: "a", reduce: function() {}});
 });
 
 // Can't specify both remove and update in a findAndModify

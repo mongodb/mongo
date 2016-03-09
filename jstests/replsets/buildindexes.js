@@ -2,65 +2,65 @@
 
 (function() {
 
-  var name = "buildIndexes";
-  var host = getHostName();
-  
-  var replTest = new ReplSetTest( {name: name, nodes: 3} );
+    var name = "buildIndexes";
+    var host = getHostName();
 
-  var nodes = replTest.startSet();
+    var replTest = new ReplSetTest({name: name, nodes: 3});
 
-  var config = replTest.getReplSetConfig();
-  config.members[2].priority = 0;
-  config.members[2].buildIndexes = false;
-  
-  replTest.initiate(config);
+    var nodes = replTest.startSet();
 
-  var master = replTest.getPrimary().getDB(name);
-  var slaveConns = replTest.liveNodes.slaves;
-  var slave = [];
-  for (var i in slaveConns) {
-    slaveConns[i].setSlaveOk();
-    slave.push(slaveConns[i].getDB(name));
-  }
-  replTest.awaitReplication();
+    var config = replTest.getReplSetConfig();
+    config.members[2].priority = 0;
+    config.members[2].buildIndexes = false;
 
-  master.x.ensureIndex({y : 1});
+    replTest.initiate(config);
 
-  for (i = 0; i < 100; i++) {
-    master.x.insert({x:1,y:"abc",c:1});
-  }
-
-  replTest.awaitReplication();
-
-  assert.commandWorked(slave[0].runCommand({count: "x"}));
-
-  var indexes = slave[0].stats().indexes;
-  assert.eq(indexes, 2, 'number of indexes');
-
-  indexes = slave[1].stats().indexes;
-  assert.eq(indexes, 1);
-  
-  indexes = slave[0].x.stats().indexSizes;
-  
-  var count = 0;
-  for (i in indexes) {
-    count++;
-    if (i == "_id_") {
-      continue;
+    var master = replTest.getPrimary().getDB(name);
+    var slaveConns = replTest.liveNodes.slaves;
+    var slave = [];
+    for (var i in slaveConns) {
+        slaveConns[i].setSlaveOk();
+        slave.push(slaveConns[i].getDB(name));
     }
-    assert(i.match(/y_/));
-  }
+    replTest.awaitReplication();
 
-  assert.eq(count, 2);
-  
-  indexes = slave[1].x.stats().indexSizes;
+    master.x.ensureIndex({y: 1});
 
-  count = 0;
-  for (i in indexes) {
-    count++;
-  }  
+    for (i = 0; i < 100; i++) {
+        master.x.insert({x: 1, y: "abc", c: 1});
+    }
 
-  assert.eq(count, 1);
+    replTest.awaitReplication();
 
-  replTest.stopSet();
+    assert.commandWorked(slave[0].runCommand({count: "x"}));
+
+    var indexes = slave[0].stats().indexes;
+    assert.eq(indexes, 2, 'number of indexes');
+
+    indexes = slave[1].stats().indexes;
+    assert.eq(indexes, 1);
+
+    indexes = slave[0].x.stats().indexSizes;
+
+    var count = 0;
+    for (i in indexes) {
+        count++;
+        if (i == "_id_") {
+            continue;
+        }
+        assert(i.match(/y_/));
+    }
+
+    assert.eq(count, 2);
+
+    indexes = slave[1].x.stats().indexSizes;
+
+    count = 0;
+    for (i in indexes) {
+        count++;
+    }
+
+    assert.eq(count, 1);
+
+    replTest.stopSet();
 }());

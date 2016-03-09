@@ -1,7 +1,7 @@
 // SERVER-15319 Make sure pdfile version bumping for the new freelist works as intended
 
-var tooOld = "2.4"; // anything <= 2.6.4
-var newEnough = "2.6"; // latest in 2.6 is >= 2.6.5
+var tooOld = "2.4";  // anything <= 2.6.4
+var newEnough = "2.6";  // latest in 2.6 is >= 2.6.5
 var latest = "latest";
 
 function restart(conn, version) {
@@ -14,14 +14,9 @@ function repair(conn, version) {
     MongoRunner.runMongod({restart: conn, remember: true, binVersion: version, repair: ""});
 }
 
-
 // start out running tooOld
-var conn = MongoRunner.runMongod({
-    remember: true,
-    binVersion: tooOld,
-    smallfiles: "",
-    nohttpinterface: ""
-});
+var conn = MongoRunner.runMongod(
+    {remember: true, binVersion: tooOld, smallfiles: "", nohttpinterface: ""});
 assert(conn);
 
 // can go from tooOld to newEnough

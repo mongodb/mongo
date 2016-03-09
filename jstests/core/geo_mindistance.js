@@ -8,10 +8,11 @@ t.drop();
 // Useful constants and functions.
 //
 
-var km = 1000,
-    earthRadiusMeters = 6378.1 * km;
+var km = 1000, earthRadiusMeters = 6378.1 * km;
 
-function metersToRadians(m) { return m / earthRadiusMeters; }
+function metersToRadians(m) {
+    return m / earthRadiusMeters;
+}
 
 /* Count documents within some radius of (0, 0), in kilometers.
  * With this function we can use the existing $maxDistance option to test
@@ -46,8 +47,11 @@ for (var x = 0; x <= 10; x += 1) {
 /* $minDistance is supported for 2dsphere index only, not 2d or geoHaystack. */
 t.ensureIndex({loc: "2dsphere"});
 
-var n_docs = t.count(),
-    geoJSONPoint = {type: 'Point', coordinates: [0, 0]},
+var n_docs = t.count(), geoJSONPoint =
+                            {
+                              type: 'Point',
+                              coordinates: [0, 0]
+                            },
     legacyPoint = [0, 0];
 
 //
@@ -55,31 +59,23 @@ var n_docs = t.count(),
 // min/maxDistance are in meters.
 //
 
-var n_min1400_count = t.find({loc: {
-    $near: {$geometry: geoJSONPoint, $minDistance: 1400 * km
-}}}).count();
+var n_min1400_count =
+    t.find({loc: {$near: {$geometry: geoJSONPoint, $minDistance: 1400 * km}}}).count();
 
-assert.eq(
-    n_docs - n_docs_within(1400),
-    n_min1400_count,
-    "Expected " + (n_docs - n_docs_within(1400))
-        + " points $near (0, 0) with $minDistance 1400 km, got "
-        + n_min1400_count
-);
+assert.eq(n_docs - n_docs_within(1400),
+          n_min1400_count,
+          "Expected " + (n_docs - n_docs_within(1400)) +
+              " points $near (0, 0) with $minDistance 1400 km, got " + n_min1400_count);
 
-var n_bw500_and_1000_count = t.find({loc: {
-    $near: {$geometry: geoJSONPoint,
-            $minDistance: 500 * km,
-            $maxDistance: 1000 * km
-}}}).count();
+var n_bw500_and_1000_count = t.find({
+    loc: {$near: {$geometry: geoJSONPoint, $minDistance: 500 * km, $maxDistance: 1000 * km}}
+}).count();
 
-assert.eq(
-    n_docs_within(1000) - n_docs_within(500),
-    n_bw500_and_1000_count,
-    "Expected " + (n_docs_within(1000) - n_docs_within(500))
-        + " points $near (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got "
-        + n_bw500_and_1000_count
-);
+assert.eq(n_docs_within(1000) - n_docs_within(500),
+          n_bw500_and_1000_count,
+          "Expected " + (n_docs_within(1000) - n_docs_within(500)) +
+              " points $near (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got " +
+              n_bw500_and_1000_count);
 
 //
 // $nearSphere with 2dsphere index can take a legacy or GeoJSON point.
@@ -87,63 +83,49 @@ assert.eq(
 // min/maxDistance are in radians.
 //
 
-n_min1400_count = t.find({loc: {
-    $nearSphere: legacyPoint, $minDistance: metersToRadians(1400 * km)
-}}).count();
+n_min1400_count =
+    t.find({loc: {$nearSphere: legacyPoint, $minDistance: metersToRadians(1400 * km)}}).count();
 
-assert.eq(
-    n_docs - n_docs_within(1400),
-    n_min1400_count,
-    "Expected " + (n_docs - n_docs_within(1400))
-        + " points $nearSphere (0, 0) with $minDistance 1400 km, got "
-        + n_min1400_count
-);
+assert.eq(n_docs - n_docs_within(1400),
+          n_min1400_count,
+          "Expected " + (n_docs - n_docs_within(1400)) +
+              " points $nearSphere (0, 0) with $minDistance 1400 km, got " + n_min1400_count);
 
-n_bw500_and_1000_count = t.find({loc: {
-    $nearSphere: legacyPoint,
-    $minDistance: metersToRadians(500 * km),
-    $maxDistance: metersToRadians(1000 * km)
-}}).count();
+n_bw500_and_1000_count = t.find({
+    loc: {
+        $nearSphere: legacyPoint,
+        $minDistance: metersToRadians(500 * km),
+        $maxDistance: metersToRadians(1000 * km)
+    }
+}).count();
 
-assert.eq(
-    n_docs_within(1000) - n_docs_within(500),
-    n_bw500_and_1000_count,
-    "Expected " + (n_docs_within(1000) - n_docs_within(500))
-        + " points $nearSphere (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got "
-        + n_bw500_and_1000_count
-);
+assert.eq(n_docs_within(1000) - n_docs_within(500),
+          n_bw500_and_1000_count,
+          "Expected " + (n_docs_within(1000) - n_docs_within(500)) +
+              " points $nearSphere (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got " +
+              n_bw500_and_1000_count);
 
 //
 // Test $nearSphere with GeoJSON point.
 // min/maxDistance are in meters.
 //
 
-n_min1400_count = t.find({loc: {
-    $nearSphere: geoJSONPoint, $minDistance: 1400 * km
-}}).count();
+n_min1400_count = t.find({loc: {$nearSphere: geoJSONPoint, $minDistance: 1400 * km}}).count();
 
-assert.eq(
-    n_docs - n_docs_within(1400),
-    n_min1400_count,
-    "Expected " + (n_docs - n_docs_within(1400))
-        + " points $nearSphere (0, 0) with $minDistance 1400 km, got "
-        + n_min1400_count
-);
+assert.eq(n_docs - n_docs_within(1400),
+          n_min1400_count,
+          "Expected " + (n_docs - n_docs_within(1400)) +
+              " points $nearSphere (0, 0) with $minDistance 1400 km, got " + n_min1400_count);
 
-n_bw500_and_1000_count = t.find({loc: {
-    $nearSphere: geoJSONPoint,
-    $minDistance: 500 * km,
-    $maxDistance: 1000 * km
-}}).count();
+n_bw500_and_1000_count =
+    t.find({loc: {$nearSphere: geoJSONPoint, $minDistance: 500 * km, $maxDistance: 1000 * km}})
+        .count();
 
-assert.eq(
-    n_docs_within(1000) - n_docs_within(500),
-    n_bw500_and_1000_count,
-    "Expected " + (n_docs_within(1000) - n_docs_within(500))
-        + " points $nearSphere (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got "
-        + n_bw500_and_1000_count
-);
-
+assert.eq(n_docs_within(1000) - n_docs_within(500),
+          n_bw500_and_1000_count,
+          "Expected " + (n_docs_within(1000) - n_docs_within(500)) +
+              " points $nearSphere (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got " +
+              n_bw500_and_1000_count);
 
 //
 // Test geoNear command with GeoJSON point.
@@ -156,13 +138,10 @@ var cmdResult = db.runCommand({
     minDistance: 1400 * km,
     spherical: true  // spherical required for 2dsphere index
 });
-assert.eq(
-    n_docs - n_docs_within(1400),
-    cmdResult.results.length,
-    "Expected " + (n_docs - n_docs_within(1400))
-        + " points geoNear (0, 0) with $minDistance 1400 km, got "
-        + cmdResult.results.length
-);
+assert.eq(n_docs - n_docs_within(1400),
+          cmdResult.results.length,
+          "Expected " + (n_docs - n_docs_within(1400)) +
+              " points geoNear (0, 0) with $minDistance 1400 km, got " + cmdResult.results.length);
 
 cmdResult = db.runCommand({
     geoNear: t.getName(),
@@ -171,13 +150,11 @@ cmdResult = db.runCommand({
     maxDistance: 1000 * km,
     spherical: true
 });
-assert.eq(
-    n_docs_within(1000) - n_docs_within(500),
-    cmdResult.results.length,
-    "Expected " + (n_docs_within(1000) - n_docs_within(500))
-        + " points geoNear (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got "
-        + cmdResult.results.length
-);
+assert.eq(n_docs_within(1000) - n_docs_within(500),
+          cmdResult.results.length,
+          "Expected " + (n_docs_within(1000) - n_docs_within(500)) +
+              " points geoNear (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got " +
+              cmdResult.results.length);
 
 //
 // Test geoNear command with legacy point.
@@ -190,13 +167,10 @@ cmdResult = db.runCommand({
     minDistance: metersToRadians(1400 * km),
     spherical: true  // spherical required for 2dsphere index
 });
-assert.eq(
-    n_docs - n_docs_within(1400),
-    cmdResult.results.length,
-    "Expected " + (n_docs - n_docs_within(1400))
-        + " points geoNear (0, 0) with $minDistance 1400 km, got "
-        + cmdResult.results.length
-);
+assert.eq(n_docs - n_docs_within(1400),
+          cmdResult.results.length,
+          "Expected " + (n_docs - n_docs_within(1400)) +
+              " points geoNear (0, 0) with $minDistance 1400 km, got " + cmdResult.results.length);
 
 cmdResult = db.runCommand({
     geoNear: t.getName(),
@@ -205,10 +179,8 @@ cmdResult = db.runCommand({
     maxDistance: metersToRadians(1000 * km),
     spherical: true
 });
-assert.eq(
-    n_docs_within(1000) - n_docs_within(500),
-    cmdResult.results.length,
-    "Expected " + (n_docs_within(1000) - n_docs_within(500))
-        + " points geoNear (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got "
-        + cmdResult.results.length
-);
+assert.eq(n_docs_within(1000) - n_docs_within(500),
+          cmdResult.results.length,
+          "Expected " + (n_docs_within(1000) - n_docs_within(500)) +
+              " points geoNear (0, 0) with $minDistance 500 km and $maxDistance 1000 km, got " +
+              cmdResult.results.length);

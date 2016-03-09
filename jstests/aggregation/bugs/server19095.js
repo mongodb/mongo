@@ -8,23 +8,23 @@ load("jstests/aggregation/extras/utils.js");
 
     // Used by testPipeline to sort result documents. All _ids must be primitives.
     function compareId(a, b) {
-      if (a._id < b._id) {
-        return -1;
-      }
-      if (a._id > b._id) {
-        return 1;
-      }
-      return 0;
+        if (a._id < b._id) {
+            return -1;
+        }
+        if (a._id > b._id) {
+            return 1;
+        }
+        return 0;
     }
 
     // Helper for testing that pipeline returns correct set of results.
     function testPipeline(pipeline, expectedResult, collection) {
         assert.eq(collection.aggregate(pipeline).toArray().sort(compareId),
-            expectedResult.sort(compareId));
+                  expectedResult.sort(compareId));
     }
 
     function runTest(coll, from) {
-        var db = null; // Using the db variable is banned in this function.
+        var db = null;  // Using the db variable is banned in this function.
 
         assert.writeOK(coll.insert({_id: 0, a: 1}));
         assert.writeOK(coll.insert({_id: 1, a: null}));
@@ -45,14 +45,9 @@ load("jstests/aggregation/extras/utils.js");
             {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
             {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
         ];
-        testPipeline([{
-            $lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "from",
-                as: "same"
-            }
-        }], expectedResults, coll);
+        testPipeline([{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}],
+                     expectedResults,
+                     coll);
 
         // If localField is nonexistent, it is treated as if it is null.
         expectedResults = [
@@ -61,13 +56,10 @@ load("jstests/aggregation/extras/utils.js");
             {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
         ];
         testPipeline([{
-            $lookup: {
-                localField: "nonexistent",
-                foreignField: "b",
-                from: "from",
-                as: "same"
-            }
-        }], expectedResults, coll);
+            $lookup: {localField: "nonexistent", foreignField: "b", from: "from", as: "same"}
+        }],
+                     expectedResults,
+                     coll);
 
         // If foreignField is nonexistent, it is treated as if it is null.
         expectedResults = [
@@ -76,36 +68,24 @@ load("jstests/aggregation/extras/utils.js");
             {_id: 2, "same": [{_id: 0, b: 1}, {_id: 1, b: null}, {_id: 2}]}
         ];
         testPipeline([{
-            $lookup: {
-                localField: "a",
-                foreignField: "nonexistent",
-                from: "from",
-                as: "same"
-            }
-        }], expectedResults, coll);
+            $lookup: {localField: "a", foreignField: "nonexistent", from: "from", as: "same"}
+        }],
+                     expectedResults,
+                     coll);
 
         // If there are no matches or the from coll doesn't exist, the result is an empty array.
-        expectedResults = [
-            {_id: 0, a: 1, "same": []},
-            {_id: 1, a: null, "same": []},
-            {_id: 2, "same": []}
-        ];
+        expectedResults =
+            [{_id: 0, a: 1, "same": []}, {_id: 1, a: null, "same": []}, {_id: 2, "same": []}];
         testPipeline([{
-            $lookup: {
-                localField: "_id",
-                foreignField: "nonexistent",
-                from: "from",
-                as: "same"
-            }
-        }], expectedResults, coll);
+            $lookup: {localField: "_id", foreignField: "nonexistent", from: "from", as: "same"}
+        }],
+                     expectedResults,
+                     coll);
         testPipeline([{
-            $lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "nonexistent",
-                as: "same"
-            }
-        }], expectedResults, coll);
+            $lookup: {localField: "a", foreignField: "b", from: "nonexistent", as: "same"}
+        }],
+                     expectedResults,
+                     coll);
 
         // If field name specified by "as" already exists, it is overwritten.
         expectedResults = [
@@ -113,42 +93,26 @@ load("jstests/aggregation/extras/utils.js");
             {_id: 1, "a": [{_id: 1, b: null}, {_id: 2}]},
             {_id: 2, "a": [{_id: 1, b: null}, {_id: 2}]}
         ];
-        testPipeline([{
-            $lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "from",
-                as: "a"
-            }
-        }], expectedResults, coll);
-
+        testPipeline([{$lookup: {localField: "a", foreignField: "b", from: "from", as: "a"}}],
+                     expectedResults,
+                     coll);
 
         // Running multiple $lookups in the same pipeline is allowed.
         expectedResults = [
-            {_id: 0, a: 1, "c": [{_id:0, b:1}], "d": [{_id:0, b:1}]},
-            {_id: 1, a: null, "c": [{_id:1, b:null}, {_id:2}], "d": [{_id:1, b:null}, {_id:2}]},
-            {_id: 2, "c": [{_id:1, b:null}, {_id:2}], "d": [{_id:1, b:null}, {_id:2}]}
+            {_id: 0, a: 1, "c": [{_id: 0, b: 1}], "d": [{_id: 0, b: 1}]},
+            {
+              _id: 1,
+              a: null, "c": [{_id: 1, b: null}, {_id: 2}], "d": [{_id: 1, b: null}, {_id: 2}]
+            },
+            {_id: 2, "c": [{_id: 1, b: null}, {_id: 2}], "d": [{_id: 1, b: null}, {_id: 2}]}
         ];
-        testPipeline([{
-            $lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "from",
-                as: "c"
-            }
-        }, {
-            $project: {
-                "a": 1,
-                "c": 1
-            }
-        }, {
-            $lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "from",
-                as: "d"
-            }
-        }], expectedResults, coll);
+        testPipeline([
+            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "c"}},
+            {$project: {"a": 1, "c": 1}},
+            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "d"}}
+        ],
+                     expectedResults,
+                     coll);
 
         //
         // Coalescing with $unwind.
@@ -162,16 +126,12 @@ load("jstests/aggregation/extras/utils.js");
             {_id: 2, same: {_id: 1, b: null}},
             {_id: 2, same: {_id: 2}}
         ];
-        testPipeline([{
-            $lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "from",
-                as: "same"
-            }
-        }, {
-            $unwind: {path: "$same"}
-        }], expectedResults, coll);
+        testPipeline([
+            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}},
+            {$unwind: {path: "$same"}}
+        ],
+                     expectedResults,
+                     coll);
 
         // An $unwind on the "as" field, with includeArrayIndex.
         expectedResults = [
@@ -181,72 +141,39 @@ load("jstests/aggregation/extras/utils.js");
             {_id: 2, same: {_id: 1, b: null}, index: NumberLong(0)},
             {_id: 2, same: {_id: 2}, index: NumberLong(1)},
         ];
-        testPipeline([{
-            $lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "from",
-                as: "same"
-            }
-        }, {
-            $unwind: {
-                path: "$same",
-                includeArrayIndex: "index"
-            }
-        }], expectedResults, coll);
+        testPipeline([
+            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}},
+            {$unwind: {path: "$same", includeArrayIndex: "index"}}
+        ],
+                     expectedResults,
+                     coll);
 
         // Normal $unwind with no matching documents.
         expectedResults = [];
-        testPipeline([{
-            $lookup: {
-                localField: "_id",
-                foreignField: "nonexistent",
-                from: "from",
-                as: "same"
-            }
-        }, {
-            $unwind: {path: "$same"}
-        }], expectedResults, coll);
+        testPipeline([
+            {$lookup: {localField: "_id", foreignField: "nonexistent", from: "from", as: "same"}},
+            {$unwind: {path: "$same"}}
+        ],
+                     expectedResults,
+                     coll);
 
         // $unwind with preserveNullAndEmptyArray with no matching documents.
-        expectedResults = [
-            {_id: 0, a: 1},
-            {_id: 1, a: null},
-            {_id: 2},
-        ];
-        testPipeline([{
-            $lookup: {
-                localField: "_id",
-                foreignField: "nonexistent",
-                from: "from",
-                as: "same"
-            }
-        }, {
-            $unwind: {
-                path: "$same",
-                preserveNullAndEmptyArrays: true
-            }
-        }], expectedResults, coll);
+        expectedResults = [{_id: 0, a: 1}, {_id: 1, a: null}, {_id: 2}, ];
+        testPipeline([
+            {$lookup: {localField: "_id", foreignField: "nonexistent", from: "from", as: "same"}},
+            {$unwind: {path: "$same", preserveNullAndEmptyArrays: true}}
+        ],
+                     expectedResults,
+                     coll);
 
         // $unwind with preserveNullAndEmptyArray, some with matching documents, some without.
-        expectedResults = [
-            {_id: 0, a: 1},
-            {_id: 1, a: null, same: {_id: 0, b: 1}},
-            {_id: 2},
-        ];
-        testPipeline([{
-            $lookup: {
-                localField: "_id",
-                foreignField: "b",
-                from: "from",
-                as: "same"
-            }
-        }, {
-            $unwind: {
-                path: "$same",
-                preserveNullAndEmptyArrays: true
-            }
-        }], expectedResults, coll);
+        expectedResults = [{_id: 0, a: 1}, {_id: 1, a: null, same: {_id: 0, b: 1}}, {_id: 2}, ];
+        testPipeline([
+            {$lookup: {localField: "_id", foreignField: "b", from: "from", as: "same"}},
+            {$unwind: {path: "$same", preserveNullAndEmptyArrays: true}}
+        ],
+                     expectedResults,
+                     coll);
 
         // $unwind with preserveNullAndEmptyArray and includeArrayIndex, some with matching
         // documents, some without.
@@ -255,20 +182,15 @@ load("jstests/aggregation/extras/utils.js");
             {_id: 1, a: null, same: {_id: 0, b: 1}, index: NumberLong(0)},
             {_id: 2, index: null},
         ];
-        testPipeline([{
-            $lookup: {
-                localField: "_id",
-                foreignField: "b",
-                from: "from",
-                as: "same"
+        testPipeline([
+            {$lookup: {localField: "_id", foreignField: "b", from: "from", as: "same"}},
+            {
+              $unwind:
+                  {path: "$same", preserveNullAndEmptyArrays: true, includeArrayIndex: "index"}
             }
-        }, {
-            $unwind: {
-                path: "$same",
-                preserveNullAndEmptyArrays: true,
-                includeArrayIndex: "index"
-            }
-        }], expectedResults, coll);
+        ],
+                     expectedResults,
+                     coll);
 
         //
         // Dependencies.
@@ -281,18 +203,12 @@ load("jstests/aggregation/extras/utils.js");
             {_id: 1, "same": [{_id: 1, b: null}, {_id: 2}]},
             {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
         ];
-        testPipeline([{
-            $lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "from",
-                as: "same"
-            }
-        }, {
-            $project: {
-                "same": 1
-            }
-        }], expectedResults, coll);
+        testPipeline([
+            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}},
+            {$project: {"same": 1}}
+        ],
+                     expectedResults,
+                     coll);
 
         //
         // Dotted field paths.
@@ -312,14 +228,7 @@ load("jstests/aggregation/extras/utils.js");
         assert.writeOK(from.insert({_id: 4, b: {c: 2}}));
 
         // Once without a dotted field.
-        var pipeline = [{
-            $lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "from",
-                as: "same"
-            }
-        }];
+        var pipeline = [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}];
         expectedResults = [
             {_id: 0, a: 1, "same": [{_id: 0, b: 1}]},
             {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
@@ -329,14 +238,7 @@ load("jstests/aggregation/extras/utils.js");
         testPipeline(pipeline, expectedResults, coll);
 
         // Look up a dotted field.
-        pipeline = [{
-            $lookup: {
-                localField: "a.c",
-                foreignField: "b.c",
-                from: "from",
-                as: "same"
-            }
-        }];
+        pipeline = [{$lookup: {localField: "a.c", foreignField: "b.c", from: "from", as: "same"}}];
         // All but the last document in 'coll' have a nullish value for 'a.c'.
         expectedResults = [
             {_id: 0, a: 1, same: [{_id: 0, b: 1}, {_id: 1, b: null}, {_id: 2}]},
@@ -354,25 +256,33 @@ load("jstests/aggregation/extras/utils.js");
         from.drop();
         assert.writeOK(from.insert({_id: 0, target: 1}));
 
-        pipeline = [{
-            $lookup: {
-                localField: "a.b",
-                foreignField: "target",
-                from: "from",
-                as: "same.documents",
+        pipeline = [
+            {
+              $lookup: {
+                  localField: "a.b",
+                  foreignField: "target",
+                  from: "from",
+                  as: "same.documents",
+              }
+            },
+            {
+              // Expected input to $unwind:
+              // {_id: 0, a: {b: 1}, same: {documents: [{_id: 0, target: 1}]}}
+              // {_id: 1, same: {documents: []}}
+              $unwind: {
+                  path: "$same.documents",
+                  preserveNullAndEmptyArrays: true,
+                  includeArrayIndex: "c.d.e",
+              }
             }
-        }, {
-            // Expected input to $unwind:
-            // {_id: 0, a: {b: 1}, same: {documents: [{_id: 0, target: 1}]}}
-            // {_id: 1, same: {documents: []}}
-            $unwind: {
-                path: "$same.documents",
-                preserveNullAndEmptyArrays: true,
-                includeArrayIndex: "c.d.e",
-            }
-        }];
+        ];
         expectedResults = [
-            {_id: 0, a: {b: 1}, same: {documents: {_id: 0, target: 1}}, c: {d: {e: NumberLong(0)}}},
+            {
+              _id: 0,
+              a: {b: 1},
+              same: {documents: {_id: 0, target: 1}},
+              c: {d: {e: NumberLong(0)}}
+            },
             {_id: 1, same: {}, c: {d: {e: null}}},
         ];
         testPipeline(pipeline, expectedResults, coll);
@@ -390,16 +300,16 @@ load("jstests/aggregation/extras/utils.js");
         assert.writeOK(from.insert({_id: 1, b: "string that matches /a regex/"}));
 
         pipeline = [
-            {$lookup: {
-                localField: "a",
-                foreignField: "b",
-                from: "from",
-                as: "b",
-            }},
+            {
+              $lookup: {
+                  localField: "a",
+                  foreignField: "b",
+                  from: "from",
+                  as: "b",
+              }
+            },
         ];
-        expectedResults = [
-            {_id: 0, a: /a regex/, b: [{_id: 0, b: /a regex/}]}
-        ];
+        expectedResults = [{_id: 0, a: /a regex/, b: [{_id: 0, b: /a regex/}]}];
         testPipeline(pipeline, expectedResults, coll);
 
         //
@@ -407,20 +317,21 @@ load("jstests/aggregation/extras/utils.js");
         //
 
         // All four fields must be specified.
-        assertErrorCode(coll, [{$lookup: {foreignField:"b", from:"from", as:"same"}}], 4572);
-        assertErrorCode(coll, [{$lookup: {localField:"a", from:"from", as:"same"}}], 4572);
-        assertErrorCode(coll, [{$lookup: {localField:"a", foreignField:"b", as:"same"}}], 4572);
-        assertErrorCode(coll, [{$lookup: {localField:"a", foreignField:"b", from:"from"}}], 4572);
+        assertErrorCode(coll, [{$lookup: {foreignField: "b", from: "from", as: "same"}}], 4572);
+        assertErrorCode(coll, [{$lookup: {localField: "a", from: "from", as: "same"}}], 4572);
+        assertErrorCode(coll, [{$lookup: {localField: "a", foreignField: "b", as: "same"}}], 4572);
+        assertErrorCode(
+            coll, [{$lookup: {localField: "a", foreignField: "b", from: "from"}}], 4572);
 
         // All four field's values must be strings.
-        assertErrorCode(coll, [{$lookup: {localField:1, foreignField:"b", from:"from", as:"as"}}]
-            , 4570);
-        assertErrorCode(coll, [{$lookup: {localField:"a", foreignField:1, from:"from", as:"as"}}]
-            , 4570);
-        assertErrorCode(coll, [{$lookup: {localField:"a", foreignField:"b", from:1, as:"as"}}]
-            , 4570);
-        assertErrorCode(coll, [{$lookup: {localField:"a", foreignField: "b", from:"from", as:1}}]
-            , 4570);
+        assertErrorCode(
+            coll, [{$lookup: {localField: 1, foreignField: "b", from: "from", as: "as"}}], 4570);
+        assertErrorCode(
+            coll, [{$lookup: {localField: "a", foreignField: 1, from: "from", as: "as"}}], 4570);
+        assertErrorCode(
+            coll, [{$lookup: {localField: "a", foreignField: "b", from: 1, as: "as"}}], 4570);
+        assertErrorCode(
+            coll, [{$lookup: {localField: "a", foreignField: "b", from: "from", as: 1}}], 4570);
 
         // $lookup's field must be an object.
         assertErrorCode(coll, [{$lookup: "string"}], 4569);
@@ -433,21 +344,17 @@ load("jstests/aggregation/extras/utils.js");
 
     // Run tests in a sharded environment.
     var sharded = new ShardingTest({shards: 2, mongos: 1});
-    assert(sharded.adminCommand({enableSharding : "test"}));
+    assert(sharded.adminCommand({enableSharding: "test"}));
     sharded.getDB('test').lookUp.drop();
     sharded.getDB('test').from.drop();
     assert(sharded.adminCommand({shardCollection: "test.lookUp", key: {_id: 'hashed'}}));
     runTest(sharded.getDB('test').lookUp, sharded.getDB('test').from);
 
     // An error is thrown if the from collection is sharded.
-    assert(sharded.adminCommand({ shardCollection:"test.from", key: {_id: 1}}));
-    assertErrorCode(sharded.getDB('test').lookUp, [{
-        $lookup: {
-            localField: "a",
-            foreignField: "b",
-            from: "from",
-            as: "same"
-        }
-    }], 28769);
+    assert(sharded.adminCommand({shardCollection: "test.from", key: {_id: 1}}));
+    assertErrorCode(
+        sharded.getDB('test').lookUp,
+            [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}],
+        28769);
     sharded.stop();
 }());

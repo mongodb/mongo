@@ -6,14 +6,14 @@ t.drop();
 
 function doit() {
     arr = [];
-    for (var i=0; i< 1000*1000;i++)
+    for (var i = 0; i < 1000 * 1000; i++)
         arr.push(i);
 
-    t.insert({a:arr});
+    t.insert({a: arr});
 
-    //t.ensureIndex({a:1}, {background:true}) // always worked
+    // t.ensureIndex({a:1}, {background:true}) // always worked
 
-    t.ensureIndex({a:1}); // used to fail server with out of fds error
+    t.ensureIndex({a: 1});  // used to fail server with out of fds error
 }
 
 doit();

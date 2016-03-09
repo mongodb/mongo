@@ -3,20 +3,16 @@
 // Initialize two replica sets A and B with the same name: A_0; B_0
 // Add B_0 to the replica set A. This operation should fail on replica set A should fail on
 // detecting an inconsistent replica set ID in the heartbeat response metadata from B_0.
-(function () {
+(function() {
     'use strict';
 
     var name = 'disallow_adding_initialized_node1';
-    var replSetA = new ReplSetTest({name: name, nodes: [
-        {rsConfig: {_id: 10}},
-    ]});
-    replSetA.startSet({dbpath : "$set-A-$node"});
+    var replSetA = new ReplSetTest({name: name, nodes: [{rsConfig: {_id: 10}}, ]});
+    replSetA.startSet({dbpath: "$set-A-$node"});
     replSetA.initiate();
 
-    var replSetB = new ReplSetTest({name: name, nodes: [
-        {rsConfig: {_id: 20}},
-    ]});
-    replSetB.startSet({dbpath : "$set-B-$node"});
+    var replSetB = new ReplSetTest({name: name, nodes: [{rsConfig: {_id: 20}}, ]});
+    replSetB.startSet({dbpath: "$set-B-$node"});
     replSetB.initiate();
 
     var primaryA = replSetA.getPrimary();
@@ -34,12 +30,11 @@
     jsTestLog("Adding replica set B's primary " + primaryB.host + " to replica set A's config");
     configA.version++;
     configA.members.push({_id: 11, host: primaryB.host});
-    var reconfigResult = assert.commandFailedWithCode(
-        primaryA.adminCommand({replSetReconfig: configA}),
-        ErrorCodes.NewReplicaSetConfigurationIncompatible);
-    var msgA =
-        'Our replica set ID of ' + configA.settings.replicaSetId + ' did not match that of ' +
-        primaryB.host + ', which is ' + configB.settings.replicaSetId;
+    var reconfigResult =
+        assert.commandFailedWithCode(primaryA.adminCommand({replSetReconfig: configA}),
+                                     ErrorCodes.NewReplicaSetConfigurationIncompatible);
+    var msgA = 'Our replica set ID of ' + configA.settings.replicaSetId +
+        ' did not match that of ' + primaryB.host + ', which is ' + configB.settings.replicaSetId;
     assert.neq(-1, reconfigResult.errmsg.indexOf(msgA));
 
     var newPrimaryA = replSetA.getPrimary();
@@ -61,8 +56,7 @@
             return false;
         }, 'Did not see a log entry containing the following message: ' + msg, 10000, 1000);
     };
-    var msgB =
-        "replica set IDs do not match, ours: " + configB.settings.replicaSetId +
+    var msgB = "replica set IDs do not match, ours: " + configB.settings.replicaSetId +
         "; remote node's: " + configA.settings.replicaSetId;
     checkLog(primaryB, msgB);
 

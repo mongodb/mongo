@@ -16,29 +16,21 @@ var st;
     var dataCollectionName = testDBName + ".data";
 
     jsTest.log("Setting up CSRS sharded cluster");
-    st = new ShardingTest({
-        name: "csrs",
-        mongos: 2,
-        mongosOptions : { noAutoSplit : "" },
-        shards: 2
-    });
+    st = new ShardingTest({name: "csrs", mongos: 2, mongosOptions: {noAutoSplit: ""}, shards: 2});
 
     jsTest.log("Enabling sharding on " + testDBName);
     assert.commandWorked(st.s0.adminCommand({enablesharding: testDBName}));
 
     jsTest.log("Creating a sharded collection " + dataCollectionName);
-    assert.commandWorked(st.s0.adminCommand({
-        shardcollection: dataCollectionName,
-        key: { _id: 1 }
-    }));
+    assert.commandWorked(st.s0.adminCommand({shardcollection: dataCollectionName, key: {_id: 1}}));
 
     jsTest.log("Inserting data into " + dataCollectionName);
-    st.s1.getCollection(dataCollectionName).insert(
-        (function () {
+    st.s1.getCollection(dataCollectionName)
+        .insert((function() {
             var result = [];
             var i;
             for (i = -20; i < 20; ++i) {
-                result.push({ _id: i });
+                result.push({_id: i});
             }
             return result;
         }()));
@@ -46,7 +38,7 @@ var st;
     jsTest.log("Splitting sharded collection " + dataCollectionName);
     var splitCmd = {
         split: dataCollectionName,
-        middle: { _id: 0 }
+        middle: {_id: 0}
     };
     assert.commandWorked(st.s0.adminCommand(splitCmd));
 
@@ -55,10 +47,9 @@ var st;
     st.shard0.restart = true;
     MongoRunner.stopMongod(st.shard0);
     var restartedMongod = MongoRunner.runMongod(st.shard0);
-    assert.isnull(restartedMongod.adminCommand({ serverStatus : 1 }).sharding);
+    assert.isnull(restartedMongod.adminCommand({serverStatus: 1}).sharding);
 
-    jsTest.log("Sending moveChunk command with SCCC configDB string " +
-                "to restarted mongod");
+    jsTest.log("Sending moveChunk command with SCCC configDB string " + "to restarted mongod");
     // We construct a moveChunk command that mimics what a mongos
     // sends to a mongod in order to purposely send an SCCC config string.
     var maxChunkSizeBytes = 52428800;
@@ -73,8 +64,8 @@ var st;
         to: st.shard1.name,
         fromShard: st.shard0.shardName,
         toShard: st.shard1.shardName,
-        min: { _id: 0.0 },
-        max: { _id: MaxKey },
+        min: {_id: 0.0},
+        max: {_id: MaxKey},
         maxChunkSizeBytes: maxChunkSizeBytes,
         configdb: configSCCCString,
         secondaryThrottle: true,
@@ -85,23 +76,23 @@ var st;
     };
     assert.commandWorked(restartedMongod.adminCommand(moveChunkCmd));
 
-    jsTest.log("Ensuring restarted mongod is now sharding-aware " +
-                "and has CSRS config string");
+    jsTest.log("Ensuring restarted mongod is now sharding-aware " + "and has CSRS config string");
 
-    var res = st.shard1.adminCommand({ serverStatus : 1 });
+    var res = st.shard1.adminCommand({serverStatus: 1});
     assert(res.sharding);
     var expectedConfigString = res.sharding.configsvrConnectionString;
     assert(expectedConfigString);
     assert(st.isCSRSConnectionString(expectedConfigString));
 
-    var res = restartedMongod.adminCommand({ serverStatus : 1 });
+    var res = restartedMongod.adminCommand({serverStatus: 1});
     assert(res.sharding);
     var observedConfigString = res.sharding.configsvrConnectionString;
     assert(observedConfigString);
 
-    assert.eq(expectedConfigString, observedConfigString,
-        "Restarted shard mongod's config string " + observedConfigString +
-        " differs from expected config string " + expectedConfigString);
+    assert.eq(expectedConfigString,
+              observedConfigString,
+              "Restarted shard mongod's config string " + observedConfigString +
+                  " differs from expected config string " + expectedConfigString);
 
     st.stop();
 

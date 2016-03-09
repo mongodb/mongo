@@ -8,14 +8,13 @@ var ss = db.serverStatus();
 // Test is only valid in the WT suites which run against a mongod with WiredTiger enabled
 if (ss.storageEngine.name !== "wiredTiger") {
     print("Skipping reconfigwt.js since this server does not have WiredTiger enabled");
-}
-else {
+} else {
     var conn = MongoRunner.runMongod();
 
-    var admin = conn.getDB( "admin" );
+    var admin = conn.getDB("admin");
 
     function reconfigure(str) {
-        ret = admin.runCommand( { setParameter : 1, "wiredTigerEngineRuntimeConfig" : str });
+        ret = admin.runCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": str});
         print("ret: " + tojson(ret));
         return ret;
     }

@@ -8,35 +8,31 @@
  */
 
 var increaseDropDistLockTimeout = function increaseDropDistLockTimeout(db) {
-    var waitTimeSecs = 10 * 60; // 10 minutes
+    var waitTimeSecs = 10 * 60;  // 10 minutes
     assert.commandWorked(db.runCommand({
         configureFailPoint: 'setDropCollDistLockWait',
         mode: 'alwaysOn',
-        data: { waitForSecs: waitTimeSecs }
+        data: {waitForSecs: waitTimeSecs}
     }));
 };
 
 var resetDropDistLockTimeout = function resetDropDistLockTimeout(db) {
-    assert.commandWorked(db.runCommand({
-        configureFailPoint: 'setDropCollDistLockWait',
-        mode: 'off'
-    }));
+    assert.commandWorked(
+        db.runCommand({configureFailPoint: 'setDropCollDistLockWait', mode: 'off'}));
 };
 
 var increaseDropDistLockTimeoutSCCC = function increaseDropDistLockTimeoutSCCC(db) {
-    var waitTimeSecs = 10 * 60; // 10 minutes
+    var waitTimeSecs = 10 * 60;  // 10 minutes
     assert.commandWorked(db.runCommand({
         configureFailPoint: 'setSCCCDropCollDistLockWait',
         mode: 'alwaysOn',
-        data: { waitForSecs: waitTimeSecs }
+        data: {waitForSecs: waitTimeSecs}
     }));
 };
 
 var resetDropDistLockTimeoutSCCC = function resetDropDistLockTimeoutSCCC(db) {
-    assert.commandWorked(db.runCommand({
-        configureFailPoint: 'setSCCCDropCollDistLockWait',
-        mode: 'off'
-    }));
+    assert.commandWorked(
+        db.runCommand({configureFailPoint: 'setSCCCDropCollDistLockWait', mode: 'off'}));
 };
 
 var setYieldAllLocksFailPoint = function setYieldAllLocksFailPoint(db) {
@@ -44,13 +40,10 @@ var setYieldAllLocksFailPoint = function setYieldAllLocksFailPoint(db) {
     assert.commandWorked(db.runCommand({
         configureFailPoint: 'setYieldAllLocksWait',
         mode: 'alwaysOn',
-        data: { waitForMillis: waitTimeMillis }
+        data: {waitForMillis: waitTimeMillis}
     }));
 };
 
 var resetYieldAllLocksFailPoint = function resetYieldAllLocksFailPoint(db) {
-    assert.commandWorked(db.runCommand({
-        configureFailPoint: 'setYieldAllLocksWait',
-        mode: 'off'
-    }));
+    assert.commandWorked(db.runCommand({configureFailPoint: 'setYieldAllLocksWait', mode: 'off'}));
 };

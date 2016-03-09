@@ -5,9 +5,9 @@
     var mongo = db.getMongo();
 
     // Get current log component setttings. We will reset to these later.
-    var originalSettings = assert.commandWorked(
-            db.adminCommand({ getParameter:1, logComponentVerbosity:1 })
-            ).logComponentVerbosity;
+    var originalSettings =
+        assert.commandWorked(db.adminCommand({getParameter: 1, logComponentVerbosity: 1}))
+            .logComponentVerbosity;
 
     // getLogComponents
     var components1 = mongo.getLogComponents();
@@ -37,6 +37,5 @@
 
     // Restore originalSettings
     assert.commandWorked(
-            db.adminCommand({setParameter:1, logComponentVerbosity:originalSettings })
-            );
- }(db));
+        db.adminCommand({setParameter: 1, logComponentVerbosity: originalSettings}));
+}(db));

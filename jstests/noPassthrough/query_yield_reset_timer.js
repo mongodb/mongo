@@ -9,14 +9,16 @@
     // Configure the server so that queries are expected to yield after every 10 work cycles, or
     // after every 500 milliseconds (whichever comes first). In addition, enable a failpoint that
     // introduces a sleep delay of 1 second during each yield.
-    assert.commandWorked(coll.getDB().adminCommand({setParameter: 1,
-                                                    internalQueryExecYieldIterations: 10}));
-    assert.commandWorked(coll.getDB().adminCommand({setParameter: 1,
-                                                    internalQueryExecYieldPeriodMS: 500}));
-    assert.commandWorked(coll.getDB().adminCommand({configureFailPoint: "setYieldAllLocksWait",
-                                                    namespace: coll.getFullName(),
-                                                    mode: "alwaysOn",
-                                                    data: {waitForMillis: 1000}}));
+    assert.commandWorked(
+        coll.getDB().adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}));
+    assert.commandWorked(
+        coll.getDB().adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 500}));
+    assert.commandWorked(coll.getDB().adminCommand({
+        configureFailPoint: "setYieldAllLocksWait",
+        namespace: coll.getFullName(),
+        mode: "alwaysOn",
+        data: {waitForMillis: 1000}
+    }));
 
     // Insert 40 documents in the collection, perform a collection scan, and verify that it yields
     // about 4 times. Since each group of 10 documents should always be processed in less than 500
@@ -30,17 +32,13 @@
     // not during query execution, it should never count towards our 500 millisecond threshold for a
     // timing-based yield (incorrect accounting for timing-based yields was the cause for
     // SERVER-21341).
-    for (var i=0; i<40; ++i) {
+    for (var i = 0; i < 40; ++i) {
         assert.writeOK(coll.insert({}));
     }
     var explainRes = coll.find().explain("executionStats");
     // We expect 4 yields, but we throw in a fudge factor of 2 for test reliability. We also can
     // use "saveState" calls as a proxy for "number of yields" here, because we expect our entire
     // result set to be returned in a single batch.
-    assert.gt(explainRes.executionStats.executionStages.saveState,
-              4 / 2,
-              tojson(explainRes));
-    assert.lt(explainRes.executionStats.executionStages.saveState,
-              4 * 2,
-              tojson(explainRes));
+    assert.gt(explainRes.executionStats.executionStages.saveState, 4 / 2, tojson(explainRes));
+    assert.lt(explainRes.executionStats.executionStages.saveState, 4 * 2, tojson(explainRes));
 })();

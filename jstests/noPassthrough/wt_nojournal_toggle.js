@@ -29,9 +29,10 @@
             }
         };
 
-        return '(' + insertFunction.toString().replace('__checkpoint_template_placeholder__',
-                                                       checkpoint.toString()) +
-               ')();';
+        return '(' +
+            insertFunction.toString().replace('__checkpoint_template_placeholder__',
+                                              checkpoint.toString()) +
+            ')();';
     }
 
     function runTest(options) {
@@ -77,14 +78,15 @@
         assert.neq(null, conn, 'mongod was unable to restart after receiving a SIGKILL');
 
         var testDB = conn.getDB('test');
-        assert.eq(1, testDB.nojournal.count({final: true}),
-                  'final journaled write was not found');
-        assert.lte(100, testDB.nojournal.count({journaled: {$exists: true}}),
+        assert.eq(1, testDB.nojournal.count({final: true}), 'final journaled write was not found');
+        assert.lte(100,
+                   testDB.nojournal.count({journaled: {$exists: true}}),
                    'journaled write operations since the last checkpoint were not replayed');
 
         var initialNumLogWrites = testDB.serverStatus().wiredTiger.log['log write operations'];
         assert.writeOK(testDB.nojournal.insert({a: 1}, {writeConcern: {fsync: true}}));
-        assert.eq(initialNumLogWrites, testDB.serverStatus().wiredTiger.log['log write operations'],
+        assert.eq(initialNumLogWrites,
+                  testDB.serverStatus().wiredTiger.log['log write operations'],
                   'journaling is still enabled even though --nojournal was specified');
 
         MongoRunner.stopMongod(conn);
@@ -102,7 +104,8 @@
         initialNumLogWrites = testDB.serverStatus().wiredTiger.log['log write operations'];
 
         assert.writeOK(testDB.nojournal.insert({a: 1}, {writeConcern: {fsync: true}}));
-        assert.lt(initialNumLogWrites, testDB.serverStatus().wiredTiger.log['log write operations'],
+        assert.lt(initialNumLogWrites,
+                  testDB.serverStatus().wiredTiger.log['log write operations'],
                   'journaling is still disabled even though --journal was specified');
 
         MongoRunner.stopMongod(conn);

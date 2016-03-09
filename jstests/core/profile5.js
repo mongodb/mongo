@@ -20,7 +20,8 @@ t.update({x: {$gt: 3}}, {$set: {y: true}}, {multi: true});
 
 printjson(t.find().toArray());
 
-assert.eq(1, db.system.profile.count({op: "update"}),
+assert.eq(1,
+          db.system.profile.count({op: "update"}),
           "expected exactly one update op in system.profile");
 var prof = db.system.profile.findOne({op: "update"});
 printjson(prof);

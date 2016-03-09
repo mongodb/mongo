@@ -15,7 +15,7 @@ function test(userName) {
     var users = output.authInfo.authenticatedUsers;
 
     var matches = 0;
-    for (var i=0; i < users.length; i++) {
+    for (var i = 0; i < users.length; i++) {
         if (users[i].db != dbName)
             continue;
 
@@ -28,7 +28,7 @@ function test(userName) {
     var roles = output.authInfo.authenticatedUserRoles;
 
     matches = 0;
-    for (var i=0; i < roles.length; i++) {
+    for (var i = 0; i < roles.length; i++) {
         if (roles[i].db != "admin")
             continue;
 
@@ -48,7 +48,7 @@ function test(userName) {
     var privileges = output.authInfo.authenticatedUserPrivileges;
 
     matches = 0;
-    for (var i=0; i < privileges.length; i++) {
+    for (var i = 0; i < privileges.length; i++) {
         if (privileges[i].resource.anyResource) {
             matches++;
         }
@@ -65,4 +65,3 @@ function test(userName) {
 
 test("someone");
 test("someone else");
-

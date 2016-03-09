@@ -8,8 +8,10 @@ var newVersion = "latest";
 var name = "multiversioninitsync";
 
 var multitest = function(replSetVersion, newNodeVersion) {
-    var nodes = {n1: {binVersion: replSetVersion},
-                 n2: {binVersion: replSetVersion}};
+    var nodes = {
+        n1: {binVersion: replSetVersion},
+        n2: {binVersion: replSetVersion}
+    };
 
     print("Start up a two-node " + replSetVersion + " replica set.");
     var rst = new ReplSetTest({name: name, nodes: nodes});
@@ -25,13 +27,12 @@ var multitest = function(replSetVersion, newNodeVersion) {
     var primary = rst.getPrimary();
 
     // Insert some data and wait for replication.
-    for (var i=0; i<25; i++) {
+    for (var i = 0; i < 25; i++) {
         primary.getDB("foo").foo.insert({_id: i});
     }
     rst.awaitReplication();
 
-    print("Bring up a new node with version " + newNodeVersion +
-          " and add to set.");
+    print("Bring up a new node with version " + newNodeVersion + " and add to set.");
     rst.add({binVersion: newNodeVersion});
     rst.reInitiate();
 

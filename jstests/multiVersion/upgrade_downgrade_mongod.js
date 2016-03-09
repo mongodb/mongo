@@ -28,7 +28,7 @@
         while (!db.isMaster().ismaster) {
             sleep(interval);
             var timeNow = new Date().getTime();
-            if (timeNow-timeStart > timeout) {
+            if (timeNow - timeStart > timeout) {
                 return 0;
             }
         }
@@ -42,19 +42,19 @@
         var indexName = 'namedIndex';
 
         assert.commandWorked(testDB.createCollection("capped", {capped: true, size: 10000}),
-            testName + ' basic createCollection');
+                             testName + ' basic createCollection');
         var capped = testDB.capped;
 
         // Insert documents
         for (var i = 0; i < this.data.numColl; i++) {
             if (i < this.data.numCapped) {
-                assert.writeOK(capped.insert({x: i}),  testName + ' basic capped insert');
+                assert.writeOK(capped.insert({x: i}), testName + ' basic capped insert');
             }
             assert.writeOK(coll.insert({x: i, y: i, a: i}), testName + ' basic insert');
         }
         // Create a named index
         assert.commandWorked(coll.createIndex({x: 1}, {name: indexName}),
-            testName + ' basic createIndex');
+                             testName + ' basic createIndex');
         this.data.indexNames[indexName] = 1;
         this.data.numIndex = coll.getIndexes().length;
     }
@@ -93,11 +93,10 @@
         }
         // Ensure TTL monitor will not run
         assert.commandWorked(testDB.adminCommand({setParameter: 1, ttlMonitorEnabled: false}),
-            testName + ' setParameter ttlMonitorEnabled');
+                             testName + ' setParameter ttlMonitorEnabled');
         // Create a named ttl index, expire after 1 hour
-        assert.commandWorked(coll.createIndex(
-                                {date: 1},
-                                {name: indexName, expireAfterSeconds: 60 * 60}),
+        assert.commandWorked(
+            coll.createIndex({date: 1}, {name: indexName, expireAfterSeconds: 60 * 60}),
             testName + ' ttl createIndex');
         this.data.indexNames[indexName] = 1;
         this.data.numIndex = coll.getIndexes().length;
@@ -113,9 +112,8 @@
         // least 2.
         var ttlPass = coll.getDB().serverStatus().metrics.ttl.passes;
         assert.soon(function() {
-                        return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
-                    },
-                    testName + " TTL monitor didn't run before timing out.");
+            return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
+        }, testName + " TTL monitor didn't run before timing out.");
         // All docs should be expired, except 1
         assert.eq(coll.count(), 1, testName + ' ttl count');
     }
@@ -134,18 +132,20 @@
             var past = new Date(this.data.now - (60000 * 60 * i));
             assert.writeOK(coll.insert({x: i, date: past}), testName + ' ttl_partial insert1');
             assert.writeOK(coll.insert({x: i, date: past, z: i}),
-                testName + ' ttl_partial insert2');
+                           testName + ' ttl_partial insert2');
         }
 
         // Ensure TTL monitor will not run
         assert.commandWorked(testDB.adminCommand({setParameter: 1, ttlMonitorEnabled: false}),
-            testName + ' ttl_partial setParameter ttlMonitorEnabled');
+                             testName + ' ttl_partial setParameter ttlMonitorEnabled');
         // Create a named ttl index, expire after 1 hour
-        assert.commandWorked(coll.createIndex(
-                                {date: 1},
-                                {name: indexName, expireAfterSeconds: 60 * 60,
-                                 partialFilterExpression: {z: {$exists: true}}}),
-            testName + ' ttl_partial createIndex');
+        assert.commandWorked(coll.createIndex({date: 1},
+                                              {
+                                                name: indexName,
+                                                expireAfterSeconds: 60 * 60,
+                                                partialFilterExpression: {z: {$exists: true}}
+                                              }),
+                             testName + ' ttl_partial createIndex');
         this.data.indexNames[indexName] = 1;
         this.data.numIndex = coll.getIndexes().length;
     }
@@ -160,9 +160,8 @@
         // least 2.
         var ttlPass = coll.getDB().serverStatus().metrics.ttl.passes;
         assert.soon(function() {
-                        return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
-                    },
-                    testName + " TTL monitor didn't run before timing out.");
+            return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
+        }, testName + " TTL monitor didn't run before timing out.");
 
         // All documents except for 2 have expired because their 'date' field is more than an hour
         // old. However, the partial index does not contain index entries for documents where the
@@ -179,20 +178,19 @@
         var indexName = 'partial_index';
 
         // Create a partial index
-        assert.commandWorked(coll.createIndex(
-                                {x: 1},
-                                {name: indexName,
-                                 partialFilterExpression: {a: {$lt: this.data.partial}}}),
+        assert.commandWorked(
+            coll.createIndex(
+                {x: 1}, {name: indexName, partialFilterExpression: {a: {$lt: this.data.partial}}}),
             testName + ' partial_index createIndex');
         // Insert doc that will be indexed
-        assert.writeOK(coll.insert({x: 1, a: this.data.partial-1}),
-            testName + ' partial_index insert1');
+        assert.writeOK(coll.insert({x: 1, a: this.data.partial - 1}),
+                       testName + ' partial_index insert1');
         // In 3.2 insert doc that will not be indexed
         assert.writeOK(coll.insert({x: 2, a: this.data.partial}),
-            testName + ' partial_index insert2');
+                       testName + ' partial_index insert2');
         assert.eq(coll.validate().keysPerIndex["test.partial.$" + indexName],
-            1,
-            testName + ' partial_index validate');
+                  1,
+                  testName + ' partial_index validate');
         this.data.indexNames[indexName] = 1;
         this.data.numIndex = coll.getIndexes().length;
     }
@@ -204,28 +202,29 @@
         var indexName = 'partial_index';
 
         assert.eq(coll.validate().keysPerIndex["test.partial.$" + indexName],
-            1,
-            testName + ' partial_index validate1');
+                  1,
+                  testName + ' partial_index validate1');
         // Insert doc that will be indexed
         assert.writeOK(coll.insert({x: 3, a: this.data.partial - 2}),
-            testName + ' partial_index insert1');
+                       testName + ' partial_index insert1');
         // In 3.2 insert doc that will not be indexed
         assert.writeOK(coll.insert({x: 4, a: this.data.partial + 1}),
-            testName + ' partial_index insert2');
+                       testName + ' partial_index insert2');
         assert.eq(coll.validate().keysPerIndex["test.partial.$" + indexName],
-            3,
-            testName + ' partial_index validate2');
+                  3,
+                  testName + ' partial_index validate2');
         // Remove the documents with partial indexes
         assert.writeOK(coll.remove({x: 1, a: this.data.partial - 1}),
-            testName + ' partial_index remove1');
+                       testName + ' partial_index remove1');
         assert.writeOK(coll.remove({x: 2, a: this.data.partial}),
-            testName + ' partial_index remove2');
+                       testName + ' partial_index remove2');
         assert.writeOK(coll.remove({x: 3, a: this.data.partial - 2}),
-            testName + ' partial_index remove3');
+                       testName + ' partial_index remove3');
         assert.writeOK(coll.remove({x: 4, a: this.data.partial + 1}),
-            testName + ' partial_index remove4');
-        assert.eq(coll.validate().keysPerIndex["test.partial.$" + indexName], 0,
-            testName + ' partial_index validate3');
+                       testName + ' partial_index remove4');
+        assert.eq(coll.validate().keysPerIndex["test.partial.$" + indexName],
+                  0,
+                  testName + ' partial_index validate3');
     }
 
     function init_document_validation(conn) {
@@ -234,9 +233,8 @@
         var testName = this.name;
 
         // Create collection with document validator and insert 1 valid doc
-        assert.commandWorked(
-            testDB.createCollection("docVal", {validator: {a: {$exists: true}}}),
-            testName + ' document_validation createCollection');
+        assert.commandWorked(testDB.createCollection("docVal", {validator: {a: {$exists: true}}}),
+                             testName + ' document_validation createCollection');
         assert.writeOK(coll.insert({a: 1}), testName + ' document_validation insert1');
         assert.writeError(coll.insert({b: 1}), testName + ' document_validation insert2');
         this.data.docVal = coll.count();
@@ -254,33 +252,35 @@
         assert.writeOK(coll.insert({b: 1}), testName + ' document_validation insert2');
         assert.writeOK(coll.update({b: 1}, {c: 1}), testName + ' document_validation update');
         assert.writeOK(coll.update({b: 3}, {c: 1}, {upsert: true}),
-            testName + ' document_validation upsert');
+                       testName + ' document_validation upsert');
         // Verify documents are there
         assert.eq(coll.count(), this.data.docVal + 3, testName + ' document_validation count2');
     }
 
-    function init_replication(conn){
+    function init_replication(conn) {
         var testDB = conn.getDB('test');
         var testName = this.name;
-        var rsconf = {_id: 'oplog',
-                      members: [ {_id: 0, host: 'localhost:' + conn.port}],
-                      protocolVersion: 0};
+        var rsconf = {
+            _id: 'oplog',
+            members: [{_id: 0, host: 'localhost:' + conn.port}],
+            protocolVersion: 0
+        };
 
-        assert.commandWorked(testDB.adminCommand({replSetInitiate : rsconf}),
-            testName + ' replSetInitiate');
+        assert.commandWorked(testDB.adminCommand({replSetInitiate: rsconf}),
+                             testName + ' replSetInitiate');
         assert(waitForPrimary(testDB), testName + ' host did not become primary');
         // Insert 1 document
         assert.writeOK(testDB.repl.insert({a: 1}), testName + ' insert');
     }
 
-    function verify_replication(conn){
+    function verify_replication(conn) {
         var testDB = conn.getDB('test');
         var testName = this.name;
 
         assert(waitForPrimary(testDB), testName + ' host did not become primary');
         assert.eq(conn.getDB("local").oplog.rs.findOne({ns: "test.repl"}).op,
-            "i",
-            testName + ' replication no oplog entry');
+                  "i",
+                  testName + ' replication no oplog entry');
     }
 
     function init_fullTextSearch(conn) {
@@ -292,7 +292,7 @@
 
         indexSpec[indexName] = 'text';
         assert.commandWorked(coll.createIndex(indexSpec, {default_language: "spanish"}),
-            testName + ' fullTextSearch createIndex');
+                             testName + ' fullTextSearch createIndex');
         this.data.indexNames[indexName] = 1;
         this.data.numIndex = coll.getIndexes().length;
     }
@@ -304,8 +304,10 @@
         var indexName = 'content';
 
         assert.eq(1,
-            coll.getIndexes().filter(function(z){ return z.name == indexName + "_text"; }).length,
-            testName + ' fullTextSearch getIndexes');
+                  coll.getIndexes().filter(function(z) {
+                      return z.name == indexName + "_text";
+                  }).length,
+                  testName + ' fullTextSearch getIndexes');
     }
 
     function init_geo(conn) {
@@ -316,8 +318,7 @@
         var indexSpec = {};
 
         indexSpec[indexName] = '2dsphere';
-        assert.commandWorked(coll.createIndex(indexSpec),
-            testName + ' geo createIndex');
+        assert.commandWorked(coll.createIndex(indexSpec), testName + ' geo createIndex');
         this.data.indexNames[indexName] = 1;
         this.data.numIndex = coll.getIndexes().length;
     }
@@ -329,226 +330,171 @@
         var indexName = 'geo';
 
         assert.eq(1,
-            coll.getIndexes().filter(
-                function(z){ return z.name == indexName + "_2dsphere"; }).length,
-            testName + ' geo getIndexes');
+                  coll.getIndexes().filter(function(z) {
+                      return z.name == indexName + "_2dsphere";
+                  }).length,
+                  testName + ' geo getIndexes');
     }
-
 
     // Upgrade/downgrade tests
     var tests = [
         // Upgrade with mmapv1
         {
-            name: "Upgrade - mmapv1",
-            fromBinVersion: "last-stable",
-            toBinVersion: "latest",
-            storageEngine: "mmapv1",
-            data: {
-                indexNames: {_id_: 1},
-                numCapped: 10,
-                numColl: 50,
-            },
-            init: [init_basic],
-            verify: [verify_basic]
+          name: "Upgrade - mmapv1",
+          fromBinVersion: "last-stable",
+          toBinVersion: "latest",
+          storageEngine: "mmapv1",
+          data: {
+              indexNames: {_id_: 1},
+              numCapped: 10,
+              numColl: 50,
+          },
+          init: [init_basic],
+          verify: [verify_basic]
         },
         // Downgrade with mmapv1
         {
-            name: "Downgrade - mmapv1",
-            fromBinVersion: "latest",
-            toBinVersion: "last-stable",
-            storageEngine: "mmapv1",
-            options: {setParameter: "ttlMonitorSleepSecs=3"},
-            data: {
-                indexNames: {_id_: 1},
-                numCapped: 10,
-                numColl: 50,
-                partial: 5
-            },
-            init: [
-                init_basic,
-                init_ttl,
-                init_partial_index,
-                init_document_validation
-            ],
-            verify: [
-                verify_basic,
-                verify_ttl,
-                verify_partial_index,
-                verify_document_validation
-            ]
+          name: "Downgrade - mmapv1",
+          fromBinVersion: "latest",
+          toBinVersion: "last-stable",
+          storageEngine: "mmapv1",
+          options: {setParameter: "ttlMonitorSleepSecs=3"},
+          data: {indexNames: {_id_: 1}, numCapped: 10, numColl: 50, partial: 5},
+          init: [init_basic, init_ttl, init_partial_index, init_document_validation],
+          verify: [verify_basic, verify_ttl, verify_partial_index, verify_document_validation]
         },
         // Downgrade with mmapv1 - ttl w/partial index
         {
-            name: "Downgrade - mmapv1: ttl with partial index filter",
-            fromBinVersion: "latest",
-            toBinVersion: "last-stable",
-            storageEngine: "mmapv1",
-            options: {setParameter: "ttlMonitorSleepSecs=3"},
-            data: {
-                indexNames: {_id_: 1},
-                numColl: 50,
-                partial: 5
-            },
-            init: [init_ttl_partial],
-            verify: [verify_ttl_partial]
+          name: "Downgrade - mmapv1: ttl with partial index filter",
+          fromBinVersion: "latest",
+          toBinVersion: "last-stable",
+          storageEngine: "mmapv1",
+          options: {setParameter: "ttlMonitorSleepSecs=3"},
+          data: {indexNames: {_id_: 1}, numColl: 50, partial: 5},
+          init: [init_ttl_partial],
+          verify: [verify_ttl_partial]
         },
         // Downgrade with mmapv1 - fullTextSearch index
         {
-            name: "Downgrade - mmapv1: fullTextSearch index",
-            fromBinVersion: "latest",
-            toBinVersion: "last-stable",
-            storageEngine: "mmapv1",
-            data: {
-                indexNames: {_id_: 1},
-                failedConn: true
-            },
-            init: [init_fullTextSearch],
-            verify: [verify_fullTextSearch]
+          name: "Downgrade - mmapv1: fullTextSearch index",
+          fromBinVersion: "latest",
+          toBinVersion: "last-stable",
+          storageEngine: "mmapv1",
+          data: {indexNames: {_id_: 1}, failedConn: true},
+          init: [init_fullTextSearch],
+          verify: [verify_fullTextSearch]
         },
         // Downgrade with mmapv1 - geo index
         {
-            name: "Downgrade - mmapv1: geo index",
-            fromBinVersion: "latest",
-            toBinVersion: "last-stable",
-            storageEngine: "mmapv1",
-            data: {
-                indexNames: {_id_: 1},
-                failedConn: true
-            },
-            init: [init_geo],
-            verify: [verify_geo]
+          name: "Downgrade - mmapv1: geo index",
+          fromBinVersion: "latest",
+          toBinVersion: "last-stable",
+          storageEngine: "mmapv1",
+          data: {indexNames: {_id_: 1}, failedConn: true},
+          init: [init_geo],
+          verify: [verify_geo]
         },
         // Downgrade with mmapv1 - oplog
         {
-            name: "Downgrade - mmapv1: oplog",
-            fromBinVersion: "latest",
-            toBinVersion: "last-stable",
-            storageEngine: "mmapv1",
-            options: {replSet: "oplog"},
-            data: {
-                indexNames: {_id_: 1},
-                numCapped: 10,
-                numColl: 50,
-            },
-            init: [
-                init_replication,
-                init_basic
-            ],
-            verify: [
-                verify_replication,
-                verify_basic
-            ],
+          name: "Downgrade - mmapv1: oplog",
+          fromBinVersion: "latest",
+          toBinVersion: "last-stable",
+          storageEngine: "mmapv1",
+          options: {replSet: "oplog"},
+          data: {
+              indexNames: {_id_: 1},
+              numCapped: 10,
+              numColl: 50,
+          },
+          init: [init_replication, init_basic],
+          verify: [verify_replication, verify_basic],
         },
         // Upgrade with wiredTiger
         {
-            name: "Upgrade - wiredTiger",
-            fromBinVersion: "last-stable",
-            toBinVersion: "latest",
-            storageEngine: "wiredTiger",
-            options: {setParameter: "ttlMonitorSleepSecs=3"},
-            data: {
-                indexNames: {_id_: 1},
-                numCapped: 10,
-                numColl: 50,
-            },
-            init: [
-                init_basic,
-                init_ttl,
-                init_fullTextSearch,
-                init_geo
-            ],
-            verify: [
-                verify_basic,
-                verify_ttl,
-                verify_fullTextSearch,
-                verify_geo
-            ]
+          name: "Upgrade - wiredTiger",
+          fromBinVersion: "last-stable",
+          toBinVersion: "latest",
+          storageEngine: "wiredTiger",
+          options: {setParameter: "ttlMonitorSleepSecs=3"},
+          data: {
+              indexNames: {_id_: 1},
+              numCapped: 10,
+              numColl: 50,
+          },
+          init: [init_basic, init_ttl, init_fullTextSearch, init_geo],
+          verify: [verify_basic, verify_ttl, verify_fullTextSearch, verify_geo]
         },
         // Upgrade with wiredTiger LSM, nojournal
         {
-            name: "Upgrade - wiredTiger: LSM, nojournal",
-            fromBinVersion: "last-stable",
-            toBinVersion: "latest",
-            storageEngine: "wiredTiger",
-            options: {
-                wiredTigerCollectionConfigString: "type=lsm",
-                wiredTigerIndexConfigString: "type=lsm",
-                nojournal: "",
-            },
-            data: {
-                indexNames: {_id_: 1},
-                numCapped: 10,
-                numColl: 50,
-            },
-            init: [init_basic],
-            verify: [verify_basic]
+          name: "Upgrade - wiredTiger: LSM, nojournal",
+          fromBinVersion: "last-stable",
+          toBinVersion: "latest",
+          storageEngine: "wiredTiger",
+          options: {
+              wiredTigerCollectionConfigString: "type=lsm",
+              wiredTigerIndexConfigString: "type=lsm",
+              nojournal: "",
+          },
+          data: {
+              indexNames: {_id_: 1},
+              numCapped: 10,
+              numColl: 50,
+          },
+          init: [init_basic],
+          verify: [verify_basic]
         },
         // Downgrade with wiredTiger
         {
-            name: "Downgrade - wiredTiger",
-            fromBinVersion: "latest",
-            toBinVersion: "last-stable",
-            storageEngine: "wiredTiger",
-            options: {replSet: "oplog"},
-            data: {
-                indexNames: {_id_: 1},
-                numCapped: 10,
-                numColl: 50,
-                partial: 5,
-            },
-            init: [
-                init_replication,
-                init_basic,
-                init_document_validation
-            ],
-            verify: [
-                verify_replication,
-                verify_basic,
-                verify_document_validation
-            ]
+          name: "Downgrade - wiredTiger",
+          fromBinVersion: "latest",
+          toBinVersion: "last-stable",
+          storageEngine: "wiredTiger",
+          options: {replSet: "oplog"},
+          data: {
+              indexNames: {_id_: 1},
+              numCapped: 10,
+              numColl: 50,
+              partial: 5,
+          },
+          init: [init_replication, init_basic, init_document_validation],
+          verify: [verify_replication, verify_basic, verify_document_validation]
         },
         // Downgrade with wiredTiger - ttl w/partial index
         {
-            name: "Downgrade - wiredTiger: ttl with partial index filter",
-            fromBinVersion: "latest",
-            toBinVersion: "last-stable",
-            storageEngine: "wiredTiger",
-            options: {setParameter: "ttlMonitorSleepSecs=3"},
-            data: {
-                indexNames: {_id_: 1},
-                numCapped: 10,
-                numColl: 50,
-                partial: 5,
-            },
-            init: [init_ttl_partial],
-            verify: [verify_ttl_partial]
+          name: "Downgrade - wiredTiger: ttl with partial index filter",
+          fromBinVersion: "latest",
+          toBinVersion: "last-stable",
+          storageEngine: "wiredTiger",
+          options: {setParameter: "ttlMonitorSleepSecs=3"},
+          data: {
+              indexNames: {_id_: 1},
+              numCapped: 10,
+              numColl: 50,
+              partial: 5,
+          },
+          init: [init_ttl_partial],
+          verify: [verify_ttl_partial]
         },
 
         // Downgrade with wiredTiger - fullTextSearch index
         {
-            name: "Downgrade - wiredTiger: fullTextSearch index",
-            fromBinVersion: "latest",
-            toBinVersion: "last-stable",
-            storageEngine: "wiredTiger",
-            data: {
-                indexNames: {_id_: 1},
-                failedConn: true
-            },
-            init: [init_fullTextSearch],
-            verify: [verify_fullTextSearch]
+          name: "Downgrade - wiredTiger: fullTextSearch index",
+          fromBinVersion: "latest",
+          toBinVersion: "last-stable",
+          storageEngine: "wiredTiger",
+          data: {indexNames: {_id_: 1}, failedConn: true},
+          init: [init_fullTextSearch],
+          verify: [verify_fullTextSearch]
         },
         // Downgrade with wiredTiger - geo index
         {
-            name: "Downgrade - wiredTiger: geo index",
-            fromBinVersion: "latest",
-            toBinVersion: "last-stable",
-            storageEngine: "wiredTiger",
-            data: {
-                indexNames: {_id_: 1},
-                failedConn: true
-            },
-            init: [init_geo],
-            verify: [verify_geo]
+          name: "Downgrade - wiredTiger: geo index",
+          fromBinVersion: "latest",
+          toBinVersion: "last-stable",
+          storageEngine: "wiredTiger",
+          data: {indexNames: {_id_: 1}, failedConn: true},
+          init: [init_geo],
+          verify: [verify_geo]
         },
     ];
 

@@ -56,23 +56,20 @@
         // Start a mongod with system-wide defaults for engine-specific index options.
         var conn = MongoRunner.runMongod({
             dbpath: dbpath,
-            noCleanData: true,
-            [engine + 'IndexConfigString']: systemWideConfigString,
+            noCleanData: true, [engine + 'IndexConfigString']: systemWideConfigString,
         });
         assert.neq(null, conn, 'mongod was unable to start up');
 
         var testDB = conn.getDB('test');
-        var cmdObj = {create: 'coll'};
+        var cmdObj = {
+            create: 'coll'
+        };
 
         // Apply collection-wide defaults for engine-specific index options if any were
         // specified.
         if (hasIndexOptionDefaults) {
             cmdObj.indexOptionDefaults = {
-                storageEngine: {
-                    [engine]: {
-                        configString: collOptions.indexOptionDefaults
-                    }
-                }
+                storageEngine: {[engine]: {configString: collOptions.indexOptionDefaults}}
             };
         }
         assert.commandWorked(testDB.runCommand(cmdObj));
@@ -81,10 +78,12 @@
         assert.commandWorked(testDB.coll.createIndex({a: 1}, {name: 'without_options'}));
 
         // Create an index that specifies engine-specific index options.
-        assert.commandWorked(testDB.coll.createIndex({b: 1}, {
-            name: 'with_options',
-            storageEngine: {[engine]: {configString: indexSpecificConfigString}}
-        }));
+        assert.commandWorked(testDB.coll.createIndex(
+            {b: 1},
+            {
+              name: 'with_options',
+              storageEngine: {[engine]: {configString: indexSpecificConfigString}}
+            }));
 
         var collStats = testDB.runCommand({collStats: 'coll'});
         assert.commandWorked(collStats);
@@ -98,49 +97,57 @@
             var indexSpec = getIndexSpecByName(testDB.coll, 'without_options');
             assert(!indexSpec.hasOwnProperty('storageEngine'),
                    'no storage engine options should have been set in the index spec: ' +
-                   tojson(indexSpec));
+                       tojson(indexSpec));
 
             var creationString = indexDetails.without_options.creationString;
             if (hasIndexOptionDefaults) {
-                assert.eq(-1, creationString.indexOf(systemWideConfigString),
+                assert.eq(-1,
+                          creationString.indexOf(systemWideConfigString),
                           'system-wide index option present in the creation string even though a ' +
-                          'collection-wide option was specified: ' + creationString);
-                assert.lte(0, creationString.indexOf(collectionWideConfigString),
+                              'collection-wide option was specified: ' + creationString);
+                assert.lte(0,
+                           creationString.indexOf(collectionWideConfigString),
                            'collection-wide index option not present in the creation string: ' +
-                           creationString);
+                               creationString);
             } else {
-                assert.lte(0, creationString.indexOf(systemWideConfigString),
+                assert.lte(0,
+                           creationString.indexOf(systemWideConfigString),
                            'system-wide index option not present in the creation string: ' +
-                           creationString);
-                assert.eq(-1, creationString.indexOf(collectionWideConfigString),
+                               creationString);
+                assert.eq(-1,
+                          creationString.indexOf(collectionWideConfigString),
                           'collection-wide index option present in creation string even though ' +
-                          'it was not specified: ' + creationString);
+                              'it was not specified: ' + creationString);
             }
 
-            assert.eq(-1, creationString.indexOf(indexSpecificConfigString),
+            assert.eq(-1,
+                      creationString.indexOf(indexSpecificConfigString),
                       'index-specific option present in creation string even though it was not' +
-                      ' specified: ' + creationString);
+                          ' specified: ' + creationString);
         }
 
         function checkIndexWithOptions(indexDetails) {
             var indexSpec = getIndexSpecByName(testDB.coll, 'with_options');
             assert(indexSpec.hasOwnProperty('storageEngine'),
                    'storage engine options should have been set in the index spec: ' +
-                   tojson(indexSpec));
+                       tojson(indexSpec));
             assert.docEq({[engine]: {configString: indexSpecificConfigString}},
                          indexSpec.storageEngine,
                          engine + ' index options not present in the index spec');
 
             var creationString = indexDetails.with_options.creationString;
-            assert.eq(-1, creationString.indexOf(systemWideConfigString),
+            assert.eq(-1,
+                      creationString.indexOf(systemWideConfigString),
                       'system-wide index option present in the creation string even though an ' +
-                      'index-specific option was specified: ' + creationString);
-            assert.eq(-1, creationString.indexOf(collectionWideConfigString),
+                          'index-specific option was specified: ' + creationString);
+            assert.eq(-1,
+                      creationString.indexOf(collectionWideConfigString),
                       'system-wide index option present in the creation string even though an ' +
-                      'index-specific option was specified: ' + creationString);
-            assert.lte(0, creationString.indexOf(indexSpecificConfigString),
-                       'index-specific option not present in the creation string: ' +
-                       creationString);
+                          'index-specific option was specified: ' + creationString);
+            assert.lte(
+                0,
+                creationString.indexOf(indexSpecificConfigString),
+                'index-specific option not present in the creation string: ' + creationString);
         }
     }
 

@@ -1,6 +1,6 @@
 'use strict';
 
-load('jstests/concurrency/fsm_libs/errors.js'); // for IterationEnd
+load('jstests/concurrency/fsm_libs/errors.js');  // for IterationEnd
 
 /**
  * background_base.js
@@ -24,16 +24,16 @@ var $config = (function() {
 
         checkForTermination: function checkForTermination(db, collName) {
             var coll = db.getSiblingDB('config').fsm_background;
-            var numDocs = coll.find({ terminate: true }).itcount();
+            var numDocs = coll.find({terminate: true}).itcount();
             if (numDocs >= 1) {
-               throw new IterationEnd('Background workload was instructed to terminate');
+                throw new IterationEnd('Background workload was instructed to terminate');
             }
         }
     };
 
     var transitions = {
-        wait: { checkForTermination: 1 },
-        checkForTermination: { wait: 1 }
+        wait: {checkForTermination: 1},
+        checkForTermination: {wait: 1}
     };
 
     var teardown = function teardown(db, collName, cluster) {

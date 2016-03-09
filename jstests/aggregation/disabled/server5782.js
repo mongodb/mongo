@@ -20,85 +20,42 @@ load('jstests/aggregation/data/articles.js');
 db = db.getSiblingDB("aggdb");
 
 // Make an article where the author is $author
-db.article.save( {
-    _id : 4,
-    title : "this is the fourth title" ,
-    author : "$author" ,
-    posted : new Date(1079895594000) ,
-    pageViews : 123 ,
-    tags : [ "bad" , "doesnt" , "matter" ] ,
-    comments : [
-        { author :"billy" , text : "i am the one" } ,
-        { author :"jean" , text : "kid is not my son" }
-    ],
-    other : { foo : 9 }
+db.article.save({
+    _id: 4,
+    title: "this is the fourth title",
+    author: "$author",
+    posted: new Date(1079895594000),
+    pageViews: 123,
+    tags: ["bad", "doesnt", "matter"],
+    comments:
+        [{author: "billy", text: "i am the one"}, {author: "jean", text: "kid is not my son"}],
+    other: {foo: 9}
 });
 
 // Create a var to compare against in the aggregation
 var name = "$author";
 
 // Aggregate checking against the field $author
-var l1 = db.article.aggregate(
-    { $project : {
-        author : 1,
-        authorWroteIt : { $eq:["$author", name] }
-    }}
-);
+var l1 = db.article.aggregate({$project: {author: 1, authorWroteIt: {$eq: ["$author", name]}}});
 
 // All should be true since we are comparing a field to itself
 var l1result = [
-    {
-        "_id" : 1,
-        "author" : "bob",
-        "authorWroteIt" : true
-    },
-    {
-        "_id" : 2,
-        "author" : "dave",
-        "authorWroteIt" : true
-    },
-    {
-        "_id" : 3,
-        "author" : "jane",
-        "authorWroteIt" : true
-    },
-    {
-        "_id" : 4,
-        "author" : "$author",
-        "authorWroteIt" : true
-    }
+    {"_id": 1, "author": "bob", "authorWroteIt": true},
+    {"_id": 2, "author": "dave", "authorWroteIt": true},
+    {"_id": 3, "author": "jane", "authorWroteIt": true},
+    {"_id": 4, "author": "$author", "authorWroteIt": true}
 ];
 
 // Aggregate checking against the literal string $author
 var l2 = db.article.aggregate(
-    { $project : {
-        author : 1,
-        authorWroteIt : { $eq:["$author", { $literal: name } ] }
-    }}
-);
+    {$project: {author: 1, authorWroteIt: {$eq: ["$author", {$literal: name}]}}});
 
 // Only the one written by $author should be true
 var l2result = [
-    {
-        "_id" : 1,
-        "author" : "bob",
-        "authorWroteIt" : false
-    },
-    {
-        "_id" : 2,
-        "author" : "dave",
-        "authorWroteIt" : false
-    },
-    {
-        "_id" : 3,
-        "author" : "jane",
-        "authorWroteIt" : false
-    },
-    {
-        "_id" : 4,
-        "author" : "$author",
-        "authorWroteIt" : true
-    }
+    {"_id": 1, "author": "bob", "authorWroteIt": false},
+    {"_id": 2, "author": "dave", "authorWroteIt": false},
+    {"_id": 3, "author": "jane", "authorWroteIt": false},
+    {"_id": 4, "author": "$author", "authorWroteIt": true}
 ];
 
 // Asserts

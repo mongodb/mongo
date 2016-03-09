@@ -3,7 +3,7 @@
  * functionality, so we'll just check that it succeeds and fails when it's supposed to.
  */
 
-(function () {
+(function() {
     "use strict";
     var name = "getstatus";
     var numNodes = 4;
@@ -12,15 +12,15 @@
 
     var config = replTest.getReplSetConfig();
     config.members[numNodes - 1].arbiterOnly = true;
-    //An invalid time to get status
+    // An invalid time to get status
     var statusBeforeInitCode = 94;
     assert.commandFailedWithCode(nodes[0].getDB("admin").runCommand({replSetGetStatus: 1}),
                                  statusBeforeInitCode,
-                                 "replSetGetStatus should fail before initializing." );
+                                 "replSetGetStatus should fail before initializing.");
     replTest.initiate(config);
     replTest.awaitSecondaryNodes();
 
-    //A valid status
+    // A valid status
     var primary = replTest.getPrimary();
     assert.commandWorked(primary.getDB("admin").runCommand({replSetGetStatus: 1}));
 

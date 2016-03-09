@@ -54,8 +54,8 @@ load('jstests/aggregation/extras/utils.js');
 
     // These expressions are associative and commutative so inner expression can be combined with
     // outer.
-    testOp({$sum: ["$a", 2, 3, {$sum : [4, 5]}]}, 15);
-    testOp({$min: ["$a", 2, 3, {$min : [4, 5]}]}, 1);
+    testOp({$sum: ["$a", 2, 3, {$sum: [4, 5]}]}, 15);
+    testOp({$min: ["$a", 2, 3, {$min: [4, 5]}]}, 1);
     testOp({$max: ["$a", 2, 3, {$max: [4, 5]}]}, 5);
 
     // These expressions are not associative and commutative so inner expression cannot be combined
@@ -67,7 +67,7 @@ load('jstests/aggregation/extras/utils.js');
     // If isAssociativeAndCommutative() did not return false when provided a single argument, the
     // single array argument provided to the inner expression would be ignored instead of treated
     // as a list of arguments, and these tests would fail.
-    testOp({$sum: ["$a", 2, 3, {$sum : [[4, 5]]}]}, 15);
-    testOp({$min: ["$a", 2, 3, {$min : [[4, 5]]}]}, 1);
+    testOp({$sum: ["$a", 2, 3, {$sum: [[4, 5]]}]}, 15);
+    testOp({$min: ["$a", 2, 3, {$min: [[4, 5]]}]}, 1);
     testOp({$max: ["$a", 2, 3, {$max: [[4, 5]]}]}, 5);
 }());

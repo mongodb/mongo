@@ -31,11 +31,11 @@ var st;
     /**
      * Runs a split command with a never-before used middle split point. Returns the command result.
      */
-    var runNextSplit = function (snode) {
+    var runNextSplit = function(snode) {
         var splitPoint = nextSplit;
         nextSplit += 10;
-        return snode.adminCommand({split: coordinator.getShardedCollectionName(),
-                                   middle: { _id: splitPoint }});
+        return snode.adminCommand(
+            {split: coordinator.getShardedCollectionName(), middle: {_id: splitPoint}});
     };
 
     /**
@@ -43,7 +43,7 @@ var st;
      * spliting the data collection, and doing basic crud ops against the data collection, and
      * expects all operations to succeed.
      */
-    var assertOpsWork = function (snode, msg) {
+    var assertOpsWork = function(snode, msg) {
         if (msg) {
             jsTest.log("Confirming that " + snode.name + " CAN run basic sharding ops " + msg);
         }
@@ -55,14 +55,14 @@ var st;
         assert.eq(40, dataColl.find().itcount());
         assert.writeOK(dataColl.insert({_id: 100, x: 1}));
         assert.writeOK(dataColl.update({_id: 100}, {$inc: {x: 1}}));
-        assert.writeOK(dataColl.remove({x:2}));
+        assert.writeOK(dataColl.remove({x: 2}));
     };
 
     /**
      * Runs a config.version read, then splits the data collection and expects the read to succed
      * and the split to fail.
      */
-    var assertCannotSplit = function (snode, msg) {
+    var assertCannotSplit = function(snode, msg) {
         jsTest.log("Confirming that " + snode.name + " CANNOT run a split " + msg);
         assert(snode.getCollection("config.version").findOne());
         assert.commandFailed(runNextSplit(snode));
@@ -73,17 +73,18 @@ var st;
     assert.commandWorked(runNextSplit(coordinator.getMongos(0)));
     assert.commandWorked(coordinator.getMongos(0).adminCommand({
         moveChunk: coordinator.getShardedCollectionName(),
-        find: { _id: 0 },
+        find: {_id: 0},
         to: coordinator.getShardName(1)
     }));
 
     jsTest.log("Inserting data into " + coordinator.getShardedCollectionName());
-    coordinator.getMongos(1).getCollection(coordinator.getShardedCollectionName()).insert(
-        (function () {
+    coordinator.getMongos(1)
+        .getCollection(coordinator.getShardedCollectionName())
+        .insert((function() {
             var result = [];
             var i;
             for (i = -20; i < 20; ++i) {
-                result.push({ _id: i });
+                result.push({_id: i});
             }
             return result;
         }()));
@@ -99,7 +100,7 @@ var st;
                "node with secondaries");
     assertOpsWork(coordinator.getMongos(0),
                   "using SCCC protocol when first config server is primary of " +
-                  coordinator.getCSRSNodes().length + "-node replica set");
+                      coordinator.getCSRSNodes().length + "-node replica set");
 
     coordinator.waitUntilConfigsCaughtUp();
     coordinator.shutdownOneSCCCNode();

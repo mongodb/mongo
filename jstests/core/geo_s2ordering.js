@@ -16,20 +16,21 @@ function makepoints(needle) {
     for (var x = -points; x < points; x += 1) {
         for (var y = -points; y < points; y += 1) {
             tag = x.toString() + "," + y.toString();
-            bulk.insert({ nongeo: tag,
-                          geo: {
-                              type: "Point",
-                              coordinates: [lng + x/points, lat + y/points]}});
+            bulk.insert({
+                nongeo: tag,
+                geo: {type: "Point", coordinates: [lng + x / points, lat + y / points]}
+            });
         }
     }
-    bulk.insert({ nongeo: needle, geo: { type: "Point", coordinates: [0,0] }});
+    bulk.insert({nongeo: needle, geo: {type: "Point", coordinates: [0, 0]}});
     assert.writeOK(bulk.execute());
 }
 
 function runTest(index) {
     t.ensureIndex(index);
     var resultcount = 0;
-    var cursor = t.find({nongeo: needle, geo: {$within: {$centerSphere: [[0,0], Math.PI/180.0]}}});
+    var cursor =
+        t.find({nongeo: needle, geo: {$within: {$centerSphere: [[0, 0], Math.PI / 180.0]}}});
 
     var stats = cursor.explain("executionStats").executionStats;
     t.dropIndex(index);

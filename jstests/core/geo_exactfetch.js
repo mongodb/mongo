@@ -10,8 +10,8 @@ function test(indexname) {
     t.dropIndex({lon_lat: indexname, population: -1});
 }
 
-t.insert({ city: "B", lon_lat: [-71.34895, 42.46037], population: 1000});
-t.insert({ city: "A", lon_lat: [1.48736, 42.55327], population: 100});
+t.insert({city: "B", lon_lat: [-71.34895, 42.46037], population: 1000});
+t.insert({city: "A", lon_lat: [1.48736, 42.55327], population: 100});
 
 test("2d");
 test("2dsphere");
