@@ -10,15 +10,11 @@ objId = ObjectId();
 
 c.insert({a: new NumberInt(1), b: objId, c: [1, 2, 3], d: {a: "hello", b: "world"}, e: '-'});
 c.insert({a: -2.0, c: MinKey, d: "Then he said, \"Hello World!\"", e: new NumberLong(3)});
-c.insert({
-    a: new BinData(0, "1234"),
-    b: ISODate("2009-08-27T12:34:56.789"),
-    c: new Timestamp(1234, 9876),
-    d: /foo*\"bar\"/i,
-    e: function foo() {
-        print("Hello World!");
-    }
-});
+// clang-format off
+c.insert({ a : new BinData(0, "1234"), b : ISODate("2009-08-27T12:34:56.789"),
+           c : new Timestamp(1234, 9876), d : /foo*\"bar\"/i,
+           e : function foo() { print("Hello World!"); }});
+// clang-format on
 
 assert.eq(3, c.count(), "setup2");
 
@@ -45,15 +41,11 @@ expected.push({
 expected.push({a: -2.0, b: "", c: "$MinKey", d: "Then he said, \"Hello World!\"", e: 3});
 // "t" should be 1234, but the shell interprets the first field of timestamps as milliseconds while
 // they are stored as seconds.  See SERVER-7718.
-expected.push({
-    a: "D76DF8",
-    b: "2009-08-27T12:34:56.789Z",
-    c: {"$timestamp": {"t": 1234, "i": 9876}},
-    d: "/foo*\\\"bar\\\"/i",
-    e: tojson(function foo() {
-        print("Hello World!");
-    })
-});
+// clang-format off
+expected.push({ a : "D76DF8", b : "2009-08-27T12:34:56.789Z",
+                c : { "$timestamp" : { "t" : 1234, "i" : 9876 } },
+                d : "/foo*\\\"bar\\\"/i", e : tojson(function foo() { print("Hello World!"); })});
+// clang-format on
 
 actual = [];
 actual.push(c.find({a: 1}).toArray()[0]);
