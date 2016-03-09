@@ -13,16 +13,14 @@ import (
 
 type ScopeReport struct {
 	Title string
-	ID    string
 	File  string
 	Line  int
 }
 
-func NewScopeReport(title, name string) *ScopeReport {
+func NewScopeReport(title string) *ScopeReport {
 	file, line, _ := gotest.ResolveExternalCaller()
 	self := new(ScopeReport)
 	self.Title = title
-	self.ID = fmt.Sprintf("%s|%s", title, name)
 	self.File = file
 	self.Line = line
 	return self
@@ -78,10 +76,12 @@ func removePackagePath(name string) string {
 
 /////////////////// FailureView ////////////////////////
 
+// This struct is also declared in github.com/smartystreets/assertions.
+// The json struct tags should be equal in both declarations.
 type FailureView struct {
-	Message  string
-	Expected string
-	Actual   string
+	Message  string `json:"Message"`
+	Expected string `json:"Expected"`
+	Actual   string `json:"Actual"`
 }
 
 ////////////////////AssertionResult //////////////////////

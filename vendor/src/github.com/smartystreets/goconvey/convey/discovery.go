@@ -1,54 +1,100 @@
 package convey
 
-func discover(items []interface{}) *registration {
-	ensureEnough(items)
+type actionSpecifier uint8
 
-	name := parseName(items)
-	test := parseGoTest(items)
-	action := parseAction(items, test)
+const (
+	noSpecifier actionSpecifier = iota
+	skipConvey
+	focusConvey
+)
 
-	return newRegistration(name, action, test)
+type suite struct {
+	Situation string
+	Test      t
+	Focus     bool
+	Func      func(C) // nil means skipped
+	FailMode  FailureMode
 }
-func ensureEnough(items []interface{}) {
-	if len(items) < 2 {
-		panic(parseError)
+
+func newSuite(situation string, failureMode FailureMode, f func(C), test t, specifier actionSpecifier) *suite {
+	ret := &suite{
+		Situation: situation,
+		Test:      test,
+		Func:      f,
+		FailMode:  failureMode,
 	}
-}
-func parseName(items []interface{}) string {
-	if name, parsed := items[0].(string); parsed {
-		return name
+	switch specifier {
+	case skipConvey:
+		ret.Func = nil
+	case focusConvey:
+		ret.Focus = true
 	}
-	panic(parseError)
+	return ret
 }
-func parseGoTest(items []interface{}) t {
-	if test, parsed := items[1].(t); parsed {
-		return test
-	}
-	return nil
-}
-func parseAction(items []interface{}, test t) *action {
-	var index = 1
-	var failure = FailureInherits
-	if test != nil {
-		index = 2
+
+func discover(items []interface{}) *suite {
+	name, items := parseName(items)
+	test, items := parseGoTest(items)
+	failure, items := parseFailureMode(items)
+	action, items := parseAction(items)
+	specifier, items := parseSpecifier(items)
+
+	if len(items) != 0 {
+		conveyPanic(parseError)
 	}
 
-	if mode, parsed := items[index].(FailureMode); parsed {
-		failure = mode
-		index += 1
+	return newSuite(name, failure, action, test, specifier)
+}
+func item(items []interface{}) interface{} {
+	if len(items) == 0 {
+		conveyPanic(parseError)
 	}
-
-	if action, parsed := items[index].(func()); parsed {
-		return newAction(action, failure)
+	return items[0]
+}
+func parseName(items []interface{}) (string, []interface{}) {
+	if name, parsed := item(items).(string); parsed {
+		return name, items[1:]
 	}
-	if items[index] == nil {
-		return newSkippedAction(skipReport, failure)
+	conveyPanic(parseError)
+	panic("never get here")
+}
+func parseGoTest(items []interface{}) (t, []interface{}) {
+	if test, parsed := item(items).(t); parsed {
+		return test, items[1:]
 	}
-	panic(parseError)
+	return nil, items
+}
+func parseFailureMode(items []interface{}) (FailureMode, []interface{}) {
+	if mode, parsed := item(items).(FailureMode); parsed {
+		return mode, items[1:]
+	}
+	return FailureInherits, items
+}
+func parseAction(items []interface{}) (func(C), []interface{}) {
+	switch x := item(items).(type) {
+	case nil:
+		return nil, items[1:]
+	case func(C):
+		return x, items[1:]
+	case func():
+		return func(C) { x() }, items[1:]
+	}
+	conveyPanic(parseError)
+	panic("never get here")
+}
+func parseSpecifier(items []interface{}) (actionSpecifier, []interface{}) {
+	if len(items) == 0 {
+		return noSpecifier, items
+	}
+	if spec, ok := items[0].(actionSpecifier); ok {
+		return spec, items[1:]
+	}
+	conveyPanic(parseError)
+	panic("never get here")
 }
 
 // This interface allows us to pass the *testing.T struct
-// throughout the internals of this tool without ever
+// throughout the internals of this package without ever
 // having to import the "testing" package.
 type t interface {
 	Fail()

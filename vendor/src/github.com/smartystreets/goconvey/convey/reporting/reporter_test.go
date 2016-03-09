@@ -14,7 +14,7 @@ func TestEachNestedReporterReceivesTheCallFromTheContainingReporter(t *testing.T
 	assertTrue(t, fake1.begun)
 	assertTrue(t, fake2.begun)
 
-	reporter.Enter(NewScopeReport("scope", "hi"))
+	reporter.Enter(NewScopeReport("scope"))
 	assertTrue(t, fake1.entered)
 	assertTrue(t, fake2.entered)
 

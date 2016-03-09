@@ -12,10 +12,14 @@ type Parser struct {
 
 func (self *Parser) Parse(packages []*contract.Package) {
 	for _, p := range packages {
-		if p.Active {
+		if p.Active() && p.HasUsableResult() {
 			self.parser(p.Result, p.Output)
-		} else {
+		} else if p.Ignored {
 			p.Result.Outcome = contract.Ignored
+		} else if p.Disabled {
+			p.Result.Outcome = contract.Disabled
+		} else {
+			p.Result.Outcome = contract.TestRunAbortedUnexpectedly
 		}
 		log.Printf("[%s]: %s\n", p.Result.Outcome, p.Name)
 	}

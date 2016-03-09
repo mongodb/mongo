@@ -4,13 +4,17 @@ import (
 	"flag"
 	"os"
 
+	"github.com/jtolds/gls"
+	"github.com/smartystreets/assertions"
 	"github.com/smartystreets/goconvey/convey/reporting"
 )
 
 func init() {
+	assertions.GoConveyMode(true)
+
 	declareFlags()
 
-	suites = newSuiteContext()
+	ctxMgr = gls.NewContextManager()
 }
 
 func declareFlags() {
@@ -30,14 +34,19 @@ func noStoryFlagProvided() bool {
 }
 
 func buildReporter() reporting.Reporter {
+	selectReporter := os.Getenv("GOCONVEY_REPORTER")
+
 	switch {
 	case testReporter != nil:
 		return testReporter
-	case json:
+	case json || selectReporter == "json":
 		return reporting.BuildJsonReporter()
-	case silent:
+	case silent || selectReporter == "silent":
 		return reporting.BuildSilentReporter()
-	case story:
+	case selectReporter == "dot":
+		// Story is turned on when verbose is set, so we need to check for dot reporter first.
+		return reporting.BuildDotReporter()
+	case story || selectReporter == "story":
 		return reporting.BuildStoryReporter()
 	default:
 		return reporting.BuildDotReporter()
@@ -45,7 +54,7 @@ func buildReporter() reporting.Reporter {
 }
 
 var (
-	suites *suiteContext
+	ctxMgr *gls.ContextManager
 
 	// only set by internal tests
 	testReporter reporting.Reporter

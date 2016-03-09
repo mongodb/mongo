@@ -2,6 +2,7 @@
 <html>
 	<head>
 		<title>GoConvey</title>
+		<meta name="apple-mobile-web-app-capable" content="yes">
 		<link rel="stylesheet" href="/resources/css/font-awesome.min.css">
 		<link rel="stylesheet" href="/resources/css/tipsy.css">
 		<link rel="stylesheet" href="/resources/css/common.css">
@@ -9,12 +10,12 @@
 		<link rel="shortcut icon" class="favicon" href="/favicon.ico" type="image/vnd.microsoft.icon">
 		<script src="/resources/js/lib/markup.min.js"></script>
 		<script src="/resources/js/lib/moment.min.js"></script>
+		<script src="/resources/js/lib/ansispan.js"></script>
 		<script src="/resources/js/lib/diff-match-patch.min.js"></script>
 		<script src="/resources/js/lib/jquery-2_1_0.min.js"></script>
 		<script src="/resources/js/lib/jquery-ui-1_10_3-custom.min.js"></script>
 		<script src="/resources/js/lib/jquery.pretty-text-diff.min.js"></script>
 		<script src="/resources/js/lib/jquery.tipsy.min.js"></script>
-		<script src="/resources/js/lib/jquery.waypoints.sticky.min.js"></script>
 
 		<!-- Script ordering is important -->
 		<script src="/resources/js/poller.js"></script>
@@ -45,7 +46,7 @@
 					<ul class="float-right" id="control-buttons">
 						<li class="fa fa-pause" id="play-pause" title="Play/pause tests"></li>
 						<li class="fa fa-refresh" id="run-tests" title="Run tests"></li>
-						<li class="fa fa-clock-o" id="show-history" title="Test history"></li>
+						<li class="fa fa-history" id="show-history" title="Test history"></li>
 						<li class="fa fa-bell-o" id="toggle-notif" title="Toggle notifications"></li>
 						<li class="fa fa-cog" id="show-settings" title="Settings"></li>
 						<li class="fa fa-pencil-square-o" id="show-gen" title="Composer"></li>
@@ -74,7 +75,7 @@
 						</div>
 						<div class="setting">
 							<div class="setting-meta">
-								Default View
+								Default
 							</div>
 							<div class="setting-val">
 								<ol class="enum" id="pkg-expand-collapse">
@@ -91,6 +92,17 @@
 								<ol class="enum" id="show-debug-output">
 									<li data-show-debug-output="show">Show</li>
 									<li data-show-debug-output="hide">Hide</li>
+								</ol>
+							</div>
+						</div>
+						<div class="setting">
+							<div class="setting-meta">
+								Effects
+							</div>
+							<div class="setting-val">
+								<ol class="enum" id="ui-effects">
+									<li data-ui-effects="true">Cinematic</li>
+									<li data-ui-effects="false">Off</li>
 								</ol>
 							</div>
 						</div>
@@ -137,6 +149,23 @@
 					</div>
 				</script>
 
+
+
+				<div class="toggler" data-toggle="ignored">
+					Ignored
+				</div>
+				<div class="togglable" id="ignored"><!-- Populated by Javascript --></div>
+				<script id="tpl-ignored" type="text/template">
+					<div class="templated">
+						<div class="rtl pkg-list">
+						{{.}}
+							<div>
+								<a class="fa fa-level-down" href="#pkg-{{_id}}" style="padding: 0 5px;"></a>{{PackageName|boldPkgName}}
+							</div>
+						{{/.}}
+						</div>
+					</div>
+				</script>
 
 
 				<div class="toggler" data-toggle="notestfn">
@@ -206,7 +235,7 @@
 						{{.}}
 						<div class="buildfail">
 							<div class="buildfail-pkg"><i class="fa fa-wrench"></i>&nbsp; {{PackageName|boldPkgName}}</div>
-							<div class="buildfail-output">{{BuildOutput|showhtml}}</div>
+							<div class="buildfail-output">{{BuildOutput|htmlSafe|ansiColours}}</div>
 						</div>
 						{{/.}}
 					</div>
@@ -223,19 +252,25 @@
 						{{.}}
 						<div class="panic">
 							<div class="panic-pkg">
-								<i class="fa fa-exclamation"></i>&nbsp; {{_pkg|boldPkgName}}
+								<i class="fa fa-bomb"></i>&nbsp; {{_pkg|boldPkgName}}
 							</div>
 						<div class="panic-details">
 							<div class="panic-story">
-							<div class="panic-file">{{if File|notempty}}{{File|relativePath|boldPkgName}}:{{Line}}{{else}}{{TestName}}{{/if}}</div>
-						{{if _path|notempty}}
-							{{_path}}
-								<div{{if Depth|more>-1}} class="depth-{{Depth}}"{{/if}}>{{Title}}</div>
-							{{/_path}}
-						{{/if}}
-								{{if StackTrace|notempty}}<div class="depth-{{_maxDepth}} panic-summary">{{Error}}</div>{{/if}}
+							<div class="panic-file">
+								{{if File|notempty}}
+								<a href="goconvey://open/?url=file://{{File|url}}&line={{Line}}">{{File|relativePath}}{{if Line|more>0}}:{{Line}}{{/if}}&nbsp; <i class="fa fa-external-link"></i></a>
+								{{else}}
+								<b>{{TestName}}</b>
+								{{/if}}
+						</div>
+					{{if _path|notempty}}
+						{{_path}}
+							<div class="story-links{{if Depth|more>-1}} depth-{{Depth}}{{/if}}"><a href="#test-{{_id}}">{{Title}}</a></div>
+						{{/_path}}
+					{{/if}}
+							{{if StackTrace|notempty}}<div class="depth-{{_maxDepth}} panic-summary">{{Error}}</div>{{/if}}
 							</div>
-							<div class="panic-output">{{if StackTrace|empty}}{{Error|showhtml}}{{else}}{{StackTrace|showhtml}}{{/if}}</div>
+							<div class="panic-output">{{if StackTrace|empty}}{{Error|htmlSafe|ansiColours}}{{else}}{{StackTrace|htmlSafe|ansiColours}}{{/if}}</div>
 						</div>
 						{{/.}}
 					</div>
@@ -252,26 +287,32 @@
 					<div class="templated">
 						{{.}}
 						<div class="failure">
-							<div class="failure-pkg"><i class="fa fa-chain-broken"></i>&nbsp; {{_pkg|boldPkgName}}</div>
+							<div class="failure-pkg"><i class="fa fa-file-code-o"></i>&nbsp; {{_pkg|boldPkgName}}</div>
 							<div class="failure-details">
 								<div class="failure-story">
-									<div class="failure-file"><a href="javascript:">{{if File|notempty}}{{File|relativePath|boldPkgName}}{{else}}{{TestName}}{{/if}}</b></a>&nbsp; &nbsp; &middot; &nbsp; &nbsp;{{if Line|more>0}}<a href="goconvey://open/?url=file://{{File|url}}&line={{Line}}"><i class="fa fa-share"></i> Line {{Line}}</a>{{/if}}</div>
+									<div class="failure-file">
+										{{if File|notempty}}
+										<a href="goconvey://open/?url=file://{{File|url}}&line={{Line}}">{{File|relativePath}}{{if Line|more>0}}:{{Line}}{{/if}}&nbsp; <i class="fa fa-external-link"></i></a>
+										{{else}}
+										<b class="test-name-link"><a href="#test-{{_id}}">{{TestName}}</a></b>
+										{{/if}}
+									</div>
 							{{if _path|notempty}}
 								{{_path}}
-									<div{{if Depth|more>-1}} class="depth-{{Depth}}"{{/if}}>{{Title}}</div>
+									<div class="story-links{{if Depth|more>-1}} depth-{{Depth}}{{/if}}"><a href="#test-{{_id}}">{{Title}}</a></div>
 								{{/_path}}
 							{{/if}}
 								</div>
-								<div class="failure-output">{{if Failure|notempty}}{{Failure|showhtml}}{{else}}{{if Message|notempty}}{{Message|showhtml}}{{else}}{{StackTrace|showhtml}}{{/if}}{{/if}}</div>
+								<div class="failure-output">{{if Failure|notempty}}{{Failure|htmlSafe|ansiColours}}{{else}}{{if Message|notempty}}{{Message|htmlSafe|ansiColours}}{{else}}{{StackTrace|htmlSafe|ansiColours}}{{/if}}{{/if}}</div>
 								{{if .|needsDiff}}
 								<table class="diffviewer">
 									<tr>
 										<td class="exp">Expected</td>
-										<td class="original">{{Expected|showhtml}}</td>
+										<td class="original">{{Expected|htmlSafe|ansiColours}}</td>
 									</tr>
 									<tr>
 										<td class="act">Actual</td>
-										<td class="changed">{{Actual|showhtml}}</td>
+										<td class="changed">{{Actual|htmlSafe|ansiColours}}</td>
 									</tr>
 									<tr>
 										<td>Diff</td>
@@ -315,11 +356,15 @@
 								{{if _skipped|more>0}}<span class="story-pkg-skip-count">&nbsp; <span class="statusicon skip"><b>S</b></span> {{_skipped}}</span>{{/if}}
 							</td>
 							<td class="story-pkg-watch-td">
+								{{if Outcome|equals>disabled}}
+								<span class="fa fa-lg fa-eye-slash disabled" title="Disabled"></span>
+								{{else}}
 								<a class="fa fa-lg ignore {{if Outcome|notequals>ignored}}fa-eye unwatch{{else}}fa-eye-slash watch clr-red{{/if}}" href="javascript:" title="Toggle ignore" data-pkg="{{PackageName}}"></a>
+								{{/if}}
 							</td>
 						</tr>
 						{{TestResults}}
-						<tr class="story-line {{if _status.class}}{{_status.class}}{{else}}skip{{/if}} test-{{_id}} pkg-{{_pkgid}}">
+						<tr id="test-{{_id}}" class="story-line {{if _status.class}}{{_status.class}}{{else}}skip{{/if}} test-{{_id}} pkg-{{_pkgid}}">
 							<td class="story-line-status"></td>
 							<td class="story-line-summary-container">
 								
@@ -332,8 +377,8 @@
 
 							</td>
 							<td colspan="3" class="depth-0 story-line-desc">
-								<b>{{TestName|htmlSafe}}</b>
-								{{if Message}}<div class="message">{{Message|htmlSafe}}</div>{{/if}}
+								<b>{{TestName|htmlSafe|ansiColours}}</b>
+								{{if Message}}<div class="message">{{Message|htmlSafe|ansiColours}}</div>{{/if}}
 							</td>
 						</tr>
 
@@ -351,25 +396,29 @@
 
 								</td>
 								<td colspan="3" class="depth-{{Depth}} story-line-desc">
-									{{Title|showhtml}}
-									{{if Output}}<div class="message">{{Output|htmlSafe}}</div>{{/if}}
+									{{Title|htmlSafe|ansiColours}}
+									{{if Output}}<div class="message">{{Output|htmlSafe|ansiColours}}</div>{{/if}}
 									{{if _failed}}
 										{{Assertions}}
+											{{if _failed}}
 											<div class="failure">
 												<div class="failure-details">
-													<div class="failure-output">{{if Failure|notempty}}{{Failure|showhtml}}{{else}}{{if Message|notempty}}{{Message|showhtml}}{{else}}
-															{{StackTrace|showhtml}}{{/if}}{{/if}}</div>
+													<div class="failure-output">{{if Failure|notempty}}{{Failure|htmlSafe|ansiColours}}{{else}}{{if Message|notempty}}{{Message|htmlSafe|ansiColours}}{{else}}
+															{{StackTrace|htmlSafe|ansiColours}}{{/if}}{{/if}}</div>
 												</div>
 											</div>
+											{{/if}}
 										{{/Assertions}}
 									{{/if}}
 									{{if _panicked}}
 										{{Assertions}}
+											{{if _panicked}}
 											<div class="panic">
 												<div class="panic-details">
-													<div class="panic-output">{{if Panic|notempty}}{{Panic|showhtml}}{{else}}{{if Message|notempty}}{{Message|showhtml}}{{else}}{{StackTrace|showhtml}}{{/if}}{{/if}}</div>
+													<div class="panic-output">{{if Panic|notempty}}{{Panic|htmlSafe|ansiColours}}{{else}}{{if Message|notempty}}{{Message|htmlSafe|ansiColours}}{{else}}{{StackTrace|htmlSafe|ansiColours}}{{/if}}{{/if}}</div>
 												</div>
 											</div>
+											{{/if}}
 										{{/Assertions}}
 									{{/if}}
 								</td>

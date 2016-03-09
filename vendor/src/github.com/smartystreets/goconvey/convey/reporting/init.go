@@ -43,7 +43,7 @@ func BuildSilentReporter() Reporter {
 	out := NewPrinter(NewConsole())
 	return NewReporters(
 		NewGoTestReporter(),
-		NewProblemReporter(out))
+		NewSilentProblemReporter(out))
 }
 
 var (
@@ -68,6 +68,9 @@ var (
 )
 
 var consoleStatistics = NewStatisticsReporter(NewPrinter(NewConsole()))
+
+func SuppressConsoleStatistics() { consoleStatistics.Suppress() }
+func PrintConsoleStatistics()    { consoleStatistics.PrintSummary() }
 
 // QuiteMode disables all console output symbols. This is only meant to be used
 // for tests that are internal to goconvey where the output is distracting or

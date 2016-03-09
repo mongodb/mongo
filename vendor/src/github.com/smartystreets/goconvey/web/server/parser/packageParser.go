@@ -2,10 +2,16 @@ package parser
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/smartystreets/goconvey/web/server/contract"
+)
+
+var (
+	testNamePattern = regexp.MustCompile("^=== RUN:? +(.+)$")
 )
 
 func ParsePackageResults(result *contract.PackageResult, rawOutput string) {
@@ -19,8 +25,9 @@ type outputParser struct {
 	tests  []*contract.TestResult
 
 	// place holders for loops
-	line string
-	test *contract.TestResult
+	line    string
+	test    *contract.TestResult
+	testMap map[string]*contract.TestResult
 }
 
 func newOutputParser(result *contract.PackageResult, rawOutput string) *outputParser {
@@ -29,6 +36,7 @@ func newOutputParser(result *contract.PackageResult, rawOutput string) *outputPa
 	self.lines = strings.Split(self.raw, "\n")
 	self.result = result
 	self.tests = []*contract.TestResult{}
+	self.testMap = make(map[string]*contract.TestResult)
 	return self
 }
 
@@ -86,13 +94,19 @@ func (self *outputParser) processTestOutput() {
 }
 
 func (self *outputParser) registerTestFunction() {
-	self.test = contract.NewTestResult(self.line[len("=== RUN "):])
+	testName := testNamePattern.FindStringSubmatch(self.line)[1]
+	self.test = contract.NewTestResult(testName)
 	self.tests = append(self.tests, self.test)
+	self.testMap[self.test.TestName] = self.test
 }
 func (self *outputParser) recordTestMetadata() {
-	self.test.Passed = !strings.HasPrefix(self.line, "--- FAIL: ")
-	self.test.Skipped = strings.HasPrefix(self.line, "--- SKIP: ")
-	self.test.Elapsed = parseTestFunctionDuration(self.line)
+	testName := strings.Split(self.line, " ")[2]
+	if test, ok := self.testMap[testName]; ok {
+		self.test = test
+		self.test.Passed = !strings.HasPrefix(self.line, "--- FAIL: ")
+		self.test.Skipped = strings.HasPrefix(self.line, "--- SKIP: ")
+		self.test.Elapsed = parseTestFunctionDuration(self.line)
+	}
 }
 func (self *outputParser) recordPackageMetadata() {
 	if packageFailed(self.line) {
@@ -123,12 +137,28 @@ func (self *outputParser) recordCoverageSummary(summary string) {
 	}
 }
 func (self *outputParser) saveLineForParsingLater() {
-	self.line = strings.TrimSpace(self.line)
+	self.line = strings.TrimLeft(self.line, "\t")
 	if self.test == nil {
 		fmt.Println("Potential error parsing output of", self.result.PackageName, "; couldn't handle this stray line:", self.line)
 		return
 	}
 	self.test.RawLines = append(self.test.RawLines, self.line)
+}
+
+// TestResults is a collection of TestResults that implements sort.Interface.
+type TestResults []contract.TestResult
+
+func (r TestResults) Len() int {
+	return len(r)
+}
+
+// Less compares TestResults on TestName
+func (r TestResults) Less(i, j int) bool {
+	return r[i].TestName < r[j].TestName
+}
+
+func (r TestResults) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
 }
 
 func (self *outputParser) parseEachTestFunction() {
@@ -140,4 +170,5 @@ func (self *outputParser) parseEachTestFunction() {
 		self.test.RawLines = []string{}
 		self.result.TestResults = append(self.result.TestResults, *self.test)
 	}
+	sort.Sort(TestResults(self.result.TestResults))
 }

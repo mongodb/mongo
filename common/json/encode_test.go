@@ -212,10 +212,10 @@ func TestRefValMarshal(t *testing.T) {
 	}
 }
 
-// C implements Marshaler and returns unescaped JSON.
-type C int
+// C1 implements Marshaler and returns unescaped JSON.
+type C1 int
 
-func (C) MarshalJSON() ([]byte, error) {
+func (C1) MarshalJSON() ([]byte, error) {
 	return []byte(`"<&>"`), nil
 }
 
@@ -227,14 +227,14 @@ func (CText) MarshalText() ([]byte, error) {
 }
 
 func TestMarshalerEscaping(t *testing.T) {
-	var c C
+	var c C1
 	want := `"\u003c\u0026\u003e"`
 	b, err := Marshal(c)
 	if err != nil {
-		t.Fatalf("Marshal(c): %v", err)
+		t.Fatalf("Marshal(c1): %v", err)
 	}
 	if got := string(b); got != want {
-		t.Errorf("Marshal(c) = %#q, want %#q", got, want)
+		t.Errorf("Marshal(c1) = %#q, want %#q", got, want)
 	}
 
 	var ct CText

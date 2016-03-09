@@ -10,26 +10,26 @@ import (
 )
 
 type JsonReporter struct {
-	out     *Printer
-	current *ScopeResult
-	index   map[string]*ScopeResult
-	scopes  []*ScopeResult
-	depth   int
+	out        *Printer
+	currentKey []string
+	current    *ScopeResult
+	index      map[string]*ScopeResult
+	scopes     []*ScopeResult
 }
+
+func (self *JsonReporter) depth() int { return len(self.currentKey) }
 
 func (self *JsonReporter) BeginStory(story *StoryReport) {}
 
 func (self *JsonReporter) Enter(scope *ScopeReport) {
-	if _, found := self.index[scope.ID]; !found {
-		self.registerScope(scope)
+	self.currentKey = append(self.currentKey, scope.Title)
+	ID := strings.Join(self.currentKey, "|")
+	if _, found := self.index[ID]; !found {
+		next := newScopeResult(scope.Title, self.depth(), scope.File, scope.Line)
+		self.scopes = append(self.scopes, next)
+		self.index[ID] = next
 	}
-	self.depth++
-	self.current = self.index[scope.ID]
-}
-func (self *JsonReporter) registerScope(scope *ScopeReport) {
-	next := newScopeResult(scope.Title, self.depth, scope.File, scope.Line)
-	self.scopes = append(self.scopes, next)
-	self.index[scope.ID] = next
+	self.current = self.index[ID]
 }
 
 func (self *JsonReporter) Report(report *AssertionResult) {
@@ -37,7 +37,7 @@ func (self *JsonReporter) Report(report *AssertionResult) {
 }
 
 func (self *JsonReporter) Exit() {
-	self.depth--
+	self.currentKey = self.currentKey[:len(self.currentKey)-1]
 }
 
 func (self *JsonReporter) EndStory() {
@@ -61,7 +61,7 @@ func (self *JsonReporter) report() {
 func (self *JsonReporter) reset() {
 	self.scopes = []*ScopeResult{}
 	self.index = map[string]*ScopeResult{}
-	self.depth = 0
+	self.currentKey = nil
 }
 
 func (self *JsonReporter) Write(content []byte) (written int, err error) {
@@ -76,8 +76,8 @@ func NewJsonReporter(out *Printer) *JsonReporter {
 	return self
 }
 
-const OpenJson = ">>>>>"  // "⌦"
-const CloseJson = "<<<<<" // "⌫"
+const OpenJson = ">->->OPEN-JSON->->->"   // "⌦"
+const CloseJson = "<-<-<-CLOSE-JSON<-<-<" // "⌫"
 const jsonMarshalFailure = `
 
 GOCONVEY_JSON_MARSHALL_FAILURE: There was an error when attempting to convert test results to JSON.

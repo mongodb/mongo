@@ -17,6 +17,7 @@ var convey = {
 	overallClass: "",		// class name of the "overall" status banner
 	theme: "",				// theme currently being used
 	packageStates: {},		// packages manually collapsed or expanded during this page's lifetime
+	uiEffects: true,		// whether visual effects are enabled
 	framesOnSamePath: 0,	// number of consecutive frames on this same watch path
 	layout: {
 		selClass: "sel",	// CSS class when an element is "selected"
@@ -27,7 +28,7 @@ var convey = {
 	history: [],			// complete history of states (test results and aggregated data), including the current one
 	moments: {},			// elements that display time relative to the current time, keyed by ID, with the moment() as a value
 	intervals: {},			// ntervals that execute periodically
-	intervalFuncs: {		// Functions executed by each interval in convey.intervals
+	intervalFuncs: {		// functions executed by each interval in convey.intervals
 		time: function()
 		{
 			var t = new Date();

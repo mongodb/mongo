@@ -9,8 +9,11 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestAssertions(t *testing.T) {
-	Convey("Equality assertions should be accessible", t, FailureContinues, func() {
+func TestAssertionsAreAvailableFromConveyPackage(t *testing.T) {
+	SetDefaultFailureMode(FailureContinues)
+	defer SetDefaultFailureMode(FailureHalts)
+
+	Convey("Equality assertions should be accessible", t, func() {
 		thing1a := thing{a: "asdf"}
 		thing1b := thing{a: "asdf"}
 		thing2 := thing{a: "qwer"}
@@ -30,25 +33,30 @@ func TestAssertions(t *testing.T) {
 		So(0, ShouldBeZeroValue)
 	})
 
-	Convey("Numeric comparison assertions should be accessible", t, FailureContinues, func() {
+	Convey("Numeric comparison assertions should be accessible", t, func() {
 		So(1, ShouldBeGreaterThan, 0)
 		So(1, ShouldBeGreaterThanOrEqualTo, 1)
 		So(1, ShouldBeLessThan, 2)
 		So(1, ShouldBeLessThanOrEqualTo, 1)
 		So(1, ShouldBeBetween, 0, 2)
 		So(1, ShouldNotBeBetween, 2, 4)
+		So(1, ShouldBeBetweenOrEqual, 1, 2)
+		So(1, ShouldNotBeBetweenOrEqual, 2, 4)
 	})
 
-	Convey("Container assertions should be accessible", t, FailureContinues, func() {
+	Convey("Container assertions should be accessible", t, func() {
 		So([]int{1, 2, 3}, ShouldContain, 2)
 		So([]int{1, 2, 3}, ShouldNotContain, 4)
+		So(map[int]int{1: 1, 2: 2, 3: 3}, ShouldContainKey, 2)
+		So(map[int]int{1: 1, 2: 2, 3: 3}, ShouldNotContainKey, 4)
 		So(1, ShouldBeIn, []int{1, 2, 3})
 		So(4, ShouldNotBeIn, []int{1, 2, 3})
 		So([]int{}, ShouldBeEmpty)
 		So([]int{1}, ShouldNotBeEmpty)
+		So([]int{1, 2}, ShouldHaveLength, 2)
 	})
 
-	Convey("String assertions should be accessible", t, FailureContinues, func() {
+	Convey("String assertions should be accessible", t, func() {
 		So("asdf", ShouldStartWith, "a")
 		So("asdf", ShouldNotStartWith, "z")
 		So("asdf", ShouldEndWith, "df")
@@ -59,14 +67,14 @@ func TestAssertions(t *testing.T) {
 		So("asdf", ShouldNotContainSubstring, "af")
 	})
 
-	Convey("Panic recovery assertions should be accessible", t, FailureContinues, func() {
+	Convey("Panic recovery assertions should be accessible", t, func() {
 		So(panics, ShouldPanic)
 		So(func() {}, ShouldNotPanic)
 		So(panics, ShouldPanicWith, "Goofy Gophers!")
 		So(panics, ShouldNotPanicWith, "Guileless Gophers!")
 	})
 
-	Convey("Type-checking assertions should be accessible", t, FailureContinues, func() {
+	Convey("Type-checking assertions should be accessible", t, func() {
 
 		// NOTE: Values or pointers may be checked.  If a value is passed,
 		// it will be cast as a pointer to the value to avoid cases where
@@ -85,7 +93,7 @@ func TestAssertions(t *testing.T) {
 		So("string", ShouldNotImplement, (*io.Reader)(nil))
 	})
 
-	Convey("Time assertions should be accessible", t, FailureContinues, func() {
+	Convey("Time assertions should be accessible", t, func() {
 		january1, _ := time.Parse(timeLayout, "2013-01-01 00:00")
 		january2, _ := time.Parse(timeLayout, "2013-01-02 00:00")
 		january3, _ := time.Parse(timeLayout, "2013-01-03 00:00")

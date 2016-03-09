@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -20,7 +22,6 @@ func (self *concurrentCoordinator) ExecuteConcurrently() {
 	self.enlistWorkers()
 	self.scheduleTasks()
 	self.awaitCompletion()
-	self.checkForErrors()
 }
 
 func (self *concurrentCoordinator) enlistWorkers() {
@@ -32,12 +33,19 @@ func (self *concurrentCoordinator) enlistWorkers() {
 func (self *concurrentCoordinator) worker(id int) {
 	for folder := range self.queue {
 		packageName := strings.Replace(folder.Name, "\\", "/", -1)
-		if !folder.Active {
+		if !folder.Active() {
 			log.Printf("Skipping concurrent execution: %s\n", packageName)
 			continue
 		}
-		log.Printf("Executing concurrent tests: %s\n", packageName)
-		folder.Output, folder.Error = self.shell.GoTest(folder.Path, packageName)
+
+		if folder.HasImportCycle {
+			message := fmt.Sprintf("can't load package: import cycle not allowed\npackage %s\n\timports %s", packageName, packageName)
+			log.Println(message)
+			folder.Output, folder.Error = message, errors.New(message)
+		} else {
+			log.Printf("Executing concurrent tests: %s\n", packageName)
+			folder.Output, folder.Error = self.shell.GoTest(folder.Path, packageName, folder.BuildTags, folder.TestArguments)
+		}
 	}
 	self.waiter.Done()
 }
@@ -53,19 +61,7 @@ func (self *concurrentCoordinator) awaitCompletion() {
 	self.waiter.Wait()
 }
 
-func (self *concurrentCoordinator) checkForErrors() {
-	for _, folder := range self.folders {
-		if hasUnexpectedError(folder) {
-			log.Println("Unexpected error at", folder.Path)
-			panic(folder.Error)
-		}
-	}
-}
-func hasUnexpectedError(folder *contract.Package) bool {
-	return folder.Error != nil && folder.Output == ""
-}
-
-func newCuncurrentCoordinator(folders []*contract.Package, batchSize int, shell contract.Shell) *concurrentCoordinator {
+func newConcurrentCoordinator(folders []*contract.Package, batchSize int, shell contract.Shell) *concurrentCoordinator {
 	self := new(concurrentCoordinator)
 	self.queue = make(chan *contract.Package)
 	self.folders = folders

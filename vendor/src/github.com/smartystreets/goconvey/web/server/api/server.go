@@ -4,22 +4,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/smartystreets/goconvey/web/server/contract"
+	"github.com/smartystreets/goconvey/web/server/messaging"
 )
 
 type HTTPServer struct {
-	watcher     contract.Watcher
+	watcher     chan messaging.WatcherCommand
 	executor    contract.Executor
 	latest      *contract.CompleteOutput
-	clientChan  chan chan string
-	pauseUpdate chan bool
+	currentRoot string
+	longpoll    chan chan string
 	paused      bool
 }
 
-func (self *HTTPServer) ReceiveUpdate(update *contract.CompleteOutput) {
+func (self *HTTPServer) ReceiveUpdate(root string, update *contract.CompleteOutput) {
+	self.currentRoot = root
 	self.latest = update
 }
 
@@ -27,7 +30,7 @@ func (self *HTTPServer) Watch(response http.ResponseWriter, request *http.Reques
 	if request.Method == "POST" {
 		self.adjustRoot(response, request)
 	} else if request.Method == "GET" {
-		response.Write([]byte(self.watcher.Root()))
+		response.Write([]byte(self.currentRoot))
 	}
 }
 
@@ -36,23 +39,35 @@ func (self *HTTPServer) adjustRoot(response http.ResponseWriter, request *http.R
 	if newRoot == "" {
 		return
 	}
-	err := self.watcher.Adjust(newRoot)
-	if err != nil {
+	info, err := os.Stat(newRoot) // TODO: how to unit test?
+	if !info.IsDir() || err != nil {
 		http.Error(response, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	self.watcher <- messaging.WatcherCommand{
+		Instruction: messaging.WatcherAdjustRoot,
+		Details:     newRoot,
 	}
 }
 
 func (self *HTTPServer) Ignore(response http.ResponseWriter, request *http.Request) {
 	paths := self.parseQueryString("paths", response, request)
 	if paths != "" {
-		self.watcher.Ignore(paths)
+		self.watcher <- messaging.WatcherCommand{
+			Instruction: messaging.WatcherIgnore,
+			Details:     paths,
+		}
 	}
 }
 
 func (self *HTTPServer) Reinstate(response http.ResponseWriter, request *http.Request) {
 	paths := self.parseQueryString("paths", response, request)
 	if paths != "" {
-		self.watcher.Reinstate(paths)
+		self.watcher <- messaging.WatcherCommand{
+			Instruction: messaging.WatcherReinstate,
+			Details:     paths,
+		}
 	}
 }
 
@@ -90,7 +105,7 @@ func (self *HTTPServer) LongPollStatus(response http.ResponseWriter, request *ht
 	myReqChan := make(chan string)
 
 	select {
-	case self.clientChan <- myReqChan: // this case means the executor's status is changing
+	case self.longpoll <- myReqChan: // this case means the executor's status is changing
 	case <-time.After(time.Duration(timeout) * time.Millisecond): // this case means the executor hasn't changed status
 		return
 	}
@@ -119,24 +134,31 @@ func (self *HTTPServer) Execute(response http.ResponseWriter, request *http.Requ
 }
 
 func (self *HTTPServer) execute() {
-	self.latest = self.executor.ExecuteTests(self.watcher.WatchedFolders())
+	self.watcher <- messaging.WatcherCommand{Instruction: messaging.WatcherExecute}
 }
 
 func (self *HTTPServer) TogglePause(response http.ResponseWriter, request *http.Request) {
-	select {
-	case self.pauseUpdate <- true:
-		self.paused = !self.paused
-	default:
+	instruction := messaging.WatcherPause
+	if self.paused {
+		instruction = messaging.WatcherResume
 	}
+
+	self.watcher <- messaging.WatcherCommand{Instruction: instruction}
+	self.paused = !self.paused
 
 	fmt.Fprint(response, self.paused) // we could write out whatever helps keep the UI honest...
 }
 
-func NewHTTPServer(watcher contract.Watcher, executor contract.Executor, status chan chan string, pause chan bool) *HTTPServer {
+func NewHTTPServer(
+	root string,
+	watcher chan messaging.WatcherCommand,
+	executor contract.Executor,
+	status chan chan string) *HTTPServer {
+
 	self := new(HTTPServer)
+	self.currentRoot = root
 	self.watcher = watcher
 	self.executor = executor
-	self.clientChan = status
-	self.pauseUpdate = pause
+	self.longpoll = status
 	return self
 }
