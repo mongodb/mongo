@@ -65,14 +65,13 @@
 #define off96		r30
 #define off112		r31
 
-#define const1		v25
-#define const2		v26
+#define const1		v24
+#define const2		v25
 
-#define byteswap	v27
-#define	mask_32bit	v28
-#define	mask_64bit	v29
-#define zeroes		v30
-#define ones		v31
+#define byteswap	v26
+#define	mask_32bit	v27
+#define	mask_64bit	v28
+#define zeroes		v29
 
 #ifdef BYTESWAP_DATA
 #define VPERM(A, B, C, D) vperm	A, B, C, D
@@ -90,31 +89,6 @@ FUNC_START(__crc32_vpmsum)
 	std	r26,-48(r1)
 	std	r25,-56(r1)
 
-	li 	r31, -256
-	stvx 	v20, r31, r1
-	li 	r31, -240
-	stvx 	v21, r31, r1
-	li 	r31, -224
-	stvx 	v22, r31, r1
-	li 	r31, -208
-	stvx 	v23, r31, r1
-	li 	r31, -192
-	stvx 	v24, r31, r1
-	li 	r31, -176
-	stvx 	v25, r31, r1
-	li 	r31, -160
-	stvx 	v26, r31, r1
-	li 	r31, -144
-	stvx 	v27, r31, r1
-	li 	r31, -128
-	stvx 	v28, r31, r1
-	li 	r31, -112
-	stvx 	v29, r31, r1
-	li 	r31, -96
-	stvx 	v30, r31, r1
-	li 	r31, -80
-	stvx 	v31, r31, r1
-
 	li	off16,16
 	li	off32,32
 	li	off48,48
@@ -124,13 +98,28 @@ FUNC_START(__crc32_vpmsum)
 	li	off112,112
 	li	r0,0
 
+	/* Enough room for saving 10 non volatile VMX registers */
+	subi	r6,r1,56+10*16
+	subi	r7,r1,56+2*16
+
+	stvx	v20,0,r6
+	stvx	v21,off16,r6
+	stvx	v22,off32,r6
+	stvx	v23,off48,r6
+	stvx	v24,off64,r6
+	stvx	v25,off80,r6
+	stvx	v26,off96,r6
+	stvx	v27,off112,r6
+	stvx	v28,0,r7
+	stvx	v29,off16,r7
+
 	mr	r10,r3
 
 	vxor	zeroes,zeroes,zeroes
-	vspltisw ones,-1
+	vspltisw v0,-1
 
-	vsldoi	mask_32bit,zeroes,ones,4
-	vsldoi	mask_64bit,zeroes,ones,8
+	vsldoi	mask_32bit,zeroes,v0,4
+	vsldoi	mask_64bit,zeroes,v0,8
 
 	/* Get the initial value into v8 */
 	vxor	v8,v8,v8
@@ -596,30 +585,20 @@ FUNC_START(__crc32_vpmsum)
 	/* Get it into r3 */
 	MFVRD(r3, v0)
 
-	li 	r31, -256
-	lvx 	v20, r31, r1
-	li 	r31, -240
-	lvx 	v21, r31, r1
-	li 	r31, -224
-	lvx 	v22, r31, r1
-	li 	r31, -208
-	lvx 	v23, r31, r1
-	li 	r31, -192
-	lvx 	v24, r31, r1
-	li 	r31, -176
-	lvx 	v25, r31, r1
-	li 	r31, -160
-	lvx 	v26, r31, r1
-	li 	r31, -144
-	lvx 	v27, r31, r1
-	li 	r31, -128
-	lvx 	v28, r31, r1
-	li 	r31, -112
-	lvx 	v29, r31, r1
-	li 	r31, -96
-	lvx 	v30, r31, r1
-	li 	r31, -80
-	lvx 	v31, r31, r1
+.Lout:
+	subi	r6,r1,56+10*16
+	subi	r7,r1,56+2*16
+
+	lvx	v20,0,r6
+	lvx	v21,off16,r6
+	lvx	v22,off32,r6
+	lvx	v23,off48,r6
+	lvx	v24,off64,r6
+	lvx	v25,off80,r6
+	lvx	v26,off96,r6
+	lvx	v27,off112,r6
+	lvx	v28,0,r7
+	lvx	v29,off16,r7
 
 	ld	r31,-8(r1)
 	ld	r30,-16(r1)
@@ -786,6 +765,7 @@ FUNC_START(__crc32_vpmsum)
 
 .Lzero:
 	mr	r3,r10
-	blr
+	b	.Lout
+
 FUNC_END(__crc32_vpmsum)
 #endif
