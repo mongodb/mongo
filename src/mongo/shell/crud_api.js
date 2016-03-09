@@ -8,10 +8,8 @@ DBCollection.prototype._createWriteConcern = function(options) {
     }
 
     // Only merge in write concern options if at least one is specified in options
-    if (options.w != null
-        || options.wtimeout != null
-        || options.j != null
-        || options.fsync != null) {
+    if (options.w != null || options.wtimeout != null || options.j != null ||
+        options.fsync != null) {
         writeConcern = {};
 
         writeConcernOptions.forEach(function(wc) {
@@ -29,11 +27,13 @@ DBCollection.prototype._createWriteConcern = function(options) {
  *     Otherwise, returns the same object passed.
  */
 DBCollection.prototype.addIdIfNeeded = function(obj) {
-    if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
-        var tmp = obj; // don't want to modify input
-        obj = {_id: new ObjectId()};
+    if (typeof(obj._id) == "undefined" && !Array.isArray(obj)) {
+        var tmp = obj;  // don't want to modify input
+        obj = {
+            _id: new ObjectId()
+        };
 
-        for (var key in tmp){
+        for (var key in tmp) {
             obj[key] = tmp[key];
         }
     }
@@ -74,20 +74,20 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
     var writeConcern = this._createWriteConcern(opts);
 
     // Result
-    var result = {acknowledged: (writeConcern && writeConcern.w == 0) ? false: true};
+    var result = {
+        acknowledged: (writeConcern && writeConcern.w == 0) ? false : true
+    };
 
     // Use bulk operation API already in the shell
-    var bulkOp = opts.ordered
-        ? this.initializeOrderedBulkOp()
-        : this.initializeUnorderedBulkOp();
+    var bulkOp = opts.ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
 
     // Contains all inserted _ids
     var insertedIds = {};
 
     // For each of the operations we need to add the op to the bulk
     operations.forEach(function(op, index) {
-        if(op.insertOne) {
-            if(!op.insertOne.document) {
+        if (op.insertOne) {
+            if (!op.insertOne.document) {
                 throw new Error('insertOne bulkWrite operation expects the document field');
             }
 
@@ -97,63 +97,63 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
             insertedIds[index] = op.insertOne.document._id;
             // Translate operation to bulk operation
             bulkOp.insert(op.insertOne.document);
-        } else if(op.updateOne) {
-            if(!op.updateOne.filter) {
+        } else if (op.updateOne) {
+            if (!op.updateOne.filter) {
                 throw new Error('updateOne bulkWrite operation expects the filter field');
             }
 
-            if(!op.updateOne.update) {
+            if (!op.updateOne.update) {
                 throw new Error('updateOne bulkWrite operation expects the update field');
             }
 
             // Translate operation to bulk operation
             var operation = bulkOp.find(op.updateOne.filter);
-            if(op.updateOne.upsert) {
+            if (op.updateOne.upsert) {
                 operation = operation.upsert();
             }
 
             operation.updateOne(op.updateOne.update);
-        } else if(op.updateMany) {
-            if(!op.updateMany.filter) {
+        } else if (op.updateMany) {
+            if (!op.updateMany.filter) {
                 throw new Error('updateMany bulkWrite operation expects the filter field');
             }
 
-            if(!op.updateMany.update) {
+            if (!op.updateMany.update) {
                 throw new Error('updateMany bulkWrite operation expects the update field');
             }
 
             // Translate operation to bulk operation
             var operation = bulkOp.find(op.updateMany.filter);
-            if(op.updateMany.upsert) {
+            if (op.updateMany.upsert) {
                 operation = operation.upsert();
             }
 
             operation.update(op.updateMany.update);
-        } else if(op.replaceOne) {
-            if(!op.replaceOne.filter) {
+        } else if (op.replaceOne) {
+            if (!op.replaceOne.filter) {
                 throw new Error('replaceOne bulkWrite operation expects the filter field');
             }
 
-            if(!op.replaceOne.replacement) {
+            if (!op.replaceOne.replacement) {
                 throw new Error('replaceOne bulkWrite operation expects the replacement field');
             }
 
             // Translate operation to bulkOp operation
             var operation = bulkOp.find(op.replaceOne.filter);
-            if(op.replaceOne.upsert) {
+            if (op.replaceOne.upsert) {
                 operation = operation.upsert();
             }
 
             operation.replaceOne(op.replaceOne.replacement);
-        } else if(op.deleteOne) {
-            if(!op.deleteOne.filter) {
+        } else if (op.deleteOne) {
+            if (!op.deleteOne.filter) {
                 throw new Error('deleteOne bulkWrite operation expects the filter field');
             }
 
             // Translate operation to bulkOp operation
             bulkOp.find(op.deleteOne.filter).removeOne();
-        } else if(op.deleteMany) {
-            if(!op.deleteMany.filter) {
+        } else if (op.deleteMany) {
+            if (!op.deleteMany.filter) {
                 throw new Error('deleteMany bulkWrite operation expects the filter field');
             }
 
@@ -164,7 +164,7 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
 
     // Execute bulkOp operation
     var response = bulkOp.execute(writeConcern);
-    if(!result.acknowledged) {
+    if (!result.acknowledged) {
         return result;
     }
 
@@ -206,7 +206,9 @@ DBCollection.prototype.insertOne = function(document, options) {
     var writeConcern = this._createWriteConcern(opts);
 
     // Result
-    var result = {acknowledged: (writeConcern && writeConcern.w == 0) ? false: true};
+    var result = {
+        acknowledged: (writeConcern && writeConcern.w == 0) ? false : true
+    };
 
     // Use bulk operation API already in the shell
     var bulk = this.initializeOrderedBulkOp();
@@ -216,11 +218,11 @@ DBCollection.prototype.insertOne = function(document, options) {
         // Execute insert
         bulk.execute(writeConcern);
     } catch (err) {
-        if(err.hasWriteErrors()) {
+        if (err.hasWriteErrors()) {
             throw err.getWriteErrorAt(0);
         }
 
-        if(err.hasWriteConcernError()) {
+        if (err.hasWriteConcernError()) {
             throw err.getWriteConcernError();
         }
 
@@ -263,12 +265,12 @@ DBCollection.prototype.insertMany = function(documents, options) {
     var writeConcern = this._createWriteConcern(opts);
 
     // Result
-    var result = {acknowledged: (writeConcern && writeConcern.w == 0) ? false: true};
+    var result = {
+        acknowledged: (writeConcern && writeConcern.w == 0) ? false : true
+    };
 
     // Use bulk operation API already in the shell
-    var bulk = opts.ordered
-        ? this.initializeOrderedBulkOp()
-        : this.initializeUnorderedBulkOp();
+    var bulk = opts.ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
 
     // Add all operations to the bulk operation
     documents.forEach(function(doc) {
@@ -284,7 +286,7 @@ DBCollection.prototype.insertMany = function(documents, options) {
 
     // Set all the created inserts
     result.insertedIds = documents.map(function(x) {
-      return x._id;
+        return x._id;
     });
 
     // Return the result
@@ -309,7 +311,9 @@ DBCollection.prototype.deleteOne = function(filter, options) {
     var writeConcern = this._createWriteConcern(opts);
 
     // Result
-    var result = {acknowledged: (writeConcern && writeConcern.w == 0) ? false: true};
+    var result = {
+        acknowledged: (writeConcern && writeConcern.w == 0) ? false : true
+    };
 
     // Use bulk operation API already in the shell
     var bulk = this.initializeOrderedBulkOp();
@@ -321,11 +325,11 @@ DBCollection.prototype.deleteOne = function(filter, options) {
         // Remove the first document that matches the selector
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if(err.hasWriteErrors()) {
+        if (err.hasWriteErrors()) {
             throw err.getWriteErrorAt(0);
         }
 
-        if(err.hasWriteConcernError()) {
+        if (err.hasWriteConcernError()) {
             throw err.getWriteConcernError();
         }
 
@@ -358,7 +362,9 @@ DBCollection.prototype.deleteMany = function(filter, options) {
     var writeConcern = this._createWriteConcern(opts);
 
     // Result
-    var result = {acknowledged: (writeConcern && writeConcern.w == 0) ? false: true};
+    var result = {
+        acknowledged: (writeConcern && writeConcern.w == 0) ? false : true
+    };
 
     // Use bulk operation API already in the shell
     var bulk = this.initializeOrderedBulkOp();
@@ -370,11 +376,11 @@ DBCollection.prototype.deleteMany = function(filter, options) {
         // Remove all documents that matche the selector
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if(err.hasWriteErrors()) {
+        if (err.hasWriteErrors()) {
             throw err.getWriteErrorAt(0);
         }
 
-        if(err.hasWriteConcernError()) {
+        if (err.hasWriteConcernError()) {
             throw err.getWriteConcernError();
         }
 
@@ -408,15 +414,17 @@ DBCollection.prototype.replaceOne = function(filter, replacement, options) {
     // Check if first key in update statement contains a $
     var keys = Object.keys(replacement);
     // Check if first key does not have the $
-    if(keys.length > 0 && keys[0][0] == "$") {
-      throw new Error('the replace operation document must not contain atomic operators');
+    if (keys.length > 0 && keys[0][0] == "$") {
+        throw new Error('the replace operation document must not contain atomic operators');
     }
 
     // Get the write concern
     var writeConcern = this._createWriteConcern(opts);
 
     // Result
-    var result = {acknowledged: (writeConcern && writeConcern.w == 0) ? false: true };
+    var result = {
+        acknowledged: (writeConcern && writeConcern.w == 0) ? false : true
+    };
 
     // Use bulk operation API already in the shell
     var bulk = this.initializeOrderedBulkOp();
@@ -433,11 +441,11 @@ DBCollection.prototype.replaceOne = function(filter, replacement, options) {
         // Replace the document
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if(err.hasWriteErrors()) {
+        if (err.hasWriteErrors()) {
             throw err.getWriteErrorAt(0);
         }
 
-        if(err.hasWriteConcernError()) {
+        if (err.hasWriteConcernError()) {
             throw err.getWriteConcernError();
         }
 
@@ -476,20 +484,22 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
 
     // Check if first key in update statement contains a $
     var keys = Object.keys(update);
-    if(keys.length == 0) {
-      throw new Error("the update operation document must contain at least one atomic operator");
+    if (keys.length == 0) {
+        throw new Error("the update operation document must contain at least one atomic operator");
     }
 
     // Check if first key does not have the $
-    if(keys[0][0] != "$") {
-      throw new Error('the update operation document must contain atomic operators');
+    if (keys[0][0] != "$") {
+        throw new Error('the update operation document must contain atomic operators');
     }
 
     // Get the write concern
     var writeConcern = this._createWriteConcern(opts);
 
     // Result
-    var result = {acknowledged: (writeConcern && writeConcern.w == 0) ? false: true};
+    var result = {
+        acknowledged: (writeConcern && writeConcern.w == 0) ? false : true
+    };
 
     // Use bulk operation API already in the shell
     var bulk = this.initializeOrderedBulkOp();
@@ -506,11 +516,11 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
         // Update the first document that matches the selector
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if(err.hasWriteErrors()) {
+        if (err.hasWriteErrors()) {
             throw err.getWriteErrorAt(0);
         }
 
-        if(err.hasWriteConcernError()) {
+        if (err.hasWriteConcernError()) {
             throw err.getWriteConcernError();
         }
 
@@ -549,20 +559,22 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
 
     // Check if first key in update statement contains a $
     var keys = Object.keys(update);
-    if(keys.length == 0) {
-      throw new Error("the update operation document must contain at least one atomic operator");
+    if (keys.length == 0) {
+        throw new Error("the update operation document must contain at least one atomic operator");
     }
 
     // Check if first key does not have the $
-    if(keys[0][0] != "$") {
-      throw new Error('the update operation document must contain atomic operators');
+    if (keys[0][0] != "$") {
+        throw new Error('the update operation document must contain atomic operators');
     }
 
     // Get the write concern
     var writeConcern = this._createWriteConcern(opts);
 
     // Result
-    var result = {acknowledged: (writeConcern && writeConcern.w == 0) ? false: true};
+    var result = {
+        acknowledged: (writeConcern && writeConcern.w == 0) ? false : true
+    };
 
     // Use bulk operation API already in the shell
     var bulk = this.initializeOrderedBulkOp();
@@ -579,11 +591,11 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
         // Update all documents that match the selector
         var r = bulk.execute(writeConcern);
     } catch (err) {
-        if(err.hasWriteErrors()) {
+        if (err.hasWriteErrors()) {
             throw err.getWriteErrorAt(0);
         }
 
-        if(err.hasWriteConcernError()) {
+        if (err.hasWriteConcernError()) {
             throw err.getWriteConcernError();
         }
 
@@ -612,14 +624,18 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
 * @param {object} filter Document selection filter.
 * @param {object} [options=null] Optional settings.
 * @param {object} [options.projection=null] Limits the fields to return for all matching documents.
-* @param {object} [options.sort=null] Determines which document the operation modifies if the query selects multiple documents.
+* @param {object} [options.sort=null] Determines which document the operation modifies if the query
+*selects multiple documents.
 * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
 * @return {object}
 */
 DBCollection.prototype.findOneAndDelete = function(filter, options) {
     var opts = Object.extend({}, options || {});
     // Set up the command
-    var cmd = {query: filter, remove: true};
+    var cmd = {
+        query: filter,
+        remove: true
+    };
 
     if (opts.sort) {
         cmd.sort = opts.sort;
@@ -646,17 +662,20 @@ DBCollection.prototype.findOneAndDelete = function(filter, options) {
 };
 
 /**
-* Find a document and replace it in one atomic operation, requires a write lock for the duration of the operation.
+* Find a document and replace it in one atomic operation, requires a write lock for the duration of
+*the operation.
 *
 * @method
 * @param {object} filter Document selection filter.
 * @param {object} replacement Document replacing the matching document.
 * @param {object} [options=null] Optional settings.
 * @param {object} [options.projection=null] Limits the fields to return for all matching documents.
-* @param {object} [options.sort=null] Determines which document the operation modifies if the query selects multiple documents.
+* @param {object} [options.sort=null] Determines which document the operation modifies if the query
+*selects multiple documents.
 * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
 * @param {boolean} [options.upsert=false] Upsert the document if it does not exist.
-* @param {boolean} [options.returnNewDocument=false] When true, returns the updated document rather than the original. The default is false.
+* @param {boolean} [options.returnNewDocument=false] When true, returns the updated document rather
+*than the original. The default is false.
 * @return {object}
 */
 DBCollection.prototype.findOneAndReplace = function(filter, replacement, options) {
@@ -665,12 +684,15 @@ DBCollection.prototype.findOneAndReplace = function(filter, replacement, options
     // Check if first key in update statement contains a $
     var keys = Object.keys(replacement);
     // Check if first key does not have the $
-    if(keys.length > 0 && keys[0][0] == "$") {
-      throw new Error("the replace operation document must not contain atomic operators");
+    if (keys.length > 0 && keys[0][0] == "$") {
+        throw new Error("the replace operation document must not contain atomic operators");
     }
 
     // Set up the command
-    var cmd = {query: filter, update: replacement};
+    var cmd = {
+        query: filter,
+        update: replacement
+    };
     if (opts.sort) {
         cmd.sort = opts.sort;
     }
@@ -700,17 +722,20 @@ DBCollection.prototype.findOneAndReplace = function(filter, replacement, options
 };
 
 /**
-* Find a document and update it in one atomic operation, requires a write lock for the duration of the operation.
+* Find a document and update it in one atomic operation, requires a write lock for the duration of
+*the operation.
 *
 * @method
 * @param {object} filter Document selection filter.
 * @param {object} update Update operations to be performed on the document
 * @param {object} [options=null] Optional settings.
 * @param {object} [options.projection=null] Limits the fields to return for all matching documents.
-* @param {object} [options.sort=null] Determines which document the operation modifies if the query selects multiple documents.
+* @param {object} [options.sort=null] Determines which document the operation modifies if the query
+*selects multiple documents.
 * @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
 * @param {boolean} [options.upsert=false] Upsert the document if it does not exist.
-* @param {boolean} [options.returnNewDocument=false] When true, returns the updated document rather than the original. The default is false.
+* @param {boolean} [options.returnNewDocument=false] When true, returns the updated document rather
+*than the original. The default is false.
 * @return {object}
 */
 DBCollection.prototype.findOneAndUpdate = function(filter, update, options) {
@@ -718,17 +743,20 @@ DBCollection.prototype.findOneAndUpdate = function(filter, update, options) {
 
     // Check if first key in update statement contains a $
     var keys = Object.keys(update);
-    if(keys.length == 0) {
-      throw new Error("the update operation document must contain at least one atomic operator");
+    if (keys.length == 0) {
+        throw new Error("the update operation document must contain at least one atomic operator");
     }
 
     // Check if first key does not have the $
-    if(keys[0][0] != "$") {
-      throw new Error("the update operation document must contain atomic operators");
+    if (keys[0][0] != "$") {
+        throw new Error("the update operation document must contain atomic operators");
     }
 
     // Set up the command
-    var cmd = {query: filter, update: update};
+    var cmd = {
+        query: filter,
+        update: update
+    };
     if (opts.sort) {
         cmd.sort = opts.sort;
     }

@@ -1,22 +1,24 @@
 __quiet = false;
-__magicNoPrint = { __magicNoPrint : 1111 };
-__callLastError = false; 
+__magicNoPrint = {
+    __magicNoPrint: 1111
+};
+__callLastError = false;
 _verboseShell = false;
 
-chatty = function(s){
-    if ( ! __quiet )
-        print( s );
+chatty = function(s) {
+    if (!__quiet)
+        print(s);
 };
 
 function reconnect(db) {
     assert.soon(function() {
-                    try {
-                        db.runCommand({ping:1});
-                        return true;
-                    } catch (x) {
-                        return false;
-                    }
-                });
+        try {
+            db.runCommand({ping: 1});
+            return true;
+        } catch (x) {
+            return false;
+        }
+    });
 }
 
 function _getErrorWithCode(codeOrObj, message) {
@@ -36,32 +38,32 @@ function _getErrorWithCode(codeOrObj, message) {
 }
 
 // Please consider using bsonWoCompare instead of this as much as possible.
-friendlyEqual = function( a , b ){
-    if ( a == b )
-        return true;
-    
-    a = tojson(a,false,true);
-    b = tojson(b,false,true);
-
-    if ( a == b )
+friendlyEqual = function(a, b) {
+    if (a == b)
         return true;
 
-    var clean = function( s ){
-        s = s.replace( /NumberInt\((\-?\d+)\)/g , "$1" );
+    a = tojson(a, false, true);
+    b = tojson(b, false, true);
+
+    if (a == b)
+        return true;
+
+    var clean = function(s) {
+        s = s.replace(/NumberInt\((\-?\d+)\)/g, "$1");
         return s;
     };
-    
+
     a = clean(a);
     b = clean(b);
 
-    if ( a == b )
+    if (a == b)
         return true;
-    
+
     return false;
 };
 
-printStackTrace = function(){
-    try{
+printStackTrace = function() {
+    try {
         throw new Error("Printing Stack Trace");
     } catch (e) {
         print(e.stack);
@@ -69,13 +71,15 @@ printStackTrace = function(){
 };
 
 /**
- * <p> Set the shell verbosity. If verbose the shell will display more information about command results. </>
+ * <p> Set the shell verbosity. If verbose the shell will display more information about command
+ * results. </>
  * <p> Default is off. <p>
  * @param {Bool} verbosity on / off
  */
-setVerboseShell = function( value ) { 
-    if( value == undefined ) value = true; 
-    _verboseShell = value; 
+setVerboseShell = function(value) {
+    if (value == undefined)
+        value = true;
+    _verboseShell = value;
 };
 
 // Formats a simple stacked horizontal histogram bar in the shell.
@@ -101,92 +105,98 @@ _barFormat = function(data, width) {
     return res;
 };
 
-
-//these two are helpers for Array.sort(func)
-compare = function(l, r){ return (l == r ? 0 : (l < r ? -1 : 1)); };
-
-// arr.sort(compareOn('name'))
-compareOn = function(field){
-    return function(l, r) { return compare(l[field], r[field]); };
+// these two are helpers for Array.sort(func)
+compare = function(l, r) {
+    return (l == r ? 0 : (l < r ? -1 : 1));
 };
 
+// arr.sort(compareOn('name'))
+compareOn = function(field) {
+    return function(l, r) {
+        return compare(l[field], r[field]);
+    };
+};
 
-shellPrint = function( x ){
+shellPrint = function(x) {
     it = x;
-    if ( x != undefined )
-        shellPrintHelper( x );
-    
-    if ( db ){
+    if (x != undefined)
+        shellPrintHelper(x);
+
+    if (db) {
         var e = db.getPrevError();
-        if ( e.err ) {
-            if ( e.nPrev <= 1 )
-                print( "error on last call: " + tojson( e.err ) );
+        if (e.err) {
+            if (e.nPrev <= 1)
+                print("error on last call: " + tojson(e.err));
             else
-                print( "an error " + tojson( e.err ) + " occurred " + e.nPrev + " operations back in the command invocation" );
+                print("an error " + tojson(e.err) + " occurred " + e.nPrev +
+                      " operations back in the command invocation");
         }
         db.resetError();
     }
 };
 
-print.captureAllOutput = function (fn, args) {
+print.captureAllOutput = function(fn, args) {
     var res = {};
     res.output = [];
     var __orig_print = print;
-    print = function () {
-        Array.prototype.push.apply(res.output, Array.prototype.slice.call(arguments).join(" ").split("\n"));
+    print = function() {
+        Array.prototype.push.apply(res.output,
+                                   Array.prototype.slice.call(arguments).join(" ").split("\n"));
     };
     try {
         res.result = fn.apply(undefined, args);
-    }
-    finally {
+    } finally {
         // Stop capturing print() output
         print = __orig_print;
     }
     return res;
 };
 
-if ( typeof TestData == "undefined" ){
+if (typeof TestData == "undefined") {
     TestData = undefined;
 }
 
-jsTestName = function(){
-    if( TestData ) return TestData.testName;
+jsTestName = function() {
+    if (TestData)
+        return TestData.testName;
     return "__unknown_name__";
 };
 
-var _jsTestOptions = { enableTestCommands : true }; // Test commands should be enabled by default
+var _jsTestOptions = {
+    enableTestCommands: true
+};  // Test commands should be enabled by default
 
-jsTestOptions = function(){
-    if( TestData ) {
-        return Object.merge(_jsTestOptions,
-                            { setParameters : TestData.setParameters,
-                              setParametersMongos : TestData.setParametersMongos,
-                              storageEngine: TestData.storageEngine,
-                              wiredTigerEngineConfigString: TestData.wiredTigerEngineConfigString,
-                              wiredTigerCollectionConfigString: TestData.wiredTigerCollectionConfigString,
-                              wiredTigerIndexConfigString: TestData.wiredTigerIndexConfigString,
-                              noJournal : TestData.noJournal,
-                              noJournalPrealloc : TestData.noJournalPrealloc,
-                              auth : TestData.auth,
-                              keyFile : TestData.keyFile,
-                              authUser : "__system",
-                              authPassword : TestData.keyFileData,
-                              authMechanism : TestData.authMechanism,
-                              adminUser : TestData.adminUser || "admin",
-                              adminPassword : TestData.adminPassword || "password",
-                              useLegacyConfigServers: TestData.useLegacyConfigServers || false,
-                              useLegacyReplicationProtocol:
-                                    TestData.useLegacyReplicationProtocol || false,
-                              enableMajorityReadConcern: TestData.enableMajorityReadConcern,
-                              enableEncryption: TestData.enableEncryption,
-                              encryptionKeyFile: TestData.encryptionKeyFile,
-                              auditDestination: TestData.auditDestination,
-                              minPort: TestData.minPort,
-                              maxPort: TestData.maxPort,
-                              // Note: does not support the array version
-                              mongosBinVersion: TestData.mongosBinVersion || "",
-                            }
-                        );
+jsTestOptions = function() {
+    if (TestData) {
+        return Object.merge(
+            _jsTestOptions,
+            {
+              setParameters: TestData.setParameters,
+              setParametersMongos: TestData.setParametersMongos,
+              storageEngine: TestData.storageEngine,
+              wiredTigerEngineConfigString: TestData.wiredTigerEngineConfigString,
+              wiredTigerCollectionConfigString: TestData.wiredTigerCollectionConfigString,
+              wiredTigerIndexConfigString: TestData.wiredTigerIndexConfigString,
+              noJournal: TestData.noJournal,
+              noJournalPrealloc: TestData.noJournalPrealloc,
+              auth: TestData.auth,
+              keyFile: TestData.keyFile,
+              authUser: "__system",
+              authPassword: TestData.keyFileData,
+              authMechanism: TestData.authMechanism,
+              adminUser: TestData.adminUser || "admin",
+              adminPassword: TestData.adminPassword || "password",
+              useLegacyConfigServers: TestData.useLegacyConfigServers || false,
+              useLegacyReplicationProtocol: TestData.useLegacyReplicationProtocol || false,
+              enableMajorityReadConcern: TestData.enableMajorityReadConcern,
+              enableEncryption: TestData.enableEncryption,
+              encryptionKeyFile: TestData.encryptionKeyFile,
+              auditDestination: TestData.auditDestination,
+              minPort: TestData.minPort,
+              maxPort: TestData.maxPort,
+              // Note: does not support the array version
+              mongosBinVersion: TestData.mongosBinVersion || "",
+            });
     }
     return _jsTestOptions;
 };
@@ -195,8 +205,8 @@ setJsTestOption = function(name, value) {
     _jsTestOptions[name] = value;
 };
 
-jsTestLog = function(msg){
-    print( "\n\n----\n" + msg + "\n----\n\n" );
+jsTestLog = function(msg) {
+    print("\n\n----\n" + msg + "\n----\n\n");
 };
 
 jsTest = {};
@@ -220,9 +230,9 @@ jsTest.authenticate = function(conn) {
             // Set authenticated to stop an infinite recursion from getDB calling
             // back into authenticate.
             conn.authenticated = true;
-            print ("Authenticating as internal " + jsTestOptions().authUser + " user with mechanism " +
-                   DB.prototype._defaultAuthenticationMechanism +
-                   " on connection: " + conn);
+            print("Authenticating as internal " + jsTestOptions().authUser +
+                  " user with mechanism " + DB.prototype._defaultAuthenticationMechanism +
+                  " on connection: " + conn);
             conn.authenticated = conn.getDB('admin').auth({
                 user: jsTestOptions().authUser,
                 pwd: jsTestOptions().authPassword,
@@ -241,10 +251,10 @@ jsTest.authenticateNodes = function(nodes) {
         for (var i = 0; i < nodes.length; i++) {
             // Don't try to authenticate to arbiters
             res = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
-            if(res.myState == 7) {
+            if (res.myState == 7) {
                 continue;
             }
-            if(jsTest.authenticate(nodes[i]) != 1) {
+            if (jsTest.authenticate(nodes[i]) != 1) {
                 return false;
             }
         }
@@ -253,7 +263,7 @@ jsTest.authenticateNodes = function(nodes) {
 };
 
 jsTest.isMongos = function(conn) {
-    return conn.getDB('admin').isMaster().msg=='isdbgrid';
+    return conn.getDB('admin').isMaster().msg == 'isdbgrid';
 };
 
 defaultPrompt = function() {
@@ -279,12 +289,19 @@ defaultPrompt = function() {
             try {
                 var prompt = replSetMemberStatePrompt();
                 // set our status that it was good
-                db.getMongo().authStatus = {replSetGetStatus:true, isMaster: true};
+                db.getMongo().authStatus = {
+                    replSetGetStatus: true,
+                    isMaster: true
+                };
                 return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
-                //print(e);
-                status = {authRequired: true, replSetGetStatus: false, isMaster: true};
+                // print(e);
+                status = {
+                    authRequired: true,
+                    replSetGetStatus: false,
+                    isMaster: true
+                };
             }
         }
         // auth detected
@@ -299,7 +316,7 @@ defaultPrompt = function() {
                 return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
-                //print(e);
+                // print(e);
                 status.authRequired = true;
                 status.replSetGetStatus = false;
             }
@@ -320,7 +337,9 @@ defaultPrompt = function() {
     } catch (ex) {
         printjson(ex);
         // reset status and let it figure it out next time.
-        status = {isMaster:true};
+        status = {
+            isMaster: true
+        };
     }
 
     db.getMongo().authStatus = status;
@@ -329,34 +348,34 @@ defaultPrompt = function() {
 
 replSetMemberStatePrompt = function() {
     var state = '';
-    var stateInfo = db.getSiblingDB( 'admin' ).runCommand( { replSetGetStatus:1, forShell:1 } );
-    if ( stateInfo.ok ) {
+    var stateInfo = db.getSiblingDB('admin').runCommand({replSetGetStatus: 1, forShell: 1});
+    if (stateInfo.ok) {
         // Report the self member's stateStr if it's present.
-        stateInfo.members.forEach( function( member ) {
-                                      if ( member.self ) {
-                                          state = member.stateStr;
-                                      }
-                                  } );
+        stateInfo.members.forEach(function(member) {
+            if (member.self) {
+                state = member.stateStr;
+            }
+        });
         // Otherwise fall back to reporting the numeric myState field (mongodb 1.6).
-        if ( !state ) {
+        if (!state) {
             state = stateInfo.myState;
         }
         state = '' + stateInfo.set + ':' + state;
     } else {
-         var info = stateInfo.info;
-         if ( info && info.length < 20 ) {
-             state = info; // "mongos", "configsvr"
-         } else {
-             throw _getErrorWithCode(stateInfo, "Failed:" + info);
-         }
+        var info = stateInfo.info;
+        if (info && info.length < 20) {
+            state = info;  // "mongos", "configsvr"
+        } else {
+            throw _getErrorWithCode(stateInfo, "Failed:" + info);
+        }
     }
     return state + '> ';
 };
 
 isMasterStatePrompt = function() {
     var state = '';
-    var isMaster = db.runCommand({isMaster:1, forShell:1});
-    if ( isMaster.ok ) {
+    var isMaster = db.runCommand({isMaster: 1, forShell: 1});
+    if (isMaster.ok) {
         var role = "";
 
         if (isMaster.msg == "isdbgrid") {
@@ -384,27 +403,31 @@ isMasterStatePrompt = function() {
 
 if (typeof(_useWriteCommandsDefault) == 'undefined') {
     // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
-    _useWriteCommandsDefault = function() { return false; };
+    _useWriteCommandsDefault = function() {
+        return false;
+    };
 }
 
 if (typeof(_writeMode) == 'undefined') {
     // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
-    _writeMode = function() { return "commands"; };
+    _writeMode = function() {
+        return "commands";
+    };
 }
 
 if (typeof(_readMode) == 'undefined') {
     // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
-    _readMode = function() { return "legacy"; };
+    _readMode = function() {
+        return "legacy";
+    };
 }
 
-shellPrintHelper = function (x) {
-    if (typeof (x) == "undefined") {
+shellPrintHelper = function(x) {
+    if (typeof(x) == "undefined") {
         // Make sure that we have a db var before we use it
         // TODO: This implicit calling of GLE can cause subtle, hard to track issues - remove?
-        if (__callLastError && typeof( db ) != "undefined" &&
-                db.getMongo &&
-                db.getMongo().writeMode() == "legacy") {
-
+        if (__callLastError && typeof(db) != "undefined" && db.getMongo &&
+            db.getMongo().writeMode() == "legacy") {
             __callLastError = false;
             // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad
             var err = db.getLastError(1);
@@ -440,136 +463,166 @@ shellPrintHelper = function (x) {
         print(tojson(x));
 };
 
-shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on init. Actual function at end
+shellAutocomplete = function(
+    /*prefix*/) {  // outer scope function called on init. Actual function at end
 
-    var universalMethods = "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable".split( ' ' );
+    var universalMethods =
+        "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable"
+            .split(' ');
 
-    var builtinMethods = {}; // uses constructor objects as keys
-    builtinMethods[Array] = "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some isArray reduce reduceRight".split( ' ' );
-    builtinMethods[Boolean] = "".split( ' ' ); // nothing more than universal methods
-    builtinMethods[Date] = "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toISOString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC now".split( ' ' );
-    if (typeof JSON != "undefined") { // JSON is new in V8
+    var builtinMethods = {};  // uses constructor objects as keys
+    builtinMethods[Array] =
+        "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some isArray reduce reduceRight"
+            .split(' ');
+    builtinMethods[Boolean] = "".split(' ');  // nothing more than universal methods
+    builtinMethods[Date] =
+        "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toISOString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC now"
+            .split(' ');
+    if (typeof JSON != "undefined") {  // JSON is new in V8
         builtinMethods["[object JSON]"] = "parse stringify".split(' ');
     }
-    builtinMethods[Math] = "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split(' ');
-    builtinMethods[Number] = "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision".split( ' ' );
-    builtinMethods[RegExp] = "global ignoreCase lastIndex multiline source compile exec test".split( ' ' );
-    builtinMethods[String] = "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase trim trimLeft trimRight".split(' ');
-    builtinMethods[Function] = "call apply bind".split( ' ' );
-    builtinMethods[Object] = "bsonsize create defineProperty defineProperties getPrototypeOf keys seal freeze preventExtensions isSealed isFrozen isExtensible getOwnPropertyDescriptor getOwnPropertyNames".split(' ');
+    builtinMethods[Math] =
+        "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan"
+            .split(' ');
+    builtinMethods[Number] =
+        "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision"
+            .split(' ');
+    builtinMethods[RegExp] =
+        "global ignoreCase lastIndex multiline source compile exec test".split(' ');
+    builtinMethods[String] =
+        "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase trim trimLeft trimRight"
+            .split(' ');
+    builtinMethods[Function] = "call apply bind".split(' ');
+    builtinMethods[Object] =
+        "bsonsize create defineProperty defineProperties getPrototypeOf keys seal freeze preventExtensions isSealed isFrozen isExtensible getOwnPropertyDescriptor getOwnPropertyNames"
+            .split(' ');
 
     builtinMethods[Mongo] = "find update insert remove".split(' ');
     builtinMethods[BinData] = "hex base64 length subtype".split(' ');
 
-    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map Timestamp JSON".split( ' ' );
+    var extraGlobals =
+        "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map Timestamp JSON"
+            .split(' ');
     if (typeof NumberDecimal !== 'undefined') {
         extraGlobals[extraGlobals.length] = "NumberDecimal";
     }
 
-    var isPrivate = function( name ) {
-        if ( shellAutocomplete.showPrivate ) return false;
-        if ( name == '_id' ) return false;
-        if ( name[0] == '_' ) return true;
-        if ( name[name.length - 1] == '_' ) return true; // some native functions have an extra name_ method
+    var isPrivate = function(name) {
+        if (shellAutocomplete.showPrivate)
+            return false;
+        if (name == '_id')
+            return false;
+        if (name[0] == '_')
+            return true;
+        if (name[name.length - 1] == '_')
+            return true;  // some native functions have an extra name_ method
         return false;
     };
 
-    var customComplete = function( obj ) {
+    var customComplete = function(obj) {
         try {
-            if ( obj.__proto__.constructor.autocomplete ) {
-                var ret = obj.constructor.autocomplete( obj );
-                if ( ret.constructor != Array ) {
-                    print( "\nautocompleters must return real Arrays" );
+            if (obj.__proto__.constructor.autocomplete) {
+                var ret = obj.constructor.autocomplete(obj);
+                if (ret.constructor != Array) {
+                    print("\nautocompleters must return real Arrays");
                     return [];
                 }
                 return ret;
             } else {
                 return [];
             }
-        } catch ( e ) {
+        } catch (e) {
             // print( e ); // uncomment if debugging custom completers
             return [];
         }
     };
 
-    var worker = function( prefix ) {
-        var global = ( function() { return this; } ).call(); // trick to get global object
+    var worker = function(prefix) {
+        var global = (function() {
+            return this;
+        }).call();  // trick to get global object
 
         var curObj = global;
-        var parts = prefix.split( '.' );
-        for ( var p = 0; p < parts.length - 1; p++ ) { // doesn't include last part
+        var parts = prefix.split('.');
+        for (var p = 0; p < parts.length - 1; p++) {  // doesn't include last part
             curObj = curObj[parts[p]];
-            if ( curObj == null )
+            if (curObj == null)
                 return [];
         }
 
         var lastPrefix = parts[parts.length - 1] || '';
         var lastPrefixLowercase = lastPrefix.toLowerCase();
-        var beginning = parts.slice( 0, parts.length - 1 ).join( '.' );
-        if ( beginning.length )
+        var beginning = parts.slice(0, parts.length - 1).join('.');
+        if (beginning.length)
             beginning += '.';
 
-        var possibilities = new Array().concat(
-            universalMethods,
-            Object.keySet( curObj ),
-            Object.keySet( curObj.__proto__ ),
-            builtinMethods[curObj] || [], // curObj is a builtin constructor
-            builtinMethods[curObj.__proto__.constructor] || [], // curObj is made from a builtin constructor
-            curObj == global ? extraGlobals : [],
-            customComplete( curObj )
-        );
+        var possibilities =
+            new Array().concat(universalMethods,
+                               Object.keySet(curObj),
+                               Object.keySet(curObj.__proto__),
+                               builtinMethods[curObj] || [],  // curObj is a builtin constructor
+                               builtinMethods[curObj.__proto__.constructor] ||
+                                   [],  // curObj is made from a builtin constructor
+                               curObj == global ? extraGlobals : [],
+                               customComplete(curObj));
 
-        var noDuplicates = {}; // see http://dreaminginjavascript.wordpress.com/2008/08/22/eliminating-duplicates/
-        for ( var i = 0; i < possibilities.length; i++ ) {
+        var noDuplicates =
+            {};  // see http://dreaminginjavascript.wordpress.com/2008/08/22/eliminating-duplicates/
+        for (var i = 0; i < possibilities.length; i++) {
             var p = possibilities[i];
-            if ( typeof ( curObj[p] ) == "undefined" && curObj != global ) continue; // extraGlobals aren't in the global object
-            if ( p.length == 0 || p.length < lastPrefix.length ) continue;
-            if ( lastPrefix[0] != '_' && isPrivate( p ) ) continue;
-            if ( p.match( /^[0-9]+$/ ) ) continue; // don't array number indexes
-            if ( p.substr( 0, lastPrefix.length ).toLowerCase() != lastPrefixLowercase ) continue;
+            if (typeof(curObj[p]) == "undefined" && curObj != global)
+                continue;  // extraGlobals aren't in the global object
+            if (p.length == 0 || p.length < lastPrefix.length)
+                continue;
+            if (lastPrefix[0] != '_' && isPrivate(p))
+                continue;
+            if (p.match(/^[0-9]+$/))
+                continue;  // don't array number indexes
+            if (p.substr(0, lastPrefix.length).toLowerCase() != lastPrefixLowercase)
+                continue;
 
             var completion = beginning + p;
-            if ( curObj[p] && curObj[p].constructor == Function && p != 'constructor' )
+            if (curObj[p] && curObj[p].constructor == Function && p != 'constructor')
                 completion += '(';
 
             noDuplicates[completion] = 0;
         }
 
         var ret = [];
-        for ( var i in noDuplicates )
-            ret.push( i );
+        for (var i in noDuplicates)
+            ret.push(i);
 
         return ret;
     };
 
     // this is the actual function that gets assigned to shellAutocomplete
-    return function( prefix ) {
+    return function(prefix) {
         try {
-            __autocomplete__ = worker( prefix ).sort();
-        } catch ( e ) {
-            print( "exception during autocomplete: " + tojson( e.message ) );
+            __autocomplete__ = worker(prefix).sort();
+        } catch (e) {
+            print("exception during autocomplete: " + tojson(e.message));
             __autocomplete__ = [];
         }
     };
-} ();
+}();
 
-shellAutocomplete.showPrivate = false; // toggle to show (useful when working on internals)
+shellAutocomplete.showPrivate = false;  // toggle to show (useful when working on internals)
 
-shellHelper = function( command , rest , shouldPrint ){
+shellHelper = function(command, rest, shouldPrint) {
     command = command.trim();
-    var args = rest.trim().replace(/\s*;$/,"").split( "\s+" );
-    
-    if ( ! shellHelper[command] )
-        throw Error( "no command [" + command + "]" );
-    
-    var res = shellHelper[command].apply( null , args );
-    if ( shouldPrint ){
-        shellPrintHelper( res );
+    var args = rest.trim().replace(/\s*;$/, "").split("\s+");
+
+    if (!shellHelper[command])
+        throw Error("no command [" + command + "]");
+
+    var res = shellHelper[command].apply(null, args);
+    if (shouldPrint) {
+        shellPrintHelper(res);
     }
     return res;
 };
 
-shellHelper.use = function (dbname) {
+shellHelper.use = function(dbname) {
     var s = "" + dbname;
     if (s == "") {
         print("bad use parameter");
@@ -579,7 +632,7 @@ shellHelper.use = function (dbname) {
     print("switched to db " + db.getName());
 };
 
-shellHelper.set = function (str) {
+shellHelper.set = function(str) {
     if (str == "") {
         print("bad use parameter");
         return;
@@ -587,11 +640,14 @@ shellHelper.set = function (str) {
     tokens = str.split(" ");
     param = tokens[0];
     value = tokens[1];
-    
-    if ( value == undefined ) value = true;
+
+    if (value == undefined)
+        value = true;
     // value comes in as a string..
-    if ( value == "true" ) value = true;
-    if ( value == "false" ) value = false;
+    if (value == "true")
+        value = true;
+    if (value == "false")
+        value = false;
 
     if (param == "verbose") {
         _verboseShell = value;
@@ -599,18 +655,18 @@ shellHelper.set = function (str) {
     print("set " + param + " to " + value);
 };
 
-shellHelper.it = function(){
-    if ( typeof( ___it___ ) == "undefined" || ___it___ == null ){
-        print( "no cursor" );
+shellHelper.it = function() {
+    if (typeof(___it___) == "undefined" || ___it___ == null) {
+        print("no cursor");
         return;
     }
-    shellPrintHelper( ___it___ );
+    shellPrintHelper(___it___);
 };
 
-shellHelper.show = function (what) {
+shellHelper.show = function(what) {
     assert(typeof what == "string");
 
-    var args = what.split( /\s+/ );
+    var args = what.split(/\s+/);
     what = args[0];
     args = args.splice(1);
 
@@ -619,35 +675,34 @@ shellHelper.show = function (what) {
             print("db.system.profile is empty");
             print("Use db.setProfilingLevel(2) will enable profiling");
             print("Use db.system.profile.find() to show raw profile entries");
-        }
-        else {
+        } else {
             print();
-            db.system.profile.find({ millis: { $gt: 0} }).sort({ $natural: -1 }).limit(5).forEach(
-                function (x) { 
-                    print("" + x.op + "\t" + x.ns + " " + x.millis + "ms " + String(x.ts).substring(0, 24)); 
+            db.system.profile.find({millis: {$gt: 0}})
+                .sort({$natural: -1})
+                .limit(5)
+                .forEach(function(x) {
+                    print("" + x.op + "\t" + x.ns + " " + x.millis + "ms " +
+                          String(x.ts).substring(0, 24));
                     var l = "";
-                    for ( var z in x ){
-                        if ( z == "op" || z == "ns" || z == "millis" || z == "ts" )
+                    for (var z in x) {
+                        if (z == "op" || z == "ns" || z == "millis" || z == "ts")
                             continue;
-                        
+
                         var val = x[z];
                         var mytype = typeof(val);
-                        
-                        if ( mytype == "string" || 
-                             mytype == "number" )
+
+                        if (mytype == "string" || mytype == "number")
                             l += z + ":" + val + " ";
-                        else if ( mytype == "object" ) 
-                            l += z + ":" + tojson(val ) + " ";
-                        else if ( mytype == "boolean" )
+                        else if (mytype == "object")
+                            l += z + ":" + tojson(val) + " ";
+                        else if (mytype == "boolean")
                             l += z + " ";
                         else
                             l += z + ":" + val + " ";
-
                     }
-                    print( l );
-                    print("\n"); 
-                }
-            );
+                    print(l);
+                    print("\n");
+                });
         }
         return "";
     }
@@ -663,7 +718,9 @@ shellHelper.show = function (what) {
     }
 
     if (what == "collections" || what == "tables") {
-        db.getCollectionNames().forEach(function (x) { print(x); });
+        db.getCollectionNames().forEach(function(x) {
+            print(x);
+        });
         return "";
     }
 
@@ -673,27 +730,29 @@ shellHelper.show = function (what) {
         var maxNameLength = 0;
         var maxGbDigits = 0;
 
-        dbs.databases.forEach(function (x){
+        dbs.databases.forEach(function(x) {
             var sizeStr = (x.sizeOnDisk / 1024 / 1024 / 1024).toFixed(3);
             var nameLength = x.name.length;
             var gbDigits = sizeStr.indexOf(".");
 
-            if( nameLength > maxNameLength) maxNameLength = nameLength;
-            if( gbDigits > maxGbDigits ) maxGbDigits = gbDigits;
+            if (nameLength > maxNameLength)
+                maxNameLength = nameLength;
+            if (gbDigits > maxGbDigits)
+                maxGbDigits = gbDigits;
 
             dbinfo.push({
-                name:      x.name,
-                size:      x.sizeOnDisk,
-                size_str:  sizeStr,
+                name: x.name,
+                size: x.sizeOnDisk,
+                size_str: sizeStr,
                 name_size: nameLength,
                 gb_digits: gbDigits
             });
         });
 
         dbinfo.sort(compareOn('name'));
-        dbinfo.forEach(function (db) {
+        dbinfo.forEach(function(db) {
             var namePadding = maxNameLength - db.name_size;
-            var sizePadding = maxGbDigits   - db.gb_digits;
+            var sizePadding = maxGbDigits - db.gb_digits;
             var padding = Array(namePadding + sizePadding + 3).join(" ");
             if (db.size > 1) {
                 print(db.name + padding + db.size_str + "GB");
@@ -704,36 +763,36 @@ shellHelper.show = function (what) {
 
         return "";
     }
-    
-    if (what == "log" ) {
+
+    if (what == "log") {
         var n = "global";
-        if ( args.length > 0 )
+        if (args.length > 0)
             n = args[0];
-        
-        var res = db.adminCommand( { getLog : n } );
-        if ( ! res.ok ) {
+
+        var res = db.adminCommand({getLog: n});
+        if (!res.ok) {
             print("Error while trying to show " + n + " log: " + res.errmsg);
             return "";
         }
-        for ( var i=0; i<res.log.length; i++){
-            print( res.log[i] );
+        for (var i = 0; i < res.log.length; i++) {
+            print(res.log[i]);
         }
         return "";
     }
 
-    if (what == "logs" ) {
-        var res = db.adminCommand( { getLog : "*" } );
-        if ( ! res.ok ) {
+    if (what == "logs") {
+        var res = db.adminCommand({getLog: "*"});
+        if (!res.ok) {
             print("Error while trying to show logs: " + res.errmsg);
             return "";
         }
-        for ( var i=0; i<res.names.length; i++){
-            print( res.names[i] );
+        for (var i = 0; i < res.names.length; i++) {
+            print(res.names[i]);
         }
         return "";
     }
 
-    if (what == "startupWarnings" ) {
+    if (what == "startupWarnings") {
         var dbDeclared, ex;
         try {
             // !!db essentially casts db to a boolean
@@ -743,21 +802,20 @@ shellHelper.show = function (what) {
             dbDeclared = false;
         }
         if (dbDeclared) {
-            var res = db.adminCommand( { getLog : "startupWarnings" } );
-            if ( res.ok ) {
+            var res = db.adminCommand({getLog: "startupWarnings"});
+            if (res.ok) {
                 if (res.log.length == 0) {
                     return "";
                 }
-                print( "Server has startup warnings: " );
-                for ( var i=0; i<res.log.length; i++){
-                    print( res.log[i] );
+                print("Server has startup warnings: ");
+                for (var i = 0; i < res.log.length; i++) {
+                    print(res.log[i]);
                 }
                 return "";
-            } else if (res.errmsg == "no such cmd: getLog" ) {
+            } else if (res.errmsg == "no such cmd: getLog") {
                 // Don't print if the command is not available
                 return "";
-            } else if (res.code == 13 /*unauthorized*/ ||
-                       res.errmsg == "unauthorized" ||
+            } else if (res.code == 13 /*unauthorized*/ || res.errmsg == "unauthorized" ||
                        res.errmsg == "need to login") {
                 // Don't print if startupWarnings command failed due to auth
                 return "";
@@ -771,22 +829,22 @@ shellHelper.show = function (what) {
         }
     }
 
-    throw Error( "don't know how to show [" + what + "]" );
+    throw Error("don't know how to show [" + what + "]");
 
 };
 
-Math.sigFig = function( x , N ){
-    if ( ! N ){
+Math.sigFig = function(x, N) {
+    if (!N) {
         N = 3;
     }
-    var p = Math.pow( 10, N - Math.ceil( Math.log( Math.abs(x) ) / Math.log( 10 )) );
-    return Math.round(x*p)/p;
+    var p = Math.pow(10, N - Math.ceil(Math.log(Math.abs(x)) / Math.log(10)));
+    return Math.round(x * p) / p;
 };
 
 var Random = (function() {
     var initialized = false;
-    var errorMsg = "The random number generator hasn't been seeded yet; " +
-                   "call Random.setRandomSeed()";
+    var errorMsg =
+        "The random number generator hasn't been seeded yet; " + "call Random.setRandomSeed()";
 
     // Set the random generator seed.
     function srand(s) {
@@ -840,7 +898,7 @@ var Random = (function() {
             throw new Error(errorMsg);
         }
         // See http://en.wikipedia.org/wiki/Marsaglia_polar_method
-        while ( true ) {
+        while (true) {
             var x = (2 * rand()) - 1;
             var y = (2 * rand()) - 1;
             var s = (x * x) + (y * y);
@@ -864,71 +922,70 @@ var Random = (function() {
 })();
 
 Geo = {};
-Geo.distance = function( a , b ){
+Geo.distance = function(a, b) {
     var ax = null;
     var ay = null;
     var bx = null;
     var by = null;
-    
-    for ( var key in a ){
-        if ( ax == null )
+
+    for (var key in a) {
+        if (ax == null)
             ax = a[key];
-        else if ( ay == null )
+        else if (ay == null)
             ay = a[key];
     }
-    
-    for ( var key in b ){
-        if ( bx == null )
+
+    for (var key in b) {
+        if (bx == null)
             bx = b[key];
-        else if ( by == null )
+        else if (by == null)
             by = b[key];
     }
 
-    return Math.sqrt( Math.pow( by - ay , 2 ) + 
-                      Math.pow( bx - ax , 2 ) );
+    return Math.sqrt(Math.pow(by - ay, 2) + Math.pow(bx - ax, 2));
 };
 
-Geo.sphereDistance = function( a , b ){
+Geo.sphereDistance = function(a, b) {
     var ax = null;
     var ay = null;
     var bx = null;
     var by = null;
-    
+
     // TODO swap order of x and y when done on server
-    for ( var key in a ){
-        if ( ax == null )
-            ax = a[key] * (Math.PI/180);
-        else if ( ay == null )
-            ay = a[key] * (Math.PI/180);
-    }
-    
-    for ( var key in b ){
-        if ( bx == null )
-            bx = b[key] * (Math.PI/180);
-        else if ( by == null )
-            by = b[key] * (Math.PI/180);
+    for (var key in a) {
+        if (ax == null)
+            ax = a[key] * (Math.PI / 180);
+        else if (ay == null)
+            ay = a[key] * (Math.PI / 180);
     }
 
-    var sin_x1=Math.sin(ax), cos_x1=Math.cos(ax);
-    var sin_y1=Math.sin(ay), cos_y1=Math.cos(ay);
-    var sin_x2=Math.sin(bx), cos_x2=Math.cos(bx);
-    var sin_y2=Math.sin(by), cos_y2=Math.cos(by);
+    for (var key in b) {
+        if (bx == null)
+            bx = b[key] * (Math.PI / 180);
+        else if (by == null)
+            by = b[key] * (Math.PI / 180);
+    }
 
-    var cross_prod = 
-        (cos_y1*cos_x1 * cos_y2*cos_x2) +
-        (cos_y1*sin_x1 * cos_y2*sin_x2) +
-        (sin_y1        * sin_y2);
+    var sin_x1 = Math.sin(ax), cos_x1 = Math.cos(ax);
+    var sin_y1 = Math.sin(ay), cos_y1 = Math.cos(ay);
+    var sin_x2 = Math.sin(bx), cos_x2 = Math.cos(bx);
+    var sin_y2 = Math.sin(by), cos_y2 = Math.cos(by);
 
-    if (cross_prod >= 1 || cross_prod <= -1){
+    var cross_prod = (cos_y1 * cos_x1 * cos_y2 * cos_x2) + (cos_y1 * sin_x1 * cos_y2 * sin_x2) +
+        (sin_y1 * sin_y2);
+
+    if (cross_prod >= 1 || cross_prod <= -1) {
         // fun with floats
-        assert( Math.abs(cross_prod)-1 < 1e-6 );
+        assert(Math.abs(cross_prod) - 1 < 1e-6);
         return cross_prod > 0 ? 0 : Math.PI;
     }
 
     return Math.acos(cross_prod);
 };
 
-rs = function () { return "try rs.help()"; };
+rs = function() {
+    return "try rs.help()";
+};
 
 /**
  * This method is intended to aid in the writing of tests. It takes a host's address, desired state,
@@ -941,116 +998,144 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
     timeout = timeout || 60 * 1000;
 
     if (desiredState == undefined) {
-        desiredState = {ok: true};
+        desiredState = {
+            ok: true
+        };
     }
 
     print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " + " rs " + rsName);
 
     var tests = 0;
-    assert.soon(function() {
-        var stats = _replMonitorStats(rsName);
-        if (tests++ % 10 == 0) {
-            printjson(stats);
-        }
+    assert.soon(
+        function() {
+            var stats = _replMonitorStats(rsName);
+            if (tests++ % 10 == 0) {
+                printjson(stats);
+            }
 
-        for (var i=0; i<stats.length; i++) {
-            var node = stats[i];
-            printjson(node);
-            if (node["addr"] !== hostAddr)
-                continue;
+            for (var i = 0; i < stats.length; i++) {
+                var node = stats[i];
+                printjson(node);
+                if (node["addr"] !== hostAddr)
+                    continue;
 
-            // Check that *all* hostAddr properties match desiredState properties
-            var stateReached = true;
-            for(var prop in desiredState) {
-                if (isObject(desiredState[prop])) {
-                    if (!friendlyEqual(sortDoc(desiredState[prop]), sortDoc(node[prop]))) {
+                // Check that *all* hostAddr properties match desiredState properties
+                var stateReached = true;
+                for (var prop in desiredState) {
+                    if (isObject(desiredState[prop])) {
+                        if (!friendlyEqual(sortDoc(desiredState[prop]), sortDoc(node[prop]))) {
+                            stateReached = false;
+                            break;
+                        }
+                    } else if (node[prop] !== desiredState[prop]) {
                         stateReached = false;
                         break;
                     }
                 }
-                else if (node[prop] !== desiredState[prop]) {
-                    stateReached = false;
-                    break;
+                if (stateReached) {
+                    printjson(stats);
+                    return true;
                 }
             }
-            if (stateReached) {
-                printjson(stats);
-                return true;
-            }
-        }
-        return false;
-    }, "timed out waiting for replica set member: " + hostAddr + " to reach state: " +
+            return false;
+        },
+        "timed out waiting for replica set member: " + hostAddr + " to reach state: " +
             tojson(desiredState),
-    timeout);
+        timeout);
 };
 
-rs.help = function () {
-    print("\trs.status()                                { replSetGetStatus : 1 } checks repl set status");
-    print("\trs.initiate()                              { replSetInitiate : null } initiates set with default settings");
-    print("\trs.initiate(cfg)                           { replSetInitiate : cfg } initiates set with configuration cfg");
-    print("\trs.conf()                                  get the current configuration object from local.system.replset");
-    print("\trs.reconfig(cfg)                           updates the configuration of a running replica set with cfg (disconnects)");
-    print("\trs.add(hostportstr)                        add a new member to the set with default attributes (disconnects)");
-    print("\trs.add(membercfgobj)                       add a new member to the set with extra attributes (disconnects)");
-    print("\trs.addArb(hostportstr)                     add a new member which is arbiterOnly:true (disconnects)");
+rs.help = function() {
+    print(
+        "\trs.status()                                { replSetGetStatus : 1 } checks repl set status");
+    print(
+        "\trs.initiate()                              { replSetInitiate : null } initiates set with default settings");
+    print(
+        "\trs.initiate(cfg)                           { replSetInitiate : cfg } initiates set with configuration cfg");
+    print(
+        "\trs.conf()                                  get the current configuration object from local.system.replset");
+    print(
+        "\trs.reconfig(cfg)                           updates the configuration of a running replica set with cfg (disconnects)");
+    print(
+        "\trs.add(hostportstr)                        add a new member to the set with default attributes (disconnects)");
+    print(
+        "\trs.add(membercfgobj)                       add a new member to the set with extra attributes (disconnects)");
+    print(
+        "\trs.addArb(hostportstr)                     add a new member which is arbiterOnly:true (disconnects)");
     print("\trs.stepDown([stepdownSecs, catchUpSecs])   step down as primary (disconnects)");
-    print("\trs.syncFrom(hostportstr)                   make a secondary sync from the given member");
-    print("\trs.freeze(secs)                            make a node ineligible to become primary for the time specified");
-    print("\trs.remove(hostportstr)                     remove a host from the replica set (disconnects)");
+    print(
+        "\trs.syncFrom(hostportstr)                   make a secondary sync from the given member");
+    print(
+        "\trs.freeze(secs)                            make a node ineligible to become primary for the time specified");
+    print(
+        "\trs.remove(hostportstr)                     remove a host from the replica set (disconnects)");
     print("\trs.slaveOk()                               allow queries on secondary nodes");
     print();
     print("\trs.printReplicationInfo()                  check oplog size and time range");
-    print("\trs.printSlaveReplicationInfo()             check replica set members and replication lag");
+    print(
+        "\trs.printSlaveReplicationInfo()             check replica set members and replication lag");
     print("\tdb.isMaster()                              check who is primary");
     print();
     print("\treconfiguration helpers disconnect from the database so the shell will display");
     print("\tan error, even if the command succeeds.");
 };
-rs.slaveOk = function (value) { return db.getMongo().setSlaveOk(value); };
-rs.status = function () { return db._adminCommand("replSetGetStatus"); };
-rs.isMaster = function () { return db.isMaster(); };
-rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); };
-rs.printSlaveReplicationInfo = function () { return db.printSlaveReplicationInfo(); };
-rs.printReplicationInfo = function () { return db.printReplicationInfo(); };
-rs._runCmd = function (c) {
+rs.slaveOk = function(value) {
+    return db.getMongo().setSlaveOk(value);
+};
+rs.status = function() {
+    return db._adminCommand("replSetGetStatus");
+};
+rs.isMaster = function() {
+    return db.isMaster();
+};
+rs.initiate = function(c) {
+    return db._adminCommand({replSetInitiate: c});
+};
+rs.printSlaveReplicationInfo = function() {
+    return db.printSlaveReplicationInfo();
+};
+rs.printReplicationInfo = function() {
+    return db.printReplicationInfo();
+};
+rs._runCmd = function(c) {
     // after the command, catch the disconnect and reconnect if necessary
     var res = null;
     try {
         res = db.adminCommand(c);
-    }
-    catch (e) {
+    } catch (e) {
         if (("" + e).indexOf("error doing query") >= 0) {
             // closed connection.  reconnect.
             db.getLastErrorObj();
             var o = db.getLastErrorObj();
             if (o.ok) {
                 print("reconnected to server after rs command (which is normal)");
-            }
-            else {
+            } else {
                 printjson(o);
             }
-        }
-        else {
+        } else {
             print("shell got exception during repl set operation: " + e);
-            print("in some circumstances, the primary steps down and closes connections on a reconfig");
+            print(
+                "in some circumstances, the primary steps down and closes connections on a reconfig");
         }
         return "";
     }
     return res;
 };
-rs.reconfig = function (cfg, options) {
+rs.reconfig = function(cfg, options) {
     cfg.version = rs.conf().version + 1;
-    cmd = { replSetReconfig: cfg };
+    cmd = {
+        replSetReconfig: cfg
+    };
     for (var i in options) {
         cmd[i] = options[i];
     }
     return this._runCmd(cmd);
 };
-rs.add = function (hostport, arb) {
+rs.add = function(hostport, arb) {
     var cfg = hostport;
 
     var local = db.getSisterDB("local");
-    assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
+    assert(local.system.replset.count() <= 1,
+           "error: local.system.replset has unexpected contents");
     var c = local.system.replset.findOne();
     assert(c, "no config object retrievable from local.system.replset");
 
@@ -1058,47 +1143,59 @@ rs.add = function (hostport, arb) {
 
     var max = 0;
     for (var i in c.members)
-        if (c.members[i]._id > max) max = c.members[i]._id;
+        if (c.members[i]._id > max)
+            max = c.members[i]._id;
     if (isString(hostport)) {
-        cfg = { _id: max + 1, host: hostport };
+        cfg = {
+            _id: max + 1,
+            host: hostport
+        };
         if (arb)
             cfg.arbiterOnly = true;
-    }
-    else if (arb == true) {
+    } else if (arb == true) {
         throw Error("Expected first parameter to be a host-and-port string of arbiter, but got " +
                     tojson(hostport));
     }
 
-    if (cfg._id == null){
-        cfg._id = max+1;
+    if (cfg._id == null) {
+        cfg._id = max + 1;
     }
     c.members.push(cfg);
-    return this._runCmd({ replSetReconfig: c });
+    return this._runCmd({replSetReconfig: c});
 };
-rs.syncFrom = function (host) { return db._adminCommand({replSetSyncFrom : host}); };
-rs.stepDown = function (stepdownSecs, catchUpSecs) {
-    var cmdObj = {replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs};
+rs.syncFrom = function(host) {
+    return db._adminCommand({replSetSyncFrom: host});
+};
+rs.stepDown = function(stepdownSecs, catchUpSecs) {
+    var cmdObj = {
+        replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs
+    };
     if (catchUpSecs !== undefined) {
         cmdObj['secondaryCatchUpPeriodSecs'] = catchUpSecs;
     }
     return db._adminCommand(cmdObj);
 };
-rs.freeze = function (secs) { return db._adminCommand({replSetFreeze:secs}); };
-rs.addArb = function (hn) { return this.add(hn, true); };
+rs.freeze = function(secs) {
+    return db._adminCommand({replSetFreeze: secs});
+};
+rs.addArb = function(hn) {
+    return this.add(hn, true);
+};
 
-rs.conf = function () { 
-    var resp = db._adminCommand({replSetGetConfig:1});
+rs.conf = function() {
+    var resp = db._adminCommand({replSetGetConfig: 1});
     if (resp.ok && !(resp.errmsg) && resp.config)
         return resp.config;
     else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
-        return db.getSisterDB("local").system.replset.findOne(); 
+        return db.getSisterDB("local").system.replset.findOne();
     throw new Error("Could not retrieve replica set config: " + tojson(resp));
 };
 rs.config = rs.conf;
 
-rs.remove = function (hn) {
+rs.remove = function(hn) {
     var local = db.getSisterDB("local");
-    assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
+    assert(local.system.replset.count() <= 1,
+           "error: local.system.replset has unexpected contents");
     var c = local.system.replset.findOne();
     assert(c, "no config object retrievable from local.system.replset");
     c.version++;
@@ -1106,31 +1203,34 @@ rs.remove = function (hn) {
     for (var i in c.members) {
         if (c.members[i].host == hn) {
             c.members.splice(i, 1);
-            return db._adminCommand({ replSetReconfig : c});
+            return db._adminCommand({replSetReconfig: c});
         }
     }
 
-    return "error: couldn't find "+hn+" in "+tojson(c.members);
+    return "error: couldn't find " + hn + " in " + tojson(c.members);
 };
 
 rs.debug = {};
 
 rs.debug.nullLastOpWritten = function(primary, secondary) {
-    var p = connect(primary+"/local");
-    var s = connect(secondary+"/local");
+    var p = connect(primary + "/local");
+    var s = connect(secondary + "/local");
     s.getMongo().setSlaveOk();
 
-    var secondToLast = s.oplog.rs.find().sort({$natural : -1}).limit(1).next();
-    var last = p.runCommand({findAndModify : "oplog.rs",
-                             query : {ts : {$gt : secondToLast.ts}},
-                             sort : {$natural : 1},
-                             update : {$set : {op : "n"}}});
+    var secondToLast = s.oplog.rs.find().sort({$natural: -1}).limit(1).next();
+    var last = p.runCommand({
+        findAndModify: "oplog.rs",
+        query: {ts: {$gt: secondToLast.ts}},
+        sort: {$natural: 1},
+        update: {$set: {op: "n"}}
+    });
 
     if (!last.value.o || !last.value.o._id) {
         print("couldn't find an _id?");
-    }
-    else {
-        last.value.o = {_id : last.value.o._id};
+    } else {
+        last.value.o = {
+            _id: last.value.o._id
+        };
     }
 
     print("nulling out this op:");
@@ -1140,15 +1240,14 @@ rs.debug.nullLastOpWritten = function(primary, secondary) {
 rs.debug.getLastOpWritten = function(server) {
     var s = db.getSisterDB("local");
     if (server) {
-        s = connect(server+"/local");
+        s = connect(server + "/local");
     }
     s.getMongo().setSlaveOk();
 
-    return s.oplog.rs.find().sort({$natural : -1}).limit(1).next();
+    return s.oplog.rs.find().sort({$natural: -1}).limit(1).next();
 };
 
-
-help = shellHelper.help = function (x) {
+help = shellHelper.help = function(x) {
     if (x == "mr") {
         print("\nSee also http://dochub.mongodb.org/core/mapreduce");
         print("\nfunction mapf() {");
@@ -1170,27 +1269,29 @@ help = shellHelper.help = function (x) {
         print(" [, verbose : true]}\n");
         return;
     } else if (x == "connect") {
-        print("\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.");
+        print(
+            "\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.");
         print("Additional connections may be opened:\n");
         print("    var x = new Mongo('host[:port]');");
         print("    var mydb = x.getDB('mydb');");
         print("  or");
         print("    var mydb = connect('host[:port]/mydb');");
-        print("\nNote: the REPL prompt only auto-reports getLastError() for the shell command line connection.\n");
+        print(
+            "\nNote: the REPL prompt only auto-reports getLastError() for the shell command line connection.\n");
         return;
-    }
-    else if (x == "keys") {
+    } else if (x == "keys") {
         print("Tab completion and command history is available at the command prompt.\n");
         print("Some emacs keystrokes are available too:");
         print("  Ctrl-A start of line");
         print("  Ctrl-E end of line");
         print("  Ctrl-K del to end of line");
         print("\nMulti-line commands");
-        print("You can enter a multi line javascript expression.  If parens, braces, etc. are not closed, you will see a new line ");
-        print("beginning with '...' characters.  Type the rest of your expression.  Press Ctrl-C to abort the data entry if you");
+        print(
+            "You can enter a multi line javascript expression.  If parens, braces, etc. are not closed, you will see a new line ");
+        print(
+            "beginning with '...' characters.  Type the rest of your expression.  Press Ctrl-C to abort the data entry if you");
         print("get stuck.\n");
-    }
-    else if (x == "misc") {
+    } else if (x == "misc") {
         print("\tb = new BinData(subtype,base64str)  create a BSON BinData value");
         print("\tb.subtype()                         the BinData subtype (0..255)");
         print("\tb.length()                          length of the BinData data in bytes");
@@ -1198,22 +1299,26 @@ help = shellHelper.help = function (x) {
         print("\tb.base64()                          the data as a base 64 encoded string");
         print("\tb.toString()");
         print();
-        print("\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
+        print(
+            "\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
         print("\tb = UUID(hexstr)                    create a BSON BinData value of UUID subtype");
         print("\tb = MD5(hexstr)                     create a BSON BinData value of MD5 subtype");
-        print("\t\"hexstr\"                            string, sequence of hex characters (no 0x prefix)");
+        print(
+            "\t\"hexstr\"                            string, sequence of hex characters (no 0x prefix)");
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
-        print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");
+        print(
+            "\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");
         print("\to.isObjectId");
         print("\to.toString()");
         print("\to.equals(otherid)");
         print();
-        print("\td = ISODate()                       like Date() but behaves more intuitively when used");
-        print("\td = ISODate('YYYY-MM-DD hh:mm:ss')    without an explicit \"new \" prefix on construction");
+        print(
+            "\td = ISODate()                       like Date() but behaves more intuitively when used");
+        print(
+            "\td = ISODate('YYYY-MM-DD hh:mm:ss')    without an explicit \"new \" prefix on construction");
         return;
-    }
-    else if (x == "admin") {
+    } else if (x == "admin") {
         print("\tls([path])                      list files");
         print("\tpwd()                           returns current directory");
         print("\tlistFiles([path])               returns file list");
@@ -1226,13 +1331,11 @@ help = shellHelper.help = function (x) {
         print("\tsleep(m)                        sleep m milliseconds");
         print("\tgetMemInfo()                    diagnostic");
         return;
-    }
-    else if (x == "test") {
+    } else if (x == "test") {
         print("\tMongoRunner.runMongod(args)   DELETES DATA DIR and then starts mongod");
         print("\t                              returns a connection to the new server");
         return;
-    }
-    else if (x == "") {
+    } else if (x == "") {
         print("\t" + "db.help()                    help on db methods");
         print("\t" + "db.mycoll.help()             help on collection methods");
         print("\t" + "sh.help()                    sharding helpers");
@@ -1246,16 +1349,22 @@ help = shellHelper.help = function (x) {
         print("\t" + "show dbs                     show database names");
         print("\t" + "show collections             show collections in current database");
         print("\t" + "show users                   show users in current database");
-        print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
+        print(
+            "\t" +
+            "show profile                 show most recent system.profile entries with time >= 1ms");
         print("\t" + "show logs                    show the accessible logger names");
-        print("\t" + "show log [name]              prints out the last segment of log in memory, 'global' is default");
+        print(
+            "\t" +
+            "show log [name]              prints out the last segment of log in memory, 'global' is default");
         print("\t" + "use <db_name>                set current database");
         print("\t" + "db.foo.find()                list objects in collection foo");
         print("\t" + "db.foo.find( { a : 1 } )     list objects in foo where a == 1");
-        print("\t" + "it                           result of the last line evaluated; use to further iterate");
-        print("\t" + "DBQuery.shellBatchSize = x   set default number of items to display on shell");
+        print(
+            "\t" +
+            "it                           result of the last line evaluated; use to further iterate");
+        print("\t" +
+              "DBQuery.shellBatchSize = x   set default number of items to display on shell");
         print("\t" + "exit                         quit the mongo shell");
-    }
-    else
+    } else
         print("unknown help option");
 };

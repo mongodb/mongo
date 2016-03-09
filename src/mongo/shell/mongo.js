@@ -1,31 +1,40 @@
 // mongo.js
 
 // NOTE 'Mongo' may be defined here or in MongoJS.cpp.  Add code to init, not to this constructor.
-if ( typeof Mongo == "undefined" ){
-    Mongo = function( host ){
-        this.init( host );
+if (typeof Mongo == "undefined") {
+    Mongo = function(host) {
+        this.init(host);
     };
 }
 
-if ( ! Mongo.prototype ){
+if (!Mongo.prototype) {
     throw Error("Mongo.prototype not defined");
 }
 
-if ( ! Mongo.prototype.find )
-    Mongo.prototype.find = function( ns , query , fields , limit , skip , batchSize , options ){ throw Error("find not implemented"); };
-if ( ! Mongo.prototype.insert )
-    Mongo.prototype.insert = function( ns , obj ){ throw Error("insert not implemented"); };
-if ( ! Mongo.prototype.remove )
-    Mongo.prototype.remove = function( ns , pattern ){ throw Error("remove not implemented"); };
-if ( ! Mongo.prototype.update )
-    Mongo.prototype.update = function( ns , query , obj , upsert ){ throw Error("update not implemented"); };
+if (!Mongo.prototype.find)
+    Mongo.prototype.find = function(ns, query, fields, limit, skip, batchSize, options) {
+        throw Error("find not implemented");
+    };
+if (!Mongo.prototype.insert)
+    Mongo.prototype.insert = function(ns, obj) {
+        throw Error("insert not implemented");
+    };
+if (!Mongo.prototype.remove)
+    Mongo.prototype.remove = function(ns, pattern) {
+        throw Error("remove not implemented");
+    };
+if (!Mongo.prototype.update)
+    Mongo.prototype.update = function(ns, query, obj, upsert) {
+        throw Error("update not implemented");
+    };
 
-if ( typeof mongoInject == "function" ){
-    mongoInject( Mongo.prototype );
+if (typeof mongoInject == "function") {
+    mongoInject(Mongo.prototype);
 }
 
-Mongo.prototype.setSlaveOk = function( value ) {
-    if( value == undefined ) value = true;
+Mongo.prototype.setSlaveOk = function(value) {
+    if (value == undefined)
+        value = true;
     this.slaveOk = value;
 };
 
@@ -33,9 +42,9 @@ Mongo.prototype.getSlaveOk = function() {
     return this.slaveOk || false;
 };
 
-Mongo.prototype.getDB = function( name ){
+Mongo.prototype.getDB = function(name) {
     if ((jsTest.options().keyFile) &&
-         ((typeof this.authenticated == 'undefined') || !this.authenticated)) {
+        ((typeof this.authenticated == 'undefined') || !this.authenticated)) {
         jsTest.authenticate(this);
     }
     // There is a weird issue where typeof(db._name) !== "string" when the db name
@@ -44,25 +53,25 @@ Mongo.prototype.getDB = function( name ){
     if (typeof(name) === "object") {
         name = name.toString();
     }
-    return new DB( this , name );
+    return new DB(this, name);
 };
 
-Mongo.prototype.getDBs = function(){
-    var res = this.getDB( "admin" ).runCommand( { "listDatabases" : 1 } );
-    if ( ! res.ok )
+Mongo.prototype.getDBs = function() {
+    var res = this.getDB("admin").runCommand({"listDatabases": 1});
+    if (!res.ok)
         throw _getErrorWithCode(res, "listDatabases failed:" + tojson(res));
     return res;
 };
 
-Mongo.prototype.adminCommand = function( cmd ){
-    return this.getDB( "admin" ).runCommand( cmd );
+Mongo.prototype.adminCommand = function(cmd) {
+    return this.getDB("admin").runCommand(cmd);
 };
 
 /**
  * Returns all log components and current verbosity values
  */
 Mongo.prototype.getLogComponents = function() {
-    var res = this.adminCommand({ getParameter:1, logComponentVerbosity:1 });
+    var res = this.adminCommand({getParameter: 1, logComponentVerbosity: 1});
     if (!res.ok)
         throw _getErrorWithCode(res, "getLogComponents failed:" + tojson(res));
     return res.logComponentVerbosity;
@@ -76,43 +85,42 @@ Mongo.prototype.setLogLevel = function(logLevel, component) {
     componentNames = [];
     if (typeof component === "string") {
         componentNames = component.split(".");
+    } else if (component !== undefined) {
+        throw Error("setLogLevel component must be a string:" + tojson(component));
     }
-    else if (component !== undefined) {
-        throw Error( "setLogLevel component must be a string:" + tojson(component));
-    }
-    var vDoc = { verbosity: logLevel };
+    var vDoc = {
+        verbosity: logLevel
+    };
 
     // nest vDoc
-    for (var key,obj; componentNames.length > 0;) {
+    for (var key, obj; componentNames.length > 0;) {
         obj = {};
         key = componentNames.pop();
-        obj[ key ] = vDoc;
+        obj[key] = vDoc;
         vDoc = obj;
     }
-    var res = this.adminCommand({ setParameter : 1, logComponentVerbosity : vDoc });
+    var res = this.adminCommand({setParameter: 1, logComponentVerbosity: vDoc});
     if (!res.ok)
         throw _getErrorWithCode(res, "setLogLevel failed:" + tojson(res));
     return res;
 };
 
-Mongo.prototype.getDBNames = function(){
-    return this.getDBs().databases.map( 
-        function(z){
-            return z.name;
-        }
-    );
+Mongo.prototype.getDBNames = function() {
+    return this.getDBs().databases.map(function(z) {
+        return z.name;
+    });
 };
 
-Mongo.prototype.getCollection = function(ns){
-    var idx = ns.indexOf( "." );
-    if ( idx < 0 ) 
+Mongo.prototype.getCollection = function(ns) {
+    var idx = ns.indexOf(".");
+    if (idx < 0)
         throw Error("need . in ns");
-    var db = ns.substring( 0 , idx );
-    var c = ns.substring( idx + 1 );
-    return this.getDB( db ).getCollection( c );
+    var db = ns.substring(0, idx);
+    var c = ns.substring(idx + 1);
+    return this.getDB(db).getCollection(c);
 };
 
-Mongo.prototype.toString = function(){
+Mongo.prototype.toString = function() {
     return "connection to " + this.host;
 };
 Mongo.prototype.tojson = Mongo.prototype.toString;
@@ -125,9 +133,8 @@ Mongo.prototype.tojson = Mongo.prototype.toString;
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
  *     Note that this object only keeps a shallow copy of this array.
  */
-Mongo.prototype.setReadPref = function (mode, tagSet) {
-    if ((this._readPrefMode === "primary") &&
-        (typeof(tagSet) !== "undefined") &&
+Mongo.prototype.setReadPref = function(mode, tagSet) {
+    if ((this._readPrefMode === "primary") && (typeof(tagSet) !== "undefined") &&
         (Object.keys(tagSet).length > 0)) {
         // we allow empty arrays/objects or no tagSet for compatibility reasons
         throw Error("Can not supply tagSet with readPref mode primary");
@@ -141,21 +148,20 @@ Mongo.prototype._setReadPrefUnsafe = function(mode, tagSet) {
     this._readPrefTagSet = tagSet;
 };
 
-Mongo.prototype.getReadPrefMode = function () {
+Mongo.prototype.getReadPrefMode = function() {
     return this._readPrefMode;
 };
 
-Mongo.prototype.getReadPrefTagSet = function () {
+Mongo.prototype.getReadPrefTagSet = function() {
     return this._readPrefTagSet;
 };
 
 // Returns a readPreference object of the type expected by mongos.
-Mongo.prototype.getReadPref = function () {
+Mongo.prototype.getReadPref = function() {
     var obj = {}, mode, tagSet;
     if (typeof(mode = this.getReadPrefMode()) === "string") {
         obj.mode = mode;
-    }
-    else {
+    } else {
         return null;
     }
     // Server Selection Spec: - if readPref mode is "primary" then the tags field MUST
@@ -182,8 +188,8 @@ connect = function(url, user, pass) {
         throw Error("Missing connection string");
     }
     if (urlType != "string") {
-        throw Error("Incorrect type \"" + urlType +
-                    "\" for connection string \"" + tojson(url) + "\"");
+        throw Error("Incorrect type \"" + urlType + "\" for connection string \"" + tojson(url) +
+                    "\"");
     }
     url = url.trim();
     if (0 == url.length) {
@@ -200,11 +206,10 @@ connect = function(url, user, pass) {
         }
         if (colon != -1 && colon < slash) {
             var portNumber = url.substring(colon + 1, slash);
-            if (portNumber.length > 5 ||
-                    !/^\d*$/.test(portNumber) ||
-                    parseInt(portNumber) > 65535) {
-                throw Error("Invalid port number \"" + portNumber +
-                            "\" in connection string \"" + url + "\"");
+            if (portNumber.length > 5 || !/^\d*$/.test(portNumber) ||
+                parseInt(portNumber) > 65535) {
+                throw Error("Invalid port number \"" + portNumber + "\" in connection string \"" +
+                            url + "\"");
             }
         }
         if (slash == url.length - 1) {
@@ -234,54 +239,51 @@ connect = function(url, user, pass) {
 };
 
 /** deprecated, use writeMode below
- * 
+ *
  */
 Mongo.prototype.useWriteCommands = function() {
-     return (this.writeMode() != "legacy");
+    return (this.writeMode() != "legacy");
 };
 
-Mongo.prototype.forceWriteMode = function( mode ) {
+Mongo.prototype.forceWriteMode = function(mode) {
     this._writeMode = mode;
 };
 
 Mongo.prototype.hasWriteCommands = function() {
-    var hasWriteCommands = (this.getMinWireVersion() <= 2 &&
-                            2 <= this.getMaxWireVersion());
+    var hasWriteCommands = (this.getMinWireVersion() <= 2 && 2 <= this.getMaxWireVersion());
     return hasWriteCommands;
 };
 
 Mongo.prototype.hasExplainCommand = function() {
-    var hasExplain = (this.getMinWireVersion() <= 3 &&
-                      3 <= this.getMaxWireVersion());
+    var hasExplain = (this.getMinWireVersion() <= 3 && 3 <= this.getMaxWireVersion());
     return hasExplain;
 };
 
 /**
  * {String} Returns the current mode set. Will be commands/legacy/compatibility
- * 
+ *
  * Sends isMaster to determine if the connection is capable of using bulk write operations, and
  * caches the result.
  */
 
 Mongo.prototype.writeMode = function() {
 
-    if ( '_writeMode' in this ) {
+    if ('_writeMode' in this) {
         return this._writeMode;
     }
 
     // get default from shell params
-    if ( _writeMode )
+    if (_writeMode)
         this._writeMode = _writeMode();
-    
+
     // can't use "commands" mode unless server version is good.
-    if ( this.hasWriteCommands() ) {
+    if (this.hasWriteCommands()) {
         // good with whatever is already set
-    }
-    else if ( this._writeMode == "commands" ) {
+    } else if (this._writeMode == "commands") {
         print("Cannot use commands write mode, degrading to compatibility mode");
         this._writeMode = "compatibility";
     }
-    
+
     return this._writeMode;
 };
 
@@ -320,22 +322,18 @@ Mongo.prototype.readMode = function() {
     if (this.hasOwnProperty("_readMode") && this._readMode !== "compatibility") {
         // We already have determined our read mode. Just return it.
         return this._readMode;
-    }
-    else {
+    } else {
         // We're in compatibility mode. Determine whether the server supports the find/getMore
         // commands. If it does, use commands mode. If not, degrade to legacy mode.
         try {
-            var hasReadCommands = (this.getMinWireVersion() <= 4 &&
-                                   4 <= this.getMaxWireVersion());
+            var hasReadCommands = (this.getMinWireVersion() <= 4 && 4 <= this.getMaxWireVersion());
             if (hasReadCommands) {
                 this._readMode = "commands";
-            }
-            else {
+            } else {
                 print("Cannot use 'commands' readMode, degrading to 'legacy' mode");
                 this._readMode = "legacy";
             }
-        }
-        catch (e) {
+        } catch (e) {
             // We failed trying to determine whether the remote node supports the find/getMore
             // commands. In this case, we keep _readMode as "compatibility" and the shell should
             // issue legacy reads. Next time around we will issue another isMaster to try to
@@ -351,12 +349,11 @@ Mongo.prototype.readMode = function() {
 // overridden at the collection level.
 //
 
-Mongo.prototype.setWriteConcern = function( wc ) {
-    if ( wc instanceof WriteConcern ) {
+Mongo.prototype.setWriteConcern = function(wc) {
+    if (wc instanceof WriteConcern) {
         this._writeConcern = wc;
-    }
-    else {
-        this._writeConcern = new WriteConcern( wc );
+    } else {
+        this._writeConcern = new WriteConcern(wc);
     }
 };
 
