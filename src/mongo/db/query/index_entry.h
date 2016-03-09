@@ -39,6 +39,7 @@
 
 namespace mongo {
 
+class CollatorInterface;
 class MatchExpression;
 
 /**
@@ -108,6 +109,8 @@ struct IndexEntry {
         type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
     }
 
+    std::string toString() const;
+
     BSONObj keyPattern;
 
     bool multikey;
@@ -129,7 +132,9 @@ struct IndexEntry {
     // by the keyPattern?)
     IndexType type;
 
-    std::string toString() const;
+    // Null if this index orders strings according to the simple binary compare. If non-null,
+    // represents the collator used to generate index keys for indexed strings.
+    const CollatorInterface* collator = nullptr;
 };
 
 }  // namespace mongo

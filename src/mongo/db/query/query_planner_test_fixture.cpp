@@ -122,6 +122,20 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, IndexEntry::MultikeyPaths mu
     params.indices.push_back(entry);
 }
 
+void QueryPlannerTest::addIndex(BSONObj keyPattern, std::unique_ptr<CollatorInterface> collator) {
+    _collators.emplace_back(std::move(collator));
+
+    const bool sparse = false;
+    const bool unique = false;
+    const bool multikey = false;
+    const char name[] = "my_index_with_collator";
+    const MatchExpression* filterExpr = nullptr;
+    const BSONObj infoObj;
+    IndexEntry entry(keyPattern, multikey, sparse, unique, name, filterExpr, infoObj);
+    entry.collator = _collators.back().get();
+    params.indices.push_back(entry);
+}
+
 void QueryPlannerTest::runQuery(BSONObj query) {
     runQuerySortProjSkipLimit(query, BSONObj(), BSONObj(), 0, 0);
 }

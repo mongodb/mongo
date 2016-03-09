@@ -30,10 +30,12 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/index/expression_params",
+        "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/matcher/expression_algo",
         "$BUILD_DIR/mongo/db/matcher/expressions",
-        "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/server_parameters",
+        "collation/collation_serializer",
+        "collation/collator_interface",
         "command_request_response",
         "index_bounds",
     ],

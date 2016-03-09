@@ -36,6 +36,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
@@ -61,6 +62,8 @@ protected:
     void addIndex(BSONObj keyPattern, MatchExpression* filterExpr);
 
     void addIndex(BSONObj keyPattern, IndexEntry::MultikeyPaths multikeyPaths);
+
+    void addIndex(BSONObj keyPattern, std::unique_ptr<CollatorInterface> collator);
 
     //
     // Execute planner.
@@ -198,6 +201,9 @@ protected:
     std::unique_ptr<CanonicalQuery> cq;
     QueryPlannerParams params;
     OwnedPointerVector<QuerySolution> solns;
+
+private:
+    std::vector<std::unique_ptr<CollatorInterface>> _collators;
 };
 
 }  // namespace mongo
