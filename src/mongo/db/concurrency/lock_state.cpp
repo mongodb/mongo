@@ -134,19 +134,12 @@ PartitionedInstanceWideLockStats globalStats;
 bool shouldDelayUnlock(ResourceId resId, LockMode mode) {
     // Global and flush lock are not used to protect transactional resources and as such, they
     // need to be acquired and released when requested.
-    switch (resId.getType()) {
-        case RESOURCE_GLOBAL:
-        case RESOURCE_MMAPV1_FLUSH:
-        case RESOURCE_MUTEX:
-            return false;
+    if (resId.getType() == RESOURCE_GLOBAL) {
+        return false;
+    }
 
-        case RESOURCE_COLLECTION:
-        case RESOURCE_DATABASE:
-        case RESOURCE_METADATA:
-            break;
-
-        default:
-            MONGO_UNREACHABLE;
+    if (resId == resourceIdMMAPV1Flush) {
+        return false;
     }
 
     switch (mode) {
@@ -159,7 +152,7 @@ bool shouldDelayUnlock(ResourceId resId, LockMode mode) {
             return false;
 
         default:
-            MONGO_UNREACHABLE;
+            invariant(false);
     }
 }
 
@@ -384,9 +377,9 @@ bool LockerImpl<IsForMMAPV1>::unlockGlobal() {
     LockRequestsMap::Iterator it = _requests.begin();
     while (!it.finished()) {
         // If we're here we should only have one reference to any lock. It is a programming
-        // error for any lock used with multi-granularity locking to have more references than
-        // the global lock, because every scope starts by calling lockGlobal.
-        if (it.key().getType() == RESOURCE_GLOBAL || it.key().getType() == RESOURCE_MUTEX) {
+        // error for any lock to have more references than the global lock, because every
+        // scope starts by calling lockGlobal.
+        if (it.key().getType() == RESOURCE_GLOBAL) {
             it.next();
         } else {
             invariant(_unlockImpl(&it));
@@ -580,10 +573,8 @@ bool LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock(Locker::LockSnapshot* state
     // lock goes along with it) so we store it separately from the more pedestrian locks.
     LockRequestsMap::Iterator globalRequest = _requests.find(resourceIdGlobal);
     if (!globalRequest) {
-        // If there's no global lock there isn't really anything to do. Check that.
-        for (auto it = _requests.begin(); !it.finished(); it.next()) {
-            invariant(it.key().getType() == RESOURCE_MUTEX);
-        }
+        // If there's no global lock there isn't really anything to do.
+        invariant(_requests.empty());
         return false;
     }
 
@@ -601,9 +592,6 @@ bool LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock(Locker::LockSnapshot* state
     // Next, the non-global locks.
     for (LockRequestsMap::Iterator it = _requests.begin(); !it.finished(); it.next()) {
         const ResourceId resId = it.key();
-        const ResourceType resType = resId.getType();
-        if (resType == RESOURCE_MUTEX)
-            continue;
 
         // We should never have to save and restore metadata locks.
         invariant((IsForMMAPV1 && (resourceIdMMAPV1Flush == resId)) ||
@@ -684,7 +672,7 @@ LockResult LockerImpl<IsForMMAPV1>::lockBegin(ResourceId resId, LockMode mode) {
             request->enqueueAtFront = true;
             request->compatibleFirst = true;
         }
-    } else if (resType != RESOURCE_MUTEX) {
+    } else {
         // This is all sanity checks that the global and flush locks are always be acquired
         // before any other lock has been acquired and they must be in sync with the nesting.
         DEV {
@@ -722,8 +710,7 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
     // DB lock, while holding the flush lock, so it has to be released. This is only
     // correct to do if not in a write unit of work.
     const bool yieldFlushLock = IsForMMAPV1 && !inAWriteUnitOfWork() &&
-        resId.getType() != RESOURCE_GLOBAL && resId.getType() != RESOURCE_MUTEX &&
-        resId != resourceIdMMAPV1Flush;
+        resId.getType() != RESOURCE_GLOBAL && resId != resourceIdMMAPV1Flush;
     if (yieldFlushLock) {
         invariant(unlock(resourceIdMMAPV1Flush));
     }

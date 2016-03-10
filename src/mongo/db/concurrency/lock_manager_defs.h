@@ -152,13 +152,10 @@ enum ResourceType {
     RESOURCE_GLOBAL,        // Used for mode changes or global exclusive operations
     RESOURCE_MMAPV1_FLUSH,  // Necessary only for the MMAPv1 engine
 
-    // Generic resources, used for multi-granularity locking, together with RESOURCE_GLOBAL
+    // Generic resources
     RESOURCE_DATABASE,
     RESOURCE_COLLECTION,
     RESOURCE_METADATA,
-
-    // Resource type used for locking general resources not related to the storage hierarchy.
-    RESOURCE_MUTEX,
 
     // Counts the rest. Always insert new resource types above this entry.
     ResourceTypesCount

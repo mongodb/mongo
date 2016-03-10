@@ -103,7 +103,8 @@ uint32_t modeMask(LockMode mode) {
  * Maps the resource id to a human-readable string.
  */
 static const char* ResourceTypeNames[] = {
-    "Invalid", "Global", "MMAPV1Journal", "Database", "Collection", "Metadata", "Mutex"};
+    "Invalid", "Global", "MMAPV1Journal", "Database", "Collection", "Metadata",
+};
 
 // Ensure we do not add new types without updating the names array
 static_assert((sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount,
