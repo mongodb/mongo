@@ -43,7 +43,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
-#include "mongo/s/client/scc_fast_query_handler.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
@@ -115,6 +114,11 @@ ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections)
     : _shardedConnections(shardedConnections) {}
 
 void ShardingConnectionHook::onCreate(DBClientBase* conn) {
+    if (conn->type() == ConnectionString::INVALID) {
+        throw UserException(ErrorCodes::BadValue,
+                            str::stream() << "Unrecognized connection string.");
+    }
+
     // Authenticate as the first thing we do
     // NOTE: Replica set authentication allows authentication against *any* online host
     if (getGlobalAuthorizationManager()->isAuthEnabled()) {
@@ -135,12 +139,6 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
         [this](BSONObjBuilder* metadataBob, StringData hostStringData) -> Status {
             return _shardingRequestMetadataWriter(_shardedConnections, metadataBob, hostStringData);
         });
-
-    if (conn->type() == ConnectionString::SYNC) {
-        throw UserException(ErrorCodes::UnsupportedFormat,
-                            str::stream() << "Unrecognized connection string type: " << conn->type()
-                                          << ".");
-    }
 
     if (conn->type() == ConnectionString::MASTER) {
         BSONObj isMasterResponse;

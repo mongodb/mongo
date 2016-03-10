@@ -36,7 +36,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
-#include "mongo/client/syncclusterconnection.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -177,15 +176,10 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkIn
 Status initializeGlobalShardingState(OperationContext* txn,
                                      const ConnectionString& configCS,
                                      bool allowNetworking) {
-    if (configCS.type() == ConnectionString::SYNC) {
-        return {ErrorCodes::UnsupportedFormat,
-                "SYNC config server connection string is not allowed."};
+    if (configCS.type() == ConnectionString::INVALID) {
+        return {ErrorCodes::BadValue, "Unrecognized connection string."};
     }
 
-    SyncClusterConnection::setConnectionValidationHook(
-        [](const HostAndPort& target, const executor::RemoteCommandResponse& isMasterReply) {
-            return ShardingNetworkConnectionHook::validateHostImpl(target, isMasterReply);
-        });
     auto network =
         executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",
                                        stdx::make_unique<ShardingNetworkConnectionHook>(),

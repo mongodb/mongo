@@ -131,7 +131,6 @@ env.Library(
         'global_conn_pool.cpp',
         'replica_set_monitor.cpp',
         'replica_set_monitor_manager.cpp',
-        'syncclusterconnection.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authcommon',

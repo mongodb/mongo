@@ -254,41 +254,32 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
         return Status(ErrorCodes::BadValue, "error: no args for --configdb");
     }
 
-    {
-        std::string configdbString = params["sharding.configDB"].as<std::string>();
+    std::string configdbString = params["sharding.configDB"].as<std::string>();
 
-        auto configdbConnectionString = ConnectionString::parse(configdbString);
-        if (!configdbConnectionString.isOK()) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Invalid configdb connection string: "
-                                        << configdbConnectionString.getStatus().toString());
-        }
-
-        std::vector<HostAndPort> seedServers;
-        for (const auto& host : configdbConnectionString.getValue().getServers()) {
-            seedServers.push_back(host);
-            if (!seedServers.back().hasPort()) {
-                seedServers.back() = HostAndPort{host.host(), ServerGlobalParams::ConfigServerPort};
-            }
-        }
-
-        mongosGlobalParams.configdbs =
-            ConnectionString{configdbConnectionString.getValue().type(),
-                             seedServers,
-                             configdbConnectionString.getValue().getSetName()};
+    auto configdbConnectionString = ConnectionString::parse(configdbString);
+    if (!configdbConnectionString.isOK()) {
+        return configdbConnectionString.getStatus();
     }
 
-    std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
-
-    if (mongosGlobalParams.configdbs.type() != ConnectionString::SYNC &&
-        mongosGlobalParams.configdbs.type() != ConnectionString::SET &&
-        mongosGlobalParams.configdbs.type() != ConnectionString::MASTER) {
+    if (configdbConnectionString.getValue().type() != ConnectionString::SET) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Invalid config server value "
-                                    << mongosGlobalParams.configdbs.toString());
+                      str::stream() << "configdb supports only replica set connection string");
     }
 
-    if (configServers.size() < 3) {
+    std::vector<HostAndPort> seedServers;
+    for (const auto& host : configdbConnectionString.getValue().getServers()) {
+        seedServers.push_back(host);
+        if (!seedServers.back().hasPort()) {
+            seedServers.back() = HostAndPort{host.host(), ServerGlobalParams::ConfigServerPort};
+        }
+    }
+
+    mongosGlobalParams.configdbs =
+        ConnectionString{configdbConnectionString.getValue().type(),
+                         seedServers,
+                         configdbConnectionString.getValue().getSetName()};
+
+    if (mongosGlobalParams.configdbs.getServers().size() < 3) {
         warning() << "Running a sharded cluster with fewer than 3 config servers should only be "
                      "done for testing purposes and is not recommended for production.";
     }

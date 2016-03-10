@@ -186,7 +186,6 @@ jsTestOptions = function() {
               authMechanism: TestData.authMechanism,
               adminUser: TestData.adminUser || "admin",
               adminPassword: TestData.adminPassword || "password",
-              useLegacyConfigServers: TestData.useLegacyConfigServers || false,
               useLegacyReplicationProtocol: TestData.useLegacyReplicationProtocol || false,
               enableMajorityReadConcern: TestData.enableMajorityReadConcern,
               enableEncryption: TestData.enableEncryption,

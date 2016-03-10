@@ -95,10 +95,8 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
                                           ShardRegistry* shardRegistry,
                                           const ConnectionString& connectionString,
                                           const std::string* shardProposedName) {
-    if (connectionString.type() == ConnectionString::SYNC) {
-        return {ErrorCodes::BadValue,
-                "can't use sync cluster as a shard; for a replica set, "
-                "you have to use <setname>/<server1>,<server2>,..."};
+    if (connectionString.type() == ConnectionString::INVALID) {
+        return {ErrorCodes::BadValue, "Invalid connection string"};
     }
 
     if (shardProposedName && shardProposedName->empty()) {

@@ -190,7 +190,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     // Use read pref to target a particular host from each shard. Also construct the find command
     // that we will forward to each shard.
     for (const auto& shard : shards) {
-        invariant(!shard->isConfig() || shard->getConnString().type() != ConnectionString::SYNC);
+        invariant(!shard->isConfig() || shard->getConnString().type() != ConnectionString::INVALID);
 
         // Build the find command, and attach shard version if necessary.
         BSONObjBuilder cmdBuilder;

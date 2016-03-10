@@ -423,11 +423,7 @@ void ShardRegistry::appendConnectionStats(executor::ConnectionPoolStats* stats) 
 }
 
 void ShardRegistry::_addConfigShard_inlock() {
-    _addShard_inlock("config",
-                     _configServerCS,
-                     _configServerCS.type() == ConnectionString::SYNC
-                         ? nullptr
-                         : _targeterFactory->create(_configServerCS));
+    _addShard_inlock("config", _configServerCS, _targeterFactory->create(_configServerCS));
 }
 
 void ShardRegistry::updateReplSetHosts(const ConnectionString& newConnString) {

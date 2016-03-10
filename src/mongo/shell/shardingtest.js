@@ -30,9 +30,8 @@
  *       configuration object(s)(*). @see MongoRunner.runMongod
  *
  *     config {number|Object|Array.<Object>}: number of config server or
- *       config server configuration object(s)(*). If this field has 3 or
- *       more members, it implies other.sync = true. @see MongoRunner.runMongod
- *
+ *       config server configuration object(s)(*). @see MongoRunner.runMongod
+ * 
  *     (*) There are two ways For multiple configuration objects.
  *       (1) Using the object format. Example:
  *
@@ -58,9 +57,7 @@
  *
  *       shardOptions {Object}: same as the shards property above.
  *          Can be used to specify options that are common all shards.
- *
- *       sync {boolean}: Use SyncClusterConnection, and readies
- *          1 or 3 config servers, based on the value of numConfigs.
+ * 
  *       configOptions {Object}: same as the config property above.
  *          Can be used to specify options that are common all config servers.
  *       mongosOptions {Object}: same as the mongos property above.
@@ -1182,133 +1179,57 @@ var ShardingTest = function(params) {
         rsConn.rs = rs;
     }
 
-    // Default to using 3-node legacy config servers if jsTestOptions().useLegacyOptions is true
-    // and the user didn't explicity specify a different config server configuration
-    if (jsTestOptions().useLegacyConfigServers && otherParams.sync !== false &&
-        (typeof(otherParams.config) === 'undefined' || numConfigs === 3)) {
-        otherParams.sync = true;
-    }
-
     this._configServers = [];
 
-    // Start the config servers
-    if (otherParams.sync) {
-        if (numConfigs !== 1 && numConfigs !== 3) {
-            throw Error('Sync config servers only supported with 1 or 3 nodes');
-        }
+    // Using replica set for config servers
+    var rstOptions = { useHostName : otherParams.useHostname,
+                       useBridge : otherParams.useBridge,
+                       bridgeOptions : otherParams.bridgeOptions,
+                       keyFile : keyFile,
+                       name: testName + "-configRS",
+                     };
 
-        var configNames = [];
-        for (var i = 0; i < numConfigs; i++) {
-            var options = {
-                useHostname: otherParams.useHostname,
-                noJournalPrealloc: otherParams.nopreallocj,
-                pathOpts: Object.merge(pathOpts, {config: i}),
-                dbpath: "$testName-config$config",
-                keyFile: keyFile,
-                // Ensure that journaling is always enabled for config servers.
-                journal: "",
-                configsvr: ""
-            };
+    // when using CSRS, always use wiredTiger as the storage engine
+    var startOptions = { pathOpts: pathOpts,
+                         // Ensure that journaling is always enabled for config servers.
+                         journal : "",
+                         configsvr : "",
+                         noJournalPrealloc : otherParams.nopreallocj,
+                         storageEngine : "wiredTiger",
+                       };
 
-            if (otherParams.configOptions && otherParams.configOptions.binVersion) {
-                otherParams.configOptions.binVersion =
-                    MongoRunner.versionIterator(otherParams.configOptions.binVersion);
-            }
+    if (otherParams.configOptions && otherParams.configOptions.binVersion) {
+        otherParams.configOptions.binVersion =
+            MongoRunner.versionIterator(otherParams.configOptions.binVersion);
+    }
 
-            options = Object.merge(options, otherParams.configOptions);
-            options = Object.merge(options, otherParams["c" + i]);
+    startOptions = Object.merge(startOptions, otherParams.configOptions);
+    rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
 
-            options.port = options.port || allocatePort();
+    var nodeOptions = [];
+    for (var i = 0; i < numConfigs; ++i) {
+        nodeOptions.push(otherParams["c" + i] || {});
+    }
 
-            if (otherParams.useBridge) {
-                var bridgeOptions =
-                    Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
-                bridgeOptions = Object.merge(
-                    bridgeOptions,
-                    {
-                      hostName: otherParams.useHostname ? hostName : "localhost",
-                      // The mongod processes identify themselves to mongobridge as host:port, where
-                      // the host is the actual hostname of the machine and not localhost.
-                      dest: hostName + ":" + options.port,
-                    });
+    rstOptions.nodes = nodeOptions;
 
-                var bridge = new MongoBridge(bridgeOptions);
-            }
+    this.configRS = new ReplSetTest(rstOptions);
+    this.configRS.startSet(startOptions);
 
-            var conn = MongoRunner.runMongod(options);
-            if (!conn) {
-                throw new Error("Failed to start config server " + i);
-            }
+    var config = this.configRS.getReplSetConfig();
+    config.configsvr = true;
+    config.settings = config.settings || {};
+    var initiateTimeout = otherParams.rsOptions && otherParams.rsOptions.initiateTimeout;
+    this.configRS.initiate(config, null, initiateTimeout);
 
-            if (otherParams.useBridge) {
-                bridge.connectToBridge();
-                this._configServers.push(bridge);
-                unbridgedConfigServers.push(conn);
-                configNames.push(bridge.host);
-            } else {
-                this._configServers.push(conn);
-                configNames.push(conn.name);
-            }
+    this.configRS.getPrimary(); // Wait for master to be elected before starting mongos
 
-            _alldbpaths.push(testName + "-config" + i);
-            this["config" + i] = this._configServers[i];
-            this["c" + i] = this._configServers[i];
-        }
-
-        this._configDB = configNames.join(',');
-    } else {
-        // Using replica set for config servers
-        var rstOptions = {
-            useHostName: otherParams.useHostname,
-            useBridge: otherParams.useBridge,
-            bridgeOptions: otherParams.bridgeOptions,
-            keyFile: keyFile,
-            name: testName + "-configRS",
-        };
-
-        // when using CSRS, always use wiredTiger as the storage engine
-        var startOptions = {
-            pathOpts: pathOpts,
-            // Ensure that journaling is always enabled for config servers.
-            journal: "",
-            configsvr: "",
-            noJournalPrealloc: otherParams.nopreallocj,
-            storageEngine: "wiredTiger",
-        };
-
-        if (otherParams.configOptions && otherParams.configOptions.binVersion) {
-            otherParams.configOptions.binVersion =
-                MongoRunner.versionIterator(otherParams.configOptions.binVersion);
-        }
-
-        startOptions = Object.merge(startOptions, otherParams.configOptions);
-        rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
-
-        var nodeOptions = [];
-        for (var i = 0; i < numConfigs; ++i) {
-            nodeOptions.push(otherParams["c" + i] || {});
-        }
-
-        rstOptions.nodes = nodeOptions;
-
-        this.configRS = new ReplSetTest(rstOptions);
-        this.configRS.startSet(startOptions);
-
-        var config = this.configRS.getReplSetConfig();
-        config.configsvr = true;
-        config.settings = config.settings || {};
-        var initiateTimeout = otherParams.rsOptions && otherParams.rsOptions.initiateTimeout;
-        this.configRS.initiate(config, null, initiateTimeout);
-
-        this.configRS.getPrimary();  // Wait for master to be elected before starting mongos
-
-        this._configDB = this.configRS.getURL();
-        this._configServers = this.configRS.nodes;
-        for (var i = 0; i < numConfigs; ++i) {
-            var conn = this._configServers[i];
-            this["config" + i] = conn;
-            this["c" + i] = conn;
-        }
+    this._configDB = this.configRS.getURL();
+    this._configServers = this.configRS.nodes;
+    for (var i = 0; i < numConfigs; ++i) {
+        var conn = this._configServers[i];
+        this["config" + i] = conn;
+        this["c" + i] = conn;
     }
 
     printjson("config servers: " + this._configDB);

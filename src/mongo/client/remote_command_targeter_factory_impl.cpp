@@ -54,7 +54,6 @@ std::unique_ptr<RemoteCommandTargeter> RemoteCommandTargeterFactoryImpl::create(
             return stdx::make_unique<RemoteCommandTargeterRS>(connStr.getSetName(),
                                                               connStr.getServers());
         case ConnectionString::INVALID:
-        case ConnectionString::SYNC:
             // These connections should never be seen
             break;
     }

@@ -47,10 +47,6 @@ class DBClientBase;
  *    server
  *    server:port
  *    foo/server:port,server:port   SET
- *    server,server,server          SYNC
- *                                    Warning - you usually don't want "SYNC", it's used
- *                                    for some special things such as sharding config servers.
- *                                    See syncclusterconnection.h for more info.
  *
  * Typical use:
  *
@@ -60,7 +56,7 @@ class DBClientBase;
  */
 class ConnectionString {
 public:
-    enum ConnectionType { INVALID, MASTER, SET, SYNC, CUSTOM };
+    enum ConnectionType { INVALID, MASTER, SET, CUSTOM };
 
     ConnectionString() = default;
 
@@ -86,7 +82,7 @@ public:
                      std::vector<HostAndPort> servers,
                      const std::string& setName);
 
-    ConnectionString(const std::string& s, ConnectionType favoredMultipleType);
+    ConnectionString(const std::string& s, ConnectionType connType);
 
     bool isValid() const {
         return _type != INVALID;

@@ -36,7 +36,6 @@
 
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/syncclusterconnection.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -67,15 +66,6 @@ DBClientBase* ConnectionString::connect(std::string& errmsg, double socketTimeou
                 return 0;
             }
             return set.release();
-        }
-
-        case SYNC: {
-            // TODO , don't copy
-            std::list<HostAndPort> l;
-            for (unsigned i = 0; i < _servers.size(); i++)
-                l.push_back(_servers[i]);
-            SyncClusterConnection* c = new SyncClusterConnection(l, socketTimeout);
-            return c;
         }
 
         case CUSTOM: {

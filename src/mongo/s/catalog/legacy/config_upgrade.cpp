@@ -34,7 +34,6 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/client/syncclusterconnection.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
@@ -168,24 +167,10 @@ VersionStatus isConfigVersionCompatible(const VersionType& versionInfo, string* 
 Status _checkConfigServersAlive(const ConnectionString& configLoc) {
     BSONObj result;
     try {
-        if (configLoc.type() == ConnectionString::SYNC) {
-            ScopedDbConnection conn(configLoc, 30);
-            // TODO: Dynamic cast is bad, we need a better way of managing this op
-            // via the heirarchy (or not)
-            SyncClusterConnection* scc = dynamic_cast<SyncClusterConnection*>(conn.get());
-            fassert(16729, scc != NULL);
-            std::string errMsg;
-            if (!scc->prepare(errMsg)) {
-                return {ErrorCodes::HostUnreachable, errMsg};
-            }
-            conn.done();
-            return Status::OK();
-        } else {
-            ScopedDbConnection conn(configLoc, 30);
-            conn->runCommand("admin", BSON("fsync" << 1), result);
-            conn.done();
-            return getStatusFromCommandResult(result);
-        }
+        ScopedDbConnection conn(configLoc, 30);
+        conn->runCommand("admin", BSON("fsync" << 1), result);
+        conn.done();
+        return getStatusFromCommandResult(result);
     } catch (const DBException& e) {
         return e.toStatus();
     }

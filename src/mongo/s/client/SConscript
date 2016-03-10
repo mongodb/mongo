@@ -31,7 +31,6 @@ env.Library(
     target='sharding_connection_hook',
     source=[
         'multi_host_query.cpp',
-        'scc_fast_query_handler.cpp',
         'sharding_connection_hook.cpp',
         'sharding_network_connection_hook.cpp',
     ],

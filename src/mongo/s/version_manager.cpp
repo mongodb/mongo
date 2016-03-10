@@ -161,12 +161,6 @@ DBClientBase* getVersionable(DBClientBase* conn) {
             return nullptr;
         case ConnectionString::MASTER:
             return conn;
-        case ConnectionString::SYNC:
-            massert(15906,
-                    str::stream() << "cannot set version or shard on sync connection "
-                                  << conn->toString(),
-                    false);
-            return nullptr;
         case ConnectionString::CUSTOM:
             massert(16334,
                     str::stream() << "cannot set version or shard on custom connection "

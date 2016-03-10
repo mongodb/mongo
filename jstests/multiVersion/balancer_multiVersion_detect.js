@@ -9,7 +9,6 @@ var options = {
     mongosOptions: {verbose: 1, useLogFiles: true},
     configOptions: {},
     shardOptions: {binVersion: ["latest", "last-stable"]},
-    sync: false,
     enableBalancer: true
 };
 

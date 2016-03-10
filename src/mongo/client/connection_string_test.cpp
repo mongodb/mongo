@@ -35,7 +35,8 @@
 namespace {
 
 using namespace mongo;
-
+/*
+   TODO: SERVER-23014 SYNC is gone but this can be a good check for equality
 TEST(ConnectionString, EqualitySync) {
     ConnectionString cs(ConnectionString::SYNC, "a,b,c", "");
 
@@ -45,5 +46,5 @@ TEST(ConnectionString, EqualitySync) {
 
     ASSERT(!cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "d,a,b", "")));
 }
-
+*/
 }  // namespace

@@ -201,53 +201,7 @@ allocatePorts = function(numPorts) {
     return ports;
 };
 
-SyncCCTest = function(testName, extraMongodOptions) {
-    this._testName = testName;
-    this._connections = [];
-
-    for (var i = 0; i < 3; i++) {
-        this._connections.push(MongoRunner.runMongod(extraMongodOptions));
-    }
-
-    this.url = this._connections.map(function(z) {
-        return z.name;
-    }).join(",");
-    this.conn = new Mongo(this.url);
-};
-
-SyncCCTest.prototype.stop = function() {
-    for (var i = 0; i < this._connections.length; i++) {
-        _stopMongoProgram(30000 + i);
-    }
-
-    print('*** ' + this._testName + " completed successfully ***");
-};
-
-SyncCCTest.prototype.checkHashes = function(dbname, msg) {
-    var hashes = this._connections.map(function(z) {
-        return z.getDB(dbname).runCommand("dbhash");
-    });
-
-    for (var i = 1; i < hashes.length; i++) {
-        assert.eq(hashes[0].md5,
-                  hashes[i].md5,
-                  "checkHash on " + dbname + " " + msg + "\n" + tojson(hashes));
-    }
-};
-
-SyncCCTest.prototype.tempKill = function(num) {
-    num = num || 0;
-    MongoRunner.stopMongod(this._connections[num]);
-};
-
-SyncCCTest.prototype.tempStart = function(num) {
-    num = num || 0;
-    var old = this._connections[num];
-    this._connections[num] = MongoRunner.runMongod(
-        {restart: true, cleanData: false, port: old.port, dbpath: old.dbpath});
-};
-
-function startParallelShell(jsCode, port, noConnect) {
+function startParallelShell( jsCode, port, noConnect ) {
     var args = ["mongo"];
 
     if (typeof db == "object") {
