@@ -3172,7 +3172,6 @@ int ExpressionIsoWeek::lastWeek(int year) {
 }
 
 int ExpressionIsoWeek::extract(const tm& tm) {
-    //int isoDayOfWeek = ExpressionIsoDayOfWeek::extract(tm);
     int isoDayOfWeek = (tm.tm_wday - 7) % 7 + 7;
     int isoDayOfYear = tm.tm_yday + 1;
 
