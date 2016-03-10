@@ -126,7 +126,7 @@ connection_stats = [
     ##########################################
     AsyncStat('async_alloc_race', 'number of allocation state races'),
     AsyncStat('async_alloc_view', 'number of operation slots viewed for allocation'),
-    AsyncStat('async_cur_queue', 'current work queue length'),
+    AsyncStat('async_cur_queue', 'current work queue length', 'no_scale'),
     AsyncStat('async_flush', 'number of flush calls'),
     AsyncStat('async_full', 'number of times operation allocation failed'),
     AsyncStat('async_max_queue', 'maximum work queue length', 'no_clear,no_scale'),
@@ -402,7 +402,7 @@ dsrc_stats = [
     BlockStat('block_magic', 'file magic number', 'max_aggregate,no_scale'),
     BlockStat('block_major', 'file major version number', 'max_aggregate,no_scale'),
     BlockStat('block_minor', 'minor version number', 'max_aggregate,no_scale'),
-    BlockStat('block_reuse_bytes', 'file bytes available for reuse', 'size'),
+    BlockStat('block_reuse_bytes', 'file bytes available for reuse', 'no_scale,size'),
     BlockStat('block_size', 'file size in bytes', 'no_scale,size'),
 
     ##########################################

@@ -140,6 +140,12 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_cache_config(session, false, cfg));
 
 	/*
+	 * The lowest possible page read-generation has a special meaning, it
+	 * marks a page for forcible eviction; don't let it happen by accident.
+	 */
+	cache->read_gen = WT_READGEN_START_VALUE;
+
+	/*
 	 * The target size must be lower than the trigger size or we will never
 	 * get any work done.
 	 */

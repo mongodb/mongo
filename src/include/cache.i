@@ -28,34 +28,43 @@ __wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
 
 /*
  * __wt_cache_read_gen_bump --
- *      Get the read generation to keep a page in memory.
+ *      Update the page's read generation.
  */
-static inline uint64_t
-__wt_cache_read_gen_bump(WT_SESSION_IMPL *session)
+static inline void
+__wt_cache_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	/* Ignore pages set for forcible eviction. */
+	if (page->read_gen == WT_READGEN_OLDEST)
+		return;
+
+	/* Ignore pages already in the future. */
+	if (page->read_gen > __wt_cache_read_gen(session))
+		return;
+
 	/*
-	 * We return read-generations from the future (where "the future" is
-	 * measured by increments of the global read generation).  The reason
-	 * is because when acquiring a new hazard pointer for a page, we can
-	 * check its read generation, and if the read generation isn't less
-	 * than the current global generation, we don't bother updating the
-	 * page.  In other words, the goal is to avoid some number of updates
-	 * immediately after each update we have to make.
+	 * We set read-generations in the future (where "the future" is measured
+	 * by increments of the global read generation).  The reason is because
+	 * when acquiring a new hazard pointer for a page, we can check its read
+	 * generation, and if the read generation isn't less than the current
+	 * global generation, we don't bother updating the page.  In other
+	 * words, the goal is to avoid some number of updates immediately after
+	 * each update we have to make.
 	 */
-	return (__wt_cache_read_gen(session) + WT_READGEN_STEP);
+	page->read_gen = __wt_cache_read_gen(session) + WT_READGEN_STEP;
 }
 
 /*
  * __wt_cache_read_gen_new --
  *      Get the read generation for a new page in memory.
  */
-static inline uint64_t
-__wt_cache_read_gen_new(WT_SESSION_IMPL *session)
+static inline void
+__wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
-	return (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2;
+	page->read_gen =
+	    (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2;
 }
 
 /*
