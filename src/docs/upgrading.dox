@@ -2,6 +2,14 @@
 
 @section version_271 Upgrading to Version 2.7.1
 <dl>
+<dt>LSM metadata</dt>
+<dd>
+There is a change to the format of LSM metadata in this release to fix bugs
+in dump / load of tables of type LSM.  Tables created with the old LSM metadata
+format will be upgraded automatically, but once updated to the new version
+<b>are no longer compatible with older releases of WiredTiger</b>.
+</dd>
+
 <dt>Column-store bulk-load cursors</dt>
 <dd>
 Historically, bulk-load of a column-store object ignored any key set in the

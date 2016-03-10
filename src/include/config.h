@@ -85,13 +85,15 @@ struct __wt_config_parser_impl {
 #define	WT_CONFIG_ENTRY_WT_SESSION_upgrade		33
 #define	WT_CONFIG_ENTRY_WT_SESSION_verify		34
 #define	WT_CONFIG_ENTRY_colgroup_meta			35
-#define	WT_CONFIG_ENTRY_file_meta			36
-#define	WT_CONFIG_ENTRY_index_meta			37
-#define	WT_CONFIG_ENTRY_table_meta			38
-#define	WT_CONFIG_ENTRY_wiredtiger_open			39
-#define	WT_CONFIG_ENTRY_wiredtiger_open_all		40
-#define	WT_CONFIG_ENTRY_wiredtiger_open_basecfg		41
-#define	WT_CONFIG_ENTRY_wiredtiger_open_usercfg		42
+#define	WT_CONFIG_ENTRY_file_config			36
+#define	WT_CONFIG_ENTRY_file_meta			37
+#define	WT_CONFIG_ENTRY_index_meta			38
+#define	WT_CONFIG_ENTRY_lsm_meta			39
+#define	WT_CONFIG_ENTRY_table_meta			40
+#define	WT_CONFIG_ENTRY_wiredtiger_open			41
+#define	WT_CONFIG_ENTRY_wiredtiger_open_all		42
+#define	WT_CONFIG_ENTRY_wiredtiger_open_basecfg		43
+#define	WT_CONFIG_ENTRY_wiredtiger_open_usercfg		44
 /*
  * configuration section: END
  * DO NOT EDIT: automatically built by dist/flags.py.
