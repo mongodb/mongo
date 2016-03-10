@@ -531,6 +531,9 @@ connection_runtime_config = [
         the statistics log server uses a session from the configured
         session_max''',
         type='category', subconfig=[
+        Config('json', 'false', r'''
+            encode statistics in JSON format''',
+            type='boolean'),
         Config('on_close', 'false', r'''log statistics on database close''',
             type='boolean'),
         Config('path', '"WiredTigerStat.%d.%H"', r'''
@@ -547,7 +550,8 @@ connection_runtime_config = [
             type='list'),
         Config('timestamp', '"%b %d %H:%M:%S"', r'''
             a timestamp prepended to each log record, may contain strftime
-            conversion specifications'''),
+            conversion specifications, when \c json is configured, defaults
+            to \c "%FT%Y.000Z"'''),
         Config('wait', '0', r'''
             seconds to wait between each write of the log records; setting
             this value above 0 configures statistics logging''',

@@ -68,7 +68,7 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
         # Now close and reopen.  Note that the connection function
         # above will reopen it readonly.
         self.reopen_conn()
-        msg = '/not supported/'
+        msg = '/Unsupported/'
         c = self.session.open_cursor(self.uri, None, None)
         for op in self.cursor_ops:
             c.set_key(1)

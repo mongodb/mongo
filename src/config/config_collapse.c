@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 /*
- * __wt_config_collapse --
+ * __config_collapse --
  *	Collapse a set of configuration strings into newly allocated memory.
  *
  * This function takes a NULL-terminated list of configuration strings (where
@@ -28,10 +28,14 @@
  *	"key=(k4=v4)", the result will be "key=(k4=v4)", as we search for and
  *	use the final value of "key", regardless of field overlap or missing
  *	fields in the nested value.
+ *
+ *	Optionally, values found only in the first string aren't included in the
+ *	final result, that is, the first string is only used as a list of valid
+ *	configuration strings.
  */
-int
-__wt_config_collapse(
-    WT_SESSION_IMPL *session, const char **cfg, char **config_ret)
+static int
+__config_collapse(WT_SESSION_IMPL *session,
+    const char **cfg, bool include_defaults, char **config_ret)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
@@ -41,12 +45,22 @@ __wt_config_collapse(
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
 	WT_ERR(__wt_config_init(session, &cparser, cfg[0]));
+	if (!include_defaults)
+		++cfg;
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 		if (k.type != WT_CONFIG_ITEM_STRING &&
 		    k.type != WT_CONFIG_ITEM_ID)
 			WT_ERR_MSG(session, EINVAL,
 			    "Invalid configuration key found: '%s'\n", k.str);
-		WT_ERR(__wt_config_get(session, cfg, &k, &v));
+		/*
+		 * Not-found is an expected error when not including entries
+		 * from the first configuration string.
+		 */
+		if ((ret = __wt_config_get(session, cfg, &k, &v)) != 0) {
+			WT_ERR_NOTFOUND_OK(ret);
+			continue;
+		}
+
 		/* Include the quotes around string keys/values. */
 		if (k.type == WT_CONFIG_ITEM_STRING) {
 			--k.str;
@@ -75,6 +89,30 @@ __wt_config_collapse(
 
 err:	__wt_scr_free(session, &tmp);
 	return (ret);
+}
+
+/*
+ * __wt_config_collapse --
+ *	Collapse a set of configuration strings into newly allocated memory,
+ * including the defaults from the first configuration string.
+ */
+int
+__wt_config_collapse(
+    WT_SESSION_IMPL *session, const char **cfg, char **config_ret)
+{
+	return (__config_collapse(session, cfg, true, config_ret));
+}
+
+/*
+ * __wt_config_strip_and_collapse --
+ *	Collapse a set of configuration strings into newly allocated memory,
+ * NOT including the defaults from the first configuration string.
+ */
+int
+__wt_config_strip_and_collapse(
+    WT_SESSION_IMPL *session, const char **cfg, char **config_ret)
+{
+	return (__config_collapse(session, cfg, false, config_ret));
 }
 
 /*

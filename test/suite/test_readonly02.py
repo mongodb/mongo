@@ -54,10 +54,8 @@ class test_readonly02(wttest.WiredTigerTestCase, suite_subprocess):
     #   1. setting readonly on a new database directory
     #   2. an unclean shutdown and reopening readonly
     #   3. logging with zero-fill enabled and readonly
-    #   4. readonly and statistics logging
     #
     badcfg1 = 'log=(enabled,zero_fill=true)'
-    badcfg2 = 'statistics_log=(wait=3)'
 
     def setUpConnectionOpen(self, dir):
         self.home = dir
@@ -68,8 +66,10 @@ class test_readonly02(wttest.WiredTigerTestCase, suite_subprocess):
         if self.create:
             #   1. setting readonly on a new database directory
             # Setting readonly prevents creation so we should see an
-            # ENOENT error because the lock file does not exist.
+            # error because the lock file does not exist.
             msg = '/No such file/'
+            if os.name != 'posix':
+                msg = '/cannot find the file/'
             os.mkdir(rdonlydir)
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.wiredtiger_open(
@@ -111,8 +111,6 @@ class test_readonly02(wttest.WiredTigerTestCase, suite_subprocess):
         # Close the connection.  Reopen readonly with other bad settings.
         #   3. logging with zero-fill enabled and readonly
         self.close_checkerror(self.badcfg1)
-        #   4. readonly and statistics logging
-        self.close_checkerror(self.badcfg2)
 
 if __name__ == '__main__':
     wttest.run()

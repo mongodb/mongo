@@ -75,9 +75,9 @@ struct __wt_cache {
 	/*
 	 * Read information.
 	 */
-	uint64_t   read_gen;		/* Page read generation (LRU) */
-	uint64_t   read_gen_oldest;	/* The oldest read generation that
-					   eviction knows about */
+	uint64_t read_gen;		/* Current page read generation */
+	uint64_t read_gen_oldest;	/* Oldest read generation the eviction
+					 * server saw in its last queue load */
 
 	/*
 	 * Eviction thread information.

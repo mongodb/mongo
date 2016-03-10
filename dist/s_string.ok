@@ -113,6 +113,7 @@ FORALL
 FOREACH
 FULLFSYNC
 FindFirstFile
+Fixup
 Fk
 FlushFileBuffers
 Fprintf
@@ -727,6 +728,7 @@ libwiredtiger
 llll
 llu
 loadtext
+localTime
 localtime
 logf
 logmgr
@@ -982,6 +984,7 @@ superset
 sw
 sy
 sys
+sz
 t's
 tV
 tablename
@@ -1076,6 +1079,7 @@ waitpid
 walk's
 warmup
 wb
+wiredTiger
 wiredtiger
 workFactor
 wrapup

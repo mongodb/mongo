@@ -94,6 +94,7 @@ typedef struct {
 	int64_t truncate;		/* Truncate ratio */
 	uint64_t truncate_pct;		/* Truncate Percent */
 	uint64_t truncate_count;	/* Truncate Count */
+	int64_t update_delta;		/* Value size change on update */
 
 #define	WORKER_INSERT		1	/* Insert */
 #define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
@@ -190,7 +191,10 @@ struct __config {			/* Configuration structure */
 
 	volatile uint32_t totalsec;	/* total seconds running */
 
-	u_int		 has_truncate;  /* if there is a truncate workload */
+#define	CFG_GROW	0x0001		/* There is a grow workload */
+#define	CFG_SHRINK	0x0002		/* There is a shrink workload */
+#define	CFG_TRUNCATE	0x0004		/* There is a truncate workload */
+	uint32_t	flags;		/* flags */
 
 	/* Queue head for use with the Truncate Logic */
 	TAILQ_HEAD(__truncate_qh, __truncate_queue_entry) stone_head;

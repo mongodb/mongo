@@ -8,6 +8,9 @@
 
 #include "wt_internal.h"
 
+static int __curjoin_insert_endpoint(WT_SESSION_IMPL *,
+    WT_CURSOR_JOIN_ENTRY *, u_int, WT_CURSOR_JOIN_ENDPOINT **);
+
 /*
  * __curjoin_entry_iter_init --
  *	Initialize an iteration for the index managed by a join entry.
@@ -295,11 +298,17 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 
 	/* Initially position the cursor if necessary. */
 	endmax = &entry->ends[entry->ends_next];
-	if ((end = &entry->ends[0]) < endmax &&
-	    F_ISSET(end, WT_CURJOIN_END_GE)) {
-		WT_ERR(__wt_cursor_dup_position(end->cursor, c));
-		if (WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_GE)
-			skip = 1;
+	if ((end = &entry->ends[0]) < endmax) {
+		if (F_ISSET(end, WT_CURJOIN_END_GT) ||
+		    WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_EQ) {
+			WT_ERR(__wt_cursor_dup_position(end->cursor, c));
+			if (WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_GE)
+				skip = 1;
+		} else if (F_ISSET(end, WT_CURJOIN_END_LT)) {
+			if ((ret = c->next(c)) == WT_NOTFOUND)
+				goto done;
+			WT_ERR(ret);
+		}
 	}
 	collator = (entry->index == NULL) ? NULL : entry->index->collator;
 	while (ret == 0) {
@@ -401,8 +410,13 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 {
 	WT_BLOOM *bloom;
 	WT_DECL_RET;
+	WT_CURSOR *origcur;
 	WT_CURSOR_JOIN_ENTRY *je, *jeend, *je2;
 	WT_CURSOR_JOIN_ENDPOINT *end;
+	const char *def_cfg[] = { WT_CONFIG_BASE(
+	    session, WT_SESSION_open_cursor), NULL };
+	const char *raw_cfg[] = { WT_CONFIG_BASE(
+	    session, WT_SESSION_open_cursor), "raw", NULL };
 	uint32_t f, k;
 
 	if (cjoin->entries_next == 0)
@@ -411,9 +425,27 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 		    "cursors");
 
 	je = &cjoin->entries[0];
+	jeend = &cjoin->entries[cjoin->entries_next];
+
+	/*
+	 * For a single compare=le endpoint in the first iterated entry,
+	 * construct a companion compare=ge endpoint that will actually
+	 * be iterated.
+	 */
+	if (((je = cjoin->entries) != jeend) &&
+	    je->ends_next == 1 && F_ISSET(&je->ends[0], WT_CURJOIN_END_LT)) {
+		origcur = je->ends[0].cursor;
+		WT_RET(__curjoin_insert_endpoint(session, je, 0, &end));
+		WT_RET(__wt_open_cursor(session, origcur->uri,
+		    (WT_CURSOR *)cjoin,
+		    F_ISSET(origcur, WT_CURSTD_RAW) ? raw_cfg : def_cfg,
+		    &end->cursor));
+		WT_RET(end->cursor->next(end->cursor));
+		end->flags = WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ |
+		    WT_CURJOIN_END_OWN_CURSOR;
+	}
 	WT_RET(__curjoin_entry_iter_init(session, cjoin, je, &cjoin->iter));
 
-	jeend = &cjoin->entries[cjoin->entries_next];
 	for (je = cjoin->entries; je < jeend; je++) {
 		__wt_stat_join_init_single(&je->stats);
 		for (end = &je->ends[0]; end < &je->ends[je->ends_next];
@@ -431,6 +463,10 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 			F_SET(cjoin, WT_CURJOIN_SKIP_FIRST_LEFT);
 
 		if (F_ISSET(je, WT_CURJOIN_ENTRY_BLOOM)) {
+			if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
+			       WT_RET_MSG(session, EINVAL,
+				   "join cursors with Bloom filters cannot be "
+				   "used with read-uncommitted isolation");
 			if (je->bloom == NULL) {
 				/*
 				 * Look for compatible filters to be shared,
@@ -633,7 +669,7 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			ret = c->get_value(c, &v);
 		else if (ret == WT_NOTFOUND)
 			WT_ERR_MSG(session, WT_ERROR,
-			    "main table for join is missing entry.");
+			    "main table for join is missing entry");
 		WT_TRET(c->reset(c));
 		WT_ERR(ret);
 	} else
@@ -709,7 +745,8 @@ nextkey:
 			skip_left = false;
 			WT_ERR(ret);
 		}
-	}
+	} else if (ret != WT_NOTFOUND)
+		WT_ERR(ret);
 
 	if (0) {
 err:		F_SET(cjoin, WT_CURJOIN_ERROR);
@@ -772,8 +809,11 @@ __curjoin_close(WT_CURSOR *cursor)
 		if (F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
 			WT_TRET(__wt_bloom_close(entry->bloom));
 		for (end = &entry->ends[0];
-		     end < &entry->ends[entry->ends_next]; end++)
+		     end < &entry->ends[entry->ends_next]; end++) {
 			F_CLR(end->cursor, WT_CURSTD_JOINED);
+			if (F_ISSET(end, WT_CURJOIN_END_OWN_CURSOR))
+				WT_TRET(end->cursor->close(end->cursor));
+		}
 		__wt_free(session, entry->ends);
 		__wt_free(session, entry->repack_format);
 	}
@@ -879,7 +919,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
     uint64_t count, uint32_t bloom_bit_count, uint32_t bloom_hash_count)
 {
 	WT_CURSOR_INDEX *cindex;
-	WT_CURSOR_JOIN_ENDPOINT *end, *newend;
+	WT_CURSOR_JOIN_ENDPOINT *end;
 	WT_CURSOR_JOIN_ENTRY *entry;
 	WT_DECL_RET;
 	bool hasins, needbloom, range_eq;
@@ -1000,17 +1040,10 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		entry->bloom_hash_count =
 		    WT_MAX(entry->bloom_hash_count, bloom_hash_count);
 	}
-	WT_ERR(__wt_realloc_def(session, &entry->ends_allocated,
-	    entry->ends_next + 1, &entry->ends));
-	if (!hasins)
-		ins = entry->ends_next;
-	newend = &entry->ends[ins];
-	memmove(newend + 1, newend,
-	    (entry->ends_next - ins) * sizeof(WT_CURSOR_JOIN_ENDPOINT));
-	memset(newend, 0, sizeof(WT_CURSOR_JOIN_ENDPOINT));
-	entry->ends_next++;
-	newend->cursor = ref_cursor;
-	F_SET(newend, range);
+	WT_ERR(__curjoin_insert_endpoint(session, entry,
+	    hasins ? ins : entry->ends_next, &end));
+	end->cursor = ref_cursor;
+	F_SET(end, range);
 
 	/* Open the main file with a projection of the indexed columns. */
 	if (entry->main == NULL && idx != NULL) {
@@ -1052,4 +1085,26 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 err:	if (main_uri != NULL)
 		__wt_free(session, main_uri);
 	return (ret);
+}
+
+/*
+ * __curjoin_insert_endpoint --
+ *	Insert a new entry into the endpoint array for the join entry.
+ */
+static int
+__curjoin_insert_endpoint(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
+    u_int pos, WT_CURSOR_JOIN_ENDPOINT **newendp)
+{
+	WT_CURSOR_JOIN_ENDPOINT *newend;
+
+	WT_RET(__wt_realloc_def(session, &entry->ends_allocated,
+	    entry->ends_next + 1, &entry->ends));
+	newend = &entry->ends[pos];
+	memmove(newend + 1, newend,
+	    (entry->ends_next - pos) * sizeof(WT_CURSOR_JOIN_ENDPOINT));
+	memset(newend, 0, sizeof(WT_CURSOR_JOIN_ENDPOINT));
+	entry->ends_next++;
+	*newendp = newend;
+
+	return (0);
 }

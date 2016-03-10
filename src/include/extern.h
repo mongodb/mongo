@@ -220,6 +220,7 @@ extern void __wt_conn_foc_discard(WT_SESSION_IMPL *session);
 extern int __wt_configure_method(WT_SESSION_IMPL *session, const char *method, const char *uri, const char *config, const char *type, const char *check);
 extern int __wt_config_check(WT_SESSION_IMPL *session, const WT_CONFIG_ENTRY *entry, const char *config, size_t config_len);
 extern int __wt_config_collapse( WT_SESSION_IMPL *session, const char **cfg, char **config_ret);
+extern int __wt_config_strip_and_collapse( WT_SESSION_IMPL *session, const char **cfg, char **config_ret);
 extern int __wt_config_merge(WT_SESSION_IMPL *session, const char **cfg, const char *cfg_strip, const char **config_ret);
 extern int __wt_conn_config_init(WT_SESSION_IMPL *session);
 extern void __wt_conn_config_discard(WT_SESSION_IMPL *session);
@@ -297,6 +298,7 @@ extern int __wt_json_to_item(WT_SESSION_IMPL *session, const char *jstr, const c
 extern ssize_t __wt_json_strlen(const char *src, size_t srclen);
 extern int __wt_json_strncpy(char **pdst, size_t dstlen, const char *src, size_t srclen);
 extern int __wt_curlog_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR **cursorp);
+extern int __wt_schema_create_final( WT_SESSION_IMPL *session, char *cfg_arg[], char **value_ret);
 extern int __wt_curmetadata_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp);
 extern void __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst);
 extern int __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *curjoin, const char *cfg[], WT_CURSOR_STAT *cst);
@@ -576,7 +578,6 @@ extern int __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 extern int __wt_bulk_insert_fix( WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool deleted);
 extern int __wt_bulk_insert_fix_bitmap(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert_var( WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool deleted);
-extern int __wt_schema_create_strip(WT_SESSION_IMPL *session, const char *v1, const char *v2, char **value_ret);
 extern int __wt_direct_io_size_check(WT_SESSION_IMPL *session, const char **cfg, const char *config_name, uint32_t *allocsizep);
 extern int __wt_schema_colgroup_source(WT_SESSION_IMPL *session, WT_TABLE *table, const char *cgname, const char *config, WT_ITEM *buf);
 extern int __wt_schema_index_source(WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, const char *config, WT_ITEM *buf);

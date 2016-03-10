@@ -91,9 +91,9 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 		goto err;
 
 	/*
-	 * Mark the handle as dead and close the underlying file
-	 * handle. Closing the handle decrements the open file count,
-	 * meaning the close loop won't overrun the configured minimum.
+	 * Mark the handle dead and close the underlying file handle.
+	 * Closing the handle decrements the open file count, meaning the close
+	 * loop won't overrun the configured minimum.
 	 */
 	ret = __wt_conn_btree_sync_and_close(session, false, true);
 
@@ -163,7 +163,7 @@ __sweep_discard_trees(WT_SESSION_IMPL *session, u_int *dead_handlesp)
 		    !F_ISSET(dhandle, WT_DHANDLE_DEAD))
 			continue;
 
-		/* If the handle is marked "dead", flush it from cache. */
+		/* If the handle is marked dead, flush it from cache. */
 		WT_WITH_DHANDLE(session, dhandle, ret =
 		    __wt_conn_btree_sync_and_close(session, false, false));
 

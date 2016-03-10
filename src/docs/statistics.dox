@@ -79,6 +79,15 @@ or logged:
 
 @snippet ex_all.c Statistics clear configuration
 
+The following example opens a statistics cursor on an open join cursor:
+
+@snippet ex_schema.c Statistics cursor join cursor
+
+The statistics gathered will be organized by reference cursors participating
+in the join (see WT_SESSION::join); the uri of each reference cursor appears
+as a prefix in the description field returned as a value by the statistics
+cursor.
+
 @section statistics_log Statistics logging
 
 WiredTiger will optionally log database statistics into a file when the
