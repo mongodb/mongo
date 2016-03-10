@@ -17,6 +17,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
 	struct timespec end, start;
 	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
@@ -27,6 +28,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	uint32_t flags;
 	bool evict_reset;
 
+	conn = S2C(session);
 	btree = S2BT(session);
 	walk = NULL;
 	txn = &session->txn;
@@ -223,7 +225,7 @@ err:	/* On error, clear any left-over tree walk. */
 		 * so that eviction knows that the checkpoint has completed.
 		 */
 		WT_PUBLISH(btree->checkpoint_gen,
-		    S2C(session)->txn_global.checkpoint_gen);
+		    conn->txn_global.checkpoint_gen);
 		WT_STAT_FAST_DATA_SET(session,
 		    btree_checkpoint_generation, btree->checkpoint_gen);
 
@@ -257,7 +259,8 @@ err:	/* On error, clear any left-over tree walk. */
 	 * before checkpointing the file).  Start a flush to stable storage,
 	 * but don't wait for it.
 	 */
-	if (ret == 0 && syncop == WT_SYNC_WRITE_LEAVES)
+	if (ret == 0 &&
+	    syncop == WT_SYNC_WRITE_LEAVES && F_ISSET(conn, WT_CONN_CKPT_SYNC))
 		WT_RET(btree->bm->sync(btree->bm, session, true));
 
 	return (ret);
