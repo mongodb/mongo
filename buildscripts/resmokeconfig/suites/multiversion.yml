@@ -5,8 +5,6 @@ selector:
     exclude_files: 
 # TODO: SERVER-21578
     - jstests/multiVersion/balancer_multiVersion_detect.js
-# TODO: SERVER-22942
-    - jstests/multiVersion/dumprestore_sharded.js
 
 # Multiversion tests start their own mongod's.
 executor:

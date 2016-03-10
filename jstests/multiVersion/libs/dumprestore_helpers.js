@@ -51,7 +51,6 @@ function multiVersionDumpRestoreTest(configObj) {
     resetDbpath(configObj.testDbpath);
     if (configObj.dumpType === "mongos") {
         var shardingTestConfig = {
-            sync: true,  // Mixed version clusters can't use replsets for config servers
             name: testBaseName + "_sharded_source",
             mongos: [{binVersion: configObj.serverSourceVersion}],
             shards: [{binVersion: configObj.serverSourceVersion}],
@@ -114,7 +113,6 @@ function multiVersionDumpRestoreTest(configObj) {
                                  });
     } else { /* "mongos" */
         var shardingTestConfig = {
-            sync: true,  // Mixed version clusters can't use replsets for config servers
             name: testBaseName + "_sharded_dest",
             mongos: [{binVersion: configObj.serverDestVersion}],
             shards: [{binVersion: configObj.serverDestVersion}],
