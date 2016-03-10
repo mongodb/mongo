@@ -3144,6 +3144,7 @@ Value ExpressionIsoWeek::evaluateInternal(Variables* vars) const {
 }
 
 int ExpressionIsoWeek::lastWeek(int year) {
+    // create YYYY-12-31T23:59:59 so only 1 second left to new year
     struct tm tm;
     tm.tm_year = year - 1900;
     tm.tm_mon = 11;
@@ -3152,21 +3153,31 @@ int ExpressionIsoWeek::lastWeek(int year) {
     tm.tm_min = 59;
     tm.tm_sec = 59;
     mktime(&tm);
-    if (tm.tm_wday > 0 && tm.tm_wday < 4) {
+    /* From: https://en.wikipedia.org/wiki/ISO_week_date#Last_week
+     *
+     * If 31 December is on a Monday, Tuesday or Wednesday, it is in week 01
+     * of the next year. If it is on a Thursday, it is in week 53 of the year
+     * just ending; if on a Friday it is in week 52 (or 53 if the year just
+     * ending is a leap year); if on a Saturday or Sunday, it is in week 52 of
+     * the year just ending.
+     */
+    if (tm.tm_wday > 0 && tm.tm_wday < 4) { // Mon(1), Tue(2), and Wed(3)
         return 1;
-    } else if (tm.tm_wday == 4) {
+    } else if (tm.tm_wday == 4) { // Thu (4)
         return 53;
-    } else if (tm.tm_wday == 5) {
-        if (year % 400 == 0) { // leap year
-            return 53;
-        } else if (year % 100 == 0) { // non leap year
+    } else if (tm.tm_wday == 5) { // Fri (5)
+        // On Fri it's week 52 for non leap years and 53 for leap years
+        // https://en.wikipedia.org/wiki/Leap_year#Algorithm
+        if (year % 4 != 0) { // non leap year
             return 52;
-        } else if (year % 4 == 0) { // leap year
+        } else if (year % 100 != 0) { // leap year
             return 53;
-        } else { // non leap year
+        } else if (year % 400 != 0) { // non leap year
             return 52;
+        } else { // leap year
+            return 53;
         }
-    } else {
+    } else { // Sat (6) or Sun (0)
         return 52;
     }
 }
