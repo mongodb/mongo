@@ -3088,8 +3088,8 @@ const char* ExpressionWeek::getOpName() const {
 /* ------------------------- ExpressionIsoDayOfWeek --------------------- */
 
 Value ExpressionIsoDayOfWeek::evaluateInternal(Variables* vars) const {
-    Value pDate(vpOperand[0]->evaluateInternal(vars));
-    return Value(extract(pDate.coerceToTm()));
+    Value date(vpOperand[0]->evaluateInternal(vars));
+    return Value(extract(date.coerceToTm()));
 }
 
 int ExpressionIsoDayOfWeek::extract(const tm& tm) {
@@ -3104,24 +3104,24 @@ const char* ExpressionIsoDayOfWeek::getOpName() const {
 /* ------------------------- ExpressionIsoWeekYear ---------------------- */
 
 Value ExpressionIsoWeekYear::evaluateInternal(Variables* vars) const {
-    Value pDate(vpOperand[0]->evaluateInternal(vars));
-    return Value(extract(pDate.coerceToTm()));
+    Value date(vpOperand[0]->evaluateInternal(vars));
+    return Value(extract(date.coerceToTm()));
 }
 
 int ExpressionIsoWeekYear::extract(const tm& tm) {
     if (tm.tm_mon > 0 && tm.tm_mon < 11) {
-        // if month isnt January or December it's just the year given
+        // If month is between February and November, it is just the year given.
         return tm.tm_year + 1900;
     } else if (tm.tm_mon == 0) {
-        // In January we  need to check if the week belongs to previous year
+        // In January we need to check if the week belongs to previous year.
         int isoWeek = ExpressionIsoWeek::extract(tm);
-        if (isoWeek > 51) { // weeks 52 and 53 belong to the previous year
+        if (isoWeek > 51) { // Weeks 52 and 53 belong to the previous year.
             return tm.tm_year + 1900 - 1;
-        } else { // all other weeks belong to given year
+        } else { // All other weeks belong to given year.
             return tm.tm_year + 1900;
         }
     } else {
-        // the week 1 in December belongs to the next year
+        // A week 1 in December belongs to the next year.
         int isoWeek = ExpressionIsoWeek::extract(tm);
         if (isoWeek == 1) {
             return tm.tm_year + 1900 + 1;
@@ -3139,8 +3139,8 @@ const char* ExpressionIsoWeekYear::getOpName() const {
 /* ------------------------- ExpressionIsoWeek -------------------------- */
 
 Value ExpressionIsoWeek::evaluateInternal(Variables* vars) const {
-    Value pDate(vpOperand[0]->evaluateInternal(vars));
-    return Value(extract(pDate.coerceToTm()));
+    Value date(vpOperand[0]->evaluateInternal(vars));
+    return Value(extract(date.coerceToTm()));
 }
 
 int ExpressionIsoWeek::lastWeek(int year) {
@@ -3153,20 +3153,18 @@ int ExpressionIsoWeek::lastWeek(int year) {
     tm.tm_min = 59;
     tm.tm_sec = 59;
     mktime(&tm);
-    /* From: https://en.wikipedia.org/wiki/ISO_week_date#Last_week
-     *
-     * If 31 December is on a Monday, Tuesday or Wednesday, it is in week 01
-     * of the next year. If it is on a Thursday, it is in week 53 of the year
-     * just ending; if on a Friday it is in week 52 (or 53 if the year just
-     * ending is a leap year); if on a Saturday or Sunday, it is in week 52 of
-     * the year just ending.
-     */
+
+    // From: https://en.wikipedia.org/wiki/ISO_week_date#Last_week :
+    // If 31 December is on a Monday, Tuesday or Wednesday, it is in week 01 of the next year. If
+    // it is on a Thursday, it is in week 53 of the year just ending; if on a Friday it is in week
+    // 52 (or 53 if the year just ending is a leap year); if on a Saturday or Sunday, it is in week
+    // 52 of the year just ending.
     if (tm.tm_wday > 0 && tm.tm_wday < 4) { // Mon(1), Tue(2), and Wed(3)
         return 1;
     } else if (tm.tm_wday == 4) { // Thu (4)
         return 53;
     } else if (tm.tm_wday == 5) { // Fri (5)
-        // On Fri it's week 52 for non leap years and 53 for leap years
+        // On Fri it's week 52 for non leap years and 53 for leap years.
         // https://en.wikipedia.org/wiki/Leap_year#Algorithm
         if (year % 4 != 0) { // non leap year
             return 52;
@@ -3182,10 +3180,31 @@ int ExpressionIsoWeek::lastWeek(int year) {
     }
 }
 
+// Quote https://en.wikipedia.org/wiki/ISO_week_date :
+// Weeks start with Monday. The first week of a year is the week that contains the first Thursday of
+// the year (and, hence, always contains 4 January).
 int ExpressionIsoWeek::extract(const tm& tm) {
-    int isoDayOfWeek = (tm.tm_wday - 7) % 7 + 7;
+    int isoDayOfWeek = ExpressionIsoDayOfWeek::extract(tm);
     int isoDayOfYear = tm.tm_yday + 1;
 
+    // Calculation taken from:
+    // https://en.wikipedia.org/wiki/ISO_week_date#Calculating_the_week_number_of_a_given_date
+    //
+    // The first week must contain the first Thursday, therefore the `+ 10` after subtracting the
+    // weekday. Example: 2016-01-07 is the first Thursday
+    // ordinal(2016-01-07) => 7
+    // weekday(2016-01-07) => 4
+    //
+    // floor((7-4+10)/7) = floor(13/7) => 1
+    //
+    //              │ ordinal(date) - weekday(date) + 10 │
+    // week(date) = │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
+    //              │                 7                  │
+    //              └                                    ┘
+    //
+    // week(date)    = isoWeek
+    // ordinal(date) = isoDayOfYear
+    // weekday(date) = isoDayOfWeek
     int isoWeek = (isoDayOfYear - isoDayOfWeek + 10) / 7;
 
     if (isoWeek < 1) {
