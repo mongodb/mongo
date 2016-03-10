@@ -70,7 +70,6 @@ BSONObj createRecvChunkCommitRequest(const MigrationSessionId& sessionId) {
 
 MONGO_FP_DECLARE(failMigrationCommit);
 MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
-MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
 
 }  // namespace
 
@@ -386,47 +385,9 @@ Status ChunkMoveOperationState::commitMigration(const MigrationSessionId& sessio
         preCond.append(b.obj());
     }
 
-    Status applyOpsStatus{Status::OK()};
-    try {
-        // For testing migration failures
-        if (MONGO_FAIL_POINT(failMigrationConfigWritePrepare)) {
-            throw DBException("mock migration failure before config write",
-                              ErrorCodes::PrepareConfigsFailed);
-        }
-
-        applyOpsStatus = grid.catalogManager(_txn)->applyChunkOpsDeprecated(
-            _txn, updates.arr(), preCond.arr(), _nss.ns(), nextVersion);
-
-    } catch (const DBException& ex) {
-        applyOpsStatus = ex.toStatus();
-    }
-
-    if (applyOpsStatus == ErrorCodes::PrepareConfigsFailed) {
-        // In the process of issuing the migrate commit, the SyncClusterConnection checks that
-        // the config servers are reachable. If they are not, we are sure that the applyOps
-        // command was not sent to any of the configs, so we can safely back out of the
-        // migration here, by resetting the shard version that we bumped up to in the
-        // donateChunk() call above.
-        log() << "About to acquire moveChunk coll lock to reset shard version from "
-              << "failed migration";
-
-        {
-            ScopedTransaction transaction(_txn, MODE_IX);
-            Lock::DBLock dbLock(_txn->lockState(), _nss.db(), MODE_IX);
-            Lock::CollectionLock collLock(_txn->lockState(), _nss.ns(), MODE_X);
-
-            // Revert the metadata back to the state before "forgetting" about the chunk
-            shardingState->undoDonateChunk(_txn, _nss.ns(), getCollMetadata());
-        }
-
-        log() << "Shard version successfully reset to clean up failed migration";
-
-        const string msg = stream() << "Failed to send migrate commit to configs "
-                                    << causedBy(applyOpsStatus);
-        return Status(applyOpsStatus.code(), msg);
-    } else if (!applyOpsStatus.isOK()) {
-        fassertStatusOK(34431, applyOpsStatus);
-    }
+    fassertStatusOK(34431,
+                    grid.catalogManager(_txn)->applyChunkOpsDeprecated(
+                        _txn, updates.arr(), preCond.arr(), _nss.ns(), nextVersion));
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
