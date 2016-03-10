@@ -87,7 +87,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         #
         # We've configured checkpoints to run every 5 seconds, sweep server to
         # run every 2 seconds and idle time to be 6 seconds. It should take
-        # about 8 seconds for a handle to be closed. Sleep for 12 seconds to be
+        # about 8 seconds for a handle to be closed. Sleep for double to be
         # safe.
         #
         uri = '%s.test' % self.uri
@@ -105,7 +105,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(uri, None)
         k = 0
         sleep = 0
-        while sleep < 12:
+        while sleep < 16:
             self.session.checkpoint()
             k = k+1
             c[k] = 1
