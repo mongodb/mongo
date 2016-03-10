@@ -150,9 +150,9 @@ dump_config(WT_SESSION *session, const char *uri, bool hex)
 
 	/* Open a metadata cursor. */
 	if ((ret = session->open_cursor(
-	    session, "metadata:create", NULL, NULL, &cursor)) != 0) {
+	    session, "metadata:", NULL, NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n", progname,
-		    "metadata:create", session->strerror(session, ret));
+		    "metadata:", session->strerror(session, ret));
 		return (1);
 	}
 	/*
@@ -536,7 +536,7 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 		 * hugely simpler.
 		 */
 		if ((ret = session->open_cursor(
-		    session, "metadata:create", NULL, NULL, &srch)) != 0)
+		    session, "metadata:", NULL, NULL, &srch)) != 0)
 			return (util_cerr(cursor, "open_cursor", ret));
 
 		if ((ret = dump_table_config_complex(

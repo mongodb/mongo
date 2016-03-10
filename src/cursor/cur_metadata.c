@@ -33,9 +33,11 @@
 /*
  * __wt_schema_create_final --
  *	Create a single configuration line from a set of configuration strings,
- * including all of the defaults declared for a session.create. Here for the wt
- * dump command utility, which reads a set of configuration strings and needs to
- * add in the defaults and then collapse them into single string for load.
+ * including all of the defaults declared for a session.create, and stripping
+ * any configuration strings that don't belong in a session.create. Here for
+ * the wt dump command utility, which reads a set of configuration strings and
+ * needs to add in the defaults and then collapse them into single string for
+ * a subsequent load.
  */
 int
 __wt_schema_create_final(
@@ -48,7 +50,8 @@ __wt_schema_create_final(
 	/*
 	 * Count the entries in the original,
 	 * Allocate a copy with the defaults as the first entry,
-	 * Collapse the whole thing into a single configuration string.
+	 * Collapse the whole thing into a single configuration string (which
+	 * also strips any entries that don't appear in the first entry).
 	 */
 	for (i = 0; cfg_arg[i] != NULL; ++i)
 		;
@@ -67,8 +70,7 @@ __wt_schema_create_final(
 /*
  * __schema_create_strip --
  *	Discard any configuration information from a schema entry that is not
- * applicable to an session.create call. Here for the wt dump command utility,
- * which only wants to dump the schema information needed for load.
+ * applicable to an session.create call. Here for the metadata:create URI.
  */
 static int
 __schema_create_strip(
@@ -77,7 +79,7 @@ __schema_create_strip(
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_create), value, NULL };
 
-	return (__wt_config_strip_and_collapse(session, cfg, value_ret));
+	return (__wt_config_collapse(session, cfg, value_ret));
 }
 
 /*
