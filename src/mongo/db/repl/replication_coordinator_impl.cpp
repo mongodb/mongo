@@ -1331,14 +1331,18 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
                 return false;
             }
 
-            // Wait for the "current" snapshot to advance to/past the opTime.
-            // We cannot have this committed snapshot until we have replicated to a majority,
-            // so we can return true here once that requirement is met.
-            return (_currentCommittedSnapshot->opTime >= opTime &&
-                    _currentCommittedSnapshot->name >= minSnapshot);
-        } else {
-            patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
+            if (getWriteConcernMajorityShouldJournal_inlock()) {
+                // Wait for the "current" snapshot to advance to/past the opTime.
+
+                // We cannot have this committed snapshot until we have replicated to a majority,
+                // so we can return true here once that requirement is met for durable writes.
+                return (_currentCommittedSnapshot->opTime >= opTime &&
+                        _currentCommittedSnapshot->name >= minSnapshot);
+            }
         }
+        // Continue and wait for replication to the majority (of voters).
+        // *** Needed for J:True, writeConcernMajorityShouldJournal:False (appliedOpTime snapshot).
+        patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
     } else {
         patternName = writeConcern.wMode;
     }
@@ -2343,6 +2347,11 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     const ReplicaSetConfig oldConfig = _rsConfig;
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
+
+    // On a reconfig we drop all snapshots so we don't mistakenely read from the wrong one.
+    // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
+    _dropAllSnapshots_inlock();
+
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
@@ -3189,11 +3198,15 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
 
     std::vector<OpTime> votingNodesOpTimes;
 
+    // Whether we use the applied or durable OpTime for the commit point is decided here.
+    const bool useDurableOpTime = getWriteConcernMajorityShouldJournal_inlock();
+
     for (const auto& sI : _slaveInfo) {
         auto memberConfig = _rsConfig.findMemberByID(sI.memberId);
         invariant(memberConfig);
         if (memberConfig->isVoter()) {
-            votingNodesOpTimes.push_back(sI.lastDurableOpTime);
+            const auto opTime = useDurableOpTime ? sI.lastDurableOpTime : sI.lastAppliedOpTime;
+            votingNodesOpTimes.push_back(opTime);
         }
     }
 
