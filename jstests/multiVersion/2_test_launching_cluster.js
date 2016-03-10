@@ -7,12 +7,8 @@ load('./jstests/multiVersion/libs/verify_versions.js');
 (function() {
     "use strict";
     // Check our latest versions
-    // var versionsToCheck = [ "last-stable", "latest" ];
-    // var versionsToCheckMongos = [ "last-stable" ];
-    // TODO put this back when SERVER-22761 is resolved
-
-    var versionsToCheck = ["latest"];
-    var versionsToCheckMongos = ["latest"];
+    var versionsToCheck = [ "last-stable", "latest" ];
+    var versionsToCheckMongos = [ "last-stable" ];
 
     jsTest.log("Testing legacy versions...");
 
