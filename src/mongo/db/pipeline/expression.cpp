@@ -3110,15 +3110,24 @@ Value ExpressionIsoWeekYear::evaluateInternal(Variables* vars) const {
 
 int ExpressionIsoWeekYear::extract(const tm& tm) {
     if (tm.tm_mon > 0 && tm.tm_mon < 11) {
+        // if month isnt January or December it's just the year given
         return tm.tm_year + 1900;
     } else if (tm.tm_mon == 0) {
+        // In January we  need to check if the week belongs to previous year
         int isoWeek = ExpressionIsoWeek::extract(tm);
-        if (isoWeek > 51) return tm.tm_year + 1900 - 1;
-        else return tm.tm_year + 1900;
+        if (isoWeek > 51) { // weeks 52 and 53 belong to the previous year
+            return tm.tm_year + 1900 - 1;
+        } else { // all other weeks belong to given year
+            return tm.tm_year + 1900;
+        }
     } else {
+        // the week 1 in December belongs to the next year
         int isoWeek = ExpressionIsoWeek::extract(tm);
-        if (isoWeek == 1) return tm.tm_year + 1900 + 1;
-        else return tm.tm_year + 1900;
+        if (isoWeek == 1) {
+            return tm.tm_year + 1900 + 1;
+        } else {
+            return tm.tm_year + 1900;
+        }
     }
 }
 
