@@ -50,6 +50,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "collation_serializer",
+        "collator_interface_mock",
     ],
 )
 

@@ -86,8 +86,6 @@ BSONObj CollationSerializer::specToBSON(const CollationSpec& spec) {
     return builder.obj();
 }
 
-// TODO SERVER-22372: Add test coverage for this method once the CollatorInterfaceMock is
-// implemented.
 void CollationSerializer::appendCollationKey(StringData fieldName,
                                              const CollatorInterface::ComparisonKey& key,
                                              BSONObjBuilder* bob) {
