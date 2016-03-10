@@ -54,7 +54,7 @@ cat > $pre_push_hook <<'EOF'
 quiet=${GITHOOKS_QUIET:-""}
 
 origin="`git config remote.origin.url`"
-repo="`basename $origin`"
+repo="`basename -s .git $origin`"
 
 hooksdir="$HOME/.githooks/$repo/pre-push"
 if [ ! -d "$hooksdir" ]; then
