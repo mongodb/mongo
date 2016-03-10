@@ -758,6 +758,8 @@ majorp
 malloc
 marshall
 marshalled
+maxcpu
+maxdbs
 mbll
 mbss
 mem
@@ -845,8 +847,11 @@ parserp
 patchp
 pathname
 pathnames
+pclose
+pcpu
 perf
 pfx
+popen
 poptable
 popthreads
 portably

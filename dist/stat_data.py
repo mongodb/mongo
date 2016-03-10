@@ -109,6 +109,8 @@ connection_stats = [
     ##########################################
     # System statistics
     ##########################################
+    ConnStat('cond_auto_wait', 'auto adjusting condition wait calls'),
+    ConnStat('cond_auto_wait_reset', 'auto adjusting condition resets'),
     ConnStat('cond_wait', 'pthread mutex condition wait calls'),
     ConnStat('file_open', 'files currently open', 'no_clear,no_scale'),
     ConnStat('memory_allocation', 'memory allocations'),
@@ -218,6 +220,8 @@ connection_stats = [
     LogStat('log_compress_write_fails', 'log records not compressed'),
     LogStat('log_compress_writes', 'log records compressed'),
     LogStat('log_flush', 'log flush operations'),
+    LogStat('log_force_write', 'log force write operations'),
+    LogStat('log_force_write_skip', 'log force write operations skipped'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale,size'),
     LogStat('log_prealloc_files', 'pre-allocated log files prepared'),
     LogStat('log_prealloc_max', 'number of pre-allocated log files to create', 'no_clear,no_scale'),
@@ -238,6 +242,7 @@ connection_stats = [
     LogStat('log_sync', 'log sync operations'),
     LogStat('log_sync_dir', 'log sync_dir operations'),
     LogStat('log_write_lsn', 'log server thread advances write LSN'),
+    LogStat('log_write_lsn_skip', 'log server thread write LSN walk skipped'),
     LogStat('log_writes', 'log write operations'),
     LogStat('log_zero_fills', 'log files manually zero-filled'),
 
