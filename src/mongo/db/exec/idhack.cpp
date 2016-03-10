@@ -38,7 +38,6 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/storage/record_fetcher.h"
-#include "mongo/s/d_state.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {

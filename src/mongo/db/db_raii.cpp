@@ -36,8 +36,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/s/d_state.h"
 
 namespace mongo {
 
@@ -46,9 +46,15 @@ AutoGetDb::AutoGetDb(OperationContext* txn, StringData ns, LockMode mode)
 
 AutoGetCollection::AutoGetCollection(OperationContext* txn,
                                      const NamespaceString& nss,
-                                     LockMode mode)
-    : _autoDb(txn, nss.db(), mode),
-      _collLock(txn->lockState(), nss.ns(), mode),
+                                     LockMode modeAll)
+    : AutoGetCollection(txn, nss, modeAll, modeAll) {}
+
+AutoGetCollection::AutoGetCollection(OperationContext* txn,
+                                     const NamespaceString& nss,
+                                     LockMode modeDB,
+                                     LockMode modeColl)
+    : _autoDb(txn, nss.db(), modeDB),
+      _collLock(txn->lockState(), nss.ns(), modeColl),
       _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(nss) : nullptr) {}
 
 AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockMode mode)
@@ -95,7 +101,10 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
 
     // We have both the DB and collection locked, which is the prerequisite to do a stable shard
     // version check, but we'd like to do the check after we have a satisfactory snapshot.
-    ensureShardVersionOKOrThrow(_txn, nss.ns());
+    auto css = CollectionShardingState::get(txn, nss);
+    if (css) {
+        css->checkShardVersionOrThrow(txn);
+    }
 }
 
 AutoGetCollectionForRead::~AutoGetCollectionForRead() {
@@ -186,7 +195,10 @@ void OldClientContext::_checkNotStale() const {
         case dbDelete:   // here as well.
             break;
         default:
-            ensureShardVersionOKOrThrow(_txn, _ns);
+            auto css = CollectionShardingState::get(_txn, _ns);
+            if (css) {
+                css->checkShardVersionOrThrow(_txn);
+            }
     }
 }
 

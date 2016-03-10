@@ -70,7 +70,7 @@ bool inShutdown() {
     return dbexitCalled;
 }
 
-bool haveLocalShardingInfo(Client* client, const string& ns) {
+bool haveLocalShardingInfo(OperationContext* txn, const string& ns) {
     return false;
 }
 

@@ -75,8 +75,9 @@ void DBCollectionInfo::construct(JSContext* cx, JS::CallArgs args) {
     std::string fullName = ValueWriter(cx, args.get(3)).toString();
 
     auto context = scope->getOpContext();
-    if (context && haveLocalShardingInfo(context->getClient(), fullName))
+    if (context && haveLocalShardingInfo(context, fullName)) {
         uasserted(ErrorCodes::BadValue, "can't use sharded collection from db.eval");
+    }
 
     args.rval().setObjectOrNull(thisv);
 }

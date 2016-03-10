@@ -36,7 +36,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -218,7 +218,10 @@ CollectionShardingState* ShardingState::getNS(const std::string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     CollectionShardingStateMap::iterator it = _collections.find(ns);
     if (it == _collections.end()) {
-        return nullptr;
+        auto inserted = _collections.insert(make_pair(
+            ns, stdx::make_unique<CollectionShardingState>(NamespaceString(ns), nullptr)));
+        invariant(inserted.second);
+        it = std::move(inserted.first);
     }
 
     return it->second.get();
@@ -229,21 +232,22 @@ void ShardingState::clearCollectionMetadata() {
     _collections.clear();
 }
 
-// TODO we shouldn't need three ways for checking the version. Fix this.
-bool ShardingState::hasVersion(const string& ns) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return !!_collections.count(ns);
-}
-
 ChunkVersion ShardingState::getVersion(const string& ns) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    CollectionShardingStateMap::const_iterator it = _collections.find(ns);
-    if (it != _collections.end()) {
-        shared_ptr<CollectionMetadata> p = it->second->getMetadata();
-        return p->getShardVersion();
-    } else {
-        return ChunkVersion(0, 0, OID());
+    shared_ptr<CollectionMetadata> p;
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        CollectionShardingStateMap::const_iterator it = _collections.find(ns);
+        if (it != _collections.end()) {
+            p = it->second->getMetadata();
+        }
     }
+
+    if (p) {
+        return p->getShardVersion();
+    }
+
+    return ChunkVersion::UNSHARDED();
 }
 
 void ShardingState::donateChunk(OperationContext* txn,
@@ -618,24 +622,16 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
                                        const ChunkVersion& reqShardVersion,
                                        bool useRequestedVersion,
                                        ChunkVersion* latestShardVersion) {
+    invariant(!txn->lockState()->isLocked());
+
     Status status = _waitForInitialization(txn);
     if (!status.isOK())
         return status;
 
-    // The idea here is that we're going to reload the metadata from the config server, but
-    // we need to do so outside any locks.  When we get our result back, if the current metadata
-    // has changed, we may not be able to install the new metadata.
-
-    //
-    // Get the initial metadata
-    // No DBLock is needed since the metadata is expected to change during reload.
-    //
-
-    shared_ptr<CollectionMetadata> beforeMetadata;
-
+    // We can't reload if a shard name has not yet been set
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        // We also can't reload if a shard name has not yet been set.
+
         if (_shardName.empty()) {
             string errMsg = str::stream() << "cannot refresh metadata for " << ns
                                           << " before shard name has been set";
@@ -643,15 +639,24 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
             warning() << errMsg;
             return Status(ErrorCodes::NotYetInitialized, errMsg);
         }
+    }
 
-        CollectionShardingStateMap::iterator it = _collections.find(ns);
-        if (it != _collections.end()) {
-            beforeMetadata = it->second->getMetadata();
-        }
+    const NamespaceString nss(ns);
+
+    // The idea here is that we're going to reload the metadata from the config server, but we need
+    // to do so outside any locks.  When we get our result back, if the current metadata has
+    // changed, we may not be able to install the new metadata.
+    shared_ptr<CollectionMetadata> beforeMetadata;
+    {
+        ScopedTransaction transaction(txn, MODE_IS);
+        AutoGetCollection autoColl(txn, nss, MODE_IS);
+
+        beforeMetadata = CollectionShardingState::get(txn, nss)->getMetadata();
     }
 
     ChunkVersion beforeShardVersion;
     ChunkVersion beforeCollVersion;
+
     if (beforeMetadata) {
         beforeShardVersion = beforeMetadata->getShardVersion();
         beforeCollVersion = beforeMetadata->getCollVersion();
@@ -696,7 +701,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
                                                         grid.catalogManager(txn),
                                                         ns,
                                                         getShardName(),
-                                                        fullReload ? NULL : beforeMetadata.get(),
+                                                        fullReload ? nullptr : beforeMetadata.get(),
                                                         remoteMetadata.get());
         refreshMillis = refreshTimer.millis();
 
@@ -739,29 +744,11 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
         // Exclusive collection lock needed since we're now potentially changing the metadata,
         // and don't want reads/writes to be ongoing.
         ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
-        Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
+        AutoGetCollection autoColl(txn, nss, MODE_IX, MODE_X);
 
-        //
         // Get the metadata now that the load has completed
-        //
-
-        // Don't reload if our config server has changed or sharding is no longer enabled
-        if (!enabled()) {
-            string errMsg = str::stream() << "could not refresh metadata for " << ns
-                                          << ", sharding is no longer enabled";
-
-            warning() << errMsg;
-            return Status(ErrorCodes::NotYetInitialized, errMsg);
-        }
-
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-        CollectionShardingStateMap::iterator it = _collections.find(ns);
-        if (it != _collections.end()) {
-            afterMetadata = it->second->getMetadata();
-        }
-
+        auto css = CollectionShardingState::get(txn, nss);
+        afterMetadata = css->getMetadata();
         if (afterMetadata) {
             afterShardVersion = afterMetadata->getShardVersion();
             afterCollVersion = afterMetadata->getCollVersion();
@@ -774,7 +761,6 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
         //
 
         Status status = mdLoader.promotePendingChunks(afterMetadata.get(), remoteMetadata.get());
-
         if (!status.isOK()) {
             warning() << "remote metadata for " << ns
                       << " is inconsistent with current pending chunks"
@@ -797,31 +783,22 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
             if (!afterCollVersion.epoch().isSet()) {
                 // First metadata load
                 installType = InstallType_New;
-                dassert(it == _collections.end());
-                _collections.insert(make_pair(ns,
-                                              stdx::make_unique<CollectionShardingState>(
-                                                  NamespaceString(ns), std::move(remoteMetadata))));
+                css->setMetadata(std::move(remoteMetadata));
             } else if (remoteCollVersion.epoch().isSet() &&
                        remoteCollVersion.epoch() == afterCollVersion.epoch()) {
                 // Update to existing metadata
                 installType = InstallType_Update;
-
-                // Invariant: If CollMetadata was not found, version should be have been 0.
-                dassert(it != _collections.end());
-                it->second->setMetadata(std::move(remoteMetadata));
+                css->setMetadata(std::move(remoteMetadata));
             } else if (remoteCollVersion.epoch().isSet()) {
                 // New epoch detected, replacing metadata
                 installType = InstallType_Replace;
-
-                // Invariant: If CollMetadata was not found, version should be have been 0.
-                dassert(it != _collections.end());
-                it->second->setMetadata(std::move(remoteMetadata));
+                css->setMetadata(std::move(remoteMetadata));
             } else {
                 dassert(!remoteCollVersion.epoch().isSet());
 
                 // Drop detected
                 installType = InstallType_Drop;
-                _collections.erase(it);
+                css->setMetadata(nullptr);
             }
 
             *latestShardVersion = remoteShardVersion;
@@ -906,15 +883,17 @@ void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
          it != _collections.end();
          ++it) {
         shared_ptr<CollectionMetadata> metadata = it->second->getMetadata();
-        versionB.appendTimestamp(it->first, metadata->getShardVersion().toLong());
+        if (metadata) {
+            versionB.appendTimestamp(it->first, metadata->getShardVersion().toLong());
+        } else {
+            versionB.appendTimestamp(it->first, ChunkVersion::UNSHARDED().toLong());
+        }
     }
 
     versionB.done();
 }
 
 bool ShardingState::needCollectionMetadata(OperationContext* txn, const string& ns) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
     if (!enabled())
         return false;
 

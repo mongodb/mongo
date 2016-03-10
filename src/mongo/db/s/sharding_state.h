@@ -132,8 +132,6 @@ public:
      */
     void clearCollectionMetadata();
 
-    bool hasVersion(const std::string& ns);
-
     ChunkVersion getVersion(const std::string& ns);
 
     /**

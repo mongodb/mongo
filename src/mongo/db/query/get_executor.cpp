@@ -75,6 +75,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/oplog_hack.h"
@@ -85,7 +86,6 @@
 namespace mongo {
 
 using std::unique_ptr;
-using std::endl;
 using std::string;
 using std::vector;
 using stdx::make_unique;
@@ -174,7 +174,7 @@ void fillOutPlannerParams(OperationContext* txn,
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         std::shared_ptr<CollectionMetadata> collMetadata =
-            ShardingState::get(txn)->getCollectionMetadata(canonicalQuery->ns());
+            CollectionShardingState::get(txn, canonicalQuery->nss())->getMetadata();
         if (collMetadata) {
             plannerParams->shardKey = collMetadata->getKeyPattern();
         } else {
@@ -259,7 +259,7 @@ Status prepareExecution(OperationContext* opCtx,
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             *rootOut = new ShardFilterStage(
                 opCtx,
-                ShardingState::get(opCtx)->getCollectionMetadata(collection->ns().ns()),
+                CollectionShardingState::get(opCtx, canonicalQuery->nss())->getMetadata(),
                 ws,
                 *rootOut);
         }
@@ -648,7 +648,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
                 12050, "cannot delete from system namespace", legalClientSystemNS(nss.ns(), true));
         }
         if (nss.ns().find('$') != string::npos) {
-            log() << "cannot delete from collection with reserved $ in name: " << nss << endl;
+            log() << "cannot delete from collection with reserved $ in name: " << nss;
             uasserted(10100, "cannot delete from collection with reserved $ in name");
         }
     }

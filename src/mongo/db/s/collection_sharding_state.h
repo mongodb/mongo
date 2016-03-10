@@ -37,6 +37,7 @@
 namespace mongo {
 
 class BSONObj;
+struct ChunkVersion;
 class CollectionMetadata;
 class OperationContext;
 
@@ -81,6 +82,17 @@ public:
      */
     void setMetadata(std::shared_ptr<CollectionMetadata> newMetadata);
 
+    /**
+     * Checks whether the shard version in the context is compatible with the shard version of the
+     * collection locally and if not throws SendStaleConfigException populated with the expected and
+     * actual versions.
+     *
+     * Because SendStaleConfigException has special semantics in terms of how a sharded command's
+     * response is constructed, this function should be the only means of checking for shard version
+     * match.
+     */
+    void checkShardVersionOrThrow(OperationContext* txn) const;
+
     // Replication subsystem hooks. If this collection is serving as a source for migration, these
     // methods inform it of any changes to its contents.
 
@@ -93,10 +105,29 @@ public:
     void onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId);
 
 private:
+    /**
+     * Checks whether the shard version of the operation matches that of the collection.
+     *
+     * txn - Operation context from which to retrieve the operation's expected version.
+     * errmsg (out) - On false return contains an explanatory error message.
+     * expectedShardVersion (out) - On false return contains the expected collection version on this
+     *  shard. Obtained from the operation sharding state.
+     * actualShardVersion (out) - On false return contains the actual collection version on this
+     *  shard. Obtained from the collection sharding state.
+     *
+     * Returns true if the expected collection version on the shard matches its actual version on
+     * the shard and false otherwise. Upon false return, the output parameters will be set.
+     */
+    bool _checkShardVersionOk(OperationContext* txn,
+                              std::string* errmsg,
+                              ChunkVersion* expectedShardVersion,
+                              ChunkVersion* actualShardVersion) const;
+
     // Namespace to which this state belongs.
     const NamespaceString _nss;
 
-    // Contains all the chunks associated with this collection. This value is always non-null.
+    // Contains all the chunks associated with this collection. This value will be null if the
+    // collection is not sharded.
     std::shared_ptr<CollectionMetadata> _metadata;
 };
 

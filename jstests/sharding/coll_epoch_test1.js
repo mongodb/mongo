@@ -1,7 +1,7 @@
 // Tests various cases of dropping and recreating collections in the same namespace with multiple
 // mongoses
 
-var st = new ShardingTest({shards: 3, mongos: 3, verbose: 1});
+var st = new ShardingTest({shards: 3, mongos: 3});
 // Balancer is by default stopped, thus it will not interfere
 
 // Use separate mongoses for admin, inserting data, and validating results, so no
@@ -12,8 +12,6 @@ var staleMongos = st.s1;
 var config = st.s.getDB("config");
 var admin = st.s.getDB("admin");
 var coll = st.s.getCollection("foo.bar");
-
-insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true});
 
 var shards = {};
 config.shards.find().forEach(function(doc) {

@@ -54,7 +54,7 @@ DBClientBase* createDirectClient(OperationContext* txn) {
     return NULL;
 }
 
-bool haveLocalShardingInfo(Client* client, const std::string& ns) {
+bool haveLocalShardingInfo(OperationContext* txn, const std::string& ns) {
     return false;
 }
 

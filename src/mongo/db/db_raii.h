@@ -74,7 +74,12 @@ class AutoGetCollection {
     MONGO_DISALLOW_COPYING(AutoGetCollection);
 
 public:
-    AutoGetCollection(OperationContext* txn, const NamespaceString& nss, LockMode mode);
+    AutoGetCollection(OperationContext* txn, const NamespaceString& nss, LockMode modeAll);
+
+    AutoGetCollection(OperationContext* txn,
+                      const NamespaceString& nss,
+                      LockMode modeDB,
+                      LockMode modeColl);
 
     Database* getDb() const {
         return _autoDb.getDb();

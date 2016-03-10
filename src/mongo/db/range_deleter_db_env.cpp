@@ -42,7 +42,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/d_state.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

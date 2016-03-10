@@ -59,8 +59,7 @@ void DBInfo::getProperty(JSContext* cx,
 
             if (o.hasOwnField(InternedString::_fullName)) {
                 // need to check every time that the collection did not get sharded
-                if (haveLocalShardingInfo(opContext->getClient(),
-                                          o.getString(InternedString::_fullName)))
+                if (haveLocalShardingInfo(opContext, o.getString(InternedString::_fullName)))
                     uasserted(ErrorCodes::BadValue, "can't use sharded collection from db.eval");
             }
         }

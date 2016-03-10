@@ -47,7 +47,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/log.h"
@@ -224,8 +223,6 @@ void MigrationSourceManager::done(OperationContext* txn) {
 void MigrationSourceManager::logInsertOp(OperationContext* txn,
                                          const char* ns,
                                          const BSONObj& obj) {
-    ensureShardVersionOKOrThrow(txn, ns);
-
     dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
 
     if (!_sessionId || (_nss != ns))
@@ -249,8 +246,6 @@ void MigrationSourceManager::logInsertOp(OperationContext* txn,
 void MigrationSourceManager::logUpdateOp(OperationContext* txn,
                                          const char* ns,
                                          const BSONObj& updatedDoc) {
-    ensureShardVersionOKOrThrow(txn, ns);
-
     dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
 
     if (!_sessionId || (_nss != ns))
@@ -274,8 +269,6 @@ void MigrationSourceManager::logUpdateOp(OperationContext* txn,
 void MigrationSourceManager::logDeleteOp(OperationContext* txn,
                                          const char* ns,
                                          const BSONObj& obj) {
-    ensureShardVersionOKOrThrow(txn, ns);
-
     dassert(txn->lockState()->isWriteLocked());  // Must have Global IX.
 
     BSONElement idElement = obj["_id"];

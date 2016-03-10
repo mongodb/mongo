@@ -32,14 +32,20 @@
 
 #include "mongo/db/s/collection_sharding_state.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/stale_exception.h"
 
 namespace mongo {
+
+using std::string;
 
 CollectionShardingState::CollectionShardingState(
     NamespaceString nss, std::unique_ptr<CollectionMetadata> initialMetadata)
@@ -62,8 +68,20 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* txn,
 }
 
 void CollectionShardingState::setMetadata(std::shared_ptr<CollectionMetadata> newMetadata) {
-    invariant(newMetadata);
     _metadata = std::move(newMetadata);
+}
+
+void CollectionShardingState::checkShardVersionOrThrow(OperationContext* txn) const {
+    string errmsg;
+    ChunkVersion received;
+    ChunkVersion wanted;
+    if (!_checkShardVersionOk(txn, &errmsg, &received, &wanted)) {
+        throw SendStaleConfigException(_nss.ns(),
+                                       str::stream() << "[" << _nss.ns()
+                                                     << "] shard version not ok: " << errmsg,
+                                       received,
+                                       wanted);
+    }
 }
 
 bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* txn,
@@ -76,12 +94,16 @@ bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* txn,
 void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& insertedDoc) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
+    checkShardVersionOrThrow(txn);
+
     ShardingState::get(txn)->migrationSourceManager()->logInsertOp(
         txn, _nss.ns().c_str(), insertedDoc);
 }
 
 void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+
+    checkShardVersionOrThrow(txn);
 
     ShardingState::get(txn)->migrationSourceManager()->logUpdateOp(
         txn, _nss.ns().c_str(), updatedDoc);
@@ -90,8 +112,90 @@ void CollectionShardingState::onUpdateOp(OperationContext* txn, const BSONObj& u
 void CollectionShardingState::onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId) {
     dassert(txn->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
+    checkShardVersionOrThrow(txn);
+
     ShardingState::get(txn)->migrationSourceManager()->logDeleteOp(
         txn, _nss.ns().c_str(), deletedDocId);
+}
+
+bool CollectionShardingState::_checkShardVersionOk(OperationContext* txn,
+                                                   string* errmsg,
+                                                   ChunkVersion* expectedShardVersion,
+                                                   ChunkVersion* actualShardVersion) const {
+    Client* client = txn->getClient();
+
+    // Operations using the DBDirectClient are unversioned.
+    if (client->isInDirectClient()) {
+        return true;
+    }
+
+    if (!repl::ReplicationCoordinator::get(txn)->canAcceptWritesForDatabase(_nss.db())) {
+        // right now connections to secondaries aren't versioned at all
+        return true;
+    }
+
+    const auto& oss = OperationShardingState::get(txn);
+
+    // If there is a version attached to the OperationContext, use it as the received version.
+    // Otherwise, get the received version from the ShardedConnectionInfo.
+    if (oss.hasShardVersion()) {
+        *expectedShardVersion = oss.getShardVersion(_nss);
+    } else {
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, false);
+        if (!info) {
+            // There is no shard version information on either 'txn' or 'client'. This means that
+            // the operation represented by 'txn' is unversioned, and the shard version is always OK
+            // for unversioned operations.
+            return true;
+        }
+
+        *expectedShardVersion = info->getVersion(_nss.ns());
+    }
+
+    if (ChunkVersion::isIgnoredVersion(*expectedShardVersion)) {
+        return true;
+    }
+
+    *actualShardVersion = (_metadata ? _metadata->getShardVersion() : ChunkVersion::UNSHARDED());
+
+    if (expectedShardVersion->isWriteCompatibleWith(*actualShardVersion)) {
+        return true;
+    }
+
+    //
+    // Figure out exactly why not compatible, send appropriate error message
+    // The versions themselves are returned in the error, so not needed in messages here
+    //
+
+    // Check epoch first, to send more meaningful message, since other parameters probably won't
+    // match either.
+    if (actualShardVersion->epoch() != expectedShardVersion->epoch()) {
+        *errmsg = str::stream() << "version epoch mismatch detected for " << _nss.ns() << ", "
+                                << "the collection may have been dropped and recreated";
+        return false;
+    }
+
+    if (!actualShardVersion->isSet() && expectedShardVersion->isSet()) {
+        *errmsg = str::stream() << "this shard no longer contains chunks for " << _nss.ns() << ", "
+                                << "the collection may have been dropped";
+        return false;
+    }
+
+    if (actualShardVersion->isSet() && !expectedShardVersion->isSet()) {
+        *errmsg = str::stream() << "this shard contains versioned chunks for " << _nss.ns() << ", "
+                                << "but no version set in request";
+        return false;
+    }
+
+    if (actualShardVersion->majorVersion() != expectedShardVersion->majorVersion()) {
+        // Could be > or < - wanted is > if this is the source of a migration, wanted < if this is
+        // the target of a migration
+        *errmsg = str::stream() << "version mismatch detected for " << _nss.ns();
+        return false;
+    }
+
+    // Those are all the reasons the versions can mismatch
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo
