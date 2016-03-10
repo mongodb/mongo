@@ -185,6 +185,12 @@ public:
 
     RecordId findSingle(OperationContext* txn, const BSONObj& key) const;
 
+    /**
+     * Attempt compaction to regain disk space if the indexed record store supports
+     * compaction-in-place.
+     */
+    Status compact(OperationContext* txn);
+
     //
     // Bulk operations support
     //

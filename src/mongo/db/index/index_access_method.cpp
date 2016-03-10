@@ -323,6 +323,10 @@ Status IndexAccessMethod::update(OperationContext* txn,
     return Status::OK();
 }
 
+Status IndexAccessMethod::compact(OperationContext* txn) {
+    return this->_newInterface->compact(txn);
+}
+
 std::unique_ptr<IndexAccessMethod::BulkBuilder> IndexAccessMethod::initiateBulk() {
     return std::unique_ptr<BulkBuilder>(new BulkBuilder(this, _descriptor));
 }

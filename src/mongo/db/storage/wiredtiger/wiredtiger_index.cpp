@@ -426,6 +426,17 @@ Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {
     return Status::OK();
 }
 
+Status WiredTigerIndex::compact(OperationContext* txn) {
+    WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
+    if (!cache->isEphemeral()) {
+        UniqueWiredTigerSession session = cache->getSession();
+        WT_SESSION* s = session->getSession();
+        int ret = s->compact(s, uri().c_str(), "timeout=0");
+        invariantWTOK(ret);
+    }
+    return Status::OK();
+}
+
 /**
  * Base class for WiredTigerIndex bulk builders.
  *

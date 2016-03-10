@@ -108,6 +108,8 @@ public:
 
     virtual Status initAsEmpty(OperationContext* txn);
 
+    virtual Status compact(OperationContext* txn);
+
     const std::string& uri() const {
         return _uri;
     }
