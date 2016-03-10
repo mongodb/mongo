@@ -90,7 +90,8 @@ static int
 run_ops(int dbs)
 {
 	WT_ITEM data;
-	int db, db_set, i, key;
+	int db_set, i, key;
+	uint32_t db;
 	uint8_t buf[MAX_VAL];
 
 	memset(buf, 0, sizeof(buf));
@@ -100,9 +101,9 @@ run_ops(int dbs)
 	 */
 	if (session == NULL) {
 		__wt_random_init(&rnd);
-		if ((session = calloc(sizeof(WT_SESSION *), dbs)) == NULL)
+		if ((session = calloc(dbs, sizeof(WT_SESSION *))) == NULL)
 			testutil_die(ENOMEM, "session array malloc");
-		if ((cursor = calloc(sizeof(WT_CURSOR *), dbs)) == NULL)
+		if ((cursor = calloc(dbs, sizeof(WT_CURSOR *))) == NULL)
 			testutil_die(ENOMEM, "cursor array malloc");
 		for (i = 0; i < dbs; ++i) {
 			testutil_check(conn[i]->open_session(conn[i],
@@ -122,7 +123,7 @@ run_ops(int dbs)
 	db_set = dbs / 4;
 	for (i = 0; i < db_set; ++i) {
 		db = __wt_random(&rnd) % dbs;
-		printf("Write to database %d\n", db);
+		printf("Write to database %" PRIu32 "\n", db);
 		for (key = 0; key < MAX_KV; ++key) {
 			data.size = __wt_random(&rnd) % MAX_VAL;
 			cursor[db]->set_key(cursor[db], key);
@@ -181,7 +182,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		usage();
 
-	if ((conn = calloc(sizeof(WT_CONNECTION *), dbs)) == NULL)
+	if ((conn = calloc(dbs, sizeof(WT_CONNECTION *))) == NULL)
 		testutil_die(ENOMEM, "connection array malloc");
 	memset(cmd, 0, sizeof(cmd));
 	/*
