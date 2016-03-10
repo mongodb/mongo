@@ -8,7 +8,7 @@ A prototype hang analyzer for MCI integration to help investigate test timeouts
 2. Script will iterate through a list of interesting processes (mongo, mongod, and mongos),
     and run the tools from step 1.
 
-Supports Linux, MacOS X, and Windows.
+Supports Linux, MacOS X, Solaris, and Windows.
 """
 
 import StringIO
@@ -256,7 +256,7 @@ class DarwinProcessList(object):
 
         return p
 
-# GDB dumper is for Linux
+# GDB dumper is for Linux & Solaris
 class GDBDumper(object):
 
     def __find_debugger(self):
@@ -334,6 +334,27 @@ class LinuxProcessList(object):
 
         return p
 
+class SolarisProcessList(object):
+    def __find_ps(self):
+        """Finds ps"""
+        return find_program('ps', ['/bin', '/usr/bin'])
+
+    def dump_processes(self):
+        """Get list of [Pid, Process Name]"""
+        ps = self.__find_ps()
+
+        sys.stdout.write("INFO: Getting list of processes using %s\n" % ps)
+
+        ret = callo([ps, "-eo", "pid,args"])
+
+        b = StringIO.StringIO(ret)
+        csvReader = csv.reader(b, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace=True)
+
+        p = [[int(row[0]), os.path.split(row[1])[1]] for row in csvReader if row[0] != "PID"]
+
+        sys.stdout.write("INFO: Done analyzing process\n")
+
+        return p
 
 def get_hang_analyzers():
     dbg = None
@@ -341,6 +362,9 @@ def get_hang_analyzers():
     if sys.platform.startswith("linux"):
         dbg = GDBDumper()
         ps = LinuxProcessList()
+    elif sys.platform.startswith("sunos"):
+        dbg = GDBDumper()
+        ps = SolarisProcessList()
     elif os.name == 'nt' or (os.name == "posix" and sys.platform == "cygwin"):
         dbg = WindowsDumper()
         ps = WindowsProcessList()
@@ -390,7 +414,7 @@ def timeout_protector():
 # 2. Dump useful information or take dumps
 def main():
     print "Python Version: " + sys.version
-    print "OS" + platform.platform()
+    print "OS: " + platform.platform()
 
     try:
         distro = platform.linux_distribution()
