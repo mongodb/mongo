@@ -26,8 +26,10 @@ config.shards.find().forEach(function(doc) {
 jsTest.log("Enabling sharding for the first time...");
 
 admin.runCommand({enableSharding: coll.getDB() + ""});
+// TODO(PM-85): Make sure we *always* move the primary after collection lifecyle project is complete
 st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 admin.runCommand({shardCollection: coll + "", key: {_id: 1}});
+st.configRS.awaitLastOpCommitted(); // TODO: Remove after collection lifecyle project (PM-85)
 
 var bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
@@ -76,11 +78,8 @@ var getOtherShard = function(shard) {
 
 var otherShard = getOtherShard(config.databases.findOne({_id: coll.getDB() + ""}).primary);
 assert.commandWorked(admin.runCommand({movePrimary: coll.getDB() + "", to: otherShard}));
-if (st.configRS) {
-    // If we are in CSRS mode need to make sure that staleMongos will actually get
-    // the most recent config data.
-    st.configRS.awaitLastOpCommitted();
-}
+st.configRS.awaitLastOpCommitted(); // TODO: Remove after collection lifecyle project (PM-85)
+
 jsTest.log("moved primary...");
 
 bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
