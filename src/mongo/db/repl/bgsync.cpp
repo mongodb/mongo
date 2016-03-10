@@ -705,7 +705,17 @@ void BackgroundSync::_rollback(OperationContext* txn,
                                RollbackSourceImpl(getConnection, source, rsOplogName),
                                _replCoord);
     if (status.isOK()) {
+        // When the syncTail thread sees there is no new data by adding something to the buffer.
         _signalNoNewDataForApplier();
+        // Wait until the buffer is emtpy.
+        // This is an indication that syncTail has removed the sentinal marker from the buffer
+        // and reset its local lastAppliedOpTime via the replCoord.
+        while (!_buffer.empty()) {
+            sleepmillis(10);
+            if (inShutdown()) {
+                return;
+            }
+        }
         return;
     }
     if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
