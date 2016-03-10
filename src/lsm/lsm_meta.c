@@ -185,7 +185,7 @@ __lsm_meta_read_v1(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	const char *file_cfg[] = {
-		WT_CONFIG_BASE(session, file_config), NULL, NULL, NULL };
+	    WT_CONFIG_BASE(session, file_config), NULL, NULL, NULL };
 	char *fileconf;
 	u_int nchunks;
 
@@ -255,8 +255,7 @@ __lsm_meta_read_v1(
 	}
 	WT_ERR(__wt_config_check(session,
 	   WT_CONFIG_REF(session, WT_SESSION_create), cv.str, cv.len));
-	WT_ERR(__wt_strndup(
-	    session, cv.str, cv.len, &lsm_tree->bloom_config));
+	WT_ERR(__wt_strndup(session, cv.str, cv.len, &lsm_tree->bloom_config));
 	WT_ERR(__wt_config_getones(
 	    session, lsmconf, "lsm.bloom_hash_count", &cv));
 	lsm_tree->bloom_hash_count = (uint32_t)cv.val;
@@ -297,8 +296,7 @@ __lsm_meta_read_v1(
 			WT_ERR(__wt_realloc_def(session,
 			    &lsm_tree->chunk_alloc,
 			    nchunks + 1, &lsm_tree->chunk));
-			WT_ERR(
-			    __wt_calloc_one(session, &chunk));
+			WT_ERR(__wt_calloc_one(session, &chunk));
 			lsm_tree->chunk[nchunks++] = chunk;
 			chunk->id = (uint32_t)lv.val;
 			WT_ERR(__wt_lsm_tree_chunk_name(session,
@@ -306,23 +304,18 @@ __lsm_meta_read_v1(
 			F_SET(chunk,
 			    WT_LSM_CHUNK_ONDISK |
 			    WT_LSM_CHUNK_STABLE);
-		} else if (WT_STRING_MATCH(
-		    "bloom", lk.str, lk.len)) {
+		} else if (WT_STRING_MATCH("bloom", lk.str, lk.len)) {
 			WT_ERR(__wt_lsm_tree_bloom_name(
-			    session, lsm_tree,
-			    chunk->id, &chunk->bloom_uri));
+			    session, lsm_tree, chunk->id, &chunk->bloom_uri));
 			F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 			continue;
-		} else if (WT_STRING_MATCH(
-		    "chunk_size", lk.str, lk.len)) {
+		} else if (WT_STRING_MATCH("chunk_size", lk.str, lk.len)) {
 			chunk->size = (uint64_t)lv.val;
 			continue;
-		} else if (WT_STRING_MATCH(
-		    "count", lk.str, lk.len)) {
+		} else if (WT_STRING_MATCH("count", lk.str, lk.len)) {
 			chunk->count = (uint64_t)lv.val;
 			continue;
-		} else if (WT_STRING_MATCH(
-		    "generation", lk.str, lk.len)) {
+		} else if (WT_STRING_MATCH("generation", lk.str, lk.len)) {
 			chunk->generation = (uint32_t)lv.val;
 			continue;
 		}
@@ -371,7 +364,7 @@ __lsm_meta_upgrade_v1(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	const char *new_cfg[] = {
-		WT_CONFIG_BASE(session, lsm_meta), NULL, NULL, NULL };
+	    WT_CONFIG_BASE(session, lsm_meta), NULL, NULL, NULL };
 
 	/* Include the custom config that used to be embedded in file_config. */
 	new_cfg[1] = lsm_tree->file_config;
@@ -462,9 +455,9 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
+	u_int i;
 	const char *new_cfg[] = { NULL, NULL, NULL };
 	char *new_metadata;
-	u_int i;
 	bool first;
 
 	new_metadata = NULL;
