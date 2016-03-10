@@ -2516,6 +2516,10 @@ checkErrorCodes()
 # --- lint ----
 
 def doLint( env , target , source ):
+    import buildscripts.eslint
+    if not buildscripts.eslint.lint(None, dirmode=True, glob=["jstests/", "src/mongo/"]):
+        raise Exception("ESLint errors")
+
     import buildscripts.clang_format
     if not buildscripts.clang_format.lint(None, []):
         raise Exception("clang-format lint errors")
