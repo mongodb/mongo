@@ -69,6 +69,7 @@ env.Library(
         'modifier_unset.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/global_timestamp',
         'update_common',
