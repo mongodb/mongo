@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/client/constants.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-struct HostAndPort;
 class OperationContext;
 
 namespace repl {
-class Reporter;
 
 class SyncSourceFeedback {
 public:
@@ -57,22 +58,47 @@ public:
     void shutdown();
 
 private:
+    void _resetConnection();
+
+    /**
+     * Authenticates _connection using the server's cluster-membership credentials.
+     *
+     * Returns true on successful authentication.
+     */
+    bool replAuthenticate();
+
     /* Inform the sync target of our current position in the oplog, as well as the positions
      * of all secondaries chained through us.
+     * "commandStyle" indicates whether or not the upstream node is pre-3.2.4 and needs the older
+     * style
+     * ReplSetUpdatePosition commands as a result.
      */
-    Status _updateUpstream(OperationContext* txn);
+    Status updateUpstream(OperationContext* txn,
+                          ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle);
 
+    bool hasConnection() {
+        return _connection.get();
+    }
+
+    /// Connect to sync target.
+    bool _connect(OperationContext* txn, const HostAndPort& host);
+
+    // the member we are currently syncing from
+    HostAndPort _syncTarget;
+    // our connection to our sync target
+    std::unique_ptr<DBClientConnection> _connection;
     // protects cond, _shutdownSignaled, _keepAliveInterval, and _positionChanged.
     stdx::mutex _mtx;
     // used to alert our thread of changes which need to be passed up the chain
     stdx::condition_variable _cond;
+    /// _keepAliveInterval indicates how frequently to forward progress in the absence of updates.
+    Milliseconds _keepAliveInterval = Milliseconds(100);
     // used to indicate a position change which has not yet been pushed along
     bool _positionChanged = false;
     // Once this is set to true the _run method will terminate
     bool _shutdownSignaled = false;
-    // Reports replication progress to sync source.
-    Reporter* _reporter = nullptr;
+    // Indicates version of the UpdatePosition command accepted by our syncSource.
+    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle _commandStyle;
 };
-
 }  // namespace repl
 }  // namespace mongo
