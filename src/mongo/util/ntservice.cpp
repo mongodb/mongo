@@ -581,7 +581,7 @@ static void serviceShutdown(const char* controlCodeName) {
 
     // Note: This triggers _serviceCallback, ie  ServiceMain,
     // to stop by setting inShutdown() == true
-    signalShutdown();
+    shutdownNoTerminate();
 
     // Note: we will report exit status in initService
 }

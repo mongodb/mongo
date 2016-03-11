@@ -150,10 +150,6 @@ env.Library(
         "$BUILD_DIR/mongo/s/coreshard",
         "$BUILD_DIR/mongo/util/background_job",
     ],
-    LIBDEPS_TAGS=[
-        # Needs mongo::inShutDown()
-        'incomplete',
-    ],
 )
 
 env.CppUnitTest(

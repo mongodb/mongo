@@ -39,6 +39,9 @@
 // This will probably get us _exit on non-unistd platforms like Windows.
 #include <cstdlib>
 
+// NOTE: Header only dependencies are OK in this library.
+#include "mongo/stdx/mutex.h"
+
 #if !defined(__has_feature)
 #define __has_feature(x) 0
 #endif
@@ -65,7 +68,16 @@ extern "C" void __gcov_flush();
 
 namespace mongo {
 
+namespace {
+stdx::mutex* const quickExitMutex = new stdx::mutex;
+}  // namespace
+
 void quickExit(int code) {
+    // Ensure that only one thread invokes the last rites here. No
+    // RAII here - we never want to unlock this.
+    if (quickExitMutex)
+        quickExitMutex->lock();
+
 #ifdef MONGO_GCOV
     __gcov_flush();
 #endif

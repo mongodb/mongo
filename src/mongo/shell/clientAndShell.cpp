@@ -47,29 +47,6 @@ class Client;
 class DBClientBase;
 class OperationContext;
 
-
-bool dbexitCalled = false;
-
-void dbexit(ExitCode returnCode, const char* whyMsg) {
-    {
-        stdx::lock_guard<stdx::mutex> lk(shell_utils::mongoProgramOutputMutex);
-        dbexitCalled = true;
-    }
-
-    log() << "dbexit called" << endl;
-
-    if (whyMsg) {
-        log() << " b/c " << whyMsg << endl;
-    }
-
-    log() << "exiting" << endl;
-    quickExit(returnCode);
-}
-
-bool inShutdown() {
-    return dbexitCalled;
-}
-
 bool haveLocalShardingInfo(OperationContext* txn, const string& ns) {
     return false;
 }

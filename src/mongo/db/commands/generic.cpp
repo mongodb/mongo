@@ -317,7 +317,7 @@ void CmdShutdown::shutdownHelper() {
 #if defined(_WIN32)
     // Signal the ServiceMain thread to shutdown.
     if (ntservice::shouldStartService()) {
-        signalShutdown();
+        shutdownNoTerminate();
 
         // Client expects us to abruptly close the socket as part of exiting
         // so this function is not allowed to return.

@@ -92,6 +92,7 @@ baseSource=[
     'util/base64.cpp',
     'util/concurrency/thread_name.cpp',
     'util/exception_filter_win32.cpp',
+    'util/exit.cpp',
     'util/hex.cpp',
     'util/itoa.cpp',
     'util/log.cpp',

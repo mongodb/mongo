@@ -54,7 +54,6 @@ struct MongoProgramScope {
 };
 void KillMongoProgramInstances();
 
-void goingAwaySoon();
 void installShellUtilsLauncher(Scope& scope);
 
 /** Record log lines from concurrent programs.  All public members are thread safe. */

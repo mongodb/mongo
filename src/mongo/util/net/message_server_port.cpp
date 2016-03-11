@@ -53,6 +53,7 @@
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 
 #ifdef __linux__  // TODO: consider making this ifndef _WIN32
@@ -243,7 +244,7 @@ private:
             log() << "DBException handling request, closing client connection: " << e << endl;
         } catch (std::exception& e) {
             error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
-            dbexit(EXIT_UNCAUGHT);
+            quickExit(EXIT_UNCAUGHT);
         }
         portWithHandler->shutdown();
 

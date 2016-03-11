@@ -73,10 +73,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/background_job',
     ],
-    LIBDEPS_TAGS=[
-        # Depends on inShutdown
-        'incomplete',
-    ],
 )
 
 env.Library(

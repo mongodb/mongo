@@ -32,15 +32,11 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-static AtomicUInt32 myShutdownInProgress(0);
-bool inShutdown() {
-    return myShutdownInProgress.loadRelaxed() != 0;
-}
 
 namespace {
 
@@ -61,7 +57,7 @@ TEST(Listener, ElapsedTimeCheck) {
     log() << "Listener elapsed time: " << listenDelta << std::endl;
     log() << "Clock elapsed time:    " << clockDelta << std::endl;
     ASSERT_APPROX_EQUAL(listenDelta, clockDelta, kEpsilon);
-    myShutdownInProgress.store(1);
+    shutdownNoTerminate();
     t.join();
 }
 

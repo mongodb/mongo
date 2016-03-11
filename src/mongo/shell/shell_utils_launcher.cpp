@@ -54,6 +54,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/quick_exit.h"
@@ -71,8 +72,6 @@ using std::pair;
 using std::string;
 using std::stringstream;
 using std::vector;
-
-extern bool dbexitCalled;
 
 #ifdef _WIN32
 inline int close(int fd) {
@@ -192,14 +191,9 @@ void ProgramRegistry::insertHandleForPid(ProcessId pid, HANDLE handle) {
 
 ProgramRegistry& registry = *(new ProgramRegistry());
 
-void goingAwaySoon() {
-    stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
-    mongo::dbexitCalled = true;
-}
-
 void ProgramOutputMultiplexer::appendLine(int port, ProcessId pid, const char* line) {
     stdx::lock_guard<stdx::mutex> lk(mongoProgramOutputMutex);
-    uassert(28695, "program is terminating", !mongo::dbexitCalled);
+    uassert(28695, "program is terminating", !mongo::inShutdown());
     stringstream buf;
     string name = registry.programName(pid);
     if (port > 0)
@@ -342,7 +336,7 @@ void ProgramRunner::operator()() {
             }
             verify(lenToRead > 0);
             int ret = read(_pipe, (void*)start, lenToRead);
-            if (mongo::dbexitCalled)
+            if (mongo::inShutdown())
                 break;
             verify(ret != -1);
             start[ret] = '\0';

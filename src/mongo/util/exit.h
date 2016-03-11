@@ -28,12 +28,11 @@
 
 #pragma once
 
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/exit_code.h"
 
 namespace mongo {
-
-// Note: whyMsg can never be NULL.
-void dbexit(ExitCode returnCode, const char* whyMsg = "");
 
 /**
  * Quickly determines if the shutdown flag is set.  May not be definitive.
@@ -45,4 +44,36 @@ bool inShutdown();
  * than inShutdown().
  */
 bool inShutdownStrict();
+
+/**
+ * Registers a new shutdown task to be called when shutdown or
+ * shutdownNoTerminate is called. If this function is invoked after
+ * shutdown or shutdownNoTerminate has been called, std::terminate is
+ * called.
+ */
+void registerShutdownTask(stdx::function<void()>);
+
+/**
+ * Toggles the shutdown flag to 'true', runs registered shutdown
+ * tasks, and then exits with the given code. It is safe to call this
+ * function from multiple threads, only the first caller executes
+ * shutdown tasks. It is illegal to reenter this function from a
+ * registered shutdown task. The function does not return.
+ */
+MONGO_COMPILER_NORETURN void shutdown(ExitCode code);
+
+/**
+ * Toggles the shutdown flag to 'true' and runs the registered
+ * shutdown tasks. It is safe to call this function from multiple
+ * threads, only the first caller executes shutdown tasks, subsequent
+ * callers return immediately. It is legal to call shutdownNoTerminate
+ * from a shutdown task.
+ */
+void shutdownNoTerminate();
+
+/** An alias for 'shutdown'. */
+MONGO_COMPILER_NORETURN inline void exitCleanly(ExitCode code) {
+    shutdown(code);
 }
+
+}  // namespace mongo

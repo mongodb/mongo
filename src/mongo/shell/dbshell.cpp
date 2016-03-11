@@ -54,7 +54,7 @@
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/util/exit_code.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
@@ -88,8 +88,6 @@ static volatile bool atPrompt = false;  // can eval before getting to prompt
 namespace mongo {
 
 Scope* shellMainScope;
-
-extern bool dbexitCalled;
 }
 
 void generateCompletions(const string& prefix, vector<string>& all) {
@@ -179,21 +177,10 @@ void killOps() {
 // Stubs for signal_handlers.cpp
 namespace mongo {
 void logProcessDetailsForLogRotate() {}
-
-void exitCleanly(ExitCode code) {
-    {
-        stdx::lock_guard<stdx::mutex> lk(mongo::shell_utils::mongoProgramOutputMutex);
-        mongo::dbexitCalled = true;
-    }
-
-    ::killOps();
-    ::shellHistoryDone();
-    quickExit(0);
-}
 }
 
 void quitNicely(int sig) {
-    exitCleanly(EXIT_CLEAN);
+    shutdown(EXIT_CLEAN);
 }
 
 // the returned string is allocated with strdup() or malloc() and must be freed by calling free()
@@ -585,6 +572,14 @@ static void edit(const string& whatToEdit) {
 }
 
 int _main(int argc, char* argv[], char** envp) {
+    registerShutdownTask([] {
+        // NOTE: This function may be called at any time. It must not
+        // depend on the prior execution of mongo initializers or the
+        // existence of threads.
+        ::killOps();
+        ::shellHistoryDone();
+    });
+
     setupSignalHandlers();
     setupSignals();
 
@@ -905,10 +900,6 @@ int _main(int argc, char* argv[], char** envp) {
         shellHistoryDone();
     }
 
-    {
-        stdx::lock_guard<stdx::mutex> lk(mongo::shell_utils::mongoProgramOutputMutex);
-        mongo::dbexitCalled = true;
-    }
     return (lastLineSuccessful ? 0 : 1);
 }
 

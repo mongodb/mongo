@@ -364,10 +364,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/synchronization',
         'range_arithmetic',
     ],
-    LIBDEPS_TAGS=[
-        # Needs mongo::inShutdown
-        'incomplete',
-    ]
 )
 
 env.CppUnitTest(

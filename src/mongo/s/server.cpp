@@ -108,30 +108,10 @@ ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 static ExitCode initService();
 #endif
 
-static AtomicUInt32 shutdownInProgress(0);
-
-bool inShutdown() {
-    return shutdownInProgress.loadRelaxed() != 0;
-}
-void signalShutdown() {
-    // Notify all threads shutdown has started
-    shutdownInProgress.fetchAndAdd(1);
-}
-
-// shutdownLock
-//
-// Protects:
-//  Ensures shutdown is single threaded.
-// Lock Ordering:
-//  No restrictions
-stdx::mutex shutdownLock;
-
-void exitCleanly(ExitCode code) {
-    signalShutdown();
-
-    // Grab the shutdown lock to prevent concurrent callers
-    stdx::lock_guard<stdx::mutex> lockguard(shutdownLock);
-
+// NOTE: This function may be called at any time after
+// registerShutdownTask is called below. It must not depend on the
+// prior execution of mongo initializers or the existence of threads.
+static void cleanupTask() {
     {
         Client& client = cc();
         ServiceContext::UniqueOperationContext uniqueTxn;
@@ -147,24 +127,7 @@ void exitCleanly(ExitCode code) {
         grid.catalogManager(txn)->shutDown(txn);
     }
 
-    dbexit(code);
-}
-
-void dbexit(ExitCode rc, const char* why) {
     audit::logShutdown(ClientBasic::getCurrent());
-
-#if defined(_WIN32)
-    // Windows Service Controller wants to be told when we are done shutting down
-    // and call quickExit itself.
-    //
-    if (rc == EXIT_WINDOWS_SERVICE_STOP) {
-        log() << "dbexit: exiting because Windows service was stopped";
-        return;
-    }
-#endif
-
-    log() << "dbexit: " << why << " rc:" << rc;
-    quickExit(rc);
 }
 
 static BSONObj buildErrReply(const DBException& ex) {
@@ -283,7 +246,7 @@ static ExitCode runMongosServer() {
     DBClientReplicaSet::setAuthPooledSecondaryConn(false);
 
     if (getHostName().empty()) {
-        dbexit(EXIT_BADOPTIONS);
+        quickExit(EXIT_BADOPTIONS);
     }
 
     {
@@ -448,6 +411,8 @@ int mongoSMain(int argc, char* argv[], char** envp) {
     static StaticObserver staticObserver;
     if (argc < 1)
         return EXIT_FAILURE;
+
+    registerShutdownTask(cleanupTask);
 
     setupSignalHandlers();
 

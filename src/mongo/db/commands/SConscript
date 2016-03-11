@@ -75,7 +75,7 @@ env.Library(
         'server_status_core',
     ],
     LIBDEPS_TAGS=[
-        # Depends on mongo::exitCleanly.
+        # Depends on coreshard.
         'incomplete',
     ],
 )

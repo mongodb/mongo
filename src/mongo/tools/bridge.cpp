@@ -55,7 +55,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/exit_code.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/static_observer.h"
 #include "mongo/util/signal_handlers.h"
@@ -334,13 +334,7 @@ public:
         t.detach();
     }
 
-    bool inShutdown() {
-        return _inShutdown.load();
-    }
-
     void shutdownAll() {
-        _inShutdown.store(true);
-
         stdx::lock_guard<stdx::mutex> lk(_portsMutex);
         for (auto mp : _ports) {
             mp->shutdown();
@@ -367,20 +361,19 @@ MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
 
 }  // namespace
 
-bool inShutdown() {
-    return listener->inShutdown();
-}
-
 void logProcessDetailsForLogRotate() {}
-
-void exitCleanly(ExitCode code) {
-    ListeningSockets::get()->closeAll();
-    listener->shutdownAll();
-    quickExit(code);
-}
 
 int bridgeMain(int argc, char** argv, char** envp) {
     static StaticObserver staticObserver;
+
+    registerShutdownTask([&] {
+        // NOTE: This function may be called at any time. It must not
+        // depend on the prior execution of mongo initializers or the
+        // existence of threads.
+        ListeningSockets::get()->closeAll();
+        listener->shutdownAll();
+    });
+
     setupSignalHandlers();
     runGlobalInitializersOrDie(argc, argv, envp);
     startSignalProcessingThread();

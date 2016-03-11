@@ -33,7 +33,7 @@ env.Library(
         'framework_options',
     ],
     LIBDEPS_TAGS=[
-        # Depends on exitCleanly
+        # Depends on service_context_d.cpp which is in serveronly
         'incomplete',
     ],
 )

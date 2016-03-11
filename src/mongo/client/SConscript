@@ -145,11 +145,6 @@ env.Library(
         'connection_string',
         'read_preference',
     ],
-    LIBDEPS_TAGS=[
-        # Depends on mongo::inShutdown
-        'incomplete'
-    ],
-
 )
 
 env.Library(

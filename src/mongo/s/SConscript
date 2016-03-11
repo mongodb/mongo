@@ -212,10 +212,6 @@ env.Library(
         'write_ops/cluster_write_op',
         'write_ops/cluster_write_op_conversion',
     ],
-    LIBDEPS_TAGS=[
-        # Depends on inShutdown
-        'incomplete',
-    ],
 )
 
 env.CppUnitTest(
