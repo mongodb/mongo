@@ -874,7 +874,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	F_CLR(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 	++lsm_tree->dsk_gen;
 
-	lsm_tree->modified = 1;
+	lsm_tree->modified = true;
 
 	/*
 	 * Set the switch transaction in the previous chunk unless this is
