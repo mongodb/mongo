@@ -34,12 +34,17 @@ AC_PROG_CC(cc gcc)
 AC_PROG_CXX(c++ g++)
 AM_PROG_AS(as gas)
 
-# Set the libtool tag flag on PowerPC
-AS_CASE([$host_cpu],
-    [ppc64*], [AM_LIBTOOLFLAGS="--tag=cc"],
-    [elf64lppc], [AM_LIBTOOLFLAGS="--tag=cc"],
-    [powerpc*], [AM_LIBTOOLFLAGS="--tag=cc"],
-    [])
+# When we are compiling with overridden C and assembly compilers on PPC
+# then we can run into an issue where libtool doesn't see the needed tag
+# for compiling and will error out. We set a bad tag here, which still
+# lets the compile pass without overriding anything.
+if test "$CC" != "$CCAS"; then
+	AS_CASE([$host_cpu],
+		[ppc64*], [AM_LIBTOOLFLAGS="--tag=cc"],
+		[elf64lppc], [AM_LIBTOOLFLAGS="--tag=cc"],
+		[powerpc*], [AM_LIBTOOLFLAGS="--tag=cc"],
+		[])
+fi
 
 AC_SUBST(AM_LIBTOOLFLAGS)
 
