@@ -41,6 +41,7 @@ const char* CollationSpec::kAlternateField = "alternate";
 const char* CollationSpec::kMaxVariableField = "maxVariable";
 const char* CollationSpec::kNormalizationField = "normalization";
 const char* CollationSpec::kBackwardsField = "backwards";
+const char* CollationSpec::kSimpleBinaryComparison = "simple";
 const char* CollationSpec::kCaseFirstUpper = "upper";
 const char* CollationSpec::kCaseFirstLower = "lower";
 const char* CollationSpec::kCaseFirstOff = "off";

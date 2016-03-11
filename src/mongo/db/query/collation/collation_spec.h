@@ -102,6 +102,7 @@ struct CollationSpec {
     static const char* kBackwardsField;
 
     // Field value constants.
+    static const char* kSimpleBinaryComparison;
     static const char* kCaseFirstUpper;
     static const char* kCaseFirstLower;
     static const char* kCaseFirstOff;

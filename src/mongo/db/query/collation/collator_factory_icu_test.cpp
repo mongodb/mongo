@@ -63,6 +63,23 @@ TEST(CollatorFactoryICUTest, LocaleKeywordsParseSuccessfully) {
               collator.getValue()->getSpec().localeID);
 }
 
+TEST(CollatorFactoryICUTest, SimpleLocaleReturnsNullPointer) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "simple"));
+    ASSERT_OK(collator.getStatus());
+    ASSERT_TRUE(collator.getValue() == nullptr);
+}
+
+TEST(CollatorFactoryICUTest, SimpleLocaleWithOtherFieldsFailsToParse) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "simple"
+                                              << "caseLevel" << true));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::FailedToParse);
+}
+
 TEST(CollatorFactoryICUTest, LocaleFieldNotAStringFailsToParse) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(BSON("locale" << 3));

@@ -563,6 +563,17 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
         return parsedLocaleID.getStatus();
     }
 
+    // If spec = {locale: "simple"}, return a null pointer. A null CollatorInterface indicates
+    // simple binary compare.
+    if (parsedLocaleID.getValue() == CollationSpec::kSimpleBinaryComparison) {
+        if (spec.nFields() > 1) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "If locale=default, no other fields should be present in: "
+                                  << spec};
+        }
+        return {nullptr};
+    }
+
     // Check that the locale ID is recognizable by ICU.
     if (!isValidLocale(parsedLocaleID.getValue())) {
         return {ErrorCodes::BadValue,

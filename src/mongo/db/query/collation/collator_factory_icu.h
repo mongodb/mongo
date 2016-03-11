@@ -35,6 +35,8 @@ namespace mongo {
 /**
  * Creates CollatorInterface instances backed by the ICU library's collation implementation.
  *
+ * Returns success with a null collator on input {locale: "simple"}.
+ *
  * TODO: The factory should open collations once, and then return clones when a caller needs a
  * CollatorInterface. This is more efficient because the necessary read-only data will only be
  * prepared once on collation open.
