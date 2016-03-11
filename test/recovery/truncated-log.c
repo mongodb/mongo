@@ -156,14 +156,16 @@ fill_db(void)
 					    "%" PRIu32 " %" PRIu32 "\n",
 					    save_lsn.l.offset, i - 1) == -1)
 						testutil_die(errno, "fprintf");
-					if (fclose(fp) != 0)
-						testutil_die(errno, "fclose");
-					abort();
+					break;
 				}
 			}
 			first = false;
 		}
 	}
+	if (fclose(fp) != 0)
+		testutil_die(errno, "fclose");
+	abort();
+	/* NOTREACHED */
 }
 
 extern int __wt_optind;
