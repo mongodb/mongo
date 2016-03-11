@@ -1162,20 +1162,12 @@ int
 __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 {
 	WT_BTREE *btree;
-	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	cbt = (start != NULL) ? start : stop;
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	btree = cbt->btree;
+	session = (WT_SESSION_IMPL *)start->iface.session;
+	btree = start->btree;
 	WT_STAT_FAST_DATA_INCR(session, cursor_truncate);
-
-	/*
-	 * We always delete in a forward direction because it's faster, assert
-	 * our caller provided us with a start cursor.
-	 */
-	WT_ASSERT(session, start != NULL);
 
 	/*
 	 * For recovery, log the start and stop keys for a truncate operation,
