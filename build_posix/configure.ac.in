@@ -36,13 +36,12 @@ AM_PROG_AS(as gas)
 
 # When we are compiling with overridden C and assembly compilers on PPC
 # then we can run into an issue where libtool doesn't see the needed tag
-# for compiling and will error out. We set a bad tag here, which still
-# lets the compile pass without overriding anything.
+# for compiling and will error out.
 if test "$CC" != "$CCAS"; then
 	AS_CASE([$host_cpu],
-		[ppc64*], [AM_LIBTOOLFLAGS="--tag=cc"],
-		[elf64lppc], [AM_LIBTOOLFLAGS="--tag=cc"],
-		[powerpc*], [AM_LIBTOOLFLAGS="--tag=cc"],
+		[ppc64*], [AM_LIBTOOLFLAGS+="--tag=CC"],
+		[elf64lppc], [AM_LIBTOOLFLAGS+="--tag=CC"],
+		[powerpc*], [AM_LIBTOOLFLAGS+="--tag=CC"],
 		[])
 fi
 
