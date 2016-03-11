@@ -331,7 +331,8 @@ main(int argc, char *argv[])
 	 * the child even though it should not be.  So use 'system' to spawn
 	 * an entirely new process.
 	 */
-	(void)snprintf(cmd, sizeof(cmd), "%s -R", saved_argv0);
+	(void)snprintf(
+	    cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
 		testutil_die(status, "system");
 	/*
@@ -343,7 +344,8 @@ main(int argc, char *argv[])
 	/*
 	 * Scenario 2.  Run child with writable config.
 	 */
-	(void)snprintf(cmd, sizeof(cmd), "%s -W", saved_argv0);
+	(void)snprintf(
+	    cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
 		testutil_die(status, "system");
 
@@ -364,7 +366,8 @@ main(int argc, char *argv[])
 	/*
 	 * Scenario 3.  Child read-only.
 	 */
-	(void)snprintf(cmd, sizeof(cmd), "%s -R", saved_argv0);
+	(void)snprintf(
+	    cmd, sizeof(cmd), "%s -h %s -R", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
 		testutil_die(status, "system");
 	if (WEXITSTATUS(status) != 0)
@@ -373,7 +376,8 @@ main(int argc, char *argv[])
 	/*
 	 * Scenario 4.  Run child with writable config.
 	 */
-	(void)snprintf(cmd, sizeof(cmd), "%s -W", saved_argv0);
+	(void)snprintf(
+	    cmd, sizeof(cmd), "%s -h %s -W", saved_argv0, working_dir);
 	if ((status = system(cmd)) < 0)
 		testutil_die(status, "system");
 	if (WEXITSTATUS(status) != 0)
