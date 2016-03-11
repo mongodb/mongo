@@ -244,7 +244,7 @@ main(int argc, char *argv[])
 	 * the middle of that last record (i.e. ahead of that offset).
 	 */
 	new_offset = offset + V_SIZE;
-	printf("Parent: Truncate to %u\n", (uint32_t)new_offset);
+	printf("Parent: Truncate to %" PRIu64 "\n", new_offset);
 	if ((ret = truncate(LOG_FILE_1, (wt_off_t)new_offset)) != 0)
 		testutil_die(errno, "truncate");
 
@@ -267,9 +267,10 @@ main(int argc, char *argv[])
 	if ((ret = conn->close(conn, NULL)) != 0)
 		testutil_die(ret, "WT_CONNECTION:close");
 	if (count > max_key) {
-		printf("expected %u records found %u\n", max_key, count);
+		printf("expected %" PRIu32 " records found %" PRIu32 "\n",
+		    max_key, count);
 		return (EXIT_FAILURE);
 	}
-	printf("%u records verified\n", count);
+	printf("%" PRIu32 " records verified\n", count);
 	return (EXIT_SUCCESS);
 }

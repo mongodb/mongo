@@ -492,11 +492,12 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 	uint8_t symbol;
 	uint32_t weighted_length;
 
-	printf("leaf depth %" PRIu16 "..%" PRIu16 ", memory use: "
-	    "codes %u# * %uB  + code2symbol %u# * %uB\n",
+	printf("leaf depth %" PRIu16 "..%" PRIu16
+	    ", memory use: codes %u# * %" WT_SIZET_FMT
+	    "B + code2symbol %u# * %" WT_SIZET_FMT "B\n",
 	    huffman->min_depth, huffman->max_depth,
-	    huffman->numSymbols, (u_int)sizeof(WT_HUFFMAN_CODE),
-	    1U << huffman->max_depth, (u_int)sizeof(uint16_t));
+	    huffman->numSymbols, sizeof(WT_HUFFMAN_CODE),
+	    1U << huffman->max_depth, sizeof(uint16_t));
 
 	/*
 	 * measure quality of computed Huffman codes, for different max bit

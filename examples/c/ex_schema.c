@@ -165,7 +165,8 @@ main(void)
 		ret = cursor->get_key(cursor, &recno);
 		ret = cursor->get_value(cursor, &country, &year, &population);
 		printf("ID %" PRIu64, recno);
-		printf(": country %s, year %u, population %" PRIu64 "\n",
+		printf(
+		    ": country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 		    country, year, population);
 	}
 	ret = cursor->close(cursor);
@@ -186,7 +187,8 @@ main(void)
 		ret = wiredtiger_struct_unpack(session,
 		    value.data, value.size,
 		    "5sHQ", &country, &year, &population);
-		printf(": country %s, year %u, population %" PRIu64 "\n",
+		printf(
+		    ": country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 		    country, year, population);
 	}
 	/*! [List the records in the table using raw mode.] */
@@ -202,7 +204,9 @@ main(void)
 	cursor->set_key(cursor, 2);
 	if ((ret = cursor->search(cursor)) == 0) {
 		ret = cursor->get_value(cursor, &country, &year, &population);
-		printf("ID 2: country %s, year %u, population %" PRIu64 "\n",
+		printf(
+		    "ID 2: "
+		    "country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 		    country, year, population);
 	}
 	/*! [Read population from the primary column group] */
@@ -230,8 +234,8 @@ main(void)
 	cursor->set_key(cursor, "AU\0\0\0");
 	ret = cursor->search(cursor);
 	ret = cursor->get_value(cursor, &country, &year, &population);
-	printf("AU: country %s, year %u, population %" PRIu64 "\n",
-	    country, (unsigned int)year, population);
+	printf("AU: country %s, year %" PRIu16 ", population %" PRIu64 "\n",
+	    country, year, population);
 	/*! [Search in a simple index] */
 	ret = cursor->close(cursor);
 
@@ -242,8 +246,9 @@ main(void)
 	cursor->set_key(cursor, "USA\0\0", (uint16_t)1900);
 	ret = cursor->search(cursor);
 	ret = cursor->get_value(cursor, &country, &year, &population);
-	printf("US 1900: country %s, year %u, population %" PRIu64 "\n",
-	    country, (unsigned int)year, population);
+	printf(
+	    "US 1900: country %s, year %" PRIu16 ", population %" PRIu64 "\n",
+	    country, year, population);
 	/*! [Search in a composite index] */
 	ret = cursor->close(cursor);
 
@@ -256,7 +261,7 @@ main(void)
 	    "table:poptable(country,year)", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_value(cursor, &country, &year);
-		printf("country %s, year %u\n", country, year);
+		printf("country %s, year %" PRIu16 "\n", country, year);
 	}
 	/*! [Return a subset of values from the table] */
 	ret = cursor->close(cursor);
@@ -274,7 +279,7 @@ main(void)
 		ret = cursor->get_value(cursor, &value);
 		ret = wiredtiger_struct_unpack(
 		    session, value.data, value.size, "5sH", &country, &year);
-		printf("country %s, year %u\n", country, year);
+		printf("country %s, year %" PRIu16 "\n", country, year);
 	}
 	/*! [Return a subset of values from the table using raw mode] */
 	ret = cursor->close(cursor);
@@ -289,7 +294,7 @@ main(void)
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &country, &year);
 		ret = cursor->get_value(cursor, &recno);
-		printf("row ID %" PRIu64 ": country %s, year %u\n",
+		printf("row ID %" PRIu64 ": country %s, year %" PRIu16 "\n",
 		    recno, country, year);
 	}
 	/*! [Return the table's record number key using an index] */
@@ -306,7 +311,7 @@ main(void)
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &country, &year);
 		ret = cursor->get_value(cursor, &population);
-		printf("population %" PRIu64 ": country %s, year %u\n",
+		printf("population %" PRIu64 ": country %s, year %" PRIu16 "\n",
 		    population, country, year);
 	}
 	/*! [Return a subset of the value columns from an index] */
@@ -321,7 +326,7 @@ main(void)
 	    "index:poptable:country_plus_year()", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &country, &year);
-		printf("country %s, year %u\n", country, year);
+		printf("country %s, year %" PRIu16 "\n", country, year);
 	}
 	/*! [Access only the index] */
 	ret = cursor->close(cursor);
@@ -351,7 +356,8 @@ main(void)
 		ret = join_cursor->get_value(join_cursor, &country, &year,
 		    &population);
 		printf("ID %" PRIu64, recno);
-		printf(": country %s, year %u, population %" PRIu64 "\n",
+		printf(
+		    ": country %s, year %" PRIu16 ", population %" PRIu64 "\n",
 		    country, year, population);
 	}
 	/*! [Join cursors] */

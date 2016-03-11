@@ -99,11 +99,13 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 		 * key(s).  WiredTiger will perform the required operation
 		 * (such as a remove()).
 		 */
-		fprintf(stderr, "EXTRACTOR: index op for year %d: %s %s\n",
+		fprintf(stderr,
+		    "EXTRACTOR: index op for year %" PRIu16 ": %s %s\n",
 		    year, first_name, last_name);
 		result_cursor->set_key(result_cursor, year);
 		if ((ret = result_cursor->insert(result_cursor)) != 0) {
-			fprintf(stderr, "EXTRACTOR: op year %d: error %d\n",
+			fprintf(stderr,
+			    "EXTRACTOR: op year %" PRIu16 ": error %d\n",
 			    year, ret);
 			return (ret);
 		}
@@ -157,7 +159,7 @@ read_index(WT_SESSION *session)
 	 */
 	for (i = 0; i < 10 && RET_OK(ret); i++) {
 		year = (uint16_t)((rand() % YEAR_SPAN) + YEAR_BASE);
-		printf("Year %d:\n", year);
+		printf("Year %" PRIu16 ":\n", year);
 		cursor->set_key(cursor, year);
 		if ((ret = cursor->search(cursor)) != 0)
 			break;
@@ -181,7 +183,7 @@ read_index(WT_SESSION *session)
 		}
 	}
 	if (!RET_OK(ret))
-		fprintf(stderr, "Error %d for year %d\n", ret, year);
+		fprintf(stderr, "Error %d for year %" PRIu16 "\n", ret, year);
 
 	ret = cursor->close(cursor);
 	return (ret);
@@ -245,7 +247,8 @@ setup_table(WT_SESSION *session)
 		cursor->set_key(cursor, p.id);
 		cursor->set_value(cursor,
 		    p.last_name, p.first_name, p.term_start, p.term_end);
-		fprintf(stderr, "SETUP: table insert %d-%d: %s %s\n",
+		fprintf(stderr,
+		    "SETUP: table insert %" PRIu16 "-%" PRIu16 ": %s %s\n",
 		    p.term_start, p.term_end,
 		    p.first_name, p.last_name);
 		ret = cursor->insert(cursor);

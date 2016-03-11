@@ -72,7 +72,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk, *evict_chunk, *flush_chunk;
-	u_int i;
+	uint32_t i;
 
 	*chunkp = NULL;
 	chunk = evict_chunk = flush_chunk = NULL;
@@ -118,7 +118,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 
 	if (chunk != NULL) {
 		WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-		    "Flush%s: return chunk %u of %u: %s",
+		    "Flush%s: return chunk %" PRIu32 " of %" PRIu32 ": %s",
 		    force ? " w/ force" : "",
 		    i, lsm_tree->nchunks, chunk->uri));
 

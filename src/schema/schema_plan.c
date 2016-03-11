@@ -212,7 +212,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 				WT_ASSERT(session, !value_only ||
 				    coltype == WT_PROJ_VALUE);
 				WT_RET(__wt_buf_catfmt(
-				    session, plan, "%d%c", cg, coltype));
+				    session, plan, "%u%c", cg, coltype));
 
 				/*
 				 * Set the current column group and column
@@ -226,7 +226,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			if (current_col < col) {
 				if (col - current_col > 1)
 					WT_RET(__wt_buf_catfmt(session,
-					    plan, "%d", col - current_col));
+					    plan, "%u", col - current_col));
 				WT_RET(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_SKIP));
 			}
@@ -375,8 +375,8 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 			pv.type = 'u';
 
 		if (pv.havesize)
-			WT_RET(__wt_buf_catfmt(
-			    session, format, "%d%c", (int)pv.size, pv.type));
+			WT_RET(__wt_buf_catfmt(session,
+			    format, "%" PRIu32 "%c", pv.size, pv.type));
 		else
 			WT_RET(__wt_buf_catfmt(session, format, "%c", pv.type));
 	} while (have_next);
@@ -399,8 +399,8 @@ __wt_struct_truncate(WT_SESSION_IMPL *session,
 	while (ncols-- > 0) {
 		WT_RET(__pack_next(&pack, &pv));
 		if (pv.havesize)
-			WT_RET(__wt_buf_catfmt(
-			    session, format, "%d%c", (int)pv.size, pv.type));
+			WT_RET(__wt_buf_catfmt(session,
+			    format, "%" PRIu32 "%c", pv.size, pv.type));
 		else
 			WT_RET(__wt_buf_catfmt(session, format, "%c", pv.type));
 	}
