@@ -27,11 +27,11 @@
     // do some writes on 1
     var master = replTest.getPrimary();
     for (var i = 0; i < 1000; i++) {
-        master.getDB("foo").bar.insert({i: i});
+        assert.writeOK(master.getDB("foo").bar.insert({i: i}, { writeConcern: { w: 'majority' } }));
     }
 
     for (i = 0; i < 1000; i++) {
-        master.getDB("bar").baz.insert({i: i});
+        assert.writeOK(master.getDB("bar").baz.insert({i: i}, { writeConcern: { w: 'majority' } }));
     }
 
     // bring 2 back up, 2 should wait until caught up and then become master
