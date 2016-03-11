@@ -87,13 +87,14 @@ run_child(const char *homedir, int op, int expect)
 		cfg = ENV_CONFIG_RD;
 	else
 		cfg = ENV_CONFIG_WR;
-	ret = wiredtiger_open(homedir, NULL, cfg, &conn);
-	if (expect == EXPECT_SUCCESS && ret != 0)
-		testutil_die(ret, "wiredtiger_open success err");
-	if (expect == EXPECT_ERR) {
-		if (ret == 0)
+	if ((ret = wiredtiger_open(homedir, NULL, cfg, &conn)) == 0) {
+		if (expect == EXPECT_ERR)
 			testutil_die(
-			    ret, "wiredtiger_open expected err succeeded");
+			    ret, "wiredtiger_open expected error, succeeded");
+	} else {
+		if (expect == EXPECT_SUCCESS)
+			testutil_die(
+			    ret, "wiredtiger_open expected success, error");
 		/*
 		 * If we expect an error and got one, we're done.
 		 */
