@@ -65,7 +65,7 @@ TEST(FTDCVarIntTest, TestIntCompression) {
 
     // Check numbers composed of repeating hex numbers
     for (int i = 0; i < 15; i++) {
-        int v = 0;
+        std::uint64_t v = 0;
         for (int j = 0; j < 15; j++) {
             v = v << 4 | i;
             TestInt(v);
