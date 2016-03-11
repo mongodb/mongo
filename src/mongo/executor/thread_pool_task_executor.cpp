@@ -259,6 +259,9 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
                        }
                        invariant(now() >= when);
                        stdx::unique_lock<stdx::mutex> lk(_mutex);
+                       if (cbState->canceled.load()) {
+                           return;
+                       }
                        scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
                    });
 
@@ -457,20 +460,20 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
 }
 
 void ThreadPoolTaskExecutor::runCallback(std::shared_ptr<CallbackState> cbStateArg) {
-    auto cbStatePtr = cbStateArg.get();
     CallbackHandle cbHandle;
-    setCallbackForHandle(&cbHandle, std::move(cbStateArg));
+    setCallbackForHandle(&cbHandle, cbStateArg);
     CallbackArgs args(this,
                       std::move(cbHandle),
-                      cbStatePtr->canceled.load()
+                      cbStateArg->canceled.load()
                           ? Status({ErrorCodes::CallbackCanceled, "Callback canceled"})
                           : Status::OK());
-    cbStatePtr->callback(std::move(args));
-    cbStatePtr->isFinished.store(true);
+    invariant(!cbStateArg->isFinished.load());
+    cbStateArg->callback(std::move(args));
+    cbStateArg->isFinished.store(true);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _poolInProgressQueue.erase(cbStatePtr->iter);
-    if (cbStatePtr->finishedCondition) {
-        cbStatePtr->finishedCondition->notify_all();
+    _poolInProgressQueue.erase(cbStateArg->iter);
+    if (cbStateArg->finishedCondition) {
+        cbStateArg->finishedCondition->notify_all();
     }
 }
 
