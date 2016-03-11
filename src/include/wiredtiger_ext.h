@@ -268,8 +268,9 @@ struct __wt_extension_api {
 	    WT_SESSION *session, const char *key, const char *value);
 
 	/*!
-	 * Pack a structure into a buffer.
-	 * See ::wiredtiger_struct_pack for details.
+	 * Pack a structure into a buffer. Deprecated in favor of stream
+	 * based pack and unpack API. See WT_EXTENSION_API::pack_start for
+	 * details.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle
@@ -282,8 +283,8 @@ struct __wt_extension_api {
 	    void *buffer, size_t size, const char *format, ...);
 
 	/*!
-	 * Calculate the size required to pack a structure.
-	 * See ::wiredtiger_struct_size for details.
+	 * Calculate the size required to pack a structure. Deprecated in
+	 * favor of stream based pack and unpack API.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle
@@ -296,8 +297,9 @@ struct __wt_extension_api {
 	    size_t *sizep, const char *format, ...);
 
 	/*!
-	 * Unpack a structure from a buffer.
-	 * See ::wiredtiger_struct_unpack for details.
+	 * Unpack a structure from a buffer. Deprecated in favor of stream
+	 * based pack and unpack API. See WT_EXTENSION_API::unpack_start for
+	 * details.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle
