@@ -415,7 +415,7 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* txn) const {
         auto removes = getStats(WT_STAT_DSRC_CURSOR_REMOVE);
         auto insertBytes = getStats(WT_STAT_DSRC_CURSOR_INSERT_BYTES);
 
-        if (inserts == 0 or removes >= inserts)
+        if (inserts == 0 || removes >= inserts)
             return 0;
 
         // Rough approximation of index size as average entry size times number of entries.
