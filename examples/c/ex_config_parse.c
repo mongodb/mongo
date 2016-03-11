@@ -99,7 +99,7 @@ main(void)
 	while ((ret = parser->next(parser, &k, &v)) == 0) {
 		printf("%.*s:", (int)k.len, k.str);
 		if (v.type == WT_CONFIG_ITEM_NUM)
-			printf("%" PRId64 "\n", v.val);
+			printf("%lld\n", (long long)v.val);
 		else
 			printf("%.*s\n", (int)v.len, v.str);
 	}
