@@ -91,6 +91,18 @@
 # endif
 #endif
 
+
+// MONGO
+// Implement support for clang + libstdc++ similarly to new versions of boost. This is based on
+// https://github.com/boostorg/config/blob/boost-1.60.0/include/boost/config/stdlib/libstdcpp3.hpp#L115-L141
+#ifdef __clang__
+#if !__has_include(<ext/cmath>)
+#error "MongoDB does not support compiling with libstdc++ older than 4.8"
+#elif __has_include(<shared_mutex>)
+#define MONGO_CLANG_LIBSTDCPP49
+#endif
+#else
+
 //  stdlibc++ C++0x support is detected via __GNUC__, __GNUC_MINOR__, and possibly
 //  __GNUC_PATCHLEVEL__ at the suggestion of Jonathan Wakely, one of the stdlibc++
 //  developers. He also commented:
@@ -162,7 +174,11 @@
 // Note that although <atomic> existed prior to gcc 4.8 it was largely unimplemented for many types:
 #  define BOOST_NO_CXX11_HDR_ATOMIC
 #endif
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9) || !defined(__GXX_EXPERIMENTAL_CXX0X__)
+
+#endif // MONGO __clang__
+
+#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9) || !defined(__GXX_EXPERIMENTAL_CXX0X__) \
+                       || !defined(MONGO_CLANG_LIBSTDCPP49)
 // Although <regex> is present and compilable against, the actual implementation is not functional
 // even for the simplest patterns such as "\d" or "[0-9]". This is the case at least in gcc up to 4.8, inclusively.
 #  define BOOST_NO_CXX11_HDR_REGEX
