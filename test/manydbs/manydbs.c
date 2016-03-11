@@ -60,13 +60,12 @@ static const char * const uri = "table:main";
     WTOPEN_CFG_COMMON						\
     "transaction_sync=(enabled,method=fsync)"
 
-#define	MAX_CPU	10.0
-#define	MAX_DBS	10
+#define	MAX_DBS		10
 #define	MAX_IDLE_TIME	30
 #define	IDLE_INCR	5
 
-#define	MAX_KV	100
-#define	MAX_VAL	128
+#define	MAX_KV		100
+#define	MAX_VAL		128
 
 static void
 usage(void)
@@ -101,7 +100,8 @@ run_ops(int dbs)
 	 */
 	if (session == NULL) {
 		__wt_random_init(&rnd);
-		if ((session = calloc((size_t)dbs, sizeof(WT_SESSION *))) == NULL)
+		if ((session =
+		    calloc((size_t)dbs, sizeof(WT_SESSION *))) == NULL)
 			testutil_die(ENOMEM, "session array malloc");
 		if ((cursor = calloc((size_t)dbs, sizeof(WT_CURSOR *))) == NULL)
 			testutil_die(ENOMEM, "cursor array malloc");

@@ -344,7 +344,7 @@ retry:
 		    current_id - oldest_id > 10000 && oldest_session != NULL) {
 			(void)__wt_verbose(session, WT_VERB_TRANSACTION,
 			    "old snapshot %" PRIu64
-			    " pinned in session %d [%s]"
+			    " pinned in session %" PRIu32 " [%s]"
 			    " with snap_min %" PRIu64 "\n",
 			    oldest_id, oldest_session->id,
 			    oldest_session->lastop,
