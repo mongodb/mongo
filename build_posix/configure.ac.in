@@ -34,9 +34,13 @@ AC_PROG_CC(cc gcc)
 AC_PROG_CXX(c++ g++)
 AM_PROG_AS(as gas)
 
-# When we are compiling with overridden C and assembly compilers on PPC
-# then we can run into an issue where libtool doesn't see the needed tag
-# for compiling and will error out.
+# This is a workaround as part of WT-2459. Currently, clang (v3.7) does not
+# support compiling the ASM code we have to perform the CRC checks on PowerPC.
+# To compile with clang we need to override the ASM compiler with CCAS to use
+# gcc. Unfortunately, doing the compilation in this manner means libtool can't
+# determine what tag to use for that one .S file. If we catch that we are using
+# two different compilers for CC and CCAS and we are on a PowerPC system we
+# overload the libtool flags to provide CC by default.
 if test "$CC" != "$CCAS"; then
 	AS_CASE([$host_cpu],
 		[ppc64*], [AM_LIBTOOLFLAGS+="--tag=CC"],
@@ -44,7 +48,6 @@ if test "$CC" != "$CCAS"; then
 		[powerpc*], [AM_LIBTOOLFLAGS+="--tag=CC"],
 		[])
 fi
-
 AC_SUBST(AM_LIBTOOLFLAGS)
 
 if test "$GCC" = "yes"; then
