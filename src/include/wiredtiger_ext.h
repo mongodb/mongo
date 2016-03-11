@@ -323,7 +323,8 @@ struct __wt_extension_api {
 	 * @param[out] psp the new packing stream handle
 	 * @errors
 	 */
-	int (*pack_start)(WT_SESSION *session, const char *format,
+	int (*pack_start)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *format,
 	    void *buffer, size_t size, WT_PACK_STREAM **psp);
 
 	/*!
@@ -337,7 +338,8 @@ struct __wt_extension_api {
 	 * @param[out] psp the new packing stream handle
 	 * @errors
 	 */
-	int (*unpack_start)(WT_SESSION *session, const char *format,
+	int (*unpack_start)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, const char *format,
 	    const void *buffer, size_t size, WT_PACK_STREAM **psp);
 
 	/*!
@@ -348,7 +350,8 @@ struct __wt_extension_api {
 	 * stream
 	 * @errors
 	 */
-	int (*pack_close)(WT_PACK_STREAM *ps, size_t *usedp);
+	int (*pack_close)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, size_t *usedp);
 
 	/*!
 	 * Pack an item into a packing stream.
@@ -357,7 +360,8 @@ struct __wt_extension_api {
 	 * @param item an item to pack
 	 * @errors
 	 */
-	int (*pack_item)(WT_PACK_STREAM *ps, WT_ITEM *item);
+	int (*pack_item)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, WT_ITEM *item);
 
 	/*!
 	 * Pack a signed integer into a packing stream.
@@ -366,7 +370,8 @@ struct __wt_extension_api {
 	 * @param i a signed integer to pack
 	 * @errors
 	 */
-	int (*pack_int)(WT_PACK_STREAM *ps, int64_t i);
+	int (*pack_int)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, int64_t i);
 
 	/*!
 	 * Pack a string into a packing stream.
@@ -375,7 +380,8 @@ struct __wt_extension_api {
 	 * @param s a string to pack
 	 * @errors
 	 */
-	int (*pack_str)(WT_PACK_STREAM *ps, const char *s);
+	int (*pack_str)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, const char *s);
 
 	/*!
 	 * Pack an unsigned integer into a packing stream.
@@ -384,7 +390,8 @@ struct __wt_extension_api {
 	 * @param u an unsigned integer to pack
 	 * @errors
 	 */
-	int (*pack_uint)(WT_PACK_STREAM *ps, uint64_t u);
+	int (*pack_uint)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, uint64_t u);
 
 	/*!
 	 * Unpack an item from a packing stream.
@@ -393,7 +400,8 @@ struct __wt_extension_api {
 	 * @param item an item to unpack
 	 * @errors
 	 */
-	int (*unpack_item)(WT_PACK_STREAM *ps, WT_ITEM *item);
+	int (*unpack_item)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, WT_ITEM *item);
 
 	/*!
 	 * Unpack a signed integer from a packing stream.
@@ -402,7 +410,8 @@ struct __wt_extension_api {
 	 * @param[out] ip the unpacked signed integer
 	 * @errors
 	 */
-	int (*unpack_int)(WT_PACK_STREAM *ps, int64_t *ip);
+	int (*unpack_int)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, int64_t *ip);
 
 	/*!
 	 * Unpack a string from a packing stream.
@@ -411,7 +420,8 @@ struct __wt_extension_api {
 	 * @param[out] sp the unpacked string
 	 * @errors
 	 */
-	int (*unpack_str)(WT_PACK_STREAM *ps, const char **sp);
+	int (*unpack_str)(WT_EXTENSION_API *wt_api,
+	    WT_PACK_STREAM *ps, const char **sp);
 
 	/*!
 	 * Unpack an unsigned integer from a packing stream.
@@ -420,7 +430,8 @@ struct __wt_extension_api {
 	 * @param[out] up the unpacked unsigned integer
 	 * @errors
 	 */
-	int (*unpack_uint)(WT_PACK_STREAM *ps, uint64_t *up);
+	int (*unpack_uint)(WT_EXTENSION_API *wt_api,
+	     WT_PACK_STREAM *ps, uint64_t *up);
 
 	/*!
 	 * Return the current transaction ID.
