@@ -3190,6 +3190,11 @@ int ExpressionIsoWeek::extract(const tm& tm) {
     // Calculation taken from:
     // https://en.wikipedia.org/wiki/ISO_week_date#Calculating_the_week_number_of_a_given_date
     //
+    //              │ ordinal(date) - weekday(date) + 10 │
+    // week(date) = │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
+    //              │                 7                  │
+    //              └                                    ┘
+    //
     // The first week must contain the first Thursday, therefore the `+ 10` after subtracting the
     // weekday. Example: 2016-01-07 is the first Thursday
     // ordinal(2016-01-07) => 7
@@ -3197,20 +3202,19 @@ int ExpressionIsoWeek::extract(const tm& tm) {
     //
     // floor((7-4+10)/7) = floor(13/7) => 1
     //
-    //              │ ordinal(date) - weekday(date) + 10 │
-    // week(date) = │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
-    //              │                 7                  │
-    //              └                                    ┘
-    //
     // week(date)    = isoWeek
     // ordinal(date) = isoDayOfYear
     // weekday(date) = isoDayOfWeek
     int isoWeek = (isoDayOfYear - isoDayOfWeek + 10) / 7;
 
+    // There is no week 0, so it must be the last week of the previous year.
     if (isoWeek < 1) {
         return lastWeek(tm.tm_year + 1900 - 1);
+    // If the calculated week is 53 and bigger than the last week, than it is the first week of the
+    // next year.
     } else if (isoWeek == 53 && isoWeek > lastWeek(tm.tm_year + 1900)) {
         return 1;
+    // It is just the week calculated
     } else {
         return isoWeek;
     }
