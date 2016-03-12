@@ -1960,12 +1960,19 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	WT_RET(__wt_buf_init(session, &r->disk_image, corrected_page_size));
 
 	/*
-	 * Clear the disk page's header and block-manager space, set the page
-	 * type (the type doesn't change, and setting it later would require
-	 * additional code in a few different places).
+	 * Clear at least the disk page's header and block-manager space, but
+	 * in the case of fixed-length column-store, clear the entire buffer.
+	 * (Fixed-length column-store sets bits in bytes, and the bytes are
+	 * assumed to be initially 0.)
+	 */
+	memset(r->disk_image.mem, 0, page->type == WT_PAGE_COL_FIX ?
+	    corrected_page_size : WT_PAGE_HEADER_BYTE_SIZE(btree));
+
+	/*
+	 * Set the page type (the type doesn't change, and setting it later
+	 * would require additional code in a few different places).
 	 */
 	dsk = r->disk_image.mem;
-	memset(dsk, 0, WT_PAGE_HEADER_BYTE_SIZE(btree));
 	dsk->type = page->type;
 
 	/*
