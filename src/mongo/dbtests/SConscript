@@ -9,14 +9,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         '$BUILD_DIR/mongo/unittest/unittest',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on default_test_dbpath from dbtests.cpp, and on
-        # storageGlobalParams from storage_options.cpp in
-        # serverOnlyFiles.
-        'incomplete',
     ],
 )
 

@@ -46,6 +46,13 @@
 
 namespace mongo {
 
+namespace {
+
+// This specifies default dbpath for our testing framework
+const std::string default_test_dbpath = "/tmp/unittest";
+
+}  // namespace
+
 using std::cout;
 using std::endl;
 using std::string;
@@ -61,8 +68,7 @@ Status addTestFrameworkOptions(moe::OptionSection* options) {
                  "dbpath",
                  moe::String,
                  "db data path for this test run. NOTE: the contents of this directory will "
-                 "be overwritten if it already exists")
-        .setDefault(moe::Value(dbtests::default_test_dbpath));
+                 "be overwritten if it already exists").setDefault(moe::Value(default_test_dbpath));
 
     options->addOptionChaining("debug", "debug", moe::Switch, "run tests with verbose output");
 

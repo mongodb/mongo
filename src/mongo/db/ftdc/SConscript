@@ -26,10 +26,6 @@ ftdcEnv.Library(
         '$BUILD_DIR/third_party/s2/s2', # For VarInt
         '$BUILD_DIR/third_party/shim_zlib',
     ],
-    LIBDEPS_TAGS=[
-        # Needs 'mongo::Validator<mongo::BSONObj>::validateLoad(char const*, unsigned long)'
-        'incomplete',
-    ],
 )
 
 env.Library(
@@ -44,11 +40,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'ftdc'
-    ],
-    LIBDEPS_TAGS=[
-        # Needs 'mongo::storageGlobalParams' in storage_options.cpp which is in serveronly
-        # And this library is already part of serveronly
-        'incomplete',
     ],
 )
 

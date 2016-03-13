@@ -74,10 +74,6 @@ env.Library(
         'document_range',
         '$BUILD_DIR/mongo/util/net/network',
     ],
-    LIBDEPS_TAGS=[
-        # Circular with rpc because it needs object_check.cpp
-        'incomplete'
-    ],
 )
 
 env.Library(
@@ -108,10 +104,6 @@ env.Library(
     LIBDEPS=[
         'document_range',
         '$BUILD_DIR/mongo/util/net/network',
-    ],
-    LIBDEPS_TAGS=[
-        # Circular with rpc because it needs object_check.cpp
-        'incomplete'
     ],
 )
 
@@ -199,4 +191,3 @@ env.CppUnitTest(
     ],
     LIBDEPS=['metadata']
 )
-

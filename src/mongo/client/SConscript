@@ -172,11 +172,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/hostandport',
         'connection_pool',
     ],
-    LIBDEPS_TAGS=[
-        # Needs things from coredb in Command, but this would be circular through the
-        # libsharding_client
-        'incomplete',
-    ],
 )
 
 env.Library(

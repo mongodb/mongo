@@ -46,8 +46,6 @@ class Status;
 class StringData;
 
 namespace dbtests {
-// This specifies default dbpath for our testing framework
-extern const std::string default_test_dbpath;
 
 /**
  * Creates an index if it does not already exist.

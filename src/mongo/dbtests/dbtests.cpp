@@ -54,8 +54,6 @@
 
 namespace mongo {
 namespace dbtests {
-// This specifies default dbpath for our testing framework
-const std::string default_test_dbpath = "/tmp/unittest";
 
 void initWireSpec() {
     WireSpec& spec = WireSpec::instance();
