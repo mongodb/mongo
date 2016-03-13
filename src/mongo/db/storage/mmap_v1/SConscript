@@ -36,8 +36,13 @@ env.Library(
         'logfile',
         'compress',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/index_names',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/storage/journal_listener',
         '$BUILD_DIR/mongo/db/storage/paths',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
     ],
     LIBDEPS_TAGS=[
         # Many undefined symbols

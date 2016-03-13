@@ -343,41 +343,28 @@ if not has_option('noshell') and usemozjs:
                     "shell/linenoise.cpp",
                     "shell/mk_wcwidth.cpp",
                     "shell/mongo-server.cpp",
+                    "shell/shell_options.cpp",
+                    "shell/shell_options_init.cpp",
                     "shell/shell_utils.cpp",
                     "shell/shell_utils_extended.cpp",
                     "shell/shell_utils_launcher.cpp",
-                    "shell/shell_options_init.cpp"
                 ],
                 LIBDEPS=[
                     'db/catalog/index_key_validate',
                     'db/index/external_key_generator',
                     'db/query/command_request_response',
                     'db/query/lite_parsed_query',
+                    'db/server_options_core',
                     'linenoise_utf8',
+                    'rpc/protocol',
                     'scripting/scripting',
                     'shell/mongojs',
+                    'util/net/network',
+                    'util/options_parser/options_parser_init',
                     'util/processinfo',
                     'util/signal_handlers',
                 ],
-                LIBDEPS_TAGS=[
-                    # Circular with shell_options below. It is unclear
-                    # why this is split into two libraries, or even
-                    # why these libraries exist at all, since it seems
-                    # that the only thing that links them is the shell
-                    # itself.
-                    'incomplete',
-                ],
     )
-
-    # mongo shell options
-    shell_core_env.Library("shell_options", ["shell/shell_options.cpp"],
-                LIBDEPS=[
-                    '$BUILD_DIR/mongo/db/server_options_core',
-                    '$BUILD_DIR/mongo/rpc/protocol',
-                    '$BUILD_DIR/mongo/util/net/network',
-                    '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
-                    'shell_core',
-                ])
 
     shellEnv = env.Clone()
     if env.TargetOSIs('windows'):
@@ -387,7 +374,6 @@ if not has_option('noshell') and usemozjs:
         "mongo",
         "shell/dbshell.cpp",
         LIBDEPS=["$BUILD_DIR/third_party/shim_pcrecpp",
-                 "shell_options",
                  "shell_core",
                  "db/server_options_core",
                  "client/clientdriver",

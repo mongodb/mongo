@@ -39,7 +39,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/db/server_parameters',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         'ftdc'
     ],
     LIBDEPS_TAGS=[
