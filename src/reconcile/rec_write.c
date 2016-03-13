@@ -1960,12 +1960,19 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	WT_RET(__wt_buf_init(session, &r->disk_image, corrected_page_size));
 
 	/*
-	 * Clear the disk page's header and block-manager space, set the page
-	 * type (the type doesn't change, and setting it later would require
-	 * additional code in a few different places).
+	 * Clear at least the disk page's header and block-manager space, but
+	 * in the case of fixed-length column-store, clear the entire buffer.
+	 * (Fixed-length column-store sets bits in bytes, and the bytes are
+	 * assumed to be initially 0.)
+	 */
+	memset(r->disk_image.mem, 0, page->type == WT_PAGE_COL_FIX ?
+	    corrected_page_size : WT_PAGE_HEADER_BYTE_SIZE(btree));
+
+	/*
+	 * Set the page type (the type doesn't change, and setting it later
+	 * would require additional code in a few different places).
 	 */
 	dsk = r->disk_image.mem;
-	memset(dsk, 0, WT_PAGE_HEADER_BYTE_SIZE(btree));
 	dsk->type = page->type;
 
 	/*
@@ -3026,13 +3033,13 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * The data isn't laid out on a page boundary or nul padded; copy it to
 	 * a clean, aligned, padded buffer before writing it.
 	 *
-	 * Allocate a scratch buffer to hold the new disk image.  Copy the
-	 * WT_PAGE_HEADER header onto the scratch buffer, most of the header
-	 * information remains unchanged between the pages.
+	 * Allocate a scratch buffer to hold the new disk image. Copy the disk
+	 * page's header and block-manager space into the scratch buffer, most
+	 * of the header information remains unchanged between the pages.
 	 */
 	WT_RET(__wt_scr_alloc(session, r->disk_image.memsize, &tmp));
 	dsk = tmp->mem;
-	memcpy(dsk, r->disk_image.mem, WT_PAGE_HEADER_SIZE);
+	memcpy(dsk, r->disk_image.mem, WT_PAGE_HEADER_BYTE_SIZE(btree));
 
 	/*
 	 * For each split chunk we've created, update the disk image and copy
