@@ -248,13 +248,6 @@ private:
         }
         portWithHandler->shutdown();
 
-// Normal disconnect path.
-#ifdef MONGO_CONFIG_SSL
-        SSLManagerInterface* manager = getSSLManager();
-        if (manager)
-            manager->cleanupThreadLocals();
-#endif
-
         return NULL;
     }
 };

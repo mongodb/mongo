@@ -44,7 +44,6 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/timer.h"
 
 using namespace std;
@@ -157,15 +156,6 @@ void BackgroundJob::jobBody() {
 
     // We must cache this value so that we can use it after we leave the following scope.
     const bool selfDelete = _selfDelete;
-
-#ifdef MONGO_CONFIG_SSL
-    // TODO(sverch): Allow people who use the BackgroundJob to also specify cleanup tasks.
-    // Currently the networking code depends on this class and this class depends on the
-    // networking code because of this ad hoc cleanup.
-    SSLManagerInterface* manager = getSSLManager();
-    if (manager)
-        manager->cleanupThreadLocals();
-#endif
 
     {
         // It is illegal to access any state owned by this BackgroundJob after leaving this

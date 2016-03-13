@@ -104,7 +104,9 @@ public:
         _id = _next.fetchAndAdd(1);
     }
 
-    ~SSLThreadInfo() {}
+    ~SSLThreadInfo() {
+        ERR_remove_state(0);
+    }
 
     unsigned long id() const {
         return _id;
@@ -193,8 +195,6 @@ public:
 
     StatusWith<boost::optional<std::string>> parseAndValidatePeerCertificate(
         SSL* conn, const std::string& remoteHost) final;
-
-    virtual void cleanupThreadLocals();
 
     virtual const SSLConfiguration& getSSLConfiguration() const {
         return _sslConfiguration;
@@ -1033,10 +1033,6 @@ std::string SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConne
                               swPeerSubjectName.getStatus().reason());
     }
     return swPeerSubjectName.getValue().get_value_or("");
-}
-
-void SSLManager::cleanupThreadLocals() {
-    ERR_remove_state(0);
 }
 
 std::string SSLManagerInterface::getSSLErrorMessage(int code) {

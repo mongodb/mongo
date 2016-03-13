@@ -227,9 +227,6 @@ env.Library(
         'concurrency/spin_lock',
         'foundation',
     ],
-    LIBDEPS_TAGS=[
-        'incomplete'
-    ],
 )
 
 env.CppUnitTest(
@@ -240,7 +237,6 @@ env.CppUnitTest(
     LIBDEPS=[
         "background_job",
         "concurrency/synchronization",
-        "net/network", # Temporary crutch since the ssl cleanup is hard coded in background.cpp
     ],
 )
 

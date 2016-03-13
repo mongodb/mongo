@@ -121,12 +121,6 @@ public:
         const SSLConnection* conn, const std::string& remoteHost) = 0;
 
     /**
-     * Cleans up SSL thread local memory; use at thread exit
-     * to avoid memory leaks
-     */
-    virtual void cleanupThreadLocals() = 0;
-
-    /**
      * Gets the SSLConfiguration containing all information about the current SSL setup
      * @return the SSLConfiguration
      */
