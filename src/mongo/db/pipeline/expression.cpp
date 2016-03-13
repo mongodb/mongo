@@ -3093,6 +3093,7 @@ Value ExpressionIsoDayOfWeek::evaluateInternal(Variables* vars) const {
 }
 
 int ExpressionIsoDayOfWeek::extract(const tm& tm) {
+    // translate from sunday=0 … saturday=6 to monday=1 … sunday=7
     return (tm.tm_wday - 7) % 7 + 7;
 }
 
@@ -3184,9 +3185,6 @@ int ExpressionIsoWeek::lastWeek(int year) {
 // Weeks start with Monday. The first week of a year is the week that contains the first Thursday of
 // the year (and, hence, always contains 4 January).
 int ExpressionIsoWeek::extract(const tm& tm) {
-    int isoDayOfWeek = ExpressionIsoDayOfWeek::extract(tm);
-    int isoDayOfYear = tm.tm_yday + 1;
-
     // Calculation taken from:
     // https://en.wikipedia.org/wiki/ISO_week_date#Calculating_the_week_number_of_a_given_date
     //
@@ -3205,6 +3203,8 @@ int ExpressionIsoWeek::extract(const tm& tm) {
     // week(date)    = isoWeek
     // ordinal(date) = isoDayOfYear
     // weekday(date) = isoDayOfWeek
+    int isoDayOfWeek = ExpressionIsoDayOfWeek::extract(tm);
+    int isoDayOfYear = tm.tm_yday + 1;
     int isoWeek = (isoDayOfYear - isoDayOfWeek + 10) / 7;
 
     // There is no week 0, so it must be the last week of the previous year.
