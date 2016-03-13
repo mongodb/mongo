@@ -32,6 +32,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

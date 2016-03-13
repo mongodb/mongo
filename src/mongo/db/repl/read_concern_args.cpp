@@ -34,6 +34,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/util/mongoutils/str.h"
 
 using std::string;

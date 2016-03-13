@@ -98,25 +98,6 @@ Status bsonExtractStringField(const BSONObj& object, StringData fieldName, std::
     return Status::OK();
 }
 
-Status bsonExtractOpTimeField(const BSONObj& object, StringData fieldName, repl::OpTime* out) {
-    BSONElement element;
-    Status status = bsonExtractTypedField(object, fieldName, Object, &element);
-    if (!status.isOK())
-        return status;
-
-    BSONObj opTimeObj = element.Obj();
-    Timestamp ts;
-    status = bsonExtractTimestampField(opTimeObj, repl::OpTime::kTimestampFieldName, &ts);
-    if (!status.isOK())
-        return status;
-    long long term;
-    status = bsonExtractIntegerField(opTimeObj, repl::OpTime::kTermFieldName, &term);
-    if (!status.isOK())
-        return status;
-    *out = repl::OpTime(ts, term);
-    return Status::OK();
-}
-
 Status bsonExtractTimestampField(const BSONObj& object, StringData fieldName, Timestamp* out) {
     BSONElement element;
     Status status = bsonExtractTypedField(object, fieldName, bsonTimestamp, &element);

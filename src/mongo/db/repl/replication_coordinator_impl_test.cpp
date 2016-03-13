@@ -38,6 +38,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/handshake_args.h"
+#include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"

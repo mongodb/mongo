@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {

@@ -34,8 +34,8 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/stringutils.h"
 

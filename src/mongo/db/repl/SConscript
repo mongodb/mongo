@@ -708,15 +708,23 @@ env.CppUnitTest(
 
 env.Library(target='optime',
             source=[
+                'bson_extract_optime.cpp',
                 'optime.cpp',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/mongo/bson/util/bson_extract',
             ],
-            LIBDEPS_TAGS=[
-                # Circular with bson_extract library
-                'incomplete',
-            ],
+)
+
+env.CppUnitTest(
+    target='optime_extract_test',
+    source=[
+        'optime_extract_test.cpp'
+    ],
+    LIBDEPS=[
+        'optime',
+    ],
 )
 
 env.Library(

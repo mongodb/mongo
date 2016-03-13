@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -95,20 +94,6 @@ Status bsonExtractIntegerField(const BSONObj& object, StringData fieldName, long
  * Status::OK(), the resulting value of "*out" is undefined.
  */
 Status bsonExtractStringField(const BSONObj& object, StringData fieldName, std::string* out);
-
-
-/**
- * Finds an object-typed field named "fieldName" in "object" that represents an OpTime.
- *
- * The OpTime objects have two fields, a Timestamp ts and numeric term.
- *
- * Returns Status::OK() and sets *out to the found element's OpTime value on success.  Returns
- * ErrorCodes::NoSuchKey if there are no matches for "fieldName" or either subobject field is
- * missing, and ErrorCodes::TypeMismatch if the type of the matching element is not Object, the ts
- * subfield is not Timestamp, or the term subfield is not numeric.  For return values other than
- * Status::OK(), the resulting value of "*out" is undefined.
- */
-Status bsonExtractOpTimeField(const BSONObj& object, StringData fieldName, repl::OpTime* out);
 
 /**
  * Finds an Timestamp-typed element named "fieldName" in "object" and stores its value in "out".
