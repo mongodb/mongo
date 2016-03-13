@@ -3033,13 +3033,13 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * The data isn't laid out on a page boundary or nul padded; copy it to
 	 * a clean, aligned, padded buffer before writing it.
 	 *
-	 * Allocate a scratch buffer to hold the new disk image.  Copy the
-	 * WT_PAGE_HEADER header onto the scratch buffer, most of the header
-	 * information remains unchanged between the pages.
+	 * Allocate a scratch buffer to hold the new disk image. Copy the disk
+	 * page's header and block-manager space into the scratch buffer, most
+	 * of the header information remains unchanged between the pages.
 	 */
 	WT_RET(__wt_scr_alloc(session, r->disk_image.memsize, &tmp));
 	dsk = tmp->mem;
-	memcpy(dsk, r->disk_image.mem, WT_PAGE_HEADER_SIZE);
+	memcpy(dsk, r->disk_image.mem, WT_PAGE_HEADER_BYTE_SIZE(btree));
 
 	/*
 	 * For each split chunk we've created, update the disk image and copy
