@@ -461,41 +461,4 @@ void Command::generateErrorResponse(OperationContext* txn,
     _generateErrorResponse(txn, replyBuilder, exception, rpc::makeEmptyMetadata());
 }
 
-void runCommands(OperationContext* txn,
-                 const rpc::RequestInterface& request,
-                 rpc::ReplyBuilderInterface* replyBuilder) {
-    try {
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
-
-        Command* c = nullptr;
-        // In the absence of a Command object, no redaction is possible. Therefore
-        // to avoid displaying potentially sensitive information in the logs,
-        // we restrict the log message to the name of the unrecognized command.
-        // However, the complete command object will still be echoed to the client.
-        if (!(c = Command::findCommand(request.getCommandName()))) {
-            Command::unknownCommands.increment();
-            std::string msg = str::stream() << "no such command: '" << request.getCommandName()
-                                            << "'";
-            LOG(2) << msg;
-            uasserted(ErrorCodes::CommandNotFound,
-                      str::stream() << msg << ", bad cmd: '" << request.getCommandArgs() << "'");
-        }
-
-        LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
-               << c->getRedactedCopyForLogging(request.getCommandArgs());
-
-        {
-            // Try to set this as early as possible, as soon as we have figured out the command.
-            stdx::lock_guard<Client> lk(*txn->getClient());
-            CurOp::get(txn)->setLogicalOp_inlock(c->getLogicalOp());
-        }
-
-        Command::execCommand(txn, c, request, replyBuilder);
-    }
-
-    catch (const DBException& ex) {
-        Command::generateErrorResponse(txn, replyBuilder, ex, request);
-    }
-}
-
 }  // namespace mongo

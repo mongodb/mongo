@@ -455,8 +455,4 @@ private:
                                       const BSONObj& cmdObj);
 };
 
-void runCommands(OperationContext* txn,
-                 const rpc::RequestInterface& request,
-                 rpc::ReplyBuilderInterface* replyBuilder);
-
 }  // namespace mongo

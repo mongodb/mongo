@@ -151,6 +151,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/query/command_request_response',
@@ -166,7 +167,9 @@ env.CppUnitTest(
         'curop_test.cpp',
     ],
     LIBDEPS=[
+        'auth/authorization_manager_mock_init',
         'curop',
+        'commands_test_crutch',
     ],
 )
 
@@ -373,6 +376,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/replmocks',
+        'auth/authorization_manager_mock_init',
+        'commands_test_crutch',
         'common',
         'range_deleter',
     ],
@@ -489,12 +494,37 @@ env.Library(
         'auth/authorization_manager_global',
         'commands/server_status_core',
         'commands/test_commands_enabled',
-        'curop',
         'service_context',
     ],
     LIBDEPS_TAGS=[
         # Dependencies on Command::registerError and
         # Command::execCommand, which are not uniquely defined.
+        'incomplete',
+    ],
+)
+
+env.Library(
+    target="commands_test_crutch",
+    source=[
+        "commands_test_crutch.cpp",
+    ],
+    LIBDEPS=[
+        "commands",
+    ],
+)
+
+env.Library(
+    target='run_commands',
+    source=[
+        'run_commands.cpp',
+    ],
+    LIBDEPS=[
+        "commands",
+        "curop",
+    ],
+    LIBDEPS_TAGS=[
+        # Dependency on Command::execCommand, which is not uniquely
+        # defined.
         'incomplete',
     ],
 )
@@ -678,6 +708,7 @@ serveronlyLibdeps = [
     "repl/rslog",
     "repl/sync_tail",
     "repl/topology_coordinator_impl",
+    "run_commands",
     "s/commands",
     "s/metadata",
     "s/sharding",
