@@ -26,28 +26,32 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
+#include "mongo/db/query/collation/collation_index_key.h"
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
 
-class BSONObj;
+// TODO SERVER-23172: Update this to consider strings inside nested objects or arrays.
+bool CollationIndexKey::shouldUseCollationIndexKey(BSONElement elt, CollatorInterface* collator) {
+    return collator && elt.type() == BSONType::String;
+}
 
-struct CollationSpec;
-
-/**
- * Provides functions for serializing collation-related objects.
- */
-class CollationSerializer {
-public:
-    /**
-     * Converts CollationSpec 'spec' to its BSONObj representation. The resulting BSON can be stored
-     * and later used to recreate the corresponding CollatorInterface.
-     *
-     * The resulting BSONObj is owned by the caller.
-     */
-    static BSONObj specToBSON(const CollationSpec& spec);
-};
+// TODO SERVER-23172: Update this to convert strings inside nested objects or arrays to their
+// corresponding comparison keys.
+void CollationIndexKey::collationAwareIndexKeyAppend(BSONElement elt,
+                                                     CollatorInterface* collator,
+                                                     BSONObjBuilder* out) {
+    if (shouldUseCollationIndexKey(elt, collator)) {
+        auto comparisonKey = collator->getComparisonKey(elt.valueStringData());
+        out->append("", comparisonKey.getKeyData());
+    } else {
+        out->appendAs(elt, "");
+    }
+}
 
 }  // namespace mongo

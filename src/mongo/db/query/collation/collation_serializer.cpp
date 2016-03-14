@@ -86,13 +86,4 @@ BSONObj CollationSerializer::specToBSON(const CollationSpec& spec) {
     return builder.obj();
 }
 
-void CollationSerializer::appendCollationKey(StringData fieldName,
-                                             const CollatorInterface::ComparisonKey& key,
-                                             BSONObjBuilder* bob) {
-    const auto keyData = key.getKeyData();
-    // 'keyData' should not contain a trailing null byte, but the BSONObjBuilder will add one after
-    // appending the string.
-    bob->append(fieldName, keyData);
-}
-
 }  // namespace mongo

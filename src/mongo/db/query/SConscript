@@ -108,11 +108,13 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/index/expression_params",
+        "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/matcher/expressions_geo",
         "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/server_parameters",
+        "collation/collation_index_key",
+        "collation/collator_interface",
     ],
 )
 
@@ -226,6 +228,7 @@ env.CppUnitTest(
         "index_bounds_builder_test.cpp"
     ],
     LIBDEPS=[
+        "collation/collator_interface_mock",
         "index_bounds",
     ],
 )

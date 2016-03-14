@@ -75,6 +75,28 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target="collation_index_key",
+    source=[
+        "collation_index_key.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "collator_interface",
+    ],
+)
+
+env.CppUnitTest(
+    target="collation_index_key_test",
+    source=[
+        "collation_index_key_test.cpp",
+    ],
+    LIBDEPS=[
+        "collation_index_key",
+        "collator_interface_mock",
+    ],
+)
+
 if icuEnabled:
     env.Library(
         target="collator_icu",
