@@ -1138,7 +1138,7 @@ TEST_F(QueryPlannerTest, MultikeyElemMatchAllCompound3) {
 }
 
 TEST_F(QueryPlannerTest, CanIntersectBoundsWhenFirstFieldIsNotMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$gte: 0, $lt: 10}}"));
 
@@ -1150,7 +1150,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsWhenFirstFieldIsNotMultikey) {
 }
 
 TEST_F(QueryPlannerTest, CanIntersectBoundsOnFirstFieldWhenItAndSharedPrefixAreNotMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {1U}};
+    MultikeyPaths multikeyPaths{std::set<size_t>{}, {1U}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
     runQuery(fromjson("{'a.b': {$gte: 0, $lt: 10}}"));
 
@@ -1162,7 +1162,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsOnFirstFieldWhenItAndSharedPrefixAreN
 }
 
 TEST_F(QueryPlannerTest, CannotIntersectBoundsWhenFirstFieldIsMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$gte: 0, $lt: 10}}"));
 
@@ -1177,7 +1177,7 @@ TEST_F(QueryPlannerTest, CannotIntersectBoundsWhenFirstFieldIsMultikey) {
 }
 
 TEST_F(QueryPlannerTest, CanIntersectBoundsWhenFirstFieldIsMultikeyButHasElemMatch) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$elemMatch: {$gte: 0, $lt: 10}}}"));
 
@@ -1191,7 +1191,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsWhenFirstFieldIsMultikeyButHasElemMat
 TEST_F(QueryPlannerTest, CanComplementBoundsOnFirstFieldWhenItIsMultikeyAndHasNotEqualExpr) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$ne: 3}, b: 2}"));
 
@@ -1205,7 +1205,7 @@ TEST_F(QueryPlannerTest, CanComplementBoundsOnFirstFieldWhenItIsMultikeyAndHasNo
 TEST_F(QueryPlannerTest, CanIntersectBoundsWhenFirstFieldIsMultikeyAndHasNotInsideElemMatch) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$elemMatch: {$not: {$gte: 10}, $gte: 0}}, b: 2}"));
 
@@ -1216,7 +1216,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsWhenFirstFieldIsMultikeyAndHasNotInsi
 }
 
 TEST_F(QueryPlannerTest, CanIntersectBoundsOnFirstFieldWhenSharedPrefixIsMultikeyButHasElemMatch) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    MultikeyPaths multikeyPaths{{0U}, {0U}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$elemMatch: {b: {$gte: 0, $lt: 10}}}}"));
 
@@ -1228,7 +1228,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsOnFirstFieldWhenSharedPrefixIsMultike
 }
 
 TEST_F(QueryPlannerTest, CannotIntersectBoundsOnFirstFieldWhenItAndSharedPrefixAreMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U, 1U}, {0U}};
+    MultikeyPaths multikeyPaths{{0U, 1U}, {0U}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$elemMatch: {b: {$gte: 0, $lt: 10}, c: 2}}}"));
 
@@ -1244,7 +1244,7 @@ TEST_F(QueryPlannerTest, CannotIntersectBoundsOnFirstFieldWhenItAndSharedPrefixA
 }
 
 TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsNotMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
+    MultikeyPaths multikeyPaths{{0U}, std::set<size_t>{}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: 2, b: {$gte: 0, $lt: 10}}"));
 
@@ -1256,7 +1256,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsNotMultikey) {
 }
 
 TEST_F(QueryPlannerTest, CanIntersectBoundsOnSecondFieldWhenItAndSharedPrefixAreNotMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{{1U}, std::set<size_t>{}};
+    MultikeyPaths multikeyPaths{{1U}, std::set<size_t>{}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
     runQuery(fromjson("{'a.b': 2, 'a.c': {$gte: 0, $lt: 10}}"));
 
@@ -1268,7 +1268,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsOnSecondFieldWhenItAndSharedPrefixAre
 }
 
 TEST_F(QueryPlannerTest, CannotIntersectBoundsWhenSecondFieldIsMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: 2, b: {$gte: 0, $lt: 10}}"));
 
@@ -1280,7 +1280,7 @@ TEST_F(QueryPlannerTest, CannotIntersectBoundsWhenSecondFieldIsMultikey) {
 }
 
 TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsMultikeyButHasElemMatch) {
-    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: 2, b: {$elemMatch: {$gte: 0, $lt: 10}}}"));
 
@@ -1294,7 +1294,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsMultikeyButHasElemMa
 TEST_F(QueryPlannerTest, CanComplementBoundsOnSecondFieldWhenItIsMultikeyAndHasNotEqualExpr) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
-    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: 2, b: {$ne: 3}}"));
 
@@ -1308,7 +1308,7 @@ TEST_F(QueryPlannerTest, CanComplementBoundsOnSecondFieldWhenItIsMultikeyAndHasN
 TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsMultikeyAndHasNotInsideElemMatch) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
 
-    IndexEntry::MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
+    MultikeyPaths multikeyPaths{std::set<size_t>{}, {0U}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
     runQuery(fromjson("{a: 2, b: {$elemMatch: {$not: {$gte: 10}, $gte: 0}}}"));
 
@@ -1319,7 +1319,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsMultikeyAndHasNotIns
 }
 
 TEST_F(QueryPlannerTest, CanIntersectBoundsOnSecondFieldWhenSharedPrefixIsMultikeyButHasElemMatch) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    MultikeyPaths multikeyPaths{{0U}, {0U}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$elemMatch: {b: 2, c: {$gte: 0, $lt: 10}}}}"));
 
@@ -1332,7 +1332,7 @@ TEST_F(QueryPlannerTest, CanIntersectBoundsOnSecondFieldWhenSharedPrefixIsMultik
 }
 
 TEST_F(QueryPlannerTest, CannotIntersectBoundsOnSecondFieldWhenItAndSharedPrefixAreMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U, 1U}};
+    MultikeyPaths multikeyPaths{{0U}, {0U, 1U}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$elemMatch: {b: 2, c: {$gte: 0, $lt: 10}}}}"));
 
@@ -1345,7 +1345,7 @@ TEST_F(QueryPlannerTest, CannotIntersectBoundsOnSecondFieldWhenItAndSharedPrefix
 }
 
 TEST_F(QueryPlannerTest, CannotIntersectBoundsOfTwoSeparateElemMatches) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    MultikeyPaths multikeyPaths{{0U}, {0U}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
 
     runQuery(fromjson(
@@ -1366,7 +1366,7 @@ TEST_F(QueryPlannerTest, CannotIntersectBoundsOfTwoSeparateElemMatches) {
 }
 
 TEST_F(QueryPlannerTest, CanCompoundBoundsWhenSharedPrefixIsNotMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{{1U}, {1U}};
+    MultikeyPaths multikeyPaths{{1U}, {1U}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
     runQuery(fromjson("{'a.b': 2, 'a.c': 3}"));
 
@@ -1378,7 +1378,7 @@ TEST_F(QueryPlannerTest, CanCompoundBoundsWhenSharedPrefixIsNotMultikey) {
 }
 
 TEST_F(QueryPlannerTest, CannotCompoundBoundsWhenSharedPrefixIsMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    MultikeyPaths multikeyPaths{{0U}, {0U}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
     runQuery(fromjson("{'a.b': 2, 'a.c': 3}"));
 
@@ -1390,7 +1390,7 @@ TEST_F(QueryPlannerTest, CannotCompoundBoundsWhenSharedPrefixIsMultikey) {
 }
 
 TEST_F(QueryPlannerTest, CanCompoundBoundsWhenSharedPrefixIsMultikeyButHasElemMatch) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U}, {0U}};
+    MultikeyPaths multikeyPaths{{0U}, {0U}};
     addIndex(BSON("a.b" << 1 << "a.c" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$elemMatch: {b: 2, c: 3}}}"));
 
@@ -1402,7 +1402,7 @@ TEST_F(QueryPlannerTest, CanCompoundBoundsWhenSharedPrefixIsMultikeyButHasElemMa
 }
 
 TEST_F(QueryPlannerTest, CannotCompoundBoundsWhenSharedPrefixInsideElemMatchIsMultikey) {
-    IndexEntry::MultikeyPaths multikeyPaths{{0U, 1U}, {0U, 1U}};
+    MultikeyPaths multikeyPaths{{0U, 1U}, {0U, 1U}};
     addIndex(BSON("a.b.c" << 1 << "a.b.d" << 1), multikeyPaths);
     runQuery(fromjson("{a: {$elemMatch: {'b.c': 2, 'b.d': 3}}}"));
 
