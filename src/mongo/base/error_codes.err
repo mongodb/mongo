@@ -169,7 +169,7 @@ error_code("NotMasterNoSlaveOk", 13435);
 error_code("ShardKeyTooBig", 13334);
 error_code("SendStaleConfig", 13388);
 error_code("DatabaseDifferCase", 13297);
-error_code("PrepareConfigsFailed", 13104);
+error_code("OBSOLETE_PrepareConfigsFailed", 13104);
 
 # SERVER-21428 explains the extra changes needed if error_class components change.
 error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout"])
