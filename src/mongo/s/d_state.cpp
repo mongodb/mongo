@@ -218,12 +218,17 @@ bool haveLocalShardingInfo(OperationContext* txn, const string& ns) {
         return false;
     }
 
-    auto css = CollectionShardingState::get(txn, ns);
-    if (!css->getMetadata()) {
-        return false;
+    const auto& oss = OperationShardingState::get(txn);
+    if (oss.hasShardVersion()) {
+        return true;
     }
 
-    return ShardedConnectionInfo::get(txn->getClient(), false) != nullptr;
+    const auto& sci = ShardedConnectionInfo::get(txn->getClient(), false);
+    if (sci && !sci->getVersion(ns).isStrictlyEqualTo(ChunkVersion::UNSHARDED())) {
+        return true;
+    }
+
+    return false;
 }
 
 void usingAShardConnection(const string& addr) {}

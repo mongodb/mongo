@@ -73,12 +73,12 @@ void ShardedConnectionInfo::reset(Client* client) {
     clientSCI(client) = boost::none;
 }
 
-const ChunkVersion ShardedConnectionInfo::getVersion(const std::string& ns) const {
+ChunkVersion ShardedConnectionInfo::getVersion(const std::string& ns) const {
     NSVersionMap::const_iterator it = _versions.find(ns);
     if (it != _versions.end()) {
         return it->second;
     } else {
-        return ChunkVersion(0, 0, OID());
+        return ChunkVersion::UNSHARDED();
     }
 }
 
