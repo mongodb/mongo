@@ -3297,4 +3297,174 @@ REGISTER_EXPRESSION(year, ExpressionYear::parse);
 const char* ExpressionYear::getOpName() const {
     return "$year";
 }
+
+/* -------------------------- ExpressionZip ------------------------------ */
+
+REGISTER_EXPRESSION(zip, ExpressionZip::parse);
+intrusive_ptr<Expression> ExpressionZip::parse(BSONElement expr, const VariablesParseState& vps) {
+    uassert(34460,
+            str::stream() << "$zip only supports an object as an argument, found "
+                          << typeName(expr.type()),
+            expr.type() == Object);
+
+    intrusive_ptr<ExpressionZip> newZip(new ExpressionZip());
+
+    for (auto&& elem : expr.Obj()) {
+        const auto field = elem.fieldNameStringData();
+        if (field == "inputs") {
+            uassert(34461,
+                    str::stream() << "inputs must be an array of expressions, found "
+                                  << typeName(elem.type()),
+                    elem.type() == Array);
+            for (auto&& subExpr : elem.Array()) {
+                newZip->_inputs.push_back(parseOperand(subExpr, vps));
+            }
+        } else if (field == "defaults") {
+            uassert(34462,
+                    str::stream() << "defaults must be an array of expressions, found "
+                                  << typeName(elem.type()),
+                    elem.type() == Array);
+            for (auto&& subExpr : elem.Array()) {
+                newZip->_defaults.push_back(parseOperand(subExpr, vps));
+            }
+        } else if (field == "useLongestLength") {
+            uassert(34463,
+                    str::stream() << "useLongestLength must be a bool, found "
+                                  << typeName(expr.type()),
+                    elem.type() == Bool);
+            newZip->_useLongestLength = elem.Bool();
+        } else {
+            uasserted(34464,
+                      str::stream() << "$zip found an unknown argument: " << elem.fieldName());
+        }
+    }
+
+    uassert(34465, "$zip requires at least one input array", !newZip->_inputs.empty());
+    uassert(34466,
+            "cannot specify defaults unless useLongestLength is true",
+            (newZip->_useLongestLength || newZip->_defaults.empty()));
+    uassert(34467,
+            "defaults and inputs must have the same length",
+            (newZip->_defaults.empty() || newZip->_defaults.size() == newZip->_inputs.size()));
+
+    return std::move(newZip);
+}
+
+Value ExpressionZip::evaluateInternal(Variables* vars) const {
+    // Evaluate input values.
+    vector<vector<Value>> inputValues;
+    inputValues.reserve(_inputs.size());
+
+    size_t minArraySize = 0;
+    size_t maxArraySize = 0;
+    for (size_t i = 0; i < _inputs.size(); i++) {
+        Value evalExpr = _inputs[i]->evaluateInternal(vars);
+        if (evalExpr.nullish()) {
+            return Value(BSONNULL);
+        }
+
+        uassert(
+            34468,
+            str::stream() << "$zip found a non-array expression in input: " << evalExpr.toString(),
+            evalExpr.isArray());
+
+        inputValues.push_back(evalExpr.getArray());
+
+        size_t arraySize = evalExpr.getArrayLength();
+
+        if (i == 0) {
+            minArraySize = arraySize;
+            maxArraySize = arraySize;
+        } else {
+            auto arraySizes = std::minmax({minArraySize, arraySize, maxArraySize});
+            minArraySize = arraySizes.first;
+            maxArraySize = arraySizes.second;
+        }
+    }
+
+    vector<Value> evaluatedDefaults(_inputs.size(), Value(BSONNULL));
+
+    // If we need default values, evaluate each expression.
+    if (minArraySize != maxArraySize) {
+        for (size_t i = 0; i < _defaults.size(); i++) {
+            evaluatedDefaults[i] = _defaults[i]->evaluateInternal(vars);
+        }
+    }
+
+    size_t outputLength = _useLongestLength ? maxArraySize : minArraySize;
+
+    // The final output array, e.g. [[1, 2, 3], [2, 3, 4]].
+    vector<Value> output;
+
+    // Used to construct each array in the output, e.g. [1, 2, 3].
+    vector<Value> outputChild;
+
+    output.reserve(outputLength);
+    outputChild.reserve(_inputs.size());
+
+    for (size_t row = 0; row < outputLength; row++) {
+        outputChild.clear();
+        for (size_t col = 0; col < _inputs.size(); col++) {
+            if (inputValues[col].size() > row) {
+                // Add the value from the appropriate input array.
+                outputChild.push_back(inputValues[col][row]);
+            } else {
+                // Add the corresponding default value.
+                outputChild.push_back(evaluatedDefaults[col]);
+            }
+        }
+        output.push_back(Value(outputChild));
+    }
+
+    return Value(output);
+}
+
+boost::intrusive_ptr<Expression> ExpressionZip::optimize() {
+    std::transform(_inputs.begin(),
+                   _inputs.end(),
+                   _inputs.begin(),
+                   [](intrusive_ptr<Expression> inputExpression)
+                       -> intrusive_ptr<Expression> { return inputExpression->optimize(); });
+
+    std::transform(_defaults.begin(),
+                   _defaults.end(),
+                   _defaults.begin(),
+                   [](intrusive_ptr<Expression> defaultExpression)
+                       -> intrusive_ptr<Expression> { return defaultExpression->optimize(); });
+
+    return this;
+}
+
+Value ExpressionZip::serialize(bool explain) const {
+    vector<Value> serializedInput;
+    vector<Value> serializedDefaults;
+    Value serializedUseLongestLength = Value(_useLongestLength);
+
+    for (auto&& expr : _inputs) {
+        serializedInput.push_back(expr->serialize(explain));
+    }
+
+    for (auto&& expr : _defaults) {
+        serializedDefaults.push_back(expr->serialize(explain));
+    }
+
+    return Value(DOC("$zip" << DOC("inputs" << Value(serializedInput) << "defaults"
+                                            << Value(serializedDefaults) << "useLongestLength"
+                                            << serializedUseLongestLength)));
+}
+
+void ExpressionZip::addDependencies(DepsTracker* deps, std::vector<std::string>* path) const {
+    std::for_each(_inputs.begin(),
+                  _inputs.end(),
+                  [&deps](intrusive_ptr<Expression> inputExpression)
+                      -> void { inputExpression->addDependencies(deps); });
+    std::for_each(_defaults.begin(),
+                  _defaults.end(),
+                  [&deps](intrusive_ptr<Expression> defaultExpression)
+                      -> void { defaultExpression->addDependencies(deps); });
+}
+
+const char* ExpressionZip::getOpName() const {
+    return "$zip";
+}
 }

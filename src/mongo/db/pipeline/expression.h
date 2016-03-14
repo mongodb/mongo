@@ -1313,4 +1313,21 @@ public:
         return tm.tm_year + 1900;
     }
 };
+
+
+class ExpressionZip final : public ExpressionFixedArity<ExpressionZip, 1> {
+public:
+    void addDependencies(DepsTracker* deps, std::vector<std::string>* path = nullptr) const final;
+    Value evaluateInternal(Variables* vars) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
+    static boost::intrusive_ptr<Expression> parse(BSONElement expr,
+                                                  const VariablesParseState& vpsIn);
+    Value serialize(bool explain) const final;
+    const char* getOpName() const final;
+
+private:
+    bool _useLongestLength = false;
+    ExpressionVector _inputs;
+    ExpressionVector _defaults;
+};
 }
