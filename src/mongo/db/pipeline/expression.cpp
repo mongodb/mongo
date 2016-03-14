@@ -3209,7 +3209,9 @@ int ExpressionIsoWeek::extract(const tm& tm) {
     int isoDayOfYear = tm.tm_yday + 1;
     int isoWeek = (isoDayOfYear - isoDayOfWeek + 10) / 7;
 
-    LOG(0) << tm.tm_year + 1900 << ": " << isoWeek;
+    if (tm.tm_year == 0) {
+      LOG(0) << tm.tm_year + 1900 << ": " << isoWeek;
+    }
     // There is no week 0, so it must be the last week of the previous year.
     if (isoWeek < 1) {
         return lastWeek(tm.tm_year + 1900 - 1);
