@@ -267,7 +267,7 @@ functions:
             export ${library_path}
         fi
         . ./set_gopath.sh
-        go build -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec `git rev-parse HEAD` -X github.com/mongodb/mongo-tools/common/options.VersionStr $(git describe)" ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
+        ${gorootvars} go build -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec `git rev-parse HEAD` -X github.com/mongodb/mongo-tools/common/options.VersionStr $(git describe)" ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
 
   "download mongod":
     command: shell.exec
@@ -1595,3 +1595,87 @@ buildvariants:
     integration_test_args: integration
   tasks: *ubuntu1204_race_tasks
 
+#######################################
+#     Dist only Buildvariants         #
+#######################################
+
+- name: suse11
+  display_name: SUSE 11 SSL
+  run_on:
+  - suse11-test
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    build_tags: -tags "sasl ssl"
+    arch: "linux/x86_64"
+  tasks:
+  - name: dist
+
+- name: suse12
+  display_name: SUSE 12 SSL
+  run_on:
+  - suse12-test
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    build_tags: -tags "sasl ssl"
+    arch: "linux/x86_64"
+  tasks:
+  - name: dist
+
+- name: rhel55
+  display_name: RHEL 5.5 SSL
+  run_on:
+  - rhel55
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    build_tags: -tags "sasl ssl"
+    arch: "linux/x86_64"
+  tasks:
+  - name: dist
+
+- name: rhel62
+  display_name: RHEL 6.2 SSL
+  run_on:
+  - rhel62-test
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    build_tags: -tags "sasl ssl"
+    arch: "linux/x86_64"
+  tasks:
+  - name: dist
+
+- name: rhel70
+  display_name: RHEL 7.0 SSL
+  run_on:
+  - rhel70
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    build_tags: -tags "sasl ssl"
+    arch: "linux/x86_64"
+  tasks:
+  - name: dist
+
+- name: ubuntu1404
+  display_name: Ubuntu 14.04 SSL
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    build_tags: -tags "sasl ssl"
+    arch: "linux/x86_64"
+  tasks:
+  - name: dist
+
+- name: debian71
+  display_name: Debian 7.1 SSL
+  run_on:
+  - debian71-test
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    build_tags: -tags "sasl ssl"
+    arch: "linux/x86_64"
+  tasks:
+  - name: dist
