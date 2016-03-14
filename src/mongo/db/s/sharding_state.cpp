@@ -537,7 +537,7 @@ void ShardingState::_initializeImpl(ConnectionString configSvr) {
         &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
 
     try {
-        Status status = initializeGlobalShardingState(txn.get(), configSvr, false);
+        Status status = initializeGlobalShardingState(txn.get(), configSvr);
         _signalInitializationComplete(status);
     } catch (const DBException& ex) {
         _signalInitializationComplete(ex.toStatus());

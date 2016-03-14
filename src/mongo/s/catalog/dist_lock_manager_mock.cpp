@@ -59,7 +59,7 @@ DistLockManagerMock::DistLockManagerMock()
 
 void DistLockManagerMock::startUp() {}
 
-void DistLockManagerMock::shutDown(OperationContext* txn, bool allowNetworking) {
+void DistLockManagerMock::shutDown(OperationContext* txn) {
     uassert(28659, "DistLockManagerMock shut down with outstanding locks present", _locks.empty());
 }
 

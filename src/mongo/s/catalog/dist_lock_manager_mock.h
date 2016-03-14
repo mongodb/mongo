@@ -43,7 +43,7 @@ public:
     virtual ~DistLockManagerMock() = default;
 
     virtual void startUp() override;
-    virtual void shutDown(OperationContext* txn, bool allowNetworking) override;
+    virtual void shutDown(OperationContext* txn) override;
 
     virtual std::string getProcessID() override;
 

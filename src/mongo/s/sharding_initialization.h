@@ -38,8 +38,6 @@ class Status;
  * Takes in the connection string for reaching the config servers and initializes the global
  * CatalogManager, ShardingRegistry, and grid objects.
  */
-Status initializeGlobalShardingState(OperationContext* txn,
-                                     const ConnectionString& configCS,
-                                     bool allowNetworking);
+Status initializeGlobalShardingState(OperationContext* txn, const ConnectionString& configCS);
 
 }  // namespace mongo

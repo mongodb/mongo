@@ -49,11 +49,11 @@ CatalogManagerMock::CatalogManagerMock() {
 
 CatalogManagerMock::~CatalogManagerMock() = default;
 
-Status CatalogManagerMock::startup(OperationContext* txn, bool allowNetworking) {
+Status CatalogManagerMock::startup(OperationContext* txn) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-void CatalogManagerMock::shutDown(OperationContext* txn, bool allowNetworking) {}
+void CatalogManagerMock::shutDown(OperationContext* txn) {}
 
 Status CatalogManagerMock::enableSharding(OperationContext* txn, const std::string& dbName) {
     return {ErrorCodes::InternalError, "Method not implemented"};

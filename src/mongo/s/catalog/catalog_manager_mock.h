@@ -41,9 +41,9 @@ public:
     CatalogManagerMock();
     ~CatalogManagerMock();
 
-    Status startup(OperationContext* txn, bool allowNetworking) override;
+    Status startup(OperationContext* txn) override;
 
-    void shutDown(OperationContext* txn, bool allowNetworking) override;
+    void shutDown(OperationContext* txn) override;
 
     Status enableSharding(OperationContext* txn, const std::string& dbName);
 

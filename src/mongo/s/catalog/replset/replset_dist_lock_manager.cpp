@@ -86,8 +86,7 @@ void ReplSetDistLockManager::startUp() {
     }
 }
 
-void ReplSetDistLockManager::shutDown(OperationContext* txn, bool allowNetworking) {
-    invariant(allowNetworking);
+void ReplSetDistLockManager::shutDown(OperationContext* txn) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _isShutDown = true;

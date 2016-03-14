@@ -49,11 +49,12 @@ public:
     virtual ~CatalogManagerReplicaSet();
 
     /**
-     * Safe to call multiple times as long as they
+     * Safe to call multiple times as long as the calls are externally synchronized to be
+     * non-overlapping.
      */
-    Status startup(OperationContext* txn, bool allowNetworking) override;
+    Status startup(OperationContext* txn) override;
 
-    void shutDown(OperationContext* txn, bool allowNetworking) override;
+    void shutDown(OperationContext* txn) override;
 
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,

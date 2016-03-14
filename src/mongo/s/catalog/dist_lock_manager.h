@@ -107,11 +107,10 @@ public:
     virtual void startUp() = 0;
 
     /**
-     * Cleanup the manager's resources. Pass false to allowNetworking in order to do work that
-     * involves sending network messages. Implementation do not need to guarantee thread safety
+     * Cleanup the manager's resources. Implementations do not need to guarantee thread safety
      * so callers should employ proper synchronization when calling this method.
      */
-    virtual void shutDown(OperationContext* txn, bool allowNetworking) = 0;
+    virtual void shutDown(OperationContext* txn) = 0;
 
     /**
      * Returns the process ID for this DistLockManager.

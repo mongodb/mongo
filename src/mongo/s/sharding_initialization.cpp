@@ -173,9 +173,7 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkIn
 
 }  // namespace
 
-Status initializeGlobalShardingState(OperationContext* txn,
-                                     const ConnectionString& configCS,
-                                     bool allowNetworking) {
+Status initializeGlobalShardingState(OperationContext* txn, const ConnectionString& configCS) {
     if (configCS.type() == ConnectionString::INVALID) {
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
     }
@@ -204,7 +202,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
 
     while (!inShutdown()) {
         try {
-            Status status = grid.catalogManager(txn)->startup(txn, allowNetworking);
+            Status status = grid.catalogManager(txn)->startup(txn);
             uassertStatusOK(status);
 
             if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::NONE) {

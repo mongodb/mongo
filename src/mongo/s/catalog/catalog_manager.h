@@ -97,12 +97,12 @@ public:
      * has been installed into the global 'grid' object. Implementation do not need to guarantee
      * thread safety so callers should employ proper synchronization when calling this method.
      */
-    virtual Status startup(OperationContext* txn, bool allowNetworking) = 0;
+    virtual Status startup(OperationContext* txn) = 0;
 
     /**
      * Performs necessary cleanup when shutting down cleanly.
      */
-    virtual void shutDown(OperationContext* txn, bool allowNetworking = true) = 0;
+    virtual void shutDown(OperationContext* txn) = 0;
 
     /**
      * Creates a new database or updates the sharding status for an existing one. Cannot be

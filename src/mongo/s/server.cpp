@@ -239,7 +239,7 @@ DBClientBase* createDirectClient(OperationContext* txn) {
 using namespace mongo;
 
 static Status initializeSharding(OperationContext* txn) {
-    Status status = initializeGlobalShardingState(txn, mongosGlobalParams.configdbs, true);
+    Status status = initializeGlobalShardingState(txn, mongosGlobalParams.configdbs);
     if (!status.isOK()) {
         return status;
     }
