@@ -55,6 +55,7 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
         };
 
         var st = new ShardingTest({shards: 2, mongos: 1, other: options});
+        st.configRS.awaitReplication();
 
         var version = st.s.getCollection('config.version').findOne();
 
