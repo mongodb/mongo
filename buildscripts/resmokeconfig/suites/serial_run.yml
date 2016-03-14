@@ -1,7 +1,7 @@
 selector:
   js_test:
     roots:
-    - jstests/slow2/*.js
+    - jstests/serial_run/*.js
 
 executor:
   js_test:

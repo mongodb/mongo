@@ -931,7 +931,7 @@ suiteGlobalConfig = {"js": ("core/*.js", True),
                      "gle": ("gle/*.js", True),
                      "rocksDB": ("rocksDB/*.js", True),
                      "slow1": ("slow1/*.js", True),
-                     "slow2": ("slow2/*.js", True),
+                     "serial_run": ("serial_run/*.js", True),
                      }
 
 def get_module_suites():
@@ -1006,7 +1006,7 @@ def expand_suites(suites,expandUseDB=True):
                                   'auth', 
                                   'sharding', 
                                   'slow1',
-                                  'slow2',
+                                  'serial_run',
                                   'tool'],
                                  expandUseDB=expandUseDB)
         if suite == 'dbtest' or suite == 'test':

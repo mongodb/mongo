@@ -1259,22 +1259,21 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: slow2
+  name: serial_run
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=slow2 --storageEngine=mmapv1
-      run_multiple_jobs: true
+      resmoke_args: --suites=serial_run --storageEngine=mmapv1
+      run_multiple_jobs: false
 
 - <<: *task_template
-  name: slow2_WT
+  name: serial_run_WT
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=slow2 --storageEngine=wiredTiger
-      # No parallelization of jobs due to memory constraints and WiredTiger cache size.
+      resmoke_args: --suites=serial_run --storageEngine=wiredTiger
       run_multiple_jobs: false
 
 - <<: *task_template
@@ -2282,8 +2281,8 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -2421,8 +2420,8 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -2493,7 +2492,7 @@ buildvariants:
   - name: sharding
   - name: sharding_auth
   - name: slow1
-  - name: slow2
+  - name: serial_run
   - name: sharding_jscore_passthrough
   - name: tool
   - name: unittests
@@ -2544,7 +2543,7 @@ buildvariants:
   - name: replication_WT
   - name: sharding_WT
   - name: slow1_WT
-  - name: slow2_WT
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
@@ -2645,8 +2644,8 @@ buildvariants:
   - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: ssl
@@ -2752,8 +2751,8 @@ buildvariants:
   - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: ssl
@@ -2826,8 +2825,8 @@ buildvariants:
   - name: sharding_WT_ese
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -2936,8 +2935,8 @@ buildvariants:
   - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -3096,8 +3095,8 @@ buildvariants:
   - name: sharding_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -3198,8 +3197,8 @@ buildvariants:
   - name: sharding_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -3487,8 +3486,8 @@ buildvariants:
   - name: sharding_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -3619,8 +3618,8 @@ buildvariants:
   - name: sharding_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -3714,8 +3713,8 @@ buildvariants:
   - name: sharding_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: ssl
@@ -3997,8 +3996,8 @@ buildvariants:
   - name: sharding_csrs_continuous_config_stepdown_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -4154,8 +4153,8 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_last_stable_mongos
@@ -4262,8 +4261,8 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_last_stable_mongos
@@ -4370,8 +4369,8 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_last_stable_mongos
@@ -4606,8 +4605,8 @@ buildvariants:
   - name: sharding_op_query_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -4768,8 +4767,8 @@ buildvariants:
   - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: ssl
@@ -4926,8 +4925,8 @@ buildvariants:
   - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: ssl
@@ -5008,8 +5007,8 @@ buildvariants:
   - name: sharding_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -5217,8 +5216,8 @@ buildvariants:
   - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -5329,8 +5328,8 @@ buildvariants:
   - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
@@ -5427,7 +5426,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: sharding_op_query_WT
   - name: slow1
-  - name: slow2
+  - name: serial_run
   - name: snmp
   - name: ssl
   - name: sslSpecial
@@ -5499,7 +5498,7 @@ buildvariants:
   - name: sharding_auth
   - name: sharding_op_query_WT
   - name: slow1
-  - name: slow2
+  - name: serial_run
   - name: sharded_collections_jscore_passthrough
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_wire_ops_WT
@@ -5563,7 +5562,7 @@ buildvariants:
   - name: sharding
   - name: sharding_auth
   - name: slow1
-  - name: slow2
+  - name: serial_run
   - name: sharding_jscore_passthrough
   - name: unittests
 
@@ -5685,8 +5684,8 @@ buildvariants:
   - name: sharding_op_query_WT
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -5808,8 +5807,8 @@ buildvariants:
   - name: sharding_last_stable_mongos
   - name: slow1
   - name: slow1_WT
-  - name: slow2
-  - name: slow2_WT
+  - name: serial_run
+  - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
