@@ -75,7 +75,7 @@ template <typename Handler>
 void asyncSendMessage(AsyncStreamInterface& stream, Message* m, Handler&& handler) {
     static_assert(IsNetworkHandler<Handler>::value,
                   "Handler passed to asyncSendMessage does not conform to NetworkHandler concept");
-    m->header().setResponseTo(0);
+    m->header().setResponseToMsgId(0);
     m->header().setId(nextMessageId());
     // TODO: Some day we may need to support vector messages.
     fassert(28708, m->buf() != 0);
@@ -174,7 +174,7 @@ NetworkInterfaceASIO::AsyncCommand::AsyncCommand(AsyncConnection* conn,
                                                  Date_t now,
                                                  const HostAndPort& target)
     : _conn(conn), _type(type), _toSend(std::move(command)), _start(now), _target(target) {
-    _toSend.header().setResponseTo(0);
+    _toSend.header().setResponseToMsgId(0);
 }
 
 NetworkInterfaceASIO::AsyncConnection& NetworkInterfaceASIO::AsyncCommand::conn() {
@@ -364,7 +364,7 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncOp* op, NetworkOpHandler handle
                         [this, op, recvMessageCallback, ec, bytes, cmd, handler] {
                             // validate response id
                             uint32_t expectedId = cmd->toSend().header().getId();
-                            uint32_t actualId = cmd->header().constView().getResponseTo();
+                            uint32_t actualId = cmd->header().constView().getResponseToMsgId();
                             if (actualId != expectedId) {
                                 LOG(3) << "got wrong response:"
                                        << " expected response id: " << expectedId

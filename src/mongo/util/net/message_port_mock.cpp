@@ -42,7 +42,7 @@ MessagingPortMock::~MessagingPortMock() {}
 
 void MessagingPortMock::reply(Message& received, Message& response) {}
 
-void MessagingPortMock::reply(Message& received, Message& response, MSGID responseTo) {}
+void MessagingPortMock::reply(Message& received, Message& response, int32_t responseToMsgId) {}
 
 HostAndPort MessagingPortMock::remote() const {
     return _remote;

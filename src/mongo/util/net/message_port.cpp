@@ -157,14 +157,14 @@ bool MessagingPort::recv(Message& m) {
         // If responseTo is not 0 or -1 for first packet assume SSL
         else if (psock->isAwaitingHandshake()) {
 #ifndef MONGO_CONFIG_SSL
-            if (header.constView().getResponseTo() != 0 &&
-                header.constView().getResponseTo() != -1) {
+            if (header.constView().getResponseToMsgId() != 0 &&
+                header.constView().getResponseToMsgId() != -1) {
                 uasserted(17133,
                           "SSL handshake requested, SSL feature not available in this build");
             }
 #else
-            if (header.constView().getResponseTo() != 0 &&
-                header.constView().getResponseTo() != -1) {
+            if (header.constView().getResponseToMsgId() != 0 &&
+                header.constView().getResponseToMsgId() != -1) {
                 uassert(17132,
                         "SSL handshake received but server is started without SSL support",
                         sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
@@ -215,8 +215,8 @@ void MessagingPort::reply(Message& received, Message& response) {
     say(/*received.from, */ response, received.header().getId());
 }
 
-void MessagingPort::reply(Message& received, Message& response, MSGID responseTo) {
-    say(/*received.from, */ response, responseTo);
+void MessagingPort::reply(Message& received, Message& response, int32_t responseToMsgId) {
+    say(/*received.from, */ response, responseToMsgId);
 }
 
 bool MessagingPort::call(Message& toSend, Message& response) {
@@ -231,12 +231,11 @@ bool MessagingPort::recv(const Message& toSend, Message& response) {
             mmm(log() << "recv not ok" << endl;) return false;
         }
         // log() << "got response: " << response.data->responseTo << endl;
-        if (response.header().getResponseTo() == toSend.header().getId())
+        if (response.header().getResponseToMsgId() == toSend.header().getId())
             break;
         error() << "MessagingPort::call() wrong id got:" << std::hex
-                << (unsigned)response.header().getResponseTo()
-                << " expect:" << (unsigned)toSend.header().getId() << '\n' << std::dec
-                << "  toSend op: " << (unsigned)toSend.operation() << '\n'
+                << response.header().getResponseToMsgId() << " expect:" << toSend.header().getId()
+                << '\n' << std::dec << "  toSend op: " << (unsigned)toSend.operation() << '\n'
                 << "  response msgid:" << (unsigned)response.header().getId() << '\n'
                 << "  response len:  " << (unsigned)response.header().getLen() << '\n'
                 << "  response op:  " << static_cast<int>(response.operation()) << '\n'
@@ -251,7 +250,7 @@ void MessagingPort::say(Message& toSend, int responseTo) {
     verify(!toSend.empty());
     mmm(log() << "*  say()  thr:" << GetCurrentThreadId() << endl;)
         toSend.header().setId(nextMessageId());
-    toSend.header().setResponseTo(responseTo);
+    toSend.header().setResponseToMsgId(responseTo);
     toSend.send(*this, "say");
 }
 

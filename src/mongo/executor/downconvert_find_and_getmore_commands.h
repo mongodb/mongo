@@ -56,7 +56,7 @@ StatusWith<Message> downconvertFindCommandRequest(const RemoteCommandRequest& re
  * find command response. The 'requestId' parameter is the messageId of the original OP_QUERY, and
  * the 'cursorNamespace' is the full namespace of the collection the query ran on.
  */
-StatusWith<RemoteCommandResponse> upconvertLegacyQueryResponse(std::uint32_t requestId,
+StatusWith<RemoteCommandResponse> upconvertLegacyQueryResponse(std::int32_t requestId,
                                                                StringData cursorNamespace,
                                                                const Message& response);
 
@@ -73,7 +73,7 @@ StatusWith<Message> downconvertGetMoreCommandRequest(const RemoteCommandRequest&
  * getMore command response. The 'requestId' parameter is the messageId of the original OP_GET_MORE,
  * and the 'curesorNamespace' is the full namespace of the collection the original query ran on.
  */
-StatusWith<RemoteCommandResponse> upconvertLegacyGetMoreResponse(std::uint32_t requestId,
+StatusWith<RemoteCommandResponse> upconvertLegacyGetMoreResponse(std::int32_t requestId,
                                                                  StringData cursorNamespace,
                                                                  const Message& response);
 

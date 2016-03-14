@@ -81,7 +81,7 @@ Status getStatusFromCursorResult(DBClientCursor& cursor) {
 }
 
 using RequestDownconverter = StatusWith<Message>(*)(const RemoteCommandRequest&);
-using ReplyUpconverter = StatusWith<RemoteCommandResponse>(*)(std::uint32_t requestId,
+using ReplyUpconverter = StatusWith<RemoteCommandResponse>(*)(std::int32_t requestId,
                                                               StringData cursorNamespace,
                                                               const Message& response);
 

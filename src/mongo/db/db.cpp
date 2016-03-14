@@ -178,7 +178,7 @@ public:
             }
 
             if (!dbresponse.response.empty()) {
-                port->reply(m, dbresponse.response, dbresponse.responseTo);
+                port->reply(m, dbresponse.response, dbresponse.responseToMsgId);
                 if (dbresponse.exhaustNS.size() > 0) {
                     MsgData::View header = dbresponse.response.header();
                     QueryResult::View qr = header.view2ptr();
@@ -190,7 +190,7 @@ public:
                         BufBuilder b(512);
                         b.appendNum((int)0 /*size set later in appendData()*/);
                         b.appendNum(header.getId());
-                        b.appendNum(header.getResponseTo());
+                        b.appendNum(header.getResponseToMsgId());
                         b.appendNum((int)dbGetMore);
                         b.appendNum((int)0);
                         b.appendStr(ns);

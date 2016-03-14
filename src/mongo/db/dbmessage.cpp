@@ -227,7 +227,7 @@ void replyToQuery(int queryResultFlags, Message& m, DbResponse& dbresponse, BSON
     Message resp;
     replyToQuery(queryResultFlags, resp, obj);
     dbresponse.response = std::move(resp);
-    dbresponse.responseTo = m.header().getId();
+    dbresponse.responseToMsgId = m.header().getId();
 }
 
 void replyToQuery(int queryResultFlags, Message& response, const BSONObj& resultObj) {

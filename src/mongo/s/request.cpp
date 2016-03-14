@@ -84,7 +84,7 @@ void Request::process(OperationContext* txn, int attempt) {
     int op = _m.operation();
     verify(op > dbMsg);
 
-    const MSGID msgId = _m.header().getId();
+    const int32_t msgId = _m.header().getId();
 
     LOG(3) << "Request::process begin ns: " << getnsIfPresent() << " msg id: " << msgId
            << " op: " << op << " attempt: " << attempt;

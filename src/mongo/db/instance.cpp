@@ -236,7 +236,7 @@ static void receivedCommand(OperationContext* txn,
                             Message& message) {
     invariant(nss.isCommand());
 
-    const MSGID responseTo = message.header().getId();
+    const int32_t responseToMsgId = message.header().getId();
 
     DbMessage dbMessage(message);
     QueryMessage queryMessage(dbMessage);
@@ -275,7 +275,7 @@ static void receivedCommand(OperationContext* txn,
     op->debug().responseLength = response.header().dataLen();
 
     dbResponse.response = std::move(response);
-    dbResponse.responseTo = responseTo;
+    dbResponse.responseToMsgId = responseToMsgId;
 }
 
 namespace {
@@ -283,7 +283,7 @@ namespace {
 void receivedRpc(OperationContext* txn, Client& client, DbResponse& dbResponse, Message& message) {
     invariant(message.operation() == dbCommand);
 
-    const MSGID responseTo = message.header().getId();
+    const int32_t responseToMsgId = message.header().getId();
 
     rpc::CommandReplyBuilder replyBuilder{};
 
@@ -316,7 +316,7 @@ void receivedRpc(OperationContext* txn, Client& client, DbResponse& dbResponse, 
     curOp->debug().responseLength = response.header().dataLen();
 
     dbResponse.response = std::move(response);
-    dbResponse.responseTo = responseTo;
+    dbResponse.responseToMsgId = responseToMsgId;
 }
 
 // In SERVER-7775 we reimplemented the pseudo-commands fsyncUnlock, inProg, and killOp
@@ -386,7 +386,7 @@ static void receivedQuery(OperationContext* txn,
                           Message& m) {
     invariant(!nss.isCommand());
 
-    MSGID responseTo = m.header().getId();
+    int32_t responseToMsgId = m.header().getId();
 
     DbMessage d(m);
     QueryMessage q(d);
@@ -413,7 +413,7 @@ static void receivedQuery(OperationContext* txn,
     }
 
     op.debug().responseLength = dbResponse.response.header().dataLen();
-    dbResponse.responseTo = responseTo;
+    dbResponse.responseToMsgId = responseToMsgId;
 }
 
 // Mongod on win32 defines a value for this function. In all other executables it is NULL.
@@ -547,7 +547,7 @@ void assembleResponse(OperationContext* txn,
         else
             dbresponse.response.setData(opReply, "i am fine - dbMsg deprecated");
 
-        dbresponse.responseTo = m.header().getId();
+        dbresponse.responseToMsgId = m.header().getId();
     } else {
         try {
             // The following operations all require authorization.
@@ -951,7 +951,7 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
     curop.debug().responseLength = dbresponse.response.header().dataLen();
     curop.debug().nreturned = msgdata.getNReturned();
 
-    dbresponse.responseTo = m.header().getId();
+    dbresponse.responseToMsgId = m.header().getId();
 
     if (exhaust) {
         curop.debug().exhaust = true;

@@ -61,7 +61,7 @@ public:
 
     bool isCommand() const;
 
-    MSGID id() const {
+    int32_t id() const {
         return _id;
     }
 
@@ -86,7 +86,7 @@ private:
     DbMessage _d;
     AbstractMessagingPort* const _p;
 
-    MSGID _id;
+    int32_t _id;
 
     bool _didInit;
 };

@@ -44,7 +44,7 @@ public:
     MessagingPortMock();
     virtual ~MessagingPortMock();
 
-    virtual void reply(Message& received, Message& response, MSGID responseTo);
+    virtual void reply(Message& received, Message& response, int32_t responseToMsgId);
     virtual void reply(Message& received, Message& response);
 
     virtual HostAndPort remote() const;

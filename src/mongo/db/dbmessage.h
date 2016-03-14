@@ -313,9 +313,9 @@ public:
  */
 struct DbResponse {
     Message response;
-    MSGID responseTo;
+    int32_t responseToMsgId;
     std::string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
-    DbResponse(Message r, MSGID rt) : response(std::move(r)), responseTo(rt) {}
+    DbResponse(Message r, int32_t rtId) : response(std::move(r)), responseToMsgId(rtId) {}
     DbResponse() = default;
 };
 

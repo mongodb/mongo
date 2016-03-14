@@ -287,7 +287,7 @@ void processMessage(Connection& c, Message& m) {
     AuditingDbMessage d(m);
 
     if (m.operation() == mongo::opReply)
-        out() << " - " << (unsigned)m.header().getResponseTo();
+        out() << " - " << m.header().getResponseToMsgId();
     out() << '\n';
 
     try {

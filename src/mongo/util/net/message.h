@@ -53,8 +53,6 @@ const size_t MaxMessageSizeBytes = 48 * 1000 * 1000;
 class Message;
 class MessagingPort;
 
-typedef uint32_t MSGID;
-
 enum NetworkOp : int32_t {
     opInvalid = 0,
     opReply = 1,     /* reply. responseTo is set. */
@@ -216,11 +214,11 @@ public:
         return data().read<LittleEndian<int32_t>>(offsetof(Layout, messageLength));
     }
 
-    int32_t getRequestID() const {
+    int32_t getRequestMsgId() const {
         return data().read<LittleEndian<int32_t>>(offsetof(Layout, requestID));
     }
 
-    int32_t getResponseTo() const {
+    int32_t getResponseToMsgId() const {
         return data().read<LittleEndian<int32_t>>(offsetof(Layout, responseTo));
     }
 
@@ -252,11 +250,11 @@ public:
         data().write(tagLittleEndian(value), offsetof(Layout, messageLength));
     }
 
-    void setRequestID(int32_t value) {
+    void setRequestMsgId(int32_t value) {
         data().write(tagLittleEndian(value), offsetof(Layout, requestID));
     }
 
-    void setResponseTo(int32_t value) {
+    void setResponseToMsgId(int32_t value) {
         data().write(tagLittleEndian(value), offsetof(Layout, responseTo));
     }
 
@@ -301,12 +299,12 @@ public:
         return header().getMessageLength();
     }
 
-    MSGID getId() const {
-        return header().getRequestID();
+    int32_t getId() const {
+        return header().getRequestMsgId();
     }
 
-    MSGID getResponseTo() const {
-        return header().getResponseTo();
+    int32_t getResponseToMsgId() const {
+        return header().getResponseToMsgId();
     }
 
     NetworkOp getNetworkOp() const {
@@ -326,7 +324,7 @@ public:
     }
 
     int64_t getCursor() const {
-        verify(getResponseTo() > 0);
+        verify(getResponseToMsgId() > 0);
         verify(getNetworkOp() == opReply);
         return ConstDataView(data() + sizeof(int32_t)).read<LittleEndian<int64_t>>();
     }
@@ -359,12 +357,12 @@ public:
         return header().setMessageLength(value);
     }
 
-    void setId(MSGID value) {
-        return header().setRequestID(value);
+    void setId(int32_t value) {
+        return header().setRequestMsgId(value);
     }
 
-    void setResponseTo(MSGID value) {
-        return header().setResponseTo(value);
+    void setResponseToMsgId(int32_t value) {
+        return header().setResponseToMsgId(value);
     }
 
     void setOperation(int value) {
@@ -582,7 +580,7 @@ private:
 };
 
 
-MSGID nextMessageId();
+int32_t nextMessageId();
 
 
 }  // namespace mongo

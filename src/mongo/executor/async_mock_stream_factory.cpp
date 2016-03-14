@@ -306,7 +306,7 @@ void AsyncMockStreamFactory::MockStream::simulateServer(
     replyBuilder->setMetadata(resp.metadata);
 
     auto replyMsg = replyBuilder->done();
-    replyMsg.header().setResponseTo(messageId);
+    replyMsg.header().setResponseToMsgId(messageId);
 
     {
         // The first read will be for the header.

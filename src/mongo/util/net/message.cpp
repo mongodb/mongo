@@ -51,7 +51,7 @@ void Message::send(MessagingPort& p, const char* context) {
     }
 }
 
-AtomicWord<MSGID> NextMsgId;
+AtomicWord<int32_t> NextMsgId;
 
 /*struct MsgStart {
     MsgStart() {
@@ -60,7 +60,7 @@ AtomicWord<MSGID> NextMsgId;
     }
 } msgstart;*/
 
-MSGID nextMessageId() {
+int32_t nextMessageId() {
     return NextMsgId.fetchAndAdd(1);
 }
 

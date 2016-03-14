@@ -56,7 +56,7 @@ namespace executor {
 
 namespace {
 
-StatusWith<std::tuple<CursorId, BSONArray>> getBatchFromReply(std::uint32_t requestId,
+StatusWith<std::tuple<CursorId, BSONArray>> getBatchFromReply(std::int32_t requestId,
                                                               const Message& response) {
     auto header = response.header();
     if (header.getNetworkOp() != mongo::opReply) {
@@ -65,10 +65,10 @@ StatusWith<std::tuple<CursorId, BSONArray>> getBatchFromReply(std::uint32_t requ
                               << mongo::networkOpToString(header.getNetworkOp())};
     }
 
-    if (header.getResponseTo() != requestId) {
+    if (header.getResponseToMsgId() != requestId) {
         return {ErrorCodes::ProtocolError,
                 str::stream() << "responseTo field of OP_REPLY header with value '"
-                              << header.getResponseTo() << "' does not match requestId '"
+                              << header.getResponseToMsgId() << "' does not match requestId '"
                               << requestId << "'"};
     }
 
@@ -204,7 +204,7 @@ StatusWith<Message> downconvertFindCommandRequest(const RemoteCommandRequest& re
     return {std::move(message)};
 }
 
-StatusWith<RemoteCommandResponse> upconvertLegacyQueryResponse(std::uint32_t requestId,
+StatusWith<RemoteCommandResponse> upconvertLegacyQueryResponse(std::int32_t requestId,
                                                                StringData cursorNamespace,
                                                                const Message& response) {
     auto swBatch = getBatchFromReply(requestId, response);
@@ -248,7 +248,7 @@ StatusWith<Message> downconvertGetMoreCommandRequest(const RemoteCommandRequest&
     return {std::move(m)};
 }
 
-StatusWith<RemoteCommandResponse> upconvertLegacyGetMoreResponse(std::uint32_t requestId,
+StatusWith<RemoteCommandResponse> upconvertLegacyGetMoreResponse(std::int32_t requestId,
                                                                  StringData cursorNamespace,
                                                                  const Message& response) {
     auto swBatch = getBatchFromReply(requestId, response);

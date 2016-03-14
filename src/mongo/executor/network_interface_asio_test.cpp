@@ -436,7 +436,7 @@ public:
         replyBuilder->setMetadata(BSONObj());
 
         auto message = replyBuilder->done();
-        message.header().setResponseTo(messageId);
+        message.header().setResponseToMsgId(messageId);
 
         auto actualSize = message.header().getLen();
 
@@ -465,10 +465,11 @@ public:
 };
 
 TEST_F(MalformedMessageTest, messageHeaderWrongResponseTo) {
-    runMessageTest(
-        ErrorCodes::ProtocolError,
-        false,
-        [](MsgData::View message) { message.setResponseTo(message.getResponseTo() + 1); });
+    runMessageTest(ErrorCodes::ProtocolError,
+                   false,
+                   [](MsgData::View message) {
+                       message.setResponseToMsgId(message.getResponseToMsgId() + 1);
+                   });
 }
 
 TEST_F(MalformedMessageTest, messageHeaderlenZero) {
