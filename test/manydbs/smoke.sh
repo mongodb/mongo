@@ -2,10 +2,6 @@
 
 set -e
 
-# XXX Disable more complex tests, and bump the CPU usage check up to 100 for
-#     now, since running under valgrind consumes a lot more CPU. A different
-#     measuring mechanism would be ideal.
-
 # Smoke-test format as part of running "make check".
 # Run with:
 # 1.  The defaults
