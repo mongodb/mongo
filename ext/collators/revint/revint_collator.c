@@ -53,6 +53,7 @@ revint_compare(WT_COLLATOR *collator,
 {
 	const REVINT_COLLATOR *revint_collator;
 	WT_EXTENSION_API *wtapi;
+	WT_PACK_STREAM *pstream;
 	int ret;
 	int64_t i1, i2, p1, p2;
 
@@ -78,22 +79,26 @@ revint_compare(WT_COLLATOR *collator,
 	 * To keep this code simple, we do not reverse the ordering
 	 * when comparing primary keys.
 	 */
-	if ((ret = wtapi->struct_unpack(wtapi, session,
-	    k1->data, k1->size, "ii", &i1, &p1)) != 0) {
-		/* could be missing primary key, try again without */
-		if ((ret = wtapi->struct_unpack(wtapi, session,
-		    k1->data, k1->size, "i", &i1)) != 0)
-			return (ret);
-		p1 = INT64_MIN;	/* sort this first */
-	}
-	if ((ret = wtapi->struct_unpack(wtapi, session,
-	    k2->data, k2->size, "ii", &i2, &p2)) != 0) {
-		/* could be missing primary key, try again without */
-		if ((ret = wtapi->struct_unpack(wtapi, session,
-		    k2->data, k2->size, "i", &i2)) != 0)
-			return (ret);
-		p2 = INT64_MIN;	/* sort this first */
-	}
+	if ((ret = wtapi->unpack_start(
+	    wtapi, session, "ii", k1->data, k1->size, &pstream)) != 0 ||
+	    (ret = wtapi->unpack_int(wtapi, pstream, &i1)) != 0)
+		goto err;
+	if ((ret = wtapi->unpack_int(wtapi, pstream, &p1)) != 0)
+		/* A missing primary key is OK and sorts first. */
+		p1 = INT64_MIN;
+	if ((ret = wtapi->pack_close(wtapi, pstream, NULL)) != 0)
+		goto err;
+
+	/* Unpack the second pair of numbers. */
+	if ((ret = wtapi->unpack_start(
+	    wtapi, session, "ii", k2->data, k2->size, &pstream)) != 0 ||
+	    (ret = wtapi->unpack_int(wtapi, pstream, &i2)) != 0)
+		goto err;
+	if ((ret = wtapi->unpack_int(wtapi, pstream, &p2)) != 0)
+		/* A missing primary key is OK and sorts first. */
+		p2 = INT64_MIN;
+	if ((ret = wtapi->pack_close(wtapi, pstream, NULL)) != 0)
+		goto err;
 
 	/* sorting is reversed */
 	if (i1 < i2)
@@ -108,7 +113,7 @@ revint_compare(WT_COLLATOR *collator,
 	else
 		*cmp = 0; /* index key and primary key are same */
 
-	return (0);
+err:	return (ret);
 }
 
 /*
