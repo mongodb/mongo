@@ -337,7 +337,7 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 static inline void
 extract_key(char *key_buf, uint64_t *keynop)
 {
-	sscanf(key_buf, "%" SCNu64, keynop);
+	(void)sscanf(key_buf, "%" SCNu64, keynop);
 }
 
 /*
