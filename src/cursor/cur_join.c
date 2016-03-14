@@ -26,13 +26,13 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 	const char *def_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), NULL };
-	const char *urifull, **config;
-	char *fullbuf, *urimin;
+	const char *urimain, **config;
+	char *mainbuf, *urimin;
 	WT_CURSOR_JOIN_ITER *iter;
 	size_t size;
 
 	iter = NULL;
-	fullbuf = urimin = NULL;
+	mainbuf = urimin = NULL;
 	to_dup = entry->ends[0].cursor;
 
 	if (F_ISSET((WT_CURSOR *)cjoin, WT_CURSTD_RAW))
@@ -40,23 +40,23 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	else
 		config = &def_cfg[0];
 
-	urifull = to_dup->uri;
-	size = strlen(urifull) + 3;
+	urimain = cjoin->table->name;
+	size = strlen(to_dup->uri) + 3;
 	WT_ERR(__wt_calloc(session, size, 1, &urimin));
-	snprintf(urimin, size, "%s()", urifull);
+	snprintf(urimin, size, "%s()", to_dup->uri);
 	if (cjoin->projection != NULL) {
-		size = strlen(urifull) + strlen(cjoin->projection) + 1;
-		WT_ERR(__wt_calloc(session, size, 1, &fullbuf));
-		snprintf(fullbuf, size, "%s%s", urifull, cjoin->projection);
-		urifull = fullbuf;
+		size = strlen(urimain) + strlen(cjoin->projection) + 1;
+		WT_ERR(__wt_calloc(session, size, 1, &mainbuf));
+		snprintf(mainbuf, size, "%s%s", urimain, cjoin->projection);
+		urimain = mainbuf;
 	}
 
 	WT_ERR(__wt_calloc_one(session, &iter));
 	WT_ERR(__wt_open_cursor(session, urimin, (WT_CURSOR *)cjoin, config,
 	    &iter->cursor));
 	WT_ERR(__wt_cursor_dup_position(to_dup, iter->cursor));
-	WT_ERR(__wt_open_cursor(session, urifull, (WT_CURSOR *)cjoin, config,
-	    &iter->full));
+	WT_ERR(__wt_open_cursor(session, urimain, (WT_CURSOR *)cjoin, config,
+	    &iter->main));
 	iter->cjoin = cjoin;
 	iter->session = session;
 	iter->entry = entry;
@@ -68,7 +68,7 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	if (0) {
 err:		__wt_free(session, iter);
 	}
-	__wt_free(session, fullbuf);
+	__wt_free(session, mainbuf);
 	__wt_free(session, urimin);
 	return (ret);
 }
@@ -181,7 +181,7 @@ __curjoin_entry_iter_reset(WT_CURSOR_JOIN_ITER *iter)
 {
 	if (iter->positioned) {
 		WT_RET(iter->cursor->reset(iter->cursor));
-		WT_RET(iter->full->reset(iter->full));
+		WT_RET(iter->main->reset(iter->main));
 		WT_RET(__wt_cursor_dup_position(
 		    iter->cjoin->entries[0].ends[0].cursor, iter->cursor));
 		iter->positioned = false;
@@ -213,8 +213,8 @@ __curjoin_entry_iter_close(WT_CURSOR_JOIN_ITER *iter)
 
 	if (iter->cursor != NULL)
 		WT_TRET(iter->cursor->close(iter->cursor));
-	if (iter->full != NULL)
-		WT_TRET(iter->full->close(iter->full));
+	if (iter->main != NULL)
+		WT_TRET(iter->main->close(iter->main));
 	__wt_free(iter->session, iter);
 
 	return (ret);
@@ -271,10 +271,7 @@ __curjoin_get_value(WT_CURSOR *cursor, ...)
 		WT_ERR_MSG(session, EINVAL,
 		    "join cursor must be advanced with next()");
 
-	if (iter->entry->index != NULL)
-		WT_ERR(__wt_curindex_get_valuev(iter->full, ap));
-	else
-		WT_ERR(__wt_curtable_get_valuev(iter->full, ap));
+	WT_ERR(__wt_curtable_get_valuev(iter->main, ap));
 
 err:	va_end(ap);
 	API_END_RET(session, ret);
@@ -736,7 +733,9 @@ err:		if (ret == WT_NOTFOUND && bloom_found)
 static int
 __curjoin_next(WT_CURSOR *cursor)
 {
+	WT_CURSOR *c;
 	WT_CURSOR_JOIN *cjoin;
+	WT_CURSOR_JOIN_ITER *iter;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	bool skip_left;
@@ -753,9 +752,10 @@ __curjoin_next(WT_CURSOR *cursor)
 		WT_ERR(__curjoin_init_iter(session, cjoin));
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	iter = cjoin->iter;
 
 nextkey:
-	if ((ret = __curjoin_entry_iter_next(cjoin->iter, cursor)) == 0) {
+	if ((ret = __curjoin_entry_iter_next(iter, cursor)) == 0) {
 		F_SET(cursor, WT_CURSTD_KEY_EXT);
 
 		/*
@@ -772,7 +772,7 @@ nextkey:
 				 * If this is compare=eq on our outer iterator,
 				 * and we've moved past it, we're done.
 				 */
-				if (cjoin->iter->isequal && i == 0)
+				if (iter->isequal && i == 0)
 					break;
 				goto nextkey;
 			}
@@ -783,8 +783,14 @@ nextkey:
 		WT_ERR(ret);
 
 	if (ret == 0) {
-		WT_ERR(__wt_cursor_dup_position(cjoin->iter->cursor,
-		    cjoin->iter->full));
+		/*
+		 * Position the 'main' cursor, this will be used to
+		 * retrieve values from the cursor join.
+		 */
+		c = iter->main;
+		c->set_key(c, iter->curkey);
+		if ((ret = c->search(c)) != 0)
+			WT_ERR(c->search(c));
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	}
 
