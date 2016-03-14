@@ -69,7 +69,9 @@
     var SATURDAY = 6;
     var SUNDAY = 7;
 
-    function padded(val) { return ("00" + val).slice(-2) }
+    function padded(val) {
+        return ("00" + val).slice(-2);
+    }
     function getNewYear(year) {
         return new Date("" + year + "-01-01T00:00:00Z");
     }
