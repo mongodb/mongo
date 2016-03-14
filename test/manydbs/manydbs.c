@@ -86,13 +86,13 @@ WT_RAND_STATE rnd;
 WT_SESSION **session = NULL;
 
 static int
-get_stat(WT_SESSION *session, int stat_field, uint64_t *valuep)
+get_stat(WT_SESSION *stat_session, int stat_field, uint64_t *valuep)
 {
 	WT_CURSOR *statc;
 	const char *desc, *pvalue;
 	int ret;
 
-	testutil_check(session->open_cursor(session,
+	testutil_check(stat_session->open_cursor(stat_session,
 	    "statistics:", NULL, NULL, &statc));
 	statc->set_key(statc, stat_field);
 	if ((ret = statc->search(statc)) != 0)
