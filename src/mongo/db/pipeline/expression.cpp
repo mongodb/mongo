@@ -26,8 +26,6 @@
  * it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-#include "mongo/util/log.h"
 
 #include "mongo/platform/basic.h"
 
@@ -3155,6 +3153,10 @@ int ExpressionIsoWeek::lastWeek(int year) {
     tm.tm_hour = 23;
     tm.tm_min = 59;
     tm.tm_sec = 59;
+    tm.tm_wday = -1; // this was enough to solve the bug for 1900
+    tm.tm_yday = -1;
+    tm.tm_gmtoff = 0;
+    tm.tm_isdst = 0;
     mktime(&tm);
 
     // From: https://en.wikipedia.org/wiki/ISO_week_date#Last_week :
@@ -3209,9 +3211,6 @@ int ExpressionIsoWeek::extract(const tm& tm) {
     int isoDayOfYear = tm.tm_yday + 1;
     int isoWeek = (isoDayOfYear - isoDayOfWeek + 10) / 7;
 
-    if (tm.tm_year == 0) {
-      LOG(0) << tm.tm_year + 1900 << ": " << isoWeek;
-    }
     // There is no week 0, so it must be the last week of the previous year.
     if (isoWeek < 1) {
         return lastWeek(tm.tm_year + 1900 - 1);
