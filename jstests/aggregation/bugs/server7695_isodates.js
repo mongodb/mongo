@@ -22,10 +22,10 @@
             msg);
     }
 
-    // while development there was a bug which caused an error with $dateToString if the order of
-    // %V and %G changed, so I added this test to prevent regression
+    // While development, there was a bug which caused an error with $dateToString if the order of
+    // %V and %G changed, so I added this test to prevent regression.
     testOp('$dateToString', { date: new Date("1900-12-31T23:59:59Z"), format: "%V-%G"}, "01-1901")
-    // this is failing, but it shouldn't as it is the same as above, only rotated
+    // This was failing, but it shouldn't as it is the same as above, only rotated.
     testOp('$dateToString', { date: new Date("1900-12-31T23:59:59Z"), format: "%G-%V"}, "1901-01")
 
 
@@ -33,31 +33,31 @@
     // 2000 is special, because it's devisible by 4, 100, 400 and so it is a leap year.
     var years = {
         common: [
-            1900, // starting and ending on Monday (special)
-            2002, // starting and ending on Tuesday
-            2014, // starting and ending on Wednesday
-            2015, // starting and ending on Thursday
-            2010, // starting and ending on Friday
-            2011, // starting and ending on Saturday
-            2006, // starting and ending on Sunday
+            1900, // Starting and ending on Monday (special).
+            2002, // Starting and ending on Tuesday.
+            2014, // Starting and ending on Wednesday.
+            2015, // Starting and ending on Thursday.
+            2010, // Starting and ending on Friday.
+            2011, // Starting and ending on Saturday.
+            2006, // Starting and ending on Sunday.
         ],
         leap: [
-            1996, // starting on Monday, ending on Tuesday
-            2008, // starting on Tuesday, ending on Wednesday
-            1992, // starting on Wednesday, ending on Thursday
-            2004, // starting on Thursday, ending on Friday
-            2016, // starting on Friday, ending on Saturday
-            2000, // starting on Saturday, ending on Sunday (special)
-            2012, // starting on Sunday, ending on Monday
+            1996, // Starting on Monday, ending on Tuesday.
+            2008, // Starting on Tuesday, ending on Wednesday.
+            1992, // Starting on Wednesday, ending on Thursday.
+            2004, // Starting on Thursday, ending on Friday.
+            2016, // Starting on Friday, ending on Saturday.
+            2000, // Starting on Saturday, ending on Sunday (special).
+            2012, // Starting on Sunday, ending on Monday.
         ],
         commonAfterLeap: [
-            2001, // starting and ending on Monday
-            2013, // starting and ending on Tuesday
-            1997, // starting and ending on Wednesday
-            2009, // starting and ending on Thursday
-            1993, // starting and ending on Friday
-            2005, // starting and ending on Saturday
-            2017, // starting and ending on Sunday
+            2001, // Starting and ending on Monday.
+            2013, // Starting and ending on Tuesday.
+            1997, // Starting and ending on Wednesday.
+            2009, // Starting and ending on Thursday.
+            1993, // Starting and ending on Friday.
+            2005, // Starting and ending on Saturday.
+            2017, // Starting and ending on Sunday.
         ]
     }
 
@@ -132,8 +132,8 @@
             }
 
             testOp('$isoWeekYear', birthday, year);
-            // in leap years staring on Thursday, the birthday is in week 28, every year else it is
-            // in week 27
+            // In leap years staring on Thursday, the birthday is in week 28, every year else it is
+            // in week 27.
             if (type === 'leap' && day === THURSDAY) {
                 testOp('$isoWeek', birthday, 28)
             } else {
@@ -251,7 +251,7 @@
                            "" + (year) +"-W53-"+day);
                 } else {
                     // A common year starting on between Friday and Sunday will always end with week
-                    // 52
+                    // 52.
                     testOp('$isoWeek', newYearsEve, 52);
                     testOp('$isoWeekYear', newYearsEve, year);
                     testOp('$isoWeek', endOfSecondToLastWeekInYear, 51);

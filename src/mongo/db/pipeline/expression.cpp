@@ -3145,7 +3145,7 @@ Value ExpressionIsoWeek::evaluateInternal(Variables* vars) const {
 }
 
 int ExpressionIsoWeek::lastWeek(int year) {
-    // create YYYY-12-31T23:59:59 so only 1 second left to new year
+    // Create YYYY-12-31T23:59:59 so only 1 second left to new year.
     struct tm tm;
     tm.tm_year = year - 1900;
     tm.tm_mon = 11;
