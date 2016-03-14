@@ -620,18 +620,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
                 mdata.retryNext = false;
                 mdata.initialized = true;
             } else {
-                bool success = false;
-
-                if (nsGetCollection(ns) == "$cmd") {
-                    /* TODO: remove this when config servers don't use
-                     * SyncClusterConnection anymore. This is needed
-                     * because SyncConn doesn't allow the call() method
-                     * to be used for commands.
-                     */
-                    success = state->cursor->initCommand();
-                } else {
-                    success = state->cursor->init();
-                }
+                bool success = state->cursor->init();
 
                 // Without full initialization, throw an exception
                 uassert(15987,

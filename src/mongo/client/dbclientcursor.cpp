@@ -179,16 +179,6 @@ bool DBClientCursor::initLazyFinish(bool& retry) {
     return !retry;
 }
 
-bool DBClientCursor::initCommand() {
-    BSONObj res;
-
-    bool ok = _client->runCommand(nsGetDB(ns), query, res, opts);
-    replyToQuery(0, batch.m, res);
-    dataReceived();
-
-    return ok;
-}
-
 void DBClientCursor::requestMore() {
     verify(cursorId && batch.pos == batch.nReturned);
 
