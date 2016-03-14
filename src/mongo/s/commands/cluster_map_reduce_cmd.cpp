@@ -190,8 +190,7 @@ public:
         const string fullns = dbname + "." + collection;
         const string shardResultCollection = getTmpName(collection);
 
-        BSONObj customOut;
-        string finalColShort;
+        bool shardedOutput = false;
         string finalColLong;
         bool customOutDB = false;
 
@@ -200,17 +199,26 @@ public:
         BSONElement outElmt = cmdObj.getField("out");
         if (outElmt.type() == Object) {
             // Check if there is a custom output
-            BSONObj out = outElmt.embeddedObject();
-            customOut = out;
+            BSONObj customOut = outElmt.embeddedObject();
+            shardedOutput = customOut.getBoolField("sharded");
 
-            // Mode must be 1st element
-            finalColShort = out.firstElement().str();
-            if (customOut.hasField("db")) {
-                customOutDB = true;
-                outDB = customOut.getField("db").str();
+            if (customOut.hasField("inline")) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "cannot specify inline and sharded output at the same time",
+                        !shardedOutput);
+                uassert(ErrorCodes::InvalidOptions,
+                        "cannot specify inline and output database at the same time",
+                        !customOut.hasField("db"));
+            } else {
+                // Mode must be 1st element
+                const string finalColShort = customOut.firstElement().str();
+                if (customOut.hasField("db")) {
+                    customOutDB = true;
+                    outDB = customOut.getField("db").str();
+                }
+
+                finalColLong = outDB + "." + finalColShort;
             }
-
-            finalColLong = outDB + "." + finalColShort;
         }
 
         // Ensure the input database exists
@@ -231,7 +239,6 @@ public:
 
         const bool shardedInput =
             confIn && confIn->isShardingEnabled() && confIn->isSharded(fullns);
-        const bool shardedOutput = customOut.getBoolField("sharded");
 
         if (!shardedOutput) {
             uassert(15920,
@@ -253,11 +260,6 @@ public:
 
             // maxChunkSizeBytes is sent as int BSON field
             invariant(maxChunkSizeBytes < std::numeric_limits<int>::max());
-        }
-
-        if (customOut.hasField("inline") && shardedOutput) {
-            errmsg = "cannot specify inline and sharded output at the same time";
-            return false;
         }
 
         // modify command to run on shards with output to tmp collection

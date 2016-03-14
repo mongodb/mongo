@@ -99,6 +99,7 @@ SetShardVersionRequest SetShardVersionRequest::makeForVersioning(
     const NamespaceString& nss,
     const ChunkVersion& nssVersion,
     bool isAuthoritative) {
+    invariant(nss.isValid());
     return SetShardVersionRequest(
         configServer, shardName, shardConnectionString, nss, nssVersion, isAuthoritative);
 }

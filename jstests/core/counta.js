@@ -1,9 +1,11 @@
 // Check that count returns 0 in some exception cases.
+(function() {
+'use strict';
 
-t = db.jstests_counta;
+var t = db.jstests_counta;
 t.drop();
 
-for (i = 0; i < 10; ++i) {
+for (var i = 0; i < 10; ++i) {
     t.save({a: i});
 }
 
@@ -21,6 +23,7 @@ assert.throws(function() {
 });
 
 // count must return error if collection name is absent
-res = db.runCommand("count");
-assert.eq(res.ok, 0);  // must not be OK
-assert(res.code == 2);  // should fail with errorcode("BadValue"), not an massert
+var res = assert.commandFailed(db.runCommand("count"));
+assert.eq(ErrorCodes.InvalidNamespace, res.code);
+
+})();
