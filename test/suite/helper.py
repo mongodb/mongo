@@ -107,7 +107,10 @@ def copy_wiredtiger_home(olddir, newdir, aligned=True):
     for fname in os.listdir(olddir):
         fullname = os.path.join(olddir, fname)
         # Skip lock file, on Windows it is locked.
-        if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
+        # Skip temporary log files.
+        if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname and \
+            "WiredTigerTmplog" not in fullname and \
+            "WiredTigerPreplog" not in fullname:
             # Use a dd command that does not align on a block boundary.
             if aligned:
                 shutil.copy(fullname, newdir)

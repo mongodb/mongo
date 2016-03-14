@@ -390,7 +390,7 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 	 * file.
 	 */
 	if (WT_PREFIX_MATCH(uri, "table:")) {
-		len = strlen(uri) + strlen("colgroup:");
+		len = strlen("colgroup:") + strlen(name) + 1;
 		if ((p = malloc(len)) == NULL)
 			return (util_err(session, errno, NULL));
 		(void)snprintf(p, len, "colgroup:%s", name);
@@ -495,7 +495,7 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 	 */
 	complex_table = false;
 	if (WT_PREFIX_MATCH(uri, "table:")) {
-		len = strlen(uri) + strlen("colgroup:");
+		len = strlen("colgroup:") + strlen(name) + 1;
 		if ((p = malloc(len)) == NULL)
 			return (util_err(session, errno, NULL));
 		(void)snprintf(p, len, "colgroup:%s", name);
