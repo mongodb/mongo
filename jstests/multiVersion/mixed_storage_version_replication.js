@@ -157,7 +157,7 @@ var RandomOps = {
         }
         var result =
             conn.getDB(db)[coll].insert(doc, {writeConcern: {w: writeConcern}, journal: journal});
-        assert.eq(result.ok, 1);
+        assert.writeOK(result);
         if (this.verbose) {
             print("done.");
         }
