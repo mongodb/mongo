@@ -22,7 +22,8 @@
             msg);
     }
 
-    // this works
+    // while development there was a bug which caused an error with $dateToString if the order of
+    // %V and %G changed, so I added this test to prevent regression
     testOp('$dateToString', { date: new Date("1900-12-31T23:59:59Z"), format: "%V-%G"}, "01-1901")
     // this is failing, but it shouldn't as it is the same as above, only rotated
     testOp('$dateToString', { date: new Date("1900-12-31T23:59:59Z"), format: "%G-%V"}, "1901-01")
@@ -264,5 +265,5 @@
             }
         });
     });
-    //assert.eq(testOpCount, 462, 'Expected 462 tests to run');
+    assert.eq(testOpCount, 485, 'Expected 485 tests to run');
 })()
