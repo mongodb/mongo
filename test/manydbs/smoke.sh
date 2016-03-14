@@ -13,7 +13,7 @@ set -e
 # 3.  More dbs.
 # 
 echo "manydbs: default with operations turned on"
-$TEST_WRAPPER ./t -C 100
+$TEST_WRAPPER ./t
 #echo "manydbs: totally idle databases"
 #$TEST_WRAPPER ./t -I
 #echo "manydbs: 40 databases with operations"
