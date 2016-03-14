@@ -1149,7 +1149,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 * parent frees the backing blocks for any no-longer-used overflow keys,
 	 * which will corrupt the checkpoint's block management.
 	 */
-	if (btree->checkpointing &&
+	if (btree->checkpointing != WT_CKPT_OFF &&
 	    F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
 		return (false);
 
@@ -1294,19 +1294,19 @@ __wt_page_swap_func(
 	bool acquired;
 
 	/*
-	 * In rare cases when walking the tree, we try to swap to the same
-	 * page.  Fast-path that to avoid thinking about error handling.
-	 */
-	if (held == want)
-		return (0);
-
-	/*
 	 * This function is here to simplify the error handling during hazard
 	 * pointer coupling so we never leave a hazard pointer dangling.  The
 	 * assumption is we're holding a hazard pointer on "held", and want to
 	 * acquire a hazard pointer on "want", releasing the hazard pointer on
 	 * "held" when we're done.
+	 *
+	 * When walking the tree, we sometimes swap to the same page. Fast-path
+	 * that to avoid thinking about error handling.
 	 */
+	if (held == want)
+		return (0);
+
+	/* Get the wanted page. */
 	ret = __wt_page_in_func(session, want, flags
 #ifdef HAVE_DIAGNOSTIC
 	    , file, line
@@ -1446,14 +1446,18 @@ __wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 }
 
 /*
- * __wt_split_intl_race --
+ * __wt_split_descent_race --
  *	Return if we raced with an internal page split when descending the tree.
  */
 static inline bool
-__wt_split_intl_race(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE_INDEX *saved_pindex)
+__wt_split_descent_race(
+    WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX *saved_pindex)
 {
 	WT_PAGE_INDEX *pindex;
+
+	/* No test when starting the descent (there's no home to check). */
+	if (__wt_ref_is_root(ref))
+		return (false);
 
 	/*
 	 * A place to hang this comment...
@@ -1509,6 +1513,6 @@ __wt_split_intl_race(
 	 * content the split page retains after the split, and we ignore this
 	 * race.
 	 */
-	WT_INTL_INDEX_GET(session, parent, pindex);
+	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	return (pindex != saved_pindex);
 }

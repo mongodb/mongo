@@ -51,15 +51,21 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         uri = self.type
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri, None, self.config)
-        self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: cursor.compare(cursor))
-        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
-        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.prev())
-        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())
-        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.search())
-        self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: cursor.search_near())
-        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.update())
+        msg = "/Unsupported cursor/"
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cursor.compare(cursor), msg)
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cursor.insert(), msg)
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cursor.prev(), msg)
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cursor.remove(), msg)
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cursor.search(), msg)
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cursor.search_near(), msg)
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cursor.update(), msg)
 
         self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
         self.assertEquals(cursor.reconfigure(), 0)
@@ -137,7 +143,7 @@ class test_cursor_random_column(wttest.WiredTigerTestCase):
 
     def test_cursor_random_column(self):
         self.session.create(self.uri, 'key_format=r,value_format=S')
-        msg = '/Operation not supported/'
+        msg = '/next_random .* not supported/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
             self.session.open_cursor(self.uri, None, "next_random=true"), msg)
 

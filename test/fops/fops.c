@@ -109,7 +109,7 @@ fop(void *arg)
 	__wt_random_init(&rnd);
 
 	for (i = 0; i < nops; ++i, __wt_yield())
-		switch (__wt_random(&rnd) % 9) {
+		switch (__wt_random(&rnd) % 10) {
 		case 0:
 			++s->bulk;
 			obj_bulk();

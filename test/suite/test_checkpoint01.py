@@ -265,9 +265,13 @@ class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
         cursor.set_key(key_populate(cursor, 10))
         cursor.set_value("XXX")
-        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
-        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())
-        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.update())
+        msg = "/Unsupported cursor/"
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: cursor.insert(), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: cursor.remove(), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: cursor.update(), msg)
         cursor.close()
 
 

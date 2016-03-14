@@ -8,6 +8,9 @@
 
 #include "wt_internal.h"
 
+static int __curjoin_insert_endpoint(WT_SESSION_IMPL *,
+    WT_CURSOR_JOIN_ENTRY *, u_int, WT_CURSOR_JOIN_ENDPOINT **);
+
 /*
  * __curjoin_entry_iter_init --
  *	Initialize an iteration for the index managed by a join entry.
@@ -53,7 +56,9 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	iter->session = session;
 	iter->entry = entry;
 	iter->cursor = newcur;
-	iter->advance = false;
+	iter->positioned = false;
+	iter->isequal = (entry->ends_next == 1 &&
+	    WT_CURJOIN_END_RANGE(&entry->ends[0]) == WT_CURJOIN_END_EQ);
 	*iterp = iter;
 
 	if (0) {
@@ -72,18 +77,16 @@ static int
 __curjoin_pack_recno(WT_SESSION_IMPL *session, uint64_t r, uint8_t *buf,
     size_t bufsize, WT_ITEM *item)
 {
-	WT_DECL_RET;
 	WT_SESSION *wtsession;
 	size_t sz;
 
 	wtsession = (WT_SESSION *)session;
-	WT_ERR(wiredtiger_struct_size(wtsession, &sz, "r", r));
+	WT_RET(wiredtiger_struct_size(wtsession, &sz, "r", r));
 	WT_ASSERT(session, sz < bufsize);
-	WT_ERR(wiredtiger_struct_pack(wtsession, buf, bufsize, "r", r));
+	WT_RET(wiredtiger_struct_pack(wtsession, buf, bufsize, "r", r));
 	item->size = sz;
 	item->data = buf;
-
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -97,14 +100,13 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 {
 	WT_CURSOR *firstcg_cur;
 	WT_CURSOR_JOIN *cjoin;
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	uint64_t r;
 
-	if (iter->advance)
-		WT_ERR(iter->cursor->next(iter->cursor));
+	if (iter->positioned)
+		WT_RET(iter->cursor->next(iter->cursor));
 	else
-		iter->advance = true;
+		iter->positioned = true;
 
 	session = iter->session;
 	cjoin = iter->cjoin;
@@ -119,7 +121,7 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 		firstcg_cur = ((WT_CURSOR_TABLE *)iter->cursor)->cg_cursors[0];
 	if (WT_CURSOR_RECNO(&cjoin->iface)) {
 		r = *(uint64_t *)firstcg_cur->key.data;
-		WT_ERR(__curjoin_pack_recno(session, r, cjoin->recno_buf,
+		WT_RET(__curjoin_pack_recno(session, r, cjoin->recno_buf,
 		    sizeof(cjoin->recno_buf), primkey));
 		*rp = r;
 	} else {
@@ -129,8 +131,7 @@ __curjoin_entry_iter_next(WT_CURSOR_JOIN_ITER *iter, WT_ITEM *primkey,
 	iter->curkey = primkey;
 	iter->entry->stats.actual_count++;
 	iter->entry->stats.accesses++;
-
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -141,17 +142,14 @@ err:	return (ret);
 static int
 __curjoin_entry_iter_reset(WT_CURSOR_JOIN_ITER *iter)
 {
-	WT_DECL_RET;
-
-	if (iter->advance) {
-		WT_ERR(iter->cursor->reset(iter->cursor));
-		WT_ERR(__wt_cursor_dup_position(
+	if (iter->positioned) {
+		WT_RET(iter->cursor->reset(iter->cursor));
+		WT_RET(__wt_cursor_dup_position(
 		    iter->cjoin->entries[0].ends[0].cursor, iter->cursor));
-		iter->advance = false;
+		iter->positioned = false;
 		iter->entry->stats.actual_count = 0;
 	}
-
-err:	return (ret);
+	return (0);
 }
 
 /*
@@ -162,7 +160,7 @@ err:	return (ret);
 static bool
 __curjoin_entry_iter_ready(WT_CURSOR_JOIN_ITER *iter)
 {
-	return (iter->advance);
+	return (iter->positioned);
 }
 
 /*
@@ -255,18 +253,16 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_CURSOR_JOIN_ENDPOINT *end, *endmax;
 	WT_DECL_RET;
 	WT_DECL_ITEM(uribuf);
-	WT_ITEM curkey, curvalue, *k;
+	WT_ITEM curkey, curvalue;
 	WT_TABLE *maintable;
 	const char *raw_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 	const char *mainkey_str, *p;
-	void *allocbuf;
 	size_t mainkey_len, size;
 	u_int i;
 	int cmp, skip;
 
 	c = NULL;
-	allocbuf = NULL;
 	skip = 0;
 
 	if (entry->index != NULL) {
@@ -302,29 +298,32 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 
 	/* Initially position the cursor if necessary. */
 	endmax = &entry->ends[entry->ends_next];
-	if ((end = &entry->ends[0]) < endmax &&
-	    F_ISSET(end, WT_CURJOIN_END_GE)) {
-		WT_ERR(__wt_cursor_dup_position(end->cursor, c));
-		if (end->flags == WT_CURJOIN_END_GE)
-			skip = 1;
+	if ((end = &entry->ends[0]) < endmax) {
+		if (F_ISSET(end, WT_CURJOIN_END_GT) ||
+		    WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_EQ) {
+			WT_ERR(__wt_cursor_dup_position(end->cursor, c));
+			if (WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_GE)
+				skip = 1;
+		} else if (F_ISSET(end, WT_CURJOIN_END_LT)) {
+			if ((ret = c->next(c)) == WT_NOTFOUND)
+				goto done;
+			WT_ERR(ret);
+		}
 	}
 	collator = (entry->index == NULL) ? NULL : entry->index->collator;
 	while (ret == 0) {
 		WT_ERR(c->get_key(c, &curkey));
 		if (entry->index != NULL) {
 			cindex = (WT_CURSOR_INDEX *)c;
-			if (cindex->index->extractor == NULL) {
-				/*
-				 * Repack so it's comparable to the
-				 * reference endpoints.
-				 */
-				k = &cindex->child->key;
-				WT_ERR(__wt_struct_repack(session,
-				    cindex->child->key_format,
-				    entry->main->value_format, k, &curkey,
-				    &allocbuf));
-			} else
-				curkey = cindex->child->key;
+			/*
+			 * Repack so it's comparable to the
+			 * reference endpoints.
+			 */
+			WT_ERR(__wt_struct_repack(session,
+			    cindex->child->key_format,
+			    (entry->repack_format != NULL ?
+			    entry->repack_format : cindex->iface.key_format),
+			    &cindex->child->key, &curkey));
 		}
 		for (end = &entry->ends[skip]; end < endmax; end++) {
 			WT_ERR(__wt_compare(session, collator, &curkey,
@@ -361,7 +360,6 @@ done:
 err:	if (c != NULL)
 		WT_TRET(c->close(c));
 	__wt_scr_free(session, &uribuf);
-	__wt_free(session, allocbuf);
 	return (ret);
 }
 
@@ -375,27 +373,23 @@ __curjoin_endpoint_init_key(WT_SESSION_IMPL *session,
 {
 	WT_CURSOR *cursor;
 	WT_CURSOR_INDEX *cindex;
-	WT_DECL_RET;
 	WT_ITEM *k;
 	uint64_t r;
-	void *allocbuf;
 
-	allocbuf = NULL;
 	if ((cursor = endpoint->cursor) != NULL) {
 		if (entry->index != NULL) {
 			/* Extract and save the index's logical key. */
 			cindex = (WT_CURSOR_INDEX *)endpoint->cursor;
-			WT_ERR(__wt_struct_repack(session,
+			WT_RET(__wt_struct_repack(session,
 			    cindex->child->key_format,
-			    cindex->iface.key_format,
-			    &cindex->child->key, &endpoint->key, &allocbuf));
-			if (allocbuf != NULL)
-				F_SET(endpoint, WT_CURJOIN_END_OWN_KEY);
+			    (entry->repack_format != NULL ?
+			    entry->repack_format : cindex->iface.key_format),
+			    &cindex->child->key, &endpoint->key));
 		} else {
 			k = &((WT_CURSOR_TABLE *)cursor)->cg_cursors[0]->key;
 			if (WT_CURSOR_RECNO(cursor)) {
 				r = *(uint64_t *)k->data;
-				WT_ERR(__curjoin_pack_recno(session, r,
+				WT_RET(__curjoin_pack_recno(session, r,
 				    endpoint->recno_buf,
 				    sizeof(endpoint->recno_buf),
 				    &endpoint->key));
@@ -404,10 +398,7 @@ __curjoin_endpoint_init_key(WT_SESSION_IMPL *session,
 				endpoint->key = *k;
 		}
 	}
-	if (0) {
-err:		__wt_free(session, allocbuf);
-	}
-	return (ret);
+	return (0);
 }
 
 /*
@@ -419,8 +410,13 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 {
 	WT_BLOOM *bloom;
 	WT_DECL_RET;
+	WT_CURSOR *origcur;
 	WT_CURSOR_JOIN_ENTRY *je, *jeend, *je2;
 	WT_CURSOR_JOIN_ENDPOINT *end;
+	const char *def_cfg[] = { WT_CONFIG_BASE(
+	    session, WT_SESSION_open_cursor), NULL };
+	const char *raw_cfg[] = { WT_CONFIG_BASE(
+	    session, WT_SESSION_open_cursor), "raw", NULL };
 	uint32_t f, k;
 
 	if (cjoin->entries_next == 0)
@@ -429,9 +425,27 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 		    "cursors");
 
 	je = &cjoin->entries[0];
+	jeend = &cjoin->entries[cjoin->entries_next];
+
+	/*
+	 * For a single compare=le endpoint in the first iterated entry,
+	 * construct a companion compare=ge endpoint that will actually
+	 * be iterated.
+	 */
+	if (((je = cjoin->entries) != jeend) &&
+	    je->ends_next == 1 && F_ISSET(&je->ends[0], WT_CURJOIN_END_LT)) {
+		origcur = je->ends[0].cursor;
+		WT_RET(__curjoin_insert_endpoint(session, je, 0, &end));
+		WT_RET(__wt_open_cursor(session, origcur->uri,
+		    (WT_CURSOR *)cjoin,
+		    F_ISSET(origcur, WT_CURSTD_RAW) ? raw_cfg : def_cfg,
+		    &end->cursor));
+		WT_RET(end->cursor->next(end->cursor));
+		end->flags = WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ |
+		    WT_CURJOIN_END_OWN_CURSOR;
+	}
 	WT_RET(__curjoin_entry_iter_init(session, cjoin, je, &cjoin->iter));
 
-	jeend = &cjoin->entries[cjoin->entries_next];
 	for (je = cjoin->entries; je < jeend; je++) {
 		__wt_stat_join_init_single(&je->stats);
 		for (end = &je->ends[0]; end < &je->ends[je->ends_next];
@@ -449,6 +463,10 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 			F_SET(cjoin, WT_CURJOIN_SKIP_FIRST_LEFT);
 
 		if (F_ISSET(je, WT_CURJOIN_ENTRY_BLOOM)) {
+			if (session->txn.isolation == WT_ISO_READ_UNCOMMITTED)
+			       WT_RET_MSG(session, EINVAL,
+				   "join cursors with Bloom filters cannot be "
+				   "used with read-uncommitted isolation");
 			if (je->bloom == NULL) {
 				/*
 				 * Look for compatible filters to be shared,
@@ -520,35 +538,34 @@ __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 {
 	WT_COLLATOR *collator;
 	WT_CURSOR_JOIN_ENDPOINT *end, *endmax;
-	WT_DECL_RET;
 	int cmp;
 
 	collator = (entry->index != NULL) ? entry->index->collator : NULL;
 	endmax = &entry->ends[entry->ends_next];
 	for (end = &entry->ends[skip_left ? 1 : 0]; end < endmax; end++) {
-		WT_ERR(__wt_compare(session, collator, curkey, &end->key,
+		WT_RET(__wt_compare(session, collator, curkey, &end->key,
 		    &cmp));
 		if (!F_ISSET(end, WT_CURJOIN_END_LT)) {
 			if (cmp < 0 ||
 			    (cmp == 0 &&
 			    !F_ISSET(end, WT_CURJOIN_END_EQ)) ||
 			    (cmp > 0 && !F_ISSET(end, WT_CURJOIN_END_GT)))
-				WT_ERR(WT_NOTFOUND);
+				WT_RET(WT_NOTFOUND);
 		} else {
 			if (cmp > 0 ||
 			    (cmp == 0 &&
 			    !F_ISSET(end, WT_CURJOIN_END_EQ)) ||
 			    (cmp < 0 && !F_ISSET(end, WT_CURJOIN_END_LT)))
-				WT_ERR(WT_NOTFOUND);
+				WT_RET(WT_NOTFOUND);
 		}
 	}
-err:	return (ret);
+	return (0);
 }
 
 typedef struct {
 	WT_CURSOR iface;
 	WT_CURSOR_JOIN_ENTRY *entry;
-	int ismember;
+	bool ismember;
 } WT_CURJOIN_EXTRACTOR;
 
 /*
@@ -584,8 +601,8 @@ __curjoin_extract_insert(WT_CURSOR *cursor) {
 	ret = __curjoin_entry_in_range(session, cextract->entry, &ikey, false);
 	if (ret == WT_NOTFOUND)
 		ret = 0;
-	else
-		cextract->ismember = 1;
+	else if (ret == 0)
+		cextract->ismember = true;
 
 	return (ret);
 }
@@ -602,22 +619,22 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	WT_CURJOIN_EXTRACTOR extract_cursor;
 	WT_CURSOR *c;
 	WT_CURSOR_STATIC_INIT(iface,
-	    __wt_cursor_get_key,	/* get-key */
-	    __wt_cursor_get_value,	/* get-value */
-	    __wt_cursor_set_key,	/* set-key */
-	    __wt_cursor_set_value,	/* set-value */
-	    __wt_cursor_notsup,		/* compare */
-	    __wt_cursor_notsup,		/* equals */
-	    __wt_cursor_notsup,		/* next */
-	    __wt_cursor_notsup,		/* prev */
-	    __wt_cursor_notsup,		/* reset */
-	    __wt_cursor_notsup,		/* search */
-	    __wt_cursor_notsup,		/* search-near */
-	    __curjoin_extract_insert,	/* insert */
-	    __wt_cursor_notsup,		/* update */
-	    __wt_cursor_notsup,		/* reconfigure */
-	    __wt_cursor_notsup,		/* remove */
-	    __wt_cursor_notsup);	/* close */
+	    __wt_cursor_get_key,		/* get-key */
+	    __wt_cursor_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __wt_cursor_set_value,		/* set-value */
+	    __wt_cursor_compare_notsup,		/* compare */
+	    __wt_cursor_equals_notsup,		/* equals */
+	    __wt_cursor_notsup,			/* next */
+	    __wt_cursor_notsup,			/* prev */
+	    __wt_cursor_notsup,			/* reset */
+	    __wt_cursor_notsup,			/* search */
+	    __wt_cursor_search_near_notsup,	/* search-near */
+	    __curjoin_extract_insert,		/* insert */
+	    __wt_cursor_notsup,			/* update */
+	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __wt_cursor_notsup);		/* close */
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_ITEM *key, v;
@@ -652,17 +669,18 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			ret = c->get_value(c, &v);
 		else if (ret == WT_NOTFOUND)
 			WT_ERR_MSG(session, WT_ERROR,
-			    "main table for join is missing entry.");
+			    "main table for join is missing entry");
 		WT_TRET(c->reset(c));
 		WT_ERR(ret);
 	} else
 		v = *key;
 
 	if ((idx = entry->index) != NULL && idx->extractor != NULL) {
+		WT_CLEAR(extract_cursor);
 		extract_cursor.iface = iface;
 		extract_cursor.iface.session = &session->iface;
 		extract_cursor.iface.key_format = idx->exkey_format;
-		extract_cursor.ismember = 0;
+		extract_cursor.ismember = false;
 		extract_cursor.entry = entry;
 		WT_ERR(idx->extractor->extract(idx->extractor,
 		    &session->iface, key, &v, &extract_cursor.iface));
@@ -715,12 +733,20 @@ nextkey:
 		for (i = 0; i < cjoin->entries_next; i++) {
 			ret = __curjoin_entry_member(session, cjoin,
 			    &cjoin->entries[i], skip_left);
-			if (ret == WT_NOTFOUND)
+			if (ret == WT_NOTFOUND) {
+				/*
+				 * If this is compare=eq on our outer iterator,
+				 * and we've moved past it, we're done.
+				 */
+				if (cjoin->iter->isequal && i == 0)
+					break;
 				goto nextkey;
+			}
 			skip_left = false;
 			WT_ERR(ret);
 		}
-	}
+	} else if (ret != WT_NOTFOUND)
+		WT_ERR(ret);
 
 	if (0) {
 err:		F_SET(cjoin, WT_CURJOIN_ERROR);
@@ -785,10 +811,11 @@ __curjoin_close(WT_CURSOR *cursor)
 		for (end = &entry->ends[0];
 		     end < &entry->ends[entry->ends_next]; end++) {
 			F_CLR(end->cursor, WT_CURSTD_JOINED);
-			if (F_ISSET(end, WT_CURJOIN_END_OWN_KEY))
-				__wt_free(session, end->key.data);
+			if (F_ISSET(end, WT_CURJOIN_END_OWN_CURSOR))
+				WT_TRET(end->cursor->close(end->cursor));
 		}
 		__wt_free(session, entry->ends);
+		__wt_free(session, entry->repack_format);
 	}
 
 	if (cjoin->iter != NULL)
@@ -810,22 +837,22 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    __curjoin_get_key,		/* get-key */
-	    __curjoin_get_value,	/* get-value */
-	    __wt_cursor_notsup,		/* set-key */
-	    __wt_cursor_notsup,		/* set-value */
-	    __wt_cursor_notsup,		/* compare */
-	    __wt_cursor_notsup,		/* equals */
-	    __curjoin_next,		/* next */
-	    __wt_cursor_notsup,		/* prev */
-	    __curjoin_reset,		/* reset */
-	    __wt_cursor_notsup,		/* search */
-	    __wt_cursor_notsup,		/* search-near */
-	    __wt_cursor_notsup,		/* insert */
-	    __wt_cursor_notsup,		/* update */
-	    __wt_cursor_notsup,		/* remove */
-	    __wt_cursor_notsup,		/* reconfigure */
-	    __curjoin_close);		/* close */
+	    __curjoin_get_key,			/* get-key */
+	    __curjoin_get_value,		/* get-value */
+	    __wt_cursor_set_key_notsup,		/* set-key */
+	    __wt_cursor_set_value_notsup,	/* set-value */
+	    __wt_cursor_compare_notsup,		/* compare */
+	    __wt_cursor_equals_notsup,		/* equals */
+	    __curjoin_next,			/* next */
+	    __wt_cursor_notsup,			/* prev */
+	    __curjoin_reset,			/* reset */
+	    __wt_cursor_notsup,			/* search */
+	    __wt_cursor_search_near_notsup,	/* search-near */
+	    __wt_cursor_notsup,			/* insert */
+	    __wt_cursor_notsup,			/* update */
+	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __curjoin_close);			/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_JOIN *cjoin;
 	WT_DECL_ITEM(tmp);
@@ -891,22 +918,22 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
     WT_INDEX *idx, WT_CURSOR *ref_cursor, uint8_t flags, uint8_t range,
     uint64_t count, uint32_t bloom_bit_count, uint32_t bloom_hash_count)
 {
+	WT_CURSOR_INDEX *cindex;
+	WT_CURSOR_JOIN_ENDPOINT *end;
 	WT_CURSOR_JOIN_ENTRY *entry;
 	WT_DECL_RET;
-	WT_CURSOR_JOIN_ENDPOINT *end, *newend;
 	bool hasins, needbloom, range_eq;
-	u_int i, ins, nonbloom;
+	char *main_uri, *newformat;
 	const char *raw_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "raw", NULL };
-	char *main_uri;
-	size_t namesize, newsize;
+	size_t len, newsize;
+	u_int i, ins, nonbloom;
 
 	entry = NULL;
 	hasins = needbloom = false;
 	ins = 0; /* -Wuninitialized */
 	main_uri = NULL;
 	nonbloom = 0; /* -Wuninitialized */
-	namesize = strlen(cjoin->table->name);
 
 	for (i = 0; i < cjoin->entries_next; i++) {
 		if (cjoin->entries[i].index == idx) {
@@ -982,13 +1009,13 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			    ((range & WT_CURJOIN_END_GT) != 0 || range_eq)) ||
 			    (F_ISSET(end, WT_CURJOIN_END_LT) &&
 			    ((range & WT_CURJOIN_END_LT) != 0 || range_eq)) ||
-			    (end->flags == WT_CURJOIN_END_EQ &&
+			    (WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_EQ &&
 			    (range & (WT_CURJOIN_END_LT | WT_CURJOIN_END_GT))
 			    != 0))
 				WT_ERR_MSG(session, EINVAL,
 				    "join has overlapping ranges");
 			if (range == WT_CURJOIN_END_EQ &&
-			    end->flags == WT_CURJOIN_END_EQ &&
+			    WT_CURJOIN_END_RANGE(end) == WT_CURJOIN_END_EQ &&
 			    !F_ISSET(entry, WT_CURJOIN_ENTRY_DISJUNCTION))
 				WT_ERR_MSG(session, EINVAL,
 				    "compare=eq can only be combined "
@@ -1013,31 +1040,71 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		entry->bloom_hash_count =
 		    WT_MAX(entry->bloom_hash_count, bloom_hash_count);
 	}
-	WT_ERR(__wt_realloc_def(session, &entry->ends_allocated,
-	    entry->ends_next + 1, &entry->ends));
-	if (!hasins)
-		ins = entry->ends_next;
-	newend = &entry->ends[ins];
-	memmove(newend + 1, newend,
-	    (entry->ends_next - ins) * sizeof(WT_CURSOR_JOIN_ENDPOINT));
-	memset(newend, 0, sizeof(WT_CURSOR_JOIN_ENDPOINT));
-	entry->ends_next++;
-	newend->cursor = ref_cursor;
-	F_SET(newend, range);
+	WT_ERR(__curjoin_insert_endpoint(session, entry,
+	    hasins ? ins : entry->ends_next, &end));
+	end->cursor = ref_cursor;
+	F_SET(end, range);
 
 	/* Open the main file with a projection of the indexed columns. */
-	if (entry->main == NULL && entry->index != NULL) {
-		namesize = strlen(cjoin->table->name);
-		newsize = namesize + entry->index->colconf.len + 1;
+	if (entry->main == NULL && idx != NULL) {
+		newsize = strlen(cjoin->table->name) + idx->colconf.len + 1;
 		WT_ERR(__wt_calloc(session, 1, newsize, &main_uri));
 		snprintf(main_uri, newsize, "%s%.*s",
-		    cjoin->table->name, (int)entry->index->colconf.len,
-		    entry->index->colconf.str);
+		    cjoin->table->name, (int)idx->colconf.len,
+		    idx->colconf.str);
 		WT_ERR(__wt_open_cursor(session, main_uri,
 		    (WT_CURSOR *)cjoin, raw_cfg, &entry->main));
+		if (idx->extractor == NULL) {
+			/*
+			 * Add no-op padding so trailing 'u' formats are not
+			 * transformed to 'U'.  This matches what happens in
+			 * the index.  We don't do this when we have an
+			 * extractor, extractors already use the padding
+			 * byte trick.
+			 */
+			len = strlen(entry->main->value_format) + 3;
+			WT_ERR(__wt_calloc(session, len, 1, &newformat));
+			snprintf(newformat, len, "%s0x",
+			    entry->main->value_format);
+			__wt_free(session, entry->main->value_format);
+			entry->main->value_format = newformat;
+		}
+
+		/*
+		 * When we are repacking index keys to remove the primary
+		 * key, we never want to transform trailing 'u'.  Use no-op
+		 * padding to force this.
+		 */
+		cindex = (WT_CURSOR_INDEX *)ref_cursor;
+		len = strlen(cindex->iface.key_format) + 3;
+		WT_ERR(__wt_calloc(session, len, 1, &entry->repack_format));
+		snprintf(entry->repack_format, len, "%s0x",
+		    cindex->iface.key_format);
 	}
 
 err:	if (main_uri != NULL)
 		__wt_free(session, main_uri);
 	return (ret);
+}
+
+/*
+ * __curjoin_insert_endpoint --
+ *	Insert a new entry into the endpoint array for the join entry.
+ */
+static int
+__curjoin_insert_endpoint(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
+    u_int pos, WT_CURSOR_JOIN_ENDPOINT **newendp)
+{
+	WT_CURSOR_JOIN_ENDPOINT *newend;
+
+	WT_RET(__wt_realloc_def(session, &entry->ends_allocated,
+	    entry->ends_next + 1, &entry->ends));
+	newend = &entry->ends[pos];
+	memmove(newend + 1, newend,
+	    (entry->ends_next - pos) * sizeof(WT_CURSOR_JOIN_ENDPOINT));
+	memset(newend, 0, sizeof(WT_CURSOR_JOIN_ENDPOINT));
+	entry->ends_next++;
+	*newendp = newend;
+
+	return (0);
 }
