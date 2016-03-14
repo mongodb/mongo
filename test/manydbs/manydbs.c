@@ -87,16 +87,16 @@ WT_RAND_STATE rnd;
 WT_SESSION **session = NULL;
 
 static int
-get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep)
+get_stat(WT_CURSOR *statcurs, int stat_field, uint64_t *valuep)
 {
 	const char *desc, *pvalue;
 	int ret;
 
-	cursor->set_key(cursor, stat_field);
-	if ((ret = cursor->search(cursor)) != 0)
+	statcurs->set_key(statcurs, stat_field);
+	if ((ret = statcurs->search(statcurs)) != 0)
 		return (ret);
 
-	return (cursor->get_value(cursor, &desc, &pvalue, valuep));
+	return (statcurs->get_value(statcurs, &desc, &pvalue, valuep));
 }
 
 static int
