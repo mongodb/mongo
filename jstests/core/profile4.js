@@ -41,7 +41,6 @@ try {
     assert.eq(lastOp.query.find, coll.getName());
     assert.eq(lastOp.ns, coll.getFullName());
     assert.eq(lastOp.keysExamined, 0);
-    assert.eq(lastOp.keyUpdates, 0);
     assert.eq(lastOp.nreturned, 0);
     assert.eq(lastOp.cursorExhausted, true);
 
@@ -291,8 +290,9 @@ try {
     // Tests for profiling update
     coll.drop();
     for (var i = 0; i < 3; i++) {
-        assert.writeOK(coll.insert({_id: i, a: i}));
+        assert.writeOK(coll.insert({_id: i, a: i, b: i}));
     }
+    coll.ensureIndex({b: 1});
 
     // Update
     coll.update({a: 2}, {$inc: {b: 1}});
@@ -305,6 +305,7 @@ try {
     assert.eq(lastOp.docsExamined, 3);
     assert.eq(lastOp.nMatched, 1);
     assert.eq(lastOp.nModified, 1);
+    assert.eq(lastOp.keyUpdates, 1);
 
     // Update with {upsert: true}
     coll.update({_id: 4, a: 4}, {$inc: {b: 1}}, {upsert: true});

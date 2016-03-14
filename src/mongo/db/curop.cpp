@@ -525,7 +525,10 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     OPDEBUG_TOSTRING_HELP_BOOL(upsert);
     OPDEBUG_TOSTRING_HELP_BOOL(cursorExhausted);
     OPDEBUG_TOSTRING_HELP(keyUpdates);
-    OPDEBUG_TOSTRING_HELP(writeConflicts);
+
+    if (writeConflicts > 0) {
+        s << " writeConflicts:" << writeConflicts;
+    }
 
     if (!exceptionInfo.empty()) {
         s << " exception: " << exceptionInfo.msg;
@@ -644,7 +647,11 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_BOOL(upsert);
     OPDEBUG_APPEND_BOOL(cursorExhausted);
     OPDEBUG_APPEND_NUMBER(keyUpdates);
-    OPDEBUG_APPEND_NUMBER(writeConflicts);
+
+    if (writeConflicts > 0) {
+        b.appendNumber("writeConflicts", writeConflicts);
+    }
+
     b.appendNumber("numYield", curop.numYields());
 
     {

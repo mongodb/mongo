@@ -186,7 +186,7 @@ public:
     bool upsert{false};         // true if the update actually did an insert
     bool cursorExhausted{
         false};  // true if the cursor has been closed at end a find/getMore operation
-    int keyUpdates{0};
+    int keyUpdates{-1};
     long long writeConflicts{0};
 
     // New Query Framework debugging/profiling info
