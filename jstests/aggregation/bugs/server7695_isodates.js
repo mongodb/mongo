@@ -16,10 +16,7 @@
         var pipeline = [{$project: {_id: 0, result: {}}}];
         pipeline[0].$project.result[op] = value;
         var msg = "Exptected {"+op+": "+value+"} to equal: "+expResult;
-        assert.eq(
-            coll.aggregate(pipeline).toArray()[0].result,
-            [{result: expResult}][0].result,
-            msg);
+        assert.eq(coll.aggregate(pipeline).toArray()[0].result, expResult, msg);
     }
 
     // While development, there was a bug which caused an error with $dateToString if the order of
