@@ -100,6 +100,9 @@ StatusWith<Message> messageFromRequest(const RemoteCommandRequest& request,
 
 }  // namespace
 
+const NetworkInterfaceASIO::TableRow NetworkInterfaceASIO::AsyncOp::kFieldLabels = {
+    "", "id", "states", "start_time", "request"};
+
 NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
                                        const TaskExecutor::CallbackHandle& cbHandle,
                                        const RemoteCommandRequest& request,
@@ -300,7 +303,7 @@ void NetworkInterfaceASIO::AsyncOp::setOnFinish(RemoteCommandCompletionFn&& onFi
 std::string NetworkInterfaceASIO::AsyncOp::_stateToString(AsyncOp::State state) const {
     switch (state) {
         case State::kUninitialized:
-            return "UNITIALIZED";
+            return "UNINITIALIZED";
         case State::kInProgress:
             return "IN_PROGRESS";
         case State::kTimedOut:
@@ -344,10 +347,21 @@ NetworkInterfaceASIO::TableRow NetworkInterfaceASIO::AsyncOp::getStringFields() 
 
 std::string NetworkInterfaceASIO::AsyncOp::toString() const {
     str::stream s;
+    int fieldIdx = 1;
+    bool first = true;
+
     for (auto field : getStringFields()) {
-        s << field << "\t\t";
+        if (field != "") {
+            if (first) {
+                first = false;
+            } else {
+                s << ", ";
+            }
+
+            s << kFieldLabels[fieldIdx] << ": " << field;
+            fieldIdx++;
+        }
     }
-    s << "\n";
     return s;
 }
 
@@ -431,8 +445,8 @@ void NetworkInterfaceASIO::AsyncOp::_failWithInfo(const char* file,
                                                   int line,
                                                   std::string error) const {
     std::stringstream ss;
-    ss << "Invariant failure at " << file << ":" << line << ": " << error;
-    ss << "\n\t Operation: " << toString();
+    ss << "Invariant failure at " << file << ":" << line << ": " << error
+       << ", Operation: " << toString();
     Status status{ErrorCodes::InternalError, ss.str()};
     fassertFailedWithStatus(34430, status);
 }

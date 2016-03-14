@@ -104,9 +104,8 @@ std::string NetworkInterfaceASIO::_getDiagnosticString_inlock(AsyncOp* currentOp
     output << "\t Operations _inProgress: " << _inProgress.size() << "\n";
 
     if (_inProgress.size() > 0) {
-        // Set up labels, first is placeholder for asterisk
         std::vector<TableRow> rows;
-        rows.push_back({"", "ID", "STATES", "START_TIME", "REQUEST"});
+        rows.push_back(AsyncOp::kFieldLabels);
 
         // Push AsyncOps
         for (auto&& kv : _inProgress) {

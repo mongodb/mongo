@@ -351,6 +351,8 @@ private:
         // Type to represent the internal id of this request.
         using AsyncOpId = uint64_t;
 
+        static const TableRow kFieldLabels;
+
         // Return string representation of a given state.
         std::string _stateToString(State state) const;
 
