@@ -82,21 +82,25 @@ void (*custom_die)(void) = NULL;
 
 WT_CONNECTION **conn = NULL;
 WT_CURSOR **cursor = NULL;
-WT_CURSOR **statc = NULL;
 WT_RAND_STATE rnd;
 WT_SESSION **session = NULL;
 
 static int
-get_stat(WT_CURSOR *statcurs, int stat_field, uint64_t *valuep)
+get_stat(WT_SESSION *session, int stat_field, uint64_t *valuep)
 {
+	WT_CURSOR *statc;
 	const char *desc, *pvalue;
 	int ret;
 
-	statcurs->set_key(statcurs, stat_field);
-	if ((ret = statcurs->search(statcurs)) != 0)
+	testutil_check(session->open_cursor(session,
+	    "statistics:", NULL, NULL, &statc));
+	statc->set_key(statc, stat_field);
+	if ((ret = statc->search(statc)) != 0)
 		return (ret);
 
-	return (statcurs->get_value(statcurs, &desc, &pvalue, valuep));
+	ret = statc->get_value(statc, &desc, &pvalue, valuep);
+	statc->close(statc);
+	return (ret);
 }
 
 static int
@@ -173,8 +177,6 @@ main(int argc, char *argv[])
 	if ((session = calloc(
 	    (size_t)dbs, sizeof(WT_SESSION *))) == NULL)
 		testutil_die(ENOMEM, "session array malloc");
-	if ((statc = calloc((size_t)dbs, sizeof(WT_CURSOR *))) == NULL)
-		testutil_die(ENOMEM, "cursor array malloc");
 	if ((cond_reset_orig = calloc((size_t)dbs, sizeof(uint64_t))) == NULL)
 		testutil_die(ENOMEM, "orig stat malloc");
 	if (!idle && ((cursor = calloc(
@@ -206,8 +208,6 @@ main(int argc, char *argv[])
 		    hometmp, NULL, wt_cfg, &conn[i]));
 		testutil_check(conn[i]->open_session(conn[i],
 		    NULL, NULL, &session[i]));
-		testutil_check(session[i]->open_cursor(session[i],
-		    "statistics:", NULL, NULL, &statc[i]));
 		if (!idle) {
 			testutil_check(session[i]->create(session[i],
 			    uri, "key_format=Q,value_format=u"));
@@ -223,7 +223,7 @@ main(int argc, char *argv[])
 	 * activity during the creation period.
 	 */
 	for (i = 0; i < dbs; ++i)
-		testutil_check(get_stat(statc[i],
+		testutil_check(get_stat(session[i],
 		    WT_STAT_CONN_COND_AUTO_WAIT_RESET, &cond_reset_orig[i]));
 	for (i = 0; i < MAX_IDLE_TIME; i += IDLE_INCR) {
 		if (!idle)
@@ -232,9 +232,9 @@ main(int argc, char *argv[])
 		sleep(IDLE_INCR);
 	}
 	for (i = 0; i < dbs; ++i) {
-		testutil_check(get_stat(statc[i],
+		testutil_check(get_stat(session[i],
 		    WT_STAT_CONN_COND_AUTO_WAIT_RESET, &cond_reset));
-		testutil_check(get_stat(statc[i],
+		testutil_check(get_stat(session[i],
 		    WT_STAT_CONN_COND_AUTO_WAIT, &cond_wait));
 		/*
 		 * On an idle workload there should be no resets of condition
