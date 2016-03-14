@@ -243,9 +243,12 @@ main(int argc, char *argv[])
 		 */
 		if (idle && cond_reset != cond_reset_orig[i])
 			testutil_die(ERANGE,
-			    "condvar reset on idle connection");
+			    "condvar reset on idle connection %d of %" PRIu64,
+			    i, cond_reset);
 		if (!idle && cond_reset > cond_wait / 20)
-			testutil_die(ERANGE, "condvar reset exceeds 5%");
+			testutil_die(ERANGE, "connection %d condvar reset %"
+			    PRIu64 " exceeds 5%% of %" PRIu64,
+			    i, cond_reset, cond_wait);
 		testutil_check(conn[i]->close(conn[i], NULL));
 	}
 
