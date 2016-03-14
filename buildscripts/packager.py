@@ -236,13 +236,13 @@ class Distro(object):
         for redhat, "ubuntu1204" and "ubuntu1404" for Ubuntu, "debian71" for Debian), and "suse11"
         for SUSE)"""
         # Community builds only support amd64
-        if not arch == "x86_64":
+        if arch not in ['x86_64', 'ppc64le']:
             raise Exception("BUG: unsupported architecture (%s)" % arch)
 
         if re.search("(suse)", self.n):
             return [ "suse11", "suse12" ]
         elif re.search("(redhat|fedora|centos)", self.n):
-            return [ "rhel70", "rhel62", "rhel55" ]
+            return [ "rhel70", "rhel71", "rhel62", "rhel55" ]
         elif self.n == 'amazon':
             return [ "amazon" ]
         elif self.n == 'ubuntu':
