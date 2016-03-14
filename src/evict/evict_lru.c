@@ -721,12 +721,32 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_request_walk_clear --
+ * __evict_clear_all_walks --
+ *	Clear the eviction walk points for all files a session is waiting on.
+ */
+static int
+__evict_clear_all_walks(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
+		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
+			WT_WITH_DHANDLE(session,
+			    dhandle, WT_TRET(__evict_clear_walk(session)));
+	return (ret);
+}
+
+/*
+ * __evict_request_clear_walk --
  *	Request that the eviction server clear the tree's current eviction
  *	point.
  */
 static int
-__evict_request_walk_clear(WT_SESSION_IMPL *session)
+__evict_request_clear_walk(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -754,32 +774,12 @@ __evict_request_walk_clear(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_clear_all_walks --
- *	Clear the eviction walk points for all files a session is waiting on.
- */
-static int
-__evict_clear_all_walks(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle;
-	WT_DECL_RET;
-
-	conn = S2C(session);
-
-	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
-		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
-			WT_WITH_DHANDLE(session,
-			    dhandle, WT_TRET(__evict_clear_walk(session)));
-	return (ret);
-}
-
-/*
  * __wt_evict_file_exclusive_on --
  *	Get exclusive eviction access to a file and discard any of the file's
  *	blocks queued for eviction.
  */
 int
-__wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp)
+__wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -787,40 +787,39 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp)
 	WT_EVICT_ENTRY *evict;
 	u_int i, elem;
 
-	*evict_resetp = false;
-
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 
-	/* If the file was never evictable, there's no work to do. */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+	/*
+	 * Hold the walk lock to set the no-eviction flag.
+	 *
+	 * The no-eviction flag can be set permanently, in which case we never
+	 * increment the no-eviction count.
+	 */
+	__wt_spin_lock(session, &btree->evict_lock);
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+		if (btree->evict_disabled != 0)
+			++btree->evict_disabled;
+		__wt_spin_unlock(session, &btree->evict_lock);
 		return (0);
+	}
+	++btree->evict_disabled;
 
 	/*
-	 * Hold the walk lock to set the "no eviction" flag: no new pages from
-	 * the file will be queued for eviction after this point.
+	 * Ensure no new pages from the file will be queued for eviction after
+	 * this point.
 	 */
-	__wt_spin_lock(session, &cache->evict_walk_lock);
-	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
-		F_SET(btree, WT_BTREE_NO_EVICTION);
-		*evict_resetp = true;
-	}
-	__wt_spin_unlock(session, &cache->evict_walk_lock);
-
-	/* If some other operation has disabled eviction, we're done. */
-	if (!*evict_resetp)
-		return (0);
+	F_SET(btree, WT_BTREE_NO_EVICTION);
+	WT_FULL_BARRIER();
 
 	/* Clear any existing LRU eviction walk for the file. */
-	WT_ERR(__evict_request_walk_clear(session));
-
-	/* Hold the evict lock to remove any queued pages from this file. */
-	__wt_spin_lock(session, &cache->evict_lock);
+	WT_ERR(__evict_request_clear_walk(session));
 
 	/*
 	 * The eviction candidate list might reference pages from the file,
-	 * clear it.
+	 * clear it. Hold the evict lock to remove queued pages from a file.
 	 */
+	__wt_spin_lock(session, &cache->evict_lock);
 	elem = cache->evict_max;
 	for (i = 0, evict = cache->evict_queue; i < elem; i++, evict++)
 		if (evict->btree == btree)
@@ -834,10 +833,11 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp)
 	while (btree->evict_busy > 0)
 		__wt_yield();
 
-	return (0);
-
-err:	F_CLR(btree, WT_BTREE_NO_EVICTION);
-	*evict_resetp = false;
+	if (0) {
+err:		--btree->evict_disabled;
+		F_CLR(btree, WT_BTREE_NO_EVICTION);
+	}
+	__wt_spin_unlock(session, &btree->evict_lock);
 	return (ret);
 }
 
@@ -858,10 +858,17 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 	 */
 	WT_DIAGNOSTIC_YIELD;
 
-	WT_ASSERT(session, btree->evict_ref == NULL &&
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION));
+	WT_ASSERT(session,
+	    btree->evict_ref == NULL && F_ISSET(btree, WT_BTREE_NO_EVICTION));
 
-	F_CLR(btree, WT_BTREE_NO_EVICTION);
+	/*
+	 * The no-eviction flag can be set permanently, in which case we never
+	 * increment the no-eviction count.
+	 */
+	__wt_spin_lock(session, &btree->evict_lock);
+	if (btree->evict_disabled > 0 && --btree->evict_disabled == 0)
+		F_CLR(btree, WT_BTREE_NO_EVICTION);
+	__wt_spin_unlock(session, &btree->evict_lock);
 }
 
 /*
@@ -1156,22 +1163,26 @@ retry:	while (slot < max_entries && ret == 0) {
 		__wt_spin_unlock(session, &conn->dhandle_lock);
 		dhandle_locked = false;
 
-		__wt_spin_lock(session, &cache->evict_walk_lock);
-
 		/*
-		 * Re-check the "no eviction" flag -- it is used to enforce
-		 * exclusive access when a handle is being closed.
+		 * Re-check the "no eviction" flag, used to enforce exclusive
+		 * access when a handle is being closed. If not set, remember
+		 * the file to visit first, next loop.
+		 *
+		 * Only try to acquire the lock and simply continue if we fail;
+		 * the lock is held while the thread turning off eviction clears
+		 * the tree's current eviction point, and part of the process is
+		 * waiting on this thread to acknowledge that action.
 		 */
-		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
-			/* Remember the file to visit first, next loop. */
-			cache->evict_file_next = dhandle;
-
-			WT_WITH_DHANDLE(session, dhandle,
-			    ret = __evict_walk_file(session, &slot));
-			WT_ASSERT(session, session->split_gen == 0);
+		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
+		    !__wt_spin_trylock(session, &btree->evict_lock)) {
+			if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+				cache->evict_file_next = dhandle;
+				WT_WITH_DHANDLE(session, dhandle,
+				    ret = __evict_walk_file(session, &slot));
+				WT_ASSERT(session, session->split_gen == 0);
+			}
+			__wt_spin_unlock(session, &btree->evict_lock);
 		}
-
-		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
 		/*
 		 * If we didn't find any candidates in the file, skip it next

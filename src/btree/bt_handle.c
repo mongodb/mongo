@@ -164,6 +164,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	/* Destroy locks. */
 	WT_TRET(__wt_rwlock_destroy(session, &btree->ovfl_lock));
+	__wt_spin_destroy(session, &btree->evict_lock);
 	__wt_spin_destroy(session, &btree->flush_lock);
 
 	/* Free allocated memory. */
@@ -350,7 +351,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	/* Initialize locks. */
 	WT_RET(__wt_rwlock_alloc(
 	    session, &btree->ovfl_lock, "btree overflow lock"));
-	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush lock"));
+	WT_RET(__wt_spin_init(session, &btree->evict_lock, "btree evict"));
+	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush"));
 
 	btree->checkpointing = WT_CKPT_OFF;		/* Not checkpointing */
 	btree->modified = 0;				/* Clean */
