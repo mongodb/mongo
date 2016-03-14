@@ -132,6 +132,7 @@ int
 main(int argc, char *argv[])
 {
 	uint64_t cond_reset, cond_wait;
+	uint64_t *cond_reset_orig;
 	int cfg, ch, dbs, i;
 	bool idle;
 	const char *working_dir, *wt_cfg;
@@ -174,6 +175,8 @@ main(int argc, char *argv[])
 		testutil_die(ENOMEM, "session array malloc");
 	if ((statc = calloc((size_t)dbs, sizeof(WT_CURSOR *))) == NULL)
 		testutil_die(ENOMEM, "cursor array malloc");
+	if ((cond_reset_orig = calloc((size_t)dbs, sizeof(uint64_t))) == NULL)
+		testutil_die(ENOMEM, "orig stat malloc");
 	if (!idle && ((cursor = calloc(
 	    (size_t)dbs, sizeof(WT_CURSOR *))) == NULL))
 		testutil_die(ENOMEM, "cursor array malloc");
@@ -215,6 +218,13 @@ main(int argc, char *argv[])
 
 	sleep(10);
 
+	/*
+	 * Record original reset setting.  There could have been some
+	 * activity during the creation period.
+	 */
+	for (i = 0; i < dbs; ++i)
+		testutil_check(get_stat(statc[i],
+		    WT_STAT_CONN_COND_AUTO_WAIT_RESET, &cond_reset_orig[i]));
 	for (i = 0; i < MAX_IDLE_TIME; i += IDLE_INCR) {
 		if (!idle)
 			testutil_check(run_ops(dbs));
@@ -228,10 +238,10 @@ main(int argc, char *argv[])
 		    WT_STAT_CONN_COND_AUTO_WAIT, &cond_wait));
 		/*
 		 * On an idle workload there should be no resets of condition
-		 * variables.  Even with a light workload, resets should not be
-		 * very common.  We look for 5%.
+		 * variables during the idle period.  Even with a light
+		 * workload, resets should not be very common.  We look for 5%.
 		 */
-		if (idle && cond_reset != 0)
+		if (idle && cond_reset != cond_reset_orig[i])
 			testutil_die(ERANGE,
 			    "condvar reset on idle connection");
 		if (!idle && cond_reset > cond_wait / 20)
