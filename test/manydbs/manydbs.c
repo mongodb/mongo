@@ -71,7 +71,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-I] [-C maxcpu%%] [-D maxdbs] [-h dir]\n", progname);
+	    "usage: %s [-I] [-D maxdbs] [-h dir]\n", progname);
 	exit(EXIT_FAILURE);
 }
 
@@ -86,6 +86,24 @@ WT_RAND_STATE rnd;
 WT_SESSION **session = NULL;
 
 static int
+get_stat(WT_SESSION *stat_session, int stat_field, uint64_t *valuep)
+{
+	WT_CURSOR *statc;
+	const char *desc, *pvalue;
+	int ret;
+
+	testutil_check(stat_session->open_cursor(stat_session,
+	    "statistics:", NULL, NULL, &statc));
+	statc->set_key(statc, stat_field);
+	if ((ret = statc->search(statc)) != 0)
+		return (ret);
+
+	ret = statc->get_value(statc, &desc, &pvalue, valuep);
+	statc->close(statc);
+	return (ret);
+}
+
+static int
 run_ops(int dbs)
 {
 	WT_ITEM data;
@@ -94,26 +112,6 @@ run_ops(int dbs)
 	uint8_t buf[MAX_VAL];
 
 	memset(buf, 0, sizeof(buf));
-	/*
-	 * First time through, set up sessions, create the tables and
-	 * open cursors.
-	 */
-	if (session == NULL) {
-		__wt_random_init(&rnd);
-		if ((session =
-		    calloc((size_t)dbs, sizeof(WT_SESSION *))) == NULL)
-			testutil_die(ENOMEM, "session array malloc");
-		if ((cursor = calloc((size_t)dbs, sizeof(WT_CURSOR *))) == NULL)
-			testutil_die(ENOMEM, "cursor array malloc");
-		for (i = 0; i < dbs; ++i) {
-			testutil_check(conn[i]->open_session(conn[i],
-			    NULL, NULL, &session[i]));
-			testutil_check(session[i]->create(session[i],
-			    uri, "key_format=Q,value_format=u"));
-			testutil_check(session[i]->open_cursor(session[i],
-			    uri, NULL, NULL, &cursor[i]));
-		}
-	}
 	for (i = 0; i < MAX_VAL; ++i)
 		buf[i] = (uint8_t)__wt_random(&rnd);
 	data.data = buf;
@@ -137,12 +135,11 @@ run_ops(int dbs)
 int
 main(int argc, char *argv[])
 {
-	FILE *fp;
-	float cpu, max;
+	uint64_t cond_reset, cond_wait;
+	uint64_t *cond_reset_orig;
 	int cfg, ch, dbs, i;
-	const char *working_dir;
-	bool idle, setmax;
-	const char *wt_cfg;
+	bool idle;
+	const char *working_dir, *wt_cfg;
 	char cmd[128];
 
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
@@ -151,14 +148,9 @@ main(int argc, char *argv[])
 		++progname;
 	dbs = MAX_DBS;
 	working_dir = HOME_BASE;
-	max = (float)dbs;
-	idle = setmax = false;
-	while ((ch = __wt_getopt(progname, argc, argv, "C:D:h:I")) != EOF)
+	idle = false;
+	while ((ch = __wt_getopt(progname, argc, argv, "D:h:I")) != EOF)
 		switch (ch) {
-		case 'C':
-			max = (float)atof(__wt_optarg);
-			setmax = true;
-			break;
 		case 'D':
 			dbs = atoi(__wt_optarg);
 			break;
@@ -173,29 +165,37 @@ main(int argc, char *argv[])
 		}
 	argc -= __wt_optind;
 	argv += __wt_optind;
-	/*
-	 * Adjust the maxcpu in relation to the number of databases, unless
-	 * the user set it explicitly.
-	 */
-	if (!setmax)
-		max = (float)dbs;
 	if (argc != 0)
 		usage();
 
+	/*
+	 * Allocate arrays for connection handles, sessions, statistics
+	 * cursors and, if needed, data cursors.
+	 */
 	if ((conn = calloc((size_t)dbs, sizeof(WT_CONNECTION *))) == NULL)
 		testutil_die(ENOMEM, "connection array malloc");
+	if ((session = calloc(
+	    (size_t)dbs, sizeof(WT_SESSION *))) == NULL)
+		testutil_die(ENOMEM, "session array malloc");
+	if ((cond_reset_orig = calloc((size_t)dbs, sizeof(uint64_t))) == NULL)
+		testutil_die(ENOMEM, "orig stat malloc");
+	if (!idle && ((cursor = calloc(
+	    (size_t)dbs, sizeof(WT_CURSOR *))) == NULL))
+		testutil_die(ENOMEM, "cursor array malloc");
 	memset(cmd, 0, sizeof(cmd));
 	/*
 	 * Set up all the directory names.
 	 */
 	testutil_work_dir_from_path(home, HOME_SIZE, working_dir);
 	testutil_make_work_dir(home);
+	__wt_random_init(&rnd);
 	for (i = 0; i < dbs; ++i) {
 		snprintf(hometmp, HOME_SIZE, "%s/%s.%d", home, HOME_BASE, i);
 		testutil_make_work_dir(hometmp);
 		/*
 		 * Open each database.  Rotate different configurations
-		 * among them.
+		 * among them.  Open a session and statistics cursor.
+		 * If writing data, create the table and open a data cursor.
 		 */
 		cfg = i % 3;
 		if (cfg == 0)
@@ -206,33 +206,51 @@ main(int argc, char *argv[])
 			wt_cfg = WT_CONFIG2;
 		testutil_check(wiredtiger_open(
 		    hometmp, NULL, wt_cfg, &conn[i]));
+		testutil_check(conn[i]->open_session(conn[i],
+		    NULL, NULL, &session[i]));
+		if (!idle) {
+			testutil_check(session[i]->create(session[i],
+			    uri, "key_format=Q,value_format=u"));
+			testutil_check(session[i]->open_cursor(session[i],
+			    uri, NULL, NULL, &cursor[i]));
+		}
 	}
 
 	sleep(10);
+
+	/*
+	 * Record original reset setting.  There could have been some
+	 * activity during the creation period.
+	 */
+	for (i = 0; i < dbs; ++i)
+		testutil_check(get_stat(session[i],
+		    WT_STAT_CONN_COND_AUTO_WAIT_RESET, &cond_reset_orig[i]));
 	for (i = 0; i < MAX_IDLE_TIME; i += IDLE_INCR) {
 		if (!idle)
 			testutil_check(run_ops(dbs));
 		printf("Sleep %d (%d of %d)\n", IDLE_INCR, i, MAX_IDLE_TIME);
 		sleep(IDLE_INCR);
 	}
-
-	/*
-	 * Check CPU after all idling or work is done.
-	 */
-	(void)snprintf(cmd, sizeof(cmd),
-	    "ps -p %lu -o pcpu=", (unsigned long)getpid());
-	if ((fp = popen(cmd, "r")) == NULL)
-		testutil_die(errno, "popen");
-	fscanf(fp, "%f", &cpu);
-	printf("Final CPU %f, max %f\n", cpu, max);
-	if (cpu > max) {
-		fprintf(stderr, "ERROR: CPU usage: %f, max %f\n", cpu, max);
-		testutil_die(ERANGE, "CPU");
-	}
-	if (pclose(fp) != 0)
-		testutil_die(errno, "pclose");
-	for (i = 0; i < dbs; ++i)
+	for (i = 0; i < dbs; ++i) {
+		testutil_check(get_stat(session[i],
+		    WT_STAT_CONN_COND_AUTO_WAIT_RESET, &cond_reset));
+		testutil_check(get_stat(session[i],
+		    WT_STAT_CONN_COND_AUTO_WAIT, &cond_wait));
+		/*
+		 * On an idle workload there should be no resets of condition
+		 * variables during the idle period.  Even with a light
+		 * workload, resets should not be very common.  We look for 5%.
+		 */
+		if (idle && cond_reset != cond_reset_orig[i])
+			testutil_die(ERANGE,
+			    "condvar reset on idle connection %d of %" PRIu64,
+			    i, cond_reset);
+		if (!idle && cond_reset > cond_wait / 20)
+			testutil_die(ERANGE, "connection %d condvar reset %"
+			    PRIu64 " exceeds 5%% of %" PRIu64,
+			    i, cond_reset, cond_wait);
 		testutil_check(conn[i]->close(conn[i], NULL));
+	}
 
 	return (EXIT_SUCCESS);
 }
