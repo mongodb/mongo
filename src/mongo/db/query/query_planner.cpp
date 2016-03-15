@@ -659,8 +659,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     }
 
     // Figure out how useful each index is to each predicate.
-    // TODO: pass the appropriate collator to rateIndices instead of nullptr.
-    QueryPlannerIXSelect::rateIndices(query.root(), "", relevantIndices, nullptr);
+    QueryPlannerIXSelect::rateIndices(query.root(), "", relevantIndices, params.collator);
     QueryPlannerIXSelect::stripInvalidAssignments(query.root(), relevantIndices);
 
     // Unless we have GEO_NEAR, TEXT, or a projection, we may be able to apply an optimization
