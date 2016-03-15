@@ -64,6 +64,7 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	new_aggressive = 0;
 
+	WT_ASSERT(session, lsm_tree->merge_min != 0);
 	/*
 	 * If the tree is open read-only or we are compacting, be very
 	 * aggressive. Otherwise, we can spend a long time waiting for merges

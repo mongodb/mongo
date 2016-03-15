@@ -349,6 +349,13 @@ __lsm_meta_read_v1(
 	 * Ignore any other values: the metadata entry might have been
 	 * created by a future release, with unknown options.
 	 */
+	/*
+	 * If the default merge_min was not overridden, calculate it now.  We
+	 * do this here so that trees created before merge_min was added get a
+	 * sane value.
+	 */
+	if (lsm_tree->merge_min < 2)
+		lsm_tree->merge_min = WT_MAX(2, lsm_tree->merge_max / 2);
 
 err:	__wt_scr_free(session, &buf);
 	return (ret);
