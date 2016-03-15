@@ -369,13 +369,71 @@ functions:
         # to use the old style replSetUpdatePosition command.
         ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${multiversion_platform_arch|"Linux/x86_64"} "2.6" "3.0" "3.2" "3.2.1"
 
+  "kill processes" :
+    command: shell.exec
+    params:
+      silent: true
+      script: |
+        process_kill_list="(mongo|bsondump|python|lldb|_test$|^cl\.exe$|_test\.exe$)"
+        # Exclude Evergreen agent processes
+        process_exclude_list="(main)"
+
+        if [ "Windows_NT" = "$OS" ]; then
+          # Get the list of Windows tasks (tasklist list format):
+          # - The second column (and beyond) has task name after the : (cut -f2- -d ':')
+          # - Remove leading whitespace with sed
+          # - Grep for the task names of interest while ignoring any names that are in the exclude list
+          # - Provide the unique process names (eliminate duplicates)
+
+          processes=$(tasklist /fo:list | grep 'Image Name:' | cut -f2- -d ':' | sed -e 's/^[ \t]*//' | grep -i -E "$process_kill_list" | grep -i -v -E "$process_exclude_list" | /usr/bin/sort -u)
+          # Kill the Windows process with the matching image name (/im) with force (/f)
+          kill_process () { echo "Killing process $1"; taskkill /im "$1" /f; }
+        else
+          # Get the list of Unix tasks (pgrep full & long):
+          # - Grep for the task names of interest while ignoring any names that are in the exclude list
+          # - Remove leading whitespace with sed
+          # - The second column (and beyond) has task name (cut -f2- -d " ")
+          # - Provide the unique process names to eliminate duplicates (sort -u)
+
+          # There are 2 "styles" of pgrep, figure out which one works
+          pgrep_list_full=$(pgrep -f --list-full ".*" 2>&1 > /dev/null)
+          if [ -z "$pgrep_list_full" ]; then
+            pgrep_list=$(pgrep -f --list-full "$process_kill_list")
+          else
+            pgrep_list=$(pgrep -f -l "$process_kill_list")
+          fi
+
+          # There are 2 "styles" of grep, figure out which one works
+          grep=grep
+          grep_extended=$(echo "a" | $grep -E "(a)" 2>&1 > /dev/null)
+          if [ ! -z "$grep_extended" ]; then
+            # Extended grep on Solaris is in the following location
+            grep=/usr/xpg4/bin/grep
+            if [ ! -f $grep ]; then
+              echo "Extended $grep does not exist"
+              return 1
+            fi
+          fi
+
+          processes=$(echo "$pgrep_list" | $grep -i -v -E "$process_exclude_list" | sed -e 's/^[ \t]*//' | cut -f2- -d ' ' | sort -u)
+          # Kill the matching Unix process with the matching image name with signal KILL (9)
+          kill_process () { echo "Killing process $1"; pkill -9 -f "^$1\$"; }
+        fi
+        # Since a full process name can have spaces, the IFS (internal field separator)
+        # should not include a space, just a LF & CR
+        IFS=$(printf "\n\r")
+        for process in $processes
+        do
+          kill_process "$process"
+        done
+
 pre:
   - command: shell.track
+  - func: "kill processes"
   - command: shell.exec
     params:
       silent: true
       script: |
-        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 cl; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
         rm -rf src /data/db/* mongo-coredumps.tgz
         exit 0
 
@@ -383,12 +441,7 @@ post:
   - command: attach.results
     params:
       file_location: src/report.json
-  - command: shell.exec
-    params:
-      silent: true
-      script: |
-        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 cl; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
-        exit 0
+  - func: "kill processes"
   - command: archive.targz_pack
     params:
       target: "mongo-coredumps.tgz"
